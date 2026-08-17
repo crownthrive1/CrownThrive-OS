@@ -1,55 +1,132 @@
-# Mintlify Starter Kit
+# CrownThrive Operating System
 
-Use the starter kit to get your docs deployed and ready to customize.
+This repository is the version-controlled, public-safe institutional knowledge and implementation map for **CrownThrive, LLC** and its Convergent Ecosystem.
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+It documents the governed relationship among CrownThrive doctrine, platforms, corridors, intellectual property, CHLOM, the Cultural Imprint Engine, the Thrive Flywheel, MM Suites, commerce, media, education, support, legal-policy architecture, data, APIs, MCP servers, automation, recovery, and future selective decentralization.
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
+## Current maturity
 
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
+- **Human program phase:** Phase 2.97 — Governance, Standards and Protection
+- **Human patch:** Phase 2.97.1 — Institutional Hardening and Re-Audit
+- **Machine release:** `2.7.9.1`
+- **Release state:** candidate until the governing pull request is reviewed and merged
+- **Deployment posture:** phased Mintlify working/review projection
+- **Next gates:** Phase 2.98 platform extraction, then Phase 2.99 private-core and machine-seed preparation
 
-## AI-assisted writing
+This repository is **not** the Phase 3 runtime, the private evidence vault, a production secrets store, or proof that every documented service is deployed. A page may be accepted institutional architecture while its corresponding capability remains `research`, `specified`, `build`, `legal_review_required`, `unverified`, or `production` in a separate state dimension.
 
-Set up your AI coding tool to work with Mintlify:
+## Institutional operating rule
+
+> Platforms perform the work. Corridors organize the work. CHLOM governs the work. The institutional record proves what happened.
+
+CrownThrive uses stable IDs, effective-dated versions, source authority, evidence classes, explicit rights, role-based access, approval gates, append-only corrections, DAIL events, tested recovery, and audience-specific projections.
+
+A website sentence, product card, historical prospectus, generated file, vendor dashboard, model output, or chat message does not independently establish current production, ownership, permission, legal status, payment, entitlement, registration, or audited fact.
+
+## Knowledge projections
+
+The target architecture is one governed knowledge control plane with multiple projections:
+
+1. **Public-safe institutional documentation** — this repository and its Mintlify projection.
+2. **Public customer Help Center** — task-oriented support and adopted public policies when released.
+3. **Authenticated role knowledge** — member, creator, affiliate, partner, developer, church, operator, and staff guidance.
+4. **Restricted institutional knowledge** — private strategy, contracts, evidence, confidential IP, security, legal, and financial records.
+5. **Machine interfaces** — versioned APIs, MCP resources/tools, policy records, and registry projections.
+
+Private material must be protected by real authentication and authorization. Hidden navigation, obscure URLs, `robots.txt`, or frontend-only role checks are not security controls.
+
+## Core architecture
+
+```text
+Doctrine + Portfolio Stewardship
+          ↓
+CrownThrive ID
+          ↓
+CrownThrive IO / API / MCP Federation
+          ↓
+CHLOM
+Rights · Rules · Roles · Revenue · Records · Remedies
+          ↓
+OpsOasis + Collab Portal + Automation Control Plane
+          ↓
+CrownThrive Support + Institutional Knowledge
+          ↓
+CrownLytics + CrownPulse + CrownInsights + ThrivePush
+          ↓
+CrownRewards + Affiliates + Ambassadors + Distribution
+          ↓
+Operating Corridors, Platforms, Imprints, Universes and MM Suites
+```
+
+The diagram describes institutional responsibility. It does not claim every integration is universally deployed.
+
+## Repository map
+
+- `standards/` — non-negotiables, records, versioning, corrections, evidence, IP, AI/ML, autonomy, MCP/API, search/SEO, run-packet, cleanup, and program standards.
+- `doctrine/` — Convergent Ecosystem, Thrive Flywheel, Hybrid Incubator, Cultural Imprint Engine, founder doctrine, canon, frameworks, and operating spine.
+- `chlom/` — CHLOM functions, papers, components, DLA/DAIL/LEX, rights/evidence, remedies, service contracts, use cases, and engineering decomposition.
+- `platforms/` — platform-specific institutional registries, beginning with Virality Music and KJV Visualized / The Sermon Toolkit.
+- `portfolio/` — entity, asset, priority, vendor, domain, brand, imprint, universe, and platform-state registers.
+- `technology/` — identity, data, private core, cloud, security, release control, MCP topology, SEO fleet, backup, and Phase 3 architecture.
+- `developers/` — API federation, endpoint discovery, adapters, SDK/sandbox, identity bridge, role surfaces, and builder governance.
+- `support/` — Help Center architecture, Legal Depot, policy applicability, SOPs, support operations, and lifecycle/sunset controls.
+- `automation/` — command structure, agent registry, permissions, evaluations, work queues, and control-plane design.
+- `workflows/` and `runbooks/` — governed execution and incident procedures.
+- `knowledge/` — source authority, recovery, contradictions, adjudications, metrics, corrections, restricted sources, and cumulative audits.
+- `changelog/` — effective-dated phase history, release records, and architecture decisions.
+
+## Development and validation
+
+The project uses Mintlify-compatible MDX and `docs.json` navigation.
+
+Run the repository governance validator before submitting changes:
 
 ```bash
-npx skills add https://mintlify.com/docs
+python3 scripts/validate_docs.py
 ```
 
-This command installs Mintlify's documentation skill for your configured AI tools like Claude Code, Cursor, Windsurf, and others. The skill includes component reference, writing standards, and workflow guidance.
+For a local Mintlify preview, use a supported Mintlify CLI workflow from the repository root after installing the required tooling:
 
-See the [AI tools guides](/ai-tools) for tool-specific setup.
-
-## Development
-
-Install the [Mintlify CLI](https://www.npmjs.com/package/mint) to preview your documentation changes locally. To install, use the following command:
-
-```
-npm i -g mint
-```
-
-Run the following command at the root of your documentation, where your `docs.json` is located:
-
-```
+```bash
 mint dev
 ```
 
-View your local preview at `http://localhost:3000`.
+The CI workflow runs the governance validator on pull requests and protected-branch updates. A navigation route must resolve to substantive MDX content. Template residue, obvious credential patterns, empty pages, duplicate navigation entries, and missing frontmatter are release failures.
 
-## Publishing changes
+## Change-control expectations
 
-Install our GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app) to propagate changes from your repo to your deployment. Changes are deployed to production automatically after pushing to the default branch.
+Every material change must:
 
-## Need help?
+- preserve stable IDs and lineage;
+- state whether it is current, historical, proposed, research, restricted, superseded, or unverified;
+- identify the governing source or decision;
+- use the correct human phase and machine release namespaces;
+- preserve prior records through corrections, amendments, or supersession;
+- respect public, community, internal, restricted, strategic, and machine-only boundaries;
+- identify affected platforms, policies, rights, APIs, data, commerce, search, support, and recovery paths;
+- include validation evidence and a next-run handoff.
 
-### Troubleshooting
+Read `AGENTS.md` before any automated or human-assisted repository work.
 
-- If your dev environment isn't running: Run `mint update` to ensure you have the most recent version of the CLI.
-- If a page loads as a 404: Make sure you are running in a folder with a valid `docs.json`.
+## Intellectual property and third-party material
 
-### Resources
-- [Mintlify documentation](https://mintlify.com/docs)
+CrownThrive-specific original documentation, architecture, frameworks, registries, diagrams, policies, and research summaries are protected under the repository's all-rights-reserved notice unless a file explicitly states otherwise.
+
+Repository access does not grant rights to use CrownThrive, CHLOM, the Cultural Imprint Engine, the Thrive Flywheel, MM Suites, platform names, imprints, universes, characters, source assets, confidential methods, or other CrownThrive intellectual property.
+
+Third-party templates, software, icons, services, and dependencies remain subject to their own licenses and terms. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+
+Use of `™` identifies a claimed brand identity; it does not represent a verified registration. Use of `®` requires a current verified registration record.
+
+## Security and responsible disclosure
+
+Do not place credentials, private contracts, customer data, payment data, private journals, security details, unreleased masters, or restricted evidence in public issues, pull requests, documentation, or source files.
+
+Report suspected security or privacy issues privately to `contact@crownthrive.com`. See `SECURITY.md`.
+
+## Ownership and contact
+
+**Institutional owner:** CrownThrive, LLC  
+**Founding Member:** Kavonte Jones Sr.  
+**Contact:** `contact@crownthrive.com`  
+**Primary ecosystem:** `https://crownthrive.com`
