@@ -171,7 +171,18 @@ def validate(root: Path) -> tuple[list[str], list[str], dict[str, int]]:
         errors.append("docs.json must contain an object at navigation")
         navigation = {}
 
-    page_paths = list(iter_navigation_pages(navigation))
+    # Current Mintlify uses navigation.groups for this project. A legacy
+    # navigation.pages field may still exist as an editor compatibility value;
+    # do not count both trees as separate public navigation.
+    primary_navigation: Any
+    if navigation.get("groups"):
+        primary_navigation = navigation["groups"]
+    elif navigation.get("pages"):
+        primary_navigation = navigation["pages"]
+    else:
+        primary_navigation = navigation
+
+    page_paths = list(iter_navigation_pages(primary_navigation))
     stats["navigation_pages"] = len(page_paths)
 
     duplicates = sorted(path for path, count in Counter(page_paths).items() if count > 1)
