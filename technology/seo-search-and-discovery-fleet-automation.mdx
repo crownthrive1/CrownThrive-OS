@@ -1,0 +1,130 @@
+---
+title: "SEO, Search and Discovery Fleet Automation"
+sidebarTitle: "SEO Fleet"
+description: "The central control plane and per-platform adapters for automated crawl, metadata, robots, sitemaps, structured data, claims, redirects, AIO and search-quality operations."
+icon: "magnifying-glass-chart"
+---
+
+# SEO, Search and Discovery Fleet Automation
+
+CrownThrive needs one search-governance system operating across many specialized websites. The fleet should automate technical maintenance while allowing platform-specific editorial strategy and audience language.
+
+## Control-plane services
+
+- host/domain registry;
+- route inventory;
+- canonical/redirect graph;
+- metadata and structured-data profiles;
+- robots/sitemap generator and validator;
+- crawl/indexability monitor;
+- broken-link and orphan-page detection;
+- duplicate/thin-page analysis;
+- public-claim consistency checker;
+- image/media metadata and accessibility checks;
+- performance/Core Web Vitals ingestion where available;
+- search-console/analytics connectors;
+- content freshness/review scheduling;
+- programmatic-page quality gates;
+- AI/AIO discovery outputs;
+- incident and correction routing.
+
+## Per-platform SEO profile
+
+```yaml
+seo_profile_id: ct.seo.virality
+platform_id: ct.platform.virality-music
+canonical_host: vm.crownthrive.com
+preferred_protocol: https
+route_classes:
+  world: index
+  character: index
+  ops: noindex
+  checkout_token: disallow_and_noindex
+structured_data:
+  organization: true
+  music_recording: true
+  book: true
+  product: true
+  event: true
+sitemaps:
+  - worlds
+  - characters
+  - books
+  - products
+  - music
+claim_registry_required: true
+last_verified_at: null
+```
+
+## Robots generation
+
+Robots policy is generated from environment and route classification:
+
+- production public routes: intentional allow/index;
+- staging/test/preview: block and noindex with real access control;
+- account/admin/ops/private API: authenticated and noindex;
+- tokenized download/checkout/callback routes: not indexed;
+- restricted evidence/private knowledge: never public merely because crawlers are blocked.
+
+A deploy must fail or alert on accidental `Disallow: /` in production or accidental indexing in non-production.
+
+## Sitemap fleet
+
+Generate sitemap indexes by platform/content type. Validate status code, canonical target, last-modified source, indexability, locale and duplicate relationships. Remove expired, private, soft-404, redirecting and tokenized URLs.
+
+High-scale properties should partition sitemaps for universes, characters, books, tracks/releases, products, rooms, studies, people, places, events, courses, articles and help content.
+
+## Metadata source
+
+Metadata must resolve from governed records rather than separate manually typed copies. A content object may define:
+
+- approved title/description;
+- canonical URL;
+- entity type;
+- audience/rating;
+- image/alt text;
+- organization/imprint;
+- authors/contributors;
+- published/modified dates;
+- structured relationships;
+- current claim IDs;
+- noindex/robots state.
+
+## Structured data
+
+Use only types supported by the actual page and evidence. Potential types include Organization, WebSite, BreadcrumbList, MusicRecording, MusicAlbum, Book, Person/fictional-character modeling where appropriate, Product, Offer, Event, Course, Article, VideoObject, FAQPage and SoftwareApplication/APIReference.
+
+Do not use structured data to make claims not visible or supported on the page.
+
+## Programmatic SEO
+
+Automation may create useful pages from real governed inventory. It must not create fabricated locations, fake profiles, unsupported reviews, duplicated city/genre pages, empty category pages or content whose sole purpose is search capture.
+
+## Cross-platform duplication
+
+When the same asset appears across CrownThrive properties, define a canonical owner and approved distribution pages. MVP, Go Flipbooks, Melanated TV, Virality Music and CrownThrive.com may describe the same work differently for audience context, but must reference the same asset ID and avoid competing identical copies.
+
+## AIO and machine discovery
+
+Publish public-safe entity facts through consistent HTML, structured data, feeds, public APIs and documentation. Maintain `llms.txt` or equivalent discovery files only as a controlled supplemental artifact, not as a replacement for robots, security or authoritative pages.
+
+## Automated workflow
+
+```text
+scheduled crawl or deployment event
+  → retrieve platform SEO profile
+  → crawl/inspect routes
+  → validate metadata/claims/links/schema
+  → compare robots and sitemaps
+  → classify findings
+  → auto-fix A2-safe derived artifacts
+  → prepare A1/A3 content or canonical changes
+  → verify
+  → publish
+  → submit/refresh search integrations where supported
+  → DAIL + CrownLytics event
+```
+
+## Phase 3 and 4
+
+Phase 3 builds the SEO profile registry, crawler/validators, event model and platform adapters. Phase 4 rolls the fleet across P0/P1 cohorts and makes current metrics, offers and status claims flow from institutional registries.

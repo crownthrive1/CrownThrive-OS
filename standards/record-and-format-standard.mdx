@@ -1,0 +1,242 @@
+---
+title: "Institutional Record and Format Standard"
+sidebarTitle: "Record Standards"
+description: "Canonical formats for IDs, versions, status, provenance, audiences, roles, evidence, APIs, policies, content, and machine-readable records."
+icon: "brackets-curly"
+---
+
+# Institutional Record and Format Standard
+
+CrownThrive records must be understandable by people and executable by machines. Prose explains the institution; structured records control consequential state.
+
+## Core principles
+
+- one stable identity per institutional object;
+- names, aliases, vendors, routes and implementations may change without changing identity;
+- current state is separate from history, target architecture and legal status;
+- accepted material changes append versions rather than overwrite history;
+- public, community, internal, restricted and strategic data remain distinguishable;
+- every material record identifies owner, authority, source, effective period and review state;
+- records are portable and vendor-independent.
+
+## Identifier standard
+
+Use globally unique, time-sortable opaque IDs such as UUIDv7 or ULID for stored instances. Human-readable namespaces may provide stable semantic aliases.
+
+| Entity | Preferred semantic namespace | Example |
+| --- | --- | --- |
+| tenant | `ct.tenant.*` | `ct.tenant.crownthrive` |
+| organization | `ct.org.*` | `ct.org.crownthrive-llc` |
+| actor/person/service | `ct.actor.*` | `ct.actor.founder.kavonte-jones-sr` |
+| role | `ct.role.*` | `ct.role.rights-steward` |
+| asset/work | `ct.asset.*` | `ct.asset.vm.receipt-night` |
+| platform | `ct.platform.*` | `ct.platform.virality-music` |
+| brand/imprint | `ct.brand.*`, `ct.imprint.*` | `ct.imprint.gospel-soul` |
+| universe/room/character | `ct.universe.*`, `ct.room.*`, `ct.character.*` | `ct.room.kjv.pulpit` |
+| product/offer | `ct.product.*`, `ct.offer.*` | `ct.offer.kjv.personal` |
+| right/claim | `ct.right.*`, `ct.claim.*` | `ct.claim.locticians.community-size` |
+| DLA/license/entitlement | `ct.dla.*`, `ct.license.*`, `ct.entitlement.*` | `ct.dla.vm.sync.01J...` |
+| policy/SOP/ADR | `ct.policy.*`, `ct.sop.*`, `ct.adr.*` | `ct.policy.api-terms` |
+| API/MCP/tool | `ct.api.*`, `ct.mcp.*`, `ct.mcp-tool.*` | `ct.mcp.chlom` |
+| component/pallet/framework | `ct.component.*`, `ct.pallet.*`, `ct.framework.*` | `ct.component.dail` |
+| source/paper | `ct.source.*`, `ct.paper.*` | `ct.paper.chlom.goldpaper` |
+| run/event/correction/case | `ct.run.*`, `ct.event.*`, `ct.correction.*`, `ct.case.*` | `ct.event.01J...` |
+
+External provider IDs are stored as namespaced references such as `stripe:pi_...`, `github:repo/...`, `soundcloud:...`; they never replace internal identity.
+
+## Common governed-record envelope
+
+```yaml
+id: ct.platform.example
+record_type: platform
+canonical_name: Example
+aliases: []
+ownership:
+  owner_org_id: ct.org.crownthrive-llc
+  control_basis: owned_documented
+classification: internal
+audiences: [operator]
+corridors: []
+relationships: []
+authority:
+  authority_class: adopted_registry
+  decision_id: null
+state:
+  lifecycle: build
+  implementation: specified
+  legal: not_applicable
+  evidence: E2_owner_attested
+versions:
+  institutional: 3
+  schema: 1.0.0
+  record: 7
+effective:
+  from: "2026-08-17T00:00:00Z"
+  until: null
+lineage:
+  supersedes: null
+  predecessor: null
+  successor: null
+sources: []
+visibility:
+  public_projection: true
+  restricted_fields: []
+review:
+  owner_role: ct.role.platform-owner
+  last_verified_at: "2026-08-17T00:00:00Z"
+  next_review_at: null
+```
+
+## Independent state dimensions
+
+Do not use one “status” field to describe everything.
+
+### Lifecycle
+
+`concept → validate → build → pilot → active → growth → license → reserve → merge → sunset → archive`
+
+### Implementation
+
+`uninspected → recovered → reconciled → decomposed → specified → prototype → test → controlled_pilot → production → maintained → degraded → superseded`
+
+### Legal
+
+`not_reviewed → research_only → legal_review_required → draft → counsel_review → jurisdiction_ready → authorized → active → suspended → expired → terminated`
+
+### Evidence
+
+`E0_unverified → E1_source_exists → E2_owner_attested → E3_operational → E4_transactional → E5_independent → E6_reconciled`
+
+### Visibility
+
+`public → community → internal → restricted → strategic → machine_only`
+
+## Version namespaces
+
+Version independently:
+
+- institutional record;
+- four-part program release;
+- schema;
+- API;
+- MCP contract/tool;
+- service;
+- deployment;
+- data migration;
+- policy;
+- legal terms;
+- rights;
+- license/DLA terms;
+- economic schedule;
+- product/content/edition/canon;
+- model/provider/prompt policy;
+- dataset/evaluation;
+- SEO/metadata profile;
+- platform adapter.
+
+API/service code may use SemVer. Institutional program releases use the CrownThrive four-part `EPOCH.PROGRAM.AUDIT.PATCH` standard.
+
+## Data classification
+
+| Class | Examples | Minimum access posture |
+| --- | --- | --- |
+| Public | approved platform summaries, public offers, published governance results | public API/site; correction history |
+| Community | authenticated profiles, member resources, non-public education | role/purpose based |
+| Internal | tasks, operational metadata, non-sensitive analytics | authorized staff/service roles |
+| Restricted | PII, KYC/KYB, contracts, payment references, private evidence, journals | need-to-know, MFA, logged access |
+| Strategic | security design, secrets context, incidents, confidential IP/economics/negotiations | named privileged roles, minimum necessary |
+| Machine-only | raw authorization state, secret references, control records | service identity and policy only |
+
+Legal hold overrides ordinary deletion. Public classification is an affirmative publication decision, not the absence of a lock.
+
+## Source and authority record
+
+Every source should identify source ID, title, creator/custodian, date, source family, original file/reference, integrity hash where appropriate, classification, authority tier, claims supported, conflicts, supersession, current review state and public-summary relationship.
+
+Preferred authority order for current claims:
+
+1. current signed/adopted governing record;
+2. verified current production/provider/transaction evidence;
+3. current machine registry and explicit founder adjudication;
+4. adopted current policy/ADR;
+5. current approved public statement;
+6. historical plans/prospectuses/papers;
+7. research/drafts/conversational context.
+
+A lower source may retain unique history without controlling current state.
+
+## Event envelope
+
+```yaml
+id: ct.event.01J...
+type: license.activated
+version: 1
+occurred_at: "2026-08-17T00:00:00Z"
+tenant_id: ct.tenant.crownthrive
+actor:
+  actor_id: ct.actor.01J...
+  role_ids: []
+subject:
+  type: license
+  id: ct.license.01J...
+correlation_id: ct.run.01J...
+causation_id: ct.event.01J...
+data: {}
+classification: internal
+integrity:
+  hash: null
+  signature_ref: null
+```
+
+Material events include authority context, minimum non-sensitive payload, correlation/causation, schema version and integrity reference. Sensitive details remain in protected evidence objects.
+
+## API request/response standard
+
+Requests and responses should support:
+
+- major URI/API version;
+- request/trace/correlation ID;
+- actor/service/tenant context;
+- idempotency key for applicable mutations;
+- ETag/version precondition for concurrency-sensitive changes;
+- UTC timestamp;
+- standardized error code/message/details;
+- pagination/cursor where applicable;
+- warnings/deprecations;
+- resulting record/event IDs;
+- environment and service version in diagnostic metadata.
+
+Accepted licenses, agreements, rights records and material decisions are immutable; changes create amendments/corrections/new versions.
+
+## Documentation format
+
+Every platform institutional package should include:
+
+1. identity and purpose;
+2. ownership/control and aliases;
+3. audiences/roles;
+4. current capability-by-capability state;
+5. products/services/content/IP;
+6. rights and legal dependencies;
+7. data classification and flows;
+8. commerce/entitlements;
+9. APIs/MCPs/webhooks/vendor engine;
+10. portals/dashboards/interfaces;
+11. SEO/search/robots/sitemaps;
+12. support/SLA/incidents;
+13. security/backup/recovery/vendor exit;
+14. metrics/claims;
+15. dependencies/handoffs;
+16. current blockers and next milestone.
+
+## Audience projections
+
+The same stable record may produce public help, member guidance, developer docs, operator runbooks, founder dashboards and machine APIs. Each projection may change vocabulary and detail for its audience while resolving to the same IDs, versions and current state.
+
+## Time and metrics
+
+Use ISO-8601 UTC timestamps for machine records. Metrics require population, method, period/as-of date, source, deduplication, actual/estimate/projection classification and owner. Do not convert a listing count into a member count or a product record into an active purchasable SKU.
+
+## Validation
+
+Structured records are schema-validated, referentially checked and linted for visibility, authority and required fields. Invalid records cannot silently publish to public sites or feed agents.

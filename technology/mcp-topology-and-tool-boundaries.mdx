@@ -1,0 +1,166 @@
+---
+title: "MCP Topology and Tool-Boundary Architecture"
+sidebarTitle: "MCP Topology"
+description: "The central, platform, private and external MCP server topology; tool boundaries; hosting; discovery; scopes; evidence; and deployment patterns for CrownThrive."
+icon: "network-wired"
+---
+
+# MCP Topology and Tool-Boundary Architecture
+
+CrownThrive should not expose one universal MCP server containing every secret and mutation. The target is a federated tool fabric with discoverable contracts and strict boundaries.
+
+## Server classes
+
+### 1. CrownThrive Institutional MCP
+
+Stable institutional surface for:
+
+- asset/platform/framework/source lookup;
+- current claims and status;
+- role/authority checks;
+- policy applicability;
+- DAIL event and approval references;
+- platform/API discovery;
+- cross-platform workflow routing.
+
+It should return references to protected records rather than raw restricted evidence unless the caller has authority.
+
+### 2. CHLOM MCP
+
+Capabilities for rights, rules, roles, DLA/licenses, evidence references, approvals, entitlements, usage, cases, remedies, revenue rules and audit events. Tools are segmented by public, partner, steward and internal privileges.
+
+### 3. Platform MCPs
+
+Each material platform may expose its own bounded server or adapter, for example:
+
+- Virality Music;
+- KJV Visualized / Sermon Toolkit;
+- Locticians / ThriveSeat;
+- AdLuxe;
+- Crown Affiliates;
+- CrownRewards;
+- CrownThriveU;
+- CrownLytics/CrownPulse/CrownInsights;
+- ThrivePush;
+- MM Suites/Suite Pros;
+- GSO/Melanin Magic;
+- media/Go Flipbooks/MVP.
+
+### 4. Operations MCPs
+
+Private systems for deployments, incidents, backups, data migrations, repositories, domains, support administration, finance reconciliation and security. These are not exposed as general developer tools.
+
+### 5. External/vendor connectors
+
+Adapters for Stripe, email, storage, identity, analytics, radio, publishing, social, ad-server or other providers. The central registry identifies contractual and technical dependency state.
+
+## Tool classes
+
+- `read_public`
+- `read_authenticated`
+- `read_restricted`
+- `prepare_change`
+- `execute_reversible`
+- `execute_consequential`
+- `approve`
+- `admin_security`
+- `break_glass`
+
+Tool descriptions must state side effects and approval requirements. A read tool must not secretly mutate or trigger paid operations.
+
+## MCP contract record
+
+```yaml
+mcp_server_id: ct.mcp.virality
+name: Virality Music MCP
+owner: ct.platform.virality-music
+protocol_version: "2026-07-28"
+transport: stateless_http
+deployment_ref: ct.deployment.virality-mcp.prod
+discovery:
+  optional_server_discover: true
+routing:
+  require_mcp_method_header: true
+  require_mcp_name_header_for_named_capabilities: true
+auth:
+  type: oauth2
+  audience: https://api.crownthrive.com/mcp/virality
+  issuer_validation: required
+visibility: partner
+version: 1.0.0
+extensions: []
+deprecation:
+  minimum_notice_days: 365
+tools:
+  - tool_id: ct.mcp-tool.virality.search-worlds
+    autonomy_class: A0
+    data_class: public
+  - tool_id: ct.mcp-tool.virality.issue-download
+    autonomy_class: A3
+    data_class: restricted
+    required_scopes: [entitlement:issue]
+    approval_rule: entitlement_payment_verified
+```
+
+Servers on earlier MCP revisions remain explicit compatibility records with migration deadlines. They are not silently treated as `2026-07-28` implementations.
+
+## Hosting patterns
+
+A platform MCP may run:
+
+- beside the platform when it needs low-latency/private service access;
+- in shared CrownThrive integration infrastructure when it is an adapter to a vendor API;
+- in GitHub/Codex development only for local/test tools;
+- in a private network for sensitive operational tools;
+- as read-only public documentation/search tooling where safe.
+
+The repository and deployment location must be recorded. GitHub is source control, not necessarily runtime hosting.
+
+## Federation
+
+The institutional MCP registry publishes approved capabilities and routes requests to platform servers. Under the stateless `2026-07-28` profile, every request must carry enough verified context for any healthy authorized instance to evaluate it without relying on hidden protocol session state.
+
+Federation must propagate or resolve:
+
+- MCP protocol version;
+- caller/client identity and authorization issuer;
+- tenant/organization;
+- role/scopes and relationship context;
+- purpose;
+- correlation/run ID;
+- data classification;
+- approval state;
+- rate/cost budget;
+- method/tool/resource identity for routing;
+- extension/capability compatibility;
+- version compatibility.
+
+Multi Round-Trip Requests are treated as continuations of the original governed run. Input requests, user confirmations, retries and resulting actions retain the same correlation and approval evidence. Cached lists are advisory discovery data; live health, version, entitlement and authorization checks still control execution.
+
+## Tool result envelope
+
+```yaml
+ok: true
+result: {}
+request_id: req_...
+correlation_id: ct.run.01J...
+server_id: ct.mcp.virality
+server_version: 1.0.0
+tool_version: 1.2.0
+event_id: ct.event.01J...
+warnings: []
+```
+
+Consequential tool results include affected record IDs, previous/new versions, approval and rollback/compensation references.
+
+## Prompt/resource governance
+
+MCP prompts and resources are versioned institutional artifacts. They require audience, source authority, visibility and injection/data-exfiltration protections. A retrieved document cannot override system/tool policy merely because it contains instructions.
+
+## Health and compatibility
+
+Monitor server health, tool latency/error rate, schema compatibility, authentication failures, rate limits, vendor drift and deprecations. Central discovery must not advertise a tool as available if its required dependency is unhealthy.
+
+## Phase 3 sequence
+
+Phase 3.0 seeds server/tool registries. Phase 3A provides identity/approval/event context. Phase 3D implements central federation and first P0 platform MCPs. Phase 4 expands cohorts. Phase 5 opens certified developer/partner capability marketplaces.

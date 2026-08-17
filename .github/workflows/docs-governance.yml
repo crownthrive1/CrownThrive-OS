@@ -1,0 +1,59 @@
+name: Documentation Governance
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "**/*.mdx"
+      - "**/*.json"
+      - "**/*.svg"
+      - "scripts/**"
+      - ".github/workflows/docs-governance.yml"
+  push:
+    branches:
+      - main
+      - "admin-mcp/**"
+    paths:
+      - "**/*.md"
+      - "**/*.mdx"
+      - "**/*.json"
+      - "**/*.svg"
+      - "scripts/**"
+      - ".github/workflows/docs-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate institutional documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify validator syntax
+        run: python -m py_compile scripts/validate_docs.py
+
+      - name: Run CrownThrive governance validator
+        run: python scripts/validate_docs.py
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
