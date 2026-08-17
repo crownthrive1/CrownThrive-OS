@@ -55,10 +55,16 @@ REQUIRED_ROOT_FILES = {
     Path("AGENTS.md"),
     Path("LICENSE"),
     Path("THIRD_PARTY_NOTICES.md"),
+    Path("SECURITY.md"),
+    Path("CONTRIBUTING.md"),
+    Path("TRADEMARKS.md"),
     Path("docs.json"),
     Path("logo/light.svg"),
     Path("logo/dark.svg"),
     Path("favicon.svg"),
+    Path(".github/CODEOWNERS"),
+    Path(".github/pull_request_template.md"),
+    Path(".github/workflows/docs-governance.yml"),
 }
 
 FRONTMATTER_REQUIRED_FIELDS = {"title", "description"}
