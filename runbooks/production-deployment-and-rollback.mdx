@@ -1,0 +1,152 @@
+---
+title: "Production Deployment and Rollback"
+description: "The operational runbook for approving, deploying, validating, monitoring, and rolling back CrownThrive production changes."
+sidebarTitle: "Deploy & Rollback"
+icon: "rocket"
+keywords: ["production deployment", "rollback", "release", "smoke test"]
+---
+
+# Production deployment and rollback
+
+Use this runbook for controlled production releases across CrownThrive websites, APIs, documentation, commerce, and supporting services.
+
+## Preconditions
+
+Before deployment, confirm:
+
+- governed issue or release ID exists
+- scope and acceptance criteria are clear
+- branch and commit are identified
+- required tests pass
+- rights, privacy, security, commerce, or publishing approvals exist where applicable
+- environment variables and secrets are present without exposing values
+- migrations have rollback or reconciliation plans
+- last known good release is recorded
+- monitoring and smoke-test owners are assigned
+
+## Release record
+
+Record:
+
+```yaml
+release_id: rel_2026_001
+platform: vm.crownthrive.com
+environment: production
+commit: git-sha-or-build-id
+previous_release: rel_2026_000
+operator: website-release-agent
+approver: human-approver
+started_at: UTC timestamp
+rollback_target: rel_2026_000
+```
+
+## Deployment sequence
+
+1. Freeze unrelated high-risk changes.
+2. Confirm production health before deployment.
+3. Apply configuration or migration prerequisites.
+4. Deploy the approved build.
+5. Confirm build and service startup.
+6. Run route, API, authentication, commerce, and content smoke tests according to scope.
+7. Compare public and registry states.
+8. Monitor errors, latency, payment events, and customer impact.
+9. Mark the release verified or initiate rollback.
+
+## Minimum smoke tests
+
+For a public site:
+
+- homepage and primary navigation
+- authentication and account entry
+- search and sitemap
+- critical forms
+- mobile and desktop rendering
+- legal and support routes
+- error and 404 handling
+
+For commerce:
+
+- product page
+- server-side price mapping
+- checkout creation
+- signed webhook
+- entitlement
+- protected delivery
+- refund or dispute behavior if affected
+
+For documentation:
+
+- navigation tree
+- page rendering
+- internal links
+- code blocks and diagrams
+- public/private content scan
+- search indexing intent
+
+## Rollback triggers
+
+Rollback or disable the affected feature when:
+
+- authentication or authorization fails
+- payment or entitlement integrity fails
+- protected data is exposed
+- critical routes return errors
+- required migrations cannot reconcile
+- customer-impact errors exceed the approved threshold
+- public claims or product states become materially false
+- monitoring is unavailable for a high-risk release
+
+## Rollback sequence
+
+1. Declare rollback and preserve incident evidence.
+2. Stop additional unsafe traffic or automation where necessary.
+3. Revert to the last known good build or disable the affected feature flag.
+4. Reverse or reconcile migrations using the approved procedure.
+5. Re-run critical smoke tests.
+6. Confirm payment, entitlement, account, and public states.
+7. Communicate customer impact where required.
+8. Update the issue, release record, incident, and changelog.
+
+## Database and state cautions
+
+A code rollback does not automatically reverse:
+
+- database writes
+- Stripe objects
+- entitlements
+- credits ledger entries
+- emails or notifications
+- published files
+- external API actions
+- rights or license records
+
+These require explicit reconciliation.
+
+## Post-deployment monitoring
+
+Monitor:
+
+- HTTP and application errors
+- authentication failures
+- webhook failures
+- payment and entitlement mismatches
+- latency
+- broken assets
+- search and sitemap regressions
+- support tickets
+- conversion anomalies
+
+## Closure
+
+A deployment closes only when:
+
+- production smoke tests pass
+- registries and public states agree
+- monitoring is stable
+- required downstream systems are reconciled
+- release notes and known issues are updated
+- rollback readiness remains documented
+
+<Warning>
+  A successful build is not a successful release. Production behavior, records, and customer outcomes must also be verified.
+</Warning>

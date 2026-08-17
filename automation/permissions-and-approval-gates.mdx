@@ -1,0 +1,211 @@
+---
+title: "Permissions and Human Approval Gates"
+description: "The role, tool, data, financial, rights, publishing, security, and irreversible-action controls applied to CrownThrive automation."
+sidebarTitle: "Permissions & Approvals"
+icon: "user-lock"
+keywords: ["human approval", "agent permissions", "least privilege", "automation governance"]
+---
+
+# Permissions and human approval gates
+
+CrownThrive applies least privilege to people, agents, services, and integrations.
+
+A connected tool is not an unrestricted permission grant. Access is determined by:
+
+- role
+- task
+- data classification
+- environment
+- action type
+- financial threshold
+- rights scope
+- current approval state
+
+## Permission dimensions
+
+### Data permissions
+
+Define which classifications an actor may read, create, update, export, or summarize:
+
+- `PUBLIC`
+- `INTERNAL`
+- `CONFIDENTIAL`
+- `RESTRICTED`
+- `SEALED`
+
+### Tool permissions
+
+Separate capabilities such as:
+
+- search
+- read
+- draft
+- create test data
+- update draft data
+- publish
+- delete
+- refund
+- payout
+- rotate credentials
+- change roles
+
+### Environment permissions
+
+- local or sandbox
+- development
+- test
+- staging
+- production read
+- production write
+- production destructive
+
+### Financial permissions
+
+Set explicit thresholds for:
+
+- live price changes
+- discounts and promotions
+- refunds
+- credits adjustments
+- application fees
+- invoices
+- payouts or transfers
+
+### Rights and publishing permissions
+
+Separate:
+
+- personal-use product activation
+- institutional license approval
+- synchronization approval
+- public-performance approval
+- character or likeness use
+- adaptation and development rights
+- protected-identity publishing
+
+## Mandatory human approvals
+
+Human approval is required for:
+
+- publishing a new public product
+- activating a live checkout for a new rights class
+- changing a live price beyond the approved operating threshold
+- issuing a refund or financial adjustment above the delegated limit
+- granting commercial, institutional, broadcast, performance, character, voice, source-file, or adaptation rights
+- signing contracts or externally binding agreements
+- deleting customer, source, rights, financial, or audit records
+- rotating production credentials
+- changing super-admin or privileged access
+- deploying destructive or high-risk database migrations
+- publishing protected identities, child-related information, or confidential partner material
+- making material public claims about revenue, clients, partners, audience, or verification
+- overriding a rights, security, privacy, accessibility, or quality hold
+
+## Two-person control
+
+Two-person review is recommended for:
+
+- production credential rotation
+- high-value refunds or payouts
+- rights grants with material value
+- destructive data changes
+- super-admin access changes
+- protected-identity releases
+- incident closure after a material security or payment failure
+
+## Approval request standard
+
+```yaml
+approval_id: apr_123
+subject_type: product-release
+subject_id: vm-to-001
+version: 2
+requested_action: activate-live-checkout
+requested_by: commerce-agent
+evidence:
+  - product-manifest
+  - rights-approval
+  - checkout-test
+  - entitlement-test
+risk_class: controlled-production
+expires_at: optional
+```
+
+The decision record adds:
+
+```yaml
+decision: approved
+approver: commerce-manager
+conditions:
+  - launch-price-fixed
+  - monitor-first-10-orders
+decided_at: UTC timestamp
+```
+
+## Delegated low-risk actions
+
+Agents may perform low-risk actions without individual approval when the registry expressly permits them, such as:
+
+- updating draft documentation
+- creating GitHub issues
+- running tests
+- reconciling read-only processor state
+- preparing product manifests
+- drafting customer responses from approved knowledge
+- identifying broken links
+- proposing metadata changes
+- creating non-production branches
+
+## Denial and expiration
+
+An approval may be:
+
+- approved
+- approved with conditions
+- denied
+- expired
+- revoked
+- superseded
+
+Expired or revoked approvals must not remain reusable.
+
+## Tool-token separation
+
+Master credentials should remain in server-side secret management. Users and agents should receive scoped, revocable tokens or tool permissions.
+
+Never provide artists, customers, or ordinary agents with:
+
+- master CrownThrive IO credentials
+- Stripe secret keys
+- webhook signing secrets
+- storage master keys
+- unrestricted database service keys
+- super-admin session tokens
+
+## Break-glass access
+
+Emergency access should be:
+
+- rare
+- time-limited
+- reason-coded
+- fully logged
+- reviewed after use
+- automatically revoked
+
+## Monitoring
+
+Monitor for:
+
+- permission expansion
+- repeated denied actions
+- unusual production reads
+- destructive-action attempts
+- privilege changes
+- unexpected tool use
+- access outside the task scope
+- agent behavior inconsistent with evaluations
+
+<Warning>
+  Never solve an operational blocker by silently broadening an agent’s permissions. Escalate, approve, scope, execute, and record.
+</Warning>

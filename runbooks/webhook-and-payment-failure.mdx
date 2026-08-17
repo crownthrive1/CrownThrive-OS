@@ -1,0 +1,166 @@
+---
+title: "Webhook and Payment Failure"
+description: "The tactical runbook for diagnosing and correcting Stripe webhook, payment, order, entitlement, refund, dispute, and protected-delivery failures."
+sidebarTitle: "Webhook / Payment Failure"
+icon: "circle-exclamation"
+keywords: ["webhook failure", "Stripe troubleshooting", "payment failure", "entitlement"]
+---
+
+# Webhook and payment failure
+
+Use this runbook when a Stripe-backed CrownThrive transaction does not produce the expected order, entitlement, access state, refund state, or customer experience.
+
+## Immediate questions
+
+1. Did Stripe create the Checkout Session?
+2. Did the customer complete payment?
+3. Which Stripe object and event represent the authoritative state?
+4. Did the production webhook receive the event?
+5. Did signature verification pass?
+6. Did idempotent processing complete?
+7. Did the product registry resolve the correct SKU and version?
+8. Was the order created exactly once?
+9. Was the entitlement created or updated correctly?
+10. Can the approved asset be delivered through the protected route?
+
+## Common symptoms
+
+### Payment succeeded, no access
+
+Check:
+
+- webhook delivery and response
+- signature-secret/environment mismatch
+- event handler logs
+- product or Price mapping
+- entitlement transaction failure
+- customer-account association
+- storage asset mapping
+
+Do not create an entitlement from the browser redirect without verifying the authoritative paid event.
+
+### Access exists without valid payment
+
+Immediately:
+
+- suspend the affected entitlement
+- determine whether the event or order was forged, duplicated, or incorrectly classified
+- inspect client-trusted fields
+- review webhook signature and product mapping
+- assess scope across other orders
+
+Escalate as a payment-integrity incident.
+
+### Duplicate order or entitlement
+
+Check:
+
+- event-ID uniqueness
+- Checkout Session or PaymentIntent uniqueness
+- idempotency keys
+- transaction boundaries
+- retry behavior
+- asynchronous and synchronous handler overlap
+
+Preserve one valid entitlement per legitimate purchase and reconcile duplicates without deleting audit history.
+
+### Refund or dispute not reflected
+
+Check:
+
+- subscribed event types
+- refund or dispute event delivery
+- mapping from charge or PaymentIntent to order
+- entitlement suspension or revocation logic
+- customer account and download-token cache
+
+### Protected file fails
+
+Check:
+
+- entitlement status
+- download allowance
+- token expiration
+- token-to-product and version mapping
+- storage object key
+- private storage permissions
+- file existence and checksum
+- response headers and range behavior where relevant
+
+## Safe diagnostic order
+
+1. Read Stripe state.
+2. Read CrownThrive order state.
+3. Read entitlement state.
+4. Read delivery state.
+5. Compare product and version mapping.
+6. Review recent deployment and configuration changes.
+7. Reproduce in test or a safe controlled production case.
+8. Repair through an idempotent reconciliation path.
+
+## Do not do during diagnosis
+
+- do not rotate the webhook secret without confirming the current environment and endpoint
+- do not create duplicate Stripe Products or Prices to bypass mapping errors
+- do not edit live customer records without preserving prior state
+- do not expose raw payment payloads in public tickets or documentation
+- do not refund merely because access failed before investigating whether the purchase remains valid and recoverable
+- do not open checkout broadly when the fulfillment chain is unverified
+
+## Reconciliation record
+
+```yaml
+reconciliation_id: rec_123
+stripe_event_id: evt_...
+checkout_session_id: cs_...
+order_id: ord_...
+entitlement_id: ent_...
+product_id: canonical-product-id
+version: 2
+observed_mismatch: paid-without-entitlement
+action: replay-verified-event
+result: reconciled
+reviewed_by: commerce-manager
+```
+
+## Customer response
+
+Tell the customer:
+
+- whether payment succeeded
+- whether access is active, pending, suspended, or refunded
+- what action CrownThrive completed
+- what the customer should do next
+- how to contact support
+
+Do not expose internal credentials, processor payloads, or security details.
+
+## Recovery validation
+
+After repair, verify:
+
+- original order
+- fresh purchase
+- duplicate webhook
+- closed browser before success page
+- access reissue
+- expired token
+- download limit
+- refund
+- dispute
+- repurchase
+
+## Escalation
+
+Escalate to QA/Security and founder or commerce authority when:
+
+- credentials may be compromised
+- unauthorized access occurred
+- multiple customers are affected
+- financial totals disagree
+- a processor or platform-level outage exists
+- a legal or dispute response is required
+
+<Warning>
+  Preserve the current working endpoint and secret unless evidence shows they must change. Uncoordinated recreation can turn one mapping issue into a full production outage.
+</Warning>
