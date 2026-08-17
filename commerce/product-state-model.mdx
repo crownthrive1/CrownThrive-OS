@@ -1,0 +1,164 @@
+---
+title: "Product State Model"
+description: "The governed lifecycle states and activation gates used for CrownThrive books, printables, readers, print editions, licenses, and services."
+sidebarTitle: "Product States"
+icon: "timeline"
+keywords: ["product states", "release gates", "digital active", "print ready", "GSO"]
+---
+
+# Product state model
+
+A CrownThrive product is not represented by one broad status. Content, rights, digital delivery, hosted reading, print, licensing, and commerce may progress independently.
+
+## Core lifecycle
+
+```text
+IDEA
+→ SOURCE_INCOMPLETE
+→ CONTENT_COMPLETE
+→ CANON_REVIEW
+→ RIGHTS_REVIEW
+→ RIGHTS_CONFIRMED
+→ DIGITAL_PREFLIGHT
+→ DIGITAL_READY
+→ DIGITAL_ACTIVE
+```
+
+### State definitions
+
+| State | Meaning |
+| --- | --- |
+| `IDEA` | A governed concept exists, but no complete source is represented. |
+| `SOURCE_INCOMPLETE` | Work exists, but the canonical source or required components are incomplete. |
+| `CONTENT_COMPLETE` | The content is complete enough to enter formal review. |
+| `CANON_REVIEW` | Continuity, character, cultural, edition, and source consistency are being checked. |
+| `RIGHTS_REVIEW` | Ownership, contributor, art, music, likeness, AI provenance, and usage permissions are being verified. |
+| `RIGHTS_CONFIRMED` | Required rights records exist for the intended release scope. |
+| `DIGITAL_PREFLIGHT` | File quality, metadata, accessibility, product mapping, and delivery requirements are being tested. |
+| `DIGITAL_READY` | The digital product is complete but not necessarily active for sale. |
+| `DIGITAL_ACTIVE` | The approved direct digital transaction and fulfillment path is active and tested. |
+
+## Print lifecycle
+
+```text
+PRINT_SOURCE_REQUIRED
+→ PRINT_SOURCE_READY
+→ PRINT_PREFLIGHT
+→ PRINT_PROOF_REQUIRED
+→ PRINT_APPROVED
+→ PRINT_ACTIVE
+```
+
+A PDF filename does not establish print readiness. Print approval requires the appropriate canonical source, trim, margins, bleed, image quality, fonts, cover/spine calculations where applicable, proof state, and approved fulfillment path.
+
+## Hosted-reader lifecycle
+
+```text
+READER_PENDING
+→ READER_UPLOADED
+→ READER_VERIFIED
+→ READER_ACTIVE
+```
+
+A hosted-reader state does not activate downloadable, print, or commercial-rights states.
+
+## Good Shit Only lifecycle
+
+```text
+RIGHTS_LISTING_PENDING
+→ RIGHTS_LISTING_REVIEW
+→ RIGHTS_LISTING_VERIFIED
+→ GSO_ACTIVE
+```
+
+The GSO listing must match the approved rights class, restrictions, price, term, territory, permitted use, and fulfillment evidence.
+
+## Stripe Direct activation gate
+
+A paid first-party digital product may be marked `DIGITAL_ACTIVE` only when the required fields exist and pass validation:
+
+- canonical product record
+- unique SKU
+- title, description, category, universe, and audience
+- approved version
+- governed cover or thumbnail
+- final fulfillment file
+- private storage mapping
+- price and currency
+- Stripe Product and Price mapping
+- rights class and terms
+- checkout mapping
+- signed-webhook fulfillment
+- entitlement creation
+- protected delivery
+- download allowance where used
+- refund and dispute behavior
+- success, account, and support routes
+- search and sitemap updates where public
+
+If a required dependency is missing, the public status must remain inactive, pending, or unavailable.
+
+## Multi-state example
+
+One edition may validly be:
+
+```yaml
+digital: DIGITAL_ACTIVE
+reader: READER_ACTIVE
+print: PRINT_PROOF_REQUIRED
+gso: RIGHTS_LISTING_PENDING
+```
+
+The public interface should show each relevant state plainly rather than collapsing them into “available.”
+
+## Public status language
+
+Use customer-facing language such as:
+
+- Available now
+- Instant download
+- Read now
+- Hosted reader pending
+- Print proof pending
+- Print edition unavailable
+- License through GSO
+- Rights inquiry
+- In production
+- Forthcoming
+- Development property
+- Legacy edition
+
+Do not expose raw internal state codes to ordinary customers unless they are inside an operator or admin environment.
+
+## State transitions
+
+Every transition should record:
+
+- prior state
+- new state
+- actor
+- timestamp
+- source or evidence
+- approval or rejection reason
+- affected dependencies
+- correlation or release ID
+
+## Rejection and hold states
+
+Recommended exceptional states:
+
+- `REJECTED_CANON`
+- `RIGHTS_HOLD`
+- `SECURITY_HOLD`
+- `QUALITY_HOLD`
+- `PAYMENT_HOLD`
+- `FULFILLMENT_HOLD`
+- `DEPRECATED`
+- `REVOKED`
+- `ARCHIVED`
+
+A hold should identify the owner and condition required for release.
+
+<Warning>
+  Do not change public availability because a person believes the work is “basically done.” Availability is the result of the complete governed state chain.
+</Warning>
