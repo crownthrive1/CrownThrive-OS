@@ -7,38 +7,189 @@ icon: "database"
 
 # Centralized, Partitioned and Decentralized Data Roadmap
 
-CrownThrive needs enough centralization to operate coherently and enough partitioning to protect people, rights, money, evidence, and platform-specific information. Decentralization is a later architectural choice, not a substitute for disciplined data governance.
+CrownThrive requires centralized institutional coherence, partitioned operational security and a credible path to selective decentralization. The objective is not one database or one chain. The objective is one governed institution whose records can be trusted, moved, recovered and progressively distributed.
 
-## Target model
+## Architecture principles
 
-### Institutional control plane
+- one authoritative institutional vocabulary and stable-ID graph;
+- one authoritative record per aggregate, with explicit cross-domain grants;
+- operational stores partitioned by domain, tenant, purpose and classification;
+- cross-domain exchange through versioned APIs/events;
+- restricted evidence separated from public summaries;
+- secrets and keys separated from ordinary application data;
+- append-only correction and material event history;
+- portable formats and tested export;
+- cloud-first operational usefulness;
+- decentralization only where it adds verifiability, resilience, interoperability, settlement or governance value.
 
-A central registry/control layer holds stable IDs, source authority, platform state, policy references, API/MCP inventory, roles, approval rules, dependency metadata, public claims, and references to distributed records.
+## Layer 1 — Institutional control plane
 
-### Partitioned service data
+Holds or references:
 
-Customer identities, health/sensitive records if ever applicable, payments, entitlements, licenses, evidence, support cases, creator data, analytics, ads, education records, MM Suites operations and platform-specific application state should be separated by service/domain and data classification. Cross-domain access occurs through governed APIs/events rather than universal database credentials.
+- organizations, people/service actors and roles;
+- platforms, brands, imprints, universes, rooms and assets;
+- source authority and evidence references;
+- versions, status, aliases, predecessors/successors;
+- policies, approvals and authority;
+- API/MCP/domain/repository/deployment/vendor inventory;
+- public claims and metrics definitions;
+- data-flow and dependency maps;
+- component/pallet/paper/IP registries;
+- run packets and Phase 3–5 state.
 
-### Restricted evidence vaults
+This layer should not store every customer transaction or private source file.
 
-Contracts, signed documents, private masters, investigations, legal records, security evidence, secrets, highly sensitive identity material and protected CHLOM implementation details require separately controlled storage and audit.
+## Layer 2 — Partitioned operational domains
 
-### Cloud posture
+### Identity domain
 
-The default operational direction is cloud-hosted, portable infrastructure with infrastructure-as-code where feasible, managed databases/object storage where justified, secret management, encrypted backups, observability, tested restore, and vendor-exit procedures.
+Accounts, external subjects, account links, authentication assurance, consent, role assignments, organizations and recovery.
 
-### Selective decentralization
+### Rights/CHLOM domain
 
-Later phases may decentralize proofs, attestations, identifier resolution, settlement, governance, licensing or other components where doing so improves resilience, interoperability, verifiability or market structure. Decentralization is evaluated component-by-component.
+Assets, claims, evidence references, rights, policies, DLA/licenses, usage, entitlements, revenue rules, cases and remedies.
 
-## Centralization rule
+### Commerce domain
 
-Centralized does not mean one giant database. CrownThrive should have one institutional vocabulary/control plane with logically and physically partitioned operational stores.
+Products/offers/prices, orders, provider references, subscriptions, refunds, disputes, entitlements, downloads and statements.
 
-## Data movement
+### Media/content domain
 
-Every cross-platform data flow should specify purpose, source, destination, legal/policy basis, classification, minimum fields, retention, consent where applicable, event contract, failure behavior and owner.
+Works, masters, editions, universes, characters, canon, releases, schedules, products and distribution.
 
-## Self-sustaining target
+### Ministry/education domain
 
-Automation should monitor schema drift, failed events, backup health, storage thresholds, stale integrations, API changes, access anomalies and recovery readiness with minimal human intervention, escalating only when policy requires judgment.
+Scripture-content relationships, rooms, studies, curricula, plans, organizations, courses, certificates and private learner/member records.
+
+### Advertising/growth domain
+
+Campaigns, advertisers/publishers, placements, creator deliverables, attribution, affiliates, rewards and messaging.
+
+### MM Suites/phygital domain
+
+Locations, suites/seats, operators, Suite Pros, bookings, products, training, territories, buildout, incidents and impact.
+
+### Support/knowledge domain
+
+Tickets, articles, policies, SOPs, runbooks, source lineage, feedback and search indexes.
+
+### Analytics domain
+
+Normalized events, derived aggregates, approved metrics and model outputs. Raw restricted payloads remain in source domains unless explicitly needed.
+
+## Layer 3 — Restricted evidence and IP vaults
+
+Separate storage for:
+
+- contracts, assignments, licenses and signed agreements;
+- private rights/evidence;
+- customer/identity verification;
+- investigations and legal holds;
+- unpublished masters/source files;
+- trade secrets, economic models and protected CHLOM internals;
+- sensitive journals/reflections;
+- incident/security evidence;
+- privileged/legal communications where applicable.
+
+Store integrity hashes/references in the control plane; do not duplicate sensitive payloads into broad indexes.
+
+## Layer 4 — Secret and key plane
+
+- API keys/OAuth client secrets;
+- database credentials;
+- webhook signing secrets;
+- encryption/signing keys;
+- recovery/break-glass credentials;
+- deployment secrets;
+- provider tokens.
+
+Use a secret manager/KMS; applications and docs receive references/leases. Access is logged and rotated.
+
+## Layer 5 — Backup and continuity plane
+
+- database PITR/snapshots;
+- object-version replication;
+- immutable/off-provider institutional exports;
+- repository mirrors/tags;
+- DNS/domain inventory;
+- provider exports;
+- restore environments;
+- recovery authority and runbooks;
+- recurring restoration tests.
+
+## Data-flow contract
+
+Every cross-domain flow identifies:
+
+```yaml
+flow_id: ct.data-flow.01J...
+source_domain: commerce
+destination_domain: chlom
+purpose: verify_paid_entitlement
+legal_policy_basis: ct.policy.digital-products.v3
+classification: restricted
+fields:
+  - order_id
+  - subject_id
+  - product_id
+  - payment_status
+retention: event_reference_only
+consent_required: false
+event_type: order.payment_confirmed
+failure_behavior: hold_entitlement
+owner: ct.role.commerce-integration
+```
+
+No “sync all data” integrations without field/purpose design.
+
+## Tenant and relationship isolation
+
+Use row-level tenant controls, organization boundaries, object relationships and policy-as-code. A role in one tenant/platform does not automatically grant another. Cross-tenant access requires explicit relationship/grant and DAIL evidence.
+
+## Data retention and deletion
+
+Retention is based on data class, purpose, legal/contractual requirement, security, user rights and historical value. Legal hold overrides deletion. Deletion should propagate to derived stores where required while retaining lawful minimum audit references.
+
+## Cloud-first phase
+
+Use portable managed services where they reduce operational risk: PostgreSQL, versioned object storage, queues/event bus, durable workflows, search, observability, KMS and infrastructure-as-code. Maintain provider abstraction and export.
+
+## Federated/sovereign phase
+
+As CrownThrive matures:
+
+- self-host or multi-cloud critical control services;
+- isolate key custody;
+- maintain independent registries/exports;
+- support organization-managed nodes or data partitions where justified;
+- use public/verifiable proofs rather than publishing private data;
+- allow certified external verifiers/oracles;
+- preserve interoperability across platforms and licensees.
+
+## Selective decentralization candidates
+
+- DID/VC resolution;
+- proof/attestation anchoring;
+- public license/rights verification;
+- external verifier/oracle networks;
+- multiparty settlement;
+- governance approvals;
+- LEX transaction proofs;
+- cross-institution credential/entitlement portability.
+
+## What should not be indiscriminately decentralized
+
+PII, passwords, private evidence, contracts, journals, payment credentials, security incidents, confidential economics and material that cannot be lawfully corrected/deleted should not be placed on immutable public ledgers.
+
+## Automation and drift control
+
+Watch schema compatibility, missing events, cross-domain leakage, stale replicas, backup health, storage thresholds, access anomalies, API/provider changes, retention violations and restore readiness. Automatically quarantine or degrade when policy allows; escalate consequential corrections.
+
+## Phase sequence
+
+- **2.98:** discover current stores, vendors, APIs, flows and exports;
+- **2.99:** decide private core, IaC, secret manager, tenancy and event topology;
+- **3.0:** seed control plane and schemas;
+- **3A–D:** implement services and governed flows;
+- **4:** federate platform cohorts;
+- **5:** selectively distribute proofs, identity, licensing, settlement and governance where validated.

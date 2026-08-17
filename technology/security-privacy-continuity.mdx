@@ -5,47 +5,189 @@ description: "The institutional controls for least privilege, secrets, backups, 
 icon: "shield-halved"
 ---
 
-# Security, Privacy and Continuity
+# Security, Privacy, Zero Trust and Continuity
 
-CrownThrive's operating spine must be designed so that growth does not increase institutional fragility. Security, privacy, recoverability, and vendor independence are therefore operating requirements rather than post-launch enhancements.
+CrownThrive's operating spine must grow without becoming institutionally fragile. Security, privacy, recoverability, supply-chain assurance and vendor independence are release requirements—not post-launch enhancements.
 
-## Baseline controls
+## Security principles
 
-Every production system should have:
+- never trust solely because an actor/service is inside a network;
+- authenticate and authorize every consequential request;
+- use least privilege, short-lived access and relationship/purpose checks;
+- separate public, community, internal, restricted, strategic and machine-only data;
+- isolate tenants and organizations;
+- protect secrets and signing keys outside source/docs;
+- preserve evidence without unnecessarily exposing payloads;
+- make releases reproducible and attributable;
+- detect, contain, recover and learn;
+- maintain provider exit and off-provider recovery.
 
-- named accountable owner;
-- environment classification;
-- least-privilege roles;
-- MFA where supported;
-- secret isolation and rotation process;
-- data inventory and privacy classification;
-- backup/export method;
-- recovery objective and rollback procedure;
-- dependency/vendor record;
-- incident and escalation path;
-- lifecycle and sunset procedure;
-- change log and release evidence.
+## Identity and access
 
-## Secrets
+Every human, agent and service uses a stable identity. Controls include:
 
-Credentials, recovery phrases, API keys, webhook secrets, database passwords, signing keys, HSM/KMS material, and super-admin tokens never belong in public Mintlify documentation or public repositories.
+- MFA for privileged human access;
+- service identities/workload credentials;
+- no shared admin accounts as the normal path;
+- role, relationship, resource and purpose authorization;
+- assurance/step-up for sensitive actions;
+- time-bound delegation;
+- periodic access recertification;
+- offboarding and token/session revocation;
+- separate break-glass access with alerts and after-action review;
+- no platform role automatically granting institution-wide authority.
 
-## Institutional continuity
+## Tenant and domain isolation
 
-No external SaaS should hold the sole copy of critical institutional knowledge, roadmap history, rights records, customer data, source masters, or operational evidence. Exportability and independent backups are required for critical systems.
+Use database row-level or equivalent tenant controls, service-level authorization, organization/asset relationships and policy enforcement. Cross-tenant data access requires explicit grant and DAIL evidence. Test isolation in APIs, search, caches, object storage, queues, analytics, backups and AI retrieval.
 
-## Privacy
+## Secret and key management
 
-Use purpose limitation, data minimization, explicit consent where required, retention schedules, access logging, and deletion/export workflows. High-risk datasets require stronger boundaries and must not be copied into analytics or AI context merely because an integration makes it technically possible.
+Secrets include API/OAuth credentials, database passwords, webhook secrets, encryption/signing keys, recovery codes, super-admin tokens, private keys and provider tokens.
 
-## Incidents
+Required controls:
 
-Incidents should be classified by impact and routed through an event-driven response model:
+- managed secret store/KMS/HSM abstraction appropriate to risk;
+- secret references, never values, in configuration/docs;
+- environment and service scoping;
+- short-lived/dynamic credentials where feasible;
+- rotation schedule and event-driven rotation on compromise/change;
+- no secrets in URLs, prompts, logs, screenshots or tickets;
+- secret scanning in repositories and CI;
+- dual control for high-value signing/recovery keys;
+- backup/recovery and key-loss plan;
+- usage/access logging;
+- emergency revocation.
+
+## Data protection
+
+- TLS in transit;
+- encryption at rest according to provider/system capability;
+- field/object-level protection for high-risk data where justified;
+- minimum field return through APIs/MCPs;
+- tokenization/pseudonymous references for analytics;
+- no private journal/evidence/body content in ordinary telemetry;
+- signed/expiring download and evidence access;
+- integrity hashes/signatures where useful;
+- data-loss-prevention checks on publication/export;
+- secure deletion or cryptographic erasure where applicable and permitted.
+
+## Privacy lifecycle
+
+For each data class record purpose, collection source, lawful/policy basis, consent, sharing/processors, retention, access, correction, export, deletion, legal hold, automated-decision use and cross-border/residency. Data collected for one platform purpose does not become general ecosystem training/advertising data.
+
+Sensitive examples include identity verification, children/minors, private reflections, precise location, payment references, contracts, customer communications, investigations and unpublished source material.
+
+## Software supply chain
+
+Critical releases should identify:
+
+- source repository/commit/tag;
+- branch protection/review;
+- dependency lock and vulnerability status;
+- builder/workflow identity;
+- build inputs and artifact digest;
+- provenance/SBOM where adopted;
+- test/evaluation results;
+- approval;
+- deployment/environment;
+- migration/configuration/secret-reference versions;
+- release event and rollback target.
+
+Third-party dependencies/plugins/themes/images/containers/actions are inventoried, pinned/verified according to profile, monitored and replaceable. Avoid arbitrary production scripts and dashboard-only code without source history.
+
+## Secure development
+
+- threat model by service/use case;
+- secure defaults and input/output validation;
+- authorization at domain boundaries;
+- parameterized database access;
+- file upload scanning/type/size/quarantine;
+- webhook signature and replay controls;
+- SSRF/path traversal/injection protections;
+- rate limits and abuse/fraud controls;
+- safe error messages;
+- security lint/scanning and dependency updates;
+- test/staging before production;
+- documented exceptions with expiration.
+
+## API/MCP and agent security
+
+- audience-bound OAuth/resource validation;
+- exact scopes and step-up authorization;
+- no token passthrough;
+- server/tool identity and version validation;
+- tool descriptions/resources/prompts treated as untrusted metadata unless trusted;
+- prompt-injection/data-exfiltration tests;
+- per-run/tool/tenant credentials and budgets;
+- no raw database/shell access when a scoped action exists;
+- independent verification for consequential actions;
+- kill switch and read-only fallback;
+- protected logs/evidence for tool activity.
+
+## Logging and observability
+
+Collect enough to detect and investigate without creating another sensitive-data leak:
+
+- authentication/authorization decisions;
+- privileged access;
+- configuration and secret-reference changes;
+- deployments/migrations;
+- API/MCP tool calls and outcomes;
+- payment/webhook/entitlement transitions;
+- rights/policy/approval changes;
+- evidence access;
+- data exports/deletions;
+- security events and anomalies.
+
+Use correlation/run/event IDs, UTC timestamps, retention controls and protected access. Never log credentials, raw payment data or unrestricted private content.
+
+## Vulnerability and dependency operations
+
+Maintain severity, exploitability, exposure, owner, remediation, exception and verification records. Emergency fixes may use A3 security-hotfix flow, followed by post-review and durable source/update. Unsupported/end-of-life components trigger migration plans.
+
+## Incident response
 
 ```text
-Detect → Contain → Preserve Evidence → Assess Impact → Correct → Recover → Notify where required → Review → Update controls
+Detect
+ → Triage/classify
+ → Contain/pause/isolate
+ → Preserve evidence
+ → Determine affected identities/data/systems/rights/money
+ → Eradicate/correct
+ → Restore/reconcile
+ → Notify where required
+ → Verify
+ → After-action review
+ → patch standards/tests/runbooks
 ```
 
-## Phase 3 implication
+Incident classes include account/credential compromise, data exposure, malicious integration, rights evidence loss, payment fraud, harmful agent action, domain/DNS takeover, dependency compromise, ransomware/destructive event and vendor outage.
 
-Security policy, approval gates, event logging, data classes, and recovery requirements must be encoded in the service contracts before autonomous agents are allowed to perform production mutations.
+## Business continuity and disaster recovery
+
+Every critical service defines owner, dependencies, RTO/RPO, backup method, restore procedure, degraded mode, alternate provider/manual process, communication path and last test.
+
+- databases: PITR/snapshots and export;
+- objects: versioning/replication and inventory;
+- repos: protected source, tags and mirror/export;
+- DNS/domains: owner/registrar/MFA/recovery contacts;
+- knowledge: public and restricted exports;
+- identity: recovery/break-glass;
+- payments: reconciliation/manual fallback;
+- events/DAIL: durable replay and integrity;
+- secrets: recovery/rotation without public disclosure.
+
+A backup is not verified until restoration is tested.
+
+## Vendor independence
+
+No SaaS holds the only copy of institutional knowledge, rights, source masters, schemas, customer/operating data or evidence. Critical vendor records include contract/renewal, account owner, data export, API, replacement, migration window, billing cutoff and deletion confirmation.
+
+## Security state
+
+`unassessed → baseline_gap → remediation → controlled_test → approved_production → monitored → exception → degraded → incident → recovered → retired`
+
+## Phase 3 gate
+
+Before broad autonomous mutations, Phase 3 must implement identity/authority, data classes, secret manager, audit/DAIL, scoped API/MCP credentials, isolation tests, release provenance, incident/pause, backup/restore and agent security evaluations. Phase 4 platform cohorts inherit the same profile; Phase 5 external partners require certification and contractual security obligations.

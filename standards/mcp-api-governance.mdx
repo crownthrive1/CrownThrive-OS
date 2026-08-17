@@ -7,38 +7,212 @@ icon: "plug-circle-check"
 
 # MCP, API and Integration Governance Standard
 
-CrownThrive should expose a governed integration fabric rather than one uncontrolled super-API.
+CrownThrive should operate a governed integration fabric: stable institutional contracts, platform-specific capabilities and replaceable vendor adapters. It should not expose one uncontrolled super-API or let each platform invent incompatible identity, event, error and authorization logic.
 
-## Three-layer model
+## Architecture layers
 
-**Central institutional surface:** CrownThrive IO / API Gateway / MCP provides stable institutional capabilities, routing, discovery, common IDs, authorization context, events, and cross-platform workflows.
+### Institutional API and MCP surface
 
-**Platform surfaces:** each platform may expose its own REST, GraphQL, webhook, vendor API, database adapter, feed, export, or MCP server according to what the underlying system supports.
+CrownThrive IO/API Gateway/Institutional MCP provides:
 
-**Private operational surface:** restricted internal tools, maintenance endpoints, evidence systems, admin actions, and sensitive data remain inaccessible to public/developer scopes unless an explicit role and policy allows them.
+- stable IDs and registry discovery;
+- current platform/claim/policy state;
+- identity/organization/role context;
+- approval and DAIL references;
+- cross-platform workflow routing;
+- API/MCP capability discovery;
+- common event and error contracts.
 
-## API registry
+### CHLOM governance surface
 
-For every platform collect: platform ID, product/vendor, base URLs by environment, documentation URL, authentication method, OAuth/OIDC support, scopes, rate limits, native endpoints, vendor endpoints, webhooks, event types, pagination, error model, SDKs, MCP tools/resources/prompts, data classifications, owner, credential owner, health check, version, last verification, and replacement/export path.
+Rights, Rules, Roles, Revenue, Records and Remedies services: evidence, approvals, DLA/licenses, entitlements, usage, cases, splits, settlements, corrections and audit.
 
-## MCP registry
+### Platform surfaces
 
-Every MCP capability should identify server ID, platform, transport, deployment, authentication, tool/resource names, input/output classifications, side effects, autonomy class, approval requirements, audience, rate limits, audit requirements, and version.
+Each platform may expose native REST, GraphQL, webhooks, feeds, exports, database adapters, SDKs or MCP tools according to its engine and use cases.
 
-Platform-specific MCPs may be hosted with the platform or in controlled engineering infrastructure. A central CrownThrive MCP may federate approved platform MCPs without exposing all internal capabilities to every caller.
+### Private operations surface
 
-## Security
+Deployment, credentials, evidence, finance reconciliation, incident, security and administrative tools remain private and role-scoped.
 
-Use least privilege, short-lived credentials where feasible, separate production and test access, secret-manager references rather than credentials in docs/code, request tracing, idempotency for mutations, signature verification for webhooks, and explicit private/public tool separation.
+### Vendor adapters
 
-## API-first operating rule
+Provider-specific integrations sit behind CrownThrive contracts where practical. Stripe may be a default payment candidate; identity, storage, email, analytics, ad-server, media and other vendors remain replaceable.
 
-When a platform offers a reliable supported API, prefer the API over brittle browser automation. When no API exists, create an adapter with a declared support level and migration path. Never silently scrape restricted/private surfaces as a substitute for authorization.
+## API registry minimum
 
-## Versioning
+For every API/interface capture:
 
-Breaking changes require explicit API/MCP versioning and migration records. A platform vendor upgrade must not silently alter the institutional contract.
+- API ID, platform/owner and provider;
+- interface class;
+- environment base URLs;
+- official docs/OpenAPI/GraphQL/package links;
+- authentication and OIDC/OAuth issuer/audience;
+- scopes/roles/relationship checks;
+- endpoint/tool list;
+- input/output/error/event schema versions;
+- rate/usage/cost limits;
+- pagination/filtering/sorting;
+- idempotency/concurrency behavior;
+- webhooks/events/retries/replay;
+- data classification and retention;
+- credential owner/secret reference;
+- health/version endpoint;
+- dependencies;
+- support/SLA/incident path;
+- export/vendor-exit/replacement path;
+- last verification and test evidence;
+- deprecation/migration status.
 
-## Automation
+## API protocol baseline
 
-Phase 2.98 will collect available base URLs, API documentation, endpoints and integration methods platform by platform. Phase 3 converts the registry into executable adapters, health checks, credential scopes and generated developer documentation.
+- HTTPS/TLS for network interfaces;
+- major URI/API versions for public contracts where adopted;
+- backward-compatible minor changes where feasible;
+- explicit deprecation and migration windows;
+- OAuth/OIDC profiles based on current adopted RFCs rather than an undefined “OAuth 2.1” label alone;
+- service identities for service-to-service access;
+- centralized tenant, role, relationship, asset and policy authorization;
+- idempotency keys for applicable mutation/financial operations;
+- ETag/version preconditions for concurrency-sensitive updates;
+- UTC timestamps;
+- request/correlation IDs;
+- standardized errors;
+- audit/event references;
+- no live secrets in URLs, docs or logs.
+
+## MCP protocol profile
+
+CrownThrive's target MCP profile is the final `2026-07-28` specification. New remote servers and federation components should be designed around:
+
+- a stateless protocol core rather than hidden transport sessions;
+- self-describing requests carrying the protocol version and caller/client context;
+- `Mcp-Method` and `Mcp-Name` header-based routing and policy enforcement where applicable;
+- optional `server/discover` for capability discovery;
+- deterministic, cache-aware list responses without trusting stale catalogs for authority;
+- Multi Round-Trip Requests for governed mid-call input or confirmation;
+- formal extensions with separate registration, versions and approval rules;
+- a minimum documented deprecation window and compatibility tests;
+- migration away from deprecated roots, sampling, logging and legacy HTTP\+SSE behavior for new implementations.
+
+Existing compatible MCP integrations may remain on an earlier protocol version during a recorded migration window. The registry must state the exact supported version; `MCP-compatible` without a version is not sufficient.
+
+## Baseline service families
+
+The CHLOM technical sources include high-level endpoint families such as:
+
+- entitlement verification;
+- provider webhook intake;
+- dispute creation;
+- dispute evidence submission;
+- governance proposal submission;
+- scoped audit-event queries;
+- webhook endpoint registration.
+
+These are source specifications to implement/test, not evidence that production routes already exist.
+
+## MCP registry minimum
+
+Every MCP server records:
+
+- server ID, owner and platform;
+- repository/deployment;
+- transport and base URL;
+- authentication/audience/scopes;
+- visibility: public, partner, internal, restricted;
+- tools/resources/prompts;
+- input/output data class;
+- side effects and autonomy class;
+- approval/entitlement/policy rules;
+- version and schema;
+- rate/cost limits;
+- health and observability;
+- dependencies and fallback;
+- incident/deprecation/retirement.
+
+Every tool has a stable tool ID. Tool naming should use clear verb-object forms and must disclose side effects.
+
+## Central federation
+
+The central MCP/API fabric propagates:
+
+- caller actor/service;
+- tenant/organization;
+- role and relationship;
+- purpose and platform context;
+- scopes;
+- run/correlation ID;
+- approval state;
+- data classification;
+- cost/rate budget;
+- requested/compatible version.
+
+A platform server re-evaluates authority; it does not blindly trust caller-supplied role text.
+
+## Public, developer and private separation
+
+### Public
+
+Read-only approved platform/content/claim discovery.
+
+### Authenticated customer/member
+
+Own records, purchases, entitlements, saved content and support under purpose-limited access.
+
+### Developer/partner
+
+Sandbox/production APIs and MCP tools with explicit scopes, terms, quotas and certification.
+
+### Operator/admin
+
+Platform operations according to role and tenant.
+
+### Restricted
+
+Evidence, investigations, security, finance, private IP and reserved decisions through named privileged roles.
+
+## Webhooks
+
+Every webhook endpoint requires provider/account, environment, event list, signature algorithm/secret reference, payload version, idempotency, retry/dead-letter, replay, ordering assumptions, timeout, data class, owner, last delivery and rotation/deprecation record.
+
+Webhook handlers must verify signatures, tolerate duplicate/out-of-order events where applicable, retrieve authoritative provider state when needed and reconcile partial failures.
+
+## Adapter policy
+
+Prefer supported APIs. If none exists, classify the adapter:
+
+- supported native;
+- supported vendor;
+- controlled database/internal;
+- feed/export;
+- browser-assisted temporary;
+- manual documented;
+- blocked;
+- deprecated.
+
+Browser automation is never a substitute for authorization or a durable contract. Temporary adapters require an exit path.
+
+## Developer experience
+
+Generate reference docs and SDKs from authoritative schemas where possible. Provide sandbox identities, synthetic data, test webhooks, fixtures, rate-limit/error simulation and integration certification. Handwritten workflow guides must link to the current contract version.
+
+## Data minimization
+
+APIs and MCPs return only fields required for the purpose/role. Restricted evidence should usually be returned as a reference, status or signed proof—not raw content.
+
+## Mutations and event trail
+
+Consequential mutations return affected IDs, previous/new versions, approval, event ID and rollback/compensation reference. Accepted licenses, agreements and material decisions are immutable; amendments create linked records.
+
+## Version/vendor drift
+
+Automated health jobs compare live providers/interfaces to registered schemas, scopes and versions. Breaking drift creates a hold/incident and migration run packet. A vendor upgrade cannot silently change the institutional contract.
+
+## Phase sequence
+
+- **2.98:** discover and verify engines, docs, base URLs, endpoints, webhooks and exports;
+- **2.99:** finalize private/public topology, credentials, adapters, manifests and CI tests;
+- **3.0:** seed executable API/MCP registries and common contracts;
+- **3D:** deploy federation, SDKs and first P0 adapters;
+- **4:** integrate platform cohorts;
+- **5:** open certified external developer/partner ecosystem.

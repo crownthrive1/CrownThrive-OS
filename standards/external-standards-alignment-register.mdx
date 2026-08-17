@@ -1,0 +1,125 @@
+---
+title: "External Standards Alignment Register"
+sidebarTitle: "External Standards"
+description: "The version-pinned external standards baseline for MCP, OAuth, search, AI governance, cybersecurity, zero trust, accessibility and software-supply-chain controls."
+icon: "badge-check"
+---
+
+# External Standards Alignment Register
+
+CrownThrive standards must be internally owned and externally interoperable. This register identifies the current external baselines that CrownThrive adopts, profiles, or monitors. It does not delegate CrownThrive governance to an outside standard, and it does not make a vendor-specific implementation permanent.
+
+## Version-control rule
+
+Every external standard receives a stable record with publisher, identifier, adopted version/date, CrownThrive profile, affected systems, implementation evidence, exceptions, owner, review date, and successor. References such as “follow OAuth” or “WCAG compliant” are insufficient without the exact version and evidence.
+
+```yaml
+standard_id: ct.standard.external.mcp.2026-07-28
+publisher: Model Context Protocol
+identifier: MCP-2026-07-28
+status: adopted_profile
+applies_to: [mcp_servers, mcp_clients, tool_broker, developer_platform]
+owner: ct.role.security-architecture
+last_verified_at: "2026-08-17"
+next_review_at: "2026-11-17"
+exceptions: []
+evidence_refs: []
+```
+
+## Current baseline
+
+| Domain | Current reference | CrownThrive adoption posture | Mandatory internal effect |
+| --- | --- | --- | --- |
+| Model Context Protocol | MCP specification `2026-07-28` | Version-pinned production target | Stateless request/response core; self-describing requests; `MCP-Protocol-Version`, `Mcp-Method` and `Mcp-Name` routing headers; optional `server/discover`; cacheable deterministic lists; Multi Round-Trip Requests; formal extensions; compatibility and deprecation tests |
+| MCP authorization | MCP `2026-07-28` authorization model plus applicable OAuth RFCs | Required for protected remote servers | OAuth-based authorization; protected-resource metadata; issuer validation; audience/resource binding; exact scopes; no token passthrough; no credentials in URLs; PKCE/exact redirect validation; client credentials bound to issuer; Dynamic Client Registration treated as deprecated in favor of Client ID Metadata Documents where supported; SSRF-safe discovery |
+| OAuth security | RFC 9700, RFC 9728 and RFC 8707 | Required profile | OAuth Security BCP; Protected Resource Metadata; Resource Indicators; issuer/audience validation; redirect and open-redirect protection; least-privilege tokens |
+| Robots | RFC 9309 | Required protocol baseline | Root-level `robots.txt`; deterministic group/rule behavior; UTF-8 and status handling; robots remains crawl guidance, never authentication or authorization |
+| Search | Current Google Search technical, canonical, sitemap, robots, `noindex` and structured-data guidance | Operational monitoring profile | Crawlable public pages, deliberate canonicals, visible/accurate structured data, crawlable `noindex`, valid sitemaps, no deceptive programmatic pages, no private-data exposure |
+| Cybersecurity | NIST Cybersecurity Framework 2.0 | Governance/control taxonomy | Govern, Identify, Protect, Detect, Respond and Recover mapped to institutional controls, owners, evidence, suppliers and risk acceptance |
+| AI governance | NIST AI RMF 1.0 and NIST AI 600-1 Generative AI Profile | Current risk/evaluation baseline; AI RMF revision is actively monitored | Govern, Map, Measure and Manage; model/system inventory; source and data boundaries; evaluations; incident/correction records; human authority; generative-AI-specific risk treatment; compatibility review when NIST publishes a successor |
+| Zero trust | NIST SP 800-207 and SP 800-207A | Architecture profile | No implicit trust by network location; service/workload identities; policy decision/enforcement points; continuous verification; cloud-native identity-tier controls |
+| Accessibility | WCAG 2.2, W3C Recommendation / ISO/IEC 40500:2025 | Minimum public-product target | Target Level AA unless a stricter contract applies; automated and human testing; keyboard, focus, labels, contrast, errors, authentication and accessible alternatives |
+| Software supply chain | SLSA 1.2, Approved | Progressive source-and-build assurance profile | Versioned source and build tracks; provenance; protected source/build process; dependency/lock evidence; artifact identity; verification summaries; release verification; higher assurance for critical services |
+| Verifiable credentials | W3C Verifiable Credentials Data Model 2.0 and Data Integrity 1.0 | Future credential/interoperability profile | Issuer-holder-verifier roles; status/revocation; privacy and selective-disclosure analysis; cryptographic integrity; no credential claim stronger than issuer authority/evidence |
+| Decentralized identifiers | W3C DID Core 1.0; DID Core 1.1 monitored as a Candidate Recommendation | Later selective-decentralization profile | DID method registry and resolution choices; controller/verification-method governance; recovery and rotation; no DID as proof of real-world identity or legal authority by itself |
+| Content provenance | C2PA Technical Specification 2.4 | Optional media/content-credentials profile | Signed provenance manifests, ingredients/actions, validation, conflict/version handling and repository receipts where useful; C2PA evidence supplements rather than replaces CrownThrive chain of title and human-authorship records |
+| Structured schemas | JSON Schema 2020-12 where compatible | Default machine-contract dialect | Explicit schema identifiers/versions; validation; compatibility tests; generated docs; no silent contract drift |
+
+## MCP-specific CrownThrive controls
+
+A protected remote CrownThrive MCP server targeting `2026-07-28` must:
+
+1. process each request as self-describing and avoid hidden dependence on protocol sessions;
+2. validate `MCP-Protocol-Version` and route/authorize with the registered method/tool identity, including `Mcp-Method` and `Mcp-Name` where applicable;
+3. use `server/discover` only as an optional capability-discovery path, not a prerequisite that creates undocumented authority;
+4. publish or resolve protected-resource metadata;
+5. validate token issuer, audience/resource, expiry and scopes, including authorization-server issuer checks;
+6. bind client credentials to the issuer that created them and prohibit cross-issuer reuse;
+7. bind authorization to the exact server/resource rather than accept broad bearer tokens;
+8. prohibit token passthrough to downstream platforms;
+9. use exact redirect matching and PKCE where authorization-code flows apply;
+10. prefer Client ID Metadata Documents or another adopted current registration pattern; treat Dynamic Client Registration as a compatibility path under deprecation review;
+11. keep credentials and sensitive payment/identity data out of URLs and ordinary elicitation/input forms;
+12. treat tool descriptions, resources, prompts, extensions and annotations as untrusted metadata unless the server and source are trusted;
+13. use Multi Round-Trip Requests only through registered request/confirmation schemas and preserve approval evidence for consequential continuations;
+14. honor cache metadata without allowing stale tool/resource catalogs to bypass version, health, entitlement or authorization checks;
+15. isolate extensions and experimental MCP features behind capability, version and policy gates;
+16. avoid new dependencies on deprecated roots, sampling, logging and legacy HTTP\+SSE behavior unless a documented migration exception exists;
+17. test confused-deputy, authorization-server mix-up, SSRF, prompt injection, data exfiltration, replay, stale-cache, scope escalation and header-routing manipulation cases.
+
+## Search-specific CrownThrive controls
+
+- A `robots.txt` rule never protects private content.
+- A URL blocked from crawling cannot reliably communicate `noindex`; private routes require access control and public URLs that should disappear must remain crawlable long enough for the directive to be observed where applicable.
+- Structured data must describe visible, current and supported page content.
+- Canonical hints, redirects, internal links and sitemap entries must agree.
+- Programmatic content requires governed data, substantive user value and quality gates.
+- Public claim records, not copied prose, drive cross-platform numbers, status, ownership and offer metadata.
+
+## AI and agent assurance
+
+AI systems are governed as socio-technical systems, not isolated models. Each material use must register purpose, audience, provider/model, data/source classes, prompt/policy version, evaluation set, known limitations, human-review boundary, incident path, cost and retirement state. CrownThrive should monitor NIST AI RMF revisions and adopt changes through a versioned ADR rather than silently changing controls.
+
+## Accessibility evidence
+
+Conformance claims require page/component scope, WCAG version and level, automated results, manual keyboard/screen-reader review, known exceptions, remediation owner and test date. A passing scanner alone is not proof of conformance.
+
+## Supply-chain evidence
+
+Critical CrownThrive releases should resolve source commit, dependency lock, builder/workflow identity, artifact digest, provenance, tests, approval and deployment event. Public documentation builds may use a lower assurance profile than CHLOM rights, identity, finance or evidence services, but every profile is explicit.
+
+## Review cadence
+
+- security/authorization standards: quarterly and on material revision;
+- MCP specification: at every supported protocol-version change;
+- search-platform guidance: monthly automated watch plus deployment checks;
+- accessibility: at design-system release and material interface change;
+- AI standards: quarterly and on NIST/profile revision;
+- supply chain: at CI/CD or builder change.
+
+A newer external version is not automatically adopted. The standards steward opens a compatibility record, evaluates changes, updates tests and issues a CrownThrive patch or ADR.
+
+## Authoritative references
+
+- [MCP specification release 2026-07-28](https://blog.modelcontextprotocol.io/posts/2026-07-28/)
+- [MCP specification](https://modelcontextprotocol.io/specification/latest)
+- [RFC 9700: OAuth 2.0 Security Best Current Practice](https://www.rfc-editor.org/rfc/rfc9700)
+- [RFC 9728: OAuth 2.0 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728)
+- [RFC 8707: Resource Indicators for OAuth 2.0](https://www.rfc-editor.org/rfc/rfc8707)
+- [RFC 9207: OAuth 2.0 Authorization Server Issuer Identification](https://www.rfc-editor.org/rfc/rfc9207)
+- [RFC 9309: Robots Exclusion Protocol](https://www.rfc-editor.org/rfc/rfc9309)
+- [NIST Cybersecurity Framework 2.0](https://www.nist.gov/cyberframework)
+- [NIST AI Risk Management Framework](https://www.nist.gov/itl/ai-risk-management-framework)
+- [NIST AI 600-1 Generative AI Profile](https://doi.org/10.6028/NIST.AI.600-1)
+- [NIST SP 800-207 Zero Trust Architecture](https://doi.org/10.6028/NIST.SP.800-207)
+- [WCAG 2.2](https://www.w3.org/TR/WCAG22/)
+- [SLSA 1.2](https://slsa.dev/spec/v1.2/)
+- [W3C Verifiable Credentials Data Model 2.0](https://www.w3.org/TR/vc-data-model-2.0/)
+- [W3C Verifiable Credential Data Integrity 1.0](https://www.w3.org/TR/vc-data-integrity/)
+- [W3C DID Core 1.0](https://www.w3.org/TR/did-core/)
+- [C2PA Technical Specification 2.4](https://spec.c2pa.org/specifications/specifications/2.4/specs/C2PA_Specification.html)
+- [Google Search technical requirements](https://developers.google.com/search/docs/essentials/technical)
+
+## Gate
+
+No Phase 3 external interface, MCP server, authorization server, automated publishing fleet or critical build pipeline may claim standards alignment without a versioned profile and implementation evidence.
