@@ -1,0 +1,51 @@
+---
+title: "Environments and Release Control"
+sidebarTitle: "Environments & Release"
+description: "The development, test, staging, production, branch, migration, feature-flag, rollback, and release-evidence model for CrownThrive systems."
+icon: "code-branch"
+---
+
+# Environments and Release Control
+
+Phase 3 services will become infrastructure dependencies. They need stronger release discipline than ad-hoc website editing.
+
+## Environment model
+
+At minimum distinguish:
+
+- local/developer;
+- automated test / ephemeral sandbox;
+- staging or controlled preview where feasible;
+- production.
+
+Test and preview environments must not use production customer data or production credentials by default.
+
+## Repository and branch discipline
+
+- protected canonical branch;
+- scoped feature/fix branches;
+- one coherent task or issue per branch where practical;
+- required automated tests;
+- change summary and migration impact;
+- reviewer/approval requirements based on risk;
+- immutable release/commit reference in deployment evidence.
+
+## Database and schema changes
+
+Migrations require forward and rollback strategy, backups where relevant, compatibility with running application versions and explicit handling of partial deployment failure. High-risk destructive migrations require human approval and recovery verification.
+
+## Feature flags
+
+Use feature flags for risky or gradual activations when they reduce deployment risk. Every flag needs an owner, target state and removal date; flags must not become permanent hidden product configuration.
+
+## Release evidence
+
+A release record should capture commit/build, environment, deployer/agent, tests, approvals, migration state, feature flags, affected services, smoke results, monitoring window and rollback decision.
+
+## Incident connection
+
+If a release causes material failure, incident and rollback events should reference the release ID in DAIL. Post-incident changes should update tests, runbooks and knowledge.
+
+## Phase 3 implication
+
+DAIL, Approval and Registry services should deploy in small increments with compatibility-tested APIs. The automation team should be able to propose and validate changes, but production release authority remains governed.
