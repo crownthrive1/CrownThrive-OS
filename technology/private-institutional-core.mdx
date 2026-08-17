@@ -1,0 +1,69 @@
+---
+title: "Private Institutional Core and Storage Boundaries"
+sidebarTitle: "Private Core"
+description: "Where CrownThrive should store public knowledge, private registries, restricted evidence, operational data, credentials, and backups without creating another single point of failure."
+icon: "vault"
+---
+
+# Private Institutional Core and Storage Boundaries
+
+The public **CrownThrive-Support** repository and Mintlify deployment are institutional knowledge projections. They are not appropriate stores for every operating record CrownThrive needs.
+
+## Recommended storage model
+
+```text
+Public CrownThrive-Support / Mintlify
+    Public-safe doctrine, architecture, support, policies, runbooks, source lineage
+
+Private institutional registry repository / service
+    Schemas, non-public registry definitions, controlled operating configuration,
+    internal ADRs, private runbook metadata, automation configuration
+
+Operational service databases
+    Accounts, orders, licenses, cases, entitlements, campaigns, events and application state
+
+Restricted evidence/object storage
+    Contracts, assignments, source masters, protected evidence, private media,
+    signed documents and other restricted artifacts
+
+Secret manager / platform credential stores
+    API keys, signing secrets, OAuth credentials, encryption keys, recovery material
+
+Independent backup / archive
+    Versioned exports needed for institutional continuity
+```
+
+## Repository roles
+
+For the current transition:
+
+- `crownthrive1/CrownThrive-Support` remains the active public institutional knowledge and Mintlify source.
+- `crownthrive/chlom-protocol` remains intact as a technical/historical CHLOM source while the institution consolidates knowledge. It should not be deleted or silently made obsolete during the pre–Phase 3 audit.
+- A future private `crownthrive-os` or equivalent repository/service can hold restricted institutional schemas, internal automation configuration, private source metadata, and infrastructure code that does not belong in the public Support repository.
+
+Repository names and boundaries may evolve through an ADR; the **data-class separation** is the durable requirement.
+
+## Never place in the public documentation repository
+
+- production API keys or webhook signing secrets;
+- wallet/private signing keys or recovery phrases;
+- database credentials;
+- full customer, contributor, employee or protected-person records;
+- raw rights evidence or private contracts unless intentionally public;
+- unreleased source masters and manuscripts;
+- confidential Fingerprint implementation or private policy/risk logic;
+- privileged legal communications;
+- private partner economics or confidential financial data;
+- security details that materially increase attack feasibility.
+
+## Evidence references
+
+DAIL and CHLOM should store durable references, hashes/checksums, classifications, source IDs and access metadata without requiring the audit ledger to contain the entire sensitive artifact.
+
+## Backup rule
+
+A vendor or SaaS integration may host a working copy, but critical institutional data must have an independent export and recovery plan. A future vendor outage or account loss must not be able to erase the institution's knowledge or rights history.
+
+## Phase 3 gate
+
+Before the first production service is deployed, CrownThrive should designate where each data class lives, which credentials it may access, how backups work, and which environments may process restricted records.

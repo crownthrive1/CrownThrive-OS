@@ -1,0 +1,53 @@
+---
+title: "API and Integration Standards"
+sidebarTitle: "API Standards"
+description: "The versioning, authentication, idempotency, webhook, retry, schema, rate-limit, observability, and error-contract rules for CrownThrive integrations."
+icon: "code"
+---
+
+# API and Integration Standards
+
+CrownThrive IO/MCP needs consistent integration contracts so every platform does not invent its own authentication, retry, error, event and identifier behavior.
+
+## API baseline
+
+- HTTPS only for remote production APIs.
+- Stable resource IDs independent of human-readable slugs.
+- Explicit API/schema versions and deprecation windows.
+- Least-privilege OAuth/OIDC or appropriately scoped service credentials where supported.
+- Short-lived access and revocable authorization where practical.
+- Idempotency keys for retryable mutations involving payments, licenses, entitlements, publishing or irreversible side effects.
+- Structured errors with stable error codes, correlation IDs and retry guidance.
+- Pagination, filtering and cursor semantics documented per collection.
+- Rate limits and backoff behavior exposed rather than hidden.
+- Input validation at trust boundaries.
+- Privacy classification and purpose documented for shared fields.
+
+## Webhooks
+
+Webhook contracts should include:
+
+- signed authenticity/integrity verification;
+- replay protection;
+- idempotent handlers;
+- fast acknowledgement with durable async processing where practical;
+- retry policy and dead-letter handling;
+- event version and event ID;
+- correlation to source object;
+- no dependence on client redirects as proof of payment or completion.
+
+## Event delivery
+
+For critical state changes, prefer durable queue/outbox patterns over best-effort synchronous fan-out. A failed downstream integration must not silently erase the institutional event.
+
+## MCP
+
+Remote MCP authorization should follow the protocol's current authorization specification when authorization is implemented, using established OAuth patterns, secure token storage, HTTPS and appropriate PKCE/resource protections. MCP tools should expose domain actions—not unrestricted database or shell access.
+
+## Contract testing
+
+Each integration needs synthetic fixtures, schema tests, auth tests, retry/idempotency tests, negative permission tests, timeout/failure tests and a documented mock/test environment where feasible.
+
+## Phase 3 implication
+
+DAIL, Approval, Rights and IO services should establish these conventions first; downstream adapters inherit them.
