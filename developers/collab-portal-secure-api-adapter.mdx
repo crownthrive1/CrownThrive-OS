@@ -230,21 +230,68 @@ The Collab Portal's own OpenAI-provider setting is a **provider configuration su
 
 No OpenAI or Collab Portal production secret belongs in CrownThrive-Support Git history.
 
+## Secure adapter runtime
+
+A server-side runtime now exists in the connected CrownThrive Supabase project as Edge Function `collab-portal-pm` version 1.
+
+```yaml
+runtime_provider: Supabase Edge Functions
+function: collab-portal-pm
+runtime_state: active_fail_closed_unconfigured
+caller_authentication: Supabase JWT required
+collab_portal_credentials_in_source: false
+server_side_secret_binding: pending_external_secret_configuration
+write_gate_default: closed
+allowed_read_actions:
+  - health
+  - project_meta
+  - find_project
+conditional_write_action:
+  - update_project_status
+conditionally_allowed_fields:
+  - status
+  - info_description
+  - project_custom_fields
+read_before_write: required
+read_after_write: required
+unknown_outcome_blind_retry: prohibited
+```
+
+The function reads `COLLAB_PORTAL_PUBLIC_ID` and `COLLAB_PORTAL_SECRET_KEY` only from server-side environment secrets; neither value is embedded in source. `COLLAB_PORTAL_ALLOW_WRITE` defaults false and must be explicitly enabled only after the authenticated read and project/field mapping gates pass. Until the secrets are bound, the runtime deliberately returns a fail-closed unconfigured state rather than attempting production calls.
+
+The current ChatGPT Supabase connector can deploy Edge Functions but does not expose a project-secret write operation. Therefore the runtime is established, but credential binding must occur through an approved Supabase secret-management path outside the public documentation workflow. This is a concrete integration blocker, not an API-design ambiguity.
+
 ## Webhook state
 
-The user reports SuitePro/Collab Portal supports webhooks. The supplied Secure API OpenAPI contract does not describe webhook registration, event schemas, signing or retry semantics.
+Current first-party Collab Portal UI evidence now verifies configurable outbound webhook endpoints and a Projects event family with separate **Project Created**, **Project Updated** and **Project Deleted** toggles. The template builder permits selectable payload fields.
+
+A Project Created preview exposes project identity/state/timing fields, staff/client-facing information, business/economic fields, client/secondary-client/team/leader assignments and `project_custom_fields`. The preview displays a UUID-like `project_uid`, but `project_name` and several other fields are null; therefore the preview UID is a sample/preview value until authenticated project lookup proves it belongs to a real named CrownThrive project.
 
 Current state:
 
 ```yaml
-webhook_capability_claim: user_confirmed/provider_ui_context
-webhook_contract_recovered: false
+source_id: S102
+webhook_capability_verified_from_current_ui: true
+webhook_endpoint_configuration_ui_verified: true
+webhook_event_families:
+  billing: ui_verified
+  projects: ui_verified
+project_events_verified:
+  - Project Created
+  - Project Updated
+  - Project Deleted
+project_payload_selector_verified: true
+project_created_preview_payload_observed: true
+project_preview_uid_is_institutional_project_uid: unverified
 webhook_signing_verified: false
-webhook_events_verified: false
+webhook_retry_delivery_contract_verified: false
+webhook_replay_contract_verified: false
 webhook_receiver_implemented: false
 ```
 
-Before event-driven Collab Portal automation, recover the webhook documentation or admin configuration and register event names, payload schema, signature verification, retries, replay/idempotency and secret rotation.
+This materially advances the event-driven lane without certifying it. No signature header/secret, delivery-attempt identifier, retry schedule, replay mechanism, timeout policy or dead-letter behavior is proven by the screenshots. A production receiver must fail closed until sender authentication/integrity is established and idempotency/replay behavior is tested.
+
+Until then, hourly authenticated reads/project-status projection remain the reconciliation fallback; Project Created/Updated/Deleted events become eligible only after the receiver and sender-integrity contract pass certification.
 
 ## Phase 2.99 hard checkpoint
 
