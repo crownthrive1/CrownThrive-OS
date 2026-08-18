@@ -104,8 +104,27 @@ The repository validator currently checks:
 
 ## What this validation does not prove
 
-A successful documentation-governance run does not independently prove every external link, documented API endpoint, product checkout, entitlement, room, universe, metric, legal claim, registration, private security state, historical recovery, trademark, CHLOM/MM Suites/SSO/cloud/decentralized component, or professional-review state. Those require their own effective-dated evidence, tests and approvals.
+A successful documentation-governance run does not independently prove:
+
+- every external link is currently reachable beyond the configured source checks;
+- every documented API endpoint is authenticated, authorized, version-compatible, or production-active;
+- every product checkout, entitlement, file, license, or refund path works;
+- every platform, room, universe, count, metric, legal claim, registration, filing, or partnership is current;
+- private systems contain no vulnerabilities or misconfigurations;
+- every historical source has been recovered;
+- every CrownThrive mark is registered;
+- every CHLOM, MM Suites, SSO, cloud, decentralized, ZK, DID, oracle, token, treasury, or LEX component is deployed;
+- professional legal, accounting, tax, franchise, securities, privacy, or security review has occurred.
+
+Those states require their own evidence, tests, approvals, and effective-dated records.
 
 ## Inherited next gates
 
-After final combined validation, the repository remains in Phase 2.97.1 accepted governance baseline, Phase 2.98 active platform extraction, Phase 2.99 pending private-core/machine-seed preparation, and Phase 3.0 not yet accepted for broad runtime implementation.
+After final combined validation, the repository remains in:
+
+- Phase 2.97.1 accepted governance baseline;
+- Phase 2.98 active platform extraction;
+- Phase 2.99 pending private-core and machine-seed preparation;
+- Phase 3.0 not yet accepted for broad runtime implementation.
+
+The final public Help Center, authenticated role portal, custom CrownThrive support domain, restricted evidence system, centralized control-plane runtime, platform MCP fleet, and selectively decentralized CHLOM infrastructure remain separate gated releases.
