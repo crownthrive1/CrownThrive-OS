@@ -52,13 +52,30 @@ The ordering above is logical rather than PR-number order. PR #9 and PR #10 were
 - Python syntax: passed
 - Whitespace/conflict-marker checks: passed
 
-## Combined-tree validation gate
+## Combined-tree validation evidence
 
-This receipt pull request exists because the two component workflows above validated their own merge refs against the prior `52762bd...` base. The current `main` tree includes both accepted lines of work. The Documentation Governance workflow on this receipt branch must therefore validate the combined tree before this receipt is merged.
+The current `main` tree includes both accepted lines of work. PR #12 validates that combined canonical tree rather than either concurrent branch in isolation.
 
-Current gate state: `pending_combined_validation`.
+### First combined-tree run
 
-The receipt will be updated with the first combined-tree run ID, job ID, validated merge ref, counts, warnings, and result. The final receipt commit must then receive its own successful workflow run before merge.
+- Workflow: `Documentation Governance`
+- Run ID: `32083889121`
+- Job ID: `95552236327`
+- Validated merge ref: `1a082f0576bd3abdab37b122ac85731a48ba0c50`
+- Source head before receipt-evidence update: `dfe757fa5143b6cf654471971c40784085819533`
+- Base: `5ae215e772ad6acab48e58b422efc26c946869e7`
+- Result: `success`
+- Navigation entries: `189`
+- MDX files: `189`
+- Text files: `203`
+- Internal links: `28`
+- Warnings: `0`
+- Python syntax: passed
+- Whitespace/conflict-marker checks: passed
+
+Current gate state: `first_combined_validation_passed / final_receipt_validation_pending`.
+
+The commit that writes this evidence into the receipt must receive its own successful Documentation Governance run before PR #12 may merge. That second run validates the exact final receipt content and the combined source tree together.
 
 ## Validator scope
 
@@ -99,7 +116,7 @@ Those states require their own evidence, tests, approvals, and effective-dated r
 
 ## Inherited next gates
 
-After combined validation, the repository remains in:
+After final combined validation, the repository remains in:
 
 - Phase 2.97.1 accepted governance baseline;
 - Phase 2.98 active platform extraction;
