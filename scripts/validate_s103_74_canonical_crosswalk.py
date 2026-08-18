@@ -3,9 +3,9 @@
 
 This validator protects source-row completeness, mapping-type distribution,
 S100 cross-source relationship count, critical alias/predecessor/split mappings,
-first-tranche stable-ID completion, and the fail-closed Phase 3 gate. It does
-not treat an unresolved mapping as a failure: unresolved is an intentional
-machine state until stronger evidence or adjudication exists.
+two evidence-backed stable-ID completion tranches, and the fail-closed Phase 3
+gate. It does not treat an unresolved mapping as a failure: unresolved is an
+intentional machine state until stronger evidence or adjudication exists.
 """
 
 from __future__ import annotations
@@ -19,10 +19,14 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "knowledge/phase-2-99-workstream-3a-phase-2-7-74-platform-framework-source-seed.mdx"
 CROSSWALK = ROOT / "knowledge/phase-2-99-workstream-3a-s103-74-canonical-identity-crosswalk.mdx"
 S100 = ROOT / "knowledge/phase-2-99-workstream-3a-holdings-68-source-row-identity-seed.mdx"
-TRANCHE = ROOT / "changelog/phase-2-99-workstream-3a-s103-stable-id-tranche-1.mdx"
+TRANCHE1 = ROOT / "changelog/phase-2-99-workstream-3a-s103-stable-id-tranche-1.mdx"
+TRANCHE2 = ROOT / "changelog/phase-2-99-workstream-3a-s103-stable-id-tranche-2.mdx"
 THRIVERELAY = ROOT / "platforms/thriverelay-institutional-registry.mdx"
 THRIVEMAPS = ROOT / "platforms/thrivemaps-institutional-registry.mdx"
 BACKROAD = ROOT / "platforms/backroad-fm-institutional-registry.mdx"
+MEDIA_FEDERATION = ROOT / "platforms/media-federation-institutional-registry.mdx"
+D6 = ROOT / "knowledge/phase-2-98-d6-long-tail-platform-disposition-register.mdx"
+PLATFORM_STATE = ROOT / "portfolio/platform-state-register.mdx"
 ADAPTER_MATRIX = ROOT / "developers/platform-api-adapter-matrix.mdx"
 PLAN = ROOT / "changelog/phase-2-99-plan.mdx"
 GATE = ROOT / "technology/phase-3-readiness-gate.mdx"
@@ -38,12 +42,12 @@ ROW_RE = re.compile(
 )
 
 EXPECTED_TYPES = {
-    "exact": 35,
-    "alias": 2,
+    "exact": 43,
+    "alias": 3,
     "predecessor": 3,
     "framework_platform_split": 3,
     "composite_split": 2,
-    "unresolved": 29,
+    "unresolved": 20,
 }
 
 CRITICAL = {
@@ -56,6 +60,14 @@ CRITICAL = {
     "S103-PF-021": ("alias", "ct.platform.thriveseat"),
     "S103-PF-022": ("exact", "ct.platform.the-mane-experience"),
     "S103-PF-024": ("exact", "ct.platform.backroad-fm"),
+    "S103-PF-025": ("exact", "ct.platform.melanated-voices-platform"),
+    "S103-PF-026": ("exact", "ct.platform.melanated-voices-tv"),
+    "S103-PF-027": ("exact", "ct.platform.melanated-tv"),
+    "S103-PF-029": ("exact", "ct.platform.locticians-tv"),
+    "S103-PF-032": ("exact", "ct.platform.melanated-vault"),
+    "S103-PF-033": ("exact", "ct.platform.melanated-stock"),
+    "S103-PF-034": ("exact", "ct.platform.tame-gallery"),
+    "S103-PF-035": ("exact", "ct.asset.artful-mane-gallery"),
     "S103-PF-054": ("exact", "ct.platform.kjv-sermon-toolkit"),
     "S103-PF-057": ("predecessor", "ct.platform.ops-oasis"),
     "S103-PF-065": ("composite_split", "ct.platform.thrivesupport", "ct.platform.crownthrive-support"),
@@ -63,12 +75,23 @@ CRITICAL = {
     "S103-PF-067": ("predecessor", "ct.platform.crownthrive-studios"),
     "S103-PF-068": ("alias", "ct.platform.ops-oasis"),
     "S103-PF-069": ("exact", "ct.platform.thrivemaps"),
+    "S103-PF-071": ("alias", "ct.platform.crownapps-thriveapps"),
 }
 
 TRANCHE_S100 = {
     "S100-PORT-015": "ct.platform.thrivemaps",
     "S100-PORT-017": "ct.platform.thrivetools",
+    "S100-PORT-020": "ct.platform.crownapps-thriveapps",
+    "S100-PORT-025": "ct.platform.melanated-voices",
+    "S100-PORT-026": "ct.platform.melanated-tv",
+    "S100-PORT-027": "ct.platform.melanated-voices-platform",
+    "S100-PORT-028": "ct.platform.melanated-voices-tv",
+    "S100-PORT-029": "ct.platform.locticians-tv",
     "S100-PORT-030": "ct.platform.the-mane-experience",
+    "S100-PORT-031": "ct.platform.tame-gallery",
+    "S100-PORT-034": "ct.platform.melanated-vault",
+    "S100-PORT-035": "ct.platform.melanated-stock",
+    "S100-PORT-036": "ct.asset.artful-mane-gallery",
 }
 
 
@@ -144,6 +167,12 @@ def main() -> int:
             if fragment not in canonical:
                 fail(f"Critical canonical reference {fragment!r} missing from {row_id}")
 
+    mvp_roku_type, mvp_roku_canonical, _, mvp_roku_disposition = row_lookup["S103-PF-028"]
+    if mvp_roku_type != "unresolved" or mvp_roku_canonical != "—":
+        fail("MVP (Roku) must remain unresolved until its orchestration/channel lineage is independently reconciled")
+    if "lineage" not in mvp_roku_disposition.lower():
+        fail("MVP (Roku) must preserve explicit lineage-reconciliation state")
+
     s100_text = S100.read_text(encoding="utf-8")
     for source_row, canonical_id in TRANCHE_S100.items():
         matching = [line for line in s100_text.splitlines() if source_row in line]
@@ -156,20 +185,28 @@ def main() -> int:
     require(THRIVEMAPS, "Stable platform ID: `ct.platform.thrivemaps`")
     require(BACKROAD, "Stable platform ID:** `ct.platform.backroad-fm`")
     require(ADAPTER_MATRIX, "`ct.platform.kjv-sermon-toolkit`")
-    require(TRANCHE, "s103_unresolved: 29")
-    require(TRANCHE, "phase_3_entry: blocked_pending_phase_2_99_hard_exit")
+    require(TRANCHE1, "s103_unresolved: 29")
+    require(TRANCHE1, "phase_3_entry: blocked_pending_phase_2_99_hard_exit")
+    require(TRANCHE2, "unresolved: 20")
+    require(TRANCHE2, "phase_3_entry: blocked_pending_phase_2_99_hard_exit")
+    require(MEDIA_FEDERATION, "`ct.platform.melanated-voices-platform`")
+    require(MEDIA_FEDERATION, "`MVP (Roku)` remains a separate unresolved lineage record")
+    require(D6, "`ct.platform.crownapps-thriveapps`")
+    require(PLATFORM_STATE, "53 source rows map one-to-one")
+    require(PLATFORM_STATE, "six remain canonical/child identity resolution items")
     require(CROSSWALK, "ct_count_002_row_classification: pass")
     require(CROSSWALK, "ct_count_002_all_canonical_ids_resolved: false")
     require(CROSSWALK, "phase_3_entry: blocked_pending_phase_2_99_hard_exit")
-    require(PLAN, "Stable-ID Tranche 1")
-    require(GATE, "29 unresolved")
-    require(CHARTER, "29 `unresolved`")
+    require(PLAN, "two evidence-backed stable-ID tranches")
+    require(GATE, "20 unresolved")
+    require(CHARTER, "20 `unresolved`")
 
     print(
         "S103 74-row canonical crosswalk validation PASSED: "
-        "74 source-aligned mapping rows, 35 exact, 2 aliases, 3 predecessors, "
-        "3 framework/platform splits, 2 composite splits, 29 unresolved, "
-        "49 S100 relationships, tranche-1 stable IDs pinned, Phase 3 remains fail-closed."
+        "74 source-aligned mapping rows, 43 exact, 3 aliases, 3 predecessors, "
+        "3 framework/platform splits, 2 composite splits, 20 unresolved, "
+        "49 S100 relationships, tranche-2 alias/media IDs pinned, MVP Roku remains fail-closed, "
+        "Phase 3 remains blocked."
     )
     return 0
 
