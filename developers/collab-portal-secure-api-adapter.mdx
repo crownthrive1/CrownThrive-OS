@@ -1,0 +1,270 @@
+---
+title: "Collab Portal Secure API Adapter"
+sidebarTitle: "Collab Portal API"
+description: "Verified OpenAPI 3.0.3 adapter contract for portal.crownthrive.com Secure API, covering CRM, project-status, marketing and Worlds endpoints, header authentication, current automation limits, security boundaries and Phase 2.99 integration requirements."
+icon: "plug"
+keywords: ["Collab Portal", "SuitePro", "Secure API", "OpenAPI", "projects", "CRM", "X-Public-ID", "X-Secret-Key", "Phase 2.99"]
+---
+
+# Collab Portal Secure API Adapter
+
+## Verified source contract
+
+The CrownThrive Collab Portal exposes a public-safe **OpenAPI 3.0.3** interactive specification at:
+
+`https://portal.crownthrive.com/secure-api/swagger`
+
+The declared API server/base URL is:
+
+`https://portal.crownthrive.com/secure-api/`
+
+The current uploaded specification snapshot is 115,116 bytes with SHA-256:
+
+`65a59d29859e0ba04993985c7e3bdfcd1d4e07b97f0a17cd9d1683eea6423376`
+
+This is contract evidence for supported HTTP surfaces. It is **not** evidence that the CrownThrive automation runtime currently possesses valid production credentials or has successfully executed a live authenticated write.
+
+## Authentication
+
+The specification declares two `apiKey` header schemes:
+
+```text
+X-Public-ID: <public API identifier>
+X-Secret-Key: <server-side secret>
+```
+
+Both headers are required by the documented secured operations.
+
+Production credentials must remain server-side. They must not be committed to this public repository, Mintlify, browser JavaScript, screenshots, Gmail, GitHub comments, logs or DAIL payload bodies.
+
+### Credential state
+
+```yaml
+contract_verified: true
+base_url_verified_from_openapi: true
+auth_header_names_verified: true
+production_secret_bound_to_agent_runtime: false
+live_authenticated_read_test: pending
+live_authenticated_write_test: pending
+```
+
+Any credential previously exposed in chat or screenshots must be treated as compromised and rotated before production automation.
+
+## Verified endpoint surface
+
+| Method | Path | Purpose | Current automation posture |
+| --- | --- | --- | --- |
+| GET | `/contact/meta` | Contact default/custom-field schema | read-only discovery candidate |
+| GET | `/contacts` | List contacts | read candidate after credential binding |
+| POST | `/contact` | Create contact | D2 write; not enabled by default |
+| GET | `/contact/{identifier}` | Find contact by UID/email | read candidate |
+| PUT | `/contact/{identifier}` | Update contact | D2 write; scoped use only |
+| GET | `/company/meta` | Company default/custom-field schema | read-only discovery candidate |
+| GET | `/companies` | List companies | read candidate |
+| POST | `/company` | Create company | D2 write; not needed for PM loop by default |
+| GET | `/company/{identifier}` | Find company by UID/name | read candidate |
+| PUT | `/company/{identifier}` | Update company | D2 write; scoped use only |
+| GET | `/project/meta` | Project account-specific field schema | required first discovery step |
+| GET | `/projects` | List projects | read candidate |
+| GET | `/project/{type}/{identifier}` | Find project by UID, exact name, substring or most recent | primary project lookup |
+| PUT | `/project/{type}/{identifier}` | Update a project | primary PM write candidate after validation |
+| POST | `/marketing/subscribe` | Subscribe contacts to marketing audiences | out of scope for PM loop unless separately approved |
+| GET | `/worlds` | List Worlds | optional; requires Worlds power-up |
+
+### Important negative findings
+
+The supplied OpenAPI contract does **not** expose:
+
+- a `POST /project` create-project endpoint;
+- task CRUD endpoints;
+- project-comment/note endpoints;
+- milestone CRUD endpoints;
+- file-upload endpoints;
+- signature endpoints;
+- webhook registration or webhook event endpoints.
+
+Those capabilities may exist elsewhere in SuitePro/Collab Portal, but they are **not verified by this Secure API specification**. The PM automation must not claim them until a separate authoritative contract is recovered.
+
+## Project-manager integration design
+
+Because the verified API can **read and update existing projects but cannot create projects**, the initial safe pattern is:
+
+1. use an existing manually created CrownThrive institutional project;
+2. discover the account-specific project schema with `GET /project/meta`;
+3. resolve the project with `GET /project/uid/{uid}` or exact-name lookup;
+4. preserve current fields and calculate a bounded update;
+5. write approved project status/information/custom-field values with `PUT /project/uid/{uid}`;
+6. immediately read the project back and verify the expected values;
+7. record the request/response evidence reference and result in the institutional changelog/DAIL layer;
+8. on 401/404/422/429 or semantic mismatch, do not retry mutation blindly; open a governed delta and fall back to GitHub \+ Gmail reporting.
+
+### Recommended Collab Portal project record
+
+A project such as **CrownThrive Institutional Build** should be pre-created in the portal and assigned a stable `ct.external.collab-project.*` mapping once its UID is retrieved.
+
+Recommended project/custom-field concepts, subject to `/project/meta` proving they exist or being created by an authorized portal admin:
+
+- Institutional Phase
+- Subphase / Workstream
+- Current Packet
+- Packet Status
+- Hard Entry Gate
+- Hard Exit Gate
+- Last GitHub PR
+- Last Merge Commit
+- Validation Result
+- Founder Review State
+- Blocker Summary
+- Next Packet
+- Last Successful Pass At
+- Documentation Impact Outcome
+
+Do not invent UUIDs for custom fields. Account-specific field IDs come from `GET /project/meta`.
+
+## Project schema constraints
+
+The public OpenAPI model exposes project fields including:
+
+- `uid`;
+- `name`;
+- `status`;
+- `start_date`;
+- `end_date`;
+- `due_time`;
+- `info_description` for staff-visible project information;
+- `info_title_client` and `info_description_client` for client-visible information;
+- `business_sector`;
+- `estimated_value` and currency;
+- time-spend requirement;
+- `project_custom_fields`;
+- client, secondary clients, teammates, team and leader on read views.
+
+The update model reuses project list/view components. Until a live test proves partial-update behavior, the adapter must not assume PUT is PATCH-like. The safe implementation is schema discovery \+ current-object read \+ validated update payload \+ read-after-write verification.
+
+## Project lookup types
+
+`GET/PUT /project/{type}/{identifier}` supports:
+
+- `uid` — exact project UID;
+- `name` — exact project name;
+- `contains_the_following` — project-name substring;
+- `most_recent` — identifier must be `true`.
+
+Production automation should prefer stable UID after initial discovery. Name/substring lookup is a bootstrap/recovery method, not the durable identity layer.
+
+## API rate and failure behavior
+
+The contract documents HTTP `429` for request-limit exhaustion and instructs users to inspect monthly usage in **Integrations → Secure API**. The portal UI snapshot separately showed a 20,000-request monthly account limit at the time of inspection. Treat the UI limit as a dated account-state observation, not a permanent provider guarantee.
+
+The OpenAPI example inside the generic `Error-429` schema still mentions a 200-request monthly maximum. That conflicts with the current account UI. The account UI is newer account-specific evidence; the generic example should not be used as CrownThrive's current limit.
+
+The adapter must maintain:
+
+- request budget and monthly usage awareness;
+- bounded exponential backoff for safe idempotent reads only;
+- no automatic mutation replay after unknown outcome;
+- read-after-write verification;
+- dead-letter/delta record for failed writes;
+- secret-safe logging;
+- request correlation IDs in CrownThrive's own adapter layer when implemented.
+
+## OpenAPI security-definition anomaly
+
+The contract correctly defines `Public-ID` and `Secret-Key` as `apiKey` header schemes. Several operations nevertheless place scope-like strings such as `read:contacts`, `write:contacts`, `read:project` or `write:project` inside the security requirement arrays.
+
+For OpenAPI `apiKey` schemes those arrays are not OAuth scope grants. They should be treated as provider documentation hints, not as a verified authorization model. Some labels are also inconsistent—for example certain company/project reads reference contact/write labels.
+
+Therefore:
+
+- do not derive least-privilege policy solely from those strings;
+- verify actual key permissions through the portal/admin configuration and live safe tests;
+- record observed behavior separately from the OpenAPI annotation;
+- never elevate a key because a Swagger label says `write:*`.
+
+## Dummy-request support
+
+The documentation provides dummy credentials for endpoints explicitly marked `dummy request allowed`:
+
+```text
+X-Public-ID: 00000000-0000-0000-0000-000000000000
+X-Secret-Key: DummySecretKey
+```
+
+Dummy mode can validate selected read-contract behavior without touching production data. It cannot prove CrownThrive production credential validity, project existence, account-specific custom fields or write capability.
+
+## Initial automation authority
+
+### Automatically permitted after credential binding and testing
+
+- `GET /project/meta`;
+- `GET /projects`;
+- `GET /project/uid/{uid}`;
+- read-after-write verification;
+- bounded read-only health/contract checks.
+
+### Conditionally permitted D1/D2 project update
+
+`PUT /project/uid/{uid}` may update **only** approved project-management status fields after:
+
+- project UID is pinned;
+- `/project/meta` field identities are pinned;
+- current project object is read;
+- proposed diff contains no billing, client authority, legal, financial, rights or sensitive-IP mutation;
+- validation passes;
+- read-after-write verification succeeds.
+
+A failed or ambiguous write opens `docs_delta_opened` / project-integration incident state and falls back to GitHub \+ Gmail.
+
+### Not part of the default PM loop
+
+- CRM contact/company creation or mutation;
+- marketing subscription changes;
+- Worlds assignment;
+- project economics changes;
+- client/staff assignment changes;
+- any operation whose effect cannot be verified from the contract/current object.
+
+## OpenAI agent boundary
+
+The Collab Portal's own OpenAI-provider setting is a **provider configuration surface**, not a secret vault for CrownThrive-wide automation. An OpenAI project API key used by portal-side agents must be newly generated, server-side, least-privilege/budgeted where supported, and independently rotatable from the portal API secret.
+
+No OpenAI or Collab Portal production secret belongs in CrownThrive-Support Git history.
+
+## Webhook state
+
+The user reports SuitePro/Collab Portal supports webhooks. The supplied Secure API OpenAPI contract does not describe webhook registration, event schemas, signing or retry semantics.
+
+Current state:
+
+```yaml
+webhook_capability_claim: user_confirmed/provider_ui_context
+webhook_contract_recovered: false
+webhook_signing_verified: false
+webhook_events_verified: false
+webhook_receiver_implemented: false
+```
+
+Before event-driven Collab Portal automation, recover the webhook documentation or admin configuration and register event names, payload schema, signature verification, retries, replay/idempotency and secret rotation.
+
+## Phase 2.99 hard checkpoint
+
+Collab Portal moves from `vendor_api_candidate` to **`api_contract_verified / live_auth_pending`**.
+
+Phase 2.99 must now produce:
+
+- stable adapter ID and platform relationship;
+- public-safe OpenAPI source reference and checksum;
+- base URL/auth-header contract;
+- endpoint inventory;
+- account-specific `/project/meta` evidence;
+- stable institutional project UID;
+- credential binding through a server-side secret store;
+- authenticated read test;
+- bounded update test on approved project-management fields;
+- read-after-write test;
+- 401/404/422/429 fixtures;
+- request-budget/incident rules;
+- webhook contract recovery as a separate lane;
+- rollback/fallback to GitHub \+ Gmail.
+
+No future phase may continue describing Collab Portal as having no verified API contract. Conversely, no future phase may describe the integration as production-write-ready until authenticated evidence completes the remaining checkpoints.

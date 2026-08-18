@@ -41,9 +41,34 @@ The Collab Portal captures execution evidence and approvals. CHLOM records the r
 
 ## Current automation-integration state
 
-The current institutional record does **not** yet contain a verified direct Collab Portal API/connector/write path for project-manager status automation. Until an authenticated endpoint, scopes, platform/service ID, audit semantics, idempotency/retry behavior and support owner are registered and tested, agents must not claim that a status update was posted directly to Collab Portal.
+The Collab Portal **Secure API contract is now verified** from the live OpenAPI 3.0.3 documentation and supplied specification snapshot. The canonical API server is `https://portal.crownthrive.com/secure-api/`, authenticated with server-side `X-Public-ID` and `X-Secret-Key` headers.
 
-For current project-management runs, the safe continuity path is GitHub/Mintlify as the governed work record plus Gmail project-status messages. Each material pass should include a clearly labeled `Collab Portal Update` section and retain the direct-integration gap in the [Current-State Validation Queue](/knowledge/current-state-validation-queue).
+The verified project surface currently supports:
+
+- `GET /project/meta` — account-specific project field schema;
+- `GET /projects` — project inventory;
+- `GET /project/{type}/{identifier}` — lookup by UID, exact name, substring or most-recent;
+- `PUT /project/{type}/{identifier}` — update an existing project.
+
+The Secure API contract does **not** currently expose project creation, task CRUD, comments, milestones, file uploads, signatures or webhook registration/event schemas. Those capabilities must remain separately unverified even if the portal UI supports them through other modules.
+
+Current integration state:
+
+```yaml
+api_contract_verified: true
+base_url_verified: true
+auth_header_contract_verified: true
+project_read_contract_verified: true
+project_update_contract_verified: true
+production_credential_bound_to_agent_runtime: false
+authenticated_read_test: pending
+authenticated_write_test: pending
+webhook_contract_recovered: false
+```
+
+Until credential binding and live read/write tests pass, agents must not claim that a status update was posted directly to Collab Portal. GitHub/Mintlify remains the governed work record and Gmail remains the notification fallback.
+
+See [Collab Portal Secure API Adapter](/developers/collab-portal-secure-api-adapter) for endpoint, security, rate-limit, testing and project-manager integration rules.
 
 ## Phase 3 implication
 

@@ -121,6 +121,29 @@ The next run receives:
 - next recommended sequence;
 - no-repeat list so already-settled work is not rediscovered.
 
+## Project-status projection and notification
+
+The governed run packet remains authoritative. External project-management systems receive projections of accepted run state rather than becoming competing sources of truth.
+
+### Collab Portal
+
+The Collab Portal Secure API contract is verified under `S101`, but direct hourly status mutation remains gated until rotated server-side credentials, project metadata, a stable project UID, an authenticated read and a bounded update/read-after-write test are complete.
+
+After certification, each material run may project approved fields into the pinned Collab Portal project using the [Collab Portal Secure API Adapter](/developers/collab-portal-secure-api-adapter). The default PM surface is limited to project metadata/list/find and bounded project update. Project creation, task/comment/milestone/file/signature and webhook operations are not part of the verified Secure API contract and must not be fabricated.
+
+If direct portal projection is unavailable or fails ambiguously, the run records `collab_portal_projection: blocked_or_pending`, preserves GitHub/Mintlify as the governed record, sends the required Gmail update, and continues safe parallel work.
+
+### Project-manager communications
+
+Every successful material pass should leave:
+
+- an actionable GitHub PR/issue status comment where an appropriate thread exists;
+- a final post-validation Gmail project update to the designated CrownThrive PM recipients;
+- Collab Portal projection evidence or an explicit integration-gap/blocker state;
+- the exact next packet and founder-review state.
+
+Failures requiring attention use a separate action-needed communication rather than silently disappearing.
+
 ## Audit trail
 
-The orchestrator must be able to answer: what was requested, what sources were used, what changed, who/what acted, what failed, what was approved, what was deployed and what remains.
+The orchestrator must be able to answer: what was requested, what sources were used, what changed, who/what acted, what failed, what was approved, what was deployed, what project-management projections/notifications were emitted, and what remains.
