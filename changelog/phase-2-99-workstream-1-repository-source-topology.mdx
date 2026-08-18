@@ -1,0 +1,187 @@
+---
+title: "Phase 2.99 Workstream 1 — Repository & Source Topology"
+sidebarTitle: "2.99 WS1 — Repository Topology"
+description: "The governed repository, source, evidence, IaC, policy-fixture and release-topology decision package for Phase 3 machine readiness."
+icon: "code-branch"
+keywords: ["Phase 2.99", "repository topology", "source control", "private core", "AGENTS.md", "provenance"]
+---
+
+# Phase 2.99 Workstream 1 — Repository and Source Topology
+
+## Status
+
+```yaml
+workstream: phase_2_99_workstream_1
+baseline_commit: 33f93d1659dc39ce04d748256397f2f4423db05d
+state: decision_complete_provisioning_gated
+connected_github_scope:
+  - crownthrive1/CrownThrive-Support
+other_repository_state: not_connected_not_absent
+production_secret_in_public_git: prohibited
+restricted_evidence_in_public_git: prohibited
+```
+
+This workstream converts the repository and source-control portion of Phase 2.99 into an explicit topology that Phase 3 can implement without treating the currently connected documentation repository as the whole institution.
+
+## Governing decision
+
+CrownThrive adopts a **federated repository topology with a governed private core**, not a single all-purpose monorepo and not a proliferation of ungoverned per-brand repositories.
+
+The durable rule is separation by authority and data class:
+
+1. public institutional documentation and safe architecture;
+2. private institutional schemas, registries and automation definitions;
+3. executable CHLOM/institutional services;
+4. adapters, MCP servers and SDKs;
+5. infrastructure-as-code and environment controls;
+6. private policy/evaluation fixtures;
+7. restricted evidence and source masters outside ordinary Git history;
+8. independently recoverable exports, release tags and provenance receipts.
+
+Repository names below are **target logical identities**. Unless independently verified, they are not claims that a repository already exists or is connected.
+
+## Repository topology
+
+| Logical repository ID | Target role | Visibility | Current state | Git may contain | Git must not contain |
+| --- | --- | --- | --- | --- | --- |
+| `repo.crownthrive.support` | CrownThrive-Support / Mintlify institutional projection | public-safe | `connected_active` | public doctrine, support, safe ADRs, changelogs, public schemas/examples | secrets, raw contracts, private evidence, customer records, unreleased masters |
+| `repo.crownthrive.os` | private institutional registry and machine-readable source of truth | private | `target_not_connected` | schemas, registry seeds, internal ADR metadata, run packets, automation config, private-safe references | production credentials, raw privileged communications, unrestricted master binaries |
+| `repo.chlom.services` | CHLOM and institutional service implementations | private by default | `target_not_connected` | service source, tests, migrations, protocol contracts, generated interfaces | unrestricted evidence blobs, long-lived secrets |
+| `repo.crownthrive.integrations` | provider adapters, MCP servers, SDKs and shared integration contracts | private with publishable packages as governed outputs | `target_not_connected` | adapters, OpenAPI/MCP manifests, contract tests, SDK generation | provider secrets, customer data, hidden operational tokens |
+| `repo.crownthrive.infrastructure` | IaC, environment topology, deployment policy and recovery automation | private | `target_not_connected` | Terraform/Pulumi-equivalent source, policy-as-code, environment manifests, backup/restore automation | plaintext keys, break-glass credentials, private evidence |
+| `repo.crownthrive.evals` | private policy, safety, rights and agent evaluation fixtures | private/restricted | `target_not_connected` | redacted/synthetic fixtures, evaluation definitions, expected outputs, risk tests | unnecessary PII, privileged evidence, reusable secrets |
+
+A future ADR may consolidate executable repositories into a governed monorepo if build coupling, staffing, release atomicity and access-control evidence justify it. Consolidation must not collapse public/private or restricted-data boundaries.
+
+## Source and evidence topology
+
+Git is a source-control layer, not the universal evidence vault.
+
+Restricted contracts, assignments, signed releases, source masters, private financial schedules, sensitive legal evidence and protected media belong in access-controlled object/document storage. Git records may contain stable source IDs, checksums, classification, effective dates, owners, retention state and authorized retrieval references.
+
+```yaml
+source_reference:
+  source_id:
+  authority_tier:
+  classification:
+  checksum:
+  storage_class:
+  object_reference:
+  owner:
+  effective_at:
+  supersedes:
+  retention_profile:
+  legal_hold_state:
+```
+
+No public documentation path may resolve a restricted object reference directly.
+
+## Repository-to-platform mapping
+
+Every platform and service record must eventually declare:
+
+```yaml
+platform_id:
+source_repository_ids: []
+deployment_repository_id:
+documentation_repository_id: repo.crownthrive.support
+infrastructure_repository_id:
+api_manifest_id:
+mcp_manifest_ids: []
+docs_impact_targets: []
+repository_state: connected | not_connected | unavailable | archived | unknown
+last_verified_at:
+```
+
+`not_connected` is not equivalent to `nonexistent`. A repository may be known through deployment, provider, source-package or historical evidence while remaining inaccessible to the documentation workflow.
+
+## Branch and change-control baseline
+
+Phase 3 repositories inherit these minimum controls:
+
+- protected default branch;
+- no direct production release from unreviewed local state;
+- scoped feature/fix branches;
+- required review proportional to D0–D3 risk;
+- CI validation before merge for schemas, tests, policy checks and documentation impact;
+- secret scanning and dependency review;
+- signed or otherwise attributable releases where supported;
+- immutable release tags for production baselines;
+- versioned migration and rollback instructions;
+- explicit owner and support path;
+- repository-specific `AGENTS.md` defining allowed tools, forbidden data, test commands, approval boundaries and documentation obligations.
+
+## AGENTS.md institutional contract
+
+Every executable or machine-seed repository should define at minimum:
+
+```yaml
+repository_role:
+allowed_data_classes: []
+forbidden_data_classes: []
+default_branch:
+required_tests: []
+docs_impact_contract: required
+risk_classes: [D0, D1, D2, D3]
+self_approval: prohibited
+production_write_authority:
+secret_handling:
+release_process:
+rollback_process:
+incident_pause:
+```
+
+An agent instruction file may narrow authority; it cannot grant authority beyond institutional policy or the invoking identity.
+
+## Provenance and release receipts
+
+Accepted Phase 3 releases should be traceable through:
+
+- source repository and commit;
+- review/approval record;
+- CI/evaluation result;
+- schema/API/policy version where applicable;
+- build artifact digest;
+- deployment/environment reference;
+- documentation-impact result;
+- migration and rollback references;
+- DAIL/change-event record.
+
+Where artifact signing or SLSA-compatible provenance is adopted, its receipt supplements CrownThrive authority and evidence records rather than replacing them.
+
+## Source mirrors, exports and vendor exit
+
+Critical repositories and machine registries require an independent continuity path:
+
+- periodic Git bundle/archive or equivalent repository export;
+- release-tag inventory;
+- schema and registry export;
+- off-provider object/evidence index backup;
+- restore test;
+- owner and recovery credential custody record;
+- provider-exit procedure.
+
+A SaaS outage, account suspension or repository-provider loss must not erase CrownThrive's institutional history.
+
+## Provisioning gate
+
+This workstream does **not** provision or modify unconnected repositories. Under the current execution scope, only `crownthrive1/CrownThrive-Support` is treated as connected and mutable.
+
+Before a target repository is promoted from `target_not_connected` to `active`, record:
+
+1. exact repository owner/name or service identifier;
+2. visibility and access model;
+3. data classes permitted/prohibited;
+4. branch protection and review settings;
+5. secret-management path;
+6. CI/evaluation baseline;
+7. backup/export method;
+8. documentation-impact mapping;
+9. owner and incident path;
+10. first signed/attributable baseline commit or release.
+
+## Phase 3 effect
+
+Phase 3 may generate skeletons against these logical repository IDs, but deployment automation must fail closed when an expected private repository, credential path, environment or evidence store remains `target_not_connected`, `unknown` or `unverified`.
+
+Workstream 2 may now design the private institutional data architecture against this topology without assuming that GitHub, Mintlify, a single database or a single repository is the whole system.
