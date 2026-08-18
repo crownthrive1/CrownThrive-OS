@@ -1,0 +1,121 @@
+---
+title: "Phase 2.99 — Collab Portal Webhooks & Runtime"
+sidebarTitle: "2.99 Collab Webhooks"
+description: "Verifies current Collab Portal Project webhook events, establishes S102, deploys a fail-closed Supabase PM adapter runtime, preserves sample-versus-live project identity boundaries, and propagates the new integration state into later phase gates."
+icon: "webhook"
+keywords: ["Phase 2.99", "Collab Portal", "webhooks", "Supabase", "Project Created", "Project Updated", "Project Deleted", "runtime"]
+---
+
+# Phase 2.99 — Collab Portal Webhooks & Runtime
+
+## Baseline
+
+- **Repository:** `crownthrive1/CrownThrive-Support`
+- **Top-level phase:** 2
+- **Subphase:** 2.99
+- **Prior API evidence:** `S101`
+- **New webhook evidence:** `S102`
+- **Phase 3 entry:** `blocked_pending_phase_2_99_hard_exit`
+
+## What changed
+
+Current first-party Collab Portal UI evidence verifies a configurable outbound webhook surface and distinct **Project Created**, **Project Updated** and **Project Deleted** event toggles. The webhook template builder exposes selectable payload data, and a Project Created preview confirms project, assignment and project-custom-field payload families.
+
+The preview contains a UUID-like `project_uid`, but `project_name` and several other values are null. That value is therefore a **preview/sample identity**, not the CrownThrive Institutional Build project UID, until authenticated project lookup establishes the relationship.
+
+## Secure runtime established
+
+The connected CrownThrive Supabase project was restored to healthy service and a server-side Edge Function named `collab-portal-pm` version 1 was deployed.
+
+The runtime is deliberately **fail closed**:
+
+```yaml
+provider: Supabase Edge Functions
+function: collab-portal-pm
+status: active
+caller_authentication: Supabase JWT required
+collab_portal_secret_in_source: false
+credential_binding: pending
+write_gate_default: closed
+reads:
+  - health
+  - project_meta
+  - find_project
+conditional_write:
+  - update_project_status
+allowed_write_fields:
+  - status
+  - info_description
+  - project_custom_fields
+read_before_write: required
+read_after_write: required
+blind_mutation_retry: prohibited
+```
+
+The function reads Collab Portal credentials only from server-side environment variables and contains no production credential values. Because the current Supabase connector can deploy functions but does not expose project-secret management, credential binding remains a real deployment dependency outside the public documentation workflow.
+
+## Why this design
+
+The objective is not maximum portal authority. It is a narrow, auditable project-status projection that can eventually participate in the hourly CrownThrive PM loop without making Collab Portal the institutional source of truth.
+
+The adapter is built so that:
+
+- no credential can be committed in public source;
+- writes cannot occur until explicitly enabled server-side;
+- the real project is resolved by authenticated lookup rather than screenshot inference;
+- only PM status/information/custom-field state can be changed initially;
+- each write is preceded by a read and followed by a read-back comparison;
+- ambiguous outcomes are not automatically replayed;
+- GitHub/Mintlify and Gmail remain the fallback continuity path.
+
+## Webhook gate
+
+The webhook capability is now `ui_contract_verified`, not `unknown`, but it is not production-certified.
+
+Still required:
+
+- sender authentication/signature or another fail-closed integrity mechanism;
+- delivery-attempt identity;
+- retry timing/limits;
+- replay behavior;
+- receiver idempotency/deduplication;
+- observability and incident handling;
+- polling/read fallback.
+
+Until those are known and tested, the receiver is not activated as an authoritative event source.
+
+## Downstream phase propagation
+
+- **Phase 3:** external-adapter pilot now includes both bounded outbound API projection and inbound project-event receiver certification.
+- **Phase 4:** event-driven Collab Portal synchronization becomes eligible after sender-integrity, idempotency and replay tests pass.
+- **Phase 5:** CRM/marketing writes remain separately purpose/consent gated; PM authority does not imply marketing authority.
+- **Phase 8:** project-state evidence may feed portfolio reporting only after semantics, account boundaries and reconciliation are certified.
+- **Phase 10:** preserve adapter configuration, webhook event/export mapping and a polling/read fallback so continuity does not depend on SuitePro delivery.
+
+## Hard-gate state
+
+```yaml
+S101_api_contract: pass
+S102_webhook_ui_contract: pass
+server_side_runtime: pass_fail_closed_unconfigured
+credential_binding: pending
+authenticated_project_meta: pending
+institutional_project_uid: pending
+bounded_write_and_readback: pending
+webhook_sender_integrity: pending
+phase_2_99_hard_exit: not_met
+phase_3_hard_entry: not_met
+```
+
+## Exact next packet
+
+1. bind rotated Collab Portal credentials through approved Supabase server-side secret management;
+2. execute authenticated `GET /project/meta`;
+3. resolve the actual named CrownThrive institutional project and pin its UID;
+4. map only approved PM fields;
+5. run authenticated project reads;
+6. enable one bounded PM update and verify it immediately by read-back;
+7. determine webhook sender-integrity/retry/replay behavior;
+8. only then deploy/activate an inbound Project Created/Updated/Deleted receiver.
+
+This is progress inside Phase 2.99, not permission to enter Phase 3.
