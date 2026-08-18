@@ -1,0 +1,175 @@
+---
+title: "Phase 2.99 — Collab Portal Secure API Integration"
+sidebarTitle: "2.99 Collab Portal API"
+description: "Phase 2.99 evidence and integration checkpoint that verifies the Collab Portal OpenAPI contract, establishes the bounded project-manager adapter, hardens CI, propagates the finding through the ten-phase roadmap and preserves live credential/write/webhook gates."
+icon: "plug"
+keywords: ["Phase 2.99", "Collab Portal", "Secure API", "OpenAPI", "SuitePro", "project management", "CI", "roadmap"]
+---
+
+# Phase 2.99 — Collab Portal Secure API Integration
+
+## Baseline
+
+- **Repository scope:** `crownthrive1/CrownThrive-Support` only
+- **Institutional phase:** Phase 2
+- **Subphase:** Phase 2.99
+- **Evidence source:** `S101`
+- **Public Swagger:** `https://portal.crownthrive.com/secure-api/swagger`
+- **API base:** `https://portal.crownthrive.com/secure-api/`
+- **OpenAPI:** `3.0.3`
+- **Snapshot SHA-256:** `65a59d29859e0ba04993985c7e3bdfcd1d4e07b97f0a17cd9d1683eea6423376`
+
+## What changed
+
+Collab Portal is no longer represented as a generic `vendor_api_candidate` with no verified interface contract.
+
+The supplied first-party OpenAPI specification verifies a concrete Secure API with paired `X-Public-ID` / `X-Secret-Key` headers and sixteen operations across CRM contacts, CRM companies, projects, marketing-audience subscription and Worlds.
+
+For CrownThrive's hourly institutional project-manager loop, the intentionally narrow initial contract is:
+
+```text
+GET /project/meta
+GET /projects
+GET /project/{type}/{identifier}
+PUT /project/{type}/{identifier}
+```
+
+This allows a future certified adapter to project accepted institutional execution state into an **existing** Collab Portal project.
+
+## Why the integration is bounded
+
+The recovered Secure API specification does not expose project creation, task CRUD, project comments, milestone CRUD, file upload, signature operations, webhook registration or webhook event schemas.
+
+Those features may exist elsewhere in SuitePro/Collab Portal, but allowing the automation to assume them would violate CrownThrive's evidence and anti-hallucination rules.
+
+The initial adapter therefore treats Collab Portal as a **project-status projection**, not a replacement operations database and not an institutional authority.
+
+## Machine contract
+
+A public-safe machine manifest is added at:
+
+`developers/manifests/collab-portal-secure-api.adapter.json`
+
+It pins:
+
+- stable adapter/platform/API/source IDs;
+- OpenAPI/base/Swagger/checksum identity;
+- auth header names without storing credential values;
+- the exact sixteen-operation inventory;
+- project lookup types;
+- allowed PM reads;
+- conditionally permitted project update;
+- default-excluded CRM/marketing/economic/assignment writes;
+- negative capability list;
+- account-UI versus generic-429 rate-limit evidence;
+- live-certification state.
+
+## CI hardening
+
+A new standard-library validator, `scripts/validate_collab_portal_adapter.py`, verifies the public-safe manifest without needing a live production credential.
+
+It fails CI when:
+
+- stable IDs drift;
+- S101 base/Swagger/checksum identity changes silently;
+- header names or server-side-secret rule changes;
+- the recovered operation set changes without a reviewed contract update;
+- hourly PM read/write authority expands silently;
+- negative capabilities disappear;
+- raw credential-shaped values enter the manifest;
+- live/certification states use unsupported values.
+
+The Documentation Governance workflow now syntax-checks and executes this validator in addition to the repository-wide documentation validator.
+
+## Security correction
+
+The recovery session included screenshots/chat content containing credential material. Those exposed values are not copied into the repository or documentation and must be rotated before any production binding.
+
+Required live state remains:
+
+```yaml
+secure_api_secret: rotate_then_bind_server_side
+openai_project_key: create_new_and_bind_server_side
+project_meta: pending
+project_uid: pending
+authenticated_read: pending
+bounded_write: pending
+read_after_write: pending
+webhook_contract: not_recovered
+```
+
+## OpenAPI quality correction
+
+The specification defines API-key header schemes but includes OAuth-like scope strings in security requirement arrays. These strings are not OAuth scopes for an `apiKey` scheme, and some operation labels are inconsistent.
+
+CrownThrive therefore separates:
+
+1. **contract header identity** — verified;
+2. **provider annotation strings** — preserved but non-authoritative for least privilege;
+3. **observed live permission behavior** — pending authenticated tests.
+
+The account UI also showed a current 20,000-request monthly limit while the generic Error-429 example mentions 200. Both records are preserved; the account UI is the newer account-specific dated observation.
+
+## Institutional boundaries
+
+- GitHub/Mintlify remains the governed work record.
+- CrownThrive institutional records govern approved meaning and gates.
+- Collab Portal receives bounded execution/project-status projections.
+- Gmail remains the human/audit notification fallback.
+- CRM and marketing writes are not inherited by the project-manager agent.
+- OpenAI provider configuration inside Collab Portal is not CrownThrive's global secret or model-policy authority.
+
+## Downstream roadmap changes
+
+This pass materially updates the ten-phase roadmap:
+
+- **Phase 3:** Collab Portal becomes a concrete external-adapter pilot with secret references, typed contract, error fixtures, DAIL evidence and bounded mutation tests.
+- **Phase 4:** a certified adapter can project institutional execution state into one pinned project.
+- **Phase 5:** CRM/marketing use remains separately purpose/consent gated; marketing subscribe is not a PM function.
+- **Phase 6:** the adapter becomes a reusable certification pattern for controlled external integrations.
+- **Phase 8:** portfolio/Holdings project reporting remains gated by role/data/export controls.
+- **Phase 10:** continuity must include portal field/project mapping, credential rotation, export/vendor exit and GitHub-based reconstruction.
+
+No future phase may regress the API contract to `unknown`, and no future phase may promote it to production-write-ready before the remaining evidence gates pass.
+
+## Hard entry gate for live PM projection
+
+All must pass:
+
+- exposed Secure API secret rotated;
+- new server-side credential reference established;
+- institutional project exists;
+- project UID pinned;
+- `GET /project/meta` retrieved with production auth;
+- allowed custom-field mapping approved;
+- safe authenticated project read succeeds;
+- mutation payload is minimized and validated.
+
+## Hard exit gate for adapter certification
+
+All must pass:
+
+- one bounded project update succeeds;
+- read-after-write verifies exact expected state;
+- 401, 404, 422 and 429 behavior has fixtures/runbook handling;
+- unknown-outcome mutation is not automatically replayed;
+- request budget and secret-safe logging are implemented;
+- fallback GitHub \+ Gmail path is tested;
+- credential rotation/owner/support and vendor-exit records exist;
+- webhook lane is either recovered/certified separately or explicitly deferred without being required for PM status projection.
+
+## What is next
+
+1. rotate the exposed portal and OpenAI credentials outside Git/documentation;
+2. bind a suitable secure HTTP/adapter runtime when available;
+3. retrieve `GET /project/meta`;
+4. find/pin the CrownThrive institutional project UID;
+5. map only approved PM fields;
+6. run authenticated read-only tests;
+7. execute one bounded status update and verify it by read-back;
+8. then update the hourly PM automation from `portal write gated` to `certified project projection`;
+9. separately recover SuitePro webhook/task/comment/milestone/file/signature contracts if CrownThrive wants those automated later.
+
+Until those steps pass, the correct operational state is:
+
+`contract_verified / live_auth_pending / direct_project_write_gated`.
