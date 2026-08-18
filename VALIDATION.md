@@ -1,0 +1,109 @@
+# CrownThrive Institutional Validation Receipt
+
+This record preserves machine-verifiable evidence for the current public-safe CrownThrive Operating System source tree. It does not certify the legal sufficiency, production deployment, rights clearance, security posture, or operational readiness of every platform described by the documentation.
+
+## Current baseline composition
+
+The combined baseline under validation contains:
+
+1. **Phase 2.97.1 / release `2.7.9.1` institutional hardening**
+   - PR: `#8`
+   - accepted release merge: `52762bd4bd629ea8012fac6ceb3790d0955b0499`
+
+2. **Post-merge accepted-status reconciliation**
+   - PR: `#10`
+   - reconciliation merge: `1de1d2a059333c92760f60c1ebacad2a6e4651e2`
+
+3. **Phase 2.98 Pass A — CrownThrive.com institutional extraction**
+   - PR: `#9`
+   - extraction merge: `5ae215e772ad6acab48e58b422efc26c946869e7`
+
+The ordering above is logical rather than PR-number order. PR #9 and PR #10 were developed concurrently and merged into the same accepted lineage.
+
+## Component validation evidence
+
+### PR #10 — effective-status reconciliation
+
+- Workflow: `Documentation Governance`
+- Run ID: `32083585215`
+- Job ID: `95551302701`
+- Validated merge ref: `81ca681ef9de0eb8c4b80af91bc5cb3c7c6ab6cf`
+- Result: `success`
+- Navigation entries: `180`
+- MDX files: `180`
+- Text files: `193`
+- Internal links: `28`
+- Warnings: `0`
+- Python syntax: passed
+- Whitespace/conflict-marker checks: passed
+
+### PR #9 — Phase 2.98 Pass A
+
+- Workflow: `Documentation Governance`
+- Run ID: `32083574586`
+- Job ID: `95551270603`
+- Validated merge ref: `ef63b66d8790a4793eff83ad73d1881a972f80bf`
+- Result: `success`
+- Navigation entries: `189`
+- MDX files: `189`
+- Text files: `202`
+- Internal links: `28`
+- Warnings: `0`
+- Python syntax: passed
+- Whitespace/conflict-marker checks: passed
+
+## Combined-tree validation gate
+
+This receipt pull request exists because the two component workflows above validated their own merge refs against the prior `52762bd...` base. The current `main` tree includes both accepted lines of work. The Documentation Governance workflow on this receipt branch must therefore validate the combined tree before this receipt is merged.
+
+Current gate state: `pending_combined_validation`.
+
+The receipt will be updated with the first combined-tree run ID, job ID, validated merge ref, counts, warnings, and result. The final receipt commit must then receive its own successful workflow run before merge.
+
+## Validator scope
+
+The repository validator currently checks:
+
+- required CrownThrive repository governance files;
+- `docs.json` structure and canonical navigation tree;
+- duplicate navigation routes;
+- missing navigated MDX files;
+- malformed or missing frontmatter;
+- frontmatter-only or insubstantial navigated pages;
+- missing H1 headings;
+- unlisted MDX warnings;
+- Mintlify Starter Kit residue in root and brand assets;
+- CrownThrive identity and valid XML in SVG assets;
+- public navbar/footer separation from Mintlify administration;
+- CrownThrive support-contact presence;
+- credential-shaped secret patterns;
+- broken internal documentation links;
+- Python validator syntax;
+- whitespace defects and unresolved merge-conflict markers.
+
+## What this validation does not prove
+
+A successful documentation-governance run does not independently prove:
+
+- every external link is currently reachable beyond the configured source checks;
+- every documented API endpoint is authenticated, authorized, version-compatible, or production-active;
+- every product checkout, entitlement, file, license, or refund path works;
+- every platform, room, universe, count, metric, legal claim, registration, filing, or partnership is current;
+- private systems contain no vulnerabilities or misconfigurations;
+- every historical source has been recovered;
+- every CrownThrive mark is registered;
+- every CHLOM, MM Suites, SSO, cloud, decentralized, ZK, DID, oracle, token, treasury, or LEX component is deployed;
+- professional legal, accounting, tax, franchise, securities, privacy, or security review has occurred.
+
+Those states require their own evidence, tests, approvals, and effective-dated records.
+
+## Inherited next gates
+
+After combined validation, the repository remains in:
+
+- Phase 2.97.1 accepted governance baseline;
+- Phase 2.98 active platform extraction;
+- Phase 2.99 pending private-core and machine-seed preparation;
+- Phase 3.0 not yet accepted for broad runtime implementation.
+
+The final public Help Center, authenticated role portal, custom CrownThrive support domain, restricted evidence system, centralized control-plane runtime, platform MCP fleet, and selectively decentralized CHLOM infrastructure remain separate gated releases.
