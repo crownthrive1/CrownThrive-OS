@@ -3,9 +3,9 @@
 
 This validator protects source-row completeness, mapping-type distribution,
 S100 cross-source relationship count, critical alias/predecessor/split mappings,
-and the fail-closed Phase 3 gate. It does not treat an unresolved mapping as a
-failure: unresolved is an intentional machine state until stronger evidence or
-adjudication exists.
+first-tranche stable-ID completion, and the fail-closed Phase 3 gate. It does
+not treat an unresolved mapping as a failure: unresolved is an intentional
+machine state until stronger evidence or adjudication exists.
 """
 
 from __future__ import annotations
@@ -18,8 +18,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "knowledge/phase-2-99-workstream-3a-phase-2-7-74-platform-framework-source-seed.mdx"
 CROSSWALK = ROOT / "knowledge/phase-2-99-workstream-3a-s103-74-canonical-identity-crosswalk.mdx"
+S100 = ROOT / "knowledge/phase-2-99-workstream-3a-holdings-68-source-row-identity-seed.mdx"
+TRANCHE = ROOT / "changelog/phase-2-99-workstream-3a-s103-stable-id-tranche-1.mdx"
+THRIVERELAY = ROOT / "platforms/thriverelay-institutional-registry.mdx"
+THRIVEMAPS = ROOT / "platforms/thrivemaps-institutional-registry.mdx"
+BACKROAD = ROOT / "platforms/backroad-fm-institutional-registry.mdx"
+ADAPTER_MATRIX = ROOT / "developers/platform-api-adapter-matrix.mdx"
 PLAN = ROOT / "changelog/phase-2-99-plan.mdx"
 GATE = ROOT / "technology/phase-3-readiness-gate.mdx"
+CHARTER = ROOT / "standards/ten-phase-institutional-program-charter.mdx"
 
 SOURCE_RE = re.compile(
     r'^- id: (S103-PF-\d{3}); source_index: \d+; source_name: "([^"]+)"$',
@@ -31,31 +38,50 @@ ROW_RE = re.compile(
 )
 
 EXPECTED_TYPES = {
-    "exact": 29,
+    "exact": 35,
     "alias": 2,
     "predecessor": 3,
     "framework_platform_split": 3,
     "composite_split": 2,
-    "unresolved": 35,
+    "unresolved": 29,
 }
 
 CRITICAL = {
     "S103-PF-001": ("composite_split", "ct.org.crownthrive-llc", "ct.platform.crownthrive"),
     "S103-PF-002": ("framework_platform_split", "ct.framework.chlom", "ct.platform.chlom"),
     "S103-PF-005": ("framework_platform_split", "ct.framework.mm-suites", "ct.platform.mm-suites"),
+    "S103-PF-009": ("exact", "ct.platform.thrivetools"),
+    "S103-PF-010": ("exact", "ct.platform.thriverelay"),
     "S103-PF-019": ("framework_platform_split", "ct.framework.mm-suites", "ct.platform.mm-suites"),
     "S103-PF-021": ("alias", "ct.platform.thriveseat"),
+    "S103-PF-022": ("exact", "ct.platform.the-mane-experience"),
+    "S103-PF-024": ("exact", "ct.platform.backroad-fm"),
+    "S103-PF-054": ("exact", "ct.platform.kjv-sermon-toolkit"),
     "S103-PF-057": ("predecessor", "ct.platform.ops-oasis"),
     "S103-PF-065": ("composite_split", "ct.platform.thrivesupport", "ct.platform.crownthrive-support"),
     "S103-PF-066": ("predecessor", "ct.platform.virality-music"),
     "S103-PF-067": ("predecessor", "ct.platform.crownthrive-studios"),
     "S103-PF-068": ("alias", "ct.platform.ops-oasis"),
+    "S103-PF-069": ("exact", "ct.platform.thrivemaps"),
+}
+
+TRANCHE_S100 = {
+    "S100-PORT-015": "ct.platform.thrivemaps",
+    "S100-PORT-017": "ct.platform.thrivetools",
+    "S100-PORT-030": "ct.platform.the-mane-experience",
 }
 
 
 def fail(message: str) -> None:
     print(f"ERROR: {message}")
     raise SystemExit(1)
+
+
+def require(path: Path, fragment: str) -> None:
+    if not path.is_file():
+        fail(f"Missing required file: {path.relative_to(ROOT)}")
+    if fragment not in path.read_text(encoding="utf-8"):
+        fail(f"Required fragment {fragment!r} missing from {path.relative_to(ROOT)}")
 
 
 def main() -> int:
@@ -118,23 +144,32 @@ def main() -> int:
             if fragment not in canonical:
                 fail(f"Critical canonical reference {fragment!r} missing from {row_id}")
 
-    required_fragments = [
-        (CROSSWALK, "ct_count_002_row_classification: pass"),
-        (CROSSWALK, "ct_count_002_all_canonical_ids_resolved: false"),
-        (CROSSWALK, "phase_3_entry: blocked_pending_phase_2_99_hard_exit"),
-        (PLAN, "S103 74-Row Canonical Identity Crosswalk"),
-        (GATE, "S103 74-Row Canonical Identity Crosswalk"),
-    ]
-    for path, fragment in required_fragments:
-        text = path.read_text(encoding="utf-8")
-        if fragment not in text:
-            fail(f"Required crosswalk-governance fragment {fragment!r} missing from {path.relative_to(ROOT)}")
+    s100_text = S100.read_text(encoding="utf-8")
+    for source_row, canonical_id in TRANCHE_S100.items():
+        matching = [line for line in s100_text.splitlines() if source_row in line]
+        if len(matching) != 1:
+            fail(f"Expected exactly one S100 row for {source_row}, found {len(matching)}")
+        if canonical_id not in matching[0]:
+            fail(f"S100 row {source_row} missing stable ID {canonical_id}")
+
+    require(THRIVERELAY, "Stable platform ID: `ct.platform.thriverelay`")
+    require(THRIVEMAPS, "Stable platform ID: `ct.platform.thrivemaps`")
+    require(BACKROAD, "Stable platform ID:** `ct.platform.backroad-fm`")
+    require(ADAPTER_MATRIX, "`ct.platform.kjv-sermon-toolkit`")
+    require(TRANCHE, "s103_unresolved: 29")
+    require(TRANCHE, "phase_3_entry: blocked_pending_phase_2_99_hard_exit")
+    require(CROSSWALK, "ct_count_002_row_classification: pass")
+    require(CROSSWALK, "ct_count_002_all_canonical_ids_resolved: false")
+    require(CROSSWALK, "phase_3_entry: blocked_pending_phase_2_99_hard_exit")
+    require(PLAN, "Stable-ID Tranche 1")
+    require(GATE, "29 unresolved")
+    require(CHARTER, "29 `unresolved`")
 
     print(
         "S103 74-row canonical crosswalk validation PASSED: "
-        "74 source-aligned mapping rows, 29 exact, 2 aliases, 3 predecessors, "
-        "3 framework/platform splits, 2 composite splits, 35 unresolved, "
-        "49 S100 relationships, Phase 3 remains fail-closed."
+        "74 source-aligned mapping rows, 35 exact, 2 aliases, 3 predecessors, "
+        "3 framework/platform splits, 2 composite splits, 29 unresolved, "
+        "49 S100 relationships, tranche-1 stable IDs pinned, Phase 3 remains fail-closed."
     )
     return 0
 
