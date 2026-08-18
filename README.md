@@ -9,7 +9,7 @@ It documents the governed relationship among CrownThrive doctrine, platforms, co
 - **Human program phase:** Phase 2.97 — Governance, Standards and Protection
 - **Human patch:** Phase 2.97.1 — Institutional Hardening and Re-Audit
 - **Machine release:** `2.7.9.1`
-- **Release state:** candidate until the governing pull request is reviewed and merged
+- **Release state:** accepted and merged into `main` as `52762bd4bd629ea8012fac6ceb3790d0955b0499`
 - **Deployment posture:** phased Mintlify working/review projection
 - **Next gates:** Phase 2.98 platform extraction, then Phase 2.99 private-core and machine-seed preparation
 
