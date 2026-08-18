@@ -1,0 +1,277 @@
+---
+title: "BrandCards Institutional Registry"
+sidebarTitle: "BrandCards Registry"
+description: "Evidence-controlled registry for BrandCards as CrownThrive's portable identity/contact/profile/share surface, including public/private profile fields, QR/NFC handoffs, consent, analytics, commerce/referral routing, APIs, lifecycle and recovery boundaries."
+icon: "id-card"
+keywords: ["BrandCards", "digital business card", "profile", "QR", "NFC", "identity", "CrownThrive ID", "Phase 2.98"]
+---
+
+# BrandCards Institutional Registry
+
+## Institutional identity
+
+BrandCards is a CrownThrive profile/share/contact surface intended to make a person, creator, professional, brand, partner or organization portable across digital and phygital touchpoints without replacing the durable institutional identity layer.
+
+- **Stable platform ID:** `ct.platform.brandcards`
+- **Canonical identity dependency:** CrownThrive ID
+- **Primary corridor:** Technology & Operating Spine / Education, Talent & Community / Growth & Distribution
+- **Phase:** 2.98 Pass D4
+- **Current implementation state:** `recovered_role_current_deployment_unverified`
+
+The recovered portfolio and Phase 2.7 materials establish BrandCards as a distinct platform record requiring explicit disposition. The Holdings operating plan also uses BrandCards as part of the progression/business-building path. Current engine, source repository, domain, provider account, live profile count, QR/NFC implementation, pricing and API state remain verification-gated.
+
+<Warning>
+  BrandCards is not CrownThrive ID. A public profile or QR code is a projection/handoff surface; identity authority, roles, consent, entitlements and sensitive account records remain in their governing systems.
+</Warning>
+
+## Primary use cases
+
+Potential governed uses include:
+
+- professional/business profile;
+- creator/artist profile;
+- organization/team card;
+- contact exchange;
+- social/link hub;
+- portfolio or service discovery;
+- Locticians/provider handoff;
+- affiliate/ambassador referral route;
+- event/networking profile;
+- kiosk/TapStation QR/NFC handoff;
+- product/license/support link routing;
+- selected public credential or verification badges;
+- campaign/AdLuxe landing context.
+
+A use case is not production capability until the current deployment supports it.
+
+## Stable card object
+
+```yaml
+brandcard_id:
+owner_actor_or_org_id:
+profile_type:
+public_slug:
+display_name:
+headline:
+public_bio:
+avatar_or_logo_asset_id:
+verified_badges: []
+public_links: []
+contact_methods: []
+service_or_offer_refs: []
+affiliate_or_campaign_refs: []
+location_refs: []
+qr_payload_version:
+nfc_payload_version:
+visibility:
+consent_profile_id:
+analytics_profile_id:
+canonical_identity_link_state:
+status: draft|active|paused|archived|retired
+version:
+last_verified_at:
+evidence_refs: []
+```
+
+## Data-class separation
+
+Public cards may expose only explicitly published fields. Restricted data remains in CrownThrive ID or the relevant source platform.
+
+### Public-safe examples
+
+- display name;
+- public brand/business name;
+- public bio/headline;
+- approved photo/logo;
+- public social/profile links;
+- public business contact channel;
+- public services/offers;
+- approved verification badge;
+- public location or service area when intentionally disclosed.
+
+### Restricted examples
+
+- legal identity documents;
+- home address unless explicitly published for a business purpose;
+- private email/phone;
+- payment/bank/tax data;
+- internal role/permission details;
+- private support or legal records;
+- private health/spiritual/family data;
+- raw analytics identifiers;
+- credentials or secrets.
+
+## CrownThrive ID relationship
+
+```text
+CrownThrive ID
+→ durable actor/organization identity
+→ role/consent/assurance
+→ BrandCard public projection
+→ QR/NFC/link share
+→ target platform or action
+```
+
+Changing a BrandCard must not mutate legal identity or institutional roles by implication. A verification badge must resolve to a governed verification record and expiry/revocation state.
+
+## QR/NFC and routing controls
+
+Every encoded/shareable payload should be versioned and minimally scoped.
+
+```yaml
+share_payload_id:
+brandcard_id:
+payload_type: url|deep_link|signed_reference|contact_card
+version:
+created_at:
+expires_at:
+redirect_policy_id:
+analytics_allowed:
+restricted_parameters_present: false
+```
+
+Do not embed access tokens, private identifiers, secrets, payment credentials or privileged role assertions in QR/NFC payloads.
+
+Redirects must preserve anti-phishing controls, canonical-domain verification and an incident/takedown path.
+
+## Verification and badges
+
+Potential badges may represent identity, provider status, program completion, membership, partner status or other approved facts. Badge labels must identify their authority and effective period.
+
+```yaml
+badge_id:
+badge_type:
+issuer_id:
+subject_id:
+status:
+issued_at:
+expires_at:
+verification_ref:
+public_verification_fields: []
+revocation_ref:
+```
+
+A CrownThriveU certificate, Locticians verification, Crown Ambassador role and CHLOM permission are separate record types and should not be collapsed into one “verified” status.
+
+## Commerce, referral and campaign routing
+
+BrandCards may route users to:
+
+- approved products/services;
+- booking/professional platforms;
+- Crown Affiliates referral links;
+- CrownFluence campaign deliverables;
+- ThriveTickets events;
+- CrownThriveU courses;
+- GSO offers;
+- licensing/support intake;
+- AdLuxe campaign destinations.
+
+Attribution must preserve the offer/campaign/version and must not rewrite the user's public profile to satisfy a campaign.
+
+## Analytics boundary
+
+Minimum public/profile metrics may include views, QR scans, link clicks and downstream conversion events where consent and platform rules permit.
+
+CrownLytics should normalize events without turning a BrandCard into a surveillance profile. Sensitive cross-platform behavior must not be joined merely because the same CrownThrive ID exists.
+
+## API/MCP target contract
+
+Potential interfaces:
+
+```text
+brandcards.get_public_card
+brandcards.create_draft
+brandcards.update_draft
+brandcards.publish
+brandcards.archive
+brandcards.badge.verify_public
+brandcards.share.create_qr_payload
+brandcards.analytics.get_aggregate
+brandcards.docs.open_delta
+```
+
+Public reads return only approved public fields. Mutations require identity, role, object ownership and tenant checks.
+
+## Canonical events
+
+```text
+brandcard.created
+brandcard.updated
+brandcard.published
+brandcard.paused
+brandcard.archived
+brandcard.link_clicked
+brandcard.qr_scanned
+brandcard.nfc_opened
+brandcard.badge_added
+brandcard.badge_revoked
+brandcard.destination_changed
+brandcard.reported
+brandcard.taken_down
+docs.delta_opened
+```
+
+## Safety, abuse and correction
+
+Required controls include:
+
+- impersonation reporting;
+- trademark/name conflict handling;
+- malicious-link scanning or review;
+- prohibited content and fraud policy;
+- badge revocation;
+- privacy/contact suppression;
+- correction history;
+- archived/retired redirect policy;
+- child/minor profile restrictions where applicable.
+
+No agent may create a public profile for a person from scraped/private data without authority.
+
+## Agent boundaries
+
+| Agent | Autonomous work | Prohibited authority |
+| --- | --- | --- |
+| Profile QA Agent | validate links, metadata, image dimensions, duplicate routes and public-field schema | cannot publish private data or assert identity verification |
+| Badge Verification Agent | compare badge state to authoritative record and remove stale display after approved revocation event | cannot create a credential or professional license |
+| Link Safety Agent | detect broken/malicious destinations and pause unsafe links under preapproved policy | cannot alter commercial destination/economics without owner authority |
+| Documentation Agent | update current card fields, APIs, support articles and changelog | cannot reveal restricted profiles or analytics identifiers |
+
+## Controlled self-healing
+
+Permitted: repair generated QR assets, refresh public-safe badges from authoritative state, flag broken links, rebuild search indexes, restore known-good card rendering and open correction/incident deltas.
+
+Prohibited silent actions: invent profile data, change public identity, switch affiliate ownership, alter paid offers, expose restricted data or override a takedown/appeal.
+
+## Phase gates
+
+### Phase 2.98
+
+Recover BrandCards identity, role, historical/current disposition, legal/data boundaries, phygital and affiliate/community relationships and source/provider gaps.
+
+### Phase 2.99
+
+Seed card/badge/share-payload schemas, provider/domain/repository fields, privacy classifications, event contract, support article family, lifecycle/redirect rules and synthetic fixtures.
+
+### Phase 3
+
+Implement CrownThrive ID-linked public projection, badge verification, safe routing, events and bounded API/MCP tools.
+
+### Phase 4
+
+Activate across approved networking, professional, event, affiliate, ambassador, kiosk and partner flows only after consent, abuse, analytics and recovery controls pass.
+
+## Open verification queue
+
+- current BrandCards canonical domain;
+- current engine/provider and installed version;
+- source repository/database/export path;
+- current profiles and lifecycle state;
+- QR/NFC implementation;
+- pricing/subscription state if any;
+- privacy/terms/acceptable-use surface;
+- identity verification/badge behavior;
+- API/webhooks/export;
+- analytics and retention;
+- backup/vendor-exit plan;
+- current support/help articles.
