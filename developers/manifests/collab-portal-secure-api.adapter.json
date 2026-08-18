@@ -1,0 +1,109 @@
+{
+  "adapter_id": "ct.adapter.collab-portal.secure.v1",
+  "platform_id": "ct.platform.collab-portal",
+  "api_id": "ct.api.collab-portal.secure",
+  "source_id": "S101",
+  "source_snapshot": {
+    "openapi_version": "3.0.3",
+    "swagger_url": "https://portal.crownthrive.com/secure-api/swagger",
+    "base_url": "https://portal.crownthrive.com/secure-api/",
+    "sha256": "65a59d29859e0ba04993985c7e3bdfcd1d4e07b97f0a17cd9d1683eea6423376",
+    "observed_at": "2026-08-18"
+  },
+  "authentication": {
+    "type": "paired_api_key_headers",
+    "headers": [
+      "X-Public-ID",
+      "X-Secret-Key"
+    ],
+    "secret_storage": "server_side_only",
+    "raw_secret_in_repository": false,
+    "production_credential_binding": "pending_rotation_and_secure_binding"
+  },
+  "operations": [
+    {"method": "GET", "path": "/contact/meta", "class": "crm_read"},
+    {"method": "GET", "path": "/contacts", "class": "crm_read"},
+    {"method": "POST", "path": "/contact", "class": "crm_write"},
+    {"method": "GET", "path": "/contact/{identifier}", "class": "crm_read"},
+    {"method": "PUT", "path": "/contact/{identifier}", "class": "crm_write"},
+    {"method": "GET", "path": "/company/meta", "class": "crm_read"},
+    {"method": "GET", "path": "/companies", "class": "crm_read"},
+    {"method": "POST", "path": "/company", "class": "crm_write"},
+    {"method": "GET", "path": "/company/{identifier}", "class": "crm_read"},
+    {"method": "PUT", "path": "/company/{identifier}", "class": "crm_write"},
+    {"method": "GET", "path": "/project/meta", "class": "project_read"},
+    {"method": "GET", "path": "/projects", "class": "project_read"},
+    {"method": "GET", "path": "/project/{type}/{identifier}", "class": "project_read"},
+    {"method": "PUT", "path": "/project/{type}/{identifier}", "class": "project_write"},
+    {"method": "POST", "path": "/marketing/subscribe", "class": "marketing_write"},
+    {"method": "GET", "path": "/worlds", "class": "worlds_read"}
+  ],
+  "project_lookup_types": [
+    "uid",
+    "name",
+    "contains_the_following",
+    "most_recent"
+  ],
+  "hourly_pm_policy": {
+    "allowed_read": [
+      "GET /project/meta",
+      "GET /projects",
+      "GET /project/{type}/{identifier}"
+    ],
+    "conditional_write": [
+      "PUT /project/{type}/{identifier}"
+    ],
+    "write_preconditions": [
+      "rotated production credentials are bound through a server-side secret store",
+      "institutional project UID is pinned",
+      "account-specific project metadata/custom-field IDs are pinned",
+      "current project object is read before mutation",
+      "proposed diff is restricted to approved project-management fields",
+      "no billing, legal, rights, client-authority, staff-assignment, sensitive-IP or project-economics mutation is included",
+      "read-after-write verification is enabled"
+    ],
+    "default_exclusions": [
+      "CRM contact/company writes",
+      "marketing audience subscription",
+      "Worlds assignment",
+      "project economics",
+      "client/staff/team assignment"
+    ],
+    "failure_fallback": "GitHub/Mintlify governed state plus Gmail project-management notification"
+  },
+  "not_exposed_in_recovered_openapi": [
+    "project_create",
+    "task_crud",
+    "project_comments",
+    "milestone_crud",
+    "file_upload",
+    "signature_api",
+    "webhook_registration",
+    "webhook_event_schema"
+  ],
+  "rate_limit_evidence": {
+    "account_ui_snapshot_monthly_limit": 20000,
+    "account_ui_snapshot_usage": 0,
+    "generic_openapi_error_429_example_monthly_limit": 200,
+    "interpretation": "account UI is newer account-specific evidence; generic error example remains stale_or_generic until reconciled"
+  },
+  "security_notes": [
+    "OpenAPI security schemes are apiKey headers; scope-like strings in security requirement arrays are not OAuth scopes",
+    "some operation security labels are inconsistent and must not be used as the sole least-privilege authority model",
+    "mutations with unknown outcome must not be blindly retried",
+    "production secrets must never enter public Git history, documentation, email, screenshots or logs"
+  ],
+  "state": {
+    "contract": "verified",
+    "base_url": "verified_from_openapi",
+    "auth_header_contract": "verified_from_openapi",
+    "production_auth": "pending",
+    "account_project_meta": "pending",
+    "institutional_project_uid": "pending",
+    "authenticated_read": "pending",
+    "bounded_write": "pending",
+    "read_after_write": "pending",
+    "webhook_contract": "not_recovered",
+    "certification": "pending"
+  }
+}
