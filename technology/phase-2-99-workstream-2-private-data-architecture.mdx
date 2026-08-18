@@ -1,0 +1,332 @@
+---
+title: "Phase 2.99 Workstream 2 — Private Institutional Data Architecture"
+sidebarTitle: "2.99 WS2 — Private Data"
+description: "The selected private institutional data architecture for identity, tenant isolation, registries, operational partitions, evidence vaults, search, events, retention and recovery."
+icon: "database"
+keywords: ["Phase 2.99", "private data architecture", "RBAC", "tenant isolation", "PostgreSQL", "DAIL", "evidence vault"]
+---
+
+# Phase 2.99 Workstream 2 — Private Institutional Data Architecture
+
+## Status
+
+```yaml
+workstream: phase_2_99_workstream_2
+baseline_commit: f94f8140a480e988df9e3a1df7cd088a4839571e
+state: architecture_selected_implementation_gated
+public_projection_repository: repo.crownthrive.support
+private_registry_repository: repo.crownthrive.os
+data_architecture: centralized_control_partitioned_operations_restricted_evidence
+selective_decentralization: future_adapter_only_until_verified
+```
+
+Workstream 2 selects the data architecture Phase 3 should implement. It does not claim that the private databases, queues, indexes or evidence stores are already provisioned.
+
+## Governing architecture
+
+CrownThrive adopts **centralized institutional control with partitioned operational data and a separately controlled evidence vault**.
+
+The institutional control plane holds stable identities, authority, versions, source relationships, policy references, platform state and cross-domain linkages. Domain systems keep the operational records they own. Restricted evidence is referenced through controlled object/document storage rather than copied broadly into registries, search indexes or model context.
+
+```text
+CrownThrive ID / service identity
+        |
+        v
+Institutional Control Plane
+  - organizations / tenants
+  - actors / service identities
+  - roles / grants / relationships
+  - platforms / assets / versions
+  - sources / claims / evidence references
+  - policies / applicability
+  - API/MCP/repository/deployment registry
+        |
+        +----------------------+----------------------+
+        |                      |                      |
+        v                      v                      v
+Domain Operational Store   Restricted Evidence   Event / Workflow Plane
+commerce / rights /        Vault                 DAIL + queues +
+support / media / etc.     objects + metadata    retries + dead-letter
+        |                      |                      |
+        +-----------+----------+----------+-----------+
+                    |
+                    v
+         Classified Search / Retrieval
+                    |
+                    v
+          Governed Projections
+ public docs | authenticated portals | operator tools | APIs/MCPs
+```
+
+## Logical storage classes
+
+### 1. Institutional registry
+
+A portable PostgreSQL-compatible relational store is the selected default for highly structured institutional records and referential integrity.
+
+The registry owns:
+
+- organizations/tenants;
+- actors and service identities;
+- roles, grants, delegations and relationship edges;
+- stable platform/asset/brand/work/product IDs;
+- aliases, predecessors, successors and dispositions;
+- source/claim/evidence metadata;
+- version/effective-period/correction records;
+- policy/legal applicability metadata;
+- API/MCP/repository/deployment/environment references;
+- documentation-impact mappings;
+- run-packet/approval/DAIL references.
+
+The registry is authoritative for institutional identity and governance relationships, not for every high-volume operational event.
+
+### 2. Domain operational stores
+
+Operational data is partitioned by bounded domain and tenant/organization context. Examples include commerce/orders, rights/licenses, support/cases, media/catalog, marketing/campaigns, learning/credentials, events/tickets and community/relationships.
+
+A domain may use a dedicated schema, database or service-owned store depending on scale, risk and isolation requirements. The invariant is that ownership is explicit and cross-domain writes occur through governed service/event contracts rather than shared-table convenience.
+
+### 3. Restricted evidence vault
+
+Contracts, signed releases, source masters, private rights evidence, sensitive investigations, protected legal/financial artifacts and private media live in access-controlled object/document storage.
+
+The institutional registry stores references and integrity metadata:
+
+```yaml
+evidence_id:
+source_id:
+classification:
+object_reference:
+checksum:
+content_type:
+owner_org_id:
+access_policy_id:
+retention_profile_id:
+legal_hold_state:
+created_at:
+verified_at:
+```
+
+Object URLs, signed access tokens and storage credentials are never published as durable public references.
+
+### 4. Search and retrieval indexes
+
+Search is a projection, never the root authority.
+
+Indexes are partitioned or filtered before retrieval by:
+
+- tenant/organization;
+- relationship;
+- classification;
+- purpose;
+- platform/domain;
+- environment;
+- legal/retention state;
+- actor assurance where required.
+
+Restricted records must be excluded before semantic retrieval. Post-generation redaction is not an authorization boundary.
+
+### 5. Event, workflow and queue plane
+
+The selected logical architecture separates immutable institutional events from asynchronous work execution.
+
+- **DAIL/event ledger:** append-oriented institutional change/evidence envelope;
+- **event bus:** publishes normalized events to authorized subscribers;
+- **workflow engine:** durable multi-step work with approvals/timeouts;
+- **work queues:** asynchronous jobs and bounded agent work;
+- **dead-letter queues:** preserve failed messages/jobs for replay and incident review.
+
+The exact managed products remain provider ADRs; event and workflow contracts must remain portable.
+
+## Tenant, organization and actor model
+
+CrownThrive requires a stable distinction among tenant, organization, actor, account and relationship.
+
+```yaml
+tenant_id:
+organization_id:
+actor_id:
+service_identity_id:
+account_link_ids: []
+role_ids: []
+relationship_ids: []
+```
+
+- `tenant_id` defines the primary isolation boundary for multi-tenant services.
+- `organization_id` identifies legal/operating entities, teams, churches, partners, brands or other governed organizations.
+- `actor_id` identifies a human, agent or system principal.
+- `service_identity_id` identifies non-human workload identity.
+- external/local platform accounts link to the institutional actor; they do not replace institutional identity.
+
+## Authorization model
+
+Authorization combines:
+
+1. RBAC for broad function;
+2. relationship-based access for ownership, team, case, asset or program relationships;
+3. attributes for classification, jurisdiction, purpose, environment and assurance;
+4. explicit time-bound grants for exceptional access;
+5. policy-as-code for consequential actions.
+
+```yaml
+authorization_context:
+  actor_id:
+  tenant_id:
+  organization_id:
+  role_ids: []
+  relationship_ids: []
+  purpose:
+  resource_id:
+  resource_classification:
+  requested_action:
+  environment:
+  auth_assurance:
+  policy_version:
+```
+
+Default behavior is deny when required identity, relationship, policy or classification evidence is missing.
+
+## Row and object isolation
+
+Every tenant-scoped operational record must carry a tenant boundary or equivalent service-owned partition key. Cross-tenant access requires an explicit institutional relationship or administrative policy and must be auditable.
+
+For relational stores:
+
+- tenant key is mandatory where the domain is multi-tenant;
+- unique indexes include the appropriate tenant/organization scope;
+- foreign keys cannot create accidental cross-tenant references;
+- privileged service roles are narrowly scoped;
+- direct database access is not a substitute for application authorization;
+- migrations include isolation regression tests.
+
+For object storage:
+
+- object namespace and policy bind tenant/classification;
+- signed access is short-lived;
+- public buckets are prohibited for restricted classes;
+- object metadata must not leak private names or secrets unnecessarily.
+
+## Cross-domain data flow contract
+
+A data flow is not authorized merely because two CrownThrive platforms share ownership.
+
+Every cross-domain flow records:
+
+```yaml
+flow_id:
+producer_service_id:
+consumer_service_id:
+purpose:
+field_classes: []
+source_authority:
+policy_id:
+retention_profile_id:
+consent_or_legal_basis:
+frequency:
+failure_behavior:
+replay_behavior:
+owner:
+```
+
+The minimum necessary fields move. The consumer does not inherit authority beyond the purpose recorded in the flow.
+
+## DAIL event envelope
+
+The institutional event envelope is the common audit/change vocabulary across systems.
+
+```yaml
+event_id:
+event_type:
+event_version:
+occurred_at:
+recorded_at:
+tenant_id:
+organization_id:
+actor_id:
+service_identity_id:
+resource_ids: []
+source_ids: []
+correlation_id:
+causation_id:
+classification:
+purpose:
+policy_version:
+approval_ids: []
+evidence_refs: []
+previous_version:
+new_version:
+idempotency_key:
+```
+
+Payload fields remain domain-specific and classification-aware. A DAIL record may reference restricted evidence without embedding it.
+
+## Retention, deletion and legal hold
+
+Every durable record class maps to a retention profile.
+
+A retention profile defines:
+
+- retention basis and duration;
+- deletion/anonymization behavior;
+- archival conditions;
+- legal-hold override;
+- customer/member export implications;
+- derived-index/cache cleanup;
+- event/evidence preservation rules;
+- owner and review cadence.
+
+Deletion must propagate to non-authoritative caches and search indexes while preserving legally required audit/correction metadata where applicable.
+
+## Backup and recovery
+
+Critical institutional records require:
+
+- point-in-time recovery or equivalent database recovery capability;
+- encrypted object-versioning/backup for evidence classes;
+- periodic machine-readable registry export;
+- off-provider recovery copy;
+- restore runbook;
+- scheduled restore tests;
+- RPO/RTO recorded by service/data class;
+- dependency and credential custody records.
+
+A backup is not accepted merely because a provider advertises backups; CrownThrive must possess evidence that its own data can be restored.
+
+## Data export and provider exit
+
+Every critical store must define an export format that does not require the original SaaS to interpret core institutional records.
+
+Preferred export shapes:
+
+- relational schemas \+ data dumps for structured registries;
+- JSON/JSONL/CSV/Parquet where appropriate for portable records/events;
+- object manifest \+ checksums for evidence/media;
+- OpenAPI/MCP/schema artifacts for interfaces;
+- migration metadata and version map.
+
+## Privacy and model-provider boundary
+
+Restricted and strategic data must not be sent to model, embedding or analytics providers unless the applicable provider/data-use review permits it.
+
+Agent/model requests carry caller identity, purpose, classification and authorized retrieval context. Sensitive retrieval is pre-filtered; generated output is scanned as a secondary control, not the primary authorization mechanism.
+
+## Implementation sequence
+
+Phase 3 should implement this architecture in the following order:
+
+1. institutional IDs and organization/tenant model;
+2. actor/service identity and authorization context;
+3. registry schemas and version/correction primitives;
+4. evidence-reference schema and restricted-vault adapter;
+5. DAIL envelope and append path;
+6. one low-risk domain partition;
+7. classified search projection;
+8. retention/export/backup primitives;
+9. cross-domain flow registry;
+10. additional domain stores and event subscribers.
+
+The first pilot should prove isolation, correction history, backup/restore, docs impact and agent authorization before broad platform migration.
+
+## Workstream 3 handoff
+
+Workstream 3 may now produce stable machine schemas and seed records against these selected primitives. Schema generation must preserve explicit `unknown`, `unverified`, `target_not_connected`, `source_not_recovered` and historical states rather than forcing complete-looking current data.
