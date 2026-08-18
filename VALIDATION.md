@@ -73,9 +73,13 @@ The current `main` tree includes both accepted lines of work. PR #12 validates t
 - Python syntax: passed
 - Whitespace/conflict-marker checks: passed
 
-Current gate state: `first_combined_validation_passed / final_receipt_validation_pending`.
+## Final-receipt validation rule
 
-The commit that writes this evidence into the receipt must receive its own successful Documentation Governance run before PR #12 may merge. That second run validates the exact final receipt content and the combined source tree together.
+The first combined-tree run above is written into this receipt. The exact receipt revision containing that evidence must receive a subsequent successful Documentation Governance run before PR #12 may merge.
+
+To prevent an endless self-referential sequence of commits, the subsequent final run is recorded in the merged PR #12 metadata and GitHub Actions history rather than being written back into this file. The repository merge is prohibited unless that final run is green against the exact head SHA that is merged.
+
+This file therefore records the evidence-generating run and the stable merge rule; PR #12 records the final enforcing run and merge commit.
 
 ## Validator scope
 
