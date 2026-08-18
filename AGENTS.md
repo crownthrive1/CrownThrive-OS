@@ -11,7 +11,7 @@ Current baseline:
 - human program phase: `2.97`
 - human patch: `2.97.1`
 - machine institutional release: `2.7.9.1`
-- release state: `candidate` until the governing PR is merged
+- release state: `accepted` at merge commit `52762bd4bd629ea8012fac6ceb3790d0955b0499`
 - next required passes: `2.98` platform extraction, then `2.99` private-core and machine-seed preparation
 
 ## 2. Instruction and source precedence
