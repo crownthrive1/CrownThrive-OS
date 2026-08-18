@@ -1,0 +1,189 @@
+---
+title: "Phase 2.99 — S102 Webhook State Reconciliation"
+sidebarTitle: "2.99 S102 Reconciliation"
+description: "Phase 2.99 correction pass that synchronizes S102 webhook UI evidence, S101 Secure API negative capability, the fail-closed Supabase runtime, machine manifest state, validation queues, and remaining certification gates without promoting UI capability into production authority."
+icon: "arrows-rotate"
+keywords: ["Phase 2.99", "S102", "Collab Portal", "webhooks", "reconciliation", "SuitePro", "Supabase", "governance"]
+---
+
+# Phase 2.99 — S102 Webhook State Reconciliation
+
+## Run contract
+
+```yaml
+phase: 2
+subphase: 2.99
+workstream: external_adapter_reconciliation
+packet: s102_webhook_state_reconciliation
+baseline_commit: e857daaa92a7b2e545bd6944ef6d4be55bf4ca45
+repository_scope:
+  - crownthrive1/CrownThrive-Support
+state_before: evidence_recovered_partial_documentation_drift
+phase_3_entry: blocked_pending_phase_2_99_hard_exit
+```
+
+## Purpose
+
+Close the documentation and machine-state drift created when `S102` verified the Collab Portal webhook configuration UI after the earlier `S101` Secure API adapter had already encoded `webhook_contract: not_recovered` language.
+
+The correction preserves both facts:
+
+1. `S101` still proves that the recovered Secure API OpenAPI 3.0.3 specification does **not** expose webhook registration or webhook event endpoints.
+2. `S102` separately proves that the current first-party Collab Portal UI supports configurable webhook endpoints and distinct Project Created, Project Updated and Project Deleted event selection.
+
+These are not contradictory when their evidence scopes are kept separate.
+
+## Scope
+
+This packet synchronizes the current public-safe Collab Portal architecture, API seed, validation queue, machine manifest and CI invariants so future agents cannot regress to either of these false conclusions:
+
+- `Collab Portal webhooks are completely unknown`; or
+- `because the UI has webhooks, a production-authenticated event receiver is certified`.
+
+## Non-goals
+
+This packet does not:
+
+- bind or expose production Collab Portal credentials;
+- execute `GET /project/meta` against the CrownThrive account;
+- identify or pin the institutional project UID;
+- enable the project-status write gate;
+- execute any `PUT` mutation;
+- claim project creation, task, comment, milestone, file or signature APIs;
+- infer a webhook signing secret/header;
+- invent retry, replay, timeout or dead-letter behavior;
+- activate an inbound webhook receiver;
+- advance Phase 3.
+
+## Evidence baseline
+
+### S101 — Secure API
+
+S101 remains authoritative for the recovered HTTP API specification:
+
+- OpenAPI 3.0.3;
+- base URL `https://portal.crownthrive.com/secure-api/`;
+- paired `X-Public-ID` and `X-Secret-Key` headers;
+- project meta/list/find/update operations;
+- no project-create/task/comment/milestone/file/signature/webhook registration or event endpoints in that specification.
+
+### S102 — Webhook UI
+
+S102 remains authoritative for the current UI evidence:
+
+- configurable webhook endpoint surface;
+- separate Project Created, Project Updated and Project Deleted toggles;
+- selectable project payload fields;
+- representative Project Created preview payload;
+- preview UUID remains sample/unverified because the associated project name and other fields were null.
+
+S102 does **not** prove sender authentication, signature verification, delivery-attempt identity, retry schedule/limits, replay mechanics, timeout policy, dead-letter behavior or receiver certification.
+
+### Runtime evidence
+
+The connected CrownThrive Supabase project has a deployed `collab-portal-pm` Edge Function in `active_fail_closed_unconfigured` state. The runtime requires caller JWT authentication, contains no Collab Portal credential values in source, reads credentials only from server-side environment secrets, defaults writes closed and bounds the eventual write surface to project-management status/information/custom fields with read-before-write and read-after-write verification.
+
+## Dependencies
+
+- `S101` API contract remains unchanged;
+- `S102` webhook UI evidence remains registered;
+- production secrets remain outside public Git/Mintlify;
+- Supabase secret binding remains unavailable through the current connected tool surface;
+- GitHub/Mintlify remains the governed execution record until live adapter certification passes.
+
+## Hard entry gate
+
+Pass only if:
+
+- current `main` contains merged S101/S102 evidence and runtime documentation;
+- no open PR is carrying a competing Collab Portal state correction;
+- production secret values are absent from the packet;
+- the correction can be made without inventing provider behavior.
+
+## Internal hard checkpoints
+
+1. update current-state documentation to separate S101 API-negative capability from S102 UI-positive capability;
+2. update the machine adapter manifest so webhook UI state and sender/delivery certification are independent fields;
+3. update deterministic CI so future regressions fail validation;
+4. preserve project/task/comment/milestone/file/signature negative capability boundaries;
+5. preserve `production_auth`, `/project/meta`, institutional UID, bounded write and read-after-write as pending;
+6. verify no historical changelog is silently rewritten merely to make current prose cleaner;
+7. reassess downstream Phase 3–10 impacts.
+
+## Completion criteria
+
+The packet is complete when current operational pages and the machine manifest no longer say the webhook contract is globally `not_recovered`, while the S101 OpenAPI-specific negative capability remains intact and the unverified sender/delivery/receiver controls remain fail closed.
+
+## Hard exit gate
+
+```yaml
+s101_openapi_negative_capability_preserved: required_pass
+s102_webhook_ui_state_synchronized: required_pass
+sender_integrity_still_unverified: required_true
+receiver_certification_still_pending: required_true
+production_secret_in_repo: required_false
+production_portal_write_executed: required_false
+phase_3_entry: required_blocked
+```
+
+## Validation and evaluation
+
+Validation must prove:
+
+- adapter stable IDs and S101 checksum remain unchanged;
+- the exact 16 Secure API operations remain unchanged;
+- project PM write authority remains bounded;
+- webhook registration/event schema remains absent from S101;
+- S102 is explicitly represented as separate UI evidence;
+- Project Created/Updated/Deleted are the only currently pinned Project event identities;
+- sender integrity and retry/replay remain pending;
+- no raw secret-shaped values enter the public manifest;
+- repository-wide documentation governance passes.
+
+## Authority and approval
+
+This is a D0/D1 evidence-state synchronization pass. It does not make a new legal, financial, rights, privacy, security-key or contractual decision. No authoring agent is authorized to upgrade the sender-integrity or production-certification state without new evidence.
+
+## Rollback and recovery
+
+If the packet fails validation, discard or revert only this correction branch. `main` remains the last-known-good institutional record. If later provider documentation contradicts S102, append a new source/correction record rather than deleting S102 history.
+
+## Documentation impact
+
+`docs_updated`
+
+Affected current-state surfaces include:
+
+- Collab Portal architecture/status page;
+- current-state validation queue;
+- API base URL/endpoint seed register;
+- Collab Portal Secure API adapter guidance;
+- public-safe machine adapter manifest;
+- Collab Portal deterministic validator;
+- this changelog/decision receipt.
+
+Historical S101 integration changelog language remains preserved as dated evidence unless a separate correction note is needed.
+
+## Downstream phase reassessment
+
+No new provider capability was discovered in this packet; S102 had already been propagated into the ten-phase roadmap. Therefore no downstream gate is widened.
+
+- **Phase 3:** continues to require outbound adapter certification plus inbound sender-integrity/idempotency/replay certification.
+- **Phase 4:** event-driven synchronization remains ineligible until Phase 3 receiver controls pass.
+- **Phase 5:** PM/webhook evidence still does not grant CRM/marketing authority.
+- **Phase 8:** project-event evidence remains non-authoritative for portfolio reporting until semantic/account reconciliation is certified.
+- **Phase 10:** polling/read fallback remains mandatory so institutional continuity does not depend on webhook delivery.
+
+The result is a synchronization correction, not a roadmap expansion.
+
+## Communication obligations
+
+After validation and merge, leave a top-level GitHub PM comment with evidence, validation, merge IDs, hard-gate effect, Collab Portal certification state and exact next packet. Email notification is performed only when the execution environment exposes an enabled mail-delivery path; absence of that path must be reported rather than simulated.
+
+## Exact handoff
+
+The Collab Portal lane remains blocked on **secure server-side credential binding** before authenticated certification can continue. Do not paste credentials into chat, GitHub, Mintlify or source.
+
+While that blocker remains, the next independent Phase 2.99 Workstream 3A packet is the **74-record Phase 2.7 platform/framework recovery-universe reconciliation**, using the July 2026 registry as a separate count universe from the 68 Holdings assets, 85 engines/services and 82 domains.
+
+Phase 3 remains `blocked_pending_phase_2_99_hard_exit`.

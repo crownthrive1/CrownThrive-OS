@@ -3,6 +3,9 @@
   "platform_id": "ct.platform.collab-portal",
   "api_id": "ct.api.collab-portal.secure",
   "source_id": "S101",
+  "related_source_ids": [
+    "S102"
+  ],
   "source_snapshot": {
     "openapi_version": "3.0.3",
     "swagger_url": "https://portal.crownthrive.com/secure-api/swagger",
@@ -81,6 +84,52 @@
     "webhook_registration",
     "webhook_event_schema"
   ],
+  "webhook_evidence": {
+    "source_id": "S102",
+    "evidence_type": "current_first_party_ui",
+    "ui_contract": "verified",
+    "endpoint_configuration_ui": "verified",
+    "project_events": [
+      "Project Created",
+      "Project Updated",
+      "Project Deleted"
+    ],
+    "project_payload_selector": "verified",
+    "project_created_preview_payload": "observed",
+    "preview_uid_binding": "unverified_sample_preview",
+    "sender_integrity": "pending",
+    "delivery_attempt_identity": "pending",
+    "retry_contract": "pending",
+    "replay_contract": "pending",
+    "timeout_dead_letter_contract": "pending",
+    "receiver_idempotency": "pending",
+    "receiver_certification": "pending",
+    "authoritative_event_source": false
+  },
+  "runtime": {
+    "provider": "Supabase Edge Functions",
+    "function": "collab-portal-pm",
+    "version": 1,
+    "state": "active_fail_closed_unconfigured",
+    "caller_authentication": "Supabase JWT required",
+    "collab_portal_credentials_in_source": false,
+    "server_side_secret_binding": "pending_external_secret_configuration",
+    "write_gate_default": "closed",
+    "allowed_read_actions": [
+      "health",
+      "project_meta",
+      "find_project"
+    ],
+    "conditional_write_action": "update_project_status",
+    "conditionally_allowed_fields": [
+      "status",
+      "info_description",
+      "project_custom_fields"
+    ],
+    "read_before_write": true,
+    "read_after_write": true,
+    "blind_mutation_retry": false
+  },
   "rate_limit_evidence": {
     "account_ui_snapshot_monthly_limit": 20000,
     "account_ui_snapshot_usage": 0,
@@ -91,6 +140,7 @@
     "OpenAPI security schemes are apiKey headers; scope-like strings in security requirement arrays are not OAuth scopes",
     "some operation security labels are inconsistent and must not be used as the sole least-privilege authority model",
     "mutations with unknown outcome must not be blindly retried",
+    "webhook UI capability must not be treated as sender-integrity or production receiver certification",
     "production secrets must never enter public Git history, documentation, email, screenshots or logs"
   ],
   "state": {
@@ -103,7 +153,10 @@
     "authenticated_read": "pending",
     "bounded_write": "pending",
     "read_after_write": "pending",
-    "webhook_contract": "not_recovered",
+    "webhook_ui_contract": "verified",
+    "webhook_sender_integrity": "pending",
+    "webhook_delivery_semantics": "pending",
+    "webhook_receiver_certification": "pending",
     "certification": "pending"
   }
 }
