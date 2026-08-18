@@ -23,11 +23,11 @@ Mintlify is a CrownThrive service dependency, not the owner of CrownThrive insti
 
 ## Custom-domain record
 
-`docs.crownthrive.io` has been added to the Mintlify deployment. A fresh custom-hostname verification on August 18, 2026 reports `pending_validation` / `pending` and currently requires CrownThrive DNS ownership plus certificate validation records:
+`docs.crownthrive.io` was re-added to the Mintlify deployment on August 18, 2026 after a current settings audit found the deployment's custom-domain list empty. Deployment document version advanced to `32`. A fresh custom-hostname verification reports `pending_validation` / `pending` and currently requires CrownThrive DNS ownership plus certificate validation records:
 
 ```text
-TXT  _cf-custom-hostname.docs.crownthrive.io  f54cf401-9f33-4ce3-83ea-c25f2e64560b
-TXT  _acme-challenge.docs.crownthrive.io       t5il60O-0ivuNp57vL1SrKlsm5U9VnlkMl-Tte5oATE
+TXT  _cf-custom-hostname.docs.crownthrive.io  e35924b7-a54f-41ab-8c36-55fc2c3d87dc
+TXT  _acme-challenge.docs.crownthrive.io       SMLc4BYXg05EC8Vl1vqFmOn6FtDPc2JeJ2XL-eS7iu8
 ```
 
 Cloudflare also advertises a DCV delegation alternative:
@@ -36,34 +36,39 @@ Cloudflare also advertises a DCV delegation alternative:
 CNAME _acme-challenge.docs.crownthrive.io → docs.crownthrive.io.798c61617cd2b8f1.dcv.cloudflare.com
 ```
 
-The current verification error says the hostname is not yet proven as owned by the active account and the pre-generated ownership token was not found. Until DNS is applied and TLS validates, the state remains `configured_pending_dns`, not `production_verified`. Always re-read Mintlify custom-hostname status before applying DNS because certificate-validation values can rotate.
+The current verification error says no A/AAAA record is owned by the active account and the pre-generated ownership token was not found. Until DNS is applied and TLS validates, the state remains `configured_pending_dns`, not `production_verified`. Always re-read Mintlify custom-hostname status before applying DNS because ownership and certificate-validation values can rotate.
 
 ## Current source and workflow state
 
-At the time of this Phase 2.98 checkpoint:
+At the time of this Phase 2.98 Pass D checkpoint:
 
-- CrownThrive-Support is the only repository exposed to Mintlify workflows through the current organization connection;
+- the configured Git source is the public `crownthrive1/crownthrive-support` repository on `main`;
+- the workflow connection exposes only `crownthrive1/crownthrive-support` (`total: 1`);
 - product/site source repositories are therefore `not_connected_to_mintlify_workflows`, not presumed nonexistent;
-- current link-rot and spellcheck source checks are configured as warnings;
-- an existing scheduled internal-audit workflow exists but is disabled;
+- link-rot checking is `blocking` with anchor and snippet checks enabled;
+- Vale spellcheck remains `warning` to avoid false failures on CrownThrive brands, technical terms, KJV language and recovered names;
+- the active **Weekly CrownThrive Docs Link Integrity** workflow runs Mondays at `08:00 UTC`, uses broken-link detection, and may auto-merge only deterministic low-risk repairs under its restricted prompt;
 - the GitHub documentation-governance action independently validates navigated pages, MDX/text files, internal links, whitespace and merge-conflict markers on documentation PRs.
 
 ## Required automation posture
 
-As source repositories become available, each should be registered with:
+The current founder-authorized GitHub scope is intentionally limited to **`crownthrive1/CrownThrive-Support`**. Do not connect additional GitHub repositories to this documentation workflow unless a later explicit founder decision changes that boundary.
+
+Within CrownThrive-Support, automation should register and maintain:
 
 - repository and branch;
-- platform/service IDs;
-- environment;
+- platform/service IDs represented by documentation;
 - documentation impact mapping;
-- code owners and approval class;
-- API/schema/event sources;
+- code/document owners and approval class;
+- public-safe API/schema/event documentation sources;
 - changelog policy;
 - secrets boundary;
-- source-code agent permissions;
+- documentation-agent permissions;
 - rollback path.
 
-Source-code docs agents should run on changed PRs or webhooks rather than frequent full-repository polling.
+Application/platform state outside the repository is imported as governed evidence through authorized public inspection, source/release artifacts, Drive/File Library records, provider exports and other registered sources. Those external sources remain `not_connected_to_mintlify_workflows` rather than candidates for automatic Git attachment under the current directive.
+
+Documentation agents should run from CrownThrive-Support PR/change events and bounded scheduled evidence/drift checks rather than frequent uncontrolled polling.
 
 ## Publication boundary
 
