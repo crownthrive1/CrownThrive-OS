@@ -1,0 +1,71 @@
+---
+title: "Phase 2.99 Workstream 0 — Manifest Generator"
+sidebarTitle: "2.99 Manifest Generator"
+description: "Continuation checkpoint adding the deterministic 795-record Help Center article-seed generator and its validation contract before current-Mintlify mapping and P0/P1 disposition."
+icon: "gears"
+keywords: ["Phase 2.99", "manifest generator", "Help Center", "795 articles", "articleization", "automation"]
+---
+
+# Phase 2.99 Workstream 0 — Manifest Generator
+
+## Baseline
+
+- **Repository:** `crownthrive1/CrownThrive-Support`
+- **Institutional phase:** Phase 2
+- **Subphase:** 2.99
+- **Workstream:** 0
+- **Purpose:** move the 795-article seed from documentation-only schema to deterministic machine generation.
+
+## What was implemented
+
+Added `scripts/generate_help_center_article_manifest.py` to the governed Support repository.
+
+The generator accepts the normalized `help_center_inventory.json` forensic inventory and creates the article-seed manifest required by the [Help Center 795-Article Disposition Seed](/support/help-center-795-article-disposition-seed).
+
+It enforces:
+
+- required source fields on every input record;
+- unique recovered `inventory_id` values;
+- exactly 795 recovered records;
+- deterministic `ct.article.recovered.0001` through `ct.article.recovered.0795` identities;
+- S11 source/checksum preservation;
+- deterministic section-count regeneration;
+- safe initial `source_recovery_pending` disposition;
+- safe initial `reconstruction_required` content state;
+- unclassified exposure/risk/owner fields rather than guessed values.
+
+## Pre-commit verification
+
+The generator was executed against the current recovered inventory before repository commit. It generated exactly 795 records, unique first/last article IDs and the expected section total of 795.
+
+The section census reproduced:
+
+- CHLOM — 297;
+- Convergent Ecosystem — 206;
+- CrownThrive Legal Depot — 198;
+- CrownThrive HQ — 46;
+- Thrive Flywheel — 14;
+- MM Suites — 13;
+- Cultural Imprint Engine — 11;
+- Hybrid Incubator — 5;
+- Investor Relations — 5.
+
+This verifies deterministic transformation logic. It does **not** promote the locally produced test output into the institutional source of truth.
+
+## Why this was necessary
+
+Manual creation of 795 seed rows would introduce avoidable transcription, ordering and ID errors. Deterministic generation makes the seed reproducible and self-checking while preserving the critical distinction between recovered metadata and reconstructed/current article bodies.
+
+It also creates a reusable primitive for CI: later runs can detect source-count drift, duplicate IDs, missing source fields and unintended changes to the recovered inventory before documentation publication.
+
+## What comes next
+
+1. establish the governed source-input location/reference for the normalized inventory without exposing restricted source material;
+2. generate and commit the full machine manifest through the approved workflow;
+3. build the current-Mintlify mapping pass;
+4. classify exact/strong/weak/no-match candidates;
+5. require human/domain review for ambiguous merges and D2/D3 records;
+6. begin P0/P1 disposition and reconstruction;
+7. add CI checks so manifest/source drift blocks unsafe publication.
+
+Phase 3 remains gated until Workstream 0 and the remaining Phase 2.99 private-core requirements pass.
