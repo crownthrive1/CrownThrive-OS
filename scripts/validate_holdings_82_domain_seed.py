@@ -74,6 +74,11 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
+def normalize_markup(text: str) -> str:
+    """Remove lightweight Markdown emphasis/code markers for prose invariants."""
+    return re.sub(r"[*_`]", "", text)
+
+
 def main() -> int:
     if not SEED.is_file():
         fail(f"Missing seed page: {SEED.relative_to(ROOT)}")
@@ -122,8 +127,12 @@ def main() -> int:
         (SEED, "phase_3_entry: blocked_pending_phase_2_99_hard_exit"),
     ]
     for path, fragment in required_fragments:
-        if fragment not in path.read_text(encoding="utf-8"):
-            fail(f"Required domain-governance fragment {fragment!r} missing from {path.relative_to(ROOT)}")
+        contents = path.read_text(encoding="utf-8")
+        if fragment not in contents and fragment not in normalize_markup(contents):
+            fail(
+                f"Required domain-governance fragment {fragment!r} missing from "
+                f"{path.relative_to(ROOT)}"
+            )
 
     print(
         "Holdings 82-domain seed validation PASSED: "
