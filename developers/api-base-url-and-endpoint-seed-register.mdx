@@ -369,7 +369,16 @@ state:
   production_credential_binding: pending
   authenticated_read: pending
   authenticated_write: pending
-  webhook_contract: not_recovered
+  secure_runtime: active_fail_closed_unconfigured
+  webhook_openapi_registration_contract: not_exposed
+  webhook_ui_contract: verified_s102
+  webhook_project_events:
+    - Project Created
+    - Project Updated
+    - Project Deleted
+  webhook_sender_integrity: pending
+  webhook_delivery_retry_replay: pending
+  webhook_receiver_certification: pending
 ```
 
 Verified endpoint families:
@@ -380,7 +389,7 @@ Verified endpoint families:
 - marketing: subscribe contacts to audiences;
 - Worlds: list Worlds when the Power-up is available.
 
-For the institutional PM loop, the supported contract is intentionally narrower: discover project meta, list/find an existing project, update only approved project-status/custom fields, then read back and verify. The Secure API does not expose project creation, tasks, comments, milestones, files, signatures or webhook registration/event schemas in this specification; keep those capabilities separate until authoritative contracts are recovered.
+For the institutional PM loop, the supported Secure API contract is intentionally narrower: discover project meta, list/find an existing project, update only approved project-status/custom fields, then read back and verify. The Secure API does not expose project creation, tasks, comments, milestones, files, signatures or webhook registration/event schemas in this specification. Those negative findings remain scoped to S101. Separate `S102` UI evidence now verifies configurable webhook endpoints and Project Created/Updated/Deleted event selection, but it does not prove sender authentication/signing, delivery-attempt identity, retry/replay behavior, timeout/dead-letter semantics or a certified inbound receiver. Keep those layers independently versioned rather than collapsing UI capability into API or production certification.
 
 The OpenAPI uses scope-like strings inside `apiKey` security requirements. They are not OAuth scopes, and some labels are internally inconsistent. Do not derive least-privilege authorization from those annotations alone; verify actual key permissions and observed behavior.
 
