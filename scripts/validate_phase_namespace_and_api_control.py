@@ -7,6 +7,7 @@ against the separately designated current sanitized snapshot.
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from typing import Any
@@ -122,13 +123,15 @@ def validate_current_api_control(data: dict[str, Any]) -> None:
     require(phase.get("phase_3_entry") == "blocked_pending_phase_2_99_hard_exit", "Current API evidence must not advance Phase 3")
 
     security = data.get("security_boundary", {})
-    require(security.get("integration_control_base_tables") == 12, "Current integration_control base-table count must be 12")
-    require(security.get("rls_enabled_tables") == 12, "All current integration_control base tables must have RLS enabled")
+    base_tables = security.get("integration_control_base_tables")
+    require(isinstance(base_tables, int) and base_tables >= 12, "Current integration_control base-table inventory must be an integer at or above the accepted 12-table baseline")
+    require(security.get("rls_enabled_tables") == base_tables, "Every current integration_control base table must have RLS enabled")
     require(security.get("force_rls_tables") == 0, "FORCE RLS is not part of the current certified boundary")
-    require(security.get("tables_with_explicit_policy") == 12, "Every current integration_control base table must have an explicit policy")
+    require(security.get("tables_with_explicit_policy") == base_tables, "Every current integration_control base table must have an explicit policy")
     require(security.get("policies_service_role_only") is True, "Current integration_control policies must remain service-role only")
     require(security.get("anon_authenticated_table_crud_observed") is False, "Anon/authenticated CRUD exposure must not be observed")
     require(security.get("security_advisor_lint_count") == 0, "Current Supabase Security Advisor must remain clean in the designated snapshot")
+    require(security.get("count_semantics") == "point_in_time_inventory_all_current_base_tables_must_be_rls_and_policy_covered", "Security-boundary count semantics must remain coverage-based rather than pinned to a stale inventory size")
 
     control = data.get("crownthrive_api_control", {})
     require(control.get("runtime_version") == 3, "Current crownthrive-api-control runtime must be v3")
@@ -177,6 +180,11 @@ def validate_current_api_control(data: dict[str, Any]) -> None:
     reward = data.get("reward_loyalty", {})
     require(reward.get("current_production_major") == 4, "Reward Loyalty production must remain v4 absent deployment evidence")
     require(reward.get("vendor_target_reference") == "5.27.0" and reward.get("vendor_target_is_deployment_evidence") is False, "Reward Loyalty v5.27.0 must remain target/reference only")
+    require(reward.get("control_plane_runtime") == "reward-loyalty-api-control" and reward.get("control_plane_runtime_version") == 2, "Reward Loyalty preparation control plane must remain on the current v2 runtime")
+    require(reward.get("control_plane_mode") == "preparation_only_fail_closed", "Reward Loyalty control plane must remain preparation-only and fail-closed")
+    require(reward.get("control_plane_jwt_auth") == "passed" and reward.get("control_plane_admin_authorization") == "passed", "Reward Loyalty preparation control plane must retain JWT plus explicit admin/service-role authorization")
+    require(reward.get("control_plane_request_body_bounding") == "passed_32_kib_preparse", "Reward Loyalty preparation control plane must retain its 32 KiB pre-parse request bound")
+    require(reward.get("provider_dispatch_enabled") is False, "Reward Loyalty preparation control plane must not dispatch to the provider")
     require(reward.get("v5_production_deployment") == "blocked_no_deployment_evidence", "Reward Loyalty v5 production deployment must remain blocked")
     require(reward.get("provider_writes_enabled") is False and reward.get("provider_write_gate") == "closed", "Reward Loyalty provider writes must remain closed")
     require(reward.get("partnero_is_separate_engine") is True and reward.get("adluxe_is_separate_network") is True, "Reward Loyalty/Partnero/AdLuxe boundaries must remain explicit")
@@ -201,6 +209,19 @@ def test_superseded_evidence_rejected(historical: dict[str, Any]) -> None:
     raise AssertionError("ct.tevv.control-state.current-snapshot-superseded-evidence-rejected failed: historical S107 was accepted as current")
 
 
+def test_security_boundary_coverage_fail_closed(current: dict[str, Any]) -> None:
+    """TEVV: inventory growth is allowed, but any RLS/policy coverage gap must fail."""
+    for field in ("rls_enabled_tables", "tables_with_explicit_policy"):
+        bad = copy.deepcopy(current)
+        base_tables = bad["security_boundary"]["integration_control_base_tables"]
+        bad["security_boundary"][field] = base_tables - 1
+        try:
+            validate_current_api_control(bad)
+        except AssertionError:
+            continue
+        raise AssertionError(f"ct.tevv.control-state.security-boundary-{field}-coverage-gap-rejected failed")
+
+
 def main() -> int:
     for path in (PHASE_MANIFEST, HISTORICAL_API_MANIFEST, CURRENT_API_MANIFEST, CHECKPOINT, GOVERNANCE_ADR):
         require(path.is_file(), f"Missing {path.relative_to(ROOT)}")
@@ -212,11 +233,13 @@ def main() -> int:
     validate_historical_api_snapshot(historical_api)
     validate_current_api_control(current_api)
     test_superseded_evidence_rejected(historical_api)
+    test_security_boundary_coverage_fail_closed(current_api)
 
     checkpoint = CHECKPOINT.read_text(encoding="utf-8")
     require("PR #62 five-phase machine assertion is superseded" in checkpoint, "Checkpoint must preserve and supersede the transient five-phase assertion")
     require("Phases 3–10" in checkpoint, "Checkpoint must propagate the ten-phase roadmap")
 
+    base_tables = current_api["security_boundary"]["integration_control_base_tables"]
     print("Ten-phase namespace and API/MCP control-plane validation: PASS")
     print("- top-level institutional phases: 10")
     print("- current phase: 2 / 2.99")
@@ -226,9 +249,10 @@ def main() -> int:
     print("- CrownThrive IO: read_verified / founder unlimited-call budget policy passed / writes closed")
     print("- ThriveTools SEO: read_verified / MCP read adapter passed / remaining SRE/path/external-client gates open")
     print("- Collab Portal: 6/7 fail-closed; webhook sender/delivery integrity blocked")
-    print("- Reward Loyalty: production v4 preserved; v5.27.0 target only; writes closed")
-    print("- integration_control RLS: 12/12; security advisor lints: 0")
+    print("- Reward Loyalty: production v4 / v5.27.0 target / prep-control v2 hardened / provider dispatch closed")
+    print(f"- integration_control RLS/policy coverage: {base_tables}/{base_tables}; FORCE RLS: 0; security advisor lints: 0")
     print("- ct.tevv.control-state.current-snapshot-superseded-evidence-rejected: PASS")
+    print("- ct.tevv.control-state.security-boundary-coverage-gap-rejected: PASS")
     print("- raw credential-shaped fields: none")
     return 0
 
