@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.0.1",
   "manifest_id": "ct.manifest.phase-2-99.blocker-closure-reconciliation.v1",
-  "observed_at": "2026-08-19T22:04:52Z",
+  "observed_at": "2026-08-19T22:10:20Z",
   "canonical_main_baseline": "1054e79226338809a5a91211c2271c19ff96b362",
   "phase": 2,
   "subphase": "2.99",
@@ -70,6 +70,15 @@
     "v5_production_deployed": false,
     "provider_writes": "closed",
     "readiness_runbook": "runbooks/reward-loyalty-v5-migration-readiness.mdx",
+    "preparation_control_plane": {
+      "edge_function": "reward-loyalty-api-control",
+      "version": 2,
+      "jwt_required": true,
+      "admin_authorization": "passed",
+      "request_body_bound_bytes": 32768,
+      "provider_dispatch": false,
+      "writes_enabled": false
+    },
     "readiness_gates": [
       "backup_restore_proof",
       "php_8_4_1_plus_and_extensions",
@@ -82,6 +91,36 @@
       "rate_idempotency_audit_readback",
       "rollback_drill",
       "separate_purchase_and_cutover_authority"
+    ]
+  },
+  "partnero_runtime_hardening": {
+    "api_control": {
+      "edge_function": "partnero-api-control",
+      "version": 2,
+      "jwt_and_admin_authorization": true,
+      "request_body_bound_bytes": 32768,
+      "provider_response_bound_bytes": 524288,
+      "provider_timeout_ms": 7000,
+      "provider_json_required": true,
+      "provider_writes_enabled": false
+    },
+    "webhook_receiver": {
+      "edge_function": "partnero-webhook-receiver",
+      "version": 2,
+      "request_body_bound_bytes": 65536,
+      "content_type_required": "application/json",
+      "hmac_sha256_raw_body_verification": true,
+      "acceptance_state": "fail_closed_until_signing_secret_bound"
+    },
+    "remaining_material_gates": [
+      "credential_vault_binding",
+      "webhook_signature_secret",
+      "api_read_certification",
+      "request_audit_and_budget_commit",
+      "website_visitor_tracking",
+      "customer_signup_tracking",
+      "transaction_tracking",
+      "mcp_remote_conformance"
     ]
   },
   "separation_invariants": [
