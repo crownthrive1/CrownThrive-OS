@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:crownthrive:chlom:kernel:request:v1",
   "title": "CHLOM Kernel Request Contract v1",
-  "description": "Phase 2.99 provider-independent semantic-oracle request contract. It carries authority and approval references but does not make those references self-authorizing.",
+  "description": "Phase 2.99 provider-independent semantic-oracle request contract. Request role/approval/evidence fields are caller claims only; strict-v1 authority is supplied out-of-band by a verified authority context and cannot be self-asserted by the request.",
   "type": "object",
   "required": [
     "contract_id",
@@ -32,7 +32,12 @@
         "actor_id": {"type": "string", "minLength": 1},
         "organization_id": {"type": "string", "minLength": 1},
         "authenticated": {"type": "boolean"},
-        "roles": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+        "roles": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true,
+          "description": "Caller-asserted role claims only. The strict-v1 oracle evaluates authority-sensitive rules against separately verified roles, not this array."
+        }
       },
       "additionalProperties": true
     },
@@ -66,8 +71,18 @@
       },
       "additionalProperties": true
     },
-    "authority_evidence": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
-    "approval_evidence": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "authority_evidence": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "description": "Caller-provided evidence references/claims. Free-form or non-governed values are persisted only as opaque SHA-256 evidence digests, never verbatim; this field does not create authority."
+    },
+    "approval_evidence": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "description": "Caller-provided approval claims only. Strict-v1 required approvals are satisfied only by separately verified authority context."
+    },
     "docs_impact": {
       "type": "object",
       "required": ["outcome", "reason"],
