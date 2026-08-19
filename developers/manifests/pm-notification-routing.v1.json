@@ -1,0 +1,46 @@
+{
+  "manifest_version": "1.0.0",
+  "manifest_id": "ct.manifest.pm-notification-routing.v1",
+  "phase": "2.99",
+  "transport": "gmail",
+  "material_pass_only": true,
+  "success_subject_prefix": "PASS SUCCESS",
+  "action_subject_prefix": "ACTION NEEDED",
+  "collab_portal_fallback": {
+    "state": "active_until_operational_verified",
+    "disable_only_when_all": [
+      "credential_exact_match=passed",
+      "project_meta_authenticated=passed",
+      "institutional_project_uid=pinned",
+      "approved_field_map=approved",
+      "authenticated_project_read=passed",
+      "bounded_write_readback=passed",
+      "webhook_sender_delivery_integrity=passed"
+    ],
+    "reactivate_on": [
+      "adapter_certification_revoked",
+      "authenticated_read_regression",
+      "bounded_write_readback_regression",
+      "project_uid_or_field_map_drift",
+      "webhook_integrity_regression"
+    ],
+    "after_disable_recipient_refs": ["founder_tracking", "institutional_tracking"]
+  },
+  "forbidden": [
+    "send_secrets_or_credentials",
+    "send_private_evidence_bodies",
+    "treat_noop_cycle_as_success_email",
+    "disable_collab_fallback_from_function_active_state_alone"
+  ],
+  "recipient_policy": {
+    "founder_tracking": {"runtime_ref": "CT_PM_FOUNDER_EMAIL", "active": true},
+    "institutional_tracking": {"runtime_ref": "CT_PM_INSTITUTIONAL_EMAIL", "active": true},
+    "collab_portal_fallback_tracking": {"runtime_ref": "CT_PM_COLLAB_TRACKING_EMAIL", "active": true, "sensitivity": "internal_routing_address"}
+  },
+  "privacy": {
+    "public_repository_stores_recipient_refs_not_addresses": true,
+    "runtime_addresses_must_not_be_logged": true
+  },
+  "decision_id": "CT-ADR-GOV-011",
+  "source_basis": ["founder_directive_2026-08-18", "S106_repository_enforcement_audit"]
+}

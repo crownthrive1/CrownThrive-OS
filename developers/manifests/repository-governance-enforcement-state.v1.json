@@ -1,5 +1,5 @@
 {
-  "manifest_version": "1.0.0",
+  "manifest_version": "1.1.0",
   "manifest_id": "ct.manifest.repository-governance-enforcement.v1",
   "source_id": "S106",
   "phase": "2.99",
@@ -7,10 +7,12 @@
   "branch": "main",
   "observed_at": "2026-08-18/19",
   "workflow": {
-    "name": "Documentation Governance",
-    "job": "Validate institutional documentation",
+    "documentation_name": "Documentation Governance",
+    "documentation_job": "Validate institutional documentation",
+    "security_name": "Security Governance",
     "pull_request_validation": true,
-    "push_to_main_revalidation": true
+    "push_to_main_revalidation": true,
+    "scheduled_security_revalidation": true
   },
   "observed_enforcement": {
     "branch_protected": false,
@@ -20,33 +22,65 @@
     "required_checks": [],
     "ruleset_inventory": "not_directly_enumerated_by_current_connector"
   },
-  "current_state": "monitoring_plus_post_merge_defense_in_depth",
+  "current_state": "agent_sovereign_policy_with_github_monitoring_scanning_and_post_merge_defense_in_depth",
   "merge_gate_enforced": false,
-  "policy_transition_enforcement": "partial_validator_layer_only",
+  "github_merge_gate_enforced": false,
+  "agent_merge_policy": "fail_closed_quorum_and_validation",
+  "github_branch_protection_required_for_phase_3": false,
+  "policy_transition_enforcement": "agent_sovereign_with_independent_ci_and_security_evidence",
+  "agent_policy": {
+    "decision_id": "CT-ADR-GOV-011",
+    "eligible_voters": 5,
+    "approval_ratio": 0.75,
+    "minimum_approvals": 4,
+    "independent_gatekeeper_required": true,
+    "minimum_automatic_merge_score": 85,
+    "deny_or_block_prevents_automatic_merge": true,
+    "d3_quorum_substitution": false
+  },
+  "github_role": {
+    "sovereign_merge_authority": false,
+    "repository_transport": true,
+    "ci_evidence": true,
+    "codeql_evidence": true,
+    "dependency_review_evidence": true,
+    "secret_scanning_evidence_when_enabled": true,
+    "post_merge_revalidation": true,
+    "branch_protection": "optional_defense_in_depth_not_trust_anchor"
+  },
   "target": {
     "branch": "main",
-    "required_check": "Validate institutional documentation",
-    "failed_check_mergeability": "blocked",
+    "sovereign_merge_authority": "governed_agents_plus_reserved_human_authority",
+    "agent_failed_validation_mergeability": "blocked",
+    "agent_failed_security_scan_mergeability": "blocked_when_applicable",
     "post_merge_revalidation": true,
-    "force_push": "blocked_unless_explicit_break_glass",
-    "branch_deletion": "blocked_unless_explicit_break_glass",
+    "github_branch_protection": "optional_defense_in_depth",
     "bypass_authority": "explicit_D3_decision"
   },
   "promotion_requirements": [
-    "effective_main_ruleset_or_branch_policy_evidence",
-    "exact_required_status_check_evidence",
-    "blocked_failing_check_merge_test_or_equivalent",
-    "documented_bypass_authority"
+    "successful_institutional_validation",
+    "successful_security_governance_validation",
+    "applicable_provider_security_scan_evidence_or_documented_not_applicable",
+    "risk_score_at_or_above_threshold",
+    "required_specialist_endorsements",
+    "four_of_five_agent_quorum",
+    "independent_gatekeeper_approval",
+    "rollback_or_recovery_path",
+    "documentation_and_downstream_phase_reconciliation",
+    "reserved_human_authority_for_D3"
   ],
   "forbidden_promotions": [
-    "monitoring_only_to_merge_gate_enforced_without_control_plane_evidence",
+    "github_ci_success_to_sovereign_authority",
+    "github_branch_unprotected_to_governance_failure_when_agent_policy_passes",
     "historical_to_current_without_effective_source_authority",
     "unverified_to_production_verified_without_runtime_evidence",
     "provider_capability_to_crownthrive_deployed_without_account_deployment_evidence",
     "payment_to_entitlement_without_fulfillment_evidence",
     "product_listing_to_rights_granted_without_valid_license_rights_evidence",
-    "source_active_domain_to_current_secure_canonical_host_without_registrar_dns_tls_runtime_evidence"
+    "source_active_domain_to_current_secure_canonical_host_without_registrar_dns_tls_runtime_evidence",
+    "agent_quorum_to_D3_authority_without_authorized_human",
+    "security_failure_to_pass_by_disabling_or_weakening_the_check"
   ],
   "docs_impact": "docs_updated",
-  "phase_3_entry_effect": "blocking_until_merge_gate_enforcement_is_proven"
+  "phase_3_entry_effect": "github_branch_protection_nonblocking; other_phase_2_99_hard_exit_requirements_remain_binding"
 }

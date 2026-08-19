@@ -1,0 +1,93 @@
+name: Security Governance
+
+on:
+  pull_request:
+    paths:
+      - "**/*.py"
+      - "**/*.js"
+      - "**/*.ts"
+      - "**/*.json"
+      - "**/*.yml"
+      - "**/*.yaml"
+      - ".github/workflows/**"
+      - "developers/manifests/**"
+  push:
+    branches:
+      - main
+      - "admin-mcp/**"
+    paths:
+      - "**/*.py"
+      - "**/*.js"
+      - "**/*.ts"
+      - "**/*.json"
+      - "**/*.yml"
+      - "**/*.yaml"
+      - ".github/workflows/**"
+      - "developers/manifests/**"
+  schedule:
+    - cron: "17 7 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: Validate CrownThrive security policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Verify security scripts
+        run: |
+          python -m py_compile scripts/validate_security_governance.py
+          python -m py_compile scripts/security_self_heal_plan.py
+          python -m py_compile scripts/governed_merge_decision.py
+      - name: Validate deterministic security governance
+        run: python scripts/validate_security_governance.py
+      - name: Validate self-healing planner invariants
+        run: python scripts/security_self_heal_plan.py --self-test
+      - name: Validate quorum decision invariants
+        run: python scripts/governed_merge_decision.py --self-test
+
+  codeql-provider-mode:
+    name: Validate provider-managed CodeQL compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Prevent conflicting advanced CodeQL setup
+        shell: bash
+        run: |
+          if grep -R -nE '^[[:space:]]*uses:[[:space:]]*github/codeql-action/' .github/workflows; then
+            echo "Advanced CodeQL workflow detected while GitHub default setup is the registered provider mode."
+            exit 1
+          fi
+          echo "CodeQL default setup is provider-managed; this workflow intentionally does not duplicate advanced setup."
+          echo "Actual provider CodeQL findings remain independent evidence and are not synthesized by this job."
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the current five-phase namespace and sanitized API/MCP control-plane snapshot."""
+"""Validate the ten-phase namespace and sanitized API/MCP control-plane snapshot."""
 
 from __future__ import annotations
 
@@ -11,13 +11,19 @@ ROOT = Path(__file__).resolve().parents[1]
 PHASE_MANIFEST = ROOT / "developers/manifests/institutional-phase-namespace.v2.json"
 API_MANIFEST = ROOT / "developers/manifests/api-mcp-control-plane-state.v1.json"
 CHECKPOINT = ROOT / "changelog/phase-2-99-five-phase-api-mcp-control-plane-checkpoint.md"
+GOVERNANCE_ADR = ROOT / "changelog/adr-agent-sovereign-governance-quorum-security.md"
 
 EXPECTED_PHASES = [
     "Institutional Mapping",
     "Institutional Recovery, Reconciliation & Documentation",
     "Executable Institutional Core",
     "Federated Ecosystem Activation",
-    "Institutional Scale, Licensing & Expansion",
+    "Revenue & Market Activation",
+    "Licensing, IP & Developer Economy",
+    "Physical, Phygital & Regional Expansion",
+    "Holdings, Capital & Portfolio Scale",
+    "Advanced CHLOM & Interoperable Infrastructure",
+    "Generational Continuity, Sovereign Scale & Institutional Permanence",
 ]
 
 FORBIDDEN_RAW_CREDENTIAL_KEYS = {
@@ -61,29 +67,32 @@ def require(condition: bool, message: str) -> None:
 
 def validate_phase_namespace(data: dict[str, Any]) -> None:
     require(data.get("state") == "current", "Phase namespace must be current")
-    require(data.get("top_level_phase_count") == 5, "Exactly five top-level institutional phases are required")
+    require(data.get("decision_id") == "CT-ADR-ROADMAP-010", "Ten-phase roadmap decision ID must remain CT-ADR-ROADMAP-010")
+    require(data.get("top_level_phase_count") == 10, "Exactly ten top-level institutional phases are required")
     phases = data.get("phases")
-    require(isinstance(phases, list) and len(phases) == 5, "Phase manifest must contain five phase records")
-    require([row.get("number") for row in phases] == [1, 2, 3, 4, 5], "Phase numbers must be 1 through 5")
-    require([row.get("name") for row in phases] == EXPECTED_PHASES, "Phase names do not match the governing five-phase namespace")
+    require(isinstance(phases, list) and len(phases) == 10, "Phase manifest must contain ten phase records")
+    require([row.get("number") for row in phases] == list(range(1, 11)), "Phase numbers must be 1 through 10")
+    require([row.get("name") for row in phases] == EXPECTED_PHASES, "Phase names do not match ten_phase_v1")
     require(data.get("current_phase") == 2, "Current institutional phase must remain Phase 2")
     require(data.get("current_subphase") == "2.99", "Current institutional subphase must remain 2.99")
     require(data.get("phase_3_entry") == "blocked_pending_phase_2_99_hard_exit", "Phase 3 must remain blocked")
 
     rules = data.get("rules", {})
-    require(rules.get("future_phase_propagation_scope") == [3, 4, 5], "Future propagation must be limited to Phases 3-5")
+    require(rules.get("future_phase_propagation_scope") == list(range(3, 11)), "Future propagation must cover Phases 3-10")
     require(rules.get("historical_phase_records_preserved") is True, "Historical phase records must be preserved")
     require(rules.get("retroactive_renumbering_prohibited") is True, "Retroactive renumbering must remain prohibited")
     require(rules.get("phase_3_may_start_before_phase_2_99_hard_exit") is False, "Phase 3 may not start before the Phase 2.99 hard exit")
+    require(rules.get("future_roadmap_is_fluid") is True, "Future roadmap must remain fluid")
+    require(rules.get("material_pass_must_reconcile_downstream_impacts") is True, "Material passes must reconcile downstream impacts")
 
     superseded = data.get("superseded_top_level_namespaces", [])
-    ten_phase = next((row for row in superseded if row.get("namespace") == "ten_phase_v1"), None)
-    require(ten_phase is not None, "Historical ten-phase namespace disposition must be explicit")
-    require(ten_phase.get("disposition") == "historical_operational_decomposition_not_current_top_level", "Ten-phase namespace must not remain current top-level authority")
-    require(ten_phase.get("preserve_history") is True, "Ten-phase historical evidence must be preserved")
+    five_phase_snapshot = next((row for row in superseded if row.get("namespace") == "five_phase_v2_2026_08_19_transient_machine_snapshot"), None)
+    require(five_phase_snapshot is not None, "PR #62 five-phase machine snapshot must be preserved as superseded lineage")
+    require(five_phase_snapshot.get("disposition") == "superseded_during_concurrency_reconciliation", "Five-phase transient snapshot disposition drifted")
+    require(five_phase_snapshot.get("preserve_history") is True, "Five-phase transient history must be preserved")
 
     docs = data.get("documentation_reconciliation", {})
-    require(docs.get("state") == "docs_delta_opened", "Five-phase prose reconciliation delta must remain open until stale prose is reconciled")
+    require(docs.get("state") == "docs_updated", "Namespace conflict must remain reconciled")
 
 
 def validate_api_control(data: dict[str, Any]) -> None:
@@ -127,23 +136,27 @@ def validate_api_control(data: dict[str, Any]) -> None:
     require(not forbidden, "Raw credential-shaped field names are prohibited in public-safe manifest: " + ", ".join(forbidden))
 
     docs = data.get("docs_impact", {})
-    require(docs.get("state") == "docs_delta_opened", "API/MCP prose reconciliation delta must remain explicit")
+    require(docs.get("state") == "docs_delta_opened", "API/MCP prose/conformance delta must remain explicit")
 
 
 def main() -> int:
-    require(PHASE_MANIFEST.is_file(), f"Missing {PHASE_MANIFEST.relative_to(ROOT)}")
-    require(API_MANIFEST.is_file(), f"Missing {API_MANIFEST.relative_to(ROOT)}")
-    require(CHECKPOINT.is_file(), f"Missing {CHECKPOINT.relative_to(ROOT)}")
+    for path in (PHASE_MANIFEST, API_MANIFEST, CHECKPOINT, GOVERNANCE_ADR):
+        require(path.is_file(), f"Missing {path.relative_to(ROOT)}")
 
     phase_data = load_json(PHASE_MANIFEST)
     api_data = load_json(API_MANIFEST)
     validate_phase_namespace(phase_data)
     validate_api_control(api_data)
 
-    print("Five-phase namespace and API/MCP control-plane validation: PASS")
-    print("- top-level institutional phases: 5")
+    checkpoint = CHECKPOINT.read_text(encoding="utf-8")
+    require("PR #62 five-phase machine assertion is superseded" in checkpoint, "Checkpoint must preserve and supersede the transient five-phase assertion")
+    require("Phases 3–10" in checkpoint, "Checkpoint must propagate the ten-phase roadmap")
+
+    print("Ten-phase namespace and API/MCP control-plane validation: PASS")
+    print("- top-level institutional phases: 10")
     print("- current phase: 2 / 2.99")
     print("- Phase 3 entry: blocked")
+    print("- PR #62 five-phase snapshot: preserved as superseded lineage")
     print("- CrownThrive API/MCP provider writes: disabled")
     print("- CrownThrive IO: read_verified / writes closed")
     print("- Collab Portal: credential mismatch / read blocked / writes closed")

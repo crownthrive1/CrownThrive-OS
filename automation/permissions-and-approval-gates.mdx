@@ -1,25 +1,16 @@
 ---
 title: "Permissions and Human Approval Gates"
-description: "The role, tool, data, financial, rights, publishing, security, and irreversible-action controls applied to CrownThrive automation."
+description: "The role, tool, data, financial, rights, publishing, security, quorum, specialist, and irreversible-action controls applied to CrownThrive automation."
 sidebarTitle: "Permissions & Approvals"
 icon: "user-lock"
-keywords: ["human approval", "agent permissions", "least privilege", "automation governance"]
+keywords: ["human approval", "agent permissions", "least privilege", "automation governance", "quorum", "security"]
 ---
 
 # Permissions and human approval gates
 
 CrownThrive applies least privilege to people, agents, services, and integrations.
 
-A connected tool is not an unrestricted permission grant. Access is determined by:
-
-- role
-- task
-- data classification
-- environment
-- action type
-- financial threshold
-- rights scope
-- current approval state
+A connected tool is not an unrestricted permission grant. Access is determined by role, task, data classification, environment, action type, financial threshold, rights scope and current approval state.
 
 ## Permission dimensions
 
@@ -35,19 +26,7 @@ Define which classifications an actor may read, create, update, export, or summa
 
 ### Tool permissions
 
-Separate capabilities such as:
-
-- search
-- read
-- draft
-- create test data
-- update draft data
-- publish
-- delete
-- refund
-- payout
-- rotate credentials
-- change roles
+Separate capabilities such as search, read, draft, create test data, update draft data, publish, delete, refund, payout, rotate credentials and change roles.
 
 ### Environment permissions
 
@@ -61,27 +40,11 @@ Separate capabilities such as:
 
 ### Financial permissions
 
-Set explicit thresholds for:
-
-- live price changes
-- discounts and promotions
-- refunds
-- credits adjustments
-- application fees
-- invoices
-- payouts or transfers
+Set explicit thresholds for live price changes, discounts/promotions, refunds, credit adjustments, application fees, invoices and payouts/transfers.
 
 ### Rights and publishing permissions
 
-Separate:
-
-- personal-use product activation
-- institutional license approval
-- synchronization approval
-- public-performance approval
-- character or likeness use
-- adaptation and development rights
-- protected-identity publishing
+Separate personal-use product activation, institutional license approval, synchronization approval, public-performance approval, character/likeness use, adaptation/development rights and protected-identity publishing.
 
 ## Documentation and subordinate approval classes
 
@@ -94,50 +57,100 @@ Documentation actions use the CrownThrive D0–D3 materiality model in addition 
 | D2 | source-backed capability state, route inventory, product metadata, API/provider state, canon relationship or current-public-claim correction | responsible domain agent plus independent verifier; human/owner approval where authority matrix requires it |
 | D3 | legal terms, rights grants/ownership, prices or payouts with customer effect, privacy/security/auth, Scripture/canon authority, paid entitlements, destructive source recovery, franchise/securities or irreversible production action | required authorized human/reserved specialist approval; no agent quorum can substitute |
 
-A subordinate may return only:
-
-- `approve`;
-- `approve_after_mechanical_fixes`;
-- `deny_with_required_changes`;
-- `escalate_for_domain_review`;
-- `escalate_for_human_authority`;
-- `block_due_to_missing_evidence`.
+A subordinate may return only `approve`, `approve_after_mechanical_fixes`, `deny_with_required_changes`, `escalate_for_domain_review`, `escalate_for_human_authority`, or `block_due_to_missing_evidence`.
 
 A parent agent may accept a subordinate approval only when the subordinate is registered for that check, the evidence/diff/test is inspectable, the subordinate did not self-approve the material originating change, no higher-risk gate applies, rollback exists and the decision is recorded in DAIL/changelog evidence. A lower-level approval never overrides a higher-level denial, hold or phase gate.
 
+## Agent-sovereign quorum and specialist gates
+
+`CT-ADR-GOV-011` establishes CrownThrive's repository-governance trust model: **coded CrownThrive agents are the sovereign fail-closed merge gate; GitHub is repository transport, CI/security evidence and defense-in-depth.** GitHub branch protection may supplement the model but is not the authority root.
+
+The current institutional relay voter pool is:
+
+| Voter | Core function | Merge-vote condition |
+| --- | --- | --- |
+| `ct.relay.agent-a` | orchestration/integration | current-state and packet-scope reconciliation |
+| `ct.relay.agent-b` | evidence/reconciliation audit | source/evidence integrity |
+| `ct.relay.agent-c` | implementation/documentation | bounded implementation correctness |
+| `ct.relay.agent-d` | independent gatekeeper | independent final gate; mandatory affirmative for automatic merge |
+| `ct.relay.agent-s` | security/resilience sentinel | security, dependency, secret, auth, crypto and recovery posture |
+
+Automatic D0–D2-eligible merge requires a **75% quorum**, rounded up. With five eligible voters that means **four affirmative approvals**, plus an affirmative Agent D gatekeeper decision. Missing votes and abstentions never count as approvals. Any `deny` or `block` stops automatic merge.
+
+Quorum is necessary but never sufficient. The packet must also satisfy:
+
+- institutional validators;
+- Security Governance validators;
+- applicable CodeQL/dependency/secret-scanning evidence or explicit `not_applicable` evidence;
+- minimum risk score `85/100`;
+- specialist endorsement triggered by changed domains;
+- D0–D3 authority class;
+- secret/restricted-data controls;
+- rollback/recovery;
+- documentation impact;
+- downstream Phase 3–10 impact reconciliation.
+
+One registered agent equals one vote; confidence does not create weighted voting. A risk score never converts a blocked authority class into an allowed action.
+
+### Rule-based specialist activation
+
+Specialist review is activated by the subject matter of the change, not by convenience:
+
+- **Security & privacy:** authentication, authorization, secrets, credentials, production APIs, dependencies, workflows, cryptography, keys, privacy/security controls.
+- **Legal & regulatory:** contracts, rights, licensing, privacy, securities, token/cryptocurrency, investment, franchise, KYC/AML, sanctions, cross-border regulation and regulated public claims.
+- **Operations/SRE:** deployment, incident, provider, domain, billing, fulfillment, support, backup, recovery and continuity.
+- **Blockchain/cryptographic protocol:** chains, smart contracts, ledgers, tokens, wallets, custody, consensus, bridges, oracles and settlement.
+- **AI/ML/LLM TEVV:** agents, models, prompts, evaluation, autonomous decisions, training/data-use rules and policy execution.
+- **IP/licensing:** ownership, provenance, contributor rights, chain of title, license class, adaptation, likeness/voice and developer licensing.
+- **Finance/tax/treasury:** money movement, tax treatment, settlement, reserves, payouts, revenue share, royalties and treasury design.
+- **Accessibility/consumer protection:** customer-facing disclosures, deceptive-design risk, accessibility, endorsements and regulated claims.
+- **Regional/global localization:** jurisdiction-specific legal, privacy, tax, sanctions, consumer, language and operating requirements.
+
+A specialist agent may recommend, verify or block. Where qualified counsel, tax professionals, auditors, licensed professionals or authorized human officers are required, an agent recommendation is evidence for the human decision—not a substitute.
+
+### D3 boundary
+
+No 4-of-5, 5-of-5 or other agent consensus may authorize a D3 action. D3 agent votes are advisory and may block; execution requires the reserved authorized human/specialist approval recorded for that action.
+
+## Self-healing authority
+
+Self-healing is governed recovery rather than permission escalation:
+
+- **D0/D1:** deterministic low-risk repair may be automatically proposed/applied when the original check, the full institutional suite and independent verification pass afterward.
+- **D2:** repair requires an independent verifier, applicable specialist endorsement, quorum and rollback.
+- **D3:** remediation may be prepared/tested by agents but production application remains human-reserved.
+
+Agents must never “heal” a failure by weakening/disabling the validator, suppressing a security finding, reconstructing/exposing a secret, broadening privileges, erasing evidence, inventing missing state or self-approving the originating material change.
+
 ## Current documentation repository authority
 
-For the Phase 2.98 Pass D continuation, founder authorization permits merge and execution within `crownthrive1/CrownThrive-Support` after required documentation validators and GitHub checks pass. This authorization does not extend to unconnected application repositories, production credentials, payment movement, binding licenses or other D3 actions.
+Founder authorization permits merge and execution within `crownthrive1/CrownThrive-Support` after required documentation/security validators and applicable GitHub evidence pass, within D0–D2 authority. `CT-ADR-GOV-011` converts that practice into a machine-readable five-agent sovereign quorum model for future automatic merges.
+
+This authorization does not extend to unconnected application repositories, production credentials, payment movement, binding licenses, securities/token issuance, IP transfer or other D3 actions.
 
 ## Mandatory human approvals
 
 Human approval is required for:
 
-- publishing a new public product
-- activating a live checkout for a new rights class
-- changing a live price beyond the approved operating threshold
-- issuing a refund or financial adjustment above the delegated limit
-- granting commercial, institutional, broadcast, performance, character, voice, source-file, or adaptation rights
-- signing contracts or externally binding agreements
-- deleting customer, source, rights, financial, or audit records
-- rotating production credentials
-- changing super-admin or privileged access
-- deploying destructive or high-risk database migrations
-- publishing protected identities, child-related information, or confidential partner material
-- making material public claims about revenue, clients, partners, audience, or verification
-- overriding a rights, security, privacy, accessibility, or quality hold
+- publishing a new public product;
+- activating a live checkout for a new rights class;
+- changing a live price beyond the approved operating threshold;
+- issuing a refund or financial adjustment above the delegated limit;
+- granting commercial, institutional, broadcast, performance, character, voice, source-file or adaptation rights;
+- signing contracts or externally binding agreements;
+- deleting customer, source, rights, financial or audit records;
+- rotating production credentials;
+- changing super-admin or privileged access;
+- deploying destructive or high-risk database migrations;
+- publishing protected identities, child-related information or confidential partner material;
+- making material public claims about revenue, clients, partners, audience or verification;
+- overriding a rights, security, privacy, accessibility or quality hold;
+- launching or publicly offering a token/cryptocurrency/security-like economic instrument;
+- adopting a cross-border regulated structure where professional review is required.
 
 ## Two-person control
 
-Two-person review is recommended for:
-
-- production credential rotation
-- high-value refunds or payouts
-- rights grants with material value
-- destructive data changes
-- super-admin access changes
-- protected-identity releases
-- incident closure after a material security or payment failure
+Two-person review is recommended for production credential rotation, high-value refunds/payouts, rights grants with material value, destructive data changes, super-admin access changes, protected-identity releases, material blockchain key/custody changes and incident closure after a material security/payment failure.
 
 ## Approval request standard
 
@@ -170,68 +183,26 @@ decided_at: UTC timestamp
 
 ## Delegated low-risk actions
 
-Agents may perform low-risk actions without individual approval when the registry expressly permits them, such as:
-
-- updating draft documentation
-- creating GitHub issues
-- running tests
-- reconciling read-only processor state
-- preparing product manifests
-- drafting customer responses from approved knowledge
-- identifying broken links
-- proposing metadata changes
-- creating non-production branches
+Agents may perform low-risk actions without individual approval when the registry expressly permits them, such as updating draft documentation, creating GitHub issues, running tests, reconciling read-only processor state, preparing product manifests, drafting customer responses from approved knowledge, identifying broken links, proposing metadata changes and creating non-production branches.
 
 ## Denial and expiration
 
-An approval may be:
-
-- approved
-- approved with conditions
-- denied
-- expired
-- revoked
-- superseded
-
-Expired or revoked approvals must not remain reusable.
+An approval may be approved, approved with conditions, denied, expired, revoked or superseded. Expired or revoked approvals must not remain reusable.
 
 ## Tool-token separation
 
 Master credentials should remain in server-side secret management. Users and agents should receive scoped, revocable tokens or tool permissions.
 
-Never provide artists, customers, or ordinary agents with:
-
-- master CrownThrive IO credentials
-- Stripe secret keys
-- webhook signing secrets
-- storage master keys
-- unrestricted database service keys
-- super-admin session tokens
+Never provide artists, customers or ordinary agents with master CrownThrive IO credentials, Stripe secret keys, webhook signing secrets, storage master keys, unrestricted database service keys or super-admin session tokens.
 
 ## Break-glass access
 
-Emergency access should be:
-
-- rare
-- time-limited
-- reason-coded
-- fully logged
-- reviewed after use
-- automatically revoked
+Emergency access should be rare, time-limited, reason-coded, fully logged, reviewed after use and automatically revoked. Break-glass never silently becomes ordinary authorization.
 
 ## Monitoring
 
-Monitor for:
-
-- permission expansion
-- repeated denied actions
-- unusual production reads
-- destructive-action attempts
-- privilege changes
-- unexpected tool use
-- access outside the task scope
-- agent behavior inconsistent with evaluations
+Monitor for permission expansion, repeated denied actions, unusual production reads, destructive-action attempts, privilege changes, unexpected tool use, access outside task scope, agent behavior inconsistent with evaluations, quorum manipulation, specialist-gate bypass, dependency/security findings and unauthorized self-healing.
 
 <Warning>
-  Never solve an operational blocker by silently broadening an agent’s permissions. Escalate, approve, scope, execute, and record.
+  Never solve an operational blocker by silently broadening an agent's permissions. Escalate, approve, scope, execute and record.
 </Warning>
