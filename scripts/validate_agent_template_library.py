@@ -90,9 +90,28 @@ def main() -> int:
     require_text("developers/templates/chlom-capability-pallet-template.v1.yaml",
                  "production_writes: false", "pricing_status: not_authorized",
                  "checkout_enabled: false")
+    require_text("developers/templates/chlom-runtime-adapter-template.v1.yaml",
+                 "lifecycle: RESEARCH",
+                 "production_deployed: false",
+                 "pii_on_public_immutable_ledger: prohibited",
+                 "restricted_evidence_on_public_immutable_ledger: prohibited",
+                 "production_token_sale: prohibited_by_template",
+                 "earliest_activation_phase: 9",
+                 "may_inherit_production_authority_from_research: false",
+                 "checkout_enabled: false")
     require_text("developers/templates/third-party-attribution-template.v1.yaml",
                  "license_spdx:", "distribution_allowed: false",
                  "exact upstream license")
+
+    chlom_families = data.get("chlom_template_families", {})
+    capability = chlom_families.get("capability_pallet", {})
+    runtime = chlom_families.get("runtime_adapter", {})
+    if capability.get("may_imply_blockchain_deployment") is not False:
+        fail("Capability pallet may not imply blockchain/runtime deployment")
+    if runtime.get("earliest_activation_phase") != 9:
+        fail("CHLOM runtime adapter must remain Phase-9-or-later gated")
+    if runtime.get("production_deployed_by_template") is not False:
+        fail("Runtime-adapter template may not imply production deployment")
 
     if not LINEAGE.is_file():
         fail("Missing machine-readable agent lineage archive")
@@ -172,11 +191,11 @@ def main() -> int:
         "relay": ["Agent E", "Agent H", "ct.subagent.phase3-snapshot-packet"],
         "permissions": ["Scheduled specialist and embedded subagent delegation"],
         "factory": ["Agent factory template system", "Agent K"],
-        "templates": ["CHLOM capability pallets", "Stripe commercialization state"],
-        "lineage_archive": ["Generation 4", "Template generation 1.0.0"],
+        "templates": ["CHLOM capability pallets", "CHLOM runtime/decentralized adapter templates", "Stripe commercialization state"],
+        "lineage_archive": ["Generation 4", "Template generation 1.0.1"],
         "changelog_index": ["Institutional Changelog Index", "subject-specific"],
-        "major_change": ["Agent Template & Pallet Institutionalization", "stripe_checkout_enabled: false"],
-        "chlom_pallet_map": ["chlom-capability-pallet-template.v1.yaml", "not automatically blockchain code"],
+        "major_change": ["Agent Template & Pallet Institutionalization", "stripe_checkout_enabled: false", "runtime/decentralized adapter"],
+        "chlom_pallet_map": ["chlom-capability-pallet-template.v1.yaml", "chlom-runtime-adapter-template.v1.yaml", "not automatically blockchain code"],
     }
     for key, fragments in doc_expectations.items():
         path = docs.get(key)
@@ -191,6 +210,7 @@ def main() -> int:
     print("Agent template library validation passed.")
     print("Sovereign voters: A/B/C/D/S only; E/F/G/H and I/J/K are non-voting.")
     print("Template and lineage archives are machine-readable, version-preserving and secret-safe.")
+    print("CHLOM capability pallets and runtime adapters remain distinct; runtime activation is Phase-9-or-later gated.")
     print("Template/pallet commercialization remains scaffolded only: checkout disabled, price not authorized.")
     print("Third-party distribution remains fail-closed pending exact license/attribution verification.")
     return 0
