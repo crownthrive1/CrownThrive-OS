@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/agent-template-library.v1.json"
+LINEAGE = ROOT / "developers/manifests/agent-lineage-archive.v1.json"
 
 
 def fail(message: str) -> None:
@@ -74,6 +75,10 @@ def main() -> int:
         if not (ROOT / template).is_file():
             fail(f"Missing source template: {template}")
 
+    require_text("developers/templates/README.md",
+                 "Do not copy a scheduler prompt and call it an agent",
+                 "Material role changes are versioned and archived",
+                 "No third-party code is imported merely by the presence of these templates")
     require_text("developers/templates/agent-role-template.v1.yaml",
                  "vote_eligible: false", "may_advance_phase: false",
                  "production_write_default: false", "archive_prior_versions: true")
@@ -88,6 +93,39 @@ def main() -> int:
     require_text("developers/templates/third-party-attribution-template.v1.yaml",
                  "license_spdx:", "distribution_allowed: false",
                  "exact upstream license")
+
+    if not LINEAGE.is_file():
+        fail("Missing machine-readable agent lineage archive")
+    lineage = json.loads(LINEAGE.read_text(encoding="utf-8"))
+    if lineage.get("manifest_id") != "ct.manifest.agent-lineage-archive.v1":
+        fail("Agent lineage archive identity drifted")
+    if lineage.get("archive_policy") != "append_only_preserve_predecessors":
+        fail("Agent lineage archive must remain append-only")
+    generations = lineage.get("generations", [])
+    expected_generations = {
+        "generation_0_ad_hoc",
+        "generation_1_four_role_relay",
+        "generation_2_five_voter_sovereign_relay",
+        "generation_3_scheduled_specialist_ring",
+        "generation_4_embedded_specialists",
+    }
+    if {x.get("generation_id") for x in generations} != expected_generations:
+        fail("Agent lineage generation set drifted")
+    current = next((x for x in generations if x.get("generation_id") == "generation_4_embedded_specialists"), None)
+    if not current or current.get("vote_eligible") is not False:
+        fail("Embedded I/J/K generation must remain non-voting")
+    continuity = lineage.get("continuity_rules", {})
+    for key in (
+        "stable_ids_survive_prompt_rewording",
+        "scheduler_ids_are_not_institutional_identity",
+        "prior_accepted_versions_remain_reconstructable",
+        "retired_agents_remain_queryable_as_history",
+        "commercial_and_internal_versions_are_separate",
+    ):
+        if continuity.get(key) is not True:
+            fail(f"Agent lineage continuity invariant missing: {key}")
+    if continuity.get("raw_secrets_or_restricted_evidence_in_archive") is not False:
+        fail("Agent lineage archive may not contain raw secrets/restricted evidence")
 
     inv = data.get("default_invariants", {})
     required_true = [
@@ -152,6 +190,7 @@ def main() -> int:
 
     print("Agent template library validation passed.")
     print("Sovereign voters: A/B/C/D/S only; E/F/G/H and I/J/K are non-voting.")
+    print("Template and lineage archives are machine-readable, version-preserving and secret-safe.")
     print("Template/pallet commercialization remains scaffolded only: checkout disabled, price not authorized.")
     print("Third-party distribution remains fail-closed pending exact license/attribution verification.")
     return 0
