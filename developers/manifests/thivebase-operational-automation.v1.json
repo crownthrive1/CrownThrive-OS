@@ -1,0 +1,189 @@
+{
+  "manifest_version": "1.0.0",
+  "manifest_id": "ct.manifest.thivebase-operational-automation.v1",
+  "phase": "2.99",
+  "canonical_roadmap_generation": "ten_phase_v1",
+  "governance_decision_id": "CT-ADR-GOV-011",
+  "updated_on": "2026-08-19",
+  "purpose": "Govern recurring THIVEBASE integration health, API/MCP certification, credential continuity, software-engine version tracking and bounded self-healing without expanding sovereign authority.",
+  "heartbeat": {
+    "cadence": "monthly",
+    "local_schedule": "first_day_flexible_morning",
+    "automation_title": "THIVEBASE Monthly Heartbeat",
+    "real_user_database_activity_required": true,
+    "required_first_database_call": "public.thivebase_health_snapshot()",
+    "required_project_health": "ACTIVE_HEALTHY",
+    "default_probe_mode": "read_only_fail_closed",
+    "unknown_metric_policy": "preserve_unknown_never_zero",
+    "checks": [
+      "project_health",
+      "thivebase_health_snapshot",
+      "pg_cron_failures",
+      "supabase_security_advisor",
+      "supabase_material_performance_warnings",
+      "integration_control_services_and_gates",
+      "credential_continuity",
+      "request_budgets",
+      "api_mcp_health_and_read_certification",
+      "provider_webhook_state",
+      "software_engine_version_and_support_drift",
+      "domain_and_support_renewal_queue",
+      "github_control_plane_state"
+    ],
+    "capacity_thresholds_percent": {
+      "green_max_exclusive": 50,
+      "watch_min": 50,
+      "watch_max": 69,
+      "plan_min": 70,
+      "plan_max": 79,
+      "action_needed_min": 80,
+      "action_needed_max": 89,
+      "scale_gate_min": 90
+    },
+    "forecast_early_escalation": true
+  },
+  "service_targets": [
+    {"service_id": "thivebase", "probe": "database_control_snapshot", "writes_enabled_by_heartbeat": false},
+    {"service_id": "crownthrive_io", "probe": "certified_read_health", "writes_enabled_by_heartbeat": false},
+    {"service_id": "thrivetools_seo", "probe": "certified_read_health", "writes_enabled_by_heartbeat": false},
+    {"service_id": "collab_portal", "probe": "certified_read_plus_webhook_evidence", "writes_enabled_by_heartbeat": false},
+    {"service_id": "partnero", "probe": "credential_and_readiness_state", "writes_enabled_by_heartbeat": false},
+    {"service_id": "adluxe_network", "probe": "control_state", "writes_enabled_by_heartbeat": false},
+    {"service_id": "adserver_online", "probe": "account_api_entitlement_state", "writes_enabled_by_heartbeat": false},
+    {"service_id": "crownrewards", "probe": "public_availability_and_engine_boundary", "writes_enabled_by_heartbeat": false},
+    {"service_id": "reward_loyalty", "probe": "vendor_version_and_upgrade_readiness", "writes_enabled_by_heartbeat": false},
+    {"service_id": "stripe", "probe": "credential_webhook_and_integration_state", "writes_enabled_by_heartbeat": false},
+    {"service_id": "github_main_perimeter", "probe": "repository_control_evidence", "writes_enabled_by_heartbeat": false},
+    {"service_id": "locticians", "probe": "certified_read_health_when_available", "writes_enabled_by_heartbeat": false},
+    {"service_id": "crownthrive_id", "probe": "identity_provider_control_state", "writes_enabled_by_heartbeat": false},
+    {"service_id": "onzauth", "probe": "oidc_control_state", "writes_enabled_by_heartbeat": false}
+  ],
+  "software_engine_version_policy": {
+    "current_vendor_release_is_default_target_reference": true,
+    "target_release_never_proves_installed_release": true,
+    "installed_version_requires_production_evidence": true,
+    "historical_purchase_price_never_overwritten_by_current_marketplace_price": true,
+    "channel_specific_prices_remain_separate": true,
+    "support_expiry_does_not_equal_software_deactivation_unless_vendor_terms_prove_it": true,
+    "upgrade_rule": "stage_backup_diff_test_reconcile_then_promote",
+    "code_marketplace_tracker": "GitHub_99_plus_Mintlify_operational_watch"
+  },
+  "reward_loyalty_boundary": {
+    "platform": "CrownRewards / My CrownRewards",
+    "engine": "Reward Loyalty",
+    "current_crownthrive_install": "v4",
+    "vendor_target_version": "5.27.0",
+    "production_v5_deployed": false,
+    "v4_must_remain_intact_until_v5_gates_pass": true,
+    "separate_from": ["Partnero / Crown Affiliates", "AdLuxe Network"],
+    "v5_rest_api": "session_token_bearer_user_context",
+    "v5_agent_api": "x_agent_key_machine_to_machine_role_scopes",
+    "v5_agent_openapi": "/api/agent/docs.json",
+    "v5_agent_tool_discovery": "/api/agent/v1/tools?format=mcp",
+    "v5_agent_api_audit_required": true,
+    "v5_write_and_mcp_activation_requires": [
+      "backup",
+      "separate_staging_upgrade",
+      "php_8_4_1_plus_compatibility",
+      "production_v5_deployment_evidence",
+      "least_privilege_agent_key",
+      "rate_limit_certification",
+      "idempotency_and_replay_controls",
+      "audit_and_reconciliation",
+      "bounded_read_certification"
+    ]
+  },
+  "collab_portal_webhook_boundary": {
+    "legacy_generic_receiver": "retired_410",
+    "projects_receiver_generation": "v2_hardened",
+    "billing_receiver_generation": "v2_hardened",
+    "sender_verifier_storage": "supabase_vault_reference_only",
+    "strict_project_event_envelope": true,
+    "pinned_project_uid_required": true,
+    "streaming_pre_read_body_limit_bytes": 65536,
+    "raw_payload_retention": false,
+    "event_driven_sync_enabled": false,
+    "live_provider_delivery_certified": false,
+    "remaining_gate": "webhook_sender_delivery_integrity",
+    "failure_semantics": "static_hardening_passed_but_no_live_provider_callback_observed"
+  },
+  "delegated_subagents": {
+    "integration_heartbeat": {
+      "agent_id": "ct.subagent.integration-heartbeat",
+      "vote_eligible": false,
+      "allowed": [
+        "call_sanitized_health_snapshots",
+        "run_registered_d0_d1_read_health_checks",
+        "compare_request_budgets_and_gates",
+        "inspect_cron_advisors_and_runtime_health",
+        "open_or_update_evidence_backed_watch_records",
+        "propose_deterministic_d1_registry_docs_repairs"
+      ],
+      "prohibited": [
+        "provider_mutation",
+        "credential_rotation",
+        "raw_secret_access_or_output",
+        "rights_or_money_action",
+        "sovereign_vote",
+        "unknown_to_pass_without_evidence"
+      ]
+    },
+    "credential_continuity": {
+      "agent_id": "ct.subagent.credential-continuity",
+      "vote_eligible": false,
+      "allowed": [
+        "verify_vault_reference_presence_without_values",
+        "verify_primary_recovery_continuity_through_sanitized_server_checks",
+        "detect_missing_or_stale_runtime_secret_references",
+        "open_rotation_or_recovery_action_records",
+        "perform_founder_explicitly_authorized_bounded_alias_repair_with_audit"
+      ],
+      "prohibited": [
+        "expose_secret_value",
+        "expose_credential_fingerprint",
+        "autonomous_provider_key_rotation",
+        "broaden_privilege_or_scope",
+        "sovereign_vote"
+      ]
+    },
+    "vendor_engine_watch": {
+      "agent_id": "ct.subagent.vendor-engine-watch",
+      "vote_eligible": false,
+      "allowed": [
+        "inspect_official_vendor_docs_changelogs_prices_and_terms",
+        "record_latest_vendor_target_version",
+        "track_support_renewal_and_migration_deadlines",
+        "separate_marketplace_channel_prices",
+        "open_stage_diff_backup_and_compatibility_tasks",
+        "reconcile_code_marketplace_tracker"
+      ],
+      "prohibited": [
+        "claim_target_version_is_deployed_without_evidence",
+        "overwrite_historical_purchase_cost",
+        "autonomous_production_upgrade",
+        "accept_vendor_terms_or_paid_purchase",
+        "sovereign_vote"
+      ]
+    }
+  },
+  "relay_assignments": {
+    "ct.relay.agent-a": ["heartbeat_orchestration", "roadmap_and_gate_reconciliation", "subagent_dispatch"],
+    "ct.relay.agent-b": ["evidence_and_version_audit", "unknown_state_enforcement"],
+    "ct.relay.agent-c": ["bounded_automation_scripts", "docs_and_manifest_implementation"],
+    "ct.relay.agent-d": ["independent_gate_and_no_false_pass_verification"],
+    "ct.relay.agent-s": ["security_webhook_credential_and_runtime_review"],
+    "ct.specialist.agent-e": ["read_only_api_mcp_conformance", "integration_heartbeat_execution", "endpoint_path_reconciliation"]
+  },
+  "self_healing": {
+    "automatic_scope": ["D0", "deterministic_D1"],
+    "requirements": ["preserve_evidence", "repair_root_cause", "rerun_original_control", "rerun_applicable_control_family", "record_rollback"],
+    "never": ["weaken_validator", "disable_security_control", "invent_provider_success", "expose_secret", "enable_write_to_make_test_pass", "erase_failed_evidence"]
+  },
+  "tracking": {
+    "thivebase_issue": 98,
+    "operational_watch_issue": 99,
+    "roadmap_issue": 100,
+    "mintlify_control_center": "/changelog/phase-2-99-roadmap-and-operational-watch-control-center",
+    "phase_3_entry": "blocked_pending_phase_2_99_hard_exit"
+  }
+}
