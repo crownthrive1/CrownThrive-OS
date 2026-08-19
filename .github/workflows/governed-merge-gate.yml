@@ -25,7 +25,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          # The governed diff validator receives exact provider-supplied base/head
+          # SHAs. Long-running draft branches can exceed a shallow depth of 2,
+          # so full history is required to keep exact-SHA verification fail-closed
+          # without producing false "bad object" failures.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -44,6 +48,7 @@ jobs:
           python -m py_compile scripts/validate_phase_namespace_and_api_control.py
           python -m py_compile scripts/validate_agent_sovereign_governance.py
           python -m py_compile scripts/validate_agent_template_library.py
+          python -m py_compile scripts/scan_reconciliation_tags.py
           python -m py_compile scripts/validate_security_governance.py
           python -m py_compile scripts/validate_github_actions_runtime_policy.py
           python -m py_compile scripts/governed_merge_decision.py
@@ -60,6 +65,8 @@ jobs:
           CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          git cat-file -e "$CT_GIT_BASE_SHA^{commit}"
+          git cat-file -e "$CT_GIT_HEAD_SHA^{commit}"
           python scripts/governed_merge_decision.py \
             --verify-git-diff \
             --git-base "$CT_GIT_BASE_SHA" \
@@ -70,6 +77,9 @@ jobs:
 
       - name: Validate institutional documentation
         run: python scripts/validate_docs.py
+
+      - name: Validate reconciliation tag contracts
+        run: python scripts/scan_reconciliation_tags.py
 
       - name: Validate Collab Portal adapter contract
         run: python scripts/validate_collab_portal_adapter.py
