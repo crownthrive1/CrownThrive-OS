@@ -1,45 +1,60 @@
-# Phase 2.99 Hard-Exit Closure Ledger — v1.2.1 Current-State Reconciliation
+# Phase 2.99 Hard-Exit Closure Ledger — v1.2.2 Snapshot-Semantics Self-Heal
 
 **Packet:** `ct.closure.phase-2-99.hard-exit.v1`  
 **Issue:** #84  
 **Verification baseline main:** `ef04ea9a08960376859570bca8c6cf82a00442f2`  
 **Canonical roadmap:** `CT-ADR-ROADMAP-010 / ten_phase_v1`  
 **Current institutional state:** Phase 2 / 2.99  
-**Phase 3:** `blocked_pending_phase_2_99_hard_exit`  
-**External maturity observation:** `97/100 — A+` (non-authoritative)
+**Phase 3:** `blocked_pending_phase_2_99_hard_exit`
 
 ## Current conclusion
 
-The repository/security predecessor sequence remains canonically closed. PR #64 is canonical, issue #83 is closed after provider-perimeter certification and negative behavioral proof, PR #95 is canonical, and PR #65 is canonical on the verification baseline above. The repository/security canonicalization category remains **PASS**; it does **not** complete Phase 2.99.
+The repository/security predecessor sequence remains canonically closed: PR #64 is canonical, issue #83 is closed after provider-perimeter certification and negative behavioral proof, PR #95 is canonical, and PR #65 is canonical. Repository/security canonicalization remains **PASS** and does not complete Phase 2.99.
 
-This v1.2.1 reconciliation updates only stale current-state evidence identified by independent Agent B/D review. It does not manufacture another PASS category. The hard-exit machine state therefore remains **2 PASS / 6 blocking categories**. The external 97/A+ remains a quality signal only and cannot become a phase namespace, sovereign vote, approval, or hard-exit decision.
+This v1.2.2 self-heal repairs three machine-truth defects identified by independent C/D/S review of v1.2.1:
 
-## Repository/security sequence — remains PASS
+1. the validator incorrectly froze the non-authoritative external 97/A+ observation as a timeless CI invariant;
+2. the current `integration_control` RLS evidence had expanded beyond the prior eight-table snapshot; and
+3. volatile provider request counters were being validated as eternal exact values rather than timestamped runtime observations.
 
-The accepted sequence is:
+The repair changes evidence semantics, not hard-exit authority. The machine state remains **2 PASS / 6 blocking categories**. No new PASS category is manufactured.
 
-1. PR #64 — Node-24/runtime and always-run fail-closed merge-gate bootstrap — merged canonical.
-2. Issue #83 — provider `main` perimeter certification — closed completed; disposable PR #93 preserved the failing-required-check behavioral proof.
-3. PR #95 — ruleset-vs-classic machine-state reconciliation — merged canonical.
-4. PR #65 — nine-domain specialist enforcement, trusted exact-Git-diff binding, operational current-PR preflight and CodeQL log minimization — merged canonical at `ef04ea9a08960376859570bca8c6cf82a00442f2`.
+## External assessment — explicitly non-authoritative and no longer CI-locked
 
-GitHub remains technical defense-in-depth, evidence and transport. CrownThrive sovereign authority remains CT-ADR-GOV-011.
+The latest recorded external observation remains `97/100 — A+`, but it is now represented as a timestamped, volatile, **non-authoritative progress snapshot** with `hard_exit_decision_input=false`.
 
-`CT-P299-GATE-004 repository_security_governance_sequence_canonicalization` remains **PASS**.
+The validator no longer requires the exact numeric 97 or exact letter A+. It validates only that:
 
-## Supabase RLS — remains PASS, current estate is 8/8
+- the assessment authority remains `non_authoritative_progress_metric_only`;
+- the snapshot is timestamped;
+- any numeric grade is bounded to 0–100;
+- any letter grade is a short non-empty string; and
+- the external assessment cannot become a hard-exit decision input.
 
-The original founder-authorized remediation enabled RLS on the six `integration_control` base tables that existed in the initial finding. Fresh read-only reconciliation now observes **eight** current `integration_control` base tables: `endpoint_catalog`, `gates`, `mcp_tools`, `request_audit`, `request_budget`, `services`, `stripe_event_receipts`, and `webhook_receipts`.
+A self-test now proves that a later independent regrade (for example 96/A) remains ledger-valid without changing a single Phase-2.99 hard-exit predicate. A score change cannot break institutional CI merely because an external assessor changed its opinion.
 
-All eight currently report RLS enabled, `FORCE RLS` remains off, and each table has one explicit policy. Supabase Security Advisor currently reports **0 security lints**. The original six-table remediation lineage is preserved rather than rewritten; the current estate check is additional evidence that later integration-control tables inherited the defense-in-depth posture.
+## Supabase RLS — remains PASS; current live estate is 12/12
 
-Issue #79 remains closed/completed. The former RLS-disabled finding remains historical evidence rather than a current blocker.
+The original founder-authorized remediation remains preserved as a **six-table historical lineage record**. It is not rewritten.
 
-`CT-P299-GATE-005 integration_control_rls_security_disposition` remains **PASS**.
+Fresh read-only evidence for this reconciliation observes **12 current `integration_control` base tables**. All 12 have RLS enabled, `FORCE RLS` remains off, and all 12 have one explicit `service_role`-only `ALL` policy. `anon` and `authenticated` still lack schema USAGE and inspected table CRUD grants; `service_role` retains the required private control-plane access. Supabase Security Advisor currently reports **0 security lints**.
 
-## Collab Portal — advanced to 6/7, still fail-closed
+The current manifest records:
 
-Fresh canonical gate evidence now records:
+- original remediation count: 6;
+- current live table count: 12;
+- current policy count: 12;
+- all-current-tables RLS state: PASS;
+- client ACL denial preserved: PASS;
+- Security Advisor lints: 0.
+
+The existing live control-plane gate record still contains an older 8/8 observation in its reason/evidence text. This is explicitly labeled as **stale count evidence only**, not a current RLS regression. The direct read-only 12/12 evidence is the current snapshot; no production database mutation was performed in this repository self-heal.
+
+`CT-P299-GATE-005 integration_control_rls_security_disposition` therefore remains **PASS**.
+
+## Collab Portal — 6/7 and fail-closed
+
+The canonical seven predicates remain:
 
 | Predicate | State |
 | --- | --- |
@@ -51,50 +66,56 @@ Fresh canonical gate evidence now records:
 | `bounded_write_readback` | PASS |
 | `webhook_sender_delivery_integrity` | BLOCKED |
 
-The founder-approved bounded field map is exactly `status + info_description`. A founder-authorized D2 bounded status write returned HTTP 200 and authenticated readback returned HTTP 200; the provider normalized the requested UI label `in progress` to its canonical API state `working` while preserving the other allowed field state. This is evidence for the bounded write/readback predicate only; it does not create general write authority.
+The approved bounded field map remains exactly `status + info_description`; the founder-authorized bounded write/readback evidence remains valid; the overall service `write_gate` remains false. The August request snapshot is **16 / 20,000**, now explicitly timestamped and marked `volatile_runtime_snapshot_not_ci_locked_counter`.
 
-A local webhook receiver contract has also been demonstrated with a 64 KiB body ceiling, raw-payload non-retention, pinned-project/event filtering, receipt hashing and replay deduplication. That supporting receiver evidence does **not** satisfy the remaining canonical `webhook_sender_delivery_integrity` predicate because sender authenticity, provider delivery/retry behavior and end-to-end delivery evidence still require certification.
+The validator enforces the seven-predicate state and that the observed request count is a non-negative snapshot within the positive configured limit, but it no longer treats `16` as an eternal CI constant.
 
-The overall service `write_gate` remains false and the canonical Collab certification remains fail-closed. August authenticated request count is now **16 / 20,000**.
+`CT-P299-GATE-006 collab_portal_seven_predicate_certification` remains **NOT MET**, progress **6/7**.
 
-Accordingly `CT-P299-GATE-006 collab_portal_seven_predicate_certification` remains **NOT MET**, with progress advanced from 4/7 to **6/7**.
+## CrownThrive IO / API-MCP runtime — volatile counters separated from closure predicates
 
-## API/MCP/provider closure — still open
+CrownThrive IO remains read-verified and write-closed. Fresh read-only runtime evidence observed **33 August requests**. That count is now stored with its period, timestamp and explicit volatile-snapshot semantics rather than as a timeless CI invariant.
 
-CrownThrive IO remains read-verified and write-closed. The August request ledger observed in this reconciliation is **32**. Two Operations/SRE budget conditions are explicitly open: the service has no configured authoritative monthly request ceiling, and the existing hourly health probe still lacks a fail-closed pre-dispatch monthly-budget reservation policy.
+The two Operations/SRE budget controls remain open:
 
-The CrownThrive API/MCP control plane remains write-closed. Its hard-exit category is not certified. Open acceptance work includes verified D2 authority binding, direct Cell-07 governed CI, external-client conformance, JSON Schema 2020-12 validation, bounded MCP input/output schemas, server-side output validation, endpoint-catalog revocation enforcement, validated path-template dispatch, request/provider byte limits, timeout/cancellation, provider semantic validation, least-data projection, MCP parse/content-type/HTTP-status conformance, atomic pre-dispatch audit/budget/rate reservation, an explicit monthly request-budget ceiling, and scheduled-health-probe budget policy.
+- `monthly_request_budget_ceiling` — no authoritative monthly ceiling is currently configured;
+- `scheduled_health_probe_budget_policy` — the scheduled probe still lacks a fail-closed pre-dispatch monthly-budget reservation policy.
 
-These are subconditions inside the existing closure estate; they do not create a new phase or sovereign category.
+The validator proves that a later increment in the IO request counter does **not** alter ledger validity, while a negative count, missing timestamp or authority-state change still fails closed.
 
-## Macro and identity closure — still open
+The CrownThrive API/MCP control plane remains `write_gate=false` and hard-exit uncertified. Current open acceptance work remains explicit: verified D2 authority binding, direct Cell-07 governed CI, external MCP-client conformance, JSON Schema 2020-12 behavior, bounded inputs/outputs, runtime output validation, endpoint-catalog enforcement, path-template dispatch, byte/time bounds, provider semantic validation/projection, MCP parse/content-type/status conformance, atomic pre-dispatch audit/budget/rate reservation, an explicit monthly request ceiling and scheduled-probe budget policy.
 
-The 68 / 82 / 85 / 74 source-count universes remain independent:
+No provider write is opened by this packet.
 
-- 68 portfolio rows: 62 typed/classified, 6 identity items pending.
-- 82 domain rows: current registrar/DNS/TLS/runtime certification incomplete.
-- 85 engine/service rows: current provider/account/version/deployment/API/export certification incomplete.
+## Repository/security sequence — remains PASS
+
+The accepted sequence remains:
+
+1. PR #64 — Node-24/runtime and always-run fail-closed merge-gate bootstrap — canonical.
+2. Issue #83 — provider `main` perimeter certification — closed completed; PR #93 preserves negative behavioral evidence.
+3. PR #95 — ruleset-vs-classic machine reconciliation — canonical.
+4. PR #65 — nine-domain specialist enforcement, trusted exact-Git-diff binding, operational current-PR preflight and CodeQL log minimization — canonical.
+
+GitHub remains technical defense-in-depth, evidence and transport. CrownThrive sovereign authority remains CT-ADR-GOV-011.
+
+`CT-P299-GATE-004 repository_security_governance_sequence_canonicalization` remains **PASS**.
+
+## Macro, articleization and deferral closure — still open
+
+The independent 68 / 82 / 85 / 74 source-count universes remain unchanged and not hard-exit certified:
+
+- 68 portfolio rows: 62 typed/classified, 6 identity items pending;
+- 82 domain rows: current registrar/DNS/TLS/runtime certification incomplete;
+- 85 engine/service rows: current provider/account/version/deployment/API/export certification incomplete;
 - 74 platform/framework rows: 54 typed/classified, 20 current identities unresolved.
 
-No count universe is promoted into production proof.
+PR #91 remains a noncanonical deterministic 795-title/hierarchy candidate only. It does not prove terminal disposition, article-body reconstruction, P0/P1 substantive-or-explicit-unresolved closure, full taxonomy/exposure/risk/owner/source/route/navigation disposition or Phase-2.99 exit.
 
-## 795 article estate — candidate advanced, canonical closure still open
-
-PR #91 contains a deterministic 795-title/hierarchy machine-manifest candidate, but it remains non-canonical on this checkpoint. Therefore canonical state remains:
-
-- source inventory: 795 / 795 verified;
-- stable seed schema: defined;
-- deterministic generator: present;
-- complete machine manifest on canonical main: **false**;
-- terminal dispositions: incomplete;
-- P0/P1 substantive-or-explicit-unresolved closure: incomplete;
-- full taxonomy/exposure/risk/owner/source/route/navigation disposition: incomplete.
-
-A title manifest is not an article-body or terminal-disposition certification.
+Explicit deferrals, restricted-source final audit, and continuity/recovery reproducibility certification remain open.
 
 ## Remaining hard-exit categories
 
-The machine ledger continues to track eight categories with **2 PASS / 6 blocking**:
+The machine ledger remains **2 PASS / 6 blocking**:
 
 1. 68/82/85/74 current certification — NOT MET.
 2. 795 terminal disposition + P0/P1 closure — NOT MET.
@@ -114,24 +135,24 @@ phase_2_complete: false
 phase_3_entry: blocked_pending_phase_2_99_hard_exit
 ```
 
-## Governed validator execution
+## Governed validator self-heal
 
-The dedicated read-only `Phase 2.99 Hard Exit Ledger` workflow continues to directly run:
+The dedicated read-only `Phase 2.99 Hard Exit Ledger` workflow remains the execution surface for:
 
 - Python syntax validation;
 - `scripts/validate_phase_2_99_hard_exit_ledger.py --self-test`;
-- the full closure-ledger consistency validator;
-- repository documentation governance;
+- full ledger consistency validation;
+- documentation governance; and
 - whitespace/conflict-marker checks.
 
-The validator intentionally fails on five-phase re-promotion, premature Phase-3 opening, count-universe collapse, false 795 completion, false Collab completion, repository-canonicalization regression, stale PR #65 state, and current-RLS regression. It now also binds the current Collab 6/7 evidence, current 8-table RLS estate, CrownThrive IO request observation, and open monthly-budget ceiling.
+v1.2.2 preserves the original fail-closed tests for five-phase re-promotion, premature Phase-3 opening, count collapse, false article completion, false Collab completion, repository regression, stale PR #65 state and RLS regression. It adds negative tests for RLS policy/table mismatch, invalid snapshot counters/timestamps, external-assessment authority escalation and out-of-range grades. It also adds **positive invariants** proving that a non-authoritative external regrade and an incrementing IO request counter do not incorrectly fail institutional CI.
 
 **Validator PASS means ledger consistency PASS, not Phase-2.99 hard-exit PASS.**
 
-## Docs impact and rollback
+## Governance, docs impact and rollback
+
+This is a bounded D2 institutional-evidence self-heal. Agent A materially performed the repair and therefore does not self-vote this exact head. Any prior B/C/D/S votes on v1.2.1 are stale after the head change. Fresh independent review is required, with the changed-domain specialist set expected to remain **Security & Privacy + AI/ML/LLM TEVV + Operations/SRE**.
 
 Docs impact: `docs_updated`.
 
-Repository rollback is a normal revert of this bounded closure-ledger packet. Separate production RLS and bounded Collab write evidence retain their own provider/migration/audit lineage and must never be widened or silently rolled back to make repository state convenient.
-
-No new provider write, credential mutation, payment, binding-rights action, token/crypto activation, or Phase-3 production authority is introduced by this current-state reconciliation.
+Rollback is a normal revert of this bounded ledger packet. No provider write, credential mutation, database mutation, payment, binding-rights action, Collab write, token/crypto activation or Phase-3 production authority is introduced by this self-heal.
