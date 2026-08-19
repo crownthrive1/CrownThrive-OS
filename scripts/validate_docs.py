@@ -326,7 +326,10 @@ def main() -> int:
     for warning in warnings:
         print(f"WARNING: {warning}")
     for error in errors:
-        print(f"ERROR: {error}")
+        if error.startswith("Possible ") and " exposed in " in error:
+            print("ERROR: Potential secret exposure detected (details redacted).")
+        else:
+            print(f"ERROR: {error}")
 
     if errors:
         print(f"FAILED with {len(errors)} error(s) and {len(warnings)} warning(s).")
