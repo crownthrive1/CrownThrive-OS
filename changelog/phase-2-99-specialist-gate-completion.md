@@ -26,15 +26,17 @@ Unanimity is the default, not an absolute veto forever. If one non-hard disagree
 8. all required specialist endorsements are present;
 9. required CI/security evidence is current and passing;
 10. no hard block exists;
-11. the dissent has been classified as non-hard after evidence reconciliation; a substantive unresolved defect remains a hard block rather than becoming override-eligible merely because time elapsed.
+11. the dissent is explicitly classified as `non_hard` with supporting reconciliation evidence.
 
-The deadlock override cannot be used to bypass D3/human-reserved authority, critical/high security findings, secret/credential/privilege failures, legal/rights authority blocks, missing specialist evidence, failed or stale required CI, or destructive/irreversible production concerns.
+A substantive unresolved defect remains a hard block; it does not become override-eligible merely because time elapsed.
+
+The deadlock override cannot bypass D3/human-reserved authority, critical/high security findings, secret/credential/privilege failures, legal/rights authority blocks, missing specialist evidence, failed or stale required CI, or destructive/irreversible production concerns.
 
 ## Specialist and subagent architecture
 
-The packet machine-registers the nine rule-based specialist domains: Security; Legal/Regulatory; Operations/SRE; Blockchain/Cryptographic Protocol; AI/ML/LLM TEVV; IP/Rights/Licensing; Finance/Tax/Treasury; Accessibility/Consumer Protection; and Regional/Global Localization.
+The packet machine-registers nine rule-based specialist domains: Security; Legal/Regulatory; Operations/SRE; Blockchain/Cryptographic Protocol; AI/ML/LLM TEVV; IP/Rights/Licensing; Finance/Tax/Treasury; Accessibility/Consumer Protection; and Regional/Global Localization.
 
-It also establishes governed non-voting subagents for Governance Marshal, Verification/TEVV, Recovery/Rollback, Evidence/Provenance, and the specialist domains above. Subagents increase scrutiny and execution depth without diluting the five sovereign votes.
+It also establishes 12 governed non-voting subagents: Governance Marshal, Verification/TEVV, Recovery/Rollback, Evidence/Provenance, and domain-specialist subagents. Subagents increase scrutiny and execution depth without diluting the five sovereign votes.
 
 ## Controlled evolution and self-healing
 
