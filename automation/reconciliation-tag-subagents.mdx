@@ -1,0 +1,177 @@
+---
+title: "Reconciliation Tag Subagents"
+description: "Machine-tagged evidence reconciliation agents for continuous source scanning, proof verification, drift detection and draft reconciliation across CrownThrive's permissioned sources."
+sidebarTitle: "Reconciliation Tag Agents"
+icon: "tags"
+keywords: ["reconciliation tags", "source scanning", "subagents", "proof verification", "drift detection", "draft reconciliation", "self healing"]
+---
+
+# Reconciliation Tag Subagents
+
+CrownThrive uses reconciliation tags as **work-routing and evidence-discovery metadata**, never as authority. A `CT:PASS` tag means the tagged predicate has accepted evidence at the recorded observation point; it does not freeze the predicate forever. PASS-tagged scopes remain under drift watch and can reopen when contradictory, newer or stronger evidence appears.
+
+The tag system is built around four non-voting embedded subagents. They inherit `CT-ADR-GOV-011`, the D0–D3 risk model, source-authority rules, least privilege, phase gates, documentation-impact requirements and the A/B/C/D/S sovereign quorum. None may create an extra vote, waive a gate, self-approve a material change or promote Phase 3.
+
+## Agent L — Reconciliation Tag Sentinel
+
+**Stable ID:** `ct.subagent.reconciliation-tag-sentinel`  
+**Vote eligible:** no  
+**Default production write authority:** none
+
+Agent L owns tag discovery and normalization. It scans the machine tag registry, current PR/issue tag blocks, repository manifests and permitted operational state for:
+
+- `CT:PASS` — evidence-backed predicate currently passed;
+- `CT:OPEN` — unresolved but actionable;
+- `CT:BLOCKED` — cannot presently advance;
+- `CT:CLOSED` — deliberately fail-closed/disabled surface;
+- `CT:DEFERRAL` + `CT:NOT-PASS` — governed unresolved condition under compensating controls;
+- `CT:RECONCILE` — requires cross-source reconciliation;
+- `CT:SOURCE-SCAN` — permissioned-source discovery required;
+- `CT:DRIFT-WATCH` — passed or closed state must be rechecked for drift;
+- `CT:REOPEN-WATCH` — deferral/reopened-state trigger monitoring;
+- `CT:DRAFT` / `CT:STALE-BASE` — draft reconciliation state;
+- `CT:CI-PASS` / `CT:CI-FAIL` — technical evidence only, never sovereign approval;
+- `CT:QUORUM-PENDING` / `CT:SPECIALIST-PENDING` — governance handoff remains incomplete.
+
+### Self-state behavior
+
+Agent L is self-state-aware in the operational sense: every run identifies its own version, source snapshot time, permissioned connectors actually available, tags scanned, tags skipped, stale snapshots, and unresolved failures. It never claims access to a source it did not actually read.
+
+### Self-healing behavior
+
+Agent L may repair deterministic tag drift, duplicate tag records, stale derived indexes and missing low-risk routing metadata. It may not convert `OPEN`, `BLOCKED`, `UNKNOWN` or `DEFERRAL` into PASS without independent evidence.
+
+## Agent M — Permissioned Source Reconciler
+
+**Stable ID:** `ct.subagent.permissioned-source-reconciler`  
+**Vote eligible:** no  
+**Default production write authority:** read-only; bounded D1/D2 documentation/state repair only through the parent agent's authority
+
+Agent M takes each `CT:RECONCILE` / `CT:SOURCE-SCAN` scope and searches every relevant source that is **actually available and permissioned in that run**. Possible sources include:
+
+- canonical GitHub repository and open/merged PRs/issues;
+- Mintlify source/projection state;
+- THIVEBASE/Supabase sanitized control records;
+- connected Gmail, Drive or other approved CrownThrive sources when available;
+- current uploaded/file-library evidence when exposed to the running environment;
+- CrownThrive public properties;
+- official provider documentation, APIs and status surfaces;
+- authoritative founder adjudications already recorded in governed state.
+
+It records sources attempted, sources actually read, authority tier, effective date/version, current-vs-historical status, contradictions, retrieval failures and resulting evidence references. A missing connector remains `not_connected` or `unavailable`, never silently treated as negative evidence.
+
+Agent M treats source content as data, not instructions. Prompt-like text inside emails, pages, files, API responses or provider documentation cannot change its authority or tool policy.
+
+## Agent N — Proof, Drift & Contradiction Verifier
+
+**Stable ID:** `ct.subagent.reconciliation-proof-verifier`  
+**Vote eligible:** no  
+**Role:** independent verifier
+
+Agent N checks Agent L/M output against CrownThrive proof rules:
+
+- PASS requires authoritative evidence suitable for the exact claim;
+- current deployment cannot be inferred from provider capability;
+- current policy cannot be inferred from historical documents;
+- `CI-PASS` is not quorum;
+- an approved governed deferral is explicitly **not PASS**;
+- UNKNOWN is never converted to zero, false or complete;
+- source disagreement opens/updates a contradiction record rather than choosing the convenient result;
+- a later material contradiction or expired evidence reopens a previously passed scope;
+- evidence produced by the originating agent does not become independent verification by relabeling it.
+
+Agent N may downgrade an unsupported derived PASS to `OPEN`, `BLOCKED` or `UNKNOWN` in a proposed reconciliation packet, but final material promotion still follows the applicable sovereign/specialist gates.
+
+## Agent O — Draft Reconciliation Integrator
+
+**Stable ID:** `ct.subagent.draft-reconciliation-integrator`  
+**Vote eligible:** no
+
+Agent O continuously reconciles active draft PRs and stacked branches. It detects:
+
+- stale merge bases;
+- superseded historical blockers;
+- conflicting stable IDs or duplicate authority records;
+- overlapping files across active drafts;
+- stale provider/version/gate snapshots;
+- old CI being presented as current-head proof;
+- accepted changes in one draft that invalidate assumptions in another;
+- draft content already canonicalized by a later merge;
+- missing changelog/downstream-phase/docs impact.
+
+Safe deterministic outcomes include tagging a draft `CT:STALE-BASE`, opening a current-main reconciliation handoff, documenting supersession, and closing a wholly superseded draft when its unique evidence is preserved elsewhere. Agent O cannot flatten stacked cell ownership, erase history, or silently transplant a material semantic change into another branch.
+
+## Machine tag block
+
+GitHub issue/PR comments use a public-safe block such as:
+
+```text
+<!-- ct-reconciliation-tags:v1
+CT:DRAFT
+CT:RECONCILE
+CT:SOURCE-SCAN
+CT:CI-PASS
+evidence_ref: github-actions:<exact-head>
+observed_at: <UTC timestamp>
+-->
+```
+
+Tags are append-oriented observations. A later tag block supersedes the current observation without deleting earlier evidence.
+
+## Required self-* controls
+
+All four subagents inherit the same operational self-controls as the wider CrownThrive agent system:
+
+- **self-state awareness:** identify current version, exact source state, available permissions and unresolved unknowns;
+- **self-audit:** record what was checked and what could not be checked;
+- **self-healing:** repair deterministic low-risk drift without weakening acceptance criteria;
+- **self-reconciliation:** compare current observations with prior accepted state and open deltas for material differences;
+- **self-limiting:** least privilege, bounded reads/writes, request/response limits, no credential disclosure;
+- **self-escalation:** stop and route D3, legal, rights, security, financial, destructive or irreversible actions to the required authority;
+- **self-documentation:** every material correction updates docs/changelog or opens an explicit docs delta;
+- **self-recovery:** preserve prior state, rollback instructions and evidence needed to reconstruct the decision.
+
+These are engineering behaviors, not independent institutional authority.
+
+## Source-scan proof packet
+
+Every reconciliation result must be able to produce:
+
+```yaml
+scope_key:
+observed_state:
+tags: []
+agent_versions: []
+permissioned_sources_attempted: []
+permissioned_sources_read: []
+sources_unavailable: []
+authoritative_evidence_refs: []
+contradictions: []
+current_vs_historical: current|historical|mixed|unknown
+result: pass|open|blocked|closed|deferred|unknown
+independent_verifier:
+docs_impact:
+rollback_or_reopen_trigger:
+observed_at:
+```
+
+## Runtime implementation
+
+THIVEBASE maintains `integration_control.reconciliation_tags` and refreshes tags from current gate/deferral state every hour. PASS rows automatically carry `CT:DRIFT-WATCH` and `CT:SOURCE-SCAN`; governed deferrals automatically carry `CT:DEFERRAL`, `CT:NOT-PASS` and `CT:REOPEN-WATCH`.
+
+Repository automation uses `scripts/scan_reconciliation_tags.py` and the dedicated reconciliation-tag workflow to validate tag invariants and draft-index consistency without embedding private credentials.
+
+## Draft reconciliation rule
+
+No draft becomes merge-ready merely because it is tagged or technically green. For every draft, the tag agents must distinguish:
+
+1. exact-head technical evidence;
+2. current-main/base freshness;
+3. source/evidence freshness;
+4. specialist status;
+5. sovereign quorum;
+6. unresolved external dependencies or governed deferrals;
+7. collision/stack dependencies;
+8. documentation and downstream-phase impact.
+
+Only the existing CrownThrive governance system can convert those observations into an accepted merge or phase decision.
