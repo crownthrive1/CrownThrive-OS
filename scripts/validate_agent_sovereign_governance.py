@@ -164,6 +164,16 @@ def main() -> int:
     if evolution.get("changes_to_sovereign_voter_identity_unanimity_rule_deadlock_override_floor_or_d3_boundary_require_founder_authorization") is not True:
         fail("Core sovereign authority changes must remain founder-reserved")
 
+    founder = agent.get("founder_reserved_core_policy", {})
+    if founder.get("requires_explicit_founder_authorization") is not True or founder.get("self_amendment_prohibited") is not True:
+        fail("Founder-reserved core policy must require explicit founder authorization and prohibit agent self-amendment")
+    required_core = {
+        "sovereign_voter_pool_identity", "normal_unanimity_requirement", "deadlock_override_minimum_ratio",
+        "independent_agent_d_gate", "d3_human_reserved_boundary", "secret_security_non_weakening_invariants",
+    }
+    if set(founder.get("controls", [])) != required_core:
+        fail("Founder-reserved core policy controls drifted")
+
     recipients = notify.get("recipient_policy", {})
     if set(recipients) != {"founder_tracking", "institutional_tracking", "collab_portal_fallback_tracking"}:
         fail("PM recipient references drifted")
@@ -215,7 +225,7 @@ def main() -> int:
     print("Normal sovereign vote: 5/5 unanimous; Agent D remains mandatory independent gatekeeper.")
     print("Deadlock override: exceptional non-hard-dissent path only; after 6 hours and >=2 reconciliation attempts, 2/3 rounded up = 4/5; all five votes cast; hard blocks/D3/specialist/security boundaries non-overridable.")
     print("Rule-based specialist cells: 9; governed non-voting subagents: 12.")
-    print("Self-healing: refractory rerun/original-control/root-cause rules enforced; Governance Marshal may propose bounded evolution but cannot self-expand sovereign authority.")
+    print("Core sovereign policy is founder-reserved and cannot be self-amended by agents.")
     return 0
 
 
