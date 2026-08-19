@@ -24,7 +24,6 @@ EXPECTED_SPECIALIST_ENDORSEMENTS = {
     "ai_ml_llm_tevv", "ip_rights_licensing", "finance_tax_treasury",
     "accessibility_consumer_protection", "regional_global_localization",
 }
-
 REQUIRED_SUBAGENTS = {
     "governance_marshal", "verification_tevv", "recovery_rollback",
     "legal_regulatory", "operations_sre", "blockchain_protocol",
@@ -93,6 +92,10 @@ def main() -> int:
     special_required = math.ceil(len(voters) * special_ratio)
     if override.get("enabled") is not True:
         fail("Disciplined deadlock override must remain enabled")
+    if override.get("path_class") != "exceptional_deadlock_resolution_not_default_quorum":
+        fail("Deadlock override must remain an exceptional path, not the default quorum")
+    if override.get("eligibility") != "only_non_hard_dissent_after_evidence_reconciliation":
+        fail("Deadlock override eligibility must remain limited to reconciled non-hard dissent")
     if override.get("minimum_elapsed_hours") != 6:
         fail("Deadlock override wait window must remain six hours")
     if override.get("minimum_reconciliation_attempts") != 2:
@@ -110,10 +113,8 @@ def main() -> int:
     ):
         if override.get(flag) is not True:
             fail(f"Deadlock override safety invariant drifted: {flag}")
-    if override.get("initiator_agent_id") != "ct.subagent.governance-marshal":
-        fail("Only Governance Marshal may initiate the deadlock override protocol")
-    if override.get("initiator_is_non_voting") is not True:
-        fail("Governance Marshal must remain non-voting")
+    if override.get("initiator_agent_id") != "ct.subagent.governance-marshal" or override.get("initiator_is_non_voting") is not True:
+        fail("Governance Marshal must be the non-voting deadlock protocol initiator")
 
     rating = agent.get("risk_rating", {})
     if rating.get("minimum_automatic_merge_score") != 85:
@@ -150,10 +151,8 @@ def main() -> int:
     if healing.get("enabled") is not True:
         fail("Self-healing must remain enabled")
     for flag in (
-        "same_failure_must_not_repeat_without_new_evidence",
-        "failed_repair_requires_root_cause_reassessment",
-        "validators_and_security_controls_cannot_be_weakened_to_self_heal",
-        "repair_must_rerun_original_failed_control",
+        "same_failure_must_not_repeat_without_new_evidence", "failed_repair_requires_root_cause_reassessment",
+        "validators_and_security_controls_cannot_be_weakened_to_self_heal", "repair_must_rerun_original_failed_control",
         "repair_must_rerun_full_applicable_control_family",
     ):
         if refractory.get(flag) is not True:
@@ -175,13 +174,11 @@ def main() -> int:
             fail("Runtime recipient ref contains an email address")
 
     required_collab_gates = {
-        "credential_exact_match=passed", "project_meta_authenticated=passed",
-        "institutional_project_uid=pinned", "approved_field_map=approved",
-        "authenticated_project_read=passed", "bounded_write_readback=passed",
+        "credential_exact_match=passed", "project_meta_authenticated=passed", "institutional_project_uid=pinned",
+        "approved_field_map=approved", "authenticated_project_read=passed", "bounded_write_readback=passed",
         "webhook_sender_delivery_integrity=passed",
     }
-    actual_gates = set(notify.get("collab_portal_fallback", {}).get("disable_only_when_all", []))
-    if actual_gates != required_collab_gates:
+    if set(notify.get("collab_portal_fallback", {}).get("disable_only_when_all", [])) != required_collab_gates:
         fail("Collab fallback disable gates drifted")
 
     github_security = security.get("github_security_evidence", {})
@@ -198,17 +195,13 @@ def main() -> int:
         fail("Repository state must register the fail-closed agent merge policy")
 
     for fragment in (
-        "python scripts/validate_agent_sovereign_governance.py",
-        "python scripts/governed_merge_decision.py --self-test",
-        "python scripts/resolve_pm_notification_recipients.py --self-test",
-        "python scripts/security_self_heal_plan.py --self-test",
+        "python scripts/validate_agent_sovereign_governance.py", "python scripts/governed_merge_decision.py --self-test",
+        "python scripts/resolve_pm_notification_recipients.py --self-test", "python scripts/security_self_heal_plan.py --self-test",
     ):
         require(DOCS_WORKFLOW, fragment)
     for fragment in (
-        "name: Security Governance",
-        "name: Validate provider-managed CodeQL compatibility",
-        "CodeQL default setup is provider-managed",
-        "python scripts/validate_security_governance.py",
+        "name: Security Governance", "name: Validate provider-managed CodeQL compatibility",
+        "CodeQL default setup is provider-managed", "python scripts/validate_security_governance.py",
     ):
         require(SECURITY_WORKFLOW, fragment)
     if ADVANCED_CODEQL_USE.search(SECURITY_WORKFLOW.read_text(encoding="utf-8")):
@@ -220,7 +213,7 @@ def main() -> int:
 
     print("Agent-sovereign governance validation passed.")
     print("Normal sovereign vote: 5/5 unanimous; Agent D remains mandatory independent gatekeeper.")
-    print("Deadlock override: after 6 hours and >=2 reconciliation attempts, 2/3 rounded up = 4/5; all five votes must be cast; hard blocks/D3/specialist/security boundaries remain non-overridable.")
+    print("Deadlock override: exceptional non-hard-dissent path only; after 6 hours and >=2 reconciliation attempts, 2/3 rounded up = 4/5; all five votes cast; hard blocks/D3/specialist/security boundaries non-overridable.")
     print("Rule-based specialist cells: 9; governed non-voting subagents: 12.")
     print("Self-healing: refractory rerun/original-control/root-cause rules enforced; Governance Marshal may propose bounded evolution but cannot self-expand sovereign authority.")
     return 0
