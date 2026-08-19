@@ -1,4 +1,4 @@
-# Phase 2.99 — CHLOM Cell 08 TEVV Invariants v1
+# Phase 2.99 — CHLOM Cell 08 TEVV Invariants v1.1
 
 **Program:** `ct.program.chlom-executable-build`  
 **Cell:** `ct.chlom.cell.tevv` / issue #75  
@@ -7,42 +7,67 @@
 
 ## Purpose
 
-This bounded packet creates the first executable Security/TEVV/Resilience invariant matrix for the CHLOM reference semantic oracle. It is stacked on Cell 01 kernel contract PR #82 so strict-v1 request, idempotency and concurrency metadata can be tested without editing Cell 01-owned kernel files.
+This bounded Cell 08 packet remains the executable Security/TEVV/Resilience invariant matrix for the CHLOM reference semantic oracle. It is stacked on Cell 01 PR #82 and has now merged the remediated Cell 01 kernel lineage through exact kernel head `30d7b49bf6b01d6d094f62fa357dd31647ef078a` without modifying Cell 01-owned files.
 
-The packet does not adopt OPA, OpenFGA, Cedar or Temporal and does not grant those systems semantic authority. The same invariant IDs are the future backend-equivalence contract: an adapter may be adopted only when it is no more permissive than the canonical CrownThrive semantics for every applicable vector.
+OPA, OpenFGA, Cedar and Temporal remain non-authoritative candidates. The same invariant IDs remain the future backend-equivalence contract: an adapter may be adopted only when it is no more permissive than canonical CrownThrive semantics for every applicable vector.
 
-## Current controls proved
+## Original HIGH findings under revalidation
 
-The strict-v1 native reference runtime currently proves fail-closed behavior for unauthenticated actors, cross-organization access, prompt-like unknown actions, D3 autonomous execution attempts, unknown policy conditions, idempotent retries, idempotency-key payload conflicts and DAIL hash-chain tampering.
+Cell 08 originally proved two HIGH semantic defects:
 
-## Open blocking findings
+- `ct.finding.tevv.authority-approval-self-assertion`
+- `ct.finding.tevv.restricted-evidence-reference-unsanitized`
 
-### `ct.finding.tevv.authority-approval-self-assertion` — HIGH
+Cell 01 v1.1 now claims root-cause repairs for both and additionally fixes an implicit legacy-contract downgrade gap discovered during independent review. Cell 08 therefore does not copy the old findings forward mechanically. It preserves them as `remediated_pending_exact_head_tevv_revalidation` until the original vectors and the expanded invariant set execute successfully on the reconciled exact head.
 
-The current strict-v1 reference kernel can return `allow` for an `issue_license` decision when the request self-asserts the `rights_steward` role and supplies the string `rights_authority` in `approval_evidence`, even when no independently verified authority binding exists.
+The original vector expectations have **not** been weakened:
 
-This is a prototype semantic-oracle finding, not evidence that a production license has been issued. It nevertheless blocks promotion because a future adapter must never interpret caller-supplied approval labels as self-proving authority.
+- caller-asserted role and approval labels must not create authority;
+- verified authority must be independently supplied and bound to the same actor and organization;
+- authority-sensitive allow requires verified relationship, delegation and applicable approval evidence;
+- arbitrary/restricted evidence text must never be persisted verbatim;
+- governed evidence references may remain stable;
+- untrusted requests may not silently fall back to legacy semantics.
 
-Acceptance requires Cell 03 Authority plus Cell 01 Kernel integration to bind approvals to independently verifiable identity/organization/relationship/delegation evidence. Unverified or self-asserted approval evidence must resolve to `hold` or `deny`.
+## Expanded native invariant set
 
-### `ct.finding.tevv.restricted-evidence-reference-unsanitized` — HIGH
+The native TEVV suite now exercises:
 
-The current strict-v1 reference kernel copies `authority_evidence` input verbatim into the DAIL decision-event payload. A caller can therefore cause arbitrary evidence text to be persisted where only governed references/proofs should be recorded.
+- missing contract identity / implicit legacy downgrade rejection;
+- unauthenticated and cross-tenant denial;
+- prompt-like action injection denial;
+- caller self-asserted license authority rejection;
+- successful license allow only with separately verified actor/org/role/relationship/delegation/approval context;
+- incomplete verified relationship/delegation hold;
+- verified-context actor/org mismatch denial;
+- restricted/free-form evidence digest sanitization;
+- governed evidence-reference preservation;
+- D3 never-autonomous allow;
+- unknown policy condition configuration failure;
+- idempotent retry and idempotency-key payload conflict;
+- DAIL tamper detection;
+- the original HIGH-finding detectors, which must now observe no failure if the remediation is real.
 
-Acceptance requires Cell 04 Evidence/DAIL plus Cell 01 Kernel integration to reject or sanitize restricted/secret-like material before persistence and to store governed evidence references/proofs instead of raw evidence content.
+## Remaining MEDIUM finding
 
-### `ct.finding.tevv.policy-bundle-state-unverified` — MEDIUM
+`ct.finding.tevv.policy-bundle-state-unverified` remains open. The current reference policy engine still consumes rule objects without proving bundle effective state, supersession or signature/trust lineage. Cell 02 Policy/dS-CaaS owns this gap. It is not erased by Cell 01 remediation.
 
-The current reference policy engine consumes rule objects but does not yet prove bundle effective-state, supersession or signature/trust validation. This remains assigned to Cell 02 Policy/dS-CaaS.
+## Fail-closed revalidation meaning
 
-## Fail-closed meaning of green TEVV CI
+A green validator alone is not closure. The revalidation sequence is:
 
-A green `CHLOM TEVV` workflow means the TEVV packet is internally coherent and the detector still sees the known blocking findings. It does **not** mean those findings are fixed. While either HIGH finding remains open, this packet and any dependent CHLOM promotion remain blocked.
+1. preserve the original finding IDs and acceptance criteria;
+2. merge the remediation lineage into the TEVV stack without rewriting history;
+3. rerun the original failed vectors and the expanded native invariant suite;
+4. rerun parent CHLOM build validation;
+5. consume exact-head GitHub CI and Security Governance evidence;
+6. only then change HIGH finding state to `resolved` with explicit closure evidence;
+7. leave parent sequencing, medium findings and Phase 2.99 hard-exit gates intact.
 
-When a remediation changes runtime behavior, the original vector must be rerun, the detector/manifest must be reconciled to the new evidence, the full CHLOM/institutional/security suites must pass, and an independent verifier must confirm closure. A finding may never be cleared by weakening a vector or changing its expected outcome to match insecure behavior.
+A finding may never be closed by deleting a vector, weakening its expected result, suppressing a failure, or treating a provider capability as authority.
 
 ## Provider and recovery boundaries
 
-No production provider mutation, credential/key action, payment, rights grant, token/crypto activation, external backend adoption or restricted-evidence publication occurs in this packet. OPA/OpenFGA/Cedar/Temporal outage, malformed-output and equivalence vectors remain defined but unexecuted until isolated adapters exist.
+No production provider mutation, credential/key action, payment, rights grant, token/crypto activation, external backend adoption or restricted-evidence publication occurs in this packet. OPA/OpenFGA/Cedar/Temporal outage, malformed-output and full equivalence vectors remain defined but unexecuted until isolated adapters exist.
 
 Rollback is revert of this stacked Cell 08 packet. There is no provider state or data migration to unwind. Advanced crypto/poly-chain/token/smart-contract TEVV remains Phase 9 research under separate legal/security/custody/recovery gates.
