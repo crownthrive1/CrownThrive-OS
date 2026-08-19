@@ -67,8 +67,9 @@ Responsibilities:
 Responsibilities:
 
 - independently inspect CI, branch/PR integrity, references, source-state controls, secret exposure, D0–D3 authority and downstream roadmap propagation;
+- inspect repository governance-enforcement state and distinguish validator `FAIL` from GitHub-enforced non-mergeability; never report `fail_closed` unless the effective `main` branch/ruleset requires the institutional validation status check;
 - fix safe validation failures;
-- block merges that violate source/gate/security rules;
+- block merges that violate source/gate/security rules and, until GitHub fail-closed enforcement is proven, treat any manual merge capability that could bypass a failed institutional check as an open hard-gate defect;
 - evaluate Phase 2.99 hard exit and Phase 3 hard entry every cycle without prematurely advancing;
 - verify project-management comment/email obligations for material merged work;
 - leave the authoritative closeout for the next Agent A cycle.
@@ -89,6 +90,11 @@ evidence_sources: []
 validation:
   state: passed | failed | blocked | not_applicable
   checks: []
+repository_governance:
+  workflow_validation: active | inactive | unknown
+  required_merge_check: enforced | not_enforced | unverified
+  main_branch_protected: true | false | unverified
+  post_merge_revalidation: active | inactive | unknown
 docs_impact: docs_updated | docs_no_change | docs_delta_opened
 hard_gates:
   phase_2_99_exit: met | not_met
@@ -129,6 +135,30 @@ The relay inherits all institutional governance:
 - `not_connected` never means `nonexistent`;
 - provider capability never proves CrownThrive account entitlement/deployment;
 - D2/D3 decisions never become self-approved through agent consensus.
+
+## Repository governance enforcement state
+
+`S106` establishes the current relay assumption for `crownthrive1/CrownThrive-Support`:
+
+```yaml
+workflow: Documentation Governance
+institutional_job: Validate institutional documentation
+pull_request_validation: active
+push_to_main_revalidation: active
+main_branch_protected: false
+required_status_check_enforcement: off
+fail_closed_merge_enforcement: not_established
+```
+
+The relay must therefore behave conservatively:
+
+1. all agents continue requiring successful institutional validation before they voluntarily merge;
+2. Agent D independently verifies the check state before authorizing a merge;
+3. no agent may describe the repository as GitHub-enforced or fail-closed until the effective `main` branch/ruleset proves the check is mandatory;
+4. after ruleset/protection configuration is changed, Agent D must verify both the configuration and a controlled failing-check block test before promoting the state to `merge_gate_enforced`;
+5. push-to-`main` validation remains enabled after enforcement as defense-in-depth.
+
+This prevents a policy gap from being hidden behind disciplined agent behavior: **voluntary compliance is not the same as repository-enforced compliance**.
 
 ## Collab Portal relay state
 

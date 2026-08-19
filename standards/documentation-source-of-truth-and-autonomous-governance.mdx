@@ -49,6 +49,41 @@ Every material code, configuration, product, price, license, route, API, model, 
 
 A successful build with stale institutional documentation is not a complete release.
 
+## Governance-as-code enforcement tiers
+
+CrownThrive distinguishes **automated governance monitoring** from **automated governance enforcement**.
+
+- `monitoring_only` — a validator can detect a violation and emit `FAIL`, but repository settings still allow a human or automation identity to place the change on `main` without that check being a mandatory merge condition.
+- `merge_gate_enforced` — the repository's effective branch/ruleset policy requires the designated institutional validation check to succeed before a pull request can merge to `main`.
+- `post_merge_revalidation` — the canonical branch is independently revalidated on push to `main` as defense-in-depth. This detects configuration bypass, provider drift or a merge-path defect after the fact; it does not substitute for a pre-merge required check.
+- `policy_transition_enforced` — future machine registries validate permitted state transitions so unsupported promotion such as `unverified → production_verified`, `historical → current`, or `provider_capability → CrownThrive_deployed` is rejected by executable policy.
+
+The institutional target is **fail-closed merge enforcement plus post-merge revalidation**, not validation logs alone.
+
+### Current CrownThrive-Support enforcement observation — 2026-08-18/19
+
+The current `Documentation Governance` GitHub Actions workflow is automated and runs on qualifying pull requests and qualifying pushes to `main`. Its job is named **`Validate institutional documentation`** and executes the CrownThrive documentation validator plus the registered Collab Portal, domain, S103/crosswalk and engine/domain validators.
+
+The current GitHub branch API observation for `main` reports:
+
+```yaml
+repository: crownthrive1/CrownThrive-Support
+branch: main
+protected: false
+classic_branch_protection_enabled: false
+required_status_checks:
+  enforcement_level: off
+  contexts: []
+  checks: []
+workflow_monitoring: active
+after_merge_main_revalidation: active_by_workflow_definition
+fail_closed_required_check_enforcement: not_established
+```
+
+Therefore CrownThrive-Support must **not** yet claim that a failed institutional validator physically prevents merge into `main`. The current proven state is automated governance monitoring with post-merge defense-in-depth. Repository rulesets/required checks must be explicitly configured and then re-inspected before the state advances to `merge_gate_enforced`.
+
+A future ruleset should at minimum target `main`, require pull-request merge flow where supported by the operating model, require the exact institutional status check produced by the governance workflow, prevent deletion/force-push bypass unless a separately governed emergency authority is documented, and preserve administrator/bypass policy as an explicit D3 governance decision rather than an implicit default.
+
 ```yaml
 change_id: ct.change.example
 platform_id: ct.platform.example
