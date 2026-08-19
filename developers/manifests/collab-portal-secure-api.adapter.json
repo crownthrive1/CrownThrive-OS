@@ -22,7 +22,8 @@
     ],
     "secret_storage": "server_side_only",
     "raw_secret_in_repository": false,
-    "production_credential_binding": "pending_exact_secure_copy"
+    "public_identifier_value_in_repository": false,
+    "production_credential_binding": "restricted_credential_context_available_runtime_injection_blocked"
   },
   "operations": [
     {"method": "GET", "path": "/contact/meta", "class": "crm_read"},
@@ -58,7 +59,7 @@
       "PUT /project/{type}/{identifier}"
     ],
     "write_preconditions": [
-      "character-exact production credentials are bound through a server-side secret store",
+      "character-exact production credentials are injected through an approved server-side secret path",
       "institutional project UID is pinned",
       "account-specific project metadata/custom-field IDs are pinned",
       "current project object is read before mutation",
@@ -111,7 +112,7 @@
     "provider": "Supabase Edge Functions",
     "function": "collab-portal-pm",
     "version": 2,
-    "state": "active_vault_capable_read_certification_blocked_on_exact_credential_copy",
+    "state": "active_vault_capable_read_certification_blocked_on_runtime_credential_access",
     "caller_authentication": "Supabase JWT required",
     "collab_portal_credentials_in_source": false,
     "secret_sources": [
@@ -119,7 +120,7 @@
       "supabase_vault_service_role_bridge"
     ],
     "vault_bridge": "verified_service_role_only",
-    "server_side_secret_binding": "vault_path_verified_exact_value_pending",
+    "server_side_secret_binding": "vault_path_verified_runtime_secret_injection_unavailable_to_auditor",
     "write_gate_default": "closed",
     "allowed_read_actions": [
       "health",
@@ -136,13 +137,21 @@
     "read_before_write": true,
     "read_after_write": true,
     "blind_mutation_retry": false,
-    "read_only_certification_attempt": {
+    "historical_read_only_certification_attempt": {
       "action": "GET /project/meta",
       "provider_reached": true,
       "http_status": 401,
       "classification": "screenshot_transcription_auth_failed",
       "provider_key_invalid_established": false,
       "write_attempted": false
+    },
+    "current_secure_credential_audit": {
+      "restricted_credential_context_exists": true,
+      "secret_value_exposed_to_repository": false,
+      "secret_value_exposed_to_auditor_output": false,
+      "runtime_injection_available_to_auditor": false,
+      "classification": "credential_access_blocked",
+      "write_gate_preserved": true
     }
   },
   "rate_limit_evidence": {
@@ -157,7 +166,8 @@
     "mutations with unknown outcome must not be blindly retried",
     "webhook UI capability must not be treated as sender-integrity or production receiver certification",
     "screenshot-transcribed credentials must not be brute-forced or treated as character-exact",
-    "production secrets must never enter public Git history, documentation, email, screenshots or logs"
+    "runtime credential access failure must be recorded as credential_access_blocked rather than repaired by exposing or reconstructing secret material",
+    "production secrets must never enter public Git history, documentation, email, screenshots, examples, generated artifacts, CI output or logs"
   ],
   "state": {
     "contract": "verified",
@@ -165,12 +175,12 @@
     "auth_header_contract": "verified_from_openapi",
     "secure_runtime": "verified_v2_vault_capable",
     "vault_binding_path": "verified",
-    "production_auth": "pending",
-    "exact_secure_credential_copy": "pending",
-    "account_project_meta": "pending",
+    "production_auth": "credential_access_blocked",
+    "exact_secure_credential_copy": "restricted_context_available_runtime_injection_blocked",
+    "account_project_meta": "blocked_credential_access",
     "institutional_project_uid": "pending",
-    "authenticated_read": "pending",
-    "bounded_write": "pending",
+    "authenticated_read": "blocked_credential_access",
+    "bounded_write": "blocked_write_gate_closed",
     "read_after_write": "pending",
     "webhook_ui_contract": "verified",
     "webhook_sender_integrity": "pending",
