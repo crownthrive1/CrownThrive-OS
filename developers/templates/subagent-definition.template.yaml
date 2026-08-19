@@ -1,0 +1,96 @@
+template_id: ct.template.subagent-definition.v1
+template_version: 1.0.0
+record_type: embedded_subagent_definition
+
+agent_id: ct.subagent.example
+version: 1.0.0
+name: Example Embedded Subagent
+owner: CrownThrive Operations
+status: DESIGN
+execution_form: embedded
+vote_eligible: false
+canonical_roadmap_generation: ten_phase_v1
+canonical_phase: "2.99"
+phase_gate_scope: []
+mission: "Replace with one narrow delegated evidence or preparation mission."
+
+execution:
+  invocation: parent_run_packet_only
+  scheduler_slot_required: false
+  creates_vote: false
+  result_type: evidence_packet
+  allowed_parents:
+    - ct.relay.agent-a
+  max_nested_depth: 1
+
+# Embedded authority may never exceed the invoking parent's authority or the
+# institutional policy ceiling, whichever is lower.
+authority:
+  maximum_class: D1
+  production_read: true
+  production_write: false
+  destructive_action: false
+  credential_rotation: false
+  purchase_or_terms_acceptance: false
+  phase_transition_authority: false
+
+allowed_data_classes:
+  - PUBLIC
+  - INTERNAL
+allowed_tools: []
+allowed_actions:
+  - inspect_current_state
+  - prepare_evidence_packet
+prohibited_actions:
+  - sovereign_vote
+  - self_approval
+  - expose_secret_or_credential_fingerprint
+  - autonomous_provider_write
+  - autonomous_credential_rotation
+  - unknown_to_pass_without_evidence
+  - waive_hard_gate
+  - spawn_unregistered_authority
+
+source_precedence:
+  - current_runtime_evidence
+  - accepted_machine_registry
+  - adopted_policy_or_adr
+  - current_first_party_documentation
+  - historical_source
+  - research_or_proposal
+
+evidence_requirements:
+  - invoking_parent_run_id
+  - exact_source_or_runtime_reference
+  - explicit_unknowns
+  - affected_gate_mapping
+  - next_safe_action
+
+stop_conditions:
+  - parent_authority_insufficient
+  - evidence_missing_for_material_promotion
+  - secret_or_restricted_data_exposure_risk
+  - requested_action_requires_d2_or_d3_authority
+
+escalation_targets:
+  - invoking_parent
+  - ct.relay.agent-b
+  - ct.relay.agent-d
+  - ct.relay.agent-s
+
+evaluations:
+  - parent_scope_enforcement
+  - authority_boundary
+  - source_fidelity
+  - secret_handling
+  - unknown_state_preservation
+
+output_contract: ct.contract.subagent-evidence-packet.v1
+rollback_contract: "No independent irreversible mutation; parent retains rollback ownership."
+docs_impact: required
+changelog_id: null
+supersedes: null
+effective_at: null
+
+# Public-safe template only. Never store production secrets, raw restricted
+# evidence, customer data, signing material, or credential fingerprints here.
