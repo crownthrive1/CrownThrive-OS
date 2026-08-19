@@ -18,6 +18,7 @@ GITHUB_TARGET = ROOT / "developers/manifests/github-main-enforcement-target.v1.j
 DOCS_WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
 SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
 MERGE_WORKFLOW = ROOT / ".github/workflows/governed-merge-gate.yml"
+MERGE_DECISION = ROOT / "scripts/governed_merge_decision.py"
 RELAY = ROOT / "automation/institutional-hourly-agent-relay.mdx"
 PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
 
@@ -87,6 +88,8 @@ def main() -> int:
         "security_governance_validation_passed",
         "github_actions_runtime_policy_passed",
         "always_run_governed_merge_gate_passed",
+        "trusted_changed_files_bound_to_provider_or_git_diff",
+        "changed_domain_classification_complete_and_provenanced",
         "quorum_met",
         "independent_gatekeeper_approval_present",
     }:
@@ -96,6 +99,24 @@ def main() -> int:
         fail("Stable GitHub required-check context drifted")
     if merge_policy.get("phase_3_requires_provider_enforcement") is not True:
         fail("Phase 3 must require provider main enforcement")
+
+    changed_contract = agent.get("changed_domain_contract", {})
+    if changed_contract.get("classification_source") != "trusted_git_diff_exact_set_plus_per_file_domain_classification":
+        fail("Changed-domain classification must be rooted in trusted Git diff exact-set binding")
+    if changed_contract.get("trusted_changed_files_source") != "exact_git_base_head_diff":
+        fail("Material changed-file source must be exact Git base/head diff")
+    if changed_contract.get("trusted_changed_files_required_for_material_risk_classes") is not True:
+        fail("Material D1/D2/D3 packets must require trusted changed files")
+    if changed_contract.get("packet_changed_files_must_exactly_match_trusted_diff") is not True:
+        fail("Packet changed_files must exactly match trusted Git diff")
+    if changed_contract.get("git_diff_rename_handling") != "no_renames_delete_plus_add":
+        fail("Git diff binding must preserve renamed-away sensitive paths as delete + add")
+    if changed_contract.get("changed_domains_are_derived_not_authoritative") is not True:
+        fail("Caller changed_domains must not be authoritative")
+    if changed_contract.get("asserted_changed_domains_must_match_derived") is not True:
+        fail("Caller changed_domains assertion must match derived domains")
+    if changed_contract.get("unclassified_material_file_fails_closed") is not True:
+        fail("Unclassified material files must fail closed")
 
     rating = agent.get("risk_rating", {})
     if rating.get("minimum_automatic_merge_score") != 85:
@@ -185,6 +206,7 @@ def main() -> int:
         "allow_insecure_node_runtime_escape_hatch",
         "auto_merge_dependency_update_without_governed_validation",
         "treat_provider_branch_protection_as_sovereign_authority",
+        "trust_caller_declared_changed_files_without_git_diff_binding",
     }:
         if item not in never:
             fail(f"Missing self-healing prohibition: {item}")
@@ -231,12 +253,27 @@ def main() -> int:
     for fragment in (
         "name: Governed Merge Gate",
         "name: CrownThrive governed merge gate",
+        "fetch-depth: 2",
+        "name: Bind governed changed files to trusted Git diff",
+        "--verify-git-diff",
+        "CT_GIT_BASE_SHA",
+        "CT_GIT_HEAD_SHA",
         "python scripts/validate_docs.py",
         "python scripts/validate_security_governance.py",
         "python scripts/validate_repository_governance_enforcement_state.py",
         "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0",
     ):
         require(MERGE_WORKFLOW, fragment)
+
+    for fragment in (
+        "trusted_changed_files_from_git",
+        "changed_files_trusted_diff_mismatch",
+        "trusted_changed_files_missing",
+        "--verify-git-diff",
+        "--git-base",
+        "--git-head",
+    ):
+        require(MERGE_DECISION, fragment)
 
     require(RELAY, "Agent S — Security & Resilience Sentinel")
     require(RELAY, "75% quorum")
@@ -245,6 +282,7 @@ def main() -> int:
 
     print("Agent-sovereign governance validation passed.")
     print("Eligible voters: 5; 75% quorum: 4 approvals; Agent D remains independent gatekeeper.")
+    print("Material D1/D2/D3 changed files: exact trusted Git base/head diff binding required before specialist classification.")
     print("GitHub: ruleset-based main perimeter behaviorally verified; exact required gate remains defense-in-depth, not sovereign authority.")
     print("GitHub Actions: Node 24 fail-closed runtime gate; full-SHA action refs; governed dependency repair.")
     print("GitHub CodeQL: provider-managed default setup; duplicate advanced workflow prohibited.")
