@@ -4,22 +4,26 @@
 GitHub is required defense-in-depth, evidence, CI, scanning and transport. It is
 not sovereign authority. The engine is fail-closed, retains CT-ADR-GOV-011's
 4-of-5 + mandatory Agent D rule, derives specialist gates from the governed
-registry, and derives material changed domains from per-file classifications
-rather than trusting a caller-supplied domain list.
+registry, derives material changed domains from per-file classifications, and
+requires material packet ``changed_files`` to exactly match a trusted Git diff.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
+import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/agent-sovereign-governance.v1.json"
 VALID_VOTES = {"approve", "deny", "block", "abstain"}
+MATERIAL_RISK_CLASSES = {"D1", "D2", "D3"}
+SHA40 = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def load_json(path: Path) -> Any:
@@ -29,6 +33,40 @@ def load_json(path: Path) -> Any:
 
 def normalize_domain(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+
+
+def normalize_paths(values: Iterable[Any]) -> list[str]:
+    return [str(value).strip() for value in values if str(value).strip()]
+
+
+def trusted_changed_files_from_git(base_sha: str, head_sha: str) -> set[str]:
+    """Derive the authoritative changed-file set from exact Git commit SHAs.
+
+    Rename detection is disabled so a rename is represented as deletion + add,
+    preventing a sensitive deleted path from disappearing from classification.
+    The function never accepts branch names, tags or caller-provided file lists.
+    """
+    if not SHA40.fullmatch(base_sha or "") or not SHA40.fullmatch(head_sha or ""):
+        raise ValueError("git_base_and_head_must_be_exact_40_hex_commit_shas")
+    completed = subprocess.run(
+        ["git", "diff", "--name-only", "--no-renames", base_sha, head_sha, "--"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or "git_diff_failed"
+        raise ValueError(f"trusted_git_diff_failed:{detail}")
+    paths = normalize_paths(completed.stdout.splitlines())
+    if len(paths) != len(set(paths)):
+        raise ValueError("trusted_git_diff_contains_duplicate_path")
+    return set(paths)
+
+
+def changed_file_digest(paths: Iterable[str]) -> str:
+    payload = "\n".join(sorted(set(paths))).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def specialist_alias_map(policy: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
@@ -142,15 +180,43 @@ def allowed_domain_tokens(policy: dict[str, Any]) -> set[str]:
     return allowed
 
 
+def validate_changed_file_binding(
+    declared_files: list[str],
+    trusted_changed_files: set[str] | None,
+    required: bool,
+) -> list[str]:
+    """Require exact set equality between packet files and trusted Git diff."""
+    if not required:
+        return []
+    if trusted_changed_files is None:
+        return ["trusted_changed_files_missing"]
+
+    declared = set(declared_files)
+    trusted = set(trusted_changed_files)
+    if declared == trusted:
+        return []
+
+    omitted = sorted(trusted - declared)
+    extra = sorted(declared - trusted)
+    detail: list[str] = []
+    if omitted:
+        detail.append(f"omitted={','.join(omitted)}")
+    if extra:
+        detail.append(f"extra={','.join(extra)}")
+    return ["changed_files_trusted_diff_mismatch:" + ":".join(detail)]
+
+
 def classify_changed_domains(
-    packet: dict[str, Any], policy: dict[str, Any], risk_class: str
+    packet: dict[str, Any],
+    policy: dict[str, Any],
+    risk_class: str,
+    trusted_changed_files: set[str] | None = None,
 ) -> tuple[set[str], list[str]]:
     """Derive changed domains from classified files and validate provenance.
 
-    D1/D2 and D3 packets fail closed if material changed files are omitted or
-    unclassified. A caller-provided ``changed_domains`` list is only an
-    assertion: when present it must equal the derived union and is never the
-    authority source used for specialist activation.
+    D1/D2/D3 packets fail closed if material files are omitted, unclassified,
+    or do not exactly match the trusted Git diff. Caller ``changed_domains`` is
+    only an assertion and never the authority source for specialist activation.
     """
     contract = policy.get("changed_domain_contract", {})
     if not isinstance(contract, dict):
@@ -172,13 +238,15 @@ def classify_changed_domains(
     errors: list[str] = []
     if not isinstance(changed_files_raw, list):
         return set(), ["changed_files_not_list"]
-    changed_files = [str(value).strip() for value in changed_files_raw if str(value).strip()]
+    changed_files = normalize_paths(changed_files_raw)
     if len(changed_files) != len(changed_files_raw):
         errors.append("changed_files_contains_empty_path")
     if len(changed_files) != len(set(changed_files)):
         errors.append("changed_files_contains_duplicate_path")
     if required and not changed_files:
         errors.append("material_changed_files_missing")
+
+    errors.extend(validate_changed_file_binding(changed_files, trusted_changed_files, required))
 
     if not isinstance(classifications_raw, list):
         return set(), [*errors, "domain_classifications_not_list"]
@@ -284,7 +352,11 @@ def classify_changed_domains(
     return derived, errors
 
 
-def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
+def decide(
+    packet: dict[str, Any],
+    policy: dict[str, Any],
+    trusted_changed_files: set[str] | None = None,
+) -> dict[str, Any]:
     pool = {
         item["agent_id"]: item
         for item in policy["voter_pool"]
@@ -328,7 +400,7 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     hard_blocks = [str(x) for x in packet.get("hard_blocks", []) if str(x).strip()]
 
     changed_domains, classification_errors = classify_changed_domains(
-        packet, policy, risk_class
+        packet, policy, risk_class, trusted_changed_files
     )
     endorsements, endorsement_errors = normalize_endorsements(
         packet.get("specialist_endorsements", []), policy
@@ -417,6 +489,10 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
         "missing_votes": missing,
         "composite_risk_score": composite,
         "minimum_score": policy["risk_rating"]["minimum_automatic_merge_score"],
+        "trusted_changed_files_bound": trusted_changed_files is not None,
+        "trusted_changed_files_digest": (
+            changed_file_digest(trusted_changed_files) if trusted_changed_files is not None else None
+        ),
         "derived_changed_domains": sorted(changed_domains),
         "domain_classification_errors": classification_errors,
         "required_specialists": sorted(required_specialists),
@@ -444,7 +520,6 @@ def self_test(policy: dict[str, Any]) -> None:
         {"agent_id": "ct.relay.agent-d", "vote": "approve"},
     ]
 
-    # D0 quorum baseline remains unchanged and does not require domain metadata.
     ok = decide({
         "risk_class": "D0", "scores": common_scores, "votes": four_yes,
         "specialist_endorsements": [], "hard_blocks": []
@@ -458,7 +533,7 @@ def self_test(policy: dict[str, Any]) -> None:
     }, policy)
     assert three_yes["agent_auto_merge_authorized"] is False
 
-    # D1/D2 classifications are mandatory and derive specialist activation.
+    docs_files = {"changelog/example.md"}
     d1_docs = decide({
         "risk_class": "D1", "scores": common_scores, "votes": four_yes,
         "changed_files": ["changelog/example.md"],
@@ -468,16 +543,43 @@ def self_test(policy: dict[str, Any]) -> None:
         }],
         "changed_domains": ["documentation"],
         "specialist_endorsements": [], "hard_blocks": []
-    }, policy)
+    }, policy, docs_files)
     assert d1_docs["agent_auto_merge_authorized"] is True
+    assert d1_docs["trusted_changed_files_bound"] is True
+
+    d1_missing_trusted_diff = decide({
+        "risk_class": "D1", "scores": common_scores, "votes": four_yes,
+        "changed_files": ["changelog/example.md"],
+        "domain_classifications": [{
+            "path": "changelog/example.md", "domains": ["documentation"],
+            "provenance": "reviewer_classification", "evidence_ref": "ct.evidence.test.docs"
+        }],
+        "specialist_endorsements": [], "hard_blocks": []
+    }, policy)
+    assert d1_missing_trusted_diff["agent_auto_merge_authorized"] is False
+    assert "trusted_changed_files_missing" in d1_missing_trusted_diff["domain_classification_errors"]
 
     d1_unclassified = decide({
         "risk_class": "D1", "scores": common_scores, "votes": four_yes,
         "changed_files": ["changelog/example.md"],
         "domain_classifications": [], "specialist_endorsements": [], "hard_blocks": []
-    }, policy)
+    }, policy, docs_files)
     assert d1_unclassified["agent_auto_merge_authorized"] is False
-    assert d1_unclassified["domain_classification_errors"]
+
+    omitted_sensitive = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_files": ["changelog/example.md"],
+        "domain_classifications": [{
+            "path": "changelog/example.md", "domains": ["documentation"],
+            "provenance": "reviewer_classification", "evidence_ref": "ct.evidence.test.omission"
+        }],
+        "specialist_endorsements": [], "hard_blocks": []
+    }, policy, {"changelog/example.md", "scripts/governed_merge_decision.py"})
+    assert omitted_sensitive["agent_auto_merge_authorized"] is False
+    assert any(
+        error.startswith("changed_files_trusted_diff_mismatch:omitted=scripts/governed_merge_decision.py")
+        for error in omitted_sensitive["domain_classification_errors"]
+    )
 
     expected_ids = {
         "security", "legal_regulatory", "operations_sre", "blockchain_protocol",
@@ -493,7 +595,6 @@ def self_test(policy: dict[str, Any]) -> None:
     aliases, alias_errors = specialist_alias_map(policy)
     assert not alias_errors
     assert aliases["security_privacy"] == "security"
-    assert aliases["security"] == "security"
 
     single_domain_expectations = {
         "security": {"security"},
@@ -523,6 +624,7 @@ def self_test(policy: dict[str, Any]) -> None:
         "security", "legal", "deployment", "blockchain", "llm",
         "copyright", "tax", "accessibility", "localization"
     ]
+    all_files = {"tests/specialist-matrix.json"}
     all_specialists = decide({
         "risk_class": "D2", "scores": common_scores, "votes": four_yes,
         "changed_files": ["tests/specialist-matrix.json"],
@@ -532,10 +634,11 @@ def self_test(policy: dict[str, Any]) -> None:
         }],
         "changed_domains": all_domains,
         "specialist_endorsements": sorted(expected_ids), "hard_blocks": []
-    }, policy)
+    }, policy, all_files)
     assert all_specialists["agent_auto_merge_authorized"] is True
     assert set(all_specialists["required_specialists"]) == expected_ids
 
+    rights_files = {"contracts/example-rights.json"}
     missing_one = decide({
         "risk_class": "D2", "scores": common_scores, "votes": four_yes,
         "changed_files": ["contracts/example-rights.json"],
@@ -545,12 +648,11 @@ def self_test(policy: dict[str, Any]) -> None:
         }],
         "changed_domains": ["rights"],
         "specialist_endorsements": ["legal_regulatory"], "hard_blocks": []
-    }, policy)
+    }, policy, rights_files)
     assert missing_one["agent_auto_merge_authorized"] is False
     assert missing_one["missing_specialists"] == ["ip_rights_licensing"]
 
-    # Live compatibility: historical CT-VOTE token security_privacy satisfies
-    # canonical Security & Privacy endorsement ID security.
+    security_files = {"docs/security-change.md"}
     security_alias = decide({
         "risk_class": "D2", "scores": common_scores, "votes": four_yes,
         "changed_files": ["docs/security-change.md"],
@@ -560,12 +662,11 @@ def self_test(policy: dict[str, Any]) -> None:
         }],
         "changed_domains": ["security"],
         "specialist_endorsements": ["security_privacy"], "hard_blocks": []
-    }, policy)
+    }, policy, security_files)
     assert security_alias["agent_auto_merge_authorized"] is True
     assert security_alias["normalized_specialist_endorsements"] == ["security"]
 
-    # Known governed code paths have deterministic minimum domains. Omitting
-    # Security from the merge-decision engine cannot produce zero/partial gates.
+    merge_file = {"scripts/governed_merge_decision.py"}
     missing_required_domain = decide({
         "risk_class": "D2", "scores": common_scores, "votes": four_yes,
         "changed_files": ["scripts/governed_merge_decision.py"],
@@ -575,7 +676,7 @@ def self_test(policy: dict[str, Any]) -> None:
         }],
         "changed_domains": ["agent"],
         "specialist_endorsements": ["ai_ml_llm_tevv"], "hard_blocks": []
-    }, policy)
+    }, policy, merge_file)
     assert missing_required_domain["agent_auto_merge_authorized"] is False
     assert any(
         "domain_classification_missing_required:scripts/governed_merge_decision.py:security" in error
@@ -592,13 +693,14 @@ def self_test(policy: dict[str, Any]) -> None:
         "changed_domains": ["agent"],
         "specialist_endorsements": ["security_privacy", "ai_ml_llm_tevv"],
         "hard_blocks": []
-    }, policy)
+    }, policy, merge_file)
     assert mismatch["agent_auto_merge_authorized"] is False
     assert any(
         error.startswith("changed_domains_assertion_mismatch:")
         for error in mismatch["domain_classification_errors"]
     )
 
+    legal_files = {"contracts/example-legal.json"}
     d3 = decide({
         "risk_class": "D3", "scores": common_scores, "votes": four_yes,
         "changed_files": ["contracts/example-legal.json"],
@@ -609,7 +711,7 @@ def self_test(policy: dict[str, Any]) -> None:
         "changed_domains": ["legal"],
         "specialist_endorsements": ["legal_regulatory"],
         "hard_blocks": [], "human_authorized": False
-    }, policy)
+    }, policy, legal_files)
     assert d3["agent_auto_merge_authorized"] is False
 
 
@@ -617,19 +719,46 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--packet", type=Path)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--verify-git-diff", action="store_true")
+    parser.add_argument("--git-base")
+    parser.add_argument("--git-head")
     args = parser.parse_args()
     policy = load_json(MANIFEST)
+
     if args.self_test:
         self_test(policy)
         print(
             "Agent-sovereign merge-decision self-test passed: 4/5 + Agent D preserved; "
-            "material changed-domain provenance fail-closed; specialist aliases migrated; "
-            "nine cumulative specialist gates enforced; D3 cannot auto-merge."
+            "material changed files require trusted Git-diff exact-set binding; "
+            "per-file domain provenance and nine cumulative specialist gates enforced; "
+            "D3 cannot auto-merge."
         )
         return 0
+
+    trusted: set[str] | None = None
+    if args.git_base or args.git_head or args.verify_git_diff:
+        if not args.git_base or not args.git_head:
+            parser.error("--git-base and --git-head are both required for trusted Git diff binding")
+        try:
+            trusted = trusted_changed_files_from_git(args.git_base, args.git_head)
+        except ValueError as exc:
+            raise SystemExit(f"ERROR: {exc}") from exc
+
+    if args.verify_git_diff:
+        print(json.dumps({
+            "trusted_changed_files_count": len(trusted or set()),
+            "trusted_changed_files_digest": changed_file_digest(trusted or set()),
+            "trusted_changed_files": sorted(trusted or set()),
+        }, indent=2, sort_keys=True))
+        if not args.packet:
+            return 0
+
     if not args.packet:
-        parser.error("--packet is required unless --self-test is used")
-    print(json.dumps(decide(load_json(args.packet), policy), indent=2, sort_keys=True))
+        parser.error("--packet is required unless --self-test or --verify-git-diff is used")
+
+    packet = load_json(args.packet)
+    result = decide(packet, policy, trusted)
+    print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
 
