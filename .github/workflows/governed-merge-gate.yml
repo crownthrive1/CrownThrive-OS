@@ -24,6 +24,11 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Pull-request checkout uses a synthetic merge commit. Depth 2 retains
+          # both exact parents so the trusted base/head diff can be derived
+          # without granting network/API authority to the decision engine.
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -44,11 +49,26 @@ jobs:
           python -m py_compile scripts/validate_security_governance.py
           python -m py_compile scripts/validate_github_actions_runtime_policy.py
           python -m py_compile scripts/governed_merge_decision.py
+          python -m py_compile scripts/governed_current_pr_preflight.py
           python -m py_compile scripts/resolve_pm_notification_recipients.py
           python -m py_compile scripts/security_self_heal_plan.py
 
       - name: Validate GitHub Actions runtime and supply-chain policy
         run: python scripts/validate_github_actions_runtime_policy.py
+
+      - name: Bind governed changed files to trusted Git diff
+        if: github.event_name == 'pull_request'
+        env:
+          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python scripts/governed_merge_decision.py \
+            --verify-git-diff \
+            --git-base "$CT_GIT_BASE_SHA" \
+            --git-head "$CT_GIT_HEAD_SHA"
+          python scripts/governed_current_pr_preflight.py \
+            --git-base "$CT_GIT_BASE_SHA" \
+            --git-head "$CT_GIT_HEAD_SHA"
 
       - name: Validate institutional documentation
         run: python scripts/validate_docs.py
