@@ -25,6 +25,7 @@ PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
 CHLOM = ROOT / "chlom/overview.mdx"
 DSCAAS = ROOT / "governance/ds-caas.mdx"
 SECURITY = ROOT / "SECURITY.md"
+SECURITY_POLICY = ROOT / "developers/manifests/security-self-healing-policy.v1.json"
 
 
 def fail(message: str) -> None:
@@ -116,6 +117,13 @@ def main() -> int:
     if target.get("bypass_authority") != "explicit_D3_decision":
         fail("Bypass authority must remain D3")
 
+    security_policy = json.loads(text(SECURITY_POLICY))
+    security_evidence = security_policy.get("github_security_evidence", {})
+    if security_evidence.get("codeql_execution_mode") != "github_default_setup_provider_managed":
+        fail("CodeQL provider mode drifted")
+    if security_evidence.get("advanced_codeql_workflow") != "prohibited_while_default_setup_enabled":
+        fail("Advanced CodeQL conflict policy drifted")
+
     forbidden = set(data.get("forbidden_promotions", []))
     for item in {
         "github_ci_success_to_sovereign_authority",
@@ -130,14 +138,21 @@ def main() -> int:
         "name: Validate institutional documentation",
         "python scripts/validate_docs.py",
         "python scripts/validate_agent_sovereign_governance.py",
+        "actions/checkout@v7",
+        "actions/setup-python@v7",
     ):
         require(DOCS_WORKFLOW, fragment)
     for fragment in (
         "name: Security Governance",
-        "github/codeql-action/init@v4",
+        "name: Validate provider-managed CodeQL compatibility",
+        "CodeQL default setup is provider-managed",
         "actions/dependency-review-action@v4",
+        "actions/checkout@v7",
+        "actions/setup-python@v7",
     ):
         require(SECURITY_WORKFLOW, fragment)
+    if "github/codeql-action/" in text(SECURITY_WORKFLOW):
+        fail("Conflicting advanced CodeQL workflow present while provider default setup is registered")
 
     require(ADR, "# CT-ADR-GOV-011")
     require(ADR, "Phase 3 therefore remains `blocked_pending_phase_2_99_hard_exit`")
@@ -153,6 +168,7 @@ def main() -> int:
     print("Repository governance state validation passed.")
     print("GitHub observed branch protection: false; GitHub merge gate enforced: false.")
     print("Sovereign merge policy: CrownThrive agent fail-closed quorum + validation + reserved D3 human authority.")
+    print("CodeQL execution: GitHub provider-managed default setup; duplicate advanced workflow prohibited.")
     print("Phase 3: GitHub branch protection is nonblocking; all other Phase 2.99 hard-exit requirements remain binding.")
     return 0
 
