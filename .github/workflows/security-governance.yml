@@ -41,9 +41,9 @@ jobs:
       contents: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Verify security scripts
@@ -58,23 +58,24 @@ jobs:
       - name: Validate quorum decision invariants
         run: python scripts/governed_merge_decision.py --self-test
 
-  codeql:
-    name: CodeQL security analysis
+  codeql-provider-mode:
+    name: Validate provider-managed CodeQL compatibility
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     permissions:
       contents: read
-      security-events: write
-      packages: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: python
-      - name: Analyze with CodeQL
-        uses: github/codeql-action/analyze@v4
+        uses: actions/checkout@v7
+      - name: Prevent conflicting advanced CodeQL setup
+        shell: bash
+        run: |
+          if git grep -n 'github/codeql-action/' -- '.github/workflows/*.yml' '.github/workflows/*.yaml'; then
+            echo "Advanced CodeQL workflow detected while GitHub default setup is the registered provider mode."
+            exit 1
+          fi
+          echo "CodeQL default setup is provider-managed; this workflow intentionally does not duplicate advanced setup."
+          echo "Actual provider CodeQL findings remain independent evidence and are not synthesized by this job."
 
   dependency-review:
     name: Dependency review
@@ -85,7 +86,7 @@ jobs:
       contents: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Review dependency changes
         uses: actions/dependency-review-action@v4
         with:
