@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +22,7 @@ DOCS_WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
 SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
 RELAY = ROOT / "automation/institutional-hourly-agent-relay.mdx"
 PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
+ADVANCED_CODEQL_USE = re.compile(r"^\s*uses:\s*github/codeql-action/", re.MULTILINE)
 
 
 def fail(message: str) -> None:
@@ -150,7 +152,7 @@ def main() -> int:
         "python scripts/validate_security_governance.py",
     ):
         require(SECURITY_WORKFLOW, fragment)
-    if "github/codeql-action/" in SECURITY_WORKFLOW.read_text(encoding="utf-8"):
+    if ADVANCED_CODEQL_USE.search(SECURITY_WORKFLOW.read_text(encoding="utf-8")):
         fail("Advanced CodeQL configuration conflicts with registered GitHub default setup")
 
     require(RELAY, "Agent S — Security & Resilience Sentinel")
