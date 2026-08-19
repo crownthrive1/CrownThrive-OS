@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Validate the bounded CHLOM Cell 08 TEVV packet.
 
-A green validator means the test/evidence packet is internally consistent. It does
-not mean open security findings are resolved; open high/critical findings must
-remain explicitly promotion-blocking until repaired and independently reverified.
+A green validator means the TEVV packet is internally coherent. It never turns
+an open or revalidation-pending high/critical finding into a pass. A high or
+critical finding may become resolved only when closure evidence is recorded and
+the packet no longer marks it blocking.
 """
 
 from __future__ import annotations
@@ -32,6 +33,8 @@ def main() -> int:
 
     if invariants.get("fixture_id") != "ct.fixture.chlom.tevv.invariants.v1":
         fail("TEVV invariant fixture ID drifted")
+    if invariants.get("fixture_version") != "1.1.0":
+        fail("TEVV fixture must remain on remediation-aware version 1.1.0")
     if invariants.get("state") != "phase_2_99_prototype":
         fail("TEVV invariants must remain Phase 2.99 prototype state")
     if invariants.get("authority_rule") != "no_backend_may_expand_permission_beyond_canonical_contract":
@@ -48,9 +51,11 @@ def main() -> int:
     vectors = invariants.get("vectors", [])
     ids = {item.get("vector_id") for item in vectors}
     required_vectors = {
+        "ct.tevv.contract.untrusted-no-implicit-legacy-downgrade",
         "ct.tevv.authn.unauthenticated-default-deny",
         "ct.tevv.authz.cross-tenant-isolation",
         "ct.tevv.authority.approval-not-self-proving",
+        "ct.tevv.authority.verified-context-bound-relationship-delegation",
         "ct.tevv.d3.never-autonomous-allow",
         "ct.tevv.policy.unknown-condition-fail-closed",
         "ct.tevv.policy.prompt-rule-injection-no-authority",
@@ -79,10 +84,14 @@ def main() -> int:
 
     if packet.get("packet_id") != "ct.packet.chlom.cell.tevv.invariants-v1":
         fail("Cell 08 packet ID drifted")
+    if packet.get("packet_version") != "1.1.0":
+        fail("Cell 08 packet must remain remediation-aware version 1.1.0")
     if packet.get("cell_id") != "ct.chlom.cell.tevv" or packet.get("issue") != 75:
         fail("Cell 08 ownership drifted")
     if packet.get("parent_pr") != 67 or packet.get("stacked_on_pr") != 82:
         fail("Cell 08 stack/parent relationship drifted")
+    if packet.get("tested_kernel_head") != "30d7b49bf6b01d6d094f62fa357dd31647ef078a":
+        fail("Cell 08 tested kernel head drifted")
     if packet.get("risk_class") != "D2":
         fail("TEVV packet must remain D2")
     if set(packet.get("required_specialists", [])) != {
@@ -97,29 +106,53 @@ def main() -> int:
         fail("Advanced crypto/token security must remain Phase 9 research only")
 
     findings = packet.get("known_findings", [])
-    finding_ids = {item.get("finding_id") for item in findings}
-    required_open = {
+    by_id = {item.get("finding_id"): item for item in findings}
+    required_findings = {
         "ct.finding.tevv.authority-approval-self-assertion",
         "ct.finding.tevv.restricted-evidence-reference-unsanitized",
+        "ct.finding.tevv.policy-bundle-state-unverified",
     }
-    if not required_open.issubset(finding_ids):
-        fail("Known blocking TEVV findings were removed without adjudication")
-    open_high = [
-        item for item in findings
-        if item.get("status") == "open" and item.get("severity") in {"critical", "high"}
-    ]
-    if not open_high:
-        fail("TEVV packet currently requires explicit open high findings")
-    if any(item.get("blocking") is not True for item in open_high):
-        fail("Every open critical/high TEVV finding must block promotion")
-    if packet.get("promotion_state") != "blocked_by_open_high_findings":
-        fail("Promotion must remain blocked while high findings are open")
-    if packet.get("phase_3_effect") != "no_phase_3_entry; open_high_tevv_findings_are_blocking":
-        fail("Phase 3 TEVV gate drifted")
+    if not required_findings.issubset(by_id):
+        fail("Known TEVV findings were removed instead of adjudicated")
+
+    unresolved_high = []
+    for finding_id in (
+        "ct.finding.tevv.authority-approval-self-assertion",
+        "ct.finding.tevv.restricted-evidence-reference-unsanitized",
+    ):
+        item = by_id[finding_id]
+        if item.get("severity") != "high":
+            fail(f"{finding_id} severity drifted")
+        status = item.get("status")
+        if status in {"open", "remediated_pending_exact_head_tevv_revalidation"}:
+            if item.get("blocking") is not True:
+                fail(f"{finding_id} must block until exact-head revalidation resolves it")
+            unresolved_high.append(item)
+        elif status == "resolved":
+            if item.get("blocking") is not False:
+                fail(f"resolved {finding_id} cannot remain marked blocking")
+            if not item.get("closure_evidence"):
+                fail(f"resolved {finding_id} requires closure_evidence")
+        else:
+            fail(f"unsupported finding lifecycle state for {finding_id}: {status!r}")
+
+    medium = by_id["ct.finding.tevv.policy-bundle-state-unverified"]
+    if medium.get("severity") != "medium" or medium.get("status") != "open":
+        fail("policy-bundle trust gap must remain an explicit open medium finding")
+
+    if unresolved_high:
+        if packet.get("promotion_state") != "blocked_pending_exact_head_tevv_revalidation_and_parent_sequence":
+            fail("promotion state must remain blocked while high findings await revalidation")
+    else:
+        if packet.get("promotion_state") != "high_findings_resolved_parent_sequence_and_medium_policy_gap_remain":
+            fail("promotion state must record resolved highs without erasing remaining parent/medium gates")
+
+    if not str(packet.get("phase_3_effect", "")).startswith("no_phase_3_entry"):
+        fail("Cell 08 may not open Phase 3")
 
     print("CHLOM Cell 08 TEVV packet validation passed.")
-    print(f"Invariant vectors: {len(vectors)}; open critical/high findings: {len(open_high)}.")
-    print("Green validator = evidence packet is coherent; promotion remains blocked by open high findings.")
+    print(f"Invariant vectors: {len(vectors)}; unresolved critical/high findings: {len(unresolved_high)}.")
+    print("Finding lifecycle is fail-closed; resolution requires closure evidence and cannot weaken vectors.")
     print("Backends remain non-authoritative until invariant-equivalence and adoption gates pass.")
     return 0
 
