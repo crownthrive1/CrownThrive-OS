@@ -7,8 +7,10 @@ on:
       - "**/*.mdx"
       - "**/*.json"
       - "**/*.svg"
+      - "**/*.yml"
+      - "**/*.yaml"
       - "scripts/**"
-      - ".github/workflows/docs-governance.yml"
+      - ".github/workflows/**"
   push:
     branches:
       - main
@@ -18,8 +20,10 @@ on:
       - "**/*.mdx"
       - "**/*.json"
       - "**/*.svg"
+      - "**/*.yml"
+      - "**/*.yaml"
       - "scripts/**"
-      - ".github/workflows/docs-governance.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
@@ -37,7 +41,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -53,6 +57,11 @@ jobs:
           python -m py_compile scripts/validate_s103_74_canonical_crosswalk.py
           python -m py_compile scripts/validate_s103_s100_engine_domain_edges.py
           python -m py_compile scripts/validate_repository_governance_enforcement_state.py
+          python -m py_compile scripts/validate_agent_sovereign_governance.py
+          python -m py_compile scripts/validate_security_governance.py
+          python -m py_compile scripts/governed_merge_decision.py
+          python -m py_compile scripts/resolve_pm_notification_recipients.py
+          python -m py_compile scripts/security_self_heal_plan.py
 
       - name: Run CrownThrive governance validator
         run: python scripts/validate_docs.py
@@ -72,7 +81,22 @@ jobs:
       - name: Validate S103/S100 engine-domain edges
         run: python scripts/validate_s103_s100_engine_domain_edges.py
 
-      - name: Validate repository governance enforcement state
+      - name: Validate agent-sovereign governance
+        run: python scripts/validate_agent_sovereign_governance.py
+
+      - name: Validate deterministic security governance
+        run: python scripts/validate_security_governance.py
+
+      - name: Validate agent merge decision invariants
+        run: python scripts/governed_merge_decision.py --self-test
+
+      - name: Validate PM notification routing invariants
+        run: python scripts/resolve_pm_notification_recipients.py --self-test
+
+      - name: Validate security self-healing invariants
+        run: python scripts/security_self_heal_plan.py --self-test
+
+      - name: Validate repository governance state
         run: python scripts/validate_repository_governance_enforcement_state.py
 
       - name: Check whitespace and conflict markers
