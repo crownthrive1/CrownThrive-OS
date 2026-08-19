@@ -1,7 +1,7 @@
 ---
 title: "Phase 2.99 — THIVEBASE and Partner Registry Formalization"
 sidebarTitle: "2.99 — THIVEBASE"
-description: "Formalizes THIVEBASE as CrownThrive's internal infrastructure brand and creates governed capacity, partner, vendor, referral and commercialization controls."
+description: "Formalizes THIVEBASE, governed capacity and partner registries, and provider separation across Partnero/Crown Affiliates, AdLuxe/Adserver.Online and CrownRewards/Reward Loyalty."
 icon: "database"
 ---
 
@@ -34,6 +34,18 @@ THIVEBASE owns the internal operating concern for:
 - future metering for external infrastructure products.
 
 It does not replace CrownThrive ID, CrownThrive IO/MCP, CHLOM, DAIL, CrownLytics or application-specific data systems.
+
+## Provider separation invariant
+
+Three current provider relationships are explicitly separate:
+
+```text
+Partnero → Crown Affiliates / Crown Ambassadors
+Adserver.Online → AdLuxe Network delivery/reporting provider
+Reward Loyalty / NowSquare → CrownRewards / My CrownRewards
+```
+
+Cross-platform events may interoperate through CrownThrive ID, IO/MCP, CHLOM, THIVEBASE and CrownLytics without provider or platform identity collapsing.
 
 ## Capacity policy adopted
 
@@ -72,6 +84,32 @@ The registry adds:
 
 No vendor is represented as having an affiliate/referral program until current provider evidence verifies it.
 
+## New control-plane implementation in this packet
+
+### Crown Affiliates / Partnero
+
+- Partnero program identity and public program configuration are registered separately from credentials.
+- Partnero REST endpoint families and MCP candidates are cataloged.
+- JWT-protected read-only `partnero-api-control` is deployed.
+- `partnero-webhook-receiver` is deployed fail-closed with raw-body HMAC-SHA256 verification and duplicate protection.
+- provider writes remain closed until credential, webhook and application tracking gates pass.
+
+### AdLuxe Network / Adserver.Online
+
+- evidence-controlled AdLuxe variables and public package snapshots are seeded in THIVEBASE;
+- official Adserver.Online provider capabilities are registered separately from CrownThrive account capability;
+- JWT-protected `adluxe-api-control` exposes only internal evidence/config/package/provider-capability reads;
+- Adserver account authentication and production writes remain open/closed respectively until verified.
+
+### CrownRewards / Reward Loyalty
+
+- `S100-ENG-024` is formally mapped to CrownRewards/My CrownRewards in the partner registry;
+- the current installation remains v4-current based on direct vendor support evidence;
+- v5 is the target updates/support track and is not represented as deployed;
+- Reward Loyalty v5 session REST API, scoped Agent API, OpenAPI, health and MCP-format tool-discovery targets are seeded;
+- all future Agent API/MCP tools remain disabled until v5 staging/production migration, least-privilege key design and read certification pass;
+- a dedicated v4→v5 readiness manifest/article/changelog records backup, staging, migration, rollback, security and conformance gates.
+
 ## Phase inheritance
 
 ### Phase 2 / 2.99
@@ -80,11 +118,11 @@ Formalize THIVEBASE, partner coverage, current provider baselines, safe threshol
 
 ### Phase 3
 
-Productionize THIVEBASE as the compact internal registry/control substrate; connect sanitized provider usage/capacity readings; automate threshold evaluation; establish backup/restore/provider-exit evidence.
+Productionize THIVEBASE as the compact internal registry/control substrate; connect sanitized provider usage/capacity readings; automate threshold evaluation; establish backup/restore/provider-exit evidence. CrownRewards v5 migration belongs here only after the Phase 2.99 hard exit permits it.
 
 ### Phase 4
 
-Federate THIVEBASE state across P0/P1 adapters and route capacity/cost/partner signals into CrownLytics/Ops; activate approved partner catalogs and cross-platform referral attribution.
+Federate THIVEBASE state across P0/P1 adapters and route capacity/cost/partner signals into CrownLytics/Ops; activate approved partner catalogs and cross-platform referral/reward attribution without merging platform economics.
 
 ### Phase 5+
 
@@ -116,6 +154,10 @@ Every externalized lane requires pricing, terms, privacy/security boundaries, su
 - `portfolio/partner-vendor-referral-registry.mdx`
 - `developers/manifests/partner-vendor-referral-registry.v1.json`
 - `automation/thivebase-capacity-and-partner-monitoring.mdx`
+- `platforms/crownrewards-reward-loyalty-v5-readiness.mdx`
+- `platforms/crownrewards-institutional-registry.mdx`
+- `developers/manifests/crownrewards-reward-loyalty-v5-readiness.v1.json`
+- `changelog/phase-2-99-crownrewards-reward-loyalty-v5-prep.mdx`
 - `portfolio/roster-and-brand-directory.mdx`
 - `portfolio/engine-domain-vendor-registry.mdx`
 - `portfolio/p0-operating-portfolio.mdx`
@@ -124,4 +166,4 @@ Every externalized lane requires pricing, terms, privacy/security boundaries, su
 
 Documentation impact: `docs_updated`.
 
-Risk posture: this packet formalizes internal architecture, registry and monitoring policy only. It does not upgrade Supabase, activate provider writes, create external paid services, accept referral agreements, expose credentials or advance Phase 3.
+Risk posture: this packet formalizes internal architecture, registry and monitoring policy plus bounded read-only/fail-closed control surfaces. It does not purchase or migrate CrownRewards v5, enable provider writes, accept referral agreements, expose credentials or advance Phase 3.
