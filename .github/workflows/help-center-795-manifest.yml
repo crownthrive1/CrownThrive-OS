@@ -1,0 +1,54 @@
+name: Help Center 795 Manifest
+
+on:
+  pull_request:
+    paths:
+      - "data/help_center_article_manifest.v1.bundle.json"
+      - "data/help_center_article_manifest.v1.json.gz.b64.part*"
+      - "scripts/validate_help_center_article_manifest_bundle.py"
+      - "developers/manifests/help-center-795-materialization-reconciliation.v1.json"
+      - "changelog/phase-2-99-help-center-795-machine-manifest-materialization.md"
+      - ".github/workflows/help-center-795-manifest.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "data/help_center_article_manifest.v1.bundle.json"
+      - "data/help_center_article_manifest.v1.json.gz.b64.part*"
+      - "scripts/validate_help_center_article_manifest_bundle.py"
+      - "developers/manifests/help-center-795-materialization-reconciliation.v1.json"
+      - "changelog/phase-2-99-help-center-795-machine-manifest-materialization.md"
+      - ".github/workflows/help-center-795-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-help-center-manifest:
+    name: Validate Help Center 795 manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify validator syntax
+        run: python -m py_compile scripts/validate_help_center_article_manifest_bundle.py
+
+      - name: Validate deterministic 795-record bundle
+        run: python scripts/validate_help_center_article_manifest_bundle.py
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
