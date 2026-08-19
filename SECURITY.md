@@ -42,13 +42,15 @@ CrownThrive may reclassify a report as evidence develops.
 
 `CT-ADR-GOV-011` establishes a dedicated **Security & Resilience Sentinel (`ct.relay.agent-s`)** in the institutional agent relay. Security is therefore evaluated continuously rather than only after a release is built.
 
-The repository's `Security Governance` workflow supplies independent security evidence through:
+The repository security control plane combines the `Security Governance` workflow with independent provider-managed security capabilities:
 
 - deterministic CrownThrive security-policy validation;
-- CodeQL analysis when applicable;
+- GitHub CodeQL **default setup** when applicable, operated by GitHub rather than duplicated as an advanced CodeQL job inside CrownThrive's workflow;
 - pull-request dependency review;
 - provider secret-scanning/push-protection evidence when enabled and available;
-- weekly scheduled revalidation in addition to change-triggered runs.
+- weekly scheduled CrownThrive policy revalidation in addition to change-triggered runs.
+
+The initial PR #63 security run proved that GitHub CodeQL default setup was already enabled because a duplicate advanced CodeQL initialization was rejected. CrownThrive therefore removed the conflicting duplicate advanced job while retaining the requirement to consume actual provider CodeQL findings as independent evidence. A compatibility job now fails if an advanced CodeQL action is reintroduced while default setup remains the registered provider mode.
 
 GitHub security products are valuable evidence and defense-in-depth, but GitHub is not CrownThrive's sovereign merge authority. CrownThrive's coded agent policy requires a failed applicable critical/high security control to block automatic merge even if GitHub repository settings would technically permit it.
 
