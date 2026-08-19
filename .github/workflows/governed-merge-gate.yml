@@ -27,8 +27,9 @@ jobs:
         with:
           # Trusted diff verification consumes the exact provider-supplied base
           # and head SHAs. A shallow synthetic-merge checkout can omit the
-          # historical base object after a PR accumulates enough commits, which
-          # must not turn a valid exact-SHA verification into a false failure.
+          # historical base object after a PR accumulates enough commits.
+          # The former fetch-depth: 2 control is preserved here as historical
+          # failure evidence only; it is not the active checkout setting.
           # Full history supplies both exact objects without changing their
           # authority or allowing the decision engine to substitute refs.
           fetch-depth: 0
@@ -65,6 +66,8 @@ jobs:
           CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          git cat-file -e "$CT_GIT_BASE_SHA^{commit}"
+          git cat-file -e "$CT_GIT_HEAD_SHA^{commit}"
           python scripts/governed_merge_decision.py \
             --verify-git-diff \
             --git-base "$CT_GIT_BASE_SHA" \
