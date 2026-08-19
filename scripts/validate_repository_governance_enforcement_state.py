@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Validate CrownThrive-Support repository governance state.
-
-S106 records GitHub's observed control plane. CT-ADR-GOV-011 supersedes the
-assumption that GitHub branch protection is CrownThrive's sovereign governance
-gate: governed agents now enforce fail-closed merge authority while GitHub CI,
-security scans and post-merge revalidation remain independent evidence and
-defense-in-depth.
-"""
+"""Validate CrownThrive-Support repository governance state."""
 
 from __future__ import annotations
 
@@ -16,18 +9,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/repository-governance-enforcement-state.v1.json"
+ACTIONS_POLICY = ROOT / "developers/manifests/github-actions-runtime-policy.v1.json"
 DOCS_WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
 SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
 ADR = ROOT / "changelog/adr-agent-sovereign-governance-quorum-security.md"
 STANDARD_AMENDMENT = ROOT / "standards/agent-sovereign-governance-amendment-ct-adr-gov-011.md"
+RUNTIME_STANDARD = ROOT / "standards/github-actions-runtime-supply-chain-standard.md"
 GATE_AMENDMENT = ROOT / "technology/phase-3-readiness-gate-amendment-ct-adr-gov-011.md"
 RELAY = ROOT / "automation/institutional-hourly-agent-relay.mdx"
 PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
 CHLOM = ROOT / "chlom/overview.mdx"
 DSCAAS = ROOT / "governance/ds-caas.mdx"
 SECURITY = ROOT / "SECURITY.md"
-SECURITY_POLICY = ROOT / "developers/manifests/security-self-healing-policy.v1.json"
-ADVANCED_CODEQL_USE = re.compile(r"^\s*uses:\s*github/codeql-action/", re.MULTILINE)
 
 
 def fail(message: str) -> None:
@@ -47,6 +40,7 @@ def require(path: Path, fragment: str) -> None:
 
 def main() -> int:
     data = json.loads(text(MANIFEST))
+    actions = json.loads(text(ACTIONS_POLICY))
     expected = {
         "manifest_version": "1.1.0",
         "manifest_id": "ct.manifest.repository-governance-enforcement.v1",
@@ -119,13 +113,6 @@ def main() -> int:
     if target.get("bypass_authority") != "explicit_D3_decision":
         fail("Bypass authority must remain D3")
 
-    security_policy = json.loads(text(SECURITY_POLICY))
-    security_evidence = security_policy.get("github_security_evidence", {})
-    if security_evidence.get("codeql_execution_mode") != "github_default_setup_provider_managed":
-        fail("CodeQL provider mode drifted")
-    if security_evidence.get("advanced_codeql_workflow") != "prohibited_while_default_setup_enabled":
-        fail("Advanced CodeQL conflict policy drifted")
-
     forbidden = set(data.get("forbidden_promotions", []))
     for item in {
         "github_ci_success_to_sovereign_authority",
@@ -135,42 +122,52 @@ def main() -> int:
         if item not in forbidden:
             fail(f"Missing forbidden promotion: {item}")
 
+    if actions.get("status") != "active_fail_closed" or actions.get("target_runtime") != "node24":
+        fail("Repository runtime gate must remain active and Node 24")
+    if actions.get("node20_status") != "prohibited":
+        fail("Node 20 action runtime must remain prohibited")
+    if actions.get("self_healing", {}).get("direct_to_main_mutation") is not False:
+        fail("GitHub Actions dependency repair must not bypass governed PR/quorum flow")
+
     for fragment in (
         "name: Documentation Governance",
         "name: Validate institutional documentation",
         "python scripts/validate_docs.py",
+        "python scripts/validate_github_actions_runtime_policy.py",
         "python scripts/validate_agent_sovereign_governance.py",
-        "actions/checkout@v7",
-        "actions/setup-python@v7",
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+        "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
     ):
         require(DOCS_WORKFLOW, fragment)
     for fragment in (
         "name: Security Governance",
         "name: Validate provider-managed CodeQL compatibility",
-        "CodeQL default setup is provider-managed",
-        "actions/dependency-review-action@v4",
-        "actions/checkout@v7",
-        "actions/setup-python@v7",
+        "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0",
+        "python scripts/validate_github_actions_runtime_policy.py",
     ):
         require(SECURITY_WORKFLOW, fragment)
-    if ADVANCED_CODEQL_USE.search(text(SECURITY_WORKFLOW)):
-        fail("Conflicting advanced CodeQL workflow present while provider default setup is registered")
+    if re.search(r"^\s*uses:\s*github/codeql-action/", text(SECURITY_WORKFLOW), flags=re.MULTILINE):
+        fail("Advanced CodeQL workflow conflicts with provider-managed default setup")
 
     require(ADR, "# CT-ADR-GOV-011")
     require(ADR, "Phase 3 therefore remains `blocked_pending_phase_2_99_hard_exit`")
     require(STANDARD_AMENDMENT, "GitHub branch protection may supplement the model but is not the authority root")
     require(GATE_AMENDMENT, "GitHub branch protection/rulesets are optional defense-in-depth")
+    require(GATE_AMENDMENT, "GitHub Actions runtime gate")
     require(RELAY, "GitHub is not the sovereign merge authority")
     require(RELAY, "75% quorum")
     require(PERMISSIONS, "## Agent-sovereign quorum and specialist gates")
     require(CHLOM, "Target metaprotocol architecture")
     require(DSCAAS, "Agent-sovereign enforcement")
     require(SECURITY, "Continuous Security Governance")
+    require(RUNTIME_STANDARD, "# GitHub Actions Runtime and Supply-Chain Standard")
+    require(RUNTIME_STANDARD, "Node 24")
+    require(RUNTIME_STANDARD, "Dependabot")
 
     print("Repository governance state validation passed.")
     print("GitHub observed branch protection: false; GitHub merge gate enforced: false.")
     print("Sovereign merge policy: CrownThrive agent fail-closed quorum + validation + reserved D3 human authority.")
-    print("CodeQL execution: GitHub provider-managed default setup; duplicate advanced workflow prohibited.")
+    print("GitHub Actions: Node 24 runtime/supply-chain gate is blocking; Node 20 and direct-main dependency healing are prohibited.")
     print("Phase 3: GitHub branch protection is nonblocking; all other Phase 2.99 hard-exit requirements remain binding.")
     return 0
 
