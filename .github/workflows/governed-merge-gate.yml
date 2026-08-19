@@ -1,34 +1,25 @@
-name: Documentation Governance
+name: Governed Merge Gate
 
 on:
   pull_request:
   push:
     branches:
       - main
-      - "admin-mcp/**"
-    paths:
-      - "**/*.md"
-      - "**/*.mdx"
-      - "**/*.json"
-      - "**/*.svg"
-      - "**/*.yml"
-      - "**/*.yaml"
-      - "scripts/**"
-      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
-  group: docs-governance-${{ github.workflow }}-${{ github.ref }}
+  group: governed-merge-gate-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Validate institutional documentation
+  governed-merge-gate:
+    name: CrownThrive governed merge gate
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
@@ -39,7 +30,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify validator syntax
+      - name: Verify governed validator syntax
         run: |
           python -m py_compile scripts/validate_docs.py
           python -m py_compile scripts/validate_collab_portal_adapter.py
@@ -59,7 +50,7 @@ jobs:
       - name: Validate GitHub Actions runtime and supply-chain policy
         run: python scripts/validate_github_actions_runtime_policy.py
 
-      - name: Run CrownThrive governance validator
+      - name: Validate institutional documentation
         run: python scripts/validate_docs.py
 
       - name: Validate Collab Portal adapter contract
@@ -71,7 +62,7 @@ jobs:
       - name: Validate Phase 2.7 74-registry seed
         run: python scripts/validate_phase_2_7_74_registry_seed.py
 
-      - name: Validate S103 74-row canonical crosswalk
+      - name: Validate S103 canonical crosswalk
         run: python scripts/validate_s103_74_canonical_crosswalk.py
 
       - name: Validate S103/S100 engine-domain edges
@@ -86,17 +77,33 @@ jobs:
       - name: Validate deterministic security governance
         run: python scripts/validate_security_governance.py
 
-      - name: Validate agent merge decision invariants
+      - name: Validate sovereign merge decision invariants
         run: python scripts/governed_merge_decision.py --self-test
 
-      - name: Validate PM notification routing invariants
+      - name: Validate PM routing invariants
         run: python scripts/resolve_pm_notification_recipients.py --self-test
 
       - name: Validate security self-healing invariants
         run: python scripts/security_self_heal_plan.py --self-test
 
-      - name: Validate repository governance state
+      - name: Validate repository enforcement target
         run: python scripts/validate_repository_governance_enforcement_state.py
+
+      - name: Prevent conflicting advanced CodeQL setup
+        shell: bash
+        run: |
+          if grep -R -nE '^[[:space:]]*uses:[[:space:]]*github/codeql-action/' .github/workflows; then
+            echo "Advanced CodeQL workflow detected while GitHub default setup is the registered provider mode."
+            exit 1
+          fi
+          echo "Provider-managed CodeQL default setup remains the registered mode."
+          echo "This check does not synthesize provider CodeQL findings."
+
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
 
       - name: Check whitespace and conflict markers
         run: |
