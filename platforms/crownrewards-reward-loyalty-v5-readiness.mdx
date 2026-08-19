@@ -1,0 +1,203 @@
+---
+title: "CrownRewards — Reward Loyalty v5 Readiness"
+sidebarTitle: "CrownRewards v5 Readiness"
+description: "Current v4 operating state, Reward Loyalty v5 upgrade path, REST and Agent API targets, MCP/tool discovery, safety gates, and CrownThrive phase integration."
+icon: "gift"
+---
+
+# CrownRewards — Reward Loyalty v5 Readiness
+
+## Identity boundary
+
+CrownRewards and its public alias **My CrownRewards** are CrownThrive loyalty/retention assets. Their current underlying self-hosted engine is **Reward Loyalty**.
+
+This relationship is intentionally separate from the other infrastructure relationships:
+
+| CrownThrive asset | Underlying provider/engine | Institutional job |
+| --- | --- | --- |
+| Crown Affiliates | Partnero | affiliate/referral attribution, partners, customers, commissions and transactions |
+| AdLuxe Network | Adserver.Online | advertising delivery, inventory/campaign reporting and ad-serving capability |
+| CrownRewards / My CrownRewards | Reward Loyalty | closed-loop loyalty, points, stamps, rewards, vouchers, passes and partner/member operations |
+
+Cross-platform events may interoperate through CrownThrive ID, IO/MCP, CHLOM, THIVEBASE and CrownLytics, but the providers and institutional identities do **not** collapse into one system.
+
+## Current v4 state
+
+**As of 2026-08-19:** NowSquare Support confirmed by email that the existing Reward Loyalty v4 installation can continue running as-is. The current public My CrownRewards property is reachable at `https://mycrownrewards.com`.
+
+The vendor also stated that the current updates/support path now runs through Reward Loyalty v5. Therefore the correct institutional state is:
+
+```yaml
+current_install: v4
+current_install_state: operational
+forced_shutdown: false
+v5_upgrade_available: true
+v5_deployed: false
+v5_api_certified: false
+production_migration_authorized: false
+```
+
+Do not describe CrownRewards as already running v5 until deployment evidence proves it.
+
+## Current provider commercial snapshot
+
+Reward Loyalty's current public v5 transition page states that an existing CodeCanyon buyer can move to v5 for **$299**, versus the current **$349** standard license. The v5 license includes 12 months of updates/support; continued updates/support after that are currently described as an optional **$99/year** track. The provider also states that the self-hosted installation keeps running if renewal stops.
+
+This is a **dated provider commercial snapshot**, not an approved CrownThrive purchase or accounting commitment.
+
+Source: `https://rewardloyalty.co/docs/5.x/why-the-price-changed`
+
+## v5 API architecture
+
+Reward Loyalty v5 separates two API models.
+
+### Session-token REST API
+
+The REST API is designed for signed-in custom frontends, mobile apps and third-party integrations.
+
+```text
+https://mycrownrewards.com/api/{locale}/v1
+```
+
+Authentication is session/Bearer-token based and follows the signed-in actor.
+
+Source: `https://rewardloyalty.co/docs/5.x/api-reference/overview`
+
+### Agent API
+
+The Agent API is the stronger CrownThrive machine-to-machine target for POS systems, automations and approved AI agents.
+
+```text
+https://mycrownrewards.com/api/agent/v1
+```
+
+The provider documents:
+
+- `X-Agent-Key` authentication;
+- separate partner, member and admin key classes;
+- granular scopes;
+- request audit logging;
+- rate limits;
+- stateless JSON requests;
+- health discovery;
+- OpenAPI 3.0;
+- runtime tool discovery;
+- OpenAI, Anthropic, MCP and generic tool-definition formats.
+
+Provider sources:
+
+- `https://rewardloyalty.co/docs/5.x/agent-api`
+- `https://rewardloyalty.co/docs/5.x/agent-api/overview`
+- `https://rewardloyalty.co/docs/5.x/agent-api/authentication`
+- `https://rewardloyalty.co/docs/5.x/agent-api/scopes`
+- `https://rewardloyalty.co/docs/5.x/agent-api/tool-discovery`
+
+## Machine-readable targets after upgrade
+
+Once v5 is deployed and independently verified, the installation is expected to expose:
+
+| Surface | Target |
+| --- | --- |
+| Agent health | `/api/agent/v1/health` |
+| Interactive Agent API docs | `/api/agent/docs` |
+| OpenAPI 3.0 JSON | `/api/agent/docs.json` |
+| Tool discovery | `/api/agent/v1/tools` |
+| MCP-format discovery | `/api/agent/v1/tools?format=mcp` |
+
+The provider-generated tool list must be treated as **provider capability inventory**, not CrownThrive authority. CHLOM still decides whether a discovered operation is permitted, how it is classified, and whether an agent may execute it.
+
+## CrownThrive target integration
+
+```text
+eligible CrownThrive event
+        ↓
+CrownThrive ID / organization resolution
+        ↓
+CHLOM rule + authority evaluation
+        ↓
+THIVEBASE integration state / budget / evidence
+        ↓
+Reward Loyalty v5 Agent API
+        ↓
+Reward Loyalty committed result
+        ↓
+DAIL evidence + CrownLytics signal
+        ↓
+member / partner experience
+```
+
+Examples include approved purchase earn events, booking/event rewards, affiliate-linked incentives, learning completions, campaign incentives and redemptions. Affiliate cash commissions remain Partnero/Crown Affiliates economics and must not be collapsed into CrownRewards points.
+
+## Upgrade gate
+
+The v4 production install must not be overwritten merely because v5 is available.
+
+Required sequence:
+
+1. preserve current v4 production and license evidence;
+2. obtain the v5 entitlement/package through the provider's supported path;
+3. back up the production database, uploaded files, configuration, environment and current application package;
+4. create a staging clone;
+5. validate server/runtime requirements and required PHP extensions;
+6. apply the v5 upgrade in staging using the provider-supported method;
+7. reconcile partners, members, cards, balances, transactions, rewards, stamps, vouchers, passes, plans, staff, branding and settings;
+8. test public, member, partner, staff and admin flows;
+9. verify email, queues/jobs, QR/wallet behavior, privacy/security and activity logs;
+10. enable Agent API only after feature/plan permission and least-privilege scope design;
+11. create separate keys by environment and integration surface;
+12. certify read-only health, OpenAPI and tool discovery before any write scope;
+13. run missing-scope, wrong-tenant, malformed-input, duplicate/idempotency, rate-limit, retry, timeout and reconciliation tests;
+14. document rollback and cutover;
+15. obtain the appropriate governance approval before production migration.
+
+Provider update guidance explicitly recommends testing updates in a test environment and backing up the database before production deployment.
+
+Source: `https://rewardloyalty.co/docs/5.x/installation-and-updates/updating`
+
+## Security model
+
+Agent API keys must remain server-side and follow least privilege. A general-purpose admin key is not the default integration model.
+
+CrownThrive rules:
+
+- no Agent API key in browser JavaScript or mobile bundles;
+- no single production key reused across development/staging/production;
+- separate integrations receive separate keys where practical;
+- start with read-only health/discovery;
+- grant write scopes only for a proven workflow;
+- provider permissions never override CrownThrive organization/role/CHLOM checks;
+- all material writes require idempotency/reconciliation evidence;
+- keys must have a tested rotation/revocation procedure;
+- raw member/partner data is not projected into public Mintlify documentation.
+
+## Phase integration
+
+### Phase 2 / 2.99 — current
+
+- preserve v4 as the current production truth;
+- document the v5 migration requirement;
+- capture current vendor documentation and machine endpoints;
+- seed Reward Loyalty as `S100-ENG-024` / CrownRewards provider in THIVEBASE;
+- keep v5 API/MCP tools disabled until production exists and is certified.
+
+### Phase 3 — executable core
+
+After Phase 2.99 hard exit permits entry:
+
+- perform the governed v5 staging migration and production cutover;
+- bind Reward Loyalty into CrownThrive ID/IO/MCP/CHLOM/THIVEBASE;
+- generate schemas from the live v5 OpenAPI spec;
+- certify read-only Agent API health and tool discovery;
+- progressively certify narrowly scoped write operations.
+
+### Phase 4 — federation
+
+Federate approved reward events across Locticians, ThriveSeat, Melanin Magic, MM Suites, CrownThriveU, GSO, Crown Affiliates/Ambassadors, AdLuxe, ThriveTickets/events and other qualified P0/P1 platforms.
+
+### Phase 5+
+
+Productize governed loyalty integrations, white-label/managed loyalty operations, implementation services and education while keeping CrownThrive private control data and sovereign decision authority walled off.
+
+## Machine authority
+
+The machine seed is `developers/manifests/crownrewards-reward-loyalty-v5-readiness.v1.json`.
