@@ -14,8 +14,10 @@ NOTIFY = ROOT / "developers/manifests/pm-notification-routing.v1.json"
 SECURITY = ROOT / "developers/manifests/security-self-healing-policy.v1.json"
 ACTIONS = ROOT / "developers/manifests/github-actions-runtime-policy.v1.json"
 REPO_STATE = ROOT / "developers/manifests/repository-governance-enforcement-state.v1.json"
+GITHUB_TARGET = ROOT / "developers/manifests/github-main-enforcement-target.v1.json"
 DOCS_WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
 SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
+MERGE_WORKFLOW = ROOT / ".github/workflows/governed-merge-gate.yml"
 RELAY = ROOT / "automation/institutional-hourly-agent-relay.mdx"
 PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
 
@@ -41,15 +43,16 @@ def main() -> int:
     security = data(SECURITY)
     actions = data(ACTIONS)
     repo = data(REPO_STATE)
+    github_target = data(GITHUB_TARGET)
 
     if agent.get("decision_id") != "CT-ADR-GOV-011" or agent.get("phase") != "2.99":
         fail("CT-ADR-GOV-011 / Phase 2.99 identity drifted")
-    if agent.get("authority_model") != "agent_sovereign_fail_closed":
-        fail("Agent authority model must remain fail-closed")
-    if agent.get("repository_provider_role") != "evidence_ci_scan_and_transport_not_sovereign_authority":
-        fail("GitHub role drifted from evidence/CI/scan/transport")
-    if agent.get("github_branch_protection_dependency") is not False:
-        fail("GitHub branch protection must not be a sovereign dependency")
+    if agent.get("authority_model") != "agent_sovereign_fail_closed_with_provider_merge_perimeter":
+        fail("Agent authority model must remain fail-closed with provider merge perimeter")
+    if agent.get("repository_provider_role") != "required_technical_enforcement_evidence_ci_scan_and_transport_not_sovereign_authority":
+        fail("GitHub role drifted from required technical perimeter/evidence/transport")
+    if agent.get("github_branch_protection_dependency") is not True:
+        fail("GitHub main enforcement is now required defense-in-depth for Phase 3")
     if agent.get("canonical_roadmap_generation") != "ten_phase_v1":
         fail("Canonical roadmap must remain ten_phase_v1")
 
@@ -77,16 +80,22 @@ def main() -> int:
     if quorum.get("quorum_cannot_override_d3") is not True:
         fail("Agent quorum cannot override D3")
 
-    merge_required = set(agent.get("merge_policy", {}).get("required", []))
+    merge_policy = agent.get("merge_policy", {})
+    merge_required = set(merge_policy.get("required", []))
     for gate in {
         "institutional_documentation_validation_passed",
         "security_governance_validation_passed",
         "github_actions_runtime_policy_passed",
+        "always_run_governed_merge_gate_passed",
         "quorum_met",
         "independent_gatekeeper_approval_present",
     }:
         if gate not in merge_required:
             fail(f"Required merge gate missing: {gate}")
+    if merge_policy.get("github_required_check_context") != "CrownThrive governed merge gate":
+        fail("Stable GitHub required-check context drifted")
+    if merge_policy.get("phase_3_requires_provider_enforcement") is not True:
+        fail("Phase 3 must require provider main enforcement")
 
     rating = agent.get("risk_rating", {})
     if rating.get("minimum_automatic_merge_score") != 85:
@@ -139,11 +148,34 @@ def main() -> int:
     if actions.get("status") != "active_fail_closed" or actions.get("target_runtime") != "node24":
         fail("Machine GitHub Actions runtime policy drifted")
 
+    github_gate = agent.get("github_main_enforcement_gate", {})
+    if github_gate.get("target_manifest") != "developers/manifests/github-main-enforcement-target.v1.json":
+        fail("GitHub main enforcement target manifest drifted")
+    if github_gate.get("required_for_phase_3") is not True:
+        fail("GitHub main enforcement must be a Phase 3 hard dependency")
+    if github_gate.get("required_status_context") != "CrownThrive governed merge gate":
+        fail("Required GitHub merge-gate context drifted")
+    if github_gate.get("sovereign_authority") is not False:
+        fail("GitHub enforcement must not become sovereign authority")
+
+    target = github_target.get("required_target", {})
+    if github_target.get("phase_3_entry") != "blocked_until_provider_enforcement_verified":
+        fail("GitHub main target must block Phase 3 until provider enforcement is verified")
+    if target.get("pull_request_required") is not True:
+        fail("Main target must require pull requests")
+    if target.get("required_status_check", {}).get("job") != "CrownThrive governed merge gate":
+        fail("Main target required check job drifted")
+    if target.get("required_status_check", {}).get("must_emit_on_every_pull_request") is not True:
+        fail("Required check must emit on every pull request")
+    if target.get("force_pushes_allowed") is not False or target.get("branch_deletion_allowed") is not False:
+        fail("Main target must block force pushes and deletion")
+
     never = set(agent.get("self_healing", {}).get("never", []))
     for item in {
         "force_node24_for_an_unupgraded_action",
         "allow_insecure_node_runtime_escape_hatch",
         "auto_merge_dependency_update_without_governed_validation",
+        "treat_provider_branch_protection_as_sovereign_authority",
     }:
         if item not in never:
             fail(f"Missing self-healing prohibition: {item}")
@@ -151,9 +183,9 @@ def main() -> int:
     if repo.get("agent_merge_policy") != "fail_closed_quorum_and_validation":
         fail("Repository state must register the agent fail-closed merge policy")
     if repo.get("github_merge_gate_enforced") is not False:
-        fail("Current GitHub merge gate must remain explicitly false")
-    if repo.get("github_branch_protection_required_for_phase_3") is not False:
-        fail("GitHub branch protection must not remain a Phase 3 dependency")
+        fail("Observed GitHub merge gate remains false until provider configuration is verified")
+    if repo.get("github_branch_protection_required_for_phase_3") is not True:
+        fail("GitHub branch protection must now remain a Phase 3 dependency")
 
     for fragment in (
         "python scripts/validate_github_actions_runtime_policy.py",
@@ -180,6 +212,16 @@ def main() -> int:
     if re.search(r"^\s*uses:\s*github/codeql-action/", SECURITY_WORKFLOW.read_text(encoding="utf-8"), flags=re.MULTILINE):
         fail("Advanced CodeQL configuration conflicts with registered GitHub default setup")
 
+    for fragment in (
+        "name: Governed Merge Gate",
+        "name: CrownThrive governed merge gate",
+        "python scripts/validate_docs.py",
+        "python scripts/validate_security_governance.py",
+        "python scripts/validate_repository_governance_enforcement_state.py",
+        "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0",
+    ):
+        require(MERGE_WORKFLOW, fragment)
+
     require(RELAY, "Agent S — Security & Resilience Sentinel")
     require(RELAY, "75% quorum")
     require(RELAY, "Collab Portal fallback tracking mailbox")
@@ -187,6 +229,7 @@ def main() -> int:
 
     print("Agent-sovereign governance validation passed.")
     print("Eligible voters: 5; 75% quorum: 4 approvals; Agent D remains independent gatekeeper.")
+    print("GitHub: always-run governed merge gate is bootstrapped; provider main enforcement is required before Phase 3 but is not sovereign authority.")
     print("GitHub Actions: Node 24 fail-closed runtime gate; full-SHA action refs; governed dependency repair.")
     print("GitHub CodeQL: provider-managed default setup; duplicate advanced workflow prohibited.")
     print("D3: reserved human/specialist authority; no agent quorum substitution.")
