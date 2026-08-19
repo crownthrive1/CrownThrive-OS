@@ -25,8 +25,11 @@ The reference engine remains fail closed:
 - authority-sensitive strict-v1 allows require a separately supplied `VerifiedAuthorityContext` whose actor and organization match the request and which supplies verified roles, relationships, delegations and approvals;
 - authority-sensitive decisions hold unless both verified relationship and delegation references exist;
 - governed evidence references may be preserved, but free-form/non-governed authority evidence is persisted only as an opaque SHA-256 evidence digest and never verbatim;
-- identical retries under one idempotency key reuse the prior decision and DAIL event;
-- reusing an idempotency key for a different payload fails closed.
+- an identical idempotent retry reuses a prior strict-v1 decision only when both the request payload and normalized verified-authority context are semantically unchanged;
+- removing or materially changing verified actor/org/roles/relationships/delegations/approvals/governed authority evidence under the same request and idempotency key fails closed instead of replaying a cached allow;
+- reusing an idempotency key for a different request payload fails closed.
+
+The authority-context idempotency binding covers all authority fields currently available to Cell 01. Authority version, expiry and revocation identity belong to Cell 03; those lifecycle fields must join the integrated authority fingerprint before any later production authority implementation can rely on cached decisions.
 
 This contract deliberately leaves the future authority adapter/provider implementation to Cell 03. Cell 01 only defines the provider-independent trust boundary consumed by that future adapter.
 
@@ -40,15 +43,15 @@ This contract page and the machine schemas are governed documentation inputs. **
 
 ## Validation fixtures
 
-`conformance.v1.json` and `test_kernel_contract.py` cover positive and fail-closed behavior, including missing contract identity, missing idempotency identity, cross-org access, provider-mutation intent, version conflict, D3 hold, safe idempotent retry, conflicting idempotency-key reuse, caller self-asserted authority rejection, verified identity+org+relationship+delegation+approval requirements, and non-verbatim restricted/free-form evidence persistence.
+`conformance.v1.json` and `test_kernel_contract.py` cover positive and fail-closed behavior, including missing contract identity, missing idempotency identity, cross-org access, provider-mutation intent, version conflict, D3 hold, safe idempotent retry, conflicting idempotency-key reuse, caller self-asserted authority rejection, verified identity+org+relationship+delegation+approval requirements, authority-context removal/change across an identical idempotency replay, and non-verbatim restricted/free-form evidence persistence.
 
 Existing PR #67 reference-runtime tests must remain green. The legacy behavior needed by those six parent tests is isolated to their exact `req_test` / `ct.actor.test` / `ct.resource.test` / `environment=test` / `reason=test_only` fixture and must not become an adapter/runtime compatibility promise.
 
-The child packet must also run its Cell 01 contract test directly. The governed parent workflow still does not directly invoke that Cell-local suite; Cell 08 PR #87 provides independent TEVV coverage, and its expected finding state must be reconciled by its owner after this kernel repair rather than edited from Cell 01.
+The governed Cell-01 workflow integrated through PR #96 directly invokes `contracts/chlom/kernel/test_kernel_contract.py` in addition to the parent runtime suite. Any new Cell-01 head must rerun that unchanged direct suite. Cell 08 owns independent TEVV revalidation and must rerun the authority-context idempotency replay finding against this repaired head without weakening the prior HIGH vectors.
 
 ## Specialist and authority boundary
 
-Required review for later promotion: `security_privacy` and `ai_ml_llm_tevv`. This packet is D0/D1-buildable reference code but any material D2 promotion follows CT-ADR-GOV-011. D3 remains human/qualified-professional authority.
+Required review for later promotion: `security_privacy`, `ai_ml_llm_tevv`, and `operations_sre`. This packet is D0/D1-buildable reference code but any material D2 promotion follows CT-ADR-GOV-011. D3 remains human/qualified-professional authority.
 
 No OPA, OpenFGA, Cedar or Temporal component is adopted by this packet. They remain evaluation candidates until their independent intake and compatibility gates pass.
 
@@ -56,4 +59,4 @@ No OPA, OpenFGA, Cedar or Temporal component is adopted by this packet. They rem
 
 Rollback is a revert of the bounded Cell 01 child PR; no provider state or data migration exists to reverse.
 
-After this kernel remediation receives independent TEVV/security acceptance, pair the kernel with Cell 04 Evidence/DAIL. Cell 04 must own the versioned evidence event/correction/tamper/export contract without changing this kernel trust boundary. Then integrate Cell 02 Policy and Cell 03 Authority only under an Agent A cross-cell integration packet. Parent PR #67 remains promotion-held behind PR #64, the GitHub main-perimeter certification sequence, and PR #65 governance/security reconciliation.
+The former #64 → GitHub-main-perimeter → #65 governance predecessor sequence is now canonical. Cell 01 and parent #67 remain on a historical CHLOM stack relative to current `main`, so canonical promotion still requires an Agent-A-owned parent/current-main integration packet after fresh Cell-01 Security/TEVV acceptance. Pair the accepted kernel with Cell 04 Evidence/DAIL without changing either cell's ownership. Then integrate Cell 02 Policy and Cell 03 Authority only under an Agent A cross-cell integration packet.
