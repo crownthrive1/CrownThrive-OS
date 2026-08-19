@@ -10,7 +10,7 @@
 
 This packet completes rule-based specialist enforcement and upgrades CrownThrive's sovereign-agent decision model from a normal 4-of-5 quorum to **unanimous-first governance**.
 
-Normal promotion now requires all five sovereign relay agents A/B/C/D/S to approve. Agent D remains the mandatory independent gatekeeper. Missing votes and abstentions never count as approval.
+Normal promotion requires all five sovereign relay agents A/B/C/D/S to approve. Agent D remains the mandatory independent gatekeeper. Missing votes and abstentions never count as approval.
 
 ## Disciplined deadlock override
 
@@ -52,14 +52,16 @@ The same failure may not be repeatedly retried without new evidence or root-caus
 
 ## Why this is stronger than the former 4-of-5 default
 
-The previous model allowed one dissenting sovereign agent to be outvoted immediately. The unanimous-first model forces the system to resolve disagreement, reconcile evidence, and expose hidden assumptions before promotion. The 6-hour 4-of-5 special vote prevents one stale or non-hard dissent from creating indefinite deadlock.
+The previous model allowed one dissenting sovereign agent to be outvoted immediately. The unanimous-first model forces disagreement to be investigated, evidence to be reconciled, and hidden assumptions to surface before promotion.
 
-This creates a two-stage decision system:
+The 6-hour 4-of-5 special vote provides bounded liveness: one stale, procedural, or otherwise non-hard dissent cannot freeze the institution indefinitely after two documented reconciliation attempts.
+
+The resulting two-stage decision model is:
 
 - **Stage 1: consensus discipline — 5/5**
 - **Stage 2: documented deadlock resolution — 4/5 after the wait/reconciliation protocol**
 
-The second stage is not a shortcut and cannot override hard safety, security, legal, authority, specialist, or D3 gates.
+Stage 2 is an exceptional liveness mechanism, not an alternate default quorum, and cannot override hard safety, security, legal, authority, specialist, or D3 gates.
 
 ## Rollback
 
