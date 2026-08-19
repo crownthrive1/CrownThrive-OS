@@ -21,6 +21,9 @@ SECRET_PATTERNS = {
     "openai_project_key": re.compile(r"\bsk-proj-[A-Za-z0-9_-]{20,}\b"),
     "stripe_live_secret": re.compile(r"\bsk_live_[A-Za-z0-9]{16,}\b"),
 }
+ADVANCED_CODEQL_USE = re.compile(
+    r"^\s*uses:\s*github/codeql-action/", re.MULTILINE
+)
 SCAN_SUFFIXES = {".py", ".json", ".yml", ".yaml", ".md", ".mdx", ".ts", ".js"}
 
 
@@ -61,7 +64,7 @@ def main() -> int:
     ):
         if fragment not in workflow:
             fail(f"security workflow missing {fragment!r}")
-    if "github/codeql-action/" in workflow:
+    if ADVANCED_CODEQL_USE.search(workflow):
         fail("Conflicting advanced CodeQL action detected while provider default setup is registered")
 
     findings = []
