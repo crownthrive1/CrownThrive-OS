@@ -31,7 +31,7 @@ class CHLOMReferenceEngine:
     def __init__(self, rules: list[dict[str, Any]], ledger: DAILLedger | None = None):
         self.policy = PolicyEngine(rules)
         self.ledger = ledger or DAILLedger()
-        self._idempotency_cache: dict[str, tuple[str, Decision]] = {}
+        self._idempotency_cache: dict[str, tuple[str, str, Decision]] = {}
 
     @staticmethod
     def _require_request(request: dict[str, Any]) -> None:
@@ -69,6 +69,35 @@ class CHLOMReferenceEngine:
     @staticmethod
     def _fingerprint(request: dict[str, Any]) -> str:
         return hashlib.sha256(canonical_json(request).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _authority_fingerprint(
+        verified_authority: VerifiedAuthorityContext | None,
+    ) -> str:
+        """Hash the effective out-of-band authority context used by a decision.
+
+        Idempotency cannot safely replay an authority-sensitive decision from the
+        request payload alone because verified authority is supplied separately.
+        Normalize set-like fields so semantically identical contexts produce the
+        same fingerprint while removal or material authority changes fail closed.
+        """
+
+        if verified_authority is None:
+            value: dict[str, Any] = {"present": False}
+        else:
+            value = {
+                "present": True,
+                "actor_id": verified_authority.actor_id,
+                "organization_id": verified_authority.organization_id,
+                "roles": sorted(set(verified_authority.roles)),
+                "relationships": sorted(set(verified_authority.relationships)),
+                "delegations": sorted(set(verified_authority.delegations)),
+                "approvals": sorted(set(verified_authority.approvals)),
+                "evidence_refs": sorted(
+                    set(verified_authority.sanitized_evidence_refs())
+                ),
+            }
+        return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
     def _matched_rules_require_authority(self, matched_rule_ids: tuple[str, ...]) -> bool:
         matched = set(matched_rule_ids)
@@ -150,11 +179,22 @@ class CHLOMReferenceEngine:
                 )
             )
 
-        fingerprint = self._fingerprint(request)
+        request_fingerprint = self._fingerprint(request)
+        authority_fingerprint = (
+            self._authority_fingerprint(verified_authority) if strict_v1 else "legacy-test-only"
+        )
         if strict_v1 and idempotency_key in self._idempotency_cache:
-            prior_fingerprint, prior_decision = self._idempotency_cache[idempotency_key]
-            if prior_fingerprint != fingerprint:
+            (
+                prior_request_fingerprint,
+                prior_authority_fingerprint,
+                prior_decision,
+            ) = self._idempotency_cache[idempotency_key]
+            if prior_request_fingerprint != request_fingerprint:
                 raise KernelContractError("idempotency_key_reused_with_different_payload")
+            if prior_authority_fingerprint != authority_fingerprint:
+                raise KernelContractError(
+                    "idempotency_key_reused_with_different_authority_context"
+                )
             return prior_decision
 
         effect = "deny"
@@ -274,5 +314,9 @@ class CHLOMReferenceEngine:
             verified_approvals=verified_approvals,
         )
         if strict_v1:
-            self._idempotency_cache[idempotency_key] = (fingerprint, decision)
+            self._idempotency_cache[idempotency_key] = (
+                request_fingerprint,
+                authority_fingerprint,
+                decision,
+            )
         return decision
