@@ -186,72 +186,55 @@ def self_test(policy: dict[str, Any]) -> None:
         {"agent_id": "ct.relay.agent-c", "vote": "approve"},
         {"agent_id": "ct.relay.agent-d", "vote": "approve"},
     ]
-    ok = decide({
-        "risk_class": "D1", "scores": common_scores, "votes": four_yes,
-        "changed_domains": [], "specialist_endorsements": [], "hard_blocks": []
-    }, policy)
+
+    def packet(changed_domains: list[str], endorsements: list[str], risk_class: str = "D2") -> dict[str, Any]:
+        return {
+            "risk_class": risk_class,
+            "scores": common_scores,
+            "votes": four_yes,
+            "changed_domains": changed_domains,
+            "specialist_endorsements": endorsements,
+            "hard_blocks": [],
+        }
+
+    ok = decide(packet([], [], "D1"), policy)
     assert ok["agent_auto_merge_authorized"] is True
     assert ok["minimum_approvals"] == 4
 
     three_yes = decide({
-        "risk_class": "D1", "scores": common_scores, "votes": four_yes[:3],
-        "changed_domains": [], "specialist_endorsements": [], "hard_blocks": []
+        **packet([], [], "D1"),
+        "votes": four_yes[:3],
     }, policy)
     assert three_yes["agent_auto_merge_authorized"] is False
 
-    security_without_specialist = decide({
-        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["security"], "specialist_endorsements": [], "hard_blocks": []
-    }, policy)
-    assert security_without_specialist["agent_auto_merge_authorized"] is False
-    assert "security" in security_without_specialist["missing_specialists"]
+    registry = policy.get("specialist_activation", {})
+    assert isinstance(registry, dict) and len(registry) == 9
+    for specialist_key, config in registry.items():
+        endorsement_id = normalize_domain(config["endorsement_id"])
+        missing = decide(packet([specialist_key], []), policy)
+        assert missing["agent_auto_merge_authorized"] is False
+        assert endorsement_id in missing["missing_specialists"], specialist_key
+        endorsed = decide(packet([specialist_key], [endorsement_id]), policy)
+        assert endorsed["agent_auto_merge_authorized"] is True, specialist_key
 
-    blockchain_partial = decide({
-        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["blockchain"], "specialist_endorsements": ["security"], "hard_blocks": []
-    }, policy)
-    assert blockchain_partial["agent_auto_merge_authorized"] is False
-    assert "blockchain_protocol" in blockchain_partial["missing_specialists"]
-
-    blockchain_full = decide({
-        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["blockchain"],
-        "specialist_endorsements": ["security", "blockchain_protocol"], "hard_blocks": []
-    }, policy)
-    assert blockchain_full["agent_auto_merge_authorized"] is True
-
-    ip_partial = decide({
-        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["rights"], "specialist_endorsements": ["legal_regulatory"], "hard_blocks": []
-    }, policy)
-    assert ip_partial["agent_auto_merge_authorized"] is False
-    assert "ip_rights_licensing" in ip_partial["missing_specialists"]
-
-    finance_without_specialist = decide({
-        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["tax"], "specialist_endorsements": [], "hard_blocks": []
-    }, policy)
-    assert finance_without_specialist["agent_auto_merge_authorized"] is False
-    assert "finance_tax_treasury" in finance_without_specialist["missing_specialists"]
-
-    consumer_without_specialist = decide({
-        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["accessibility"], "specialist_endorsements": [], "hard_blocks": []
-    }, policy)
-    assert consumer_without_specialist["agent_auto_merge_authorized"] is False
-    assert "accessibility_consumer_protection" in consumer_without_specialist["missing_specialists"]
-
-    regional_without_specialist = decide({
-        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["localization"], "specialist_endorsements": [], "hard_blocks": []
-    }, policy)
-    assert regional_without_specialist["agent_auto_merge_authorized"] is False
-    assert "regional_global_localization" in regional_without_specialist["missing_specialists"]
+    cross_domain_cases = [
+        ("rights", {"legal_regulatory", "ip_rights_licensing"}),
+        ("blockchain", {"security", "blockchain_protocol"}),
+        ("privacy", {"security", "legal_regulatory"}),
+        ("royalty", {"legal_regulatory", "finance_tax_treasury"}),
+        ("cross-border", {"legal_regulatory", "regional_global_localization"}),
+        ("settlement", {"blockchain_protocol", "finance_tax_treasury"}),
+    ]
+    for changed_domain, expected in cross_domain_cases:
+        result = decide(packet([changed_domain], []), policy)
+        assert expected.issubset(set(result["required_specialists"])), changed_domain
+        assert result["agent_auto_merge_authorized"] is False
+        satisfied = decide(packet([changed_domain], sorted(result["required_specialists"])), policy)
+        assert satisfied["agent_auto_merge_authorized"] is True, changed_domain
 
     d3 = decide({
-        "risk_class": "D3", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["legal"], "specialist_endorsements": ["legal_regulatory"],
-        "hard_blocks": [], "human_authorized": False
+        **packet(["legal"], ["legal_regulatory"], "D3"),
+        "human_authorized": False,
     }, policy)
     assert d3["agent_auto_merge_authorized"] is False
 
@@ -264,7 +247,7 @@ def main() -> int:
     policy = load_json(MANIFEST)
     if args.self_test:
         self_test(policy)
-        print("Agent-sovereign merge-decision self-test passed: 75% quorum is 4/5; all registered specialist gates enforce; D3 cannot auto-merge.")
+        print("Agent-sovereign merge-decision self-test passed: 75% quorum is 4/5; nine registered specialist gates and cross-domain overlaps enforce; D3 cannot auto-merge.")
         return 0
     if not args.packet:
         parser.error("--packet is required unless --self-test is used")
