@@ -1,19 +1,37 @@
 # Phase 3 Readiness Gate Amendment — CT-ADR-GOV-011
 
-**Effective:** 2026-08-18  
+**Effective:** 2026-08-19  
 **Current state:** `blocked_pending_phase_2_99_hard_exit`
 
-This amendment changes one repository-governance dependency in the Phase 3 Readiness Gate while preserving every other hard gate and now incorporates the GitHub Actions runtime/supply-chain gate.
+This amendment preserves CrownThrive's agent-sovereign authority model, keeps GitHub subordinate to institutional authority, and makes the GitHub `main` merge perimeter a required Phase 2.99 hard-exit / Phase 3 hard-entry control.
 
-## Superseded repository-provider dependency
+## GitHub authority boundary
 
-Earlier S106-era gate language treated effective GitHub `main` branch/ruleset required-check enforcement and a provider-level blocked-failing-check test as a Phase 2.99 hard-exit and Phase 3-entry requirement.
+GitHub branch protection and rulesets are not CrownThrive's sovereign authority. CT-ADR-GOV-011 remains the authority root: 4-of-5 A/B/C/D/S quorum for eligible D0–D2 promotion, mandatory Agent D approval, risk score at least 85, applicable specialist endorsements, validation/security evidence, rollback/recovery, documentation/downstream reconciliation, and reserved human/qualified-professional authority for D3.
 
-Under `CT-ADR-GOV-011`, that provider-specific requirement is superseded. GitHub branch protection/rulesets are optional defense-in-depth, not CrownThrive's sovereign authority.
+GitHub nevertheless must technically enforce the minimum canonical-branch perimeter so a failed or skipped repository control cannot be routinely merged into `main` and published through Mintlify.
 
-## Replacement hard repository-governance requirement
+## GitHub main merge perimeter is a Phase 3 hard-entry dependency
 
-Before Phase 3 entry, CrownThrive's provider-independent repository governance must prove:
+Before Phase 3 entry, provider evidence must show that canonical `main` requires:
+
+- pull requests before merge;
+- the stable required status context `CrownThrive governed merge gate`;
+- strict/current-with-`main` status-check enforcement;
+- force pushes blocked;
+- branch deletion blocked;
+- routine admin bypass disabled;
+- bypass limited to explicit D3 break-glass authority with evidence and post-event revalidation.
+
+The target machine source is `developers/manifests/github-main-enforcement-target.v1.json`.
+
+The `Documentation Governance`, `Security Governance`, and `Governed Merge Gate` workflows must emit on every pull request. This prevents a required check from remaining permanently pending because a path filter skipped the workflow.
+
+The current provider observation remains `branch_protected=false` / required checks off. Therefore this gate is **not yet satisfied**. PR #64 is the bootstrap packet that installs the always-run merge-gate substrate. Provider configuration must be enabled after that bootstrap is merged, then independently re-read from GitHub and recorded as provider evidence.
+
+## Remaining repository-governance requirements
+
+Before Phase 3 entry, CrownThrive must also prove:
 
 - registered five-agent voter identities;
 - deterministic 75% quorum = four of five affirmative votes;
@@ -36,8 +54,6 @@ Before Phase 3 entry, CrownThrive's provider-independent repository governance m
 - documentation impact and downstream Phase 3–10 propagation;
 - post-merge `main` revalidation retained as defense-in-depth.
 
-GitHub's actual branch-protection state must still be recorded accurately. The absence of GitHub protection alone does not fail this gate; a violation of the CrownThrive agent policy or the GitHub Actions runtime/supply-chain policy does.
-
 ## GitHub Actions runtime gate
 
 The governing machine source is `developers/manifests/github-actions-runtime-policy.v1.json` and its deterministic validator is `scripts/validate_github_actions_runtime_policy.py`.
@@ -52,4 +68,12 @@ This amendment does not mark Phase 2.99 complete and does not satisfy Phase 3 en
 
 ## Acceptance evidence
 
-The repository-governance portion of Phase 3 readiness can pass only when the machine manifests, validators, security workflow, GitHub Actions runtime policy, relay configuration, quorum/risk decision engine and independent validation all agree. A prose declaration alone is insufficient.
+The repository-governance portion of Phase 3 readiness passes only when:
+
+1. the machine manifests and validators agree;
+2. the always-run workflows pass on representative PRs;
+3. GitHub provider state independently confirms the target `main` ruleset/protection;
+4. a failing required-check condition is demonstrably blocked from merge, or equivalent provider evidence proves the same enforcement;
+5. the result is independently verified by the sovereign relay.
+
+A prose declaration or successful CI run alone is insufficient.
