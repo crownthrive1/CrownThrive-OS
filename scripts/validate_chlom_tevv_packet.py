@@ -84,14 +84,16 @@ def main() -> int:
 
     if packet.get("packet_id") != "ct.packet.chlom.cell.tevv.invariants-v1":
         fail("Cell 08 packet ID drifted")
-    if packet.get("packet_version") != "1.1.0":
-        fail("Cell 08 packet must remain remediation-aware version 1.1.0")
+    if packet.get("packet_version") != "1.1.1":
+        fail("Cell 08 packet must remain closure-evidence version 1.1.1")
     if packet.get("cell_id") != "ct.chlom.cell.tevv" or packet.get("issue") != 75:
         fail("Cell 08 ownership drifted")
     if packet.get("parent_pr") != 67 or packet.get("stacked_on_pr") != 82:
         fail("Cell 08 stack/parent relationship drifted")
     if packet.get("tested_kernel_head") != "30d7b49bf6b01d6d094f62fa357dd31647ef078a":
         fail("Cell 08 tested kernel head drifted")
+    if packet.get("tevv_revalidation_head") != "396d69fefb43fee447644a4f7e65e1c5cf336916":
+        fail("Cell 08 revalidation evidence head drifted")
     if packet.get("risk_class") != "D2":
         fail("TEVV packet must remain D2")
     if set(packet.get("required_specialists", [])) != {
@@ -116,6 +118,7 @@ def main() -> int:
         fail("Known TEVV findings were removed instead of adjudicated")
 
     unresolved_high = []
+    resolved_high = []
     for finding_id in (
         "ct.finding.tevv.authority-approval-self-assertion",
         "ct.finding.tevv.restricted-evidence-reference-unsanitized",
@@ -131,8 +134,10 @@ def main() -> int:
         elif status == "resolved":
             if item.get("blocking") is not False:
                 fail(f"resolved {finding_id} cannot remain marked blocking")
-            if not item.get("closure_evidence"):
-                fail(f"resolved {finding_id} requires closure_evidence")
+            closure = str(item.get("closure_evidence", ""))
+            if "32221488101" not in closure or "95972654206" not in closure or "396d69f" not in closure:
+                fail(f"resolved {finding_id} requires exact TEVV run/job/head closure evidence")
+            resolved_high.append(item)
         else:
             fail(f"unsupported finding lifecycle state for {finding_id}: {status!r}")
 
@@ -140,10 +145,28 @@ def main() -> int:
     if medium.get("severity") != "medium" or medium.get("status") != "open":
         fail("policy-bundle trust gap must remain an explicit open medium finding")
 
+    revalidation = packet.get("revalidation", {})
+    if revalidation.get("original_high_vectors_changed") is not False:
+        fail("Original HIGH acceptance vectors must not be weakened")
+    if revalidation.get("original_high_vectors_rerun_passed") is not True:
+        fail("Resolved HIGH findings require original vector rerun PASS")
+    if revalidation.get("native_tests_passed") != 16 or revalidation.get("invariant_vectors_defined") != 17:
+        fail("Cell 08 exact revalidation test/vector counts drifted")
+    for key in (
+        "full_cell_08_ci_passed_on_revalidation_head",
+        "full_parent_chlom_validation_passed_on_revalidation_head",
+        "security_governance_passed_on_revalidation_head",
+        "documentation_governance_passed_on_revalidation_head",
+    ):
+        if revalidation.get(key) is not True:
+            fail(f"Resolved HIGH findings require {key}=true")
+
     if unresolved_high:
         if packet.get("promotion_state") != "blocked_pending_exact_head_tevv_revalidation_and_parent_sequence":
             fail("promotion state must remain blocked while high findings await revalidation")
     else:
+        if len(resolved_high) != 2:
+            fail("both original HIGH findings must be explicitly resolved")
         if packet.get("promotion_state") != "high_findings_resolved_parent_sequence_and_medium_policy_gap_remain":
             fail("promotion state must record resolved highs without erasing remaining parent/medium gates")
 
@@ -151,8 +174,8 @@ def main() -> int:
         fail("Cell 08 may not open Phase 3")
 
     print("CHLOM Cell 08 TEVV packet validation passed.")
-    print(f"Invariant vectors: {len(vectors)}; unresolved critical/high findings: {len(unresolved_high)}.")
-    print("Finding lifecycle is fail-closed; resolution requires closure evidence and cannot weaken vectors.")
+    print(f"Invariant vectors: {len(vectors)}; unresolved critical/high findings: {len(unresolved_high)}; resolved high findings: {len(resolved_high)}.")
+    print("Finding lifecycle is fail-closed; resolution requires exact closure evidence and cannot weaken vectors.")
     print("Backends remain non-authoritative until invariant-equivalence and adoption gates pass.")
     return 0
 
