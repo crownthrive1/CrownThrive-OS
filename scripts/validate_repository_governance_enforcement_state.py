@@ -45,20 +45,22 @@ def main() -> int:
     target = json.loads(text(TARGET))
     actions = json.loads(text(ACTIONS_POLICY))
     expected = {
-        "manifest_version": "1.2.0",
+        "manifest_version": "1.3.0",
         "manifest_id": "ct.manifest.repository-governance-enforcement.v1",
         "source_id": "S106",
         "phase": "2.99",
         "repository": "crownthrive1/CrownThrive-Support",
         "branch": "main",
-        "current_state": "always_run_pr_gates_bootstrapped_provider_main_enforcement_pending",
-        "merge_gate_enforced": False,
-        "github_merge_gate_enforced": False,
+        "canonical_main_sha": "1a07a8755e3b18d01ec6720ec2522b1727780c01",
+        "bootstrap_pr": 64,
+        "current_state": "ruleset_enforcement_behavior_verified_machine_reconciled",
+        "merge_gate_enforced": True,
+        "github_merge_gate_enforced": True,
         "agent_merge_policy": "fail_closed_quorum_and_validation",
         "github_branch_protection_required_for_phase_3": True,
         "policy_transition_enforcement": "agent_sovereign_plus_required_provider_merge_perimeter",
         "docs_impact": "docs_updated",
-        "phase_3_entry_effect": "blocked_until_github_main_required_check_enforcement_is_enabled_and_provider_verified; all_other_phase_2_99_hard_exit_requirements_remain_binding",
+        "phase_3_entry_effect": "github_main_perimeter_verified; all_other_phase_2_99_hard_exit_requirements_remain_binding",
     }
     for key, value in expected.items():
         if data.get(key) != value:
@@ -77,16 +79,47 @@ def main() -> int:
         fail("Stable governed merge job context drifted")
 
     observed = data.get("observed_enforcement", {})
-    if observed.get("branch_protected") is not False:
-        fail("Current S106 observation must remain branch_protected=false until provider activation is verified")
+    if observed.get("branch_protected") is not True:
+        fail("Current branch observation must remain protected=true while the verified ruleset is active")
     if observed.get("classic_branch_protection_enabled") is not False:
-        fail("Current S106 observation must remain classic_branch_protection_enabled=false")
-    if observed.get("required_status_checks_enforcement") != "off":
-        fail("Current S106 observation must remain required_status_checks_enforcement=off")
-    if observed.get("required_contexts") != [] or observed.get("required_checks") != []:
-        fail("Current observation must not fabricate required contexts/checks")
+        fail("Classic branch protection observation must remain false and distinct from ruleset enforcement")
+    if observed.get("classic_required_status_checks_enforcement") != "off":
+        fail("Classic required-status API view must remain explicitly off unless separately observed otherwise")
+    if observed.get("classic_required_contexts") != [] or observed.get("classic_required_checks") != []:
+        fail("Classic branch-protection view must not fabricate required contexts/checks")
     if observed.get("ruleset_inventory") != "not_directly_enumerated_by_current_connector":
         fail("Ruleset inventory uncertainty must remain explicit")
+    ruleset_config = observed.get("ruleset_configuration_evidence", {})
+    for key in (
+        "pull_request_required",
+        "strict_up_to_date_with_main",
+    ):
+        if ruleset_config.get(key) is not True:
+            fail(f"Ruleset configuration evidence missing required true predicate: {key}")
+    if ruleset_config.get("required_status_context") != "CrownThrive governed merge gate":
+        fail("Ruleset required status context drifted")
+    if ruleset_config.get("force_pushes_allowed") is not False or ruleset_config.get("branch_deletion_allowed") is not False:
+        fail("Ruleset evidence must preserve force-push and deletion blocking")
+    if ruleset_config.get("routine_bypass_disabled") is not True:
+        fail("Routine ruleset bypass must remain disabled")
+    if ruleset_config.get("bypass_authority") != "explicit_D3_break_glass_only":
+        fail("Ruleset bypass authority must remain D3 break-glass only")
+
+    behavioral = observed.get("ruleset_behavioral_evidence", {})
+    if behavioral.get("evidence_state") != "passed":
+        fail("Ruleset behavioral proof must be passed")
+    if behavioral.get("disposable_pr") != 93:
+        fail("Ruleset behavioral proof PR drifted")
+    if behavioral.get("required_job") != "CrownThrive governed merge gate":
+        fail("Behavioral proof required job drifted")
+    if behavioral.get("required_job_conclusion") != "failure":
+        fail("Behavioral proof must demonstrate a deliberately failing required job")
+    if behavioral.get("provider_mergeable_state") != "blocked":
+        fail("Behavioral proof must preserve provider mergeable_state=blocked")
+    if behavioral.get("git_graph_mergeable") is not True:
+        fail("Behavioral proof must distinguish Git graph mergeability from provider gate blocking")
+    if behavioral.get("closed_without_merge") is not True:
+        fail("Behavioral test PR must be closed without merge")
 
     agent = data.get("agent_policy", {})
     if agent.get("decision_id") != "CT-ADR-GOV-011":
@@ -136,19 +169,52 @@ def main() -> int:
     if destination.get("bypass_authority") != "explicit_D3_break_glass_only":
         fail("Bypass authority must remain explicit D3 break-glass only")
 
+    if target.get("manifest_version") != "1.1.0":
+        fail("GitHub main target manifest version drifted")
     if target.get("manifest_id") != "ct.manifest.github-main-enforcement-target.v1":
         fail("Missing or invalid GitHub main enforcement target manifest")
-    if target.get("activation_state") != "pending_provider_admin_configuration_after_bootstrap_merge":
-        fail("Provider activation state drifted")
-    if target.get("phase_2_99_exit") != "blocking_until_provider_enforcement_verified":
-        fail("GitHub provider perimeter must block Phase 2.99 exit until verified")
-    if target.get("phase_3_entry") != "blocked_until_provider_enforcement_verified":
-        fail("GitHub provider perimeter must block Phase 3 entry until verified")
+    if target.get("activation_state") != "ruleset_enforced_behavior_verified":
+        fail("Provider activation must remain ruleset_enforced_behavior_verified")
+    if target.get("bootstrap_pr") != 64 or target.get("bootstrap_merge_sha") != "1a07a8755e3b18d01ec6720ec2522b1727780c01":
+        fail("Bootstrap PR/merge evidence drifted")
+    if target.get("phase_2_99_exit") != "github_main_perimeter_predicate_passed_other_hard_exit_requirements_remain":
+        fail("GitHub perimeter may pass only while other Phase 2.99 hard-exit requirements remain independently binding")
+    if target.get("phase_3_entry") != "github_main_perimeter_passed_but_phase3_still_blocked_pending_all_phase_2_99_hard_exit":
+        fail("Phase 3 must remain blocked by the full Phase 2.99 hard-exit contract")
     target_required = target.get("required_target", {})
     if target_required.get("required_status_check", {}).get("job") != "CrownThrive governed merge gate":
         fail("GitHub target required job drifted")
     if target_required.get("required_status_check", {}).get("must_emit_on_every_pull_request") is not True:
         fail("Required GitHub check must emit on every PR")
+    if target_required.get("required_status_check", {}).get("strict_up_to_date_with_main") is not True:
+        fail("Required GitHub check must remain strict/current-with-main")
+    if target_required.get("force_pushes_allowed") is not False or target_required.get("branch_deletion_allowed") is not False:
+        fail("GitHub target must block force pushes and deletion")
+    if target_required.get("administrative_routine_bypass") is not False or target_required.get("bypass_mode") != "explicit_d3_break_glass_only":
+        fail("GitHub target routine bypass must remain disabled with D3 break-glass only")
+
+    provider = target.get("provider_evidence", {})
+    test = provider.get("behavioral_negative_test", {})
+    if test.get("state") != "passed" or test.get("provider_mergeable_state") != "blocked":
+        fail("GitHub target behavioral negative proof must remain passed/blocked")
+    if test.get("required_job") != "CrownThrive governed merge gate" or test.get("required_job_conclusion") != "failure":
+        fail("GitHub target behavioral proof must preserve exact failing required job")
+    if test.get("test_branch_closed_without_merge") is not True:
+        fail("GitHub target behavioral test PR must remain closed without merge")
+    predicates = target.get("required_provider_evidence", {})
+    required_predicates = {
+        "branch_protected_true",
+        "pull_request_required",
+        "governed_merge_gate_context_required",
+        "strict_branch_update_required",
+        "force_push_blocked",
+        "branch_deletion_blocked",
+        "routine_bypass_disabled",
+        "d3_break_glass_only",
+        "blocked_failing_check_test_or_equivalent_provider_evidence",
+    }
+    if set(predicates) != required_predicates or any(value != "passed" for value in predicates.values()):
+        fail("All GitHub main-perimeter provider predicates must be explicitly passed")
 
     forbidden = set(data.get("forbidden_promotions", []))
     for item in {
@@ -159,6 +225,16 @@ def main() -> int:
     }:
         if item not in forbidden:
             fail(f"Missing forbidden promotion: {item}")
+
+    limitations = set(data.get("known_provider_visibility_limitations", []))
+    for item in {
+        "classic_branch_protection_subobject_reports_off_no_contexts_while_ruleset_based_protection_is_active",
+        "ruleset_inventory_not_directly_enumerated_by_current_connector",
+        "codeql_alert_inventory_unavailable_to_current_audit_surface",
+        "secret_scanning_push_protection_inventory_unavailable_to_current_audit_surface",
+    }:
+        if item not in limitations:
+            fail(f"Missing provider visibility limitation: {item}")
 
     if actions.get("status") != "active_fail_closed" or actions.get("target_runtime") != "node24":
         fail("Repository runtime gate must remain active and Node 24")
@@ -216,10 +292,10 @@ def main() -> int:
     require(RUNTIME_STANDARD, "Dependabot")
 
     print("Repository governance state validation passed.")
-    print("GitHub observed branch protection: false; provider merge gate: pending activation after bootstrap merge.")
-    print("Always-run governed merge status context: CrownThrive governed merge gate.")
+    print("GitHub main: protected by ruleset evidence; classic branch-protection API remains separately observed as off/no contexts.")
+    print("Behavioral negative proof: exact CrownThrive governed merge gate failure produced provider mergeable_state=blocked.")
     print("Sovereign merge policy: CrownThrive agent fail-closed quorum + validation + reserved D3 human authority.")
-    print("Phase 3: blocked until GitHub main required-check enforcement is enabled and provider-verified, plus all other Phase 2.99 hard-exit gates.")
+    print("Phase 3: GitHub main perimeter predicate passed; all other Phase 2.99 hard-exit gates remain binding.")
     return 0
 
 
