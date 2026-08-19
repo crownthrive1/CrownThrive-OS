@@ -44,22 +44,25 @@ contract_verified: true
 base_url_verified_from_openapi: true
 auth_header_names_verified: true
 server_side_vault_bridge: active
-runtime_version: 2
+runtime_version: 3
 write_gate: closed
-screenshot_credential_transcription: attempted_not_character_certified
-live_project_meta_attempt:
-  reached_provider: true
-  http_status: 401
-  interpretation: supplied_screenshot_text_could_not_be_transcribed_character_exactly
-live_authenticated_read_test: blocked_pending_exact_secure_credential_binding
-live_authenticated_write_test: not_attempted
+credential_exact_match: passed
+project_meta_authentication: passed
+institutional_project_uid: passed
+approved_field_map: passed
+authenticated_project_read: passed
+bounded_write_readback: passed
+webhook_ui_configuration: passed
+webhook_receiver_local_contract: passed
+webhook_sender_delivery_integrity: blocked
+credential_source_precedence_policy: open
+canonical_certification: 6_of_7
+hard_exit_gate: CT-P299-GATE-006
 ```
 
-The founder clarified that the **SuitePro Collab Portal Public ID and Default Secure API key shown in the Secure API account panel are the intended Collab Portal credentials**; the previously discussed OpenAI project key is unrelated to Secure API authentication. A server-side Vault path now exists, so production values no longer need to enter Git, Mintlify, email or function source.
+The earlier screenshot-transcription `401` is preserved as historical troubleshooting evidence only. Exact founder-supplied Collab Portal credentials were later bound through governed runtime secret storage and independently authenticated against provider reads. The pinned institutional project UID, approved safe field map, authenticated project read and a founder-authorized bounded status update with readback are now certified.
 
-A read-only certification call reached `GET /project/meta` and returned HTTP `401` because at least one character transcribed from the low-resolution screenshot could not be certified exactly. This is evidence of a **credential-transcription failure**, not evidence that the actual SuitePro credential shown in the portal is invalid. Do not brute-force screenshot variants. Bind the exact copied Public ID and Default key through the secure Vault path, then repeat the read-only test.
-
-Write authority remains closed until exact credential binding, project metadata, stable project UID and read-only verification pass.
+The bounded write certifier has since been retired from both exposed execution paths. Overall provider writes remain closed outside separately governed D2-safe experiments. A new security reconciliation item is open because the active PM runtime still permits environment-variable credentials before the Vault bridge; Security must prove the effective source and reconcile precedence with the current Vault-ingestion policy without rotating credentials.
 
 ## Verified endpoint surface
 
@@ -243,74 +246,77 @@ No OpenAI or Collab Portal production secret belongs in CrownThrive-Support Git 
 
 ## Secure adapter runtime
 
-A server-side runtime exists in the connected CrownThrive Supabase project as Edge Function `collab-portal-pm` **version 2**. Version 2 adds a Supabase Vault bridge so credentials can be bound server-side without entering public source or depending on an unavailable environment-secret setter.
+A server-side runtime exists in the connected CrownThrive Supabase project as Edge Function `collab-portal-pm` **version 3**. It remains JWT-protected and read-first. Exact credential binding, authenticated project discovery and bounded-write/readback certification have passed, while the general write gate remains closed.
 
 ```yaml
 runtime_provider: Supabase Edge Functions
 function: collab-portal-pm
-runtime_version: 2
-runtime_state: active_vault_capable_read_certification_blocked_on_exact_credential_copy
+runtime_version: 3
+runtime_state: active_read_verified_write_gate_closed
 caller_authentication: Supabase JWT required
 collab_portal_credentials_in_source: false
 secret_sources:
   - environment_when_managed_out_of_band
   - supabase_vault_service_role_bridge
-vault_function: public.get_runtime_secret
-vault_function_public_execute: revoked
+secret_source_precedence_review: open
 write_gate_default: closed
 allowed_read_actions:
   - health
   - project_meta
   - list_projects
   - find_project
-conditional_write_action:
-  - update_project_status
-conditionally_allowed_fields:
+approved_bounded_write_fields:
   - status
   - info_description
-  - project_custom_fields
 read_before_write: required
 read_after_write: required
 unknown_outcome_blind_retry: prohibited
+bounded_write_certifier: retired_http_410
+webhook_live_certifier: retired_http_410
 ```
 
-The runtime resolves `COLLAB_PORTAL_PUBLIC_ID`, `COLLAB_PORTAL_SECRET_KEY` and `COLLAB_PORTAL_ALLOW_WRITE` from server-side configuration. If environment values are absent it can read named Supabase Vault secrets through a service-role-only bridge. Raw values are not returned by health state, written to Git/Mintlify or placed in project-manager logs.
+Raw credential values are not returned by health state, written to Git/Mintlify or placed in operational evidence. The active runtime can still resolve an environment-provided value before falling back to Vault; this precedence is now an explicit security-review item rather than silently assumed compliant.
 
-A separate internal read-certifier reaches the SuitePro API using Vault values without exposing them to the caller. The first `GET /project/meta` certification attempt reached the provider and returned `401`. Because the source values were manually transcribed from a low-resolution screenshot, this result is classified as `screenshot_transcription_auth_failed`, not `provider_credential_invalid`. The exact copied Public ID and Default key must replace the screenshot transcription before the certification can advance.
-
-`COLLAB_PORTAL_ALLOW_WRITE` remains false. No production PUT has been attempted. A temporary bootstrap certification function created during runtime testing was immediately retired to a JWT-protected `410 disabled` endpoint after the internal certifier became available.
+The founder-authorized bounded project-status certification succeeded with provider HTTP `200` and authenticated readback. Provider normalization of the tested status value was captured as the canonical observed mapping. The one-shot bounded-write certifier and live webhook certifier are now retired as non-dispatching `410` stubs so certification logic cannot become a reusable mutation path.
 
 ## Webhook state
 
-Current first-party Collab Portal UI evidence now verifies configurable outbound webhook endpoints and a Projects event family with separate **Project Created**, **Project Updated** and **Project Deleted** toggles. The template builder permits selectable payload fields.
+Current first-party Collab Portal UI evidence verifies **two configured outbound webhook endpoint families**. Projects is configured for Project Created/Updated/Deleted; Billing is configured for Subscription Created/Canceled/Expired/Unpaid. Configuration evidence is separate from actual delivery evidence.
 
-A Project Created preview exposes project identity/state/timing fields, staff/client-facing information, business/economic fields, client/secondary-client/team/leader assignments and `project_custom_fields`. The preview displays a UUID-like `project_uid`, but `project_name` and several other fields are null; therefore the preview UID is a sample/preview value until authenticated project lookup proves it belongs to a real named CrownThrive project.
-
-Current state:
+The current Supabase receiver topology is intentionally split and fail-closed:
 
 ```yaml
 source_id: S102
-webhook_capability_verified_from_current_ui: true
-webhook_endpoint_configuration_ui_verified: true
-webhook_event_families:
-  billing: ui_verified
-  projects: ui_verified
-project_events_verified:
-  - Project Created
-  - Project Updated
-  - Project Deleted
-project_payload_selector_verified: true
-project_created_preview_payload_observed: true
-project_preview_uid_is_institutional_project_uid: unverified
-webhook_signing_verified: false
-webhook_retry_delivery_contract_verified: false
-webhook_replay_contract_verified: false
-webhook_receiver_implemented: false
+provider_ui_configuration: passed
+projects_receiver:
+  function: collab-portal-webhook-projects
+  version: 2
+  sender_verifier: vault_backed_token_verifier
+  body_limit: 64_KiB_streaming_pre_read
+  event_allowlist: [Project Created, Project Updated, Project Deleted]
+  pinned_project_uid_required: true
+  raw_payload_retained: false
+billing_receiver:
+  function: collab-portal-webhook-billing
+  version: 2
+  sender_verifier: vault_backed_token_verifier
+  body_limit: 64_KiB_streaming_pre_read
+  event_allowlist: [Subscription Created, Subscription Canceled, Subscription Expired, Subscription Unpaid]
+  raw_payload_retained: false
+legacy_generic_receiver:
+  version: 2
+  state: retired_http_410
+local_idempotency_contract: passed_synthetic_only
+provider_live_callback_observed: false
+provider_retry_contract_verified: false
+provider_replay_contract_verified: false
+webhook_sender_delivery_integrity: blocked
+canonical_sync_source: authenticated_provider_readback
 ```
 
-This materially advances the event-driven lane without certifying it. No signature header/secret, delivery-attempt identifier, retry schedule, replay mechanism, timeout policy or dead-letter behavior is proven by the screenshots. A production receiver must fail closed until sender authentication/integrity is established and idempotency/replay behavior is tested.
+Receiver mechanics are stronger than the earlier screenshot-only state: strict event envelopes, sender verifier material in Vault, streaming body bounds, duplicate detection and raw-payload non-retention are implemented. The historical generic receiver is retired. Two receipts in the receipt ledger are from the earlier local synthetic Project Updated test; they prove acceptance/deduplication mechanics only and are **not** provider-delivery proof.
 
-Until then, hourly authenticated reads/project-status projection remain the reconciliation fallback; Project Created/Updated/Deleted events become eligible only after the receiver and sender-integrity contract pass certification.
+A reversible founder-authorized Project Updated provider probe was observed on the provider side, but no callback arrived at the configured Projects receiver. Therefore configuration is proven while sender delivery, retry/replay and dead-letter/unknown-outcome behavior remain unproven. Event-driven synchronization stays closed and authenticated polling/readback remains the reconciliation fallback. `CT-P299-GATE-006` remains `6_of_7`, not passed.
 
 ## Phase 2.99 hard checkpoint
 
