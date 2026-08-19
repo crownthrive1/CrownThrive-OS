@@ -72,19 +72,40 @@ Negative tests prove that `scripts/governed_merge_decision.py` cannot be classif
 
 Independent Agent-S review then found a deeper trust-boundary gap: the packet's `changed_files` list itself was still caller/program supplied. Even with perfect per-file classification, an omitted sensitive file could therefore disappear before specialist activation.
 
-The current head repairs that root cause:
+The current lineage repairs that root cause:
 
 - every D1/D2/D3 decision requires a trusted changed-file set derived from an **exact 40-hex Git base SHA and exact 40-hex Git head SHA**;
 - packet `changed_files` must exactly equal the trusted Git diff set; omitted or extra paths fail closed with `changed_files_trusted_diff_mismatch`;
 - a material packet without a trusted Git file set fails closed with `trusted_changed_files_missing`;
 - rename detection is disabled for the trust calculation so a rename is represented as delete + add and a renamed-away sensitive path cannot vanish from classification;
-- the always-run `CrownThrive governed merge gate` now retains the pull-request merge parents (`fetch-depth: 2`) and invokes the merge engine against `github.event.pull_request.base.sha` and `github.event.pull_request.head.sha` to prove the trusted diff path on every pull request;
+- the always-run `CrownThrive governed merge gate` retains the pull-request merge parents (`fetch-depth: 2`) and invokes the merge engine against `github.event.pull_request.base.sha` and `github.event.pull_request.head.sha` to prove the trusted diff path on every pull request;
 - the governance validator requires this workflow binding and the engine's trusted-diff fail-closed markers, preventing a later governance packet from silently deleting the control;
-- the original domain-bypass negatives remain intact, and a new omitted-sensitive-file test proves a packet that lists only a changelog while the trusted Git diff also contains `scripts/governed_merge_decision.py` cannot auto-authorize.
+- the original domain-bypass negatives remain intact, and an omitted-sensitive-file test proves a packet that lists only a changelog while the trusted Git diff also contains `scripts/governed_merge_decision.py` cannot auto-authorize.
 
 Git/provider diff binding is evidence and defense-in-depth, not sovereign authority. A/B/C/D/S voting, Agent-D independence, specialist endorsements, risk threshold, D3 human authority, rollback and documentation/downstream gates remain separately required.
 
-Because this self-heal touches the always-run workflow plus governance decision/validation code, the current D2 specialist set now includes **Security & Privacy + AI/ML/LLM TEVV + Operations/SRE**. All votes on the pre-repair head are stale and fresh exact-head review is mandatory.
+## Provider operational decision-path binding self-heal
+
+Independent B/C/D/S review found that the required provider workflow derived and printed the exact trusted Git set but did not operationally execute current-PR per-file classification and specialist enforcement: `--verify-git-diff` returned success when no decision packet was supplied. Green CI therefore proved Git-diff derivation and synthetic self-tests, not current-PR specialist-path execution.
+
+The current self-heal adds `scripts/governed_current_pr_preflight.py` and executes it inside the required `CrownThrive governed merge gate` using only `github.event.pull_request.base.sha` and `.head.sha` as the trusted file-set source. The preflight:
+
+- derives the exact current PR changed-file set from Git with the existing `--no-renames` trust rule;
+- deterministically classifies every trusted path, using governed manifest path rules first, neutral documentation classification for documentation surfaces, security/agent/deployment classification for otherwise-unmapped governance/code surfaces, and an intentionally conservative all-specialist-domain fallback for other unmapped paths;
+- derives the applicable specialist set from the same governed nine-domain registry used by `decide()`;
+- executes the real `decide()` function against the exact trusted set;
+- carries an immutable `ci_operational_preflight_non_sovereign_authority` hard block so CI can never manufacture a sovereign A/B/C/D/S merge authorization;
+- requires the positive current-PR fixture to have zero classification errors, zero specialist-normalization errors and zero missing specialists while remaining non-authoritative;
+- removes each required specialist one at a time and requires each omission to fail closed;
+- deliberately omits a sensitive trusted file and requires `changed_files_trusted_diff_mismatch`;
+- deliberately removes one per-file classification and requires `unclassified_changed_file`;
+- prints the trusted file digest, derived domains, required specialists and negative-vector evidence for independent review.
+
+This repairs the operational binding gap without importing PR comments into GitHub as sovereign authority. CI validates the current PR's classification/specialist path; sovereign exact-head votes and evidence-backed specialist endorsements remain separate CT-ADR-GOV-011 authority inputs.
+
+Because the self-heal adds one governance preflight script to the packet, the current trusted Git set expands from five to six files. The new script is itself conservatively classified as a security/agent/deployment surface, so the applicable independent specialist set remains **Security & Privacy + AI/ML/LLM TEVV + Operations/SRE** rather than shrinking.
+
+All votes on the prior exact head are stale after this material remediation. Agent A performed this repair and therefore does not self-vote the resulting head. Fresh independent B/C/D/S review is required after exact-head Documentation Governance, Security Governance and Governed Merge Gate rerun.
 
 ## Self-healing and controlled evolution
 
@@ -100,10 +121,10 @@ Validators, findings, evidence or privilege may never be weakened to force a pas
 
 The pre-reconciliation branch was based on pre-PR-64 main and contained noncanonical unanimous-first/deadlock semantics. After PR #64 and PR #95 became canonical and issue #83 closed, the branch was merged forward onto `ee6175f...` without force-pushing or erasing historical lineage. The current proposal starts from the post-Node24/post-provider-perimeter tree and reapplies only bounded specialist/subagent hardening compatible with canonical authority.
 
-Agent-B's exact-head block on `dca9bbda87f4e61436f4b4f42d9f59c2643abebe` is preserved as the trigger evidence for the changed-domain provenance and `security_privacy` compatibility repair. Agent-S's block on `80864b5bdbc1c51757af15e71743460732648d89` is preserved as the trigger evidence for trusted Git-diff binding. Each material head change invalidates earlier votes; fresh exact-head validation, specialist review and A/B/C/D/S voting are required.
+Agent-B's exact-head block on `dca9bbda87f4e61436f4b4f42d9f59c2643abebe` is preserved as the trigger evidence for the changed-domain provenance and `security_privacy` compatibility repair. Agent-S's block on `80864b5bdbc1c51757af15e71743460732648d89` is preserved as the trigger evidence for trusted Git-diff binding. B/C/D/S blocks on `232903a7ee4804b3c11b88d2503c041f88d56c23` are preserved as trigger evidence for the provider operational decision-path binding repair. Each material head change invalidates earlier votes; fresh exact-head validation, specialist review and A/B/C/D/S voting are required.
 
 ## Rollback / impact
 
 Rollback is a normal revert of this packet. No provider, credential, customer, payment, binding rights, production infrastructure, Collab, token/crypto or restricted-evidence mutation is introduced.
 
-Documentation impact: `docs_updated` through this public-safe changelog and the machine governance manifest. Phase 3-10 inherit cumulative specialist activation, fail-closed per-file domain provenance and trusted changed-file Git binding after canonical promotion, but this packet does not itself advance any phase or activate regulated/financial/cryptographic capability.
+Documentation impact: `docs_updated` through this public-safe changelog and the machine governance manifest. Phase 3-10 inherit cumulative specialist activation, fail-closed per-file domain provenance, trusted changed-file Git binding and provider-side current-PR decision-path preflight after canonical promotion, but this packet does not itself advance any phase or activate regulated/financial/cryptographic capability.
