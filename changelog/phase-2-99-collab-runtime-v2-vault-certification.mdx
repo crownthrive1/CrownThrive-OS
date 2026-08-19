@@ -1,0 +1,139 @@
+---
+title: "Phase 2.99 — Collab Portal Runtime v2 & Vault Certification"
+sidebarTitle: "2.99 Collab Runtime v2"
+description: "Advances the SuitePro Collab Portal adapter to a Vault-capable Supabase runtime, records the read-only certification attempt, preserves the screenshot-transcription boundary, and keeps project writes fail-closed pending exact credential and project-field verification."
+icon: "shield-check"
+keywords: ["Phase 2.99", "Collab Portal", "SuitePro", "Supabase Vault", "runtime v2", "project meta", "credential certification", "write gate"]
+---
+
+# Phase 2.99 — Collab Portal Runtime v2 & Vault Certification
+
+## Run identity
+
+```yaml
+phase: 2.99
+lane: collab_portal_external_adapter_certification
+repository_scope: crownthrive1/CrownThrive-Support
+baseline_main: aa637fdf8d4d84c71a35b215552aa4a81c0cd618
+source_ids:
+  - S101
+  - S102
+  - S105
+documentation_impact: docs_updated
+phase_3_entry: blocked_pending_phase_2_99_hard_exit
+```
+
+## What changed
+
+The Collab Portal lane advanced from a deployed but externally unconfigured Edge Function to a **Vault-capable server-side certification runtime**.
+
+The connected CrownThrive Supabase project is active and now contains:
+
+- `collab-portal-pm` version 2;
+- a service-role-only `public.get_runtime_secret(text)` bridge into Supabase Vault;
+- an internal service-role-only read certifier for `project_meta` and project-list requests;
+- the PostgreSQL HTTP extension required for the internal certifier;
+- a write gate that remains closed by default;
+- read-before-write and read-after-write verification for the future bounded project-status mutation.
+
+No raw Collab Portal credential is stored in CrownThrive-Support or Mintlify.
+
+## Credential clarification
+
+Founder clarification resolves a prior semantic mix-up: the OpenAI project key discussed earlier was for the Portal's OpenAI-provider configuration and is **not** the SuitePro Secure API credential.
+
+The intended Secure API credential pair is the **Public ID plus Default Secure API key shown in the SuitePro Collab Portal Secure API account screen**. The separate Locticians-labeled key is not the default CrownThrive Collab Portal key for this adapter lane.
+
+## Read-only certification attempt
+
+A server-side read-only request was executed against:
+
+```text
+GET https://portal.crownthrive.com/secure-api/project/meta
+```
+
+The request reached the provider and returned HTTP `401` with an invalid-header-credential response.
+
+This result is classified as:
+
+```yaml
+network_path: pass
+provider_reached: pass
+auth_contract_headers_sent: pass
+screenshot_transcription: not_character_certified
+authenticated_project_meta: blocked
+classification: screenshot_transcription_auth_failed
+actual_suitepro_default_key_invalid: not_established
+write_attempted: false
+write_gate: closed
+```
+
+The values used for the test were manually read from a low-resolution screenshot. At least one character could not be established reliably. The adapter must **not brute-force plausible screenshot variants** or reclassify the actual provider credential as invalid. The next credential step is a character-exact secure copy into Supabase Vault, outside Git, Mintlify, email and ordinary chat.
+
+## Security hardening
+
+A temporary bootstrap certification function was used only while an internal server-side call path was being established. Once the internal certifier existed, that route was immediately redeployed as JWT-protected and permanently returns `410 disabled`.
+
+The Supabase security advisor was run after the DDL changes. The new Vault bridge did not surface as anonymously executable. Two pre-existing warnings remain for `public.rls_auto_enable()` being callable by `anon` and `authenticated`; they are a separate database-hardening item and were not silently modified during this integration pass.
+
+## Bounded authority
+
+The eventual project mutation remains limited to:
+
+- `status`;
+- `info_description`;
+- `project_custom_fields`.
+
+The following remain outside the PM adapter's default authority:
+
+- client/staff/team assignments;
+- estimated value or other project economics;
+- CRM contact/company mutation;
+- marketing subscription;
+- billing;
+- Worlds assignment;
+- legal/rights records;
+- destructive actions.
+
+## Webhook relationship
+
+`S102` remains current UI evidence for Project Created, Project Updated and Project Deleted webhook configuration. It does not prove sender signing/authentication, retry schedule, replay contract, timeout or dead-letter semantics.
+
+The safest activation sequence remains API read certification first, then one bounded project update/read-back, then inbound webhook certification with sender-integrity and idempotency controls.
+
+## Hard-gate effect
+
+```yaml
+secure_runtime_exists: pass
+vault_secret_path_exists: pass
+write_gate_default_closed: pass
+provider_network_reachability: pass
+exact_secure_credential_copy: open
+authenticated_project_meta: open
+institutional_project_uid: open
+approved_field_id_mapping: open
+bounded_put_readback: open
+webhook_sender_integrity: open
+phase_2_99_hard_exit: not_met
+phase_3_hard_entry: not_met
+```
+
+## Downstream propagation
+
+- **Phase 3:** external-adapter implementation must support private secret references, fail-closed authorization, read-before-write, read-back verification and explicit authentication evidence rather than treating source contracts as deployed access.
+- **Phase 4:** Collab Portal can become an execution-state projection only after the authenticated project identity/field map is certified.
+- **Phase 5:** CRM/marketing and revenue operations remain separate adapters and cannot inherit PM authority.
+- **Phase 6:** partner/developer adapters inherit the same secret-reference and observed-permission certification pattern.
+- **Phase 10:** provider exit/recovery must preserve project/field mappings and reconstruct execution state from the institutional repository if Collab Portal is unavailable.
+
+## Exact next packet
+
+1. bind a character-exact copy of the SuitePro Public ID and Default Secure API key through the secure Vault path;
+2. rerun `GET /project/meta`;
+3. list/find the named CrownThrive institutional project and pin its real UID;
+4. map only approved PM field IDs;
+5. execute authenticated read-only project tests;
+6. enable the write gate only for one bounded status mutation;
+7. immediately read back and compare;
+8. preserve the result as a versioned certification receipt;
+9. keep webhook receiver activation blocked until sender integrity and delivery semantics are proven.

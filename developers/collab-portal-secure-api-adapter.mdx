@@ -37,18 +37,29 @@ Both headers are required by the documented secured operations.
 
 Production credentials must remain server-side. They must not be committed to this public repository, Mintlify, browser JavaScript, screenshots, Gmail, GitHub comments, logs or DAIL payload bodies.
 
-### Credential state
+### Credential and certification state
 
 ```yaml
 contract_verified: true
 base_url_verified_from_openapi: true
 auth_header_names_verified: true
-production_secret_bound_to_agent_runtime: false
-live_authenticated_read_test: pending
-live_authenticated_write_test: pending
+server_side_vault_bridge: active
+runtime_version: 2
+write_gate: closed
+screenshot_credential_transcription: attempted_not_character_certified
+live_project_meta_attempt:
+  reached_provider: true
+  http_status: 401
+  interpretation: supplied_screenshot_text_could_not_be_transcribed_character_exactly
+live_authenticated_read_test: blocked_pending_exact_secure_credential_binding
+live_authenticated_write_test: not_attempted
 ```
 
-Any credential previously exposed in chat or screenshots must be treated as compromised and rotated before production automation.
+The founder clarified that the **SuitePro Collab Portal Public ID and Default Secure API key shown in the Secure API account panel are the intended Collab Portal credentials**; the previously discussed OpenAI project key is unrelated to Secure API authentication. A server-side Vault path now exists, so production values no longer need to enter Git, Mintlify, email or function source.
+
+A read-only certification call reached `GET /project/meta` and returned HTTP `401` because at least one character transcribed from the low-resolution screenshot could not be certified exactly. This is evidence of a **credential-transcription failure**, not evidence that the actual SuitePro credential shown in the portal is invalid. Do not brute-force screenshot variants. Bind the exact copied Public ID and Default key through the secure Vault path, then repeat the read-only test.
+
+Write authority remains closed until exact credential binding, project metadata, stable project UID and read-only verification pass.
 
 ## Verified endpoint surface
 
@@ -232,19 +243,25 @@ No OpenAI or Collab Portal production secret belongs in CrownThrive-Support Git 
 
 ## Secure adapter runtime
 
-A server-side runtime now exists in the connected CrownThrive Supabase project as Edge Function `collab-portal-pm` version 1.
+A server-side runtime exists in the connected CrownThrive Supabase project as Edge Function `collab-portal-pm` **version 2**. Version 2 adds a Supabase Vault bridge so credentials can be bound server-side without entering public source or depending on an unavailable environment-secret setter.
 
 ```yaml
 runtime_provider: Supabase Edge Functions
 function: collab-portal-pm
-runtime_state: active_fail_closed_unconfigured
+runtime_version: 2
+runtime_state: active_vault_capable_read_certification_blocked_on_exact_credential_copy
 caller_authentication: Supabase JWT required
 collab_portal_credentials_in_source: false
-server_side_secret_binding: pending_external_secret_configuration
+secret_sources:
+  - environment_when_managed_out_of_band
+  - supabase_vault_service_role_bridge
+vault_function: public.get_runtime_secret
+vault_function_public_execute: revoked
 write_gate_default: closed
 allowed_read_actions:
   - health
   - project_meta
+  - list_projects
   - find_project
 conditional_write_action:
   - update_project_status
@@ -257,9 +274,11 @@ read_after_write: required
 unknown_outcome_blind_retry: prohibited
 ```
 
-The function reads `COLLAB_PORTAL_PUBLIC_ID` and `COLLAB_PORTAL_SECRET_KEY` only from server-side environment secrets; neither value is embedded in source. `COLLAB_PORTAL_ALLOW_WRITE` defaults false and must be explicitly enabled only after the authenticated read and project/field mapping gates pass. Until the secrets are bound, the runtime deliberately returns a fail-closed unconfigured state rather than attempting production calls.
+The runtime resolves `COLLAB_PORTAL_PUBLIC_ID`, `COLLAB_PORTAL_SECRET_KEY` and `COLLAB_PORTAL_ALLOW_WRITE` from server-side configuration. If environment values are absent it can read named Supabase Vault secrets through a service-role-only bridge. Raw values are not returned by health state, written to Git/Mintlify or placed in project-manager logs.
 
-The current ChatGPT Supabase connector can deploy Edge Functions but does not expose a project-secret write operation. Therefore the runtime is established, but credential binding must occur through an approved Supabase secret-management path outside the public documentation workflow. This is a concrete integration blocker, not an API-design ambiguity.
+A separate internal read-certifier reaches the SuitePro API using Vault values without exposing them to the caller. The first `GET /project/meta` certification attempt reached the provider and returned `401`. Because the source values were manually transcribed from a low-resolution screenshot, this result is classified as `screenshot_transcription_auth_failed`, not `provider_credential_invalid`. The exact copied Public ID and Default key must replace the screenshot transcription before the certification can advance.
+
+`COLLAB_PORTAL_ALLOW_WRITE` remains false. No production PUT has been attempted. A temporary bootstrap certification function created during runtime testing was immediately retired to a JWT-protected `410 disabled` endpoint after the internal certifier became available.
 
 ## Webhook state
 

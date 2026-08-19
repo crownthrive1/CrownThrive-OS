@@ -4,7 +4,8 @@
   "api_id": "ct.api.collab-portal.secure",
   "source_id": "S101",
   "related_source_ids": [
-    "S102"
+    "S102",
+    "S105"
   ],
   "source_snapshot": {
     "openapi_version": "3.0.3",
@@ -21,7 +22,7 @@
     ],
     "secret_storage": "server_side_only",
     "raw_secret_in_repository": false,
-    "production_credential_binding": "pending_rotation_and_secure_binding"
+    "production_credential_binding": "pending_exact_secure_copy"
   },
   "operations": [
     {"method": "GET", "path": "/contact/meta", "class": "crm_read"},
@@ -57,7 +58,7 @@
       "PUT /project/{type}/{identifier}"
     ],
     "write_preconditions": [
-      "rotated production credentials are bound through a server-side secret store",
+      "character-exact production credentials are bound through a server-side secret store",
       "institutional project UID is pinned",
       "account-specific project metadata/custom-field IDs are pinned",
       "current project object is read before mutation",
@@ -109,15 +110,21 @@
   "runtime": {
     "provider": "Supabase Edge Functions",
     "function": "collab-portal-pm",
-    "version": 1,
-    "state": "active_fail_closed_unconfigured",
+    "version": 2,
+    "state": "active_vault_capable_read_certification_blocked_on_exact_credential_copy",
     "caller_authentication": "Supabase JWT required",
     "collab_portal_credentials_in_source": false,
-    "server_side_secret_binding": "pending_external_secret_configuration",
+    "secret_sources": [
+      "managed_environment",
+      "supabase_vault_service_role_bridge"
+    ],
+    "vault_bridge": "verified_service_role_only",
+    "server_side_secret_binding": "vault_path_verified_exact_value_pending",
     "write_gate_default": "closed",
     "allowed_read_actions": [
       "health",
       "project_meta",
+      "list_projects",
       "find_project"
     ],
     "conditional_write_action": "update_project_status",
@@ -128,7 +135,15 @@
     ],
     "read_before_write": true,
     "read_after_write": true,
-    "blind_mutation_retry": false
+    "blind_mutation_retry": false,
+    "read_only_certification_attempt": {
+      "action": "GET /project/meta",
+      "provider_reached": true,
+      "http_status": 401,
+      "classification": "screenshot_transcription_auth_failed",
+      "provider_key_invalid_established": false,
+      "write_attempted": false
+    }
   },
   "rate_limit_evidence": {
     "account_ui_snapshot_monthly_limit": 20000,
@@ -141,13 +156,17 @@
     "some operation security labels are inconsistent and must not be used as the sole least-privilege authority model",
     "mutations with unknown outcome must not be blindly retried",
     "webhook UI capability must not be treated as sender-integrity or production receiver certification",
+    "screenshot-transcribed credentials must not be brute-forced or treated as character-exact",
     "production secrets must never enter public Git history, documentation, email, screenshots or logs"
   ],
   "state": {
     "contract": "verified",
     "base_url": "verified_from_openapi",
     "auth_header_contract": "verified_from_openapi",
+    "secure_runtime": "verified_v2_vault_capable",
+    "vault_binding_path": "verified",
     "production_auth": "pending",
+    "exact_secure_credential_copy": "pending",
     "account_project_meta": "pending",
     "institutional_project_uid": "pending",
     "authenticated_read": "pending",
