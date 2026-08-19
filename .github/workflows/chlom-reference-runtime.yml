@@ -1,0 +1,67 @@
+name: CHLOM Reference Runtime
+
+on:
+  pull_request:
+    paths:
+      - "reference/chlom_runtime/**"
+      - "developers/manifests/chlom-build-cells.v1.json"
+      - "developers/manifests/chlom-upstream-components.v1.json"
+      - "scripts/validate_chlom_build_program.py"
+      - "scripts/generate_chlom_living_status.py"
+      - "chlom/build-program.md"
+      - "chlom/living-docs-runtime-contract.md"
+      - ".github/workflows/chlom-reference-runtime.yml"
+  push:
+    branches:
+      - "admin-mcp/phase-2-99-chlom-builder-cells-reference-kernel"
+    paths:
+      - "reference/chlom_runtime/**"
+      - "developers/manifests/chlom-build-cells.v1.json"
+      - "developers/manifests/chlom-upstream-components.v1.json"
+      - "scripts/validate_chlom_build_program.py"
+      - "scripts/generate_chlom_living_status.py"
+      - "chlom/build-program.md"
+      - "chlom/living-docs-runtime-contract.md"
+      - ".github/workflows/chlom-reference-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-reference-runtime-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate CHLOM executable reference runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Verify CHLOM reference syntax
+        run: |
+          python -m py_compile reference/chlom_runtime/*.py
+          python -m py_compile reference/chlom_runtime/tests/*.py
+          python -m py_compile scripts/validate_chlom_build_program.py
+          python -m py_compile scripts/generate_chlom_living_status.py
+      - name: Run CHLOM reference-runtime unit tests
+        run: python -m unittest reference.chlom_runtime.tests.test_runtime
+      - name: Validate CHLOM builder program
+        run: python scripts/validate_chlom_build_program.py
+      - name: Generate living CHLOM status
+        run: python scripts/generate_chlom_living_status.py --output /tmp/chlom-build-status.md
+      - name: Re-run repository documentation governance
+        run: python scripts/validate_docs.py
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
