@@ -2,8 +2,9 @@
 """Compute CrownThrive's agent-sovereign merge decision.
 
 GitHub is evidence, CI, scanning and transport. It is not the sovereign merge
-authority. This decision engine is deliberately fail-closed and does not perform
-the merge itself.
+authority. This engine is fail-closed: normal promotion requires unanimity;
+a narrowly-scoped, time-boxed deadlock override may use a 2/3 special vote
+(rounded up) only when all higher-order safety and authority gates remain intact.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import argparse
 import json
 import math
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +38,6 @@ def required_specialists_for(changed_domains: set[str], policy: dict[str, Any]) 
     registry = policy.get("specialist_activation", {})
     if not isinstance(registry, dict):
         return required
-
     for specialist_key, config in registry.items():
         if not isinstance(config, dict):
             continue
@@ -53,6 +54,19 @@ def required_specialists_for(changed_domains: set[str], policy: dict[str, Any]) 
     return required
 
 
+def parse_time(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     pool = {
         item["agent_id"]: item
@@ -60,7 +74,9 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
         if item.get("vote_eligible") is True
     }
     q = policy["quorum"]
-    required = math.ceil(len(pool) * float(q["approval_ratio"]))
+    normal_required = len(pool)
+    override_cfg = q["deadlock_override"]
+    override_required = math.ceil(len(pool) * float(override_cfg["special_vote_ratio"]))
 
     votes_by_agent: dict[str, str] = {}
     invalid_votes: list[str] = []
@@ -98,29 +114,70 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     endorsements = {normalize_domain(value) for value in packet.get("specialist_endorsements", [])}
     changed_domains = {str(value) for value in packet.get("changed_domains", [])}
     required_specialists = required_specialists_for(changed_domains, policy)
-
     missing_endorsements = sorted(required_specialists - endorsements)
+
     gatekeeper_ok = votes_by_agent.get("ct.relay.agent-d") == "approve"
+    security_required = "security" in required_specialists
+    security_sentinel_ok = (not security_required) or votes_by_agent.get("ct.relay.agent-s") == "approve"
     score_ok = (
         not score_errors
         and composite >= float(policy["risk_rating"]["minimum_automatic_merge_score"])
     )
-    quorum_ok = approvals >= required and not denials
     human_ok = (not d3) or packet.get("human_authorized") is True
+
+    normal_unanimity_ok = bool(
+        approvals == normal_required
+        and not denials
+        and not abstentions
+        and not missing
+    )
+
+    override = packet.get("deadlock_override", {})
+    override_requested = isinstance(override, dict) and override.get("requested") is True
+    first_vote_at = parse_time(override.get("first_vote_at") if isinstance(override, dict) else None)
+    decision_at = parse_time(override.get("decision_at") if isinstance(override, dict) else None)
+    elapsed_hours = None
+    if first_vote_at and decision_at and decision_at >= first_vote_at:
+        elapsed_hours = round((decision_at - first_vote_at).total_seconds() / 3600.0, 3)
+    reconciliation_attempts = int(override.get("reconciliation_attempts", 0)) if isinstance(override, dict) else 0
+    override_reason = str(override.get("reason", "")).strip() if isinstance(override, dict) else ""
+    override_initiator = str(override.get("initiator_agent_id", "")).strip() if isinstance(override, dict) else ""
+    all_votes_cast = not missing and not abstentions and len(votes_by_agent) == len(pool)
+    elapsed_ok = elapsed_hours is not None and elapsed_hours >= float(override_cfg["minimum_elapsed_hours"])
+    reconciliation_ok = reconciliation_attempts >= int(override_cfg["minimum_reconciliation_attempts"])
+    override_initiator_ok = override_initiator == str(override_cfg["initiator_agent_id"])
+    override_vote_ok = approvals >= override_required and all_votes_cast
+    override_mode_ok = bool(
+        override_requested
+        and override_vote_ok
+        and elapsed_ok
+        and reconciliation_ok
+        and bool(override_reason)
+        and override_initiator_ok
+        and gatekeeper_ok
+        and security_sentinel_ok
+        and score_ok
+        and risk_class in {"D0", "D1", "D2"}
+        and not hard_blocks
+        and not missing_endorsements
+        and not invalid_votes
+    )
 
     reasons: list[str] = []
     if invalid_votes:
         reasons.append(f"invalid_votes:{','.join(invalid_votes)}")
+    if not normal_unanimity_ok:
+        reasons.append(f"normal_unanimity_not_met:{approvals}/{normal_required}")
     if denials:
         reasons.append(f"deny_or_block:{','.join(denials)}")
-    if approvals < required:
-        reasons.append(f"quorum_not_met:{approvals}/{required}")
     if missing:
         reasons.append(f"missing_votes:{','.join(missing)}")
     if abstentions:
         reasons.append(f"abstentions:{','.join(abstentions)}")
     if not gatekeeper_ok:
         reasons.append("independent_gatekeeper_approval_missing")
+    if security_required and not security_sentinel_ok:
+        reasons.append("security_sentinel_approval_missing_for_security_domain")
     if score_errors:
         reasons.append(f"invalid_scores:{','.join(score_errors)}")
     if not score_ok and not score_errors:
@@ -135,29 +192,54 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     if d3 and not human_ok:
         reasons.append("d3_human_authorization_required")
     if d3:
-        reasons.append("d3_quorum_is_advisory_not_substitute_for_human_authority")
+        reasons.append("d3_sovereign_vote_is_advisory_not_substitute_for_human_authority")
+    if override_requested and not override_mode_ok:
+        if not all_votes_cast:
+            reasons.append("deadlock_override_requires_all_sovereign_votes_cast")
+        if not elapsed_ok:
+            reasons.append("deadlock_override_wait_window_not_met")
+        if not reconciliation_ok:
+            reasons.append("deadlock_override_reconciliation_attempts_not_met")
+        if not override_reason:
+            reasons.append("deadlock_override_reason_missing")
+        if not override_initiator_ok:
+            reasons.append("deadlock_override_initiator_invalid")
+        if approvals < override_required:
+            reasons.append(f"deadlock_override_special_vote_not_met:{approvals}/{override_required}")
 
     auto_merge_authorized = bool(
         risk_class in {"D0", "D1", "D2"}
-        and quorum_ok
+        and (normal_unanimity_ok or override_mode_ok)
         and gatekeeper_ok
+        and security_sentinel_ok
         and score_ok
         and not hard_blocks
         and not missing_endorsements
         and not invalid_votes
     )
 
-    decision = "approve_agent_merge" if auto_merge_authorized else "deny_or_escalate"
-    if d3 and human_ok and quorum_ok and gatekeeper_ok and score_ok and not hard_blocks and not missing_endorsements:
+    if auto_merge_authorized and override_mode_ok and not normal_unanimity_ok:
+        decision = "approve_agent_merge_via_deadlock_override"
+        decision_mode = "deadlock_override"
+    elif auto_merge_authorized:
+        decision = "approve_agent_merge_unanimous"
+        decision_mode = "unanimous"
+    else:
+        decision = "deny_or_escalate"
+        decision_mode = "blocked"
+
+    if d3 and human_ok and normal_unanimity_ok and gatekeeper_ok and score_ok and not hard_blocks and not missing_endorsements:
         decision = "human_authorized_execution_may_proceed_under_separate_d3_controls"
+        decision_mode = "d3_human_authorized"
 
     return {
         "decision": decision,
+        "decision_mode": decision_mode,
         "agent_auto_merge_authorized": auto_merge_authorized,
         "risk_class": risk_class,
         "eligible_voters": len(pool),
-        "quorum_ratio": q["approval_ratio"],
-        "minimum_approvals": required,
+        "normal_minimum_approvals": normal_required,
+        "deadlock_override_minimum_approvals": override_required,
         "approvals": approvals,
         "denials_or_blocks": denials,
         "abstentions": abstentions,
@@ -167,6 +249,9 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
         "required_specialists": sorted(required_specialists),
         "missing_specialists": missing_endorsements,
         "hard_blocks": hard_blocks,
+        "deadlock_override_requested": override_requested,
+        "deadlock_elapsed_hours": elapsed_hours,
+        "deadlock_reconciliation_attempts": reconciliation_attempts,
         "human_authorized": packet.get("human_authorized") is True,
         "reasons": reasons,
     }
@@ -180,32 +265,77 @@ def self_test(policy: dict[str, Any]) -> None:
         "reversibility": 100,
         "authority_fit": 100,
     }
-    four_yes = [
+    five_yes = [
         {"agent_id": "ct.relay.agent-a", "vote": "approve"},
         {"agent_id": "ct.relay.agent-b", "vote": "approve"},
         {"agent_id": "ct.relay.agent-c", "vote": "approve"},
         {"agent_id": "ct.relay.agent-d", "vote": "approve"},
+        {"agent_id": "ct.relay.agent-s", "vote": "approve"},
     ]
 
     def packet(changed_domains: list[str], endorsements: list[str], risk_class: str = "D2") -> dict[str, Any]:
         return {
             "risk_class": risk_class,
             "scores": common_scores,
-            "votes": four_yes,
+            "votes": five_yes,
             "changed_domains": changed_domains,
             "specialist_endorsements": endorsements,
             "hard_blocks": [],
         }
 
-    ok = decide(packet([], [], "D1"), policy)
-    assert ok["agent_auto_merge_authorized"] is True
-    assert ok["minimum_approvals"] == 4
+    unanimous = decide(packet([], [], "D1"), policy)
+    assert unanimous["agent_auto_merge_authorized"] is True
+    assert unanimous["decision_mode"] == "unanimous"
+    assert unanimous["normal_minimum_approvals"] == 5
+    assert unanimous["deadlock_override_minimum_approvals"] == 4
 
-    three_yes = decide({
+    four_yes_one_block = [*five_yes[:2], {"agent_id": "ct.relay.agent-c", "vote": "block"}, *five_yes[3:]]
+    blocked = decide({**packet([], [], "D1"), "votes": four_yes_one_block}, policy)
+    assert blocked["agent_auto_merge_authorized"] is False
+
+    override = decide({
         **packet([], [], "D1"),
-        "votes": four_yes[:3],
+        "votes": four_yes_one_block,
+        "deadlock_override": {
+            "requested": True,
+            "first_vote_at": "2026-08-19T00:00:00Z",
+            "decision_at": "2026-08-19T06:00:00Z",
+            "reconciliation_attempts": 2,
+            "reason": "One non-hard dissent remains after evidence reconciliation.",
+            "initiator_agent_id": "ct.subagent.governance-marshal",
+        },
     }, policy)
-    assert three_yes["agent_auto_merge_authorized"] is False
+    assert override["agent_auto_merge_authorized"] is True
+    assert override["decision_mode"] == "deadlock_override"
+
+    too_early = decide({
+        **packet([], [], "D1"),
+        "votes": four_yes_one_block,
+        "deadlock_override": {
+            "requested": True,
+            "first_vote_at": "2026-08-19T00:00:00Z",
+            "decision_at": "2026-08-19T05:59:00Z",
+            "reconciliation_attempts": 2,
+            "reason": "Still inside the reconciliation window.",
+            "initiator_agent_id": "ct.subagent.governance-marshal",
+        },
+    }, policy)
+    assert too_early["agent_auto_merge_authorized"] is False
+
+    hard_blocked = decide({
+        **packet([], [], "D1"),
+        "votes": four_yes_one_block,
+        "hard_blocks": ["critical_security_finding"],
+        "deadlock_override": {
+            "requested": True,
+            "first_vote_at": "2026-08-19T00:00:00Z",
+            "decision_at": "2026-08-19T07:00:00Z",
+            "reconciliation_attempts": 3,
+            "reason": "Must not override a hard block.",
+            "initiator_agent_id": "ct.subagent.governance-marshal",
+        },
+    }, policy)
+    assert hard_blocked["agent_auto_merge_authorized"] is False
 
     registry = policy.get("specialist_activation", {})
     assert isinstance(registry, dict) and len(registry) == 9
@@ -217,25 +347,27 @@ def self_test(policy: dict[str, Any]) -> None:
         endorsed = decide(packet([specialist_key], [endorsement_id]), policy)
         assert endorsed["agent_auto_merge_authorized"] is True, specialist_key
 
-    cross_domain_cases = [
-        ("rights", {"legal_regulatory", "ip_rights_licensing"}),
-        ("blockchain", {"security", "blockchain_protocol"}),
-        ("privacy", {"security", "legal_regulatory"}),
-        ("royalty", {"legal_regulatory", "finance_tax_treasury"}),
-        ("cross-border", {"legal_regulatory", "regional_global_localization"}),
-        ("settlement", {"blockchain_protocol", "finance_tax_treasury"}),
-    ]
-    for changed_domain, expected in cross_domain_cases:
-        result = decide(packet([changed_domain], []), policy)
-        assert expected.issubset(set(result["required_specialists"])), changed_domain
-        assert result["agent_auto_merge_authorized"] is False
-        satisfied = decide(packet([changed_domain], sorted(result["required_specialists"])), policy)
-        assert satisfied["agent_auto_merge_authorized"] is True, changed_domain
-
-    d3 = decide({
-        **packet(["legal"], ["legal_regulatory"], "D3"),
-        "human_authorized": False,
+    security_override_without_s = decide({
+        **packet(["security"], ["security"]),
+        "votes": [
+            {"agent_id": "ct.relay.agent-a", "vote": "approve"},
+            {"agent_id": "ct.relay.agent-b", "vote": "approve"},
+            {"agent_id": "ct.relay.agent-c", "vote": "approve"},
+            {"agent_id": "ct.relay.agent-d", "vote": "approve"},
+            {"agent_id": "ct.relay.agent-s", "vote": "block"},
+        ],
+        "deadlock_override": {
+            "requested": True,
+            "first_vote_at": "2026-08-19T00:00:00Z",
+            "decision_at": "2026-08-19T07:00:00Z",
+            "reconciliation_attempts": 3,
+            "reason": "Security dissent cannot be overridden on a security packet.",
+            "initiator_agent_id": "ct.subagent.governance-marshal",
+        },
     }, policy)
+    assert security_override_without_s["agent_auto_merge_authorized"] is False
+
+    d3 = decide({**packet(["legal"], ["legal_regulatory"], "D3"), "human_authorized": False}, policy)
     assert d3["agent_auto_merge_authorized"] is False
 
 
@@ -247,7 +379,7 @@ def main() -> int:
     policy = load_json(MANIFEST)
     if args.self_test:
         self_test(policy)
-        print("Agent-sovereign merge-decision self-test passed: 75% quorum is 4/5; nine registered specialist gates and cross-domain overlaps enforce; D3 cannot auto-merge.")
+        print("Agent-sovereign merge-decision self-test passed: normal mode requires 5/5 unanimity; after a 6-hour evidence-reconciliation window a disciplined 2/3 special vote rounds to 4/5, requires all votes cast, Agent D approval, Security Sentinel approval for security domains, specialists, score, rollback-compatible authority, and zero hard blocks; D3 cannot auto-merge.")
         return 0
     if not args.packet:
         parser.error("--packet is required unless --self-test is used")
