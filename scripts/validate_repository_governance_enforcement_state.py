@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Validate CrownThrive-Support repository governance enforcement state.
+"""Validate CrownThrive-Support repository governance state.
 
-This validator makes the observed S106 control-plane state machine-addressable and
-prevents documentation from promoting automated governance monitoring to
-fail-closed merge enforcement before GitHub enforcement evidence exists.
+S106 records GitHub's observed control plane. CT-ADR-GOV-011 supersedes the
+assumption that GitHub branch protection is CrownThrive's sovereign governance
+gate: governed agents now enforce fail-closed merge authority while GitHub CI,
+security scans and post-merge revalidation remain independent evidence and
+defense-in-depth.
 """
 
 from __future__ import annotations
@@ -13,15 +15,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/repository-governance-enforcement-state.v1.json"
-WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
-SOURCE_REGISTER = ROOT / "knowledge/source-register.mdx"
+DOCS_WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
+SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
 STANDARD = ROOT / "standards/documentation-source-of-truth-and-autonomous-governance.mdx"
-TOPOLOGY = ROOT / "changelog/phase-2-99-workstream-1-repository-source-topology.mdx"
 PLAN = ROOT / "changelog/phase-2-99-plan.mdx"
 GATE = ROOT / "technology/phase-3-readiness-gate.mdx"
 CHARTER = ROOT / "standards/ten-phase-institutional-program-charter.mdx"
 RELAY = ROOT / "automation/institutional-hourly-agent-relay.mdx"
-CHANGELOG = ROOT / "changelog/phase-2-99-governance-as-code-enforcement-audit.mdx"
+PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
 
 
 def fail(message: str) -> None:
@@ -40,36 +41,34 @@ def require(path: Path, fragment: str) -> None:
 
 
 def main() -> int:
-    if not MANIFEST.is_file():
-        fail(f"Missing manifest: {MANIFEST.relative_to(ROOT)}")
-
-    data = json.loads(MANIFEST.read_text(encoding="utf-8"))
-
-    expected_scalars = {
-        "manifest_version": "1.0.0",
+    data = json.loads(text(MANIFEST))
+    expected = {
+        "manifest_version": "1.1.0",
         "manifest_id": "ct.manifest.repository-governance-enforcement.v1",
         "source_id": "S106",
         "phase": "2.99",
         "repository": "crownthrive1/CrownThrive-Support",
         "branch": "main",
-        "current_state": "monitoring_plus_post_merge_defense_in_depth",
+        "current_state": "agent_sovereign_policy_with_github_monitoring_scanning_and_post_merge_defense_in_depth",
         "merge_gate_enforced": False,
-        "policy_transition_enforcement": "partial_validator_layer_only",
+        "github_merge_gate_enforced": False,
+        "agent_merge_policy": "fail_closed_quorum_and_validation",
+        "github_branch_protection_required_for_phase_3": False,
+        "policy_transition_enforcement": "agent_sovereign_with_independent_ci_and_security_evidence",
         "docs_impact": "docs_updated",
-        "phase_3_entry_effect": "blocking_until_merge_gate_enforcement_is_proven",
+        "phase_3_entry_effect": "github_branch_protection_nonblocking; other_phase_2_99_hard_exit_requirements_remain_binding",
     }
-    for key, expected in expected_scalars.items():
-        if data.get(key) != expected:
-            fail(f"{key} drifted: {data.get(key)!r} != {expected!r}")
+    for key, value in expected.items():
+        if data.get(key) != value:
+            fail(f"{key} drifted: {data.get(key)!r} != {value!r}")
 
     workflow = data.get("workflow", {})
-    if workflow != {
-        "name": "Documentation Governance",
-        "job": "Validate institutional documentation",
-        "pull_request_validation": True,
-        "push_to_main_revalidation": True,
-    }:
-        fail(f"Workflow state drifted: {workflow!r}")
+    for key in (
+        "pull_request_validation", "push_to_main_revalidation",
+        "scheduled_security_revalidation",
+    ):
+        if workflow.get(key) is not True:
+            fail(f"Workflow invariant {key} must be true")
 
     observed = data.get("observed_enforcement", {})
     if observed.get("branch_protected") is not False:
@@ -83,72 +82,76 @@ def main() -> int:
     if observed.get("ruleset_inventory") != "not_directly_enumerated_by_current_connector":
         fail("Ruleset inventory uncertainty must remain explicit")
 
-    target = data.get("target", {})
-    if target.get("branch") != "main":
-        fail("Target branch must remain main")
-    if target.get("required_check") != "Validate institutional documentation":
-        fail("Target institutional validation check drifted")
-    if target.get("failed_check_mergeability") != "blocked":
-        fail("Target must require failed checks to block merge")
-    if target.get("post_merge_revalidation") is not True:
-        fail("Post-merge main revalidation must remain required")
-    if target.get("bypass_authority") != "explicit_D3_decision":
-        fail("Bypass authority must remain an explicit D3 decision")
+    agent = data.get("agent_policy", {})
+    if agent.get("decision_id") != "CT-ADR-GOV-011":
+        fail("Agent decision ID drifted")
+    if agent.get("eligible_voters") != 5 or agent.get("minimum_approvals") != 4:
+        fail("Five-agent 75% quorum must require four approvals")
+    if float(agent.get("approval_ratio", 0)) != 0.75:
+        fail("Approval ratio must remain 75%")
+    if agent.get("independent_gatekeeper_required") is not True:
+        fail("Independent gatekeeper approval is required")
+    if agent.get("minimum_automatic_merge_score") != 85:
+        fail("Automatic merge risk threshold drifted")
+    if agent.get("deny_or_block_prevents_automatic_merge") is not True:
+        fail("Deny/block must stop automated merge")
+    if agent.get("d3_quorum_substitution") is not False:
+        fail("Agent quorum cannot substitute for D3 authority")
 
-    required_promotions = {
-        "effective_main_ruleset_or_branch_policy_evidence",
-        "exact_required_status_check_evidence",
-        "blocked_failing_check_merge_test_or_equivalent",
-        "documented_bypass_authority",
-    }
-    if set(data.get("promotion_requirements", [])) != required_promotions:
-        fail("Promotion requirements drifted")
+    github = data.get("github_role", {})
+    if github.get("sovereign_merge_authority") is not False:
+        fail("GitHub cannot be promoted to sovereign merge authority")
+    if github.get("branch_protection") != "optional_defense_in_depth_not_trust_anchor":
+        fail("GitHub branch-protection role drifted")
+    for key in ("repository_transport", "ci_evidence", "codeql_evidence", "dependency_review_evidence", "post_merge_revalidation"):
+        if github.get(key) is not True:
+            fail(f"GitHub defense-in-depth invariant {key} must remain true")
+
+    target = data.get("target", {})
+    if target.get("sovereign_merge_authority") != "governed_agents_plus_reserved_human_authority":
+        fail("Sovereign merge authority drifted")
+    if target.get("agent_failed_validation_mergeability") != "blocked":
+        fail("Failed agent validation must remain blocked")
+    if target.get("github_branch_protection") != "optional_defense_in_depth":
+        fail("GitHub branch protection must remain optional defense-in-depth")
+    if target.get("bypass_authority") != "explicit_D3_decision":
+        fail("Bypass authority must remain D3")
 
     forbidden = set(data.get("forbidden_promotions", []))
-    must_forbid = {
-        "monitoring_only_to_merge_gate_enforced_without_control_plane_evidence",
-        "historical_to_current_without_effective_source_authority",
-        "unverified_to_production_verified_without_runtime_evidence",
-        "provider_capability_to_crownthrive_deployed_without_account_deployment_evidence",
-        "payment_to_entitlement_without_fulfillment_evidence",
-        "product_listing_to_rights_granted_without_valid_license_rights_evidence",
-        "source_active_domain_to_current_secure_canonical_host_without_registrar_dns_tls_runtime_evidence",
-    }
-    if forbidden != must_forbid:
-        fail("Forbidden-promotion policy drifted")
+    for item in {
+        "github_ci_success_to_sovereign_authority",
+        "agent_quorum_to_D3_authority_without_authorized_human",
+        "security_failure_to_pass_by_disabling_or_weakening_the_check",
+    }:
+        if item not in forbidden:
+            fail(f"Missing forbidden promotion: {item}")
 
-    workflow_text = text(WORKFLOW)
     for fragment in (
         "name: Documentation Governance",
         "name: Validate institutional documentation",
-        "pull_request:",
-        "push:",
-        "- main",
         "python scripts/validate_docs.py",
+        "python scripts/validate_agent_sovereign_governance.py",
     ):
-        if fragment not in workflow_text:
-            fail(f"Governance workflow missing expected fragment: {fragment!r}")
+        require(DOCS_WORKFLOW, fragment)
+    for fragment in (
+        "name: Security Governance",
+        "github/codeql-action/init@v4",
+        "actions/dependency-review-action@v4",
+    ):
+        require(SECURITY_WORKFLOW, fragment)
 
-    require(SOURCE_REGISTER, "| `S106` | CrownThrive-Support GitHub governance-enforcement audit")
-    require(STANDARD, "## Governance-as-code enforcement tiers")
-    require(STANDARD, "fail_closed_required_check_enforcement: not_established")
-    require(TOPOLOGY, "hard Phase 2.99 repository-governance gap")
-    require(PLAN, "fail-closed repository governance for `main`")
-    require(GATE, "repository-enforcement checkpoint is reopened and blocking")
-    require(GATE, "validator output alone is insufficient for Phase 3 fail-closed governance")
-    require(CHARTER, "Downstream update — CrownThrive-Support governance-as-code enforcement audit")
-    require(RELAY, "## Repository governance enforcement state")
-    require(CHANGELOG, "current_classification: monitoring_plus_defense_in_depth")
+    require(RELAY, "GitHub is not the sovereign merge authority")
+    require(RELAY, "75% quorum")
+    require(PERMISSIONS, "## Agent-sovereign quorum and specialist gates")
+    require(PLAN, "CT-ADR-GOV-011")
+    require(GATE, "CT-ADR-GOV-011")
+    require(CHARTER, "CT-ADR-GOV-011")
+    require(STANDARD, "CT-ADR-GOV-011")
 
-    if observed.get("branch_protected") is False and data.get("merge_gate_enforced") is not False:
-        fail("Cannot promote to merge_gate_enforced while branch_protected=false")
-    if observed.get("required_status_checks_enforcement") == "off" and data.get("merge_gate_enforced"):
-        fail("Cannot promote to merge_gate_enforced while required status checks are off")
-
-    print("Repository governance enforcement state validation passed.")
-    print("Current state: monitoring_plus_post_merge_defense_in_depth")
-    print("Merge gate enforced: false")
-    print("Phase 3 effect: blocking until effective required-check enforcement is proven")
+    print("Repository governance state validation passed.")
+    print("GitHub observed branch protection: false; GitHub merge gate enforced: false.")
+    print("Sovereign merge policy: CrownThrive agent fail-closed quorum + validation + reserved D3 human authority.")
+    print("Phase 3: GitHub branch protection is nonblocking; all other Phase 2.99 hard-exit requirements remain binding.")
     return 0
 
 
