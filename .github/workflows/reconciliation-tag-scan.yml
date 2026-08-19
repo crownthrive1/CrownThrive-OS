@@ -1,0 +1,63 @@
+name: Reconciliation Tag Scan
+
+on:
+  pull_request:
+    paths:
+      - "automation/reconciliation-tag-subagents.mdx"
+      - "developers/agents/reconciliation/**"
+      - "developers/manifests/reconciliation-tag-system.v1.json"
+      - "developers/manifests/draft-reconciliation-index.v1.json"
+      - "scripts/scan_reconciliation_tags.py"
+      - ".github/workflows/reconciliation-tag-scan.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "automation/reconciliation-tag-subagents.mdx"
+      - "developers/agents/reconciliation/**"
+      - "developers/manifests/reconciliation-tag-system.v1.json"
+      - "developers/manifests/draft-reconciliation-index.v1.json"
+      - "scripts/scan_reconciliation_tags.py"
+      - ".github/workflows/reconciliation-tag-scan.yml"
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  reconciliation-tag-scan:
+    name: Reconciliation tag and draft audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile scanner
+        run: python -m py_compile scripts/scan_reconciliation_tags.py
+
+      - name: Validate tag contracts and local draft index
+        run: python scripts/scan_reconciliation_tags.py
+
+      - name: Reconcile draft index against live open PRs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/scan_reconciliation_tags.py --github-open-prs
+
+      - name: Re-run documentation governance
+        run: python scripts/validate_docs.py
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
