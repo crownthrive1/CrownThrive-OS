@@ -16,7 +16,7 @@ keywords: ["CrownThrive IO", "API", "QR codes", "bio links", "short links", "cus
 - Inherited institutional release: `2.7.9.1`
 - Extraction pass: `A — institutional core and public control plane`
 - Public host: `https://crownthrive.io`
-- Evidence state: `live-public / API-docs-verified / auth-and-deployment-partially-unverified`
+- Evidence state: `live-public / API-docs-verified / secure-auth-runtime-blocked`
 - Primary corridor: digital presence, routing, links, QR, lightweight hosting, analytics and interoperability
 
 ## Public product role verified
@@ -53,7 +53,7 @@ Verified documentation route:
 
 `https://crownthrive.io/api-documentation`
 
-The page explicitly states:
+The current first-party page states:
 
 - REST architecture;
 - JSON responses;
@@ -62,10 +62,11 @@ The page explicitly states:
 - UTC timezone unless otherwise stated;
 - example API pattern `https://crownthrive.io/api/{endpoint}`.
 
-Phase 2.98 state change:
+Phase 2.98/2.99 state:
 
 ```yaml
 api_id: ct.api.crownthrive-io.public
+platform_id: ct.platform.crownthrive-io
 public_host: https://crownthrive.io
 base_pattern: https://crownthrive.io/api/{endpoint}
 docs_url: https://crownthrive.io/api-documentation
@@ -73,16 +74,17 @@ auth_scheme: bearer_api_key
 state:
   host: public_host_verified
   docs: docs_verified
-  auth: untested
+  auth: credential_access_blocked
   sandbox: unverified
-  production_request: unverified
+  production_request: not_run
+  write_certification: prohibited_until_bounded_read_passes
 ```
 
-This is a meaningful upgrade from the prior seed state, but documentation alone does not prove every endpoint is enabled for every account/plan.
+This is a meaningful upgrade from the prior seed state, but documentation alone does not prove every endpoint is enabled for every account/plan. A live API credential exists in restricted operational custody, but this audit runtime has no approved secret-injection path. No credential value is copied into GitHub, Mintlify, source, examples, logs, screenshots or generated artifacts, and no authenticated request is claimed.
 
 ## Documented endpoint families
 
-The public API documentation exposes families for:
+The current first-party API documentation exposes families for:
 
 - User;
 - Links;
@@ -97,9 +99,37 @@ The public API documentation exposes families for:
 - My teams;
 - Team members;
 - Teams member;
-- Account payments.
+- Account payments;
+- Account logs.
 
-Phase 2.98 must extract the concrete path, HTTP method, parameters, pagination, errors, scopes/permissions, quota/rate-limit behavior and response schemas for each family before generating SDKs or MCP tools.
+The prior registry omitted **Account logs** from this list even though the current API documentation exposes it. This is corrected prospectively; the earlier registry snapshot remains part of historical Git lineage.
+
+Phase 2.99 must extract the concrete path, HTTP method, parameters, pagination, errors, scopes/permissions, quota/rate-limit behavior and response schemas for each family before generating SDKs or MCP tools.
+
+## Secure API certification boundary — August 19, 2026
+
+```yaml
+credential_class: restricted_runtime_only
+credential_value_in_public_repo: prohibited
+credential_value_in_docs_examples: prohibited
+credential_value_in_logs_or_ci: prohibited
+credential_rotation_without_founder_instruction: prohibited
+current_runtime_secret_injection: unavailable_to_auditor
+authenticated_read: not_run
+current_certification: credential_access_blocked
+write_gate: closed
+required_sequence:
+  - approved runtime secret injection
+  - one bounded authenticated read
+  - response/schema/permission reconciliation
+  - account/plan/quota evidence
+  - only then an explicitly authorized mutation
+  - immediate read-after-write verification
+```
+
+`credential_access_blocked` is not `credential_invalid`. It means the current audit environment cannot securely inject the restricted key. The correct response is to preserve the write gate and continue non-secret reconciliation, not reconstruct or expose credential material.
+
+CrownThrive IO remains a specialized routing, link, QR, analytics, project and digital-presence system. It is **not** CrownThrive ID, CHLOM rights authority, or the canonical institutional source of truth. API records may reference those systems only through governed stable IDs and explicit authority boundaries.
 
 ## Public feature state
 
@@ -157,6 +187,7 @@ Potential data handled by CrownThrive IO includes:
 - team membership;
 - notification-handler configuration;
 - billing/payment metadata;
+- account activity/log records;
 - AI prompts/outputs/uploads where enabled.
 
 Phase 2.98 must confirm actual retention, processor, export, deletion and regional-transfer behavior from current policies and implementation.
@@ -210,6 +241,7 @@ Potential low-risk tools derived from verified IO capabilities:
 - `list_custom_domains`
 - `list_teams`
 - `get_account_profile`
+- `get_account_logs`
 
 Higher-risk/side-effect capabilities require additional approval classes:
 
@@ -282,7 +314,9 @@ CrownThrive IO is itself an ecosystem routing utility. Phase 2.98 should therefo
 
 ## Security priorities
 
-- API keys must remain secret and revocable;
+- API keys remain restricted, revocable and runtime-only;
+- secrets never enter GitHub, Mintlify, source examples, generated artifacts, screenshots, email, CI output or logs;
+- runtime access failure is recorded as `credential_access_blocked`, never repaired by reconstructing a key from conversation text or screenshots;
 - no agent receives unrestricted user API keys;
 - per-account/tenant authorization must survive MCP wrapping;
 - custom-domain ownership verification is required;
@@ -290,7 +324,8 @@ CrownThrive IO is itself an ecosystem routing utility. Phase 2.98 should therefo
 - static-file hosting requires malware/content protections;
 - analytics/export must respect privacy and tenant isolation;
 - team membership changes require strong authorization;
-- payment endpoints require stricter side-effect controls.
+- payment endpoints require stricter side-effect controls;
+- bounded read verification precedes writes, and every authorized mutation requires read-after-write evidence.
 
 ## Phase 2.99 handoff
 
@@ -310,6 +345,7 @@ Required machine records:
 - `team`
 - `pixel`
 - `notification_handler`
+- `account_log`
 - `data_class`
 - `vendor`
 - `deployment`
@@ -319,6 +355,6 @@ Required machine records:
 
 ## Current conclusion
 
-CrownThrive IO is verified as a live public platform with a documented Bearer-key REST API and broad digital-presence feature set. It is therefore further along technically than the prior `unverified` API seed implied. The correct Phase 2.98 state is `public-host-verified + docs-verified`, while endpoint execution, account authorization, production health, deployment engine and backend ownership remain to be verified.
+CrownThrive IO is verified as a live public platform with current first-party Bearer-key REST documentation and the complete documented family set now includes **Account logs**. The correct current state is `public-host-verified + docs-verified + credential_access_blocked` for this audit environment. No authenticated production request is claimed, no write is authorized, and no credential value is placed in the public institutional repository.
 
-The next sub-run should extract concrete API paths and schemas from the official docs, verify authorized account/API behavior, identify the deployment/vendor spine, reconcile platform-specific privacy/terms, and then map only proven capabilities into CrownThrive IO MCP adapters.
+The next safe sub-run is to establish an approved runtime secret-injection path, perform one bounded authenticated read, reconcile actual account/plan/permissions/quota behavior, extract concrete endpoint contracts and then map only proven capabilities into CrownThrive IO adapters. The system must preserve CrownThrive IO as a specialized service rather than duplicate CrownThrive ID, CHLOM rights authority or canonical institutional truth.
