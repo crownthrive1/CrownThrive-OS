@@ -174,6 +174,64 @@ class KernelContractTests(unittest.TestCase):
         self.assertEqual(allowed.delegation_refs, complete.delegations)
         self.assertEqual(allowed.verified_approvals, complete.approvals)
 
+    def test_idempotent_allow_is_bound_to_verified_authority_context(self):
+        request = copy.deepcopy(self.fixture["base_request"])
+        request.update(
+            {
+                "request_id": "ct.request.kernel.authority-bound-idempotency",
+                "correlation_id": "ct.correlation.kernel.authority-bound-idempotency",
+                "idempotency_key": "ct.idempotency.kernel.authority-bound-idempotency",
+                "action": "issue_license",
+            }
+        )
+        request["actor"]["roles"] = ["rights_steward"]
+        request["resource"].update(
+            {
+                "resource_id": "ct.resource.kernel.authority-bound-license-offer",
+                "resource_type": "license_offer",
+                "classification": "internal",
+            }
+        )
+        request["approval_evidence"] = ["rights_authority"]
+
+        complete = VerifiedAuthorityContext(
+            actor_id="ct.actor.test",
+            organization_id="ct.org.crownthrive-llc",
+            roles=("rights_steward",),
+            relationships=("ct.relationship.ref.rights-steward",),
+            delegations=("ct.delegation.ref.rights-issue",),
+            approvals=("rights_authority",),
+            evidence_refs=("ct.evidence.ref.authority-test",),
+        )
+        first = self.engine.evaluate(copy.deepcopy(request), verified_authority=complete)
+        replay = self.engine.evaluate(copy.deepcopy(request), verified_authority=complete)
+        self.assertEqual(first.effect, "allow")
+        self.assertEqual(first.decision_id, replay.decision_id)
+        self.assertEqual(first.event_id, replay.event_id)
+        self.assertEqual(len(self.engine.ledger.events), 1)
+
+        with self.assertRaisesRegex(
+            KernelContractError,
+            "idempotency_key_reused_with_different_authority_context",
+        ):
+            self.engine.evaluate(copy.deepcopy(request), verified_authority=None)
+
+        changed = VerifiedAuthorityContext(
+            actor_id="ct.actor.test",
+            organization_id="ct.org.crownthrive-llc",
+            roles=("rights_steward",),
+            relationships=("ct.relationship.ref.rights-steward",),
+            delegations=tuple(),
+            approvals=("rights_authority",),
+            evidence_refs=("ct.evidence.ref.authority-test",),
+        )
+        with self.assertRaisesRegex(
+            KernelContractError,
+            "idempotency_key_reused_with_different_authority_context",
+        ):
+            self.engine.evaluate(copy.deepcopy(request), verified_authority=changed)
+        self.assertEqual(len(self.engine.ledger.events), 1)
+
     def test_restricted_or_free_form_authority_evidence_is_not_persisted_verbatim(self):
         request = copy.deepcopy(self.fixture["base_request"])
         request["request_id"] = "ct.request.kernel.evidence-sanitize"
