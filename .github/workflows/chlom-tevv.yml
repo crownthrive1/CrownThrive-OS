@@ -1,0 +1,53 @@
+name: CHLOM TEVV
+
+on:
+  pull_request:
+    paths:
+      - "contracts/chlom/**"
+      - "reference/chlom_runtime/**"
+      - "scripts/validate_chlom_tevv_packet.py"
+      - ".github/workflows/chlom-tevv.yml"
+  push:
+    branches:
+      - "agent-s/chlom-cell-08-**"
+    paths:
+      - "contracts/chlom/**"
+      - "reference/chlom_runtime/**"
+      - "scripts/validate_chlom_tevv_packet.py"
+      - ".github/workflows/chlom-tevv.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-tevv-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tevv:
+    name: Validate CHLOM TEVV invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify TEVV syntax
+        run: |
+          python -m py_compile scripts/validate_chlom_tevv_packet.py
+          python -m py_compile contracts/chlom/tevv/test_native_reference_tevv.py
+
+      - name: Validate TEVV evidence packet
+        run: python scripts/validate_chlom_tevv_packet.py
+
+      - name: Run native reference TEVV vectors
+        run: PYTHONPATH=. python -m unittest discover -s contracts/chlom/tevv -p 'test_*.py' -v
+
+      - name: Revalidate parent CHLOM build program
+        run: python scripts/validate_chlom_build_program.py
