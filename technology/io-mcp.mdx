@@ -26,9 +26,11 @@ The institutional layer should provide:
 - agent-facing MCP tools;
 - public link, QR, vCard, event-link, and static-site services where applicable.
 
-## MCP security model
+## THIVEBASE relationship
 
-Agents should never receive unrestricted vendor credentials or blanket database access. The gateway exposes narrowly scoped tools with explicit inputs, outputs, actor identity, permission checks, logging, and approval requirements.
+**THIVEBASE** is now the internal infrastructure base beneath the governed IO/MCP stack. IO/MCP defines how tools, APIs and adapters are exposed; THIVEBASE carries the compact internal control state, provider registry, capacity/cost snapshots, integration certification state and partner/vendor records that support those interfaces.
+
+The boundary is intentional:
 
 ```text
 Agent / Platform
@@ -41,15 +43,39 @@ CHLOM + Approval checks
       ↓
 Scoped adapter / tool
       ↓
-External or internal system
+THIVEBASE control state
+      ↓
+External or internal provider
       ↓
 DAIL event + CrownLytics signal
 ```
 
+THIVEBASE does not become an alternate source of sovereign authority. CHLOM/governance decides; IO/MCP exposes bounded capabilities; THIVEBASE stores governed operational/control references and provider state.
+
+## MCP security model
+
+Agents should never receive unrestricted vendor credentials or blanket database access. The gateway exposes narrowly scoped tools with explicit inputs, outputs, actor identity, permission checks, logging, and approval requirements.
+
 ## Adapter doctrine
 
-A third-party vendor can be replaced without changing institutional identity. For example, a link engine, ad server, community platform, publishing engine, or booking system may change while the CrownThrive service ID and business contract remain stable.
+A third-party vendor can be replaced without changing institutional identity. For example, a link engine, ad server, community platform, publishing engine, booking system, database provider or documentation provider may change while the CrownThrive service ID and business contract remain stable.
+
+The same rule applies to THIVEBASE: Supabase is a current implementation provider, not the permanent identity of CrownThrive's infrastructure base.
+
+## Capacity and cost governance
+
+IO/MCP integrations should emit sanitized usage/capacity signals into THIVEBASE so CrownThrive can track rate limits, provider requests, storage/database growth, function calls, egress, realtime usage and predicted exhaustion.
+
+Default initial utilization policy:
+
+- `<50%` green;
+- `50–69%` watch;
+- `70–79%` plan;
+- `80–89%` action needed;
+- `90%+` scale gate/service-risk condition.
+
+See [THIVEBASE](/technology/thivebase) for the complete policy and current Supabase baseline.
 
 ## Phase 3 requirement
 
-The gateway should initially focus on a small set of high-value integrations rather than attempting to connect the entire portfolio at once. Each integration requires an owner, data contract, permissions, event taxonomy, failure behavior, backup/export route, and support runbook.
+The gateway should initially focus on a small set of high-value integrations rather than attempting to connect the entire portfolio at once. Each integration requires an owner, data contract, permissions, event taxonomy, failure behavior, backup/export route, support runbook, THIVEBASE provider/capacity record and partner/vendor disposition.
