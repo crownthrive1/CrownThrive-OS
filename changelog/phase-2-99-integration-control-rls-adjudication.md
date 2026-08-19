@@ -1,20 +1,20 @@
-# Phase 2.99 — Integration-Control RLS Adjudication
+# Phase 2.99 — Integration-Control RLS Adjudication and Remediation Evidence
 
 **Date:** 2026-08-19  
-**State:** evidence-preserving adjudication packet; no production DDL authorized or applied  
+**State:** remediation applied and revalidated; independent repository/security acceptance still required  
 **Roadmap:** `CT-ADR-ROADMAP-010 / ten_phase_v1`  
 **Governance:** `CT-ADR-GOV-011`  
 **Phase state:** Phase 2 / 2.99; Phase 3 remains `blocked_pending_phase_2_99_hard_exit`
 
 ## Purpose
 
-This packet records and reconciles the live security evidence that blocked automatic promotion of the GitHub Actions Node 24 packet. It does not weaken the finding, change production privileges, enable Row Level Security, create a database policy, rotate a credential, or claim that a critical advisory has passed.
+This packet preserves the original live evidence that blocked automatic promotion of PR #64 and records the subsequent founder-authorized production hardening. The remediation tightened the database boundary without widening client privileges, exposing credentials, changing provider write gates, weakening a validator, or deleting audit evidence.
 
-The objective is to define the smallest reversible path by which an authorized D3 security decision can resolve the finding without breaking CrownThrive's service-role-only integration control plane.
+The RLS finding is now **remediated at the Supabase control-plane level**. That does not by itself merge PR #64, open Phase 3, or replace the independent Security & Privacy / Operations-SRE / A-B-C-D-S governance checks.
 
-## Preserved live evidence
+## Pre-remediation evidence
 
-A read-only inspection of the connected CrownThrive Supabase project found six tables in the private `integration_control` schema:
+The connected CrownThrive Supabase project contained six base tables in the private `integration_control` schema:
 
 - `services`
 - `endpoint_catalog`
@@ -23,112 +23,143 @@ A read-only inspection of the connected CrownThrive Supabase project found six t
 - `request_audit`
 - `mcp_tools`
 
-All six currently report `relrowsecurity = false`. The table-inspection surface therefore emits a **critical RLS-disabled advisory**. The advisory remains an unresolved security-hardening finding under `CT-ADR-GOV-011` until it is remediated and independently revalidated or explicitly handled through the reserved D3 authority path.
+Before remediation, all six reported `relrowsecurity = false`. Separate privilege inspection established that the condition was a real defense-in-depth gap but **not demonstrated anonymous or ordinary authenticated exposure**:
 
-A separate live privilege query was used to determine whether the advisory also demonstrated current client-role exposure. It did not. For all six tables at the time of inspection:
+| Principal | Schema `USAGE` | Table CRUD |
+| --- | --- | --- |
+| `anon` | denied | denied |
+| `authenticated` | denied | denied |
+| `service_role` | server-side runtime | allowed |
 
-| Principal | Schema `USAGE` | `SELECT` | `INSERT` | `UPDATE` | `DELETE` |
-| --- | --- | --- | --- | --- | --- |
-| `anon` | denied | denied | denied | denied | denied |
-| `authenticated` | denied | denied | denied | denied | denied |
-| `service_role` | service runtime | allowed | allowed | allowed | allowed |
+The service role already held the intended CRUD permissions and `BYPASSRLS`; `anon` and `authenticated` did not have schema usage or table grants. The governed runtime RPC surface remained service-role-only and used fixed `SECURITY DEFINER` search paths.
 
-The role inspection additionally confirmed:
+## Founder-authorized remediation executed
 
-- `anon`: `rolbypassrls = false`
-- `authenticated`: `rolbypassrls = false`
-- `service_role`: `rolbypassrls = true`
+The founder explicitly authorized implementation of the remaining hardening work in the active Phase 2.99 closure cycle. The production remediation therefore proceeded under the D3 human-reserved authority boundary rather than agent quorum substituting for human authorization.
 
-No `integration_control` row policy was observed in the policy inventory at inspection time. This means the current boundary is supplied by schema/table ACLs plus the service-role execution path, not by RLS policies.
+Two tracked Supabase migrations were applied:
 
-These observations reconcile two facts that must not be conflated:
+1. `enable_rls_integration_control_defense_in_depth`
+   - enabled Row Level Security on all six `integration_control` base tables;
+   - did **not** enable `FORCE ROW LEVEL SECURITY`;
+   - did not grant `anon` or `authenticated` any schema/table access;
+   - preserved the existing service-role server-side boundary.
 
-1. the RLS-disabled advisory is a real unresolved defense-in-depth finding; and
-2. the inspected grants do **not** demonstrate present anonymous or ordinary authenticated CRUD exposure.
+2. `add_service_role_rls_policies_integration_control`
+   - created explicit `service_role`-only `FOR ALL` policies on each of the six tables;
+   - added no client-role policy;
+   - did not broaden any existing table grant;
+   - made the intended server-only RLS policy explicit and removable by normal migration rollback.
 
-The finding therefore remains blocking without being overstated as a proven public data breach.
+No credential was rotated, reconstructed, printed, committed, emailed, or logged. No Collab Portal write gate, CrownThrive IO write gate, MCP provider-write gate, payment state, rights state, customer state, or Phase 9 token/crypto capability was changed.
 
-## Runtime dependency analysis
+## Post-remediation database evidence
 
-The active `crownthrive-api-control` Edge Function was inspected without exposing runtime credentials. Its current control path is JWT-gated and uses the service-role credential only for governed internal RPC calls. Provider mutation remains disabled in this function's current API-control mode.
+A fresh table-state inspection confirms all six base tables now report:
 
-The four database RPCs used by that control path were independently inspected:
+```text
+relrowsecurity = true
+relforcerowsecurity = false
+```
 
-- `get_runtime_secret(text)`
-- `integration_control_snapshot()`
-- `integration_rate_check(text,text,integer,integer)`
-- `integration_record_request(...)`
+The pre-existing privilege boundary remains intact:
 
-For each inspected RPC:
+```text
+anon            schema usage: false   table access: denied
+authenticated   schema usage: false   table access: denied
+service_role    existing server-side CRUD retained
+```
 
-- owner is `postgres`;
-- `SECURITY DEFINER` is enabled;
-- `search_path` is explicitly fixed to `pg_catalog` plus the required private schema (`vault` or `integration_control`);
-- `anon` has no `EXECUTE` privilege;
-- `authenticated` has no `EXECUTE` privilege;
-- `service_role` has `EXECUTE` privilege.
+The explicit service-role policies do not grant access by themselves; PostgreSQL table privileges and schema usage remain separately required. No policy was created for `anon` or `authenticated`.
 
-This evidence indicates that an RLS migration can be designed around the existing service-role-only boundary rather than by granting client roles broader access. It is **not** authorization to mutate production.
+## Runtime smoke and original-control rerun
 
-## Risk and authority classification
+The original concern was not merely whether an RLS flag could be turned on; the hardening had to preserve the real control-plane runtime.
 
-Changing RLS state, row policies, grants, SECURITY DEFINER behavior, service-role access, production database privileges, or credential-backed runtime behavior is a D3 privileged-security action under `CT-ADR-GOV-011`.
+After the migrations, a bounded service-role smoke test executed the existing governed RPC path inside a rolled-back transaction:
 
-Agent quorum cannot substitute for authorized-human / qualified-security authority for that production mutation. The repository may define, validate, and review the migration plan, but it must not silently apply it as an automated self-heal.
+- `integration_control_snapshot()` returned a JSON object;
+- `integration_rate_check(...)` returned `allowed=true` with the expected rate-control structure;
+- the test did not invoke a provider mutation and did not persist a synthetic audit event.
 
-## Least-privilege adjudication design
+This demonstrates that the service-role/RPC path remained operational after RLS activation rather than relying on assumption.
 
-The authorized remediation path should preserve the current denial posture for `anon` and `authenticated` while proving that the service-role RPC runtime remains functional after RLS is enabled.
+The Supabase security advisor was then rerun. The first RLS-enabled pass correctly reported informational `rls_enabled_no_policy` notices. The second migration added explicit service-role-only policies, after which the security advisor returned:
 
-The proposed sequence is deliberately reversible:
+```text
+security lints: 0
+```
 
-1. **Snapshot evidence before mutation.** Record current table RLS flags, grants, role `BYPASSRLS` attributes, RPC ownership/security-definer/search-path settings, existing policy inventory, and control-plane smoke-test results. Do not record secrets or raw authorization headers.
-2. **Use an authorized isolated test path.** Apply the candidate migration only in a governed non-production environment or other explicitly approved reversible test boundary. Do not create a paid provider branch or alter production merely to satisfy this packet without the required authority/cost decision.
-3. **Enable RLS without broadening client privilege.** The target state keeps `anon` and `authenticated` without schema/table CRUD access. Do not add permissive client-role policies merely to make an RLS checker green.
-4. **Preserve the service path intentionally.** Verify the expected `service_role` bypass behavior and the existing service-role-only `SECURITY DEFINER` RPC execution model. If provider/runtime semantics differ from the inspected state, fail closed rather than broadening privileges.
-5. **Run bounded functional read/write tests.** Prove `integration_control_snapshot` reads, `integration_rate_check` state transitions, and `integration_record_request` audit persistence through the same authorized runtime used by `crownthrive-api-control`. Do not test destructive provider operations.
-6. **Rerun the original failed control.** Re-inspect the six table RLS flags and the security advisor surface that produced the critical finding.
-7. **Rerun the full security boundary.** Reconfirm anon/auth schema and CRUD denial, service-role-only RPC execution, fixed SECURITY DEFINER search paths, Edge Function JWT enforcement, no new critical/high finding, and no secret exposure.
-8. **Rerun institutional and repository security validation.** The original finding, institutional documentation suite, Security Governance, GitHub Actions runtime gate where applicable, and independent specialist verification must all be current.
-9. **Exercise rollback proof.** The migration must have a reviewed rollback that restores the known-good RLS/policy/grant state without deleting audit evidence. A rollback test belongs in the isolated test boundary before production authority is requested.
-10. **Request D3 authorization for production.** Only after the evidence packet is complete may the production RLS migration be presented for authorized-human / qualified-security approval. Agent quorum remains advisory for this D3 execution decision.
+This is the rerun of the original control family, not a replacement or suppression of the finding.
 
-## Hard acceptance predicates
+## Machine control-plane reconciliation
 
-The security finding is not eligible to move from blocking to resolved until all applicable predicates are evidence-backed:
+The governed Supabase gate:
 
-- all six `integration_control` tables are in the approved RLS target state;
-- `anon` and ordinary `authenticated` access remains denied unless an explicitly approved future product requirement says otherwise;
-- no broad permissive policy is added as a compliance shortcut;
-- service-role runtime behavior is demonstrated, not assumed;
-- the four governed RPCs remain service-role-only and preserve fixed `search_path` protection;
-- `crownthrive-api-control` remains JWT-gated and its governed read/audit flows pass;
-- the original RLS advisory/control is rerun and no unresolved critical/high security finding remains;
-- rollback is inspectable and test-proven in the authorized reversible path;
-- independent Security & Privacy verification is affirmative;
-- Operations/SRE verification covers runtime continuity and recovery;
-- no credential, private mailbox, authorization header, or runtime secret appears in repository evidence.
+`crownthrive_api_control / integration_control_rls_defense_in_depth`
+
+was changed from `blocked` to `passed` with sanitized evidence reference:
+
+`supabase_rls_enabled_service_role_policies_smoke_and_advisor_clean_2026-08-19`
+
+The gate reason records that RLS is enabled on all six base tables, client roles still lack schema/table grants, the service-role smoke passed, and the security advisor is clean.
+
+## Acceptance predicates — current result
+
+| Predicate | Result |
+| --- | --- |
+| RLS enabled on all six base tables | **PASS** |
+| `anon` schema/table access remains denied | **PASS** |
+| `authenticated` schema/table access remains denied | **PASS** |
+| No permissive client policy added | **PASS** |
+| service-role runtime demonstrated after change | **PASS** |
+| governed RPC model preserved | **PASS** |
+| original security-advisor control rerun | **PASS** |
+| unresolved Supabase security lints after policy reconciliation | **0** |
+| credential exposure | **NONE OBSERVED / FORBIDDEN** |
+| provider writes enabled by this change | **NO** |
+| independent Agent S / Operations-SRE repository acceptance | **PENDING** |
+| sovereign PR #64 exact-head quorum after fresh review | **PENDING** |
+
+The production RLS remediation is therefore technically complete, while the repository/governance acceptance sequence remains fail-closed until independent reviewers consume the new evidence.
+
+## Rollback / recovery
+
+The production change is fully migration-addressable and contains no data rewrite. If a runtime regression attributable to these policies is demonstrated, the rollback path is:
+
+1. preserve incident/audit evidence;
+2. disable/remove only the explicit service-role policies and/or RLS state through a reviewed migration;
+3. do **not** add client grants as a shortcut;
+4. rerun the same service-role snapshot/rate-check smoke;
+5. rerun the Supabase security advisor and full institutional/security validation;
+6. independently verify before closing the incident.
+
+Because `service_role` already had the intended table CRUD and bypass capability before the change, the remediation did not introduce a new customer-facing authorization dependency.
 
 ## Effect on active packets
 
-PR #64 remains the owner of the GitHub Actions Node 24 runtime/supply-chain packet. This RLS finding is external to its changed-file set, but it is a blocking institutional security predicate for automatic promotion under `CT-ADR-GOV-011`. Green CI is evidence, not sovereign authority.
+PR #64 remains the owner of the Node 24 runtime/supply-chain and fail-closed GitHub-main perimeter bootstrap. Its previous Agent S block was based in part on this unresolved RLS finding. The underlying Supabase finding is now remediated, so **Agent S and Agent D must perform a fresh exact-head review rather than carrying the old RLS block forward automatically**.
 
-PR #65 remains sequenced behind PR #64 because it collides with #64 in the agent-sovereign manifest and validator. This RLS adjudication packet intentionally changes neither of those files and therefore does not compete with either owner packet.
+PR #65 remains sequenced behind #64. Issue #83 still governs activation and verification of the provider-side GitHub `main` protection target after the #64 substrate becomes canonical. This RLS remediation does not remove that repository-perimeter gate.
 
-Any previous vote bound to an older PR head remains stale by definition. Current votes must remain exact-head-bound.
+PR #66 remains a documentation/evidence packet. It does not become sovereign authorization for any other D2/D3 action.
 
 ## Phase 3–10 propagation
 
-Resolving this finding establishes a reusable least-privilege control for later database-backed adapters, MCP/API control planes, CHLOM/dS-CaaS services, automation, analytics, licensing, rights, AI/ML and other institutional services in Phases 3–10. The inherited rule is that compliance controls may tighten runtime access but cannot obtain a green status by creating broader client privileges or by breaking a governed service path.
+This remediation establishes the database default for later API/MCP, CHLOM/dS-CaaS, identity, rights, analytics, licensing, AI/ML, automation and institutional services:
 
-This packet does not open Phase 3. Phase 3 remains `blocked_pending_phase_2_99_hard_exit` until every remaining Phase 2.99 hard-exit predicate is satisfied.
+> private control-plane tables use RLS as defense in depth even when schema/table ACLs already deny client roles; policies must preserve least privilege, and a green security state may never be obtained by broadening client access or breaking the governed service path.
 
-## Notification and Collab state
+The result should be inherited by later Phase 3–10 database-backed services and validated through their own threat models.
 
-No material merge is created by this adjudication record, so no PASS SUCCESS Gmail is due from this packet alone.
+This packet **does not open Phase 3**. Phase 3 remains `blocked_pending_phase_2_99_hard_exit` until every remaining Phase 2.99 hard-exit predicate passes.
 
-Collab Portal remains fail-closed until all seven canonical predicates pass simultaneously: `credential_exact_match`, `project_meta_authenticated`, `institutional_project_uid`, `approved_field_map`, `authenticated_project_read`, `bounded_write_readback`, and `webhook_sender_delivery_integrity`. No private fallback address or credential is recorded here.
+## Collab and notification state
 
-## Exact next packet
+Collab Portal remains fail-closed until its seven canonical predicates pass simultaneously. Current live state has the credential, authenticated project metadata, pinned institutional project UID, and authenticated exact-project read passed; the approved field map, bounded write/readback, and webhook sender/delivery integrity remain incomplete.
 
-Agent B should independently review this adjudication packet against the live ACL/RLS/RPC evidence, confirm that it introduces no changed-file collision with PR #64 or #65, and refine only the reversible test/rollback evidence requirements if needed. Do not apply production RLS, grants, policies, privileged database changes, or credential changes. Route the resulting D3 migration decision to authorized-human / qualified-security authority after Security & Privacy plus Operations/SRE verification.
+No private fallback address or credential is recorded here. No PASS SUCCESS Gmail is due merely because this evidence packet changed; normal material-merge notification rules remain applicable after an authoritative merge.
+
+## Exact next review
+
+Agent S should now re-inspect the live RLS flags, client ACLs, service-role policies, Supabase security advisor, service-role smoke evidence, PR #64 exact head, and current provider-security evidence. If no other critical/high finding remains, replace the prior RLS-based block with a fresh exact-head disposition. Agent D should independently verify the same evidence before any governed promotion decision.
