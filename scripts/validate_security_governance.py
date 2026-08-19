@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "developers/manifests/security-self-healing-policy.v1.json"
+CREDENTIAL_POLICY = ROOT / "developers/manifests/credential-vault-ingestion-policy.v1.json"
 ACTIONS_POLICY = ROOT / "developers/manifests/github-actions-runtime-policy.v1.json"
 SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
 
@@ -31,6 +32,7 @@ def fail(message: str) -> None:
 
 def main() -> int:
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
+    credential_policy = json.loads(CREDENTIAL_POLICY.read_text(encoding="utf-8"))
     actions_policy = json.loads(ACTIONS_POLICY.read_text(encoding="utf-8"))
     if policy.get("control_model") != "continuous_detect_triage_repair_revalidate_independent_verify":
         fail("security control model drifted")
@@ -44,6 +46,29 @@ def main() -> int:
         fail("post-heal validation must rerun the GitHub Actions runtime policy")
     if policy["crypto_blockchain_guardrails"].get("phase_9_dependency") is not True:
         fail("advanced crypto/blockchain activation must remain Phase 9-gated")
+
+    vault_policy = credential_policy.get("policy", {})
+    if credential_policy.get("status") != "active_fail_closed":
+        fail("credential Vault-ingestion policy must remain active_fail_closed")
+    if vault_policy.get("founder_or_user_supplied_secret") != "vault_ingest_before_runtime_use":
+        fail("supplied secrets must enter Vault before runtime use")
+    if vault_policy.get("default_secret_store") != "supabase_vault":
+        fail("default secret store must remain Supabase Vault")
+    for key in (
+        "raw_secret_repository",
+        "raw_secret_documentation",
+        "raw_secret_examples",
+        "raw_secret_logs_ci_email_screenshots",
+        "raw_secret_retransmission_in_chat",
+    ):
+        if vault_policy.get(key) != "prohibited" and not (
+            key == "raw_secret_retransmission_in_chat" and vault_policy.get(key) == "prohibited_after_ingestion"
+        ):
+            fail(f"credential handling control drifted: {key}")
+    if vault_policy.get("runtime_consumption") != "server_side_vault_reference_only":
+        fail("runtime credentials must remain server-side Vault references only")
+    if vault_policy.get("vault_unavailable_behavior") != "fail_closed_and_request_connector_or_secure_binding":
+        fail("missing Vault capability must fail closed")
 
     github_evidence = policy.get("github_security_evidence", {})
     if github_evidence.get("codeql") != "required_when_applicable":
@@ -104,6 +129,7 @@ def main() -> int:
         fail("literal high-risk credential pattern(s) detected: " + ", ".join(findings))
 
     print("Deterministic security-governance validation passed.")
+    print("Credential policy: supplied secrets must enter Supabase Vault before runtime use; repository/docs/log/email exposure prohibited.")
     print("No literal GitHub/OpenAI/Stripe high-risk token patterns detected.")
     print("GitHub Actions: Node 24 fail-closed runtime policy; full-SHA action references; Dependency Review v5.")
     print("CodeQL mode: GitHub provider-managed default setup; duplicate advanced setup prohibited.")
