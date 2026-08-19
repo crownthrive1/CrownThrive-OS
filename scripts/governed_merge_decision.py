@@ -748,7 +748,7 @@ def main() -> int:
         print(json.dumps({
             "trusted_changed_files_count": len(trusted or set()),
             "trusted_changed_files_digest": changed_file_digest(trusted or set()),
-            "trusted_changed_files": sorted(trusted or set()),
+            "trusted_changed_files_redacted": True,
         }, indent=2, sort_keys=True))
         if not args.packet:
             return 0
