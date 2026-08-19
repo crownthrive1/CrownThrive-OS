@@ -97,27 +97,37 @@ last_verified_at:
 
 ## Branch and change-control baseline
 
-### Current CrownThrive-Support enforcement audit — 2026-08-18/19
+### CrownThrive-Support enforcement audit and reconciliation — 2026-08-18/19
 
-The repository already has automated governance **detection** through `.github/workflows/docs-governance.yml`. The workflow runs on qualifying pull requests and on qualifying pushes to `main`, and the validation job is named `Validate institutional documentation`.
+The repository first established automated governance **detection** through `.github/workflows/docs-governance.yml`, with pull-request validation and canonical-`main` revalidation. The initial provider observation showed the classic branch-protection surface as `protected: false` / status enforcement `off`. That initial observation is retained as historical evidence of the gap that triggered issue #83; it is not the effective current state.
 
-The current GitHub `main` branch API, however, reports `protected: false`, classic branch protection disabled, and required status checks with enforcement `off` and no required contexts/checks. This means the current proven state is:
+Subsequent 2026-08-19 provider-admin, machine-record and behavioral evidence closes the repository-governance checkpoint:
 
 ```yaml
 repository: crownthrive1/CrownThrive-Support
 branch: main
-governance_validator: active
-pull_request_validation: active
-push_to_main_revalidation: active
-branch_protection: disabled
-required_status_check_enforcement: disabled
-fail_closed_merge_governance: not_yet_proven
-classification: monitoring_plus_post_merge_defense_in_depth
+historical_initial_observation:
+  classic_branch_protection: disabled
+  classic_required_status_check_enforcement: off
+current_effective_state:
+  branch_reports_protected: true
+  protection_mode: ruleset_based
+  pull_request_required: true
+  required_status_context: CrownThrive governed merge gate
+  strict_current_with_main: true
+  force_pushes_allowed: false
+  branch_deletion_allowed: false
+  routine_bypass: disabled
+  bypass_authority: explicit_D3_break_glass_only
+  behavioral_negative_proof_pr: 93
+  fail_closed_merge_governance: verified
+  post_merge_revalidation: active
+phase_2_99_gate: CT-P299-GATE-004_pass
 ```
 
-This is a **hard Phase 2.99 repository-governance gap**. A failed validator can currently identify a policy violation, but the institutional record cannot yet claim that GitHub itself will always prevent that change from entering `main`.
+Issue #83 is completed. Disposable PR #93 deliberately failed the required governed-merge job and remained provider-blocked even though its git graph was mergeable, supplying the negative proof required by the original closure condition. GitHub's classic protection subobject may continue to show classic enforcement off while ruleset protection is active; that surface mismatch must not be interpreted as a regression without new behavioral/provider evidence.
 
-Required closure evidence is an effective repository branch/ruleset configuration targeting `main` that makes the exact institutional validation status check mandatory before merge, plus an observed blocked/non-mergeable failing test or equivalent GitHub enforcement evidence. Post-merge `main` validation remains required even after the merge gate is enabled.
+The remaining requirement is continuous drift detection, reproducible ruleset/required-check evidence and behavioral re-certification after material merge-perimeter changes. Post-merge `main` validation remains required as defense-in-depth.
 
 Phase 3 repositories inherit these minimum controls:
 

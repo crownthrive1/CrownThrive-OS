@@ -117,7 +117,7 @@ For an automatic D0–D2-eligible merge, all applicable requirements must pass:
 12. rollback/recovery exists;
 13. documentation impact and downstream Phase 3–10 reconciliation are complete.
 
-GitHub branch protection or rulesets may later be enabled as additional defense-in-depth. They are not the CrownThrive trust anchor and cannot replace this agent decision model.
+GitHub ruleset-based protection is now enabled and behaviorally verified as additional defense-in-depth. It remains non-sovereign: the provider perimeter cannot replace the CrownThrive agent/quorum/authority model, and the agent model cannot waive the required provider perimeter without an authorized D3 break-glass record.
 
 ## Shared handoff contract
 
@@ -194,45 +194,53 @@ The relay inherits all institutional governance:
 
 ## Repository governance enforcement state
 
-`S106` remains authoritative evidence that GitHub's `main` branch was observed unprotected, with required-status-check enforcement off. `CT-ADR-GOV-011` changes the policy conclusion without altering that evidence.
+`S106` preserves the earlier observation that classic branch-protection/status-check surfaces were off, but the effective current state has advanced. Issue #83 is completed, the repository-governance machine record now certifies the ruleset perimeter, and disposable PR #93 provides behavioral negative proof that a failing governed merge gate is provider-blocked.
 
 ```yaml
 workflow: Documentation Governance
 security_workflow: Security Governance
+governed_merge_workflow: Governed Merge Gate
 pull_request_validation: active
 push_to_main_revalidation: active
-main_branch_protected: false
-required_status_check_enforcement: off
-github_fail_closed_merge_enforcement: false
+main_branch_protected: true
+protection_mode: ruleset_based
+classic_required_status_check_enforcement: off
+required_status_context: CrownThrive governed merge gate
+strict_current_with_main: true
+force_pushes_allowed: false
+branch_deletion_allowed: false
+routine_bypass: disabled
+bypass_authority: explicit_D3_break_glass_only
+github_fail_closed_merge_enforcement: true
 sovereign_merge_authority: crownthrive_governed_agents
 agent_merge_policy: fail_closed_quorum_and_validation
 ```
 
-Agents therefore voluntarily refuse a merge **because executable CrownThrive policy requires that refusal**. This is the institutional automation rule, not an informal honor system. GitHub status checks and security products remain independently valuable evidence and drift/supply-chain defenses.
+Agents refuse unauthorized or noncompliant merges because CrownThrive policy requires that refusal **and** the verified GitHub ruleset now supplies an independent provider perimeter. Neither layer may be represented as the other: GitHub remains technical defense-in-depth, while CrownThrive governance retains institutional authority.
 
-No agent may call GitHub branch protection `enforced` when it is not. Conversely, no agent may treat the absence of GitHub branch protection alone as a Phase 3 blocker after `CT-ADR-GOV-011`. All remaining Phase 2.99 hard-exit requirements continue to apply.
+Any ruleset/workflow/bypass change must trigger provider reinspection and behavioral re-certification. The current Phase 2.99 ledger records the repository/security/governance sequence as `pass`; all other hard-exit requirements remain independently binding.
 
 ## Collab Portal relay state
 
-Current adapter evidence remains governed by `S101`, `S102` and `S105`.
+Current adapter evidence has advanced beyond the earlier exact-credential-copy block. The canonical Phase 2.99 ledger now records **six of seven** certification predicates passed; the remaining blocker is provider webhook sender/delivery integrity.
 
 ```yaml
 secure_api_contract: verified
 project_webhook_ui_events: verified
-server_runtime: collab-portal-pm_v2
 server_runtime_provider: Supabase
 server_runtime_vault_capable: true
-write_gate: closed
-project_meta_network_reachability: verified
-credential_exact_match: blocked
-project_meta_authentication: blocked_exact_secure_credential_copy
-institutional_project_uid: pending
-approved_field_map: pending
-bounded_write_readback: pending
-webhook_sender_integrity: pending
+credential_exact_match: passed
+project_meta_authentication: passed
+institutional_project_uid: passed
+approved_field_map: passed
+authenticated_project_read: passed
+bounded_write_readback: passed
+webhook_sender_delivery_integrity: blocked
+canonical_predicates_passed: 6_of_7
+hard_exit_gate: CT-P299-GATE-006
 ```
 
-Agents must not brute-force credential variants and must not attempt a Collab Portal mutation until the governed gates pass.
+Earlier bounded-write attempts that returned `422` do not define the current result; a later governed `200` write plus readback passed. Future mutations remain bounded by the approved adapter/authority contract, and event-driven synchronization remains fail-closed until sender/delivery integrity is proven. Cross-provider drift and alerts are tracked in the [Phase 2.99 Roadmap & Operational Watch Control Center](/changelog/phase-2-99-roadmap-and-operational-watch-control-center).
 
 ## Notification contract
 
