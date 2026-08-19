@@ -7,67 +7,66 @@
 
 ## Purpose
 
-This bounded Cell 08 packet remains the executable Security/TEVV/Resilience invariant matrix for the CHLOM reference semantic oracle. It is stacked on Cell 01 PR #82 and has now merged the remediated Cell 01 kernel lineage through exact kernel head `30d7b49bf6b01d6d094f62fa357dd31647ef078a` without modifying Cell 01-owned files.
+This bounded Cell 08 packet remains the executable Security/TEVV/Resilience invariant matrix for the CHLOM reference semantic oracle. It is stacked on Cell 01 PR #82 and now tests exact Cell 01 kernel head `30d7b49bf6b01d6d094f62fa357dd31647ef078a` without taking ownership of Cell 01 files.
 
-OPA, OpenFGA, Cedar and Temporal remain non-authoritative candidates. The same invariant IDs remain the future backend-equivalence contract: an adapter may be adopted only when it is no more permissive than canonical CrownThrive semantics for every applicable vector.
+OPA, OpenFGA, Cedar and Temporal remain non-authoritative candidates. The invariant IDs remain the future backend-equivalence contract: an adapter may be adopted only when it is no more permissive than canonical CrownThrive semantics for every applicable vector.
 
-## Original HIGH findings under revalidation
+## HIGH finding revalidation — resolved on the prototype kernel surface
 
-Cell 08 originally proved two HIGH semantic defects:
+Cell 08 originally demonstrated two HIGH semantic defects:
 
 - `ct.finding.tevv.authority-approval-self-assertion`
 - `ct.finding.tevv.restricted-evidence-reference-unsanitized`
 
-Cell 01 v1.1 now claims root-cause repairs for both and additionally fixes an implicit legacy-contract downgrade gap discovered during independent review. Cell 08 therefore does not copy the old findings forward mechanically. It preserves them as `remediated_pending_exact_head_tevv_revalidation` until the original vectors and the expanded invariant set execute successfully on the reconciled exact head.
+Cell 01 v1.1 repaired both root causes and also removed an implicit legacy-contract downgrade path. Cell 08 preserved the original finding IDs and acceptance criteria, merged the repair lineage, and reran the original failing vectors rather than weakening them.
 
-The original vector expectations have **not** been weakened:
+Exact revalidation evidence on Cell 08 head `396d69fefb43fee447644a4f7e65e1c5cf336916`:
 
-- caller-asserted role and approval labels must not create authority;
-- verified authority must be independently supplied and bound to the same actor and organization;
-- authority-sensitive allow requires verified relationship, delegation and applicable approval evidence;
-- arbitrary/restricted evidence text must never be persisted verbatim;
-- governed evidence references may remain stable;
-- untrusted requests may not silently fall back to legacy semantics.
+- CHLOM TEVV run `32221488101` — PASS
+- TEVV job `95972654206` — PASS
+- Security Governance run `32221488078` — PASS
+- Documentation Governance run `32221488189` — PASS
+- 17 invariant vectors defined
+- 16 native reference TEVV tests executed — all PASS
+- parent CHLOM build-program validation — PASS
 
-## Expanded native invariant set
+The original HIGH acceptance vectors specifically proved:
 
-The native TEVV suite now exercises:
+- caller self-asserted `rights_steward` plus `rights_authority` does **not** produce an autonomous license allow;
+- verified authority is separately supplied and actor/org bound;
+- authority-sensitive allow requires verified role, relationship, delegation and applicable approval context;
+- incomplete verified relationship/delegation resolves to hold;
+- verified-authority actor/org mismatch denies;
+- restricted/free-form authority evidence is not persisted verbatim and is represented as an opaque SHA-256 digest;
+- governed `ct.evidence.ref.*` references remain stable;
+- an untrusted request without the strict contract identity cannot silently downgrade to legacy semantics.
 
-- missing contract identity / implicit legacy downgrade rejection;
-- unauthenticated and cross-tenant denial;
-- prompt-like action injection denial;
-- caller self-asserted license authority rejection;
-- successful license allow only with separately verified actor/org/role/relationship/delegation/approval context;
-- incomplete verified relationship/delegation hold;
-- verified-context actor/org mismatch denial;
-- restricted/free-form evidence digest sanitization;
-- governed evidence-reference preservation;
-- D3 never-autonomous allow;
-- unknown policy condition configuration failure;
-- idempotent retry and idempotency-key payload conflict;
-- DAIL tamper detection;
-- the original HIGH-finding detectors, which must now observe no failure if the remediation is real.
+The two original HIGH findings are therefore recorded `resolved` for the current Phase 2.99 prototype kernel surface, with their exact run/job/head evidence retained in the machine packet. This does **not** certify a production CHLOM service, an external backend, a binding rights action, or Phase 3 entry.
 
 ## Remaining MEDIUM finding
 
-`ct.finding.tevv.policy-bundle-state-unverified` remains open. The current reference policy engine still consumes rule objects without proving bundle effective state, supersession or signature/trust lineage. Cell 02 Policy/dS-CaaS owns this gap. It is not erased by Cell 01 remediation.
+`ct.finding.tevv.policy-bundle-state-unverified` remains open. The current reference policy engine still consumes rule objects without proving bundle effective state, supersession or signature/trust lineage. Cell 02 Policy/dS-CaaS owns this gap.
 
-## Fail-closed revalidation meaning
+## Fail-closed finding lifecycle
 
-A green validator alone is not closure. The revalidation sequence is:
+The packet validator now permits a HIGH/critical finding to transition to `resolved` only when:
 
-1. preserve the original finding IDs and acceptance criteria;
-2. merge the remediation lineage into the TEVV stack without rewriting history;
-3. rerun the original failed vectors and the expanded native invariant suite;
-4. rerun parent CHLOM build validation;
-5. consume exact-head GitHub CI and Security Governance evidence;
-6. only then change HIGH finding state to `resolved` with explicit closure evidence;
-7. leave parent sequencing, medium findings and Phase 2.99 hard-exit gates intact.
+1. the finding ID remains in the machine record;
+2. the finding is explicitly marked non-blocking only after closure;
+3. exact closure evidence is recorded;
+4. the original vector has not been weakened;
+5. the original vector rerun is recorded PASS;
+6. full Cell 08, parent CHLOM, Security Governance and Documentation Governance evidence is recorded;
+7. later parent/predecessor, specialist and sovereign promotion gates remain intact.
 
-A finding may never be closed by deleting a vector, weakening its expected result, suppressing a failure, or treating a provider capability as authority.
+Deleting a finding, changing its expected outcome to match insecure behavior, suppressing a scan, or treating a provider capability as authority remains prohibited.
 
-## Provider and recovery boundaries
+## Promotion and provider boundaries
+
+Cell 08 remains an Agent-S-originated D2 prototype packet and Agent S does not self-approve its promotion. Required specialist set remains Security & Privacy + AI/ML/LLM TEVV + Operations/SRE. Independent sovereign review is still required.
 
 No production provider mutation, credential/key action, payment, rights grant, token/crypto activation, external backend adoption or restricted-evidence publication occurs in this packet. OPA/OpenFGA/Cedar/Temporal outage, malformed-output and full equivalence vectors remain defined but unexecuted until isolated adapters exist.
+
+The repository sequence remains fail-closed: PR #64 bootstrap → provider-verified `github_main_perimeter` → PR #65 reconciliation/fresh gates before normal D0-D2 canonical promotion. Parent #67 and Cell 01/08 child work may build/test in parallel but cannot leapfrog that sequence. Phase 3 remains `blocked_pending_phase_2_99_hard_exit`.
 
 Rollback is revert of this stacked Cell 08 packet. There is no provider state or data migration to unwind. Advanced crypto/poly-chain/token/smart-contract TEVV remains Phase 9 research under separate legal/security/custody/recovery gates.
