@@ -37,9 +37,9 @@ CANONICAL_COLLAB = {
     "credential_exact_match": "passed",
     "project_meta_authenticated": "passed",
     "institutional_project_uid": "passed",
-    "approved_field_map": "blocked",
+    "approved_field_map": "passed",
     "authenticated_project_read": "passed",
-    "bounded_write_readback": "closed",
+    "bounded_write_readback": "passed",
     "webhook_sender_delivery_integrity": "blocked",
 }
 
@@ -58,7 +58,7 @@ def require_equal(actual, expected, label: str) -> None:
 
 
 def validate(data: dict, root: Path, check_files: bool = True) -> None:
-    require_equal(data.get("manifest_version"), "1.2.0", "manifest version")
+    require_equal(data.get("manifest_version"), "1.2.1", "manifest version")
     require_equal(data.get("observation_semantics"), "verification_baseline_snapshot_not_dynamic_post_merge_assertion", "observation semantics")
 
     authority = data.get("authority", {})
@@ -126,7 +126,9 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     rls = sequence.get("pr_66_issue_79", {})
     require_equal(rls.get("issue_79_state"), "closed_completed", "issue79 state")
     require_equal(rls.get("critical_defense_in_depth_finding_resolved"), True, "RLS resolution")
-    require_equal(rls.get("rls_enabled_on_all_six_tables"), True, "RLS tables")
+    require_equal(rls.get("rls_enabled_on_all_six_tables"), True, "original six-table RLS remediation")
+    require_equal(rls.get("current_integration_control_table_count"), 8, "current integration-control table count")
+    require_equal(rls.get("rls_enabled_on_all_current_tables"), True, "current RLS estate")
     require_equal(rls.get("client_acl_denial_preserved"), True, "RLS client denial")
     require_equal(rls.get("service_role_smoke_passed"), True, "RLS service smoke")
     require_equal(rls.get("supabase_security_advisor_lints"), 0, "security advisor")
@@ -137,19 +139,26 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     collab = data.get("collab_portal", {})
     require_equal(collab.get("state"), "fail_closed", "Collab state")
     require_equal(collab.get("canonical_predicate_count"), 7, "Collab predicate count")
-    require_equal(collab.get("predicates_passed_count"), 4, "Collab passed count")
+    require_equal(collab.get("predicates_passed_count"), 6, "Collab passed count")
     require_equal(collab.get("all_seven_certification_predicates_passed"), False, "Collab all seven")
     for key, expected in CANONICAL_COLLAB.items():
         require_equal(collab.get(key), expected, f"collab.{key}")
-    require_equal(collab.get("request_budget_august", {}).get("consumed"), 9, "Collab requests")
+    require_equal(collab.get("request_budget_august", {}).get("consumed"), 16, "Collab requests")
     require_equal(collab.get("request_budget_august", {}).get("limit"), 20000, "Collab limit")
 
     api = data.get("api_mcp_runtime_closure", {})
-    require_equal(api.get("crownthrive_io", {}).get("state"), "read_verified_write_closed", "IO state")
+    io_state = api.get("crownthrive_io", {})
+    require_equal(io_state.get("state"), "read_verified_write_closed", "IO state")
+    require_equal(io_state.get("august_request_count_observed"), 32, "IO request count")
+    require_equal(io_state.get("monthly_request_budget_ceiling"), "open", "IO monthly request ceiling")
+    require_equal(io_state.get("scheduled_health_probe_budget_policy"), "open", "IO scheduled health budget policy")
     require_equal(api.get("crownthrive_api_control", {}).get("write_gate"), False, "API write gate")
     require_equal(api.get("crownthrive_api_control", {}).get("hard_exit_certified"), False, "API hard exit")
-    if not api.get("open_acceptance_items"):
+    open_acceptance = api.get("open_acceptance_items", [])
+    if not open_acceptance:
         fail("API/MCP open acceptance items must remain explicit while hard exit is incomplete")
+    if "monthly_request_budget_ceiling" not in open_acceptance:
+        fail("API/MCP closure must preserve the open monthly request budget ceiling")
 
     gates = data.get("open_hard_gates", [])
     require_equal(len(gates), 8, "hard-gate registry count")
@@ -158,6 +167,7 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     require_equal(by_id["CT-P299-GATE-004"].get("state"), "pass", "repository canonicalization gate")
     require_equal(by_id["CT-P299-GATE-005"].get("state"), "pass", "RLS gate")
     require_equal(by_id["CT-P299-GATE-006"].get("state"), "not_met", "Collab gate")
+    require_equal(by_id["CT-P299-GATE-006"].get("progress"), "6_of_7_passed", "Collab gate progress")
     open_blocking = [row for row in gates if row.get("blocking") is True and row.get("state") != "pass"]
     require_equal(len(open_blocking), 6, "open blocking gate count")
 
@@ -228,10 +238,10 @@ def self_test(data: dict) -> None:
     expect_failure(data, lambda d: d["hard_exit"].__setitem__("phase_3_entry_open", True), "premature Phase3")
     expect_failure(data, lambda d: d["macro_count_universes"]["holdings_domain_rows"].__setitem__("count", 68), "count collapse")
     expect_failure(data, lambda d: d["articleization"].__setitem__("terminal_disposition_assigned_795", True), "false article completion")
-    expect_failure(data, lambda d: d["collab_portal"].__setitem__("approved_field_map", "passed"), "false Collab completion")
+    expect_failure(data, lambda d: d["collab_portal"].__setitem__("all_seven_certification_predicates_passed", True), "false Collab completion")
     expect_failure(data, lambda d: d["repository_security_sequence"].__setitem__("canonicalization_complete", False), "repository regression")
     expect_failure(data, lambda d: d["repository_security_sequence"]["pr_65"].__setitem__("state", "open"), "stale PR65 state")
-    expect_failure(data, lambda d: d["repository_security_sequence"]["pr_66_issue_79"].__setitem__("critical_defense_in_depth_finding_resolved", False), "stale RLS")
+    expect_failure(data, lambda d: d["repository_security_sequence"]["pr_66_issue_79"].__setitem__("rls_enabled_on_all_current_tables", False), "stale RLS")
 
 
 def main() -> int:
@@ -247,7 +257,7 @@ def main() -> int:
     open_count = sum(1 for row in data["open_hard_gates"] if row.get("blocking") is True and row.get("state") != "pass")
     print("Phase 2.99 closure-ledger consistency validation: PASS")
     print(f"Open blocking hard-exit gates preserved: {open_count}")
-    print("Repository canonicalization: PASS; RLS defense-in-depth: PASS; Collab: 4/7 PASS, fail-closed.")
+    print("Repository canonicalization: PASS; RLS defense-in-depth: PASS; Collab: 6/7 PASS, fail-closed.")
     print("Institutional state: Phase 2 / 2.99; Phase 3 blocked_pending_phase_2_99_hard_exit.")
     print("Important: validator PASS != Phase 2.99 hard-exit PASS.")
     return 0
