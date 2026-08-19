@@ -284,6 +284,22 @@ Operational health remains stable. `pg_cron` recorded 21 executions in the prior
 
 The latest successful audited provider reads remain CrownThrive IO HTTP 200 at 22:08 UTC, ThriveTools SEO HTTP 200 at 21:41 UTC and Collab Portal bounded readback HTTP 200 at 19:41 UTC. No new external provider request was required by this heartbeat beyond the already-recorded read-only activity. Phase 2.99 remains open: the canonical hard-exit ledger is still **2 PASS / 6 blocking categories**, including GATE-001, GATE-002, GATE-003, GATE-006, GATE-007 and GATE-008. This heartbeat therefore reduces integration hardening debt but does not open Phase 3.
 
+## Credential continuity audit — 2026-08-19 22:25 UTC
+
+`ct.subagent.credential-continuity` completed a sanitized P0 continuity pass against live `integration_control`, active Supabase Edge Functions and Vault **reference names only**. No raw secret value or credential fingerprint was read into the institutional record.
+
+The credential continuity registry now carries **19 classified records**: 9 verified primary Vault references, 5 verified recovery references, 5 `blocked_missing_secret` records, 4 `provider_managed_only` records and 1 future `pending` Reward Loyalty v5 Agent API credential. A direct registry-to-Vault-name reconciliation returned **19/19 presence states matching** with zero stale presence mismatches. Current missing-secret blockers remain Adserver.Online API access, Partnero API access, Partnero webhook signing, Stripe server API access and Stripe webhook signing. Partnero, Stripe and Adserver continue under existing fail-closed recovery ownership/deferral controls; no provider credential was rotated or reconstructed.
+
+Provider-managed continuity is now explicitly classified for THIVEBASE/Supabase runtime identity, `crownthrive-api-control` Supabase runtime auth, CrownThrive ID/Supabase Auth signing and the GitHub canonical-main perimeter. Reward Loyalty's future v5 Agent API key is registered as `pending`, not missing-current-production state: CrownRewards remains on v4 production and the key must not be provisioned until the existing v5 deployment/read/least-privilege gates permit it.
+
+Runtime-consumer reconciliation confirmed the registered current Edge Function consumers are ACTIVE; future MCP/provider adapters remain marked future. A deterministic D1 registry drift was repaired for `crownthrive-api-control`: its service metadata now matches the ACTIVE v3 runtime. Two secret-source policy deltas were also opened for security review rather than hidden: Stripe's institutional webhook runtime permits an environment-variable source before Vault and is therefore **blocked** on `runtime_secret_source_policy` while Vault aliases remain unbound; Collab Portal PM permits environment-before-Vault source precedence and is **open** on `credential_source_precedence_policy` even though its Vault bindings and authenticated reads remain verified.
+
+The added control coverage changes the live integration-control totals to **12 blocked / 47 open / 79 passed / 10 closed**. This is not a new database/provider outage; it is explicit registration of previously unmodeled credential-source risk. Phase 2.99 remains current. `CT-P299-GATE-007` remains open, and `CT-P299-GATE-008` remains unjustified until upstream hard-exit requirements are actually satisfied.
+
+**Agent A handoff:** keep Partnero, Stripe and Adserver provider writes fail-closed; route approved secure Vault binding/recovery work through the existing accountable owners; preserve Reward Loyalty v4 and defer its v5 key until the v5 gates permit provisioning; carry these deltas through #98/#99/#100 and downstream Phase 3–10 reconciliation.
+
+**Agent S handoff:** verify the effective secret source for Stripe institutional webhook and Collab PM without exposing values; reconcile runtime source precedence to the active Vault-ingestion policy; do not rotate credentials merely to satisfy the control; re-run continuity and runtime-readback checks after any approved code/config remediation.
+
 ## THIVEBASE Monthly Heartbeat
 
 The recurring **THIVEBASE Monthly Heartbeat** is now the ecosystem-wide API/infrastructure certification cycle. It runs on the first day of each month in the local morning window and must begin by calling `public.thivebase_health_snapshot()` against the connected CrownThrive Supabase project so every run creates actual database activity.
