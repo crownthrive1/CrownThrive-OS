@@ -44,6 +44,10 @@ Security self-healing is permitted only when the repaired state passes the origi
 
 GitHub remains important for repository history, PR review, CI, CodeQL, dependency review, secret-scanning evidence where available and post-merge validation. Its settings are not CrownThrive's institutional sovereign authority.
 
+**GitHub branch protection may supplement the model but is not the authority root.**
+
+Where GitHub already operates a provider-managed security capability such as CodeQL default setup, CrownThrive should consume that provider evidence rather than introducing a conflicting duplicate advanced configuration solely to make its own workflow appear more complete.
+
 ## Roadmap rule
 
 This amendment does not open Phase 3. It removes only GitHub branch protection as an independent hard dependency. Every other Phase 2.99 hard-exit and Phase 3 hard-entry requirement remains binding.
