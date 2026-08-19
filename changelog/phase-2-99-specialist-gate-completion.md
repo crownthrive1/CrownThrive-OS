@@ -27,7 +27,7 @@ The non-voting subagent registry adds scrutiny and execution depth but no sovere
 
 ## Nine machine-enforced specialist domains
 
-1. Security & Privacy — `security`
+1. Security & Privacy — canonical `security`; compatibility alias `security_privacy`
 2. Legal / Regulatory — `legal_regulatory`
 3. Operations / SRE — `operations_sre`
 4. Blockchain / Cryptographic Protocol — `blockchain_protocol`
@@ -37,9 +37,9 @@ The non-voting subagent registry adds scrutiny and execution depth but no sovere
 8. Accessibility / Consumer Protection — `accessibility_consumer_protection`
 9. Regional / Global Localization — `regional_global_localization`
 
-The decision engine normalizes changed-domain labels, reads patterns and endorsement IDs from `agent-sovereign-governance.v1.json`, and accumulates every matching specialist instead of maintaining a separate hard-coded lookup table.
+The decision engine normalizes changed-domain labels, reads patterns and endorsement IDs from `agent-sovereign-governance.v1.json`, and accumulates every matching specialist instead of maintaining a separate hard-coded lookup table. Historical/live `security_privacy` evidence is explicitly migrated to canonical `security`; unknown endorsement IDs fail closed rather than being silently accepted.
 
-Examples now covered by executable self-tests:
+Examples covered by executable self-tests:
 
 - `rights` => Legal + IP/Rights;
 - `blockchain` => Security + Blockchain Protocol;
@@ -49,6 +49,24 @@ Examples now covered by executable self-tests:
 - `settlement` => Blockchain Protocol + Finance.
 
 The self-test also proves all nine stable endorsement IDs are registered, all nine can activate, missing cumulative endorsements fail closed, 4/5 remains the quorum, and D3 still cannot auto-merge.
+
+## Changed-domain provenance self-heal
+
+Independent Agent-B review identified that the earlier dynamic resolver still trusted a caller-supplied `changed_domains` array. A D2 packet could therefore omit or misclassify domains and reduce the specialist set even though the nine-domain registry itself was correct.
+
+The current self-heal closes that bypass without weakening any control:
+
+- D1/D2 material packets must provide the complete `changed_files` set and one per-file domain classification;
+- D3 packets are also classification-required before a human-authorized execution decision can proceed;
+- the specialist resolver uses the **derived union of per-file classifications**, not caller `changed_domains`, as its authority source;
+- an optional `changed_domains` assertion must exactly match the derived union or the packet fails closed;
+- every material changed file must be classified exactly once;
+- classifications use a governed vocabulary derived from specialist patterns plus neutral documentation/governance domains;
+- reviewer classifications require an inspectable evidence reference;
+- known sensitive surfaces have deterministic minimum-domain requirements, including workflows, the sovereign merge engine/manifest, and CHLOM policy/authority/evidence/rights/economics/API contracts;
+- omission of a required deterministic domain, an unclassified file, an unknown domain, an unknown endorsement ID, an alias collision, or a changed-domain mismatch blocks automatic promotion.
+
+Negative tests specifically prove that `scripts/governed_merge_decision.py` cannot be classified only as `agent` while omitting `security`, and that a caller cannot assert a smaller `changed_domains` set than the derived file classification. A valid D1 documentation-only packet remains possible through an explicit neutral `documentation` classification; D0 quorum behavior is unchanged.
 
 ## Self-healing and controlled evolution
 
@@ -64,8 +82,10 @@ Validators, findings, evidence or privilege may never be weakened to force a pas
 
 The pre-reconciliation branch was based on pre-PR-64 main and contained noncanonical unanimous-first/deadlock semantics. After PR #64 and PR #95 became canonical and issue #83 closed, the branch was merged forward onto `ee6175f...` without force-pushing or erasing historical lineage. The current proposal starts from the post-Node24/post-provider-perimeter tree and reapplies only the bounded specialist/subagent hardening compatible with canonical authority.
 
+Agent-B's exact-head block on `dca9bbda87f4e61436f4b4f42d9f59c2643abebe` is preserved as the trigger evidence for the changed-domain provenance and `security_privacy` compatibility repair. This material head change invalidates every earlier vote on that SHA; fresh exact-head validation, specialist review and A/B/C/D/S voting are required.
+
 ## Rollback / impact
 
 Rollback is a normal revert of this packet. No provider, credential, customer, payment, binding rights, production infrastructure, Collab, token/crypto or restricted-evidence mutation is introduced.
 
-Documentation impact: `docs_updated` through this public-safe changelog and the machine governance manifest. Phase 3-10 inherit cumulative specialist activation after canonical promotion, but this packet does not itself advance any phase or activate regulated/financial/cryptographic capability.
+Documentation impact: `docs_updated` through this public-safe changelog and the machine governance manifest. Phase 3-10 inherit cumulative specialist activation and fail-closed changed-domain provenance after canonical promotion, but this packet does not itself advance any phase or activate regulated/financial/cryptographic capability.
