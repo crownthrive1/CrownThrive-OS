@@ -3,8 +3,9 @@
 
 GitHub is required defense-in-depth, evidence, CI, scanning and transport. It is
 not sovereign authority. The engine is fail-closed, retains CT-ADR-GOV-011's
-4-of-5 + mandatory Agent D rule, and derives specialist gates from the governed
-registry rather than from a second hard-coded two-specialist table.
+4-of-5 + mandatory Agent D rule, derives specialist gates from the governed
+registry, and derives material changed domains from per-file classifications
+rather than trusting a caller-supplied domain list.
 """
 
 from __future__ import annotations
@@ -30,6 +31,58 @@ def normalize_domain(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
 
 
+def specialist_alias_map(policy: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
+    """Build governed endorsement alias -> canonical endorsement ID mapping."""
+    aliases: dict[str, str] = {}
+    errors: list[str] = []
+    registry = policy.get("specialist_activation", {})
+    if not isinstance(registry, dict):
+        return aliases, ["specialist_registry_not_object"]
+
+    for specialist_key, config in registry.items():
+        if not isinstance(config, dict):
+            errors.append(f"specialist_config_not_object:{normalize_domain(specialist_key)}")
+            continue
+        canonical = normalize_domain(config.get("endorsement_id", specialist_key))
+        if not canonical:
+            errors.append(f"specialist_endorsement_id_missing:{normalize_domain(specialist_key)}")
+            continue
+        candidates = [canonical, *config.get("endorsement_aliases", [])]
+        for candidate in candidates:
+            alias = normalize_domain(candidate)
+            if not alias:
+                errors.append(f"specialist_alias_empty:{canonical}")
+                continue
+            existing = aliases.get(alias)
+            if existing and existing != canonical:
+                errors.append(f"specialist_alias_collision:{alias}:{existing}:{canonical}")
+                continue
+            aliases[alias] = canonical
+    return aliases, errors
+
+
+def normalize_endorsements(
+    values: Any, policy: dict[str, Any]
+) -> tuple[set[str], list[str]]:
+    """Canonicalize specialist endorsements and reject unknown IDs fail-closed."""
+    alias_map, alias_errors = specialist_alias_map(policy)
+    errors = list(alias_errors)
+    if values is None:
+        values = []
+    if not isinstance(values, list):
+        return set(), [*errors, "specialist_endorsements_not_list"]
+
+    normalized: set[str] = set()
+    for value in values:
+        token = normalize_domain(value)
+        canonical = alias_map.get(token)
+        if not canonical:
+            errors.append(f"unknown_specialist_endorsement:{token or '<empty>'}")
+            continue
+        normalized.add(canonical)
+    return normalized, errors
+
+
 def required_specialists_for(changed_domains: set[str], policy: dict[str, Any]) -> set[str]:
     """Resolve cumulative specialist endorsements from the machine registry."""
     normalized_domains = {
@@ -53,6 +106,182 @@ def required_specialists_for(changed_domains: set[str], policy: dict[str, Any]) 
         if normalized_domains & patterns:
             required.add(endorsement_id)
     return required
+
+
+def allowed_domain_tokens(policy: dict[str, Any]) -> set[str]:
+    """Build the controlled changed-domain vocabulary from governed policy."""
+    allowed: set[str] = set()
+    contract = policy.get("changed_domain_contract", {})
+    if isinstance(contract, dict):
+        allowed.update(
+            normalize_domain(value)
+            for value in contract.get("neutral_domains", [])
+            if normalize_domain(value)
+        )
+        for rule in contract.get("path_domain_rules", []):
+            if isinstance(rule, dict):
+                allowed.update(
+                    normalize_domain(value)
+                    for value in rule.get("required_domains", [])
+                    if normalize_domain(value)
+                )
+
+    registry = policy.get("specialist_activation", {})
+    if isinstance(registry, dict):
+        for key, config in registry.items():
+            if not isinstance(config, dict):
+                continue
+            allowed.add(normalize_domain(key))
+            allowed.add(normalize_domain(config.get("endorsement_id", key)))
+            allowed.update(
+                normalize_domain(value)
+                for value in config.get("required_patterns", [])
+                if normalize_domain(value)
+            )
+    allowed.discard("")
+    return allowed
+
+
+def classify_changed_domains(
+    packet: dict[str, Any], policy: dict[str, Any], risk_class: str
+) -> tuple[set[str], list[str]]:
+    """Derive changed domains from classified files and validate provenance.
+
+    D1/D2 and D3 packets fail closed if material changed files are omitted or
+    unclassified. A caller-provided ``changed_domains`` list is only an
+    assertion: when present it must equal the derived union and is never the
+    authority source used for specialist activation.
+    """
+    contract = policy.get("changed_domain_contract", {})
+    if not isinstance(contract, dict):
+        return set(), ["changed_domain_contract_missing"]
+
+    required_risks = {
+        str(value).upper() for value in contract.get("required_for_risk_classes", [])
+    }
+    required = risk_class in required_risks or risk_class == "D3"
+    changed_files_raw = packet.get("changed_files", [])
+    classifications_raw = packet.get("domain_classifications", [])
+
+    if not required and not changed_files_raw and not classifications_raw:
+        asserted = packet.get("changed_domains")
+        if asserted:
+            return set(), ["changed_domains_asserted_without_file_classification"]
+        return set(), []
+
+    errors: list[str] = []
+    if not isinstance(changed_files_raw, list):
+        return set(), ["changed_files_not_list"]
+    changed_files = [str(value).strip() for value in changed_files_raw if str(value).strip()]
+    if len(changed_files) != len(changed_files_raw):
+        errors.append("changed_files_contains_empty_path")
+    if len(changed_files) != len(set(changed_files)):
+        errors.append("changed_files_contains_duplicate_path")
+    if required and not changed_files:
+        errors.append("material_changed_files_missing")
+
+    if not isinstance(classifications_raw, list):
+        return set(), [*errors, "domain_classifications_not_list"]
+
+    allowed = allowed_domain_tokens(policy)
+    allowed_provenance = {
+        normalize_domain(value)
+        for value in contract.get("allowed_provenance", [])
+        if normalize_domain(value)
+    }
+    reviewer_requires_evidence = bool(
+        contract.get("reviewer_classification_requires_evidence_ref", True)
+    )
+
+    by_path: dict[str, dict[str, Any]] = {}
+    derived: set[str] = set()
+    for raw in classifications_raw:
+        if not isinstance(raw, dict):
+            errors.append("domain_classification_not_object")
+            continue
+        path = str(raw.get("path", "")).strip()
+        if not path:
+            errors.append("domain_classification_missing_path")
+            continue
+        if path in by_path:
+            errors.append(f"duplicate_domain_classification:{path}")
+            continue
+        by_path[path] = raw
+        if path not in changed_files:
+            errors.append(f"domain_classification_unknown_path:{path}")
+
+        domains_raw = raw.get("domains", [])
+        if not isinstance(domains_raw, list) or not domains_raw:
+            errors.append(f"domain_classification_missing_domains:{path}")
+            domains: set[str] = set()
+        else:
+            domains = {
+                normalize_domain(value) for value in domains_raw if normalize_domain(value)
+            }
+            if len(domains) != len(domains_raw):
+                errors.append(f"domain_classification_empty_domain:{path}")
+            unknown = sorted(domains - allowed)
+            if unknown:
+                errors.append(
+                    f"domain_classification_unknown_domains:{path}:{','.join(unknown)}"
+                )
+        derived.update(domains)
+
+        provenance = normalize_domain(raw.get("provenance", ""))
+        if provenance not in allowed_provenance:
+            errors.append(f"domain_classification_invalid_provenance:{path}:{provenance}")
+        if (
+            provenance == "reviewer_classification"
+            and reviewer_requires_evidence
+            and not str(raw.get("evidence_ref", "")).strip()
+        ):
+            errors.append(f"domain_classification_evidence_ref_missing:{path}")
+
+        for rule in contract.get("path_domain_rules", []):
+            if not isinstance(rule, dict):
+                continue
+            exact = str(rule.get("path", "")).strip()
+            prefix = str(rule.get("prefix", "")).strip()
+            matches = bool((exact and path == exact) or (prefix and path.startswith(prefix)))
+            if not matches:
+                continue
+            required_domains = {
+                normalize_domain(value)
+                for value in rule.get("required_domains", [])
+                if normalize_domain(value)
+            }
+            missing = sorted(required_domains - domains)
+            if missing:
+                errors.append(
+                    f"domain_classification_missing_required:{path}:{','.join(missing)}"
+                )
+
+    missing_paths = sorted(set(changed_files) - set(by_path))
+    for path in missing_paths:
+        errors.append(f"unclassified_changed_file:{path}")
+
+    if required and not derived:
+        errors.append("material_changed_domains_empty")
+
+    if "changed_domains" in packet:
+        asserted_raw = packet.get("changed_domains", [])
+        if not isinstance(asserted_raw, list):
+            errors.append("changed_domains_assertion_not_list")
+        else:
+            asserted = {
+                normalize_domain(value)
+                for value in asserted_raw
+                if normalize_domain(value)
+            }
+            if contract.get("asserted_changed_domains_must_match_derived", True):
+                if asserted != derived:
+                    errors.append(
+                        "changed_domains_assertion_mismatch:"
+                        f"asserted={','.join(sorted(asserted))}:"
+                        f"derived={','.join(sorted(derived))}"
+                    )
+
+    return derived, errors
 
 
 def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
@@ -97,8 +326,13 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     risk_class = str(packet.get("risk_class", "")).upper()
     d3 = risk_class == "D3"
     hard_blocks = [str(x) for x in packet.get("hard_blocks", []) if str(x).strip()]
-    endorsements = {normalize_domain(value) for value in packet.get("specialist_endorsements", [])}
-    changed_domains = {str(value) for value in packet.get("changed_domains", [])}
+
+    changed_domains, classification_errors = classify_changed_domains(
+        packet, policy, risk_class
+    )
+    endorsements, endorsement_errors = normalize_endorsements(
+        packet.get("specialist_endorsements", []), policy
+    )
     required_specialists = required_specialists_for(changed_domains, policy)
     missing_endorsements = sorted(required_specialists - endorsements)
 
@@ -130,6 +364,10 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
             f"risk_score_below_threshold:{composite}/"
             f"{policy['risk_rating']['minimum_automatic_merge_score']}"
         )
+    if classification_errors:
+        reasons.append(f"invalid_domain_classification:{'|'.join(classification_errors)}")
+    if endorsement_errors:
+        reasons.append(f"invalid_specialist_endorsements:{'|'.join(endorsement_errors)}")
     if missing_endorsements:
         reasons.append(f"missing_specialists:{','.join(missing_endorsements)}")
     if hard_blocks:
@@ -147,6 +385,8 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
         and not hard_blocks
         and not missing_endorsements
         and not invalid_votes
+        and not classification_errors
+        and not endorsement_errors
     )
 
     decision = "approve_agent_merge" if auto_merge_authorized else "deny_or_escalate"
@@ -158,6 +398,9 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
         and score_ok
         and not hard_blocks
         and not missing_endorsements
+        and not invalid_votes
+        and not classification_errors
+        and not endorsement_errors
     ):
         decision = "human_authorized_execution_may_proceed_under_separate_d3_controls"
 
@@ -174,7 +417,11 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
         "missing_votes": missing,
         "composite_risk_score": composite,
         "minimum_score": policy["risk_rating"]["minimum_automatic_merge_score"],
+        "derived_changed_domains": sorted(changed_domains),
+        "domain_classification_errors": classification_errors,
         "required_specialists": sorted(required_specialists),
+        "normalized_specialist_endorsements": sorted(endorsements),
+        "specialist_endorsement_errors": endorsement_errors,
         "missing_specialists": missing_endorsements,
         "hard_blocks": hard_blocks,
         "human_authorized": packet.get("human_authorized") is True,
@@ -196,18 +443,41 @@ def self_test(policy: dict[str, Any]) -> None:
         {"agent_id": "ct.relay.agent-c", "vote": "approve"},
         {"agent_id": "ct.relay.agent-d", "vote": "approve"},
     ]
+
+    # D0 quorum baseline remains unchanged and does not require domain metadata.
     ok = decide({
-        "risk_class": "D1", "scores": common_scores, "votes": four_yes,
-        "changed_domains": [], "specialist_endorsements": [], "hard_blocks": []
+        "risk_class": "D0", "scores": common_scores, "votes": four_yes,
+        "specialist_endorsements": [], "hard_blocks": []
     }, policy)
     assert ok["agent_auto_merge_authorized"] is True
     assert ok["minimum_approvals"] == 4
 
     three_yes = decide({
-        "risk_class": "D1", "scores": common_scores, "votes": four_yes[:3],
-        "changed_domains": [], "specialist_endorsements": [], "hard_blocks": []
+        "risk_class": "D0", "scores": common_scores, "votes": four_yes[:3],
+        "specialist_endorsements": [], "hard_blocks": []
     }, policy)
     assert three_yes["agent_auto_merge_authorized"] is False
+
+    # D1/D2 classifications are mandatory and derive specialist activation.
+    d1_docs = decide({
+        "risk_class": "D1", "scores": common_scores, "votes": four_yes,
+        "changed_files": ["changelog/example.md"],
+        "domain_classifications": [{
+            "path": "changelog/example.md", "domains": ["documentation"],
+            "provenance": "reviewer_classification", "evidence_ref": "ct.evidence.test.docs"
+        }],
+        "changed_domains": ["documentation"],
+        "specialist_endorsements": [], "hard_blocks": []
+    }, policy)
+    assert d1_docs["agent_auto_merge_authorized"] is True
+
+    d1_unclassified = decide({
+        "risk_class": "D1", "scores": common_scores, "votes": four_yes,
+        "changed_files": ["changelog/example.md"],
+        "domain_classifications": [], "specialist_endorsements": [], "hard_blocks": []
+    }, policy)
+    assert d1_unclassified["agent_auto_merge_authorized"] is False
+    assert d1_unclassified["domain_classification_errors"]
 
     expected_ids = {
         "security", "legal_regulatory", "operations_sre", "blockchain_protocol",
@@ -219,6 +489,11 @@ def self_test(policy: dict[str, Any]) -> None:
         for key, config in policy.get("specialist_activation", {}).items()
     }
     assert registry_ids == expected_ids
+
+    aliases, alias_errors = specialist_alias_map(policy)
+    assert not alias_errors
+    assert aliases["security_privacy"] == "security"
+    assert aliases["security"] == "security"
 
     single_domain_expectations = {
         "security": {"security"},
@@ -244,10 +519,18 @@ def self_test(policy: dict[str, Any]) -> None:
     for domain, expected in cumulative_expectations.items():
         assert required_specialists_for({domain}, policy) == expected
 
+    all_domains = [
+        "security", "legal", "deployment", "blockchain", "llm",
+        "copyright", "tax", "accessibility", "localization"
+    ]
     all_specialists = decide({
         "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["security", "legal", "deployment", "blockchain", "llm",
-                            "copyright", "tax", "accessibility", "localization"],
+        "changed_files": ["tests/specialist-matrix.json"],
+        "domain_classifications": [{
+            "path": "tests/specialist-matrix.json", "domains": all_domains,
+            "provenance": "reviewer_classification", "evidence_ref": "ct.evidence.test.matrix"
+        }],
+        "changed_domains": all_domains,
         "specialist_endorsements": sorted(expected_ids), "hard_blocks": []
     }, policy)
     assert all_specialists["agent_auto_merge_authorized"] is True
@@ -255,15 +538,76 @@ def self_test(policy: dict[str, Any]) -> None:
 
     missing_one = decide({
         "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["rights"], "specialist_endorsements": ["legal_regulatory"],
-        "hard_blocks": []
+        "changed_files": ["contracts/example-rights.json"],
+        "domain_classifications": [{
+            "path": "contracts/example-rights.json", "domains": ["rights"],
+            "provenance": "reviewer_classification", "evidence_ref": "ct.evidence.test.rights"
+        }],
+        "changed_domains": ["rights"],
+        "specialist_endorsements": ["legal_regulatory"], "hard_blocks": []
     }, policy)
     assert missing_one["agent_auto_merge_authorized"] is False
     assert missing_one["missing_specialists"] == ["ip_rights_licensing"]
 
+    # Live compatibility: historical CT-VOTE token security_privacy satisfies
+    # canonical Security & Privacy endorsement ID security.
+    security_alias = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_files": ["docs/security-change.md"],
+        "domain_classifications": [{
+            "path": "docs/security-change.md", "domains": ["security"],
+            "provenance": "reviewer_classification", "evidence_ref": "ct.evidence.test.security"
+        }],
+        "changed_domains": ["security"],
+        "specialist_endorsements": ["security_privacy"], "hard_blocks": []
+    }, policy)
+    assert security_alias["agent_auto_merge_authorized"] is True
+    assert security_alias["normalized_specialist_endorsements"] == ["security"]
+
+    # Known governed code paths have deterministic minimum domains. Omitting
+    # Security from the merge-decision engine cannot produce zero/partial gates.
+    missing_required_domain = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_files": ["scripts/governed_merge_decision.py"],
+        "domain_classifications": [{
+            "path": "scripts/governed_merge_decision.py", "domains": ["agent"],
+            "provenance": "deterministic_path_rule"
+        }],
+        "changed_domains": ["agent"],
+        "specialist_endorsements": ["ai_ml_llm_tevv"], "hard_blocks": []
+    }, policy)
+    assert missing_required_domain["agent_auto_merge_authorized"] is False
+    assert any(
+        "domain_classification_missing_required:scripts/governed_merge_decision.py:security" in error
+        for error in missing_required_domain["domain_classification_errors"]
+    )
+
+    mismatch = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_files": ["scripts/governed_merge_decision.py"],
+        "domain_classifications": [{
+            "path": "scripts/governed_merge_decision.py", "domains": ["security", "agent"],
+            "provenance": "deterministic_path_rule"
+        }],
+        "changed_domains": ["agent"],
+        "specialist_endorsements": ["security_privacy", "ai_ml_llm_tevv"],
+        "hard_blocks": []
+    }, policy)
+    assert mismatch["agent_auto_merge_authorized"] is False
+    assert any(
+        error.startswith("changed_domains_assertion_mismatch:")
+        for error in mismatch["domain_classification_errors"]
+    )
+
     d3 = decide({
         "risk_class": "D3", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["legal"], "specialist_endorsements": ["legal_regulatory"],
+        "changed_files": ["contracts/example-legal.json"],
+        "domain_classifications": [{
+            "path": "contracts/example-legal.json", "domains": ["legal"],
+            "provenance": "reviewer_classification", "evidence_ref": "ct.evidence.test.legal"
+        }],
+        "changed_domains": ["legal"],
+        "specialist_endorsements": ["legal_regulatory"],
         "hard_blocks": [], "human_authorized": False
     }, policy)
     assert d3["agent_auto_merge_authorized"] is False
@@ -277,7 +621,11 @@ def main() -> int:
     policy = load_json(MANIFEST)
     if args.self_test:
         self_test(policy)
-        print("Agent-sovereign merge-decision self-test passed: 4/5 + Agent D preserved; nine cumulative specialist gates enforced; D3 cannot auto-merge.")
+        print(
+            "Agent-sovereign merge-decision self-test passed: 4/5 + Agent D preserved; "
+            "material changed-domain provenance fail-closed; specialist aliases migrated; "
+            "nine cumulative specialist gates enforced; D3 cannot auto-merge."
+        )
         return 0
     if not args.packet:
         parser.error("--packet is required unless --self-test is used")
