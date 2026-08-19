@@ -1,8 +1,8 @@
-# Phase 2.99 Hard-Exit Closure Ledger
+# Phase 2.99 Hard-Exit Closure Ledger — v1.2 Current-Main Rebaseline
 
 **Packet:** `ct.closure.phase-2-99.hard-exit.v1`  
 **Issue:** #84  
-**Observed canonical main:** `12f0dd9ab97391a8dd34438f77262438c0df0999`  
+**Verification baseline main:** `ef04ea9a08960376859570bca8c6cf82a00442f2`  
 **Canonical roadmap:** `CT-ADR-ROADMAP-010 / ten_phase_v1`  
 **Current institutional state:** Phase 2 / 2.99  
 **Phase 3:** `blocked_pending_phase_2_99_hard_exit`  
@@ -10,218 +10,118 @@
 
 ## Current conclusion
 
-The latest external Mintlify regrade is directionally correct: Phase 2.99 is no longer a general recovery exercise. It is operating as an institutional certification/reconciliation program. The remaining work is concentrated in current-state closure, articleization, accepted deferrals, provider proof, canonicalization and final adversarial recovery evidence.
+The repository/security predecessor sequence has materially closed. PR #64 is canonical, issue #83 is closed after provider-perimeter certification and negative behavioral proof, PR #95 is canonical, and PR #65 is now canonical on the verification baseline above. This closes the repository/security canonicalization category; it does **not** complete Phase 2.99.
 
-The external score is useful as a progress indicator only. It cannot complete Phase 2, open Phase 3, replace CT-ADR-GOV-011, or alter the canonical `CT-ADR-ROADMAP-010 / ten_phase_v1` roadmap. Any five-phase wording in an external assessment remains non-authoritative superseded lineage.
+The hard-exit machine state is now **2 PASS / 6 blocking categories**. The external 97/A+ remains a quality signal only and cannot become a phase namespace, sovereign vote, approval, or hard-exit decision.
 
-This ledger is a **closure checkpoint**, not a completion declaration.
+## Repository/security sequence — now PASS
 
-## What is already structurally established
+The accepted sequence is:
 
-Four macro source/count universes are independently recovered and must remain independent:
+1. PR #64 — Node-24/runtime and always-run fail-closed merge-gate bootstrap — merged canonical.
+2. Issue #83 — provider `main` perimeter certification — closed completed; disposable PR #93 preserved the failing-required-check behavioral proof.
+3. PR #95 — ruleset-vs-classic machine-state reconciliation — merged canonical.
+4. PR #65 — nine-domain specialist enforcement, trusted exact-Git-diff binding, operational current-PR preflight and CodeQL log minimization — merged canonical at `ef04ea9a08960376859570bca8c6cf82a00442f2`.
 
-| Universe | Source count | Current closure state |
-| --- | ---: | --- |
-| Holdings portfolio rows | 68 | source count certified; 62 typed/classified; 6 identity items pending |
-| Holdings domain rows | 82 | source count certified; registrar/DNS/TLS/runtime certification incomplete |
-| Holdings engine/service rows | 85 | source count certified; provider/account/version/deployment/API/export certification incomplete |
-| Phase-2.7 platform/framework rows | 74 | source count certified; 54 typed/classified; 20 current identities unresolved |
+GitHub remains technical defense-in-depth, evidence and transport. CrownThrive sovereign authority remains CT-ADR-GOV-011.
 
-These counts are not interchangeable and none proves production deployment. The controlling dimension rule remains:
+Accordingly `CT-P299-GATE-004 repository_security_governance_sequence_canonicalization` moves to **PASS**.
 
-`priority ≠ lifecycle ≠ implementation state ≠ institutional disposition`
+## Supabase RLS — remains PASS
 
-A P0 item may remain unverified. A live URL is not proof of every capability. A sunset record can retain rights, source, domain, contract, evidence and continuity obligations.
+Fresh read-only revalidation in this rebaseline pass confirms all six `integration_control` base tables have RLS enabled, `FORCE RLS` remains off, and each table has one explicit policy. Supabase Security Advisor currently reports **0 security lints**. Issue #79 is closed/completed. The former RLS-disabled finding remains historical evidence rather than a current blocker.
 
-## External 97 → 100 ladder — current interpretation
+`CT-P299-GATE-005 integration_control_rls_security_disposition` remains **PASS**.
 
-The grader's ladder is retained only as a non-authoritative quality signal.
+## Collab Portal — remains 4/7 fail-closed
 
-### 97 — certification/reconciliation program operating
+Current canonical predicates remain:
 
-**Observed.**
-
-The program now has dedicated hard-exit, specialist, sovereignty/quorum, drift-refractory, Node-24 supply-chain, private-data, schema, macro-registry, identity, Collab and API/MCP certification lanes. That is evidence of program maturity, not proof that the hard exit passed.
-
-### 98 — stable-ID / provider / domain / API-export / identity closure
-
-**Not met.**
-
-Remaining examples include:
-
-- six Holdings portfolio identity-resolution items;
-- twenty S103 current identity items;
-- many-to-many engine/domain/current-provider relationship verification;
-- current registrar/DNS/TLS/runtime evidence;
-- current provider/account/version/deployment/API/export evidence;
-- accepted current/historical/research/reserve/blocked/deferral dispositions for all material unresolved records.
-
-### 99 — articleization + specialists + agent/security + Collab + retroactive final reconciliation
-
-**Not met.**
-
-The 795-title source inventory and deterministic generator are established, but terminal disposition and P0/P1 closure are incomplete. Final reconciliation must also close or explicitly defer contradiction records, specialist/security findings, retroactive Phase-2.0–2.9 impacts, restricted/private-source boundaries, continuity/recovery evidence, canonical branch sequence, and all remaining Collab predicates.
-
-### 100 — authoritative hard-exit PASS
-
-**Not met.**
-
-A genuine 100 requires the machine hard-exit evaluation to say PASS on the exact canonical state, all required validation to be green, all material branches reconciled, no undisclosed blocker, reproducible recovery, and the Phase-3 hard-entry packet formally open.
-
-No score, page count, CI run, branch name, preview, workstream pass or agent confidence can substitute for that record.
-
-## Material closure achieved in this cycle — Supabase RLS
-
-One previously blocking security category materially moved.
-
-The six private `integration_control` tables originally had RLS disabled, although `anon` and `authenticated` also lacked schema/table access. The founder explicitly authorized the remaining production hardening in this closure cycle.
-
-Tracked Supabase migrations now:
-
-1. enable RLS on all six `integration_control` base tables;
-2. add explicit service-role-only ALL policies without adding client-role policies or grants.
-
-Post-change evidence confirms:
-
-- all six tables report `relrowsecurity=true`;
-- `relforcerowsecurity=false` remains deliberate;
-- `anon` and `authenticated` still have no schema usage/table access;
-- the existing service-role snapshot/rate-check runtime path passes after the change;
-- no provider mutation was invoked by the smoke;
-- Supabase security advisor now reports **zero security lints**;
-- machine gate `crownthrive_api_control / integration_control_rls_defense_in_depth` is now `passed`.
-
-The hard-exit RLS category therefore moves from `not_met` to `pass`. Fresh independent Agent S and Agent D review is still required before repository promotion decisions; a technically remediated external security finding does not self-merge PR #64.
-
-## Current repository/security sequence
-
-Canonical `main` remains the merged PR #63 baseline observed by this packet.
-
-PR #64 remains open and non-canonical. Its current role is the Node-24 runtime/supply-chain and always-run fail-closed GitHub-main perimeter bootstrap. The underlying RLS condition that contributed to the earlier Agent-S block is now remediated, so old RLS-based blocks must be re-evaluated against fresh evidence rather than carried forward mechanically.
-
-Issue #83 remains the provider-admin activation gate. It must not run before the #64 substrate is canonical. If #64 is adopted, #83 then proves the actual GitHub `main` perimeter: PR-before-merge, required `CrownThrive governed merge gate`, strict/current-with-main, blocked force pushes/deletion, and no routine bypass outside explicit D3 break-glass.
-
-PR #65 remains behind #64/#83 and must reconcile onto the resulting canonical state before fresh exact-head votes count.
-
-PR #66 / issue #79 now preserve both the original RLS finding and the authorized remediation/revalidation evidence.
-
-## Collab Portal — current 4/7 state
-
-Collab remains fail-closed, but its earlier credential/authentication blockers are no longer current.
-
-| Canonical predicate | State |
+| Predicate | State |
 | --- | --- |
-| `credential_exact_match` | **PASS** |
-| `project_meta_authenticated` | **PASS** |
-| `institutional_project_uid` | **PASS / pinned** |
-| `approved_field_map` | **BLOCKED** |
-| `authenticated_project_read` | **PASS** |
-| `bounded_write_readback` | **CLOSED** |
-| `webhook_sender_delivery_integrity` | **BLOCKED** |
+| `credential_exact_match` | PASS |
+| `project_meta_authenticated` | PASS |
+| `institutional_project_uid` | PASS |
+| `approved_field_map` | BLOCKED |
+| `authenticated_project_read` | PASS |
+| `bounded_write_readback` | CLOSED |
+| `webhook_sender_delivery_integrity` | BLOCKED |
 
-The authenticated Collab request ledger remains **9 / 20,000** for August at this checkpoint. The private fallback notification route remains active until all seven predicates pass simultaneously.
+`write_gate=false`. August authenticated request count remains **9 / 20,000**. No Collab write is authorized by this packet.
 
-The candidate write projection remains intentionally narrow: `status` + `info_description`; `project_custom_fields` remains excluded. This ledger does not self-approve that D2 field map or enable provider writes.
+## API/MCP/provider closure — still open
 
-## Articleization closure
+CrownThrive IO remains read-verified and write-closed. The August request ledger observed in this pass is **31**, including the pre-existing hourly health probe. The health-probe pre-dispatch budget policy remains open.
 
-The Help Center estate remains one of the largest concentrated gaps:
+The CrownThrive API/MCP control plane remains write-closed. Its hard-exit category is not certified. Open acceptance work includes verified D2 authority binding, direct Cell-07 governed CI, external-client conformance, JSON Schema 2020-12 validation, bounded MCP input/output schemas, server-side output validation, endpoint-catalog revocation enforcement, validated path-template dispatch, request/provider byte limits, timeout/cancellation, provider semantic validation, least-data projection, MCP parse/content-type/HTTP-status conformance, and atomic pre-dispatch audit/budget/rate reservation.
 
-```text
-source inventory                 795 / 795 verified
-stable article schema            defined
-deterministic generator          present
-full generated machine manifest  pending
-terminal dispositions            incomplete
-P0/P1 substantive-or-unresolved  incomplete
-navigation/route/source/risk     incomplete across full estate
-```
+These are subconditions inside the existing closure estate; they do not create a new phase or sovereign category.
 
-Every recovered title must terminate in an inspectable state such as substantive canonical article, merged successor, redirect, restricted record, superseded-history record, explicit unresolved-source record or another governed terminal disposition. A title/branch/generator alone is not article completion.
+## Macro and identity closure — still open
 
-## Final-deferral contract
+The 68 / 82 / 85 / 74 source-count universes remain independent:
 
-Phase 2 does not require every provider to become connected or every historical body to be recovered. It requires every material unresolved item to terminate in an inspectable disposition.
+- 68 portfolio rows: 62 typed/classified, 6 identity items pending.
+- 82 domain rows: current registrar/DNS/TLS/runtime certification incomplete.
+- 85 engine/service rows: current provider/account/version/deployment/API/export certification incomplete.
+- 74 platform/framework rows: 54 typed/classified, 20 current identities unresolved.
 
-An accepted deferral must include at least:
+No count universe is promoted into production proof.
 
-```yaml
-deferral_id: ct.deferral.<stable-id>
-subject_id: <stable institutional object>
-current_state: not_connected | unverified | blocked | source_not_recovered | owner_input_required | other_explicit_state
-why_unresolved: <evidence-based reason>
-risk_class: D0 | D1 | D2 | D3
-blocking_phase_2_99_exit: true | false
-authority_for_nonblocking_deferral: <decision or approval reference>
-evidence_refs: []
-owner_or_queue: <stable role/queue>
-revisit_trigger: <event/evidence/date>
-continuity_or_fallback: <if applicable>
-docs_impact: docs_updated | docs_no_change | docs_delta_opened
-```
+## 795 article estate — candidate advanced, canonical closure still open
 
-Missing evidence is never permission. Safety, legal authority, security, rights, money, privacy, source integrity or continuity cannot be made nonblocking merely to improve a score.
+PR #91 contains a deterministic 795-title/hierarchy machine-manifest candidate, but it remains non-canonical on this checkpoint. Therefore canonical state remains:
 
-## Current hard-gate count
+- source inventory: 795 / 795 verified;
+- stable seed schema: defined;
+- deterministic generator: present;
+- complete machine manifest on canonical main: **false**;
+- terminal dispositions: incomplete;
+- P0/P1 substantive-or-explicit-unresolved closure: incomplete;
+- full taxonomy/exposure/risk/owner/source/route/navigation disposition: incomplete.
 
-The machine ledger now records eight categories, with **one passed and seven still blocking**:
+A title manifest is not an article-body or terminal-disposition certification.
 
-1. 68/82/85/74 current certification — open;
-2. 795 terminal disposition + P0/P1 closure — open;
-3. unresolved external state + explicit deferral closure — open;
-4. repository/security sequence canonicalization — open;
-5. integration-control RLS security disposition — **PASS**;
-6. Collab seven-predicate certification — open, 4/7 passed;
-7. restricted sources + continuity/recovery final adversarial audit — open;
-8. exact canonical snapshot + Phase-3 entry packet — open.
+## Remaining hard-exit categories
 
-## Machine validator
+The machine ledger now tracks eight categories with **2 PASS / 6 blocking**:
 
-`developers/manifests/phase-2-99-hard-exit-ledger.v1.json` is the public-safe current checkpoint.
+1. 68/82/85/74 current certification — NOT MET.
+2. 795 terminal disposition + P0/P1 closure — NOT MET.
+3. unresolved external state + explicit deferral closure — NOT MET.
+4. repository/security sequence canonicalization — **PASS**.
+5. integration-control RLS security disposition — **PASS**.
+6. Collab seven-predicate certification — NOT MET, 4/7 passed.
+7. restricted sources + continuity/recovery final adversarial audit — NOT MET.
+8. exact canonical snapshot + Phase-3 entry packet — NOT MET.
 
-`scripts/validate_phase_2_99_hard_exit_ledger.py` now rejects:
-
-- five-phase re-promotion;
-- count-universe collapse;
-- false article completion;
-- stale pre-remediation RLS state;
-- stale pre-authentication Collab state;
-- premature Phase-2 completion / Phase-3 opening;
-- loss of #64 → provider-enforcement sequencing;
-- promotion of the external 97/98/99/100 ladder into institutional authority.
-
-Validator PASS means **ledger consistency PASS**, not hard-exit PASS.
-
-## Workflow integration boundary
-
-This bounded packet still does not change `.github/workflows/**` or the #64/#65 owned agent-governance surfaces. Once the predecessor sequence is dispositioned, Agent A may wire the closure validator into the always-run governed merge gate without colliding with the bootstrap packet.
-
-## Hard-exit decision rule
-
-```text
-recover
-→ reconcile
-→ classify
-→ resolve or explicitly defer
-→ prove macro current-state closure
-→ prove article/P0/P1 closure
-→ prove security/repository/provider boundaries
-→ prove continuity/recovery
-→ adversarial audit
-→ canonicalize exact accepted state
-→ evaluate every hard-exit predicate
-→ certify only if all blocking gates pass
-```
-
-Until then:
+Therefore:
 
 ```yaml
 phase_2_99_exit: not_met
-open_blocking_gates: 7
+open_blocking_gates: 6
 phase_2_complete: false
 phase_3_entry: blocked_pending_phase_2_99_hard_exit
 ```
 
-## Rollback
+## Governed validator execution
 
-The repository portion of this packet is reverted by reverting the bounded closure-ledger commits. The separate Supabase RLS remediation is migration-addressable and contains no data rewrite; any rollback must preserve audit evidence and rerun the same security/runtime controls rather than widening client access.
+This rebaseline adds a dedicated, read-only `Phase 2.99 Hard Exit Ledger` workflow. It directly runs:
+
+- Python syntax validation;
+- `scripts/validate_phase_2_99_hard_exit_ledger.py --self-test`;
+- the full closure-ledger consistency validator;
+- repository documentation governance;
+- whitespace/conflict-marker checks.
+
+The validator intentionally fails on five-phase re-promotion, premature Phase-3 opening, count-universe collapse, false 795 completion, false Collab completion, repository-canonicalization regression, stale PR #65 state, and stale RLS state.
+
+**Validator PASS means ledger consistency PASS, not Phase-2.99 hard-exit PASS.**
+
+## Docs impact and rollback
+
+Docs impact: `docs_updated`.
+
+Repository rollback is a normal revert of this bounded closure-ledger packet. Separate production RLS remediation retains its own migration/audit lineage and must never be widened or silently rolled back to make repository state convenient.
+
+No provider write, credential mutation, payment, binding-rights action, Collab write, token/crypto activation, or Phase-3 production authority is introduced by this rebaseline.

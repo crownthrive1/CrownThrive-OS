@@ -1,11 +1,11 @@
 {
-  "manifest_version": "1.0.0",
+  "manifest_version": "1.3.3",
   "manifest_id": "ct.manifest.agent-sovereign-governance.v1",
   "phase": "2.99",
-  "effective_date": "2026-08-18",
-  "authority_model": "agent_sovereign_fail_closed",
-  "repository_provider_role": "evidence_ci_scan_and_transport_not_sovereign_authority",
-  "github_branch_protection_dependency": false,
+  "effective_date": "2026-08-19",
+  "authority_model": "agent_sovereign_fail_closed_with_provider_merge_perimeter",
+  "repository_provider_role": "required_technical_enforcement_evidence_ci_scan_and_transport_not_sovereign_authority",
+  "github_branch_protection_dependency": true,
   "canonical_roadmap_generation": "ten_phase_v1",
   "voter_pool": [
     {"agent_id": "ct.relay.agent-a", "role": "orchestrator_integrator", "vote_eligible": true},
@@ -31,18 +31,24 @@
       "no_competing_packet_or_collision_resolved",
       "institutional_documentation_validation_passed",
       "security_governance_validation_passed",
+      "github_actions_runtime_policy_passed",
+      "always_run_governed_merge_gate_passed",
       "applicable_github_code_or_dependency_scans_passed_or_documented_not_applicable",
       "no_secret_exposure",
       "authority_class_allows_agent_merge",
       "risk_score_meets_threshold",
       "required_specialist_endorsements_present",
+      "trusted_changed_files_bound_to_provider_or_git_diff",
+      "changed_domain_classification_complete_and_provenanced",
       "quorum_met",
       "independent_gatekeeper_approval_present",
       "rollback_or_recovery_path_present",
       "documentation_impact_completed",
       "downstream_phase_impact_reconciled"
     ],
-    "github_required_check": "advisory_defense_in_depth_not_trust_anchor",
+    "github_required_check": "required_defense_in_depth_merge_perimeter_not_trust_anchor",
+    "github_required_check_context": "CrownThrive governed merge gate",
+    "phase_3_requires_provider_enforcement": true,
     "post_merge_revalidation": true,
     "human_reserved_actions": [
       "legal_terms_or_binding_contract",
@@ -70,45 +76,172 @@
     "hard_blocks_override_score": true,
     "weighted_votes": false
   },
+  "changed_domain_contract": {
+    "contract_version": "1.0.2",
+    "required_for_risk_classes": ["D1", "D2", "D3"],
+    "classification_source": "trusted_git_diff_exact_set_plus_per_file_domain_classification",
+    "trusted_changed_files_source": "exact_git_base_head_diff",
+    "trusted_changed_files_required_for_material_risk_classes": true,
+    "packet_changed_files_must_exactly_match_trusted_diff": true,
+    "git_diff_rename_handling": "no_renames_delete_plus_add",
+    "changed_domains_are_derived_not_authoritative": true,
+    "asserted_changed_domains_must_match_derived": true,
+    "unclassified_material_file_fails_closed": true,
+    "allowed_provenance": ["deterministic_path_rule", "reviewer_classification"],
+    "reviewer_classification_requires_evidence_ref": true,
+    "neutral_domains": ["documentation", "institutional_general", "governance"],
+    "path_domain_rules": [
+      {"prefix": ".github/workflows/", "required_domains": ["security", "deployment"]},
+      {"path": "scripts/governed_merge_decision.py", "required_domains": ["security", "agent"]},
+      {"path": "scripts/validate_agent_sovereign_governance.py", "required_domains": ["security", "agent"]},
+      {"path": "developers/manifests/agent-sovereign-governance.v1.json", "required_domains": ["security", "agent"]},
+      {"prefix": "contracts/chlom/policy/", "required_domains": ["security", "legal", "policy"]},
+      {"prefix": "contracts/chlom/authority/", "required_domains": ["security", "authorization", "legal"]},
+      {"prefix": "contracts/chlom/evidence/", "required_domains": ["security", "provenance", "rights"]},
+      {"prefix": "contracts/chlom/rights/", "required_domains": ["rights", "license"]},
+      {"prefix": "contracts/chlom/economics/", "required_domains": ["finance", "royalty"]},
+      {"prefix": "contracts/chlom/api/", "required_domains": ["api", "security", "runtime"]}
+    ]
+  },
   "specialist_activation": {
     "security": {
-      "required_patterns": ["auth", "secret", "credential", "security", "crypto", "blockchain", "wallet", "key", "production", "dependency", "workflow", "api"],
+      "endorsement_id": "security",
+      "endorsement_aliases": ["security_privacy"],
+      "required_patterns": ["auth", "authorization", "secret", "credential", "security", "crypto", "blockchain", "smart_contract", "wallet", "key", "custody", "production", "dependency", "workflow", "api", "privacy", "node", "runner", "github-actions"],
       "agent_id": "ct.relay.agent-s",
       "critical_or_high_finding_blocks": true
     },
     "legal_regulatory": {
-      "required_patterns": ["license", "rights", "legal", "contract", "token", "cryptocurrency", "securities", "investment", "royalty", "franchise", "privacy", "cross-border", "sanctions", "aml", "kyc"],
+      "endorsement_id": "legal_regulatory",
+      "required_patterns": ["license", "rights", "legal", "contract", "token", "cryptocurrency", "securities", "investment", "royalty", "franchise", "privacy", "cross-border", "jurisdiction", "sanctions", "aml", "kyc", "money_transmission"],
       "authority": "advisory_agent_plus_authorized_human_for_d3"
     },
     "operations": {
-      "required_patterns": ["deployment", "incident", "provider", "domain", "billing", "fulfillment", "support", "continuity", "recovery"],
+      "endorsement_id": "operations_sre",
+      "required_patterns": ["deployment", "incident", "provider", "domain", "dns", "tls", "runtime", "billing", "fulfillment", "support", "continuity", "recovery", "backup", "sre", "operations", "runner"],
       "authority": "bounded_by_d0_d3"
     },
     "blockchain_protocol": {
-      "required_patterns": ["chain", "ledger", "token", "smart_contract", "oracle", "bridge", "wallet", "custody", "consensus"],
+      "endorsement_id": "blockchain_protocol",
+      "required_patterns": ["chain", "blockchain", "ledger", "token", "smart_contract", "oracle", "bridge", "wallet", "custody", "consensus", "settlement", "poly-chain", "polychain"],
       "authority": "research_and_design_only_until_phase_9_entry_and_legal_security_gates"
     },
     "ai_ml_llm": {
-      "required_patterns": ["agent", "ai", "ml", "llm", "model", "prompt", "eval", "autonomy"],
+      "endorsement_id": "ai_ml_llm_tevv",
+      "required_patterns": ["agent", "ai", "ml", "llm", "model", "prompt", "eval", "evaluation", "tevv", "autonomy", "training_data", "inference"],
       "authority": "bounded_tevv_and_policy_gate"
+    },
+    "ip_rights_licensing": {
+      "endorsement_id": "ip_rights_licensing",
+      "required_patterns": ["ip", "intellectual_property", "rights", "license", "licensing", "copyright", "trademark", "patent", "provenance", "chain_of_title", "contributor", "likeness", "voice", "adaptation", "derivative"],
+      "authority": "advisory_agent_plus_authorized_human_for_d3"
+    },
+    "finance_tax_treasury": {
+      "endorsement_id": "finance_tax_treasury",
+      "required_patterns": ["finance", "tax", "treasury", "payment", "payout", "settlement", "revenue_share", "royalty", "reserve", "accounting", "money_movement", "commission", "fee"],
+      "authority": "advisory_agent_plus_authorized_human_for_d3"
+    },
+    "accessibility_consumer_protection": {
+      "endorsement_id": "accessibility_consumer_protection",
+      "required_patterns": ["accessibility", "wcag", "ada", "consumer", "disclosure", "endorsement", "marketing_claim", "deceptive_design", "dark_pattern", "customer_notice"],
+      "authority": "bounded_by_d0_d3"
+    },
+    "regional_global_localization": {
+      "endorsement_id": "regional_global_localization",
+      "required_patterns": ["regional", "global", "localization", "jurisdiction", "country", "language", "cross-border", "data_residency", "sanctions", "succession", "provider_exit"],
+      "authority": "advisory_agent_plus_authorized_human_for_d3"
     }
+  },
+  "subagent_registry": {
+    "governance_marshal": {"agent_id": "ct.subagent.governance-marshal", "vote_eligible": false, "role": "policy_evolution_rule_integrity_and_reconciliation_proposals_only"},
+    "verification_tevv": {"agent_id": "ct.subagent.verification-tevv", "vote_eligible": false, "role": "independent_test_evaluation_verification_validation"},
+    "recovery_rollback": {"agent_id": "ct.subagent.recovery-rollback", "vote_eligible": false, "role": "rollback_recovery_refractory_and_failure_containment"},
+    "evidence_provenance": {"agent_id": "ct.subagent.evidence-provenance", "vote_eligible": false, "role": "evidence_chain_of_custody_source_freshness_and_provenance"},
+    "legal_regulatory": {"agent_id": "ct.subagent.legal-regulatory", "vote_eligible": false, "role": "legal_regulatory_specialist"},
+    "operations_sre": {"agent_id": "ct.subagent.operations-sre", "vote_eligible": false, "role": "operations_reliability_incident_continuity_specialist"},
+    "blockchain_protocol": {"agent_id": "ct.subagent.blockchain-protocol", "vote_eligible": false, "role": "cryptographic_blockchain_protocol_specialist"},
+    "ai_ml_llm_tevv": {"agent_id": "ct.subagent.ai-ml-llm-tevv", "vote_eligible": false, "role": "ai_ml_llm_tevv_specialist"},
+    "ip_rights_licensing": {"agent_id": "ct.subagent.ip-rights-licensing", "vote_eligible": false, "role": "ip_rights_licensing_provenance_specialist"},
+    "finance_tax_treasury": {"agent_id": "ct.subagent.finance-tax-treasury", "vote_eligible": false, "role": "finance_tax_treasury_specialist"},
+    "accessibility_consumer_protection": {"agent_id": "ct.subagent.accessibility-consumer", "vote_eligible": false, "role": "accessibility_consumer_protection_specialist"},
+    "regional_global_localization": {"agent_id": "ct.subagent.regional-global", "vote_eligible": false, "role": "regional_global_localization_specialist"}
+  },
+  "github_main_enforcement_gate": {
+    "target_manifest": "developers/manifests/github-main-enforcement-target.v1.json",
+    "required_for_phase_3": true,
+    "required_status_context": "CrownThrive governed merge gate",
+    "pull_request_required": true,
+    "strict_update_with_main": true,
+    "force_pushes_allowed": false,
+    "branch_deletion_allowed": false,
+    "provider_bypass": "explicit_d3_break_glass_only",
+    "sovereign_authority": false
+  },
+  "github_actions_runtime_gate": {
+    "policy_manifest": "developers/manifests/github-actions-runtime-policy.v1.json",
+    "applies_to": "every_merge_and_every_agent_handoff_touching_workflows_or_action_policy",
+    "target_runtime": "node24",
+    "node20": "prohibited",
+    "remote_action_refs": "full_commit_sha_only",
+    "dependency_update_source": "dependabot_pull_request",
+    "direct_to_main_dependency_repair": false,
+    "runtime_escape_hatch": "prohibited"
   },
   "self_healing": {
     "enabled": true,
-    "default_mode": "propose_validate_vote_then_apply",
+    "default_mode": "detect_preserve_evidence_bounded_repair_rerun_original_gate_full_suite_independent_verify_vote",
     "automatic_levels": ["D0", "D1"],
     "d2_requires": ["independent_verifier", "applicable_specialist", "quorum", "rollback"],
     "d3_requires": ["authorized_human", "specialist_review", "quorum_advisory_only", "rollback_or_break_glass_plan"],
+    "refractory_policy": {
+      "same_failure_must_not_repeat_without_new_evidence": true,
+      "failed_repair_requires_root_cause_reassessment": true,
+      "validators_and_security_controls_cannot_be_weakened_to_self_heal": true,
+      "repair_must_rerun_original_failed_control": true,
+      "repair_must_rerun_full_applicable_control_family": true
+    },
+    "evolution_policy": {
+      "governance_marshal_may_propose_new_non_voting_subagents": true,
+      "governance_marshal_may_propose_validator_pattern_refractory_and_evidence_threshold_changes": true,
+      "d0_d1_non_authority_refinements_require_validation_and_audit_log": true,
+      "d2_governance_changes_require_existing_ct_adr_gov_011_quorum_and_applicable_specialists": true,
+      "core_constitution_changes_require_explicit_founder_authorization": true
+    },
     "never": [
       "weaken_validation_to_make_a_failure_pass",
       "disable_security_scan_to_clear_a_gate",
       "expose_or_reconstruct_secret_material",
       "auto_rotate_production_credentials",
       "self_approve_originating_material_change",
-      "reinterpret_missing_evidence_as_permission"
+      "reinterpret_missing_evidence_as_permission",
+      "trust_caller_declared_changed_files_without_git_diff_binding",
+      "force_node24_for_an_unupgraded_action",
+      "allow_insecure_node_runtime_escape_hatch",
+      "auto_merge_dependency_update_without_governed_validation",
+      "treat_provider_branch_protection_as_sovereign_authority",
+      "allow_non_voting_subagent_to_create_sovereign_merge_authority"
     ]
   },
-  "phase_3_effect": "github_branch_protection_not_a_phase_3_dependency; agent_sovereign_controls_and_other_phase_2_99_hard_exit_requirements_remain_binding",
+  "founder_reserved_core_policy": {
+    "requires_explicit_founder_authorization": true,
+    "self_amendment_prohibited": true,
+    "controls": [
+      "five_sovereign_voter_pool",
+      "four_of_five_including_agent_d_quorum",
+      "independent_agent_d_gate",
+      "d3_human_reserved_boundary",
+      "secret_security_non_weakening_invariants"
+    ]
+  },
+  "phase_3_effect": "blocked_until_github_main_required_check_enforcement_is_provider_verified_and_all_other_phase_2_99_hard_exit_requirements_pass",
   "decision_id": "CT-ADR-GOV-011",
-  "source_basis": ["founder_directive_2026-08-18", "S106_repository_enforcement_audit"]
+  "source_basis": [
+    "founder_directive_2026-08-18",
+    "S106_repository_enforcement_audit",
+    "github_actions_node24_runtime_reconciliation_2026-08-18",
+    "github_main_perimeter_canonicalized_2026-08-19",
+    "post_merge_self_audit_specialist_gate_completion_2026-08-19",
+    "specialist_domain_provenance_and_endorsement_alias_self_heal_2026-08-19",
+    "trusted_changed_file_git_diff_binding_self_heal_2026-08-19"
+  ]
 }
