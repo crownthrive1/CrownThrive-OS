@@ -1,23 +1,42 @@
 #!/usr/bin/env python3
-"""Fail closed on GitHub Actions Node/runtime and action-reference drift."""
+"""Fail closed on GitHub Actions Node/runtime and action-reference drift.
+
+This validator deliberately uses a narrow accepted YAML profile rather than
+trying to implement a complete YAML parser. Any `uses` or `runs-on` form that
+falls outside the accepted literal forms is rejected so syntax variation cannot
+silently bypass the supply-chain policy.
+"""
 
 from __future__ import annotations
 
 import json
 import re
 from pathlib import Path
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "developers/manifests/github-actions-runtime-policy.v1.json"
 WORKFLOW_DIR = ROOT / ".github/workflows"
 DEPENDABOT = ROOT / ".github/dependabot.yml"
 
-USES_RE = re.compile(r"^\s*uses:\s*([^\s#]+)(?:\s+#\s*(.+?))?\s*$")
+USES_DIRECTIVE_RE = re.compile(
+    r"^\s*(?:-\s*)?(?:uses|['\"]uses['\"])\s*:\s*(.*?)\s*$"
+)
+RUNS_ON_DIRECTIVE_RE = re.compile(
+    r"^\s*(?:runs-on|['\"]runs-on['\"])\s*:\s*(.*?)\s*$"
+)
+FLOW_USES_RE = re.compile(
+    r"^\s*-\s*\{.*(?:\buses\b|['\"]uses['\"])\s*:"
+)
 REMOTE_RE = re.compile(r"^([^/]+)/([^/@]+)(/[^@]+)?@([0-9a-fA-F]{40})$")
 FORBIDDEN_ENV = (
     "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24",
     "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION",
 )
+
+
+class PolicyParseError(ValueError):
+    """Raised when a governed workflow uses syntax outside the accepted profile."""
 
 
 def fail(message: str) -> None:
@@ -37,15 +56,143 @@ def workflow_paths() -> list[Path]:
     return paths
 
 
+def split_yaml_comment(raw: str) -> tuple[str, Optional[str]]:
+    """Split an inline YAML comment while respecting simple quoted scalars."""
+    quote: Optional[str] = None
+    escaped = False
+    for index, char in enumerate(raw):
+        if quote == '"':
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == quote:
+                quote = None
+                continue
+        elif quote == "'":
+            if char == quote:
+                # YAML represents a literal single quote as two adjacent quotes.
+                if index + 1 < len(raw) and raw[index + 1] == "'":
+                    continue
+                quote = None
+                continue
+        else:
+            if char in {'"', "'"}:
+                quote = char
+                continue
+            if char == "#" and (index == 0 or raw[index - 1].isspace()):
+                return raw[:index].rstrip(), raw[index + 1 :].strip() or None
+    if quote is not None:
+        raise PolicyParseError("unterminated quoted YAML scalar")
+    return raw.strip(), None
+
+
+def decode_literal_scalar(raw: str) -> tuple[str, Optional[str]]:
+    """Decode the strict scalar forms accepted for uses/runs-on directives."""
+    scalar, comment = split_yaml_comment(raw)
+    scalar = scalar.strip()
+    if not scalar:
+        raise PolicyParseError("empty directive value")
+
+    if scalar[0] in {'"', "'"}:
+        quote = scalar[0]
+        if len(scalar) < 2 or scalar[-1] != quote:
+            raise PolicyParseError("quoted directive must end on the same YAML line")
+        inner = scalar[1:-1]
+        if quote == "'":
+            inner = inner.replace("''", "'")
+        elif "\\" in inner:
+            # Action and runner identifiers require no escape sequences. Reject
+            # rather than risk accepting a YAML escape with a different meaning.
+            raise PolicyParseError("escaped double-quoted directive is outside the accepted profile")
+        value = inner
+    else:
+        if any(char.isspace() for char in scalar):
+            raise PolicyParseError("unquoted directive values may not contain whitespace")
+        if scalar in {">", ">-", ">+", "|", "|-", "|+"}:
+            raise PolicyParseError("folded or block directive values are prohibited")
+        value = scalar
+
+    if not value:
+        raise PolicyParseError("directive value resolved empty")
+    return value, comment
+
+
+def parse_uses_line(line: str) -> Optional[tuple[str, Optional[str]]]:
+    if FLOW_USES_RE.match(line):
+        raise PolicyParseError("flow-style uses mapping is prohibited; use one governed literal uses directive per line")
+    match = USES_DIRECTIVE_RE.match(line)
+    if not match:
+        return None
+    return decode_literal_scalar(match.group(1))
+
+
+def parse_runs_on_line(line: str) -> Optional[str]:
+    match = RUNS_ON_DIRECTIVE_RE.match(line)
+    if not match:
+        return None
+    value, _comment = decode_literal_scalar(match.group(1))
+    return value
+
+
+def parser_self_test() -> None:
+    sha = "a" * 40
+    expected = f"actions/checkout@{sha}"
+    cases = (
+        f"        uses: {expected} # v7.0.1",
+        f"      - uses: {expected} # v7.0.1",
+        f"        uses: '{expected}' # v7.0.1",
+        f'        "uses": "{expected}" # v7.0.1',
+    )
+    for line in cases:
+        parsed = parse_uses_line(line)
+        assert parsed is not None and parsed[0] == expected and parsed[1] == "v7.0.1"
+
+    assert parse_runs_on_line("    runs-on: ubuntu-latest") == "ubuntu-latest"
+    assert parse_runs_on_line("    'runs-on': 'ubuntu-latest'") == "ubuntu-latest"
+
+    rejected = (
+        "      - { uses: actions/checkout@" + sha + " }",
+        "        uses: >",
+        '        uses: "actions/checkout@' + sha + '\\n"',
+    )
+    for line in rejected:
+        try:
+            parsed = parse_uses_line(line)
+            if parsed is not None and parsed[0] not in {">", ">-", ">+", "|", "|-", "|+"}:
+                raise AssertionError(f"Expected parser rejection for {line!r}")
+        except PolicyParseError:
+            pass
+        else:
+            if parsed is not None:
+                # Folded/block forms are rejected later as invalid remote refs;
+                # this branch guarantees they cannot be silently skipped.
+                assert parsed[0] in {">", ">-", ">+", "|", "|-", "|+"}
+
+
 def main() -> int:
+    parser_self_test()
     policy = load_policy()
+    if policy.get("manifest_version") != "1.0.1":
+        fail("GitHub Actions runtime policy must include parser/runner hardening version 1.0.1")
     if policy.get("status") != "active_fail_closed":
         fail("GitHub Actions runtime policy must remain active_fail_closed")
     if policy.get("target_runtime") != "node24" or policy.get("node20_status") != "prohibited":
         fail("Node 24 must be the runtime floor and Node 20 must be prohibited")
     if policy.get("minimum_actions_runner_version") != "2.327.1":
         fail("Minimum Node-24-capable Actions runner version drifted")
-    if policy.get("runner_policy", {}).get("self_hosted") != "blocked_until_node24_runner_attestation_is_machine_verified":
+
+    runner_policy = policy.get("runner_policy", {})
+    if runner_policy.get("github_hosted") != "permitted_only_from_approved_literal_labels":
+        fail("GitHub-hosted runners must remain restricted to approved literal labels")
+    approved_runners = set(runner_policy.get("approved_github_hosted_labels", []))
+    if approved_runners != {"ubuntu-latest"}:
+        fail(f"Approved GitHub-hosted runner inventory drifted: {sorted(approved_runners)}")
+    if runner_policy.get("dynamic_runs_on_expressions") != "prohibited_until_runner_attestation_policy_supports_them":
+        fail("Dynamic runs-on expressions must remain prohibited")
+    if runner_policy.get("self_hosted") != "blocked_until_node24_runner_attestation_is_machine_verified":
         fail("Self-hosted runners must remain blocked until Node 24 runner attestation is machine verified")
 
     refs = policy.get("reference_policy", {})
@@ -57,6 +204,10 @@ def main() -> int:
         fail("Mutable tag/branch action references must remain prohibited")
     if refs.get("version_comment_required") is not True:
         fail("Pinned actions must retain human-readable version comments")
+    if refs.get("unparsed_uses_directive") != "blocking":
+        fail("Unparsed uses directives must remain blocking")
+    if refs.get("quoted_uses_scalars") != "parsed_and_governed":
+        fail("Quoted uses scalars must remain governed")
 
     if policy.get("escape_hatches", {}).get("ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION") != "prohibited":
         fail("Insecure Node runtime escape hatch must remain prohibited")
@@ -70,6 +221,8 @@ def main() -> int:
             fail(f"Approved action {action!r} lacks a full lowercase SHA")
         if item.get("runtime") != "node24" or item.get("compatibility") != "approved":
             fail(f"Approved action {action} is not explicitly Node 24 compatible")
+        if "verified_2026-08-19" not in str(item.get("upstream_evidence", "")):
+            fail(f"Approved action {action} lacks current upstream runtime/source evidence")
         approved[action] = {"sha": sha, "version": version}
 
     required_actions = {
@@ -81,29 +234,45 @@ def main() -> int:
         fail(f"Approved action inventory drifted: {sorted(approved)}")
 
     seen = set()
+    runner_count = 0
     for path in workflow_paths():
         text = path.read_text(encoding="utf-8")
         rel = path.relative_to(ROOT).as_posix()
         for token in FORBIDDEN_ENV:
             if token in text:
                 fail(f"{rel} contains prohibited runtime escape/substitution {token}")
-        if re.search(r"runs-on:\s*(?:\[[^\]]*self-hosted|self-hosted)", text, flags=re.IGNORECASE):
-            fail(f"{rel} uses self-hosted runner without machine-verified Node 24 runner attestation")
 
         for lineno, line in enumerate(text.splitlines(), 1):
-            match = USES_RE.match(line)
-            if not match:
+            try:
+                runner = parse_runs_on_line(line)
+            except PolicyParseError as exc:
+                fail(f"{rel}:{lineno} invalid runs-on directive: {exc}")
+            if runner is not None:
+                runner_count += 1
+                if runner not in approved_runners:
+                    fail(
+                        f"{rel}:{lineno} runner {runner!r} is not an approved literal GitHub-hosted runner; "
+                        "dynamic, matrix, self-hosted, and unverified labels are fail-closed"
+                    )
+
+            try:
+                parsed = parse_uses_line(line)
+            except PolicyParseError as exc:
+                fail(f"{rel}:{lineno} invalid uses directive: {exc}")
+            if parsed is None:
                 continue
-            value, comment = match.groups()
+            value, comment = parsed
             if value.startswith("./"):
                 continue
-            remote = REMOTE_RE.match(value)
+            remote = REMOTE_RE.fullmatch(value)
             if not remote:
-                fail(f"{rel}:{lineno} remote action must use a full 40-character commit SHA: {value}")
-            owner, repo, _subpath, sha = remote.groups()
+                fail(f"{rel}:{lineno} remote action must use a governed full 40-character commit SHA: {value}")
+            owner, repo, subpath, sha = remote.groups()
             base = f"{owner}/{repo}"
             if base not in approved:
                 fail(f"{rel}:{lineno} remote action {base} is not in the approved Node 24 action inventory")
+            if subpath:
+                fail(f"{rel}:{lineno} approved remote action {base} must use its canonical repository root, not subpath {subpath}")
             expected = approved[base]
             if sha.lower() != expected["sha"]:
                 fail(
@@ -114,6 +283,8 @@ def main() -> int:
                 fail(f"{rel}:{lineno} {base} must retain version comment {expected['version']}")
             seen.add(base)
 
+    if runner_count == 0:
+        fail("No literal runs-on directives were observed; runner policy cannot be considered enforced")
     if seen != required_actions:
         fail(f"Workflow action coverage drifted; seen={sorted(seen)}")
 
@@ -136,9 +307,10 @@ def main() -> int:
         fail("Runtime update PRs must remain subject to agent-sovereign quorum")
 
     print("GitHub Actions runtime and supply-chain policy passed.")
-    print(f"Workflows scanned: {len(workflow_paths())}; remote actions: {', '.join(sorted(seen))}.")
+    print(f"Workflows scanned: {len(workflow_paths())}; literal runner directives: {runner_count}; remote actions: {', '.join(sorted(seen))}.")
     print("Runtime floor: Node 24; Node 20 and runtime warning-suppression escape hatches: prohibited.")
-    print("Remote actions: full-SHA pinned; Dependabot: daily bounded update proposals; direct-to-main repair: disabled.")
+    print("Runner policy: approved literal GitHub-hosted labels only; dynamic/matrix/self-hosted labels fail closed.")
+    print("Remote actions: quoted/unquoted uses parsed, canonical root, full-SHA pinned; Dependabot daily proposals only.")
     print("CodeQL: provider-managed default setup; duplicate advanced workflow action references: prohibited.")
     return 0
 
