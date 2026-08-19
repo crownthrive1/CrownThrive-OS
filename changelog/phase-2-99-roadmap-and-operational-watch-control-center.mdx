@@ -125,8 +125,9 @@ Marketplace prices are comparison snapshots only. They must never overwrite the 
 | `CT-WATCH-API-002` | Adserver.Online → AdLuxe Network | UNVERIFIED account entitlement | authenticate CrownThrive account; verify plan limits and production API entitlement |
 | `CT-WATCH-API-003` | AdLuxe Studio | writes closed | license \+ public-price arithmetic \+ provider write certification |
 | `CT-WATCH-API-004` | Stripe institutional path | BLOCKED | scoped server credential \+ outbound API \+ webhook signature verification |
-| `CT-WATCH-API-005` | Collab Portal | 6/7 predicates passed | sender/delivery integrity; directly maps to `CT-P299-GATE-006` |
-| `CT-WATCH-API-006` | CrownThrive IO governed requests | read health verified; monthly ceiling UNKNOWN/open | adopt monthly ceiling and scheduled probe budget policy |
+| `CT-WATCH-API-005` | Collab Portal | 6/7 predicates passed; split receivers statically hardened | live provider sender/delivery integrity remains blocked; directly maps to `CT-P299-GATE-006` |
+| `CT-WATCH-API-006` | CrownThrive IO governed requests | read health verified; founder policy classifies monthly API calls as unlimited; request counter is telemetry | continue hourly availability probe plus monthly ecosystem heartbeat; provider writes remain closed |
+| `CT-WATCH-API-007` | ThriveTools SEO | dual-Vault credential continuity \+ eight read families certified; read-only MCP projection passed | reconcile exact team-member/payment/log paths; keep provider writes disabled |
 
 THIVEBASE capacity thresholds remain: GREEN below 50%, WATCH 50–69%, PLAN 70–79%, ACTION NEEDED 80–89%, SCALE GATE 90%\+. Forecast-based escalation may act earlier. A provider-side metric that is unavailable is not 0%.
 
@@ -232,3 +233,57 @@ Partnero/Crown Affiliates remains blocked on API-key and webhook-signing-secret 
 No authoritative registrar evidence was obtained to close the existing domain renewal queue. Public reachability does not substitute for registrar/custody/renewal proof, so the August 28, August 30 and September renewal verification items remain open.
 
 This run generated a new `ACTION NEEDED — THIVEBASE` notification because the integration-control blocker count materially increased through the newly registered ThriveTools SEO lane. The sanitized Gmail notice was sent to the institutional tracking address and labeled `CrownThrive/ACTION NEEDED`. GitHub issues #98, #99 and #100 were updated with the same current-state and downstream-phase impact. No daily `SUCCESS` email was sent because an action-needed state exists.
+
+## Phase 2.99 integration-hardening patch — 2026-08-19 21:20 UTC
+
+This bounded patch implements the founder-directed operational changes without promoting Phase 3 or silently changing production engine versions.
+
+### ThriveTools SEO — CrownThrive IO control pattern applied
+
+The live integration-control state is now ahead of the earlier action-needed snapshot. ThriveTools SEO has a verified primary \+ recovery Vault continuity record, authenticated read certification across eight currently proven API families, a JWT-protected read-only `thrivetools-seo-api-control` runtime, and a read-only MCP projection through `crownthrive-api-control` v3. Provider writes remain disabled. `monthly_request_budget_ceiling` and scheduled-probe budget policy are now `passed` under the founder-confirmed unlimited-call policy; request counts remain telemetry and abuse-detection evidence rather than an exhaustion ceiling.
+
+The remaining SEO API work is deliberately narrow: exact endpoint/path reconciliation for team-members, payments and logs. Those families remain disabled because provisional paths did not return certified API JSON. No naming similarity or provider UI hint can promote them.
+
+### Collab Portal — split receiver hardening complete; live-delivery gate still closed
+
+The legacy generic `collab-portal-webhook-receiver` is retired as an HTTP 410 non-dispatching stub. The provider-configured Projects and Billing receivers are now v2 and enforce:
+
+- sender-token verification using a Vault-held verifier reference rather than a verifier fingerprint embedded in source;
+- `POST` \+ JSON-only handling;
+- streaming **pre-read** 64 KiB request-body bounding rather than buffering first and checking later;
+- strict event allowlists;
+- mandatory pinned institutional project identity for Project events;
+- SHA-256 receipt evidence \+ replay/idempotency keys;
+- no raw webhook-payload persistence.
+
+Accordingly, `legacy_webhook_receiver_retirement`, `webhook_envelope_strictness` and `webhook_request_body_bounding` now pass. A founder-authorized reversible Project Updated certification probe completed provider read → normalized bounded write → readback with HTTP 200 and restored the canonical project state. However, no callback reached the configured hardened Projects receiver. Therefore `webhook_sender_delivery_integrity` remains **blocked**, the canonical Collab result remains **6/7**, and event-driven synchronization remains disabled. Static security hardening is not substituted for real provider-delivery evidence.
+
+### CrownRewards / My CrownRewards — v4 preserved, v5.27.0 prepared only
+
+The current CrownThrive engine boundary remains explicit: **Reward Loyalty is the self-hosted engine beneath CrownRewards / My CrownRewards and is separate from Partnero / Crown Affiliates and AdLuxe Network.** My CrownRewards remains publicly reachable, but current production engine state remains `v4`; `production_v5_deployed=false`.
+
+The latest vendor target reference is Reward Loyalty **v5.27.0 (2026-08-14)** with PHP **8.4.1\+** as the documented runtime floor. The Phase 2.99 control plane now registers the v5 REST session-token login surfaces and Agent API `/health`, OpenAPI and MCP-format tool-discovery surfaces, all disabled. A JWT-protected `reward-loyalty-api-control` readiness adapter is deployed in preparation-only mode and cannot dispatch provider API calls or writes.
+
+Activation remains gated by backup, separate staging migration, host/PHP-extension compatibility, production-v5 deployment evidence, least-privilege Agent API key, rate-limit/idempotency/replay controls, audit/reconciliation and bounded read certification. The v4 production installation stays intact until those gates pass.
+
+## THIVEBASE Monthly Heartbeat
+
+The recurring **THIVEBASE Monthly Heartbeat** is now the ecosystem-wide API/infrastructure certification cycle. It runs on the first day of each month in the local morning window and must begin by calling `public.thivebase_health_snapshot()` against the connected CrownThrive Supabase project so every run creates actual database activity.
+
+Its machine policy is `developers/manifests/thivebase-operational-automation.v1.json`, validated by `scripts/validate_thivebase_operational_automation.py`. `scripts/build_thivebase_heartbeat_plan.py` renders the deterministic sanitized execution plan. Both Documentation Governance and the required `CrownThrive governed merge gate` execute the validator.
+
+The heartbeat checks project `ACTIVE_HEALTHY` state, cron failures, Security Advisor, material Performance Advisor warnings, capacity thresholds/forecasting, request-budget semantics, credential continuity, integration-control gates, registered P0 API/MCP health, webhook state, vendor/engine version drift, support/renewal queues and GitHub control-plane state. Default execution is read-only and fail-closed. Unavailable provider metrics remain `UNKNOWN`, never zero.
+
+### Delegated operational subagents
+
+Three non-voting operational helpers are authorized under the overlay without changing the A/B/C/D/S sovereign voter pool:
+
+- `ct.subagent.integration-heartbeat` — sanitized health snapshots, registered D0/D1 read checks, gate/budget comparison, cron/advisor/runtime inspection and evidence-backed watch updates;
+- `ct.subagent.credential-continuity` — Vault-reference presence and sanitized continuity checks, missing-reference detection and only founder-explicit bounded alias repair with audit;
+- `ct.subagent.vendor-engine-watch` — official vendor changelog/version/price/license tracking, current-target-version recording, support/renewal monitoring and stage/diff/backup task creation.
+
+They cannot create sovereign votes, expose secrets or credential fingerprints, rotate provider credentials autonomously, enable provider writes, alter rights/money/legal authority, claim an unverified version is deployed, or convert `UNKNOWN` into `PASS`. Agent E is the primary read-only API/MCP conformance and heartbeat execution specialist; Agent A owns reconciliation/orchestration, B evidence review, C bounded scripts/docs implementation, D independent gatekeeping and S security/resilience review.
+
+### Software-engine version tracker rule
+
+For CodeCanyon and other third-party engines, the **most recent provider-published release becomes the default target/reference version until installed-version evidence is recovered**. Target version is not deployed version. Historical purchase price is never overwritten by current marketplace price, marketplace channels remain distinct, and support expiry is not treated as software deactivation unless vendor terms explicitly establish that effect. Every upgrade follows: stage → backup → diff → compatibility/test → reconcile → governed promotion.
