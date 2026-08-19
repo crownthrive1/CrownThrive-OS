@@ -17,12 +17,14 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/repository-governance-enforcement-state.v1.json"
 DOCS_WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
 SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
-STANDARD = ROOT / "standards/documentation-source-of-truth-and-autonomous-governance.mdx"
-PLAN = ROOT / "changelog/phase-2-99-plan.mdx"
-GATE = ROOT / "technology/phase-3-readiness-gate.mdx"
-CHARTER = ROOT / "standards/ten-phase-institutional-program-charter.mdx"
+ADR = ROOT / "changelog/adr-agent-sovereign-governance-quorum-security.md"
+STANDARD_AMENDMENT = ROOT / "standards/agent-sovereign-governance-amendment-ct-adr-gov-011.md"
+GATE_AMENDMENT = ROOT / "technology/phase-3-readiness-gate-amendment-ct-adr-gov-011.md"
 RELAY = ROOT / "automation/institutional-hourly-agent-relay.mdx"
 PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
+CHLOM = ROOT / "chlom/overview.mdx"
+DSCAAS = ROOT / "governance/ds-caas.mdx"
+SECURITY = ROOT / "SECURITY.md"
 
 
 def fail(message: str) -> None:
@@ -63,10 +65,7 @@ def main() -> int:
             fail(f"{key} drifted: {data.get(key)!r} != {value!r}")
 
     workflow = data.get("workflow", {})
-    for key in (
-        "pull_request_validation", "push_to_main_revalidation",
-        "scheduled_security_revalidation",
-    ):
+    for key in ("pull_request_validation", "push_to_main_revalidation", "scheduled_security_revalidation"):
         if workflow.get(key) is not True:
             fail(f"Workflow invariant {key} must be true")
 
@@ -140,13 +139,16 @@ def main() -> int:
     ):
         require(SECURITY_WORKFLOW, fragment)
 
+    require(ADR, "# CT-ADR-GOV-011")
+    require(ADR, "Phase 3 therefore remains `blocked_pending_phase_2_99_hard_exit`")
+    require(STANDARD_AMENDMENT, "GitHub branch protection may supplement the model but is not the authority root")
+    require(GATE_AMENDMENT, "GitHub branch protection/rulesets are optional defense-in-depth")
     require(RELAY, "GitHub is not the sovereign merge authority")
     require(RELAY, "75% quorum")
     require(PERMISSIONS, "## Agent-sovereign quorum and specialist gates")
-    require(PLAN, "CT-ADR-GOV-011")
-    require(GATE, "CT-ADR-GOV-011")
-    require(CHARTER, "CT-ADR-GOV-011")
-    require(STANDARD, "CT-ADR-GOV-011")
+    require(CHLOM, "Target metaprotocol architecture")
+    require(DSCAAS, "Agent-sovereign enforcement")
+    require(SECURITY, "Continuous Security Governance")
 
     print("Repository governance state validation passed.")
     print("GitHub observed branch protection: false; GitHub merge gate enforced: false.")
