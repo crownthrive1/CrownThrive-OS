@@ -1,11 +1,12 @@
 {
-  "packet_version": "1.0.0",
+  "packet_version": "1.1.0",
   "packet_id": "ct.packet.chlom.cell.tevv.invariants-v1",
   "program_id": "ct.program.chlom-executable-build",
   "cell_id": "ct.chlom.cell.tevv",
   "issue": 75,
   "parent_pr": 67,
   "stacked_on_pr": 82,
+  "tested_kernel_head": "30d7b49bf6b01d6d094f62fa357dd31647ef078a",
   "phase": "2.99",
   "state": "prototype_security_evaluation",
   "risk_class": "D2",
@@ -28,20 +29,22 @@
     {
       "finding_id": "ct.finding.tevv.authority-approval-self-assertion",
       "severity": "high",
-      "status": "open",
+      "status": "remediated_pending_exact_head_tevv_revalidation",
       "blocking": true,
-      "evidence": "strict_v1_reference_kernel_can_allow_issue_license_when_request_self_asserts_rights_steward_plus_rights_authority_string_without_verified_authority_binding",
+      "prior_evidence": "earlier strict_v1 kernel could allow issue_license from caller asserted role plus approval label",
+      "current_remediation_evidence": "Cell01 head 30d7b49 adds out-of-band VerifiedAuthorityContext and removes caller claims as authority",
       "remediation_owner": ["ct.chlom.cell.authority", "ct.chlom.cell.kernel"],
-      "acceptance": "unverified_or_self_asserted_approval_evidence_must_hold_or_deny; verified authority result must be issuer-bound and independently checkable"
+      "acceptance": "original self-asserted license vector must no longer allow; verified allow requires actor/org binding plus relationship, delegation and approval context"
     },
     {
       "finding_id": "ct.finding.tevv.restricted-evidence-reference-unsanitized",
       "severity": "high",
-      "status": "open",
+      "status": "remediated_pending_exact_head_tevv_revalidation",
       "blocking": true,
-      "evidence": "strict_v1_reference_kernel_persists_authority_evidence_input_verbatim_into_DAIL_event_payload",
+      "prior_evidence": "earlier strict_v1 kernel persisted caller authority_evidence text verbatim into DAIL",
+      "current_remediation_evidence": "Cell01 head 30d7b49 sanitizes non-governed evidence to opaque SHA-256 digest and preserves governed references",
       "remediation_owner": ["ct.chlom.cell.evidence", "ct.chlom.cell.kernel"],
-      "acceptance": "DAIL stores governed evidence references/proofs only; restricted or secret-like input is rejected or sanitized before persistence"
+      "acceptance": "original restricted marker vector must prove no verbatim persistence and governed evidence references remain stable"
     },
     {
       "finding_id": "ct.finding.tevv.policy-bundle-state-unverified",
@@ -53,10 +56,21 @@
       "acceptance": "stale_superseded_or_untrusted_bundle_cannot_produce_allow"
     }
   ],
-  "promotion_state": "blocked_by_open_high_findings",
+  "revalidation": {
+    "original_high_vectors_changed": false,
+    "original_high_vectors_rerun_required": true,
+    "additional_vectors_added": [
+      "ct.tevv.contract.untrusted-no-implicit-legacy-downgrade",
+      "ct.tevv.authority.verified-context-bound-relationship-delegation"
+    ],
+    "full_cell_08_ci_required": true,
+    "full_parent_chlom_validation_required": true,
+    "independent_remediation_verification_required": true
+  },
+  "promotion_state": "blocked_pending_exact_head_tevv_revalidation_and_parent_sequence",
   "self_heal_rule": "repair_owner_fixes_root_cause_then_rerun_original_tevv_vector_and_full_institutional_security_suite_then_independent_verify",
   "rollback": "revert_this_stacked_cell_08_packet; no_provider_or_data_migration_rollback_required",
   "docs_impact": "docs_updated",
-  "phase_3_effect": "no_phase_3_entry; open_high_tevv_findings_are_blocking",
+  "phase_3_effect": "no_phase_3_entry; TEVV revalidation and parent Phase 2.99 gates remain blocking",
   "advanced_crypto_state": "phase_9_research_only"
 }
