@@ -1,0 +1,170 @@
+---
+title: "Phase 2.99 — Governance-as-Code Enforcement Audit"
+sidebarTitle: "2.99 Governance Enforcement"
+description: "Audits the distinction between automated documentation validation and fail-closed GitHub merge enforcement, records the current unprotected main-branch state, and makes required governance status checks a Phase 2.99/Phase 3 hard gate."
+icon: "shield-halved"
+keywords: ["Phase 2.99", "governance as code", "branch protection", "GitHub rulesets", "required status checks", "fail closed", "Validate institutional documentation"]
+---
+
+# Phase 2.99 — Governance-as-Code Enforcement Audit
+
+## Run identity
+
+```yaml
+phase: 2.99
+workstream: repository_governance_enforcement
+repository: crownthrive1/CrownThrive-Support
+source_id: S106
+baseline_main: 906aa5b2f0d557252f1bc5a512a43e4bdb111e13
+documentation_impact: docs_updated
+phase_3_entry: blocked_pending_phase_2_99_hard_exit
+```
+
+## Why this pass exists
+
+CrownThrive already has automated institutional validation, but **validation and enforcement are not the same control**.
+
+```text
+monitoring
+"Policy violation detected. FAIL."
+
+versus
+
+enforcement
+"Policy violation detected. FAIL. GitHub blocks merge into main."
+```
+
+The institutional target is the second model.
+
+## Verified workflow state
+
+`.github/workflows/docs-governance.yml` currently defines:
+
+```yaml
+workflow: Documentation Governance
+job: Validate institutional documentation
+pull_request_validation: true
+push_to_main_validation: true
+workflow_dispatch: true
+```
+
+The job executes the core documentation validator and the registered Collab Portal, domain, S103/crosswalk and engine/domain validators, plus whitespace and merge-conflict checks.
+
+This proves automated governance **monitoring** and post-merge canonical-branch revalidation.
+
+## Verified GitHub branch state
+
+The GitHub branch API for `main` currently reports:
+
+```yaml
+branch: main
+protected: false
+classic_branch_protection_enabled: false
+required_status_checks:
+  enforcement_level: off
+  contexts: []
+  checks: []
+```
+
+Therefore the current evidence does **not** support a claim that `Validate institutional documentation` is a mandatory merge condition.
+
+## Current classification
+
+```yaml
+governance_as_code: active
+policy_detection: active
+pre_merge_validation_workflow: active
+post_merge_main_revalidation: active
+required_merge_check: not_established
+fail_closed_merge_enforcement: not_established
+current_classification: monitoring_plus_defense_in_depth
+```
+
+The current connector can inspect the effective branch response and workflow source, but it does not independently enumerate every repository Settings → Rules ruleset. A repository ruleset must therefore be inspected/configured directly and then validated through effective behavior rather than assumed.
+
+## Required target state
+
+```yaml
+target_branch: main
+pull_request_flow: required_or_equivalent_governed_merge_path
+required_status_check: Validate institutional documentation
+failed_check_mergeability: blocked
+force_push: blocked_unless_explicit_break_glass
+branch_deletion: blocked_unless_explicit_break_glass
+bypass_authority: explicitly_documented_D3_decision
+post_merge_revalidation: retained
+```
+
+The exact GitHub status-check context must be selected from the repository's actual available checks, not typed from memory if the GitHub UI presents a generated context name.
+
+## Why post-merge validation remains valuable
+
+Even after merge enforcement is enabled, the push-to-`main` workflow remains mandatory defense-in-depth. It detects:
+
+- bypass or emergency-merge defects;
+- ruleset drift;
+- changes introduced by a merge mechanism rather than the PR head;
+- workflow/configuration inconsistencies;
+- canonical-branch corruption or later direct-write exposure.
+
+Pre-merge enforcement prevents known noncompliance from entering `main`; post-merge validation independently verifies the canonical branch after the transition.
+
+## Executable policy direction
+
+The current S100/S103 source/identity/domain/provider work is increasingly suitable for policy-as-code transitions such as:
+
+```text
+source authority
+→ canonical identity
+→ ownership/authority
+→ domain
+→ provider
+→ deployment
+→ entitlement
+→ rights
+→ economic state
+→ publication eligibility
+```
+
+Agents may propose transitions, but the governance layer should reject unsupported state promotion. Examples that must fail closed include:
+
+- `historical → current` without effective source/authority evidence;
+- `unverified → production_verified` without runtime evidence;
+- `provider_capability → CrownThrive_deployed` without account/deployment evidence;
+- `payment → entitlement` without fulfillment proof;
+- `product_listing → rights_granted` without a valid license/rights path;
+- `source Active domain label → current secure canonical host` without registrar/DNS/TLS/runtime evidence.
+
+## Hard-gate effect
+
+```yaml
+phase_2_99_repository_topology_decision: accepted
+phase_2_99_repository_enforcement_checkpoint: reopened_blocking
+phase_2_99_hard_exit: not_met
+phase_3_hard_entry: not_met
+```
+
+Phase 3 cannot inherit "governance-as-code" as a fail-closed production control while the connected institutional source repository permits an ungoverned merge path.
+
+## Downstream propagation
+
+- **Phase 3:** require effective merge-gate enforcement before executable institutional policy services are treated as governed production baselines.
+- **Phase 4:** platform-integration PRs inherit mandatory identity/data/rights/adapter checks.
+- **Phase 5:** commercial-state changes inherit enforced price/offer/fulfillment/attribution checks.
+- **Phase 6:** API/MCP/SDK/licensing contracts inherit protected schema/contract validation.
+- **Phase 7:** device/location/phygital releases inherit enforced safety/privacy/configuration checks.
+- **Phase 8:** Holdings/economic/governance records inherit authority/legal/economic required checks.
+- **Phase 9:** advanced CHLOM changes inherit stronger provenance/cryptographic/security enforcement.
+- **Phase 10:** repository rulesets, required-check identities, bypass roles and emergency restoration become continuity artifacts.
+
+## Exact next state
+
+1. inspect GitHub repository **Settings → Rules → Rulesets** and/or effective branch-protection configuration for `main`;
+2. establish whether any existing ruleset targets `main`;
+3. configure the required merge condition for the actual institutional validation status check;
+4. govern bypass/administrator authority explicitly;
+5. preserve push-to-`main` revalidation;
+6. create a controlled failing validation PR or equivalent test;
+7. verify GitHub reports the PR as blocked/non-mergeable because the required check failed;
+8. re-inspect the effective branch/ruleset state;
+9. update S106 from `monitoring_plus_defense_in_depth` to `merge_gate_enforced` only after that evidence exists.
