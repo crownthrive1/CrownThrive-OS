@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "developers/manifests/security-self-healing-policy.v1.json"
 CREDENTIAL_POLICY = ROOT / "developers/manifests/credential-vault-ingestion-policy.v1.json"
+REQUEST_BUDGET_POLICY = ROOT / "developers/manifests/api-request-budget-policy.v1.json"
 ACTIONS_POLICY = ROOT / "developers/manifests/github-actions-runtime-policy.v1.json"
 SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
 
@@ -33,6 +34,7 @@ def fail(message: str) -> None:
 def main() -> int:
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     credential_policy = json.loads(CREDENTIAL_POLICY.read_text(encoding="utf-8"))
+    request_budget_policy = json.loads(REQUEST_BUDGET_POLICY.read_text(encoding="utf-8"))
     actions_policy = json.loads(ACTIONS_POLICY.read_text(encoding="utf-8"))
     if policy.get("control_model") != "continuous_detect_triage_repair_revalidate_independent_verify":
         fail("security control model drifted")
@@ -69,6 +71,26 @@ def main() -> int:
         fail("runtime credentials must remain server-side Vault references only")
     if vault_policy.get("vault_unavailable_behavior") != "fail_closed_and_request_connector_or_secure_binding":
         fail("missing Vault capability must fail closed")
+
+    unlimited = set(request_budget_policy.get("unlimited_api_families", []))
+    required_unlimited = {
+        "crownthrive_io",
+        "thrivetools_seo",
+        "thrivepush",
+        "crownpulse",
+        "crownlytics",
+        "thrivetools",
+        "thrivetools_opt",
+    }
+    if not required_unlimited.issubset(unlimited):
+        fail("founder-confirmed unlimited API family policy drifted")
+    budget_enforcement = request_budget_policy.get("enforcement", {})
+    if budget_enforcement.get("monthly_hard_ceiling") is not False:
+        fail("founder-confirmed unlimited API families must not gain a monthly hard ceiling")
+    if budget_enforcement.get("fail_closed_on_monthly_count") is not False:
+        fail("request counters for unlimited API families must remain telemetry, not fail-closed monthly quota gates")
+    if budget_enforcement.get("writes") != "remain_independently_governed_and_fail_closed":
+        fail("unlimited read-call policy must never open provider writes")
 
     github_evidence = policy.get("github_security_evidence", {})
     if github_evidence.get("codeql") != "required_when_applicable":
@@ -130,6 +152,7 @@ def main() -> int:
 
     print("Deterministic security-governance validation passed.")
     print("Credential policy: supplied secrets must enter Supabase Vault before runtime use; repository/docs/log/email exposure prohibited.")
+    print("Request-budget policy: founder-confirmed unlimited CrownThrive API families use request ledgers for telemetry, not monthly fail-closed ceilings.")
     print("No literal GitHub/OpenAI/Stripe high-risk token patterns detected.")
     print("GitHub Actions: Node 24 fail-closed runtime policy; full-SHA action references; Dependency Review v5.")
     print("CodeQL mode: GitHub provider-managed default setup; duplicate advanced setup prohibited.")
