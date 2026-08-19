@@ -5,6 +5,11 @@ Standard-library only. Offline validation is always available. With
 --github-open-prs and GITHUB_TOKEN/GITHUB_REPOSITORY, the scanner also compares
 the committed draft index to current open pull-request metadata using read-only
 GitHub API access.
+
+The draft index may designate exactly one ``self_pr`` whose head is ``SELF``.
+That avoids the impossible self-reference of committing a manifest that embeds
+its own final commit SHA. Live GitHub metadata remains authoritative for that
+single dynamic head.
 """
 from __future__ import annotations
 
@@ -92,7 +97,7 @@ def github_get(url: str, token: str) -> Any:
             "User-Agent": "crownthrive-reconciliation-tag-scanner/1.0",
         },
     )
-    with urllib.request.urlopen(req, timeout=15) as response:  # noqa: S310 - fixed GitHub API host below
+    with urllib.request.urlopen(req, timeout=15) as response:  # noqa: S310 - validated fixed GitHub host
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -175,11 +180,17 @@ def main() -> int:
     observed_main = draft_index.get("observed_main_sha")
     if not isinstance(observed_main, str) or not SHA40.fullmatch(observed_main):
         fail("Draft index observed_main_sha must be an exact commit SHA")
+    self_pr = draft_index.get("self_pr")
+    if not isinstance(self_pr, int) or self_pr <= 0:
+        fail("Draft index must declare positive integer self_pr")
+    if draft_index.get("self_head_semantics") != "dynamic_live_head_not_self_committed_sha":
+        fail("Draft index self-head semantics drifted")
     drafts = draft_index.get("drafts")
     if not isinstance(drafts, list):
         fail("Draft index drafts must be an array")
 
     seen_prs: set[int] = set()
+    self_rows = 0
     for row in drafts:
         if not isinstance(row, dict):
             fail("Draft index row must be an object")
@@ -188,7 +199,11 @@ def main() -> int:
             fail(f"Invalid/duplicate PR in draft index: {pr!r}")
         seen_prs.add(pr)
         head, base = row.get("head"), row.get("base")
-        if not isinstance(head, str) or not SHA40.fullmatch(head):
+        if pr == self_pr:
+            self_rows += 1
+            if head != "SELF":
+                fail(f"Self PR #{pr} must use head='SELF'")
+        elif not isinstance(head, str) or not SHA40.fullmatch(head):
             fail(f"PR #{pr} head must be exact SHA")
         if not isinstance(base, str) or not SHA40.fullmatch(base):
             fail(f"PR #{pr} base must be exact SHA")
@@ -200,12 +215,28 @@ def main() -> int:
         if "CT:DRAFT" not in s:
             fail(f"Open draft index entry #{pr} lacks CT:DRAFT")
         if base != observed_main and "CT:STALE-BASE" not in s:
-            # Stacked children can have a non-main parent; they still require stale/current-main reconciliation.
             fail(f"PR #{pr} base differs from observed main but lacks CT:STALE-BASE")
         if "CT:CI-PASS" in s and not row.get("evidence_refs"):
             fail(f"PR #{pr} claims CT:CI-PASS without evidence reference")
         if "CT:PASS" in s:
             fail(f"Draft PR #{pr} must not use sovereign-looking CT:PASS")
+    if self_rows != 1:
+        fail("Draft index must contain exactly one SELF row")
+
+    closed_rows = draft_index.get("closed_superseded_drafts", [])
+    if not isinstance(closed_rows, list):
+        fail("closed_superseded_drafts must be an array")
+    for row in closed_rows:
+        if not isinstance(row, dict) or not isinstance(row.get("pr"), int):
+            fail("Invalid closed superseded draft row")
+        tags = row.get("tags")
+        if not isinstance(tags, list) or not all(isinstance(x, str) for x in tags):
+            fail(f"Closed PR #{row.get('pr')} tags must be strings")
+        validate_tag_set(tags, allowed, f"closed PR #{row.get('pr')}")
+        if "CT:SUPERSEDED" not in tags:
+            fail(f"Closed superseded PR #{row.get('pr')} lacks CT:SUPERSEDED")
+        if row.get("disposition") != "closed_unmerged_history_preserved":
+            fail(f"Closed PR #{row.get('pr')} must preserve history")
 
     if args.event and args.event.is_file():
         event = load_json(args.event)
@@ -240,14 +271,17 @@ def main() -> int:
             live_row = by_number[pr]
             live_head = str((live_row.get("head") or {}).get("sha") or "")
             live_base = str((live_row.get("base") or {}).get("sha") or "")
-            if live_head and live_head != row["head"]:
+            if pr != self_pr and live_head and live_head != row["head"]:
                 fail(f"PR #{pr} head drifted: index={row['head']} live={live_head}")
+            if pr == self_pr and not SHA40.fullmatch(live_head):
+                fail(f"Self PR #{pr} live head is not a valid exact SHA")
             if live_base and live_base != row["base"]:
                 fail(f"PR #{pr} base drifted: index={row['base']} live={live_base}")
 
     print("Reconciliation tag validation passed.")
     print(f"Allowed tags: {len(allowed)}")
     print(f"Indexed open drafts: {len(drafts)}")
+    print(f"Closed superseded drafts preserved: {len(closed_rows)}")
     print("Agents L/M/N/O are non-voting, least-privilege, self-auditing and phase-gated.")
     print("PASS remains drift-watched; DEFERRAL remains explicitly NOT-PASS.")
     return 0
