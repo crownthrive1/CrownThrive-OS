@@ -1,0 +1,93 @@
+{
+  "manifest_version": "1.0.0",
+  "manifest_id": "ct.manifest.github-actions-runtime-policy.v1",
+  "phase": "2.99",
+  "status": "active_fail_closed",
+  "target_runtime": "node24",
+  "node20_status": "prohibited",
+  "minimum_actions_runner_version": "2.327.1",
+  "runner_policy": {
+    "github_hosted": "permitted",
+    "self_hosted": "blocked_until_node24_runner_attestation_is_machine_verified",
+    "unsupported_node24_targets": [
+      "macos_13_4_or_older",
+      "arm32_self_hosted"
+    ]
+  },
+  "escape_hatches": {
+    "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24": "prohibited_as_compliance_substitute",
+    "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION": "prohibited"
+  },
+  "reference_policy": {
+    "remote_actions_must_use_full_length_commit_sha": true,
+    "full_length_sha_characters": 40,
+    "version_comment_required": true,
+    "mutable_tag_or_branch_refs": "prohibited",
+    "local_actions_prefix": "./"
+  },
+  "approved_actions": [
+    {
+      "uses": "actions/checkout",
+      "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "version": "v7.0.1",
+      "runtime": "node24",
+      "purpose": "repository_checkout",
+      "compatibility": "approved"
+    },
+    {
+      "uses": "actions/setup-python",
+      "sha": "5fda3b95a4ea91299a34e894583c3862153e4b97",
+      "version": "v7",
+      "runtime": "node24",
+      "purpose": "python_toolchain",
+      "compatibility": "approved"
+    },
+    {
+      "uses": "actions/dependency-review-action",
+      "sha": "a1d282b36b6f3519aa1f3fc636f609c47dddb294",
+      "version": "v5.0.0",
+      "runtime": "node24",
+      "purpose": "dependency_review",
+      "compatibility": "approved"
+    }
+  ],
+  "provider_managed_actions": {
+    "github/codeql-action": {
+      "execution_mode": "github_default_setup_provider_managed",
+      "workflow_action_reference": "prohibited_while_default_setup_enabled",
+      "runtime_evidence": "provider_managed_not_synthesized_by_local_runtime_gate"
+    }
+  },
+  "self_healing": {
+    "drift_severity": "high",
+    "detector": "scripts/validate_github_actions_runtime_policy.py",
+    "update_source": "dependabot_github_actions",
+    "proposal_cadence": "daily",
+    "repair_mode": "pull_request_then_upstream_runtime_verify_then_policy_reconcile",
+    "mechanical_repair_authority": "D1",
+    "direct_to_main_mutation": false,
+    "merge_authority": "agent_sovereign_quorum",
+    "post_update_required_checks": [
+      "github_actions_runtime_policy",
+      "institutional_documentation_validation",
+      "security_governance_validation",
+      "applicable_provider_security_evidence",
+      "independent_agent_verification"
+    ]
+  },
+  "gates": {
+    "applies_to": "all_github_actions_workflows",
+    "phase_2_99_exit": "blocking",
+    "phase_3_entry": "blocking_on_runtime_or_supply_chain_drift",
+    "merge": "blocking",
+    "no_warning_suppression_as_fix": true
+  },
+  "source_basis": [
+    "github_actions_node20_to_node24_migration_2026",
+    "official_actions_checkout_v7_action_metadata",
+    "official_actions_setup_python_v7_action_metadata",
+    "official_dependency_review_action_v5_node24_release",
+    "github_secure_use_full_length_commit_sha_guidance",
+    "github_dependabot_github_actions_updates"
+  ]
+}
