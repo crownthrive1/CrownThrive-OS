@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Validate CrownThrive's agent-sovereign governance control plane.
-
-The invariant is explicit: GitHub supplies repository transport, CI and security
-signals, while governed CrownThrive agents plus reserved human authority decide
-whether a change may enter canonical institutional state.
-"""
+"""Validate CrownThrive's agent-sovereign governance control plane."""
 
 from __future__ import annotations
 
@@ -17,12 +12,12 @@ ROOT = Path(__file__).resolve().parents[1]
 AGENT = ROOT / "developers/manifests/agent-sovereign-governance.v1.json"
 NOTIFY = ROOT / "developers/manifests/pm-notification-routing.v1.json"
 SECURITY = ROOT / "developers/manifests/security-self-healing-policy.v1.json"
+ACTIONS = ROOT / "developers/manifests/github-actions-runtime-policy.v1.json"
 REPO_STATE = ROOT / "developers/manifests/repository-governance-enforcement-state.v1.json"
 DOCS_WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
 SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
 RELAY = ROOT / "automation/institutional-hourly-agent-relay.mdx"
 PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
-ADVANCED_CODEQL_USE = re.compile(r"^\s*uses:\s*github/codeql-action/", re.MULTILINE)
 
 
 def fail(message: str) -> None:
@@ -44,6 +39,7 @@ def main() -> int:
     agent = data(AGENT)
     notify = data(NOTIFY)
     security = data(SECURITY)
+    actions = data(ACTIONS)
     repo = data(REPO_STATE)
 
     if agent.get("decision_id") != "CT-ADR-GOV-011" or agent.get("phase") != "2.99":
@@ -60,19 +56,17 @@ def main() -> int:
     voters = [item for item in agent.get("voter_pool", []) if item.get("vote_eligible") is True]
     if len(voters) != 5:
         fail(f"Expected five eligible voters, found {len(voters)}")
-    voter_ids = {item.get("agent_id") for item in voters}
     expected_voters = {
         "ct.relay.agent-a", "ct.relay.agent-b", "ct.relay.agent-c",
         "ct.relay.agent-d", "ct.relay.agent-s",
     }
-    if voter_ids != expected_voters:
+    if {item.get("agent_id") for item in voters} != expected_voters:
         fail("Eligible voter identities drifted")
 
     quorum = agent.get("quorum", {})
     if float(quorum.get("approval_ratio", 0)) != 0.75 or quorum.get("rounding") != "ceil":
         fail("Quorum must remain ceil(75%)")
-    required = math.ceil(len(voters) * 0.75)
-    if required != 4 or quorum.get("current_minimum_approvals") != 4:
+    if math.ceil(len(voters) * 0.75) != 4 or quorum.get("current_minimum_approvals") != 4:
         fail("Five-agent 75% quorum must require four approvals")
     if quorum.get("abstention_counts_as_approval") is not False:
         fail("Abstentions cannot count as approvals")
@@ -83,11 +77,21 @@ def main() -> int:
     if quorum.get("quorum_cannot_override_d3") is not True:
         fail("Agent quorum cannot override D3")
 
+    merge_required = set(agent.get("merge_policy", {}).get("required", []))
+    for gate in {
+        "institutional_documentation_validation_passed",
+        "security_governance_validation_passed",
+        "github_actions_runtime_policy_passed",
+        "quorum_met",
+        "independent_gatekeeper_approval_present",
+    }:
+        if gate not in merge_required:
+            fail(f"Required merge gate missing: {gate}")
+
     rating = agent.get("risk_rating", {})
     if rating.get("minimum_automatic_merge_score") != 85:
         fail("Automatic merge score threshold must remain 85")
-    weights = rating.get("dimensions", {})
-    if round(sum(float(value) for value in weights.values()), 8) != 1.0:
+    if round(sum(float(v) for v in rating.get("dimensions", {}).values()), 8) != 1.0:
         fail("Risk-rating weights must sum to 1.0")
     if rating.get("weighted_votes") is not False:
         fail("Votes must remain one-agent/one-vote")
@@ -112,8 +116,7 @@ def main() -> int:
         "bounded_write_readback=passed",
         "webhook_sender_delivery_integrity=passed",
     }
-    actual_gates = set(notify.get("collab_portal_fallback", {}).get("disable_only_when_all", []))
-    if actual_gates != required_collab_gates:
+    if set(notify.get("collab_portal_fallback", {}).get("disable_only_when_all", [])) != required_collab_gates:
         fail("Collab fallback disable gates drifted")
 
     github_security = security.get("github_security_evidence", {})
@@ -126,6 +129,25 @@ def main() -> int:
     if github_security.get("codeql_execution_mode") != "github_default_setup_provider_managed":
         fail("CodeQL provider execution mode drifted")
 
+    runtime_gate = agent.get("github_actions_runtime_gate", {})
+    if runtime_gate.get("target_runtime") != "node24" or runtime_gate.get("node20") != "prohibited":
+        fail("Agent runtime gate must require Node 24 and prohibit Node 20")
+    if runtime_gate.get("remote_action_refs") != "full_commit_sha_only":
+        fail("Agent runtime gate must require full commit SHA action references")
+    if runtime_gate.get("direct_to_main_dependency_repair") is not False:
+        fail("Agents must not direct-write dependency self-heals to main")
+    if actions.get("status") != "active_fail_closed" or actions.get("target_runtime") != "node24":
+        fail("Machine GitHub Actions runtime policy drifted")
+
+    never = set(agent.get("self_healing", {}).get("never", []))
+    for item in {
+        "force_node24_for_an_unupgraded_action",
+        "allow_insecure_node_runtime_escape_hatch",
+        "auto_merge_dependency_update_without_governed_validation",
+    }:
+        if item not in never:
+            fail(f"Missing self-healing prohibition: {item}")
+
     if repo.get("agent_merge_policy") != "fail_closed_quorum_and_validation":
         fail("Repository state must register the agent fail-closed merge policy")
     if repo.get("github_merge_gate_enforced") is not False:
@@ -134,25 +156,28 @@ def main() -> int:
         fail("GitHub branch protection must not remain a Phase 3 dependency")
 
     for fragment in (
+        "python scripts/validate_github_actions_runtime_policy.py",
         "python scripts/validate_agent_sovereign_governance.py",
         "python scripts/governed_merge_decision.py --self-test",
         "python scripts/resolve_pm_notification_recipients.py --self-test",
         "python scripts/security_self_heal_plan.py --self-test",
-        "actions/checkout@v7",
-        "actions/setup-python@v7",
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+        "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
     ):
         require(DOCS_WORKFLOW, fragment)
+
     for fragment in (
         "name: Security Governance",
         "name: Validate provider-managed CodeQL compatibility",
         "CodeQL default setup is provider-managed",
-        "actions/dependency-review-action@v4",
-        "actions/checkout@v7",
-        "actions/setup-python@v7",
+        "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0",
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+        "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
+        "python scripts/validate_github_actions_runtime_policy.py",
         "python scripts/validate_security_governance.py",
     ):
         require(SECURITY_WORKFLOW, fragment)
-    if ADVANCED_CODEQL_USE.search(SECURITY_WORKFLOW.read_text(encoding="utf-8")):
+    if re.search(r"^\s*uses:\s*github/codeql-action/", SECURITY_WORKFLOW.read_text(encoding="utf-8"), flags=re.MULTILINE):
         fail("Advanced CodeQL configuration conflicts with registered GitHub default setup")
 
     require(RELAY, "Agent S — Security & Resilience Sentinel")
@@ -162,7 +187,7 @@ def main() -> int:
 
     print("Agent-sovereign governance validation passed.")
     print("Eligible voters: 5; 75% quorum: 4 approvals; Agent D remains independent gatekeeper.")
-    print("GitHub branch protection: non-sovereign defense-in-depth, not a Phase 3 dependency.")
+    print("GitHub Actions: Node 24 fail-closed runtime gate; full-SHA action refs; governed dependency repair.")
     print("GitHub CodeQL: provider-managed default setup; duplicate advanced workflow prohibited.")
     print("D3: reserved human/specialist authority; no agent quorum substitution.")
     return 0
