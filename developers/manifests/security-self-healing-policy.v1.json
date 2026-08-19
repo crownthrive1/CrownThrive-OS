@@ -1,17 +1,36 @@
 {
-  "manifest_version": "1.0.1",
+  "manifest_version": "1.1.0",
   "manifest_id": "ct.manifest.security-self-healing-policy.v1",
   "phase": "2.99",
   "control_model": "continuous_detect_triage_repair_revalidate_independent_verify",
-  "framework_alignment": ["NIST_CSF_2.0", "NIST_SSDF_1.1", "NIST_AI_RMF_1.0", "NIST_AI_600-1_Generative_AI_Profile"],
+  "framework_alignment": [
+    "NIST_CSF_2.0",
+    "NIST_SSDF_1.1",
+    "NIST_AI_RMF_1.0",
+    "NIST_AI_600-1_Generative_AI_Profile"
+  ],
   "github_security_evidence": {
     "codeql": "required_when_applicable",
     "codeql_execution_mode": "github_default_setup_provider_managed",
     "codeql_mode_evidence": "PR_63_initial_security_governance_run_rejected_duplicate_advanced_setup_because_default_setup_is_enabled",
     "advanced_codeql_workflow": "prohibited_while_default_setup_enabled",
     "dependency_review": "required_when_dependency_change_and_available",
+    "dependency_review_action_line": "v5_node24",
     "secret_scanning": "provider_capability_to_be_monitored_when_enabled",
+    "github_actions_runtime": "node24_fail_closed",
     "github_blocking": "not_relied_upon_as_sovereign_merge_authority"
+  },
+  "github_actions_runtime": {
+    "policy_manifest": "developers/manifests/github-actions-runtime-policy.v1.json",
+    "target_runtime": "node24",
+    "node20_deprecation_response": "upgrade_action_not_force_runtime",
+    "runtime_drift_severity": "high",
+    "mutable_action_ref_severity": "high",
+    "mechanical_repair_class": "D1",
+    "repair_channel": "dependabot_pr_or_bounded_agent_patch",
+    "direct_main_write": false,
+    "runtime_escape_hatches": "prohibited",
+    "regression_gate": "all_workflows"
   },
   "severity_policy": {
     "critical": "block_and_escalate",
@@ -24,7 +43,13 @@
     "mechanical_d1": "may_auto_patch_after_local_validation",
     "bounded_d2": "requires_specialist_independent_verifier_quorum",
     "d3": "human_reserved",
-    "post_heal_requirements": ["rerun_original_failing_check", "rerun_institutional_governance", "rerun_security_governance", "independent_agent_verification"]
+    "post_heal_requirements": [
+      "rerun_original_failing_check",
+      "rerun_github_actions_runtime_policy",
+      "rerun_institutional_governance",
+      "rerun_security_governance",
+      "independent_agent_verification"
+    ]
   },
   "crypto_blockchain_guardrails": {
     "production_token_or_currency_status": "research_target_not_activated",
@@ -41,8 +66,20 @@
       "consumer_disclosures_and_market_integrity_controls",
       "incident_recovery_and_reversibility"
     ],
-    "no_claims": ["legal_currency", "security_status", "non_security_status", "registered_status", "compliance_status", "production_ready"]
+    "no_claims": [
+      "legal_currency",
+      "security_status",
+      "non_security_status",
+      "registered_status",
+      "compliance_status",
+      "production_ready"
+    ]
   },
   "decision_id": "CT-ADR-GOV-011",
-  "source_basis": ["founder_directive_2026-08-18", "S106_repository_enforcement_audit", "PR_63_security_governance_runtime_evidence"]
+  "source_basis": [
+    "founder_directive_2026-08-18",
+    "S106_repository_enforcement_audit",
+    "PR_63_security_governance_runtime_evidence",
+    "github_actions_node24_runtime_reconciliation_2026-08-18"
+  ]
 }
