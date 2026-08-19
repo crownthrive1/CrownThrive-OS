@@ -1,12 +1,12 @@
 {
-  "packet_version": "1.1.0",
+  "packet_version": "1.2.0",
   "packet_id": "ct.packet.chlom.cell.kernel.contract-v1",
   "program_id": "ct.program.chlom-executable-build",
   "cell_id": "ct.chlom.cell.kernel",
   "issue": 68,
   "parent_pr": 67,
   "parent_head": "92da595d80f260ffe55d43a7f9b6b635b4d33eac",
-  "canonical_main": "12f0dd9ab97391a8dd34438f77262438c0df0999",
+  "canonical_main": "ef04ea9a08960376859570bca8c6cf82a00442f2",
   "roadmap": "CT-ADR-ROADMAP-010/ten_phase_v1",
   "phase": "2.99",
   "state": "prototype_semantic_oracle_not_production",
@@ -26,8 +26,10 @@
     "cross_organization_access_denied",
     "reference_kernel_never_executes_provider_mutation",
     "optimistic_resource_version_conflict_holds",
-    "identical_idempotent_retry_returns_same_decision_without_new_dail_event",
+    "identical_idempotent_retry_returns_same_decision_without_new_dail_event_only_when_verified_authority_context_is_semantically_unchanged",
+    "idempotent_replay_identity_binds_request_and_verified_authority_context",
     "idempotency_key_reuse_with_different_payload_fails_closed",
+    "idempotency_key_reuse_with_removed_or_materially_changed_verified_authority_context_fails_closed",
     "d3_never_resolves_to_autonomous_allow",
     "caller_asserted_roles_approval_labels_and_evidence_do_not_create_strict_v1_authority",
     "authority_sensitive_allow_requires_verified_actor_org_relationship_delegation_and_approval_context",
@@ -44,6 +46,18 @@
     "verified_relationship_required": true,
     "verified_delegation_required": true,
     "verified_approval_required_when_policy_requires_approval": true,
+    "idempotency_replay_binds_verified_authority_context": true,
+    "idempotency_authority_fingerprint_fields": [
+      "presence",
+      "actor_id",
+      "organization_id",
+      "roles",
+      "relationships",
+      "delegations",
+      "approvals",
+      "sanitized_evidence_refs"
+    ],
+    "authority_version_expiry_revocation_contract_owner": "cell-03-identity-relationship-authority",
     "provider_implementation_owner": "cell-03-identity-relationship-authority"
   },
   "evidence_boundary": {
@@ -103,22 +117,27 @@
       "resource_version_conflict",
       "d3_reserved_authority",
       "idempotency_key_conflict",
+      "idempotency_authority_context_removed_or_changed",
       "caller_self_asserted_authority",
       "verified_authority_missing_relationship_or_delegation",
       "restricted_evidence_verbatim_persistence"
     ],
     "existing_reference_tests_must_remain_green": true,
-    "cell_local_suite_governed_parent_workflow_state": "not_directly_invoked",
-    "tevv_owner_revalidation_required": "PR-87-owner-must-reconcile-finding-expectations-after-kernel-head-change"
+    "cell_local_suite_governed_parent_workflow_state": "directly_invoked_on_integrated_cell_head_via_pr_96",
+    "current_high_finding_revalidation_required": "Cell-08 owner must rerun authority-context idempotency replay vector on this repaired head without weakening prior vectors"
   },
   "tevv_findings_addressed_on_kernel_surface": [
     "ct.finding.tevv.authority-approval-self-assertion",
     "ct.finding.tevv.restricted-evidence-reference-unsanitized",
+    "ct.finding.tevv.idempotency-authority-context-not-bound-to-cache-key",
     "agent-d-implicit-legacy-downgrade-fail-closed-gap"
   ],
+  "remaining_native_prototype_finding": "ct.finding.tevv.policy-bundle-state-unverified",
+  "remaining_native_prototype_finding_owner": "cell-02-policy-ds-caas",
   "specialists_required": [
     "security_privacy",
-    "ai_ml_llm_tevv"
+    "ai_ml_llm_tevv",
+    "operations_sre"
   ],
   "external_backend_state": {
     "opa": "candidate_not_adopted",
@@ -144,15 +163,19 @@
     "issue-68-kernel-contract",
     "issue-75-cell-08-tevv",
     "pr-87-tevv-invariant-findings",
+    "issue-88-cross-cell-integration",
+    "pr-96-governed-cell01-test-integration",
     "issue-78-master-integration-board",
     "pr-67-reference-runtime",
     "CT-ADR-ROADMAP-010",
     "CT-ADR-GOV-011"
   ],
   "integration_handoff": {
-    "first_joint_dependency": "cell-04-evidence-dail-after-independent-kernel-tevv-acceptance",
+    "first_joint_dependency": "cell-04-evidence-dail-after-independent-kernel-security-tevv-acceptance",
     "then": "cell-02-policy-plus-cell-03-authority",
-    "constraint": "Agent A integration packet required for cross-cell surface changes",
-    "promotion_hold": "PR-64 then github_main_perimeter certification then PR-65 governance/security reconciliation before normal canonical promotion"
+    "constraint": "Agent A integration packet required for cross-cell and parent/current-main surface changes",
+    "canonical_predecessor_state": "PR-64 github_main_perimeter and PR-65 governance sequence are canonical",
+    "current_promotion_hold": "parent-PR67 and Cell-01 stack diverge from current canonical main; require Agent-A parent/current-main integration plus fresh exact-head CHLOM/Security/Documentation/Governed-Merge, specialists and quorum",
+    "authority_lifecycle_followup": "Cell-03 must add authority version, expiry and revocation identity to the verified authority contract; integrated idempotency must bind those fields before production authority use"
   }
 }
