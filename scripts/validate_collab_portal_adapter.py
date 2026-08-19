@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Validate the public-safe Collab Portal adapter, webhook evidence, and runtime state.
+"""Validate the historical/public-safe Collab Portal S101/S102/S105 source contract.
 
-This validator checks only non-secret institutional contract metadata. It never
-performs a live authenticated request and must never require production secrets in CI.
-S101 is the Secure API/OpenAPI source, S102 is first-party webhook UI evidence,
-and S105 records the server-side Vault-capable runtime-v2 certification state.
+This validator is intentionally a source-lineage validator, not a designated-current
+provider-state validator. It checks only non-secret institutional contract metadata,
+never performs a live authenticated request, and must never require production
+secrets in CI. S101 is the recovered Secure API/OpenAPI source, S102 is first-party
+webhook UI evidence, and S105 records the historical server-side Vault-capable
+runtime-v2 certification state. Current Collab provider truth is validated separately
+by scripts/validate_phase_namespace_and_api_control.py against
+ct.manifest.api-mcp-current-control-state.v1.
 """
 
 from __future__ import annotations
@@ -130,7 +134,7 @@ def main() -> int:
     if auth.get("raw_secret_in_repository") is not False:
         errors.append("raw_secret_in_repository must be false")
     if auth.get("production_credential_binding") != "pending_exact_secure_copy":
-        errors.append("production credential binding must remain pending_exact_secure_copy")
+        errors.append("historical S105 production credential binding must remain pending_exact_secure_copy")
 
     operations = data.get("operations", [])
     actual_operations = {
@@ -157,9 +161,9 @@ def main() -> int:
     if webhook.get("source_id") != "S102":
         errors.append("webhook_evidence.source_id must remain S102")
     if webhook.get("evidence_type") != "current_first_party_ui":
-        errors.append("S102 evidence_type must remain current_first_party_ui")
+        errors.append("S102 evidence_type must remain current_first_party_ui for the historical captured source")
     if webhook.get("ui_contract") != "verified" or webhook.get("endpoint_configuration_ui") != "verified":
-        errors.append("S102 webhook UI and endpoint configuration must remain verified")
+        errors.append("S102 webhook UI and endpoint configuration must remain verified in the captured source")
     if webhook.get("project_events") != EXPECTED_PROJECT_EVENTS:
         errors.append("S102 Project event identities/order drifted")
     if webhook.get("project_payload_selector") != "verified":
@@ -167,14 +171,14 @@ def main() -> int:
     if webhook.get("project_created_preview_payload") != "observed":
         errors.append("Project Created preview payload evidence must remain observed")
     if webhook.get("preview_uid_binding") != "unverified_sample_preview":
-        errors.append("preview UID must remain unverified_sample_preview until authenticated lookup")
+        errors.append("preview UID must remain unverified_sample_preview in historical S102 evidence")
     if webhook.get("authoritative_event_source") is not False:
-        errors.append("webhook must not become authoritative before receiver certification")
+        errors.append("historical webhook evidence must not become authoritative")
     require_pending(
         errors,
         webhook,
         ("sender_integrity", "delivery_attempt_identity", "retry_contract", "replay_contract", "timeout_dead_letter_contract", "receiver_idempotency", "receiver_certification"),
-        "webhook_evidence",
+        "historical_webhook_evidence",
     )
 
     runtime = data.get("runtime", {})
@@ -183,9 +187,9 @@ def main() -> int:
     if runtime.get("function") != "collab-portal-pm":
         errors.append("runtime.function must remain collab-portal-pm")
     if runtime.get("version") != 2:
-        errors.append("runtime.version must remain 2 for the S105 runtime release")
+        errors.append("runtime.version must remain 2 for the captured S105 runtime release")
     if runtime.get("state") != "active_vault_capable_read_certification_blocked_on_exact_credential_copy":
-        errors.append("runtime.state must preserve the S105 exact-credential-copy blocker")
+        errors.append("historical runtime.state must preserve the S105 exact-credential-copy blocker")
     if runtime.get("caller_authentication") != "Supabase JWT required":
         errors.append("runtime caller authentication must remain Supabase JWT required")
     if runtime.get("collab_portal_credentials_in_source") is not False:
@@ -195,7 +199,7 @@ def main() -> int:
     if runtime.get("vault_bridge") != "verified_service_role_only":
         errors.append("runtime Vault bridge must remain service-role only")
     if runtime.get("server_side_secret_binding") != "vault_path_verified_exact_value_pending":
-        errors.append("runtime secret binding must preserve exact-value-pending state")
+        errors.append("historical runtime secret binding must preserve exact-value-pending state")
     if runtime.get("write_gate_default") != "closed":
         errors.append("runtime write gate must default closed")
     if set(runtime.get("allowed_read_actions", [])) != EXPECTED_RUNTIME_READS:
@@ -223,22 +227,22 @@ def main() -> int:
 
     state = data.get("state", {})
     if state.get("contract") != "verified":
-        errors.append("contract state must remain verified")
+        errors.append("historical source contract state must remain verified")
     if state.get("base_url") != "verified_from_openapi":
         errors.append("state.base_url must remain verified_from_openapi")
     if state.get("auth_header_contract") != "verified_from_openapi":
         errors.append("state.auth_header_contract must remain verified_from_openapi")
     if state.get("secure_runtime") != "verified_v2_vault_capable":
-        errors.append("state.secure_runtime must remain verified_v2_vault_capable")
+        errors.append("historical state.secure_runtime must remain verified_v2_vault_capable")
     if state.get("vault_binding_path") != "verified":
         errors.append("state.vault_binding_path must remain verified")
     if state.get("exact_secure_credential_copy") != "pending":
-        errors.append("exact secure credential copy must remain pending")
+        errors.append("historical exact secure credential copy must remain pending")
     require_pending(
         errors,
         state,
         ("production_auth", "account_project_meta", "institutional_project_uid", "authenticated_read", "bounded_write", "read_after_write", "webhook_sender_integrity", "webhook_delivery_semantics", "webhook_receiver_certification", "certification"),
-        "state",
+        "historical_state",
     )
     if state.get("webhook_ui_contract") != "verified":
         errors.append("state.webhook_ui_contract must remain verified from S102")
@@ -247,13 +251,13 @@ def main() -> int:
 
     for path, fragment in DOCUMENT_REQUIREMENTS:
         if not path.is_file():
-            errors.append(f"required current-state document missing: {path.relative_to(ROOT)}")
+            errors.append(f"required source-lineage document missing: {path.relative_to(ROOT)}")
         elif fragment not in path.read_text(encoding="utf-8"):
-            errors.append(f"required S102/S105/runtime fragment {fragment!r} missing from {path.relative_to(ROOT)}")
+            errors.append(f"required S102/S105/runtime lineage fragment {fragment!r} missing from {path.relative_to(ROOT)}")
 
     for path, fragment in FORBIDDEN_CURRENT_DOC_FRAGMENTS:
         if path.is_file() and fragment in path.read_text(encoding="utf-8"):
-            errors.append(f"stale current-state fragment {fragment!r} remains in {path.relative_to(ROOT)}")
+            errors.append(f"stale source-lineage fragment {fragment!r} remains in {path.relative_to(ROOT)}")
 
     serialized = json.dumps(data, sort_keys=True)
     forbidden_fragments = ("sk-proj-", "sk_live_", "whsec_", "DummySecretKey", "$2y$13$")
@@ -264,13 +268,13 @@ def main() -> int:
     if errors:
         for error in errors:
             fail(error)
-        print(f"Collab Portal adapter validation FAILED with {len(errors)} error(s).")
+        print(f"Collab Portal historical S101/S102/S105 source-contract validation FAILED with {len(errors)} error(s).")
         return 1
 
     print(
-        "Collab Portal adapter validation PASSED: "
-        f"{len(actual_operations)} S101 operations pinned, S102 webhook UI/events synchronized, "
-        "S105 runtime v2 Vault-capable, exact secure credential copy pending, PM write gate closed and bounded."
+        "Collab Portal historical S101/S102/S105 source-contract validation PASSED: "
+        f"{len(actual_operations)} S101 operations pinned; captured S102 UI/events and S105 runtime-v2/Vault lineage preserved. "
+        "This result is not current provider certification; designated-current Collab truth is validated separately."
     )
     return 0
 
