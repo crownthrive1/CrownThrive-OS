@@ -54,7 +54,7 @@ The self-test also proves all nine stable endorsement IDs are registered, all ni
 
 Independent Agent-B review identified that the earlier dynamic resolver still trusted a caller-supplied `changed_domains` array. A D2 packet could therefore omit or misclassify domains and reduce the specialist set even though the nine-domain registry itself was correct.
 
-The current self-heal closes that bypass without weakening any control:
+The first self-heal closed that bypass without weakening any control:
 
 - D1/D2 material packets must provide the complete `changed_files` set and one per-file domain classification;
 - D3 packets are also classification-required before a human-authorized execution decision can proceed;
@@ -63,10 +63,28 @@ The current self-heal closes that bypass without weakening any control:
 - every material changed file must be classified exactly once;
 - classifications use a governed vocabulary derived from specialist patterns plus neutral documentation/governance domains;
 - reviewer classifications require an inspectable evidence reference;
-- known sensitive surfaces have deterministic minimum-domain requirements, including workflows, the sovereign merge engine/manifest, and CHLOM policy/authority/evidence/rights/economics/API contracts;
+- known sensitive surfaces have deterministic minimum-domain requirements, including workflows, the sovereign merge engine/manifest, governance validator, and CHLOM policy/authority/evidence/rights/economics/API contracts;
 - omission of a required deterministic domain, an unclassified file, an unknown domain, an unknown endorsement ID, an alias collision, or a changed-domain mismatch blocks automatic promotion.
 
-Negative tests specifically prove that `scripts/governed_merge_decision.py` cannot be classified only as `agent` while omitting `security`, and that a caller cannot assert a smaller `changed_domains` set than the derived file classification. A valid D1 documentation-only packet remains possible through an explicit neutral `documentation` classification; D0 quorum behavior is unchanged.
+Negative tests prove that `scripts/governed_merge_decision.py` cannot be classified only as `agent` while omitting `security`, and that a caller cannot assert a smaller `changed_domains` set than the derived file classification. A valid D1 documentation-only packet remains possible through an explicit neutral `documentation` classification; D0 quorum behavior is unchanged.
+
+## Trusted Git-diff binding self-heal
+
+Independent Agent-S review then found a deeper trust-boundary gap: the packet's `changed_files` list itself was still caller/program supplied. Even with perfect per-file classification, an omitted sensitive file could therefore disappear before specialist activation.
+
+The current head repairs that root cause:
+
+- every D1/D2/D3 decision requires a trusted changed-file set derived from an **exact 40-hex Git base SHA and exact 40-hex Git head SHA**;
+- packet `changed_files` must exactly equal the trusted Git diff set; omitted or extra paths fail closed with `changed_files_trusted_diff_mismatch`;
+- a material packet without a trusted Git file set fails closed with `trusted_changed_files_missing`;
+- rename detection is disabled for the trust calculation so a rename is represented as delete + add and a renamed-away sensitive path cannot vanish from classification;
+- the always-run `CrownThrive governed merge gate` now retains the pull-request merge parents (`fetch-depth: 2`) and invokes the merge engine against `github.event.pull_request.base.sha` and `github.event.pull_request.head.sha` to prove the trusted diff path on every pull request;
+- the governance validator requires this workflow binding and the engine's trusted-diff fail-closed markers, preventing a later governance packet from silently deleting the control;
+- the original domain-bypass negatives remain intact, and a new omitted-sensitive-file test proves a packet that lists only a changelog while the trusted Git diff also contains `scripts/governed_merge_decision.py` cannot auto-authorize.
+
+Git/provider diff binding is evidence and defense-in-depth, not sovereign authority. A/B/C/D/S voting, Agent-D independence, specialist endorsements, risk threshold, D3 human authority, rollback and documentation/downstream gates remain separately required.
+
+Because this self-heal touches the always-run workflow plus governance decision/validation code, the current D2 specialist set now includes **Security & Privacy + AI/ML/LLM TEVV + Operations/SRE**. All votes on the pre-repair head are stale and fresh exact-head review is mandatory.
 
 ## Self-healing and controlled evolution
 
@@ -80,12 +98,12 @@ Validators, findings, evidence or privilege may never be weakened to force a pas
 
 ## Reconciliation lineage
 
-The pre-reconciliation branch was based on pre-PR-64 main and contained noncanonical unanimous-first/deadlock semantics. After PR #64 and PR #95 became canonical and issue #83 closed, the branch was merged forward onto `ee6175f...` without force-pushing or erasing historical lineage. The current proposal starts from the post-Node24/post-provider-perimeter tree and reapplies only the bounded specialist/subagent hardening compatible with canonical authority.
+The pre-reconciliation branch was based on pre-PR-64 main and contained noncanonical unanimous-first/deadlock semantics. After PR #64 and PR #95 became canonical and issue #83 closed, the branch was merged forward onto `ee6175f...` without force-pushing or erasing historical lineage. The current proposal starts from the post-Node24/post-provider-perimeter tree and reapplies only bounded specialist/subagent hardening compatible with canonical authority.
 
-Agent-B's exact-head block on `dca9bbda87f4e61436f4b4f42d9f59c2643abebe` is preserved as the trigger evidence for the changed-domain provenance and `security_privacy` compatibility repair. This material head change invalidates every earlier vote on that SHA; fresh exact-head validation, specialist review and A/B/C/D/S voting are required.
+Agent-B's exact-head block on `dca9bbda87f4e61436f4b4f42d9f59c2643abebe` is preserved as the trigger evidence for the changed-domain provenance and `security_privacy` compatibility repair. Agent-S's block on `80864b5bdbc1c51757af15e71743460732648d89` is preserved as the trigger evidence for trusted Git-diff binding. Each material head change invalidates earlier votes; fresh exact-head validation, specialist review and A/B/C/D/S voting are required.
 
 ## Rollback / impact
 
 Rollback is a normal revert of this packet. No provider, credential, customer, payment, binding rights, production infrastructure, Collab, token/crypto or restricted-evidence mutation is introduced.
 
-Documentation impact: `docs_updated` through this public-safe changelog and the machine governance manifest. Phase 3-10 inherit cumulative specialist activation and fail-closed changed-domain provenance after canonical promotion, but this packet does not itself advance any phase or activate regulated/financial/cryptographic capability.
+Documentation impact: `docs_updated` through this public-safe changelog and the machine governance manifest. Phase 3-10 inherit cumulative specialist activation, fail-closed per-file domain provenance and trusted changed-file Git binding after canonical promotion, but this packet does not itself advance any phase or activate regulated/financial/cryptographic capability.
