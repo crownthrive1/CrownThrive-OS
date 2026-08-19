@@ -10,6 +10,11 @@ The draft index may designate exactly one ``self_pr`` whose head is ``SELF``.
 That avoids the impossible self-reference of committing a manifest that embeds
 its own final commit SHA. Live GitHub metadata remains authoritative for that
 single dynamic head.
+
+A moving open draft head is itself reconciliation evidence, not necessarily a
+CI defect. Head drift is reported and requires Agent O reconciliation; it only
+fails this scanner when the stale indexed row still claims ``CT:CI-PASS``,
+because exact-head technical proof must never silently follow a changed head.
 """
 from __future__ import annotations
 
@@ -254,6 +259,7 @@ def main() -> int:
             for block in parse_tag_blocks(text):
                 validate_tag_set(block, allowed, context)
 
+    drift_messages: list[str] = []
     if args.github_open_prs:
         token = os.environ.get("GITHUB_TOKEN", "")
         repository = os.environ.get("GITHUB_REPOSITORY", "")
@@ -271,17 +277,26 @@ def main() -> int:
             live_row = by_number[pr]
             live_head = str((live_row.get("head") or {}).get("sha") or "")
             live_base = str((live_row.get("base") or {}).get("sha") or "")
-            if pr != self_pr and live_head and live_head != row["head"]:
-                fail(f"PR #{pr} head drifted: index={row['head']} live={live_head}")
-            if pr == self_pr and not SHA40.fullmatch(live_head):
-                fail(f"Self PR #{pr} live head is not a valid exact SHA")
+            tags = set(row.get("tags") or [])
+            if pr == self_pr:
+                if not SHA40.fullmatch(live_head):
+                    fail(f"Self PR #{pr} live head is not a valid exact SHA")
+            elif live_head and live_head != row["head"]:
+                message = f"PR #{pr} head drift: index={row['head']} live={live_head}"
+                if "CT:CI-PASS" in tags:
+                    fail(message + "; stale CT:CI-PASS must be re-proven on the new exact head")
+                drift_messages.append(message)
             if live_base and live_base != row["base"]:
-                fail(f"PR #{pr} base drifted: index={row['base']} live={live_base}")
+                drift_messages.append(f"PR #{pr} base drift: index={row['base']} live={live_base}")
 
     print("Reconciliation tag validation passed.")
     print(f"Allowed tags: {len(allowed)}")
     print(f"Indexed open drafts: {len(drafts)}")
     print(f"Closed superseded drafts preserved: {len(closed_rows)}")
+    if drift_messages:
+        print(f"Live moving-draft reconciliation signals: {len(drift_messages)}")
+        for message in drift_messages:
+            print(f"DRIFT: {message}")
     print("Agents L/M/N/O are non-voting, least-privilege, self-auditing and phase-gated.")
     print("PASS remains drift-watched; DEFERRAL remains explicitly NOT-PASS.")
     return 0
