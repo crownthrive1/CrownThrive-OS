@@ -1,0 +1,119 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "ct.manifest.chlom-build-cells.v1",
+  "program_id": "ct.program.chlom-executable-build",
+  "phase": "2.99",
+  "state": "prototype_build_active_phase3_activation_blocked",
+  "authority": "CT-ADR-GOV-011",
+  "roadmap": "CT-ADR-ROADMAP-010/ten_phase_v1",
+  "purpose": "Build CHLOM piece-by-piece through bounded non-voting specialist cells while sovereign A/B/C/D/S governance remains fail-closed.",
+  "rules": {
+    "cells_are_quorum_voters": false,
+    "sovereign_voters": ["A", "B", "C", "D", "S"],
+    "one_cell_one_owned_packet": true,
+    "cross_cell_changes_require_orchestrated_integration": true,
+    "production_activation_before_phase3": false,
+    "raw_secrets_allowed": false,
+    "restricted_evidence_bodies_allowed": false,
+    "d3_self_authorization": false,
+    "upstream_code_requires_license_security_version_review": true,
+    "living_docs_required_for_material_contract_changes": true
+  },
+  "active_packet_exclusions": [
+    "developers/manifests/agent-sovereign-governance.v1.json",
+    "scripts/validate_agent_sovereign_governance.py",
+    ".github/workflows/docs-governance.yml",
+    ".github/workflows/security-governance.yml"
+  ],
+  "cells": [
+    {
+      "cell_id": "ct.chlom.cell.kernel",
+      "name": "Kernel & Contract Cell",
+      "host_agents": ["A", "C"],
+      "scope": ["reference/chlom_runtime/model.py", "reference/chlom_runtime/engine.py", "contracts/chlom/**"],
+      "specialists": ["security", "ai_ml_llm_tevv"],
+      "current_state": "prototype"
+    },
+    {
+      "cell_id": "ct.chlom.cell.policy",
+      "name": "Policy & dS-CaaS Cell",
+      "host_agents": ["C"],
+      "scope": ["reference/chlom_runtime/policy.py", "reference/chlom_runtime/policies/**"],
+      "specialists": ["legal_regulatory", "security"],
+      "current_state": "prototype"
+    },
+    {
+      "cell_id": "ct.chlom.cell.authority",
+      "name": "Identity, Relationship & Authority Cell",
+      "host_agents": ["C", "E"],
+      "scope": ["reference/chlom_runtime/authority/**", "contracts/chlom/authority/**"],
+      "specialists": ["security", "legal_regulatory"],
+      "current_state": "queued"
+    },
+    {
+      "cell_id": "ct.chlom.cell.evidence",
+      "name": "Evidence, Attestation & DAIL Cell",
+      "host_agents": ["B", "C"],
+      "scope": ["reference/chlom_runtime/dail.py", "contracts/chlom/evidence/**"],
+      "specialists": ["security", "ip_rights_licensing"],
+      "current_state": "prototype"
+    },
+    {
+      "cell_id": "ct.chlom.cell.rights",
+      "name": "Rights, DLA & Licensing Cell",
+      "host_agents": ["C"],
+      "scope": ["reference/chlom_runtime/rights/**", "contracts/chlom/rights/**"],
+      "specialists": ["legal_regulatory", "ip_rights_licensing"],
+      "current_state": "queued"
+    },
+    {
+      "cell_id": "ct.chlom.cell.economics",
+      "name": "Economics, Splits & Remedies Cell",
+      "host_agents": ["C"],
+      "scope": ["reference/chlom_runtime/economics/**", "contracts/chlom/economics/**"],
+      "specialists": ["finance_tax_treasury", "legal_regulatory"],
+      "current_state": "queued"
+    },
+    {
+      "cell_id": "ct.chlom.cell.integrations",
+      "name": "API, MCP & Adapter Cell",
+      "host_agents": ["E"],
+      "scope": ["reference/chlom_runtime/adapters/**", "contracts/chlom/api/**"],
+      "specialists": ["security", "operations_sre"],
+      "current_state": "queued"
+    },
+    {
+      "cell_id": "ct.chlom.cell.tevv",
+      "name": "Security, TEVV & Resilience Cell",
+      "host_agents": ["S"],
+      "scope": ["reference/chlom_runtime/tests/**", "evaluations/chlom/**"],
+      "specialists": ["security", "ai_ml_llm_tevv", "operations_sre"],
+      "current_state": "prototype"
+    },
+    {
+      "cell_id": "ct.chlom.cell.docs",
+      "name": "Living Docs & SDK Contract Cell",
+      "host_agents": ["A", "C"],
+      "scope": ["chlom/build-program.md", "chlom/living-docs-runtime-contract.md", "scripts/generate_chlom_living_status.py"],
+      "specialists": ["accessibility_consumer_protection"],
+      "current_state": "prototype"
+    },
+    {
+      "cell_id": "ct.chlom.cell.oss",
+      "name": "Open Source Intake & Upstream Stewardship Cell",
+      "host_agents": ["B"],
+      "scope": ["developers/manifests/chlom-upstream-components.v1.json", "THIRD_PARTY_NOTICES.md"],
+      "specialists": ["legal_regulatory", "security", "ip_rights_licensing"],
+      "current_state": "prototype"
+    }
+  ],
+  "integration_sequence": [
+    "kernel+evidence",
+    "policy+authority",
+    "rights+approval",
+    "economics+remedies",
+    "api+mcp+adapters",
+    "tevv+pilot",
+    "phase3_controlled_activation"
+  ]
+}

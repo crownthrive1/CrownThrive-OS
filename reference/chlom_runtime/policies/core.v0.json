@@ -1,0 +1,54 @@
+{
+  "bundle_id": "ct.chlom.policy.reference-core.v0",
+  "state": "prototype",
+  "default_effect": "deny",
+  "rules": [
+    {
+      "rule_id": "ct.rule.ref.restricted-publication-deny",
+      "priority": 1000,
+      "effect": "deny",
+      "actions": ["publish", "export_public"],
+      "resource_types": ["evidence", "contract", "rights_record"],
+      "conditions": {"resource.classification_in": ["restricted", "privileged", "secret"]},
+      "reason": "restricted_material_cannot_be_publicly_projected"
+    },
+    {
+      "rule_id": "ct.rule.ref.d3-hold",
+      "priority": 900,
+      "effect": "hold",
+      "actions": ["*"],
+      "resource_types": ["*"],
+      "conditions": {"context.risk_class_in": ["D3"]},
+      "required_approvals": ["authorized_human"],
+      "reason": "d3_reserved_authority"
+    },
+    {
+      "rule_id": "ct.rule.ref.license-issue-review",
+      "priority": 800,
+      "effect": "allow",
+      "actions": ["issue_license"],
+      "resource_types": ["license_offer"],
+      "conditions": {"actor.roles_any": ["rights_steward", "founder"]},
+      "required_approvals": ["rights_authority"],
+      "reason": "license_issue_requires_rights_authority"
+    },
+    {
+      "rule_id": "ct.rule.ref.public-read",
+      "priority": 200,
+      "effect": "allow",
+      "actions": ["read"],
+      "resource_types": ["*"],
+      "conditions": {"resource.classification_in": ["public"]},
+      "reason": "authenticated_public_read"
+    },
+    {
+      "rule_id": "ct.rule.ref.docs-draft",
+      "priority": 150,
+      "effect": "allow",
+      "actions": ["draft_docs"],
+      "resource_types": ["documentation"],
+      "conditions": {"actor.roles_any": ["documentation_steward", "founder"], "context.risk_class_in": ["D0", "D1", "D2"]},
+      "reason": "bounded_documentation_draft"
+    }
+  ]
+}
