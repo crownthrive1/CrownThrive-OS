@@ -3,7 +3,7 @@
 **Effective:** 2026-08-18  
 **Current state:** `blocked_pending_phase_2_99_hard_exit`
 
-This amendment changes one repository-governance dependency in the Phase 3 Readiness Gate while preserving every other hard gate.
+This amendment changes one repository-governance dependency in the Phase 3 Readiness Gate while preserving every other hard gate and now incorporates the GitHub Actions runtime/supply-chain gate.
 
 ## Superseded repository-provider dependency
 
@@ -21,6 +21,12 @@ Before Phase 3 entry, CrownThrive's provider-independent repository governance m
 - minimum `85/100` automatic-merge risk score;
 - successful institutional documentation validation;
 - successful Security Governance validation;
+- successful **GitHub Actions runtime gate** across every governed workflow;
+- Node 24 as the current action runtime floor, with Node 20 prohibited;
+- immutable full-length commit-SHA references for every remote workflow action;
+- no runtime-warning suppression or insecure Node escape hatch used as a substitute for an action upgrade;
+- no unverified self-hosted Actions runner;
+- governed dependency update/self-healing through pull-request reconciliation rather than direct-to-`main` mutation;
 - applicable CodeQL/dependency/secret-scanning evidence or explicit governed `not_applicable` state;
 - rule-based specialist endorsement for changed domains;
 - no unresolved critical/high security finding;
@@ -30,7 +36,15 @@ Before Phase 3 entry, CrownThrive's provider-independent repository governance m
 - documentation impact and downstream Phase 3–10 propagation;
 - post-merge `main` revalidation retained as defense-in-depth.
 
-GitHub's actual branch-protection state must still be recorded accurately. The absence of GitHub protection alone does not fail this gate; a violation of the CrownThrive agent policy does.
+GitHub's actual branch-protection state must still be recorded accurately. The absence of GitHub protection alone does not fail this gate; a violation of the CrownThrive agent policy or the GitHub Actions runtime/supply-chain policy does.
+
+## GitHub Actions runtime gate
+
+The governing machine source is `developers/manifests/github-actions-runtime-policy.v1.json` and its deterministic validator is `scripts/validate_github_actions_runtime_policy.py`.
+
+A Phase 3 entry decision fails if any governed workflow contains an unapproved or mutable remote action reference, a Node-20 action line, an unverified self-hosted runner, a prohibited runtime escape hatch, a duplicate advanced CodeQL configuration conflicting with provider-managed default setup, or an unreconciled action update.
+
+Dependabot may propose GitHub Actions updates, but the proposal has no merge authority. Upstream runtime/security compatibility must be verified, the pinned workflow SHA and machine policy must be reconciled together, and the ordinary agent/security/quorum controls must pass.
 
 ## Remaining Phase 2.99 state
 
@@ -38,4 +52,4 @@ This amendment does not mark Phase 2.99 complete and does not satisfy Phase 3 en
 
 ## Acceptance evidence
 
-The repository-governance portion of Phase 3 readiness can pass only when the machine manifests, validators, security workflow, relay configuration, quorum/risk decision engine and independent validation all agree. A prose declaration alone is insufficient.
+The repository-governance portion of Phase 3 readiness can pass only when the machine manifests, validators, security workflow, GitHub Actions runtime policy, relay configuration, quorum/risk decision engine and independent validation all agree. A prose declaration alone is insufficient.
