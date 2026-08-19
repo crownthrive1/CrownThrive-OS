@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Compute CrownThrive's agent-sovereign merge decision.
 
-GitHub is evidence, CI, scanning and transport. It is not the sovereign merge
-authority. This decision engine is deliberately fail-closed and does not perform
-the merge itself.
+GitHub is required defense-in-depth, evidence, CI, scanning and transport. It is
+not sovereign authority. The engine is fail-closed, retains CT-ADR-GOV-011's
+4-of-5 + mandatory Agent D rule, and derives specialist gates from the governed
+registry rather than from a second hard-coded two-specialist table.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +24,35 @@ VALID_VOTES = {"approve", "deny", "block", "abstain"}
 def load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def normalize_domain(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+
+
+def required_specialists_for(changed_domains: set[str], policy: dict[str, Any]) -> set[str]:
+    """Resolve cumulative specialist endorsements from the machine registry."""
+    normalized_domains = {
+        normalize_domain(value) for value in changed_domains if normalize_domain(value)
+    }
+    required: set[str] = set()
+    registry = policy.get("specialist_activation", {})
+    if not isinstance(registry, dict):
+        return required
+    for specialist_key, config in registry.items():
+        if not isinstance(config, dict):
+            continue
+        endorsement_id = normalize_domain(config.get("endorsement_id", specialist_key))
+        patterns = {
+            normalize_domain(value)
+            for value in config.get("required_patterns", [])
+            if normalize_domain(value)
+        }
+        patterns.add(normalize_domain(specialist_key))
+        patterns.add(endorsement_id)
+        if normalized_domains & patterns:
+            required.add(endorsement_id)
+    return required
 
 
 def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
@@ -66,23 +97,11 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     risk_class = str(packet.get("risk_class", "")).upper()
     d3 = risk_class == "D3"
     hard_blocks = [str(x) for x in packet.get("hard_blocks", []) if str(x).strip()]
-    endorsements = set(map(str, packet.get("specialist_endorsements", [])))
-    changed_domains = set(map(str, packet.get("changed_domains", [])))
-
-    required_specialists: set[str] = set()
-    if changed_domains & {
-        "auth", "secret", "credential", "security", "crypto", "blockchain",
-        "wallet", "key", "production", "dependency", "workflow", "api"
-    }:
-        required_specialists.add("security")
-    if changed_domains & {
-        "license", "rights", "legal", "contract", "token", "cryptocurrency",
-        "securities", "investment", "royalty", "franchise", "privacy",
-        "cross-border", "sanctions", "aml", "kyc"
-    }:
-        required_specialists.add("legal_regulatory")
-
+    endorsements = {normalize_domain(value) for value in packet.get("specialist_endorsements", [])}
+    changed_domains = {str(value) for value in packet.get("changed_domains", [])}
+    required_specialists = required_specialists_for(changed_domains, policy)
     missing_endorsements = sorted(required_specialists - endorsements)
+
     gatekeeper_ok = votes_by_agent.get("ct.relay.agent-d") == "approve"
     score_ok = (
         not score_errors
@@ -131,7 +150,15 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     )
 
     decision = "approve_agent_merge" if auto_merge_authorized else "deny_or_escalate"
-    if d3 and human_ok and quorum_ok and gatekeeper_ok and score_ok and not hard_blocks and not missing_endorsements:
+    if (
+        d3
+        and human_ok
+        and quorum_ok
+        and gatekeeper_ok
+        and score_ok
+        and not hard_blocks
+        and not missing_endorsements
+    ):
         decision = "human_authorized_execution_may_proceed_under_separate_d3_controls"
 
     return {
@@ -182,11 +209,57 @@ def self_test(policy: dict[str, Any]) -> None:
     }, policy)
     assert three_yes["agent_auto_merge_authorized"] is False
 
-    security_without_specialist = decide({
+    expected_ids = {
+        "security", "legal_regulatory", "operations_sre", "blockchain_protocol",
+        "ai_ml_llm_tevv", "ip_rights_licensing", "finance_tax_treasury",
+        "accessibility_consumer_protection", "regional_global_localization",
+    }
+    registry_ids = {
+        normalize_domain(config.get("endorsement_id", key))
+        for key, config in policy.get("specialist_activation", {}).items()
+    }
+    assert registry_ids == expected_ids
+
+    single_domain_expectations = {
+        "security": {"security"},
+        "legal": {"legal_regulatory"},
+        "deployment": {"operations_sre"},
+        "llm": {"ai_ml_llm_tevv"},
+        "copyright": {"ip_rights_licensing"},
+        "tax": {"finance_tax_treasury"},
+        "accessibility": {"accessibility_consumer_protection"},
+        "localization": {"regional_global_localization"},
+    }
+    for domain, expected in single_domain_expectations.items():
+        assert required_specialists_for({domain}, policy) == expected
+
+    cumulative_expectations = {
+        "rights": {"legal_regulatory", "ip_rights_licensing"},
+        "blockchain": {"security", "blockchain_protocol"},
+        "privacy": {"security", "legal_regulatory"},
+        "royalty": {"legal_regulatory", "finance_tax_treasury"},
+        "cross-border": {"legal_regulatory", "regional_global_localization"},
+        "settlement": {"blockchain_protocol", "finance_tax_treasury"},
+    }
+    for domain, expected in cumulative_expectations.items():
+        assert required_specialists_for({domain}, policy) == expected
+
+    all_specialists = decide({
         "risk_class": "D2", "scores": common_scores, "votes": four_yes,
-        "changed_domains": ["security"], "specialist_endorsements": [], "hard_blocks": []
+        "changed_domains": ["security", "legal", "deployment", "blockchain", "llm",
+                            "copyright", "tax", "accessibility", "localization"],
+        "specialist_endorsements": sorted(expected_ids), "hard_blocks": []
     }, policy)
-    assert security_without_specialist["agent_auto_merge_authorized"] is False
+    assert all_specialists["agent_auto_merge_authorized"] is True
+    assert set(all_specialists["required_specialists"]) == expected_ids
+
+    missing_one = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_domains": ["rights"], "specialist_endorsements": ["legal_regulatory"],
+        "hard_blocks": []
+    }, policy)
+    assert missing_one["agent_auto_merge_authorized"] is False
+    assert missing_one["missing_specialists"] == ["ip_rights_licensing"]
 
     d3 = decide({
         "risk_class": "D3", "scores": common_scores, "votes": four_yes,
@@ -204,7 +277,7 @@ def main() -> int:
     policy = load_json(MANIFEST)
     if args.self_test:
         self_test(policy)
-        print("Agent-sovereign merge-decision self-test passed: 75% quorum is 4/5; D3 cannot auto-merge.")
+        print("Agent-sovereign merge-decision self-test passed: 4/5 + Agent D preserved; nine cumulative specialist gates enforced; D3 cannot auto-merge.")
         return 0
     if not args.packet:
         parser.error("--packet is required unless --self-test is used")
