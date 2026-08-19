@@ -24,6 +24,18 @@ RELAY = ROOT / "automation/institutional-hourly-agent-relay.mdx"
 PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
 ADVANCED_CODEQL_USE = re.compile(r"^\s*uses:\s*github/codeql-action/", re.MULTILINE)
 
+EXPECTED_SPECIALIST_ENDORSEMENTS = {
+    "security",
+    "legal_regulatory",
+    "operations_sre",
+    "blockchain_protocol",
+    "ai_ml_llm_tevv",
+    "ip_rights_licensing",
+    "finance_tax_treasury",
+    "accessibility_consumer_protection",
+    "regional_global_localization",
+}
+
 
 def fail(message: str) -> None:
     raise SystemExit(f"ERROR: {message}")
@@ -48,6 +60,8 @@ def main() -> int:
 
     if agent.get("decision_id") != "CT-ADR-GOV-011" or agent.get("phase") != "2.99":
         fail("CT-ADR-GOV-011 / Phase 2.99 identity drifted")
+    if agent.get("manifest_version") != "1.0.1":
+        fail("Agent governance manifest must include specialist-gate completion version 1.0.1")
     if agent.get("authority_model") != "agent_sovereign_fail_closed":
         fail("Agent authority model must remain fail-closed")
     if agent.get("repository_provider_role") != "evidence_ci_scan_and_transport_not_sovereign_authority":
@@ -91,6 +105,25 @@ def main() -> int:
         fail("Risk-rating weights must sum to 1.0")
     if rating.get("weighted_votes") is not False:
         fail("Votes must remain one-agent/one-vote")
+
+    specialist_registry = agent.get("specialist_activation", {})
+    if not isinstance(specialist_registry, dict) or len(specialist_registry) != 9:
+        fail("Exactly nine rule-based specialist cells must be registered")
+    endorsement_ids = {
+        item.get("endorsement_id")
+        for item in specialist_registry.values()
+        if isinstance(item, dict)
+    }
+    if endorsement_ids != EXPECTED_SPECIALIST_ENDORSEMENTS:
+        fail(f"Specialist endorsement registry drifted: {sorted(endorsement_ids)}")
+    for key, item in specialist_registry.items():
+        if not isinstance(item, dict):
+            fail(f"Specialist {key} must be an object")
+        patterns = item.get("required_patterns", [])
+        if not isinstance(patterns, list) or not patterns:
+            fail(f"Specialist {key} must have rule-based activation patterns")
+        if not item.get("authority") and not item.get("agent_id"):
+            fail(f"Specialist {key} must declare authority or an assigned agent")
 
     recipients = notify.get("recipient_policy", {})
     if set(recipients) != {
@@ -162,6 +195,7 @@ def main() -> int:
 
     print("Agent-sovereign governance validation passed.")
     print("Eligible voters: 5; 75% quorum: 4 approvals; Agent D remains independent gatekeeper.")
+    print("Rule-based specialist cells: 9; all endorsement IDs and activation patterns registered.")
     print("GitHub branch protection: non-sovereign defense-in-depth, not a Phase 3 dependency.")
     print("GitHub CodeQL: provider-managed default setup; duplicate advanced workflow prohibited.")
     print("D3: reserved human/specialist authority; no agent quorum substitution.")
