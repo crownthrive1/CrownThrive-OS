@@ -35,6 +35,35 @@ The matching `integration_control` records were updated with public-safe evidenc
 - `reward_loyalty.v5_preparation_authorized = passed`;
 - Partnero/Stripe/Adserver credential dual-reference policy gates = passed, while actual value binding remains independently blocked.
 
+## Bounded runtime self-heal completed
+
+This reconciliation also closed technical issues that did not require a provider secret, purchase or production cutover.
+
+### Reward Loyalty preparation control plane
+
+`reward-loyalty-api-control` was upgraded to **v2**. It remains preparation-only and performs no Reward Loyalty provider dispatch. The v2 runtime now:
+
+- requires Supabase JWT authentication plus explicit founder/admin/service-role authorization;
+- requires `application/json`;
+- streams inbound request bodies with a hard **32 KiB** ceiling before JSON parsing;
+- exposes only sanitized `health` and `capabilities` preparation actions;
+- preserves v4 production, v5 Agent/REST/MCP disabled and provider writes closed.
+
+The THIVEBASE gates `control_plane_admin_authorization` and `control_plane_request_body_bounding` are now PASS for `reward_loyalty`.
+
+### Partnero control plane and webhook receiver
+
+`partnero-api-control` was upgraded to **v2**. The v2 read-only runtime now:
+
+- preserves JWT + founder/admin authorization;
+- streams inbound control requests with a **32 KiB** pre-parse ceiling;
+- enforces provider response `Content-Length` when available and also streams responses with a hard **512 KiB** ceiling before decode/parse;
+- retains the bounded provider timeout, JSON enforcement, response hashing/redaction and provider-write prohibition.
+
+`partnero-webhook-receiver` was upgraded to **v2**. It now requires JSON and streams the raw webhook body with a hard **64 KiB** limit before HMAC-SHA256 verification and parsing. It still fails closed with HTTP 503 until the Partnero webhook signing secret is safely bound in Vault.
+
+The corresponding request/response/webhook body-bounding gates are now PASS. Credential binding, live read certification, attribution wiring, transaction tracking, signed webhook certification and external MCP conformance remain separately open/blocked.
+
 ## Security boundaries
 
 - No secret, token, webhook signing secret or fingerprint is stored in this patch.
