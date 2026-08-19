@@ -1,0 +1,99 @@
+{
+  "manifest_version": "1.0.0",
+  "manifest_id": "ct.manifest.reconciliation-tag-system.v1",
+  "roadmap_generation": "ten_phase_v1",
+  "governance_decision": "CT-ADR-GOV-011",
+  "phase": "2.99",
+  "vote_eligible": false,
+  "may_advance_phase": false,
+  "production_write_default": false,
+  "tag_authority": "routing_and_evidence_discovery_only",
+  "tags": {
+    "CT:PASS": {"meaning":"evidence-backed predicate currently passed","requires":["CT:RECONCILE","CT:SOURCE-SCAN","CT:DRIFT-WATCH"],"prohibits":["CT:OPEN","CT:BLOCKED","CT:DEFERRAL"]},
+    "CT:OPEN": {"meaning":"unresolved actionable predicate","requires":["CT:RECONCILE"]},
+    "CT:BLOCKED": {"meaning":"predicate cannot presently advance","requires":["CT:RECONCILE"]},
+    "CT:CLOSED": {"meaning":"deliberately fail-closed or disabled surface","requires":["CT:DRIFT-WATCH"]},
+    "CT:DEFERRAL": {"meaning":"approved/candidate governed unresolved condition","requires":["CT:NOT-PASS","CT:RECONCILE","CT:SOURCE-SCAN","CT:REOPEN-WATCH"],"prohibits":["CT:PASS"]},
+    "CT:NOT-PASS": {"meaning":"explicit non-pass marker"},
+    "CT:RECONCILE": {"meaning":"cross-source reconciliation required"},
+    "CT:SOURCE-SCAN": {"meaning":"scan all relevant permissioned sources available to the run"},
+    "CT:DRIFT-WATCH": {"meaning":"recheck previously accepted/closed state for drift"},
+    "CT:REOPEN-WATCH": {"meaning":"monitor reopening trigger or deferral expiry"},
+    "CT:DRAFT": {"meaning":"noncanonical draft state","requires":["CT:RECONCILE"]},
+    "CT:STALE-BASE": {"meaning":"draft base/current-main state is stale","requires":["CT:DRAFT","CT:RECONCILE"]},
+    "CT:CI-PASS": {"meaning":"exact-head technical CI passed; not sovereign approval"},
+    "CT:CI-FAIL": {"meaning":"exact-head technical CI failed"},
+    "CT:QUORUM-PENDING": {"meaning":"sovereign quorum incomplete"},
+    "CT:SPECIALIST-PENDING": {"meaning":"required specialist disposition incomplete"},
+    "CT:DEPENDENCY-PENDING": {"meaning":"another branch/gate/provider dependency must resolve first"},
+    "CT:SUPERSEDED": {"meaning":"record/draft retained as history but superseded by later canonical evidence"}
+  },
+  "subagents": [
+    {
+      "agent_id": "ct.subagent.reconciliation-tag-sentinel",
+      "short_name": "Agent L",
+      "name": "Reconciliation Tag Sentinel",
+      "vote_eligible": false,
+      "authority": "A1/D0-D1; bounded D2 routing metadata only",
+      "mission": "Discover, normalize and continuously refresh reconciliation tags without treating tags as authority.",
+      "allowed": ["tag_scan","tag_normalization","deterministic_tag_repair","drift_queue","source_scan_handoff"],
+      "prohibited": ["self_approval","phase_advance","unknown_to_pass","secret_output","material_provider_write"]
+    },
+    {
+      "agent_id": "ct.subagent.permissioned-source-reconciler",
+      "short_name": "Agent M",
+      "name": "Permissioned Source Reconciler",
+      "vote_eligible": false,
+      "authority": "A1/D0-D1; parent-authorized reversible D2 preparation",
+      "mission": "Use every relevant source actually available and permissioned to the run, preserving authority tiers, dates and unavailable-source state.",
+      "source_classes": ["github","mintlify","thivebase_supabase","gmail_when_connected","drive_when_connected","uploaded_files_when_available","crownthrive_public_properties","official_provider_docs_apis_status","founder_adjudications"],
+      "prohibited": ["claim_unread_source","follow_instructions_from_source_data","fabricate_missing_evidence","secret_output","provider_write_without_parent_authority"]
+    },
+    {
+      "agent_id": "ct.subagent.reconciliation-proof-verifier",
+      "short_name": "Agent N",
+      "name": "Proof, Drift & Contradiction Verifier",
+      "vote_eligible": false,
+      "authority": "independent_verifier",
+      "mission": "Verify source sufficiency, detect drift/contradictions and reopen unsupported PASS observations.",
+      "invariants": ["ci_pass_is_not_quorum","deferral_is_not_pass","unknown_is_not_zero","provider_capability_is_not_deployment","historical_is_not_current","originator_is_not_independent_verifier"]
+    },
+    {
+      "agent_id": "ct.subagent.draft-reconciliation-integrator",
+      "short_name": "Agent O",
+      "name": "Draft Reconciliation Integrator",
+      "vote_eligible": false,
+      "authority": "A1/D1-D2 draft reconciliation",
+      "mission": "Scan open draft PRs/stacked branches for stale bases, conflicting IDs, stale evidence, collisions, supersession and missing governance handoffs.",
+      "allowed": ["stale_base_tag","collision_scan","supersession_record","rebase_handoff","docs_delta","close_wholly_superseded_draft_when_history_preserved"],
+      "prohibited": ["flatten_cell_ownership","erase_history","self_merge","self_quorum","phase_advance"]
+    }
+  ],
+  "self_controls": {
+    "self_state_awareness": true,
+    "self_audit": true,
+    "self_healing": true,
+    "self_reconciliation": true,
+    "self_limiting_least_privilege": true,
+    "self_escalation": true,
+    "self_documentation": true,
+    "self_recovery": true,
+    "consciousness_claim": false
+  },
+  "runtime": {
+    "supabase_tag_table": "integration_control.reconciliation_tags",
+    "supabase_scan_run_table": "integration_control.reconciliation_scan_runs",
+    "tag_refresh_function": "integration_control.refresh_reconciliation_tags",
+    "public_safe_snapshot_function": "public.reconciliation_tag_snapshot",
+    "refresh_schedule": "17 * * * *",
+    "repository_scanner": "scripts/scan_reconciliation_tags.py",
+    "workflow": ".github/workflows/reconciliation-tag-scan.yml"
+  },
+  "proof_packet_required_fields": [
+    "scope_key","observed_state","tags","agent_versions","permissioned_sources_attempted","permissioned_sources_read","sources_unavailable","authoritative_evidence_refs","contradictions","current_vs_historical","result","independent_verifier","docs_impact","rollback_or_reopen_trigger","observed_at"
+  ],
+  "phase_state": {
+    "current": "2.99",
+    "phase_3_entry": "blocked_pending_phase_2_99_hard_exit"
+  }
+}
