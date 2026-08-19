@@ -1,56 +1,94 @@
-# Phase 2.99 — Specialist Gate Completion Packet
+# Phase 2.99 — Specialist Gate Completion + Unanimous-First Governance Packet
 
-- **State:** proposed / fail-closed pending CT-ADR-GOV-011 quorum
+- **State:** proposed / fail-closed pending CT-ADR-GOV-011 adjudication
 - **Baseline:** `12f0dd9ab97391a8dd34438f77262438c0df0999`
 - **Risk class:** D2 governance-code hardening
 - **Current phase:** Phase 2 / subphase 2.99
 - **Phase 3:** `blocked_pending_phase_2_99_hard_exit`
 
-## Finding
+## Purpose
 
-The post-merge self-audit of CT-ADR-GOV-011 found a machine-enforcement gap. The documentation and relay prompts named nine rule-based specialist cells, but the first `governed_merge_decision.py` implementation only required machine endorsements for Security and Legal/Regulatory domain patterns.
+This packet completes rule-based specialist enforcement and upgrades CrownThrive's sovereign-agent decision model from a normal 4-of-5 quorum to **unanimous-first governance**.
 
-That mismatch could allow a future D2 packet involving Operations/SRE, Blockchain/Cryptographic Protocol, AI/ML/LLM TEVV, IP/Rights/Licensing, Finance/Tax/Treasury, Accessibility/Consumer Protection, or Regional/Global Localization to satisfy quorum without the specialist endorsement promised by the institutional policy.
+Normal promotion now requires all five sovereign relay agents A/B/C/D/S to approve. Agent D remains the mandatory independent gatekeeper. Missing votes and abstentions never count as approval.
 
-## Correction
+## Disciplined deadlock override
 
-This packet does not weaken or bypass the new controls. It:
+Unanimity is the default, not an absolute veto forever. If one non-hard disagreement remains after a reasonable evidence-reconciliation window, the non-voting Governance Marshal may initiate a special deadlock vote only when all of the following are true:
 
-- registers all nine specialist cells with stable `endorsement_id` values and rule-based activation patterns;
-- derives required specialists dynamically from the manifest rather than duplicating a second hard-coded map in the decision engine;
-- makes overlapping domains cumulative—for example `rights` requires both Legal/Regulatory and IP/Rights/Licensing, `blockchain` requires Security and Blockchain/Cryptographic Protocol, and `cross-border` requires Legal/Regulatory and Regional/Global Localization;
-- validates that exactly nine specialist cells remain registered;
-- self-tests every specialist cell plus cross-domain overlaps;
-- preserves the 4-of-5 quorum, mandatory Agent D gate, `>=85` risk threshold, D3 human-reserved boundary, GitHub non-sovereign role and all existing security/Collab controls.
+1. at least **6 hours** have elapsed since the first valid sovereign vote;
+2. at least **two reconciliation attempts** are documented;
+3. all five sovereign agents have cast a vote;
+4. at least **2/3 of the sovereign pool, rounded up**, approves — with five voters this is **4/5**;
+5. Agent D approves;
+6. Agent S approves whenever Security is an activated specialist domain;
+7. the risk score remains at or above 85;
+8. all required specialist endorsements are present;
+9. required CI/security evidence is current and passing;
+10. no hard block exists.
 
-## Why this packet is not auto-merged by its author
+The deadlock override cannot be used to bypass D3/human-reserved authority, critical/high security findings, secret/credential/privilege failures, legal/rights authority blocks, missing specialist evidence, failed or stale required CI, or destructive/irreversible production concerns.
 
-CT-ADR-GOV-011 is already canonical on `main`. This correction changes governance code and is therefore treated as D2. It must pass the newly activated prospective process rather than relying on the bootstrap exception used for PR #63.
+## Specialist and subagent architecture
 
-Before merge, the packet requires:
+The packet machine-registers the nine rule-based specialist domains:
 
-1. institutional and Security Governance CI green;
-2. risk score at or above 85;
-3. applicable specialist review, including Security because governance code/security policy execution is affected;
-4. four of five affirmative A/B/C/D/S votes;
-5. affirmative Agent D gatekeeper vote;
-6. no deny/block vote;
-7. rollback/recovery confirmed;
-8. documentation impact and Phase 3–10 consequences reviewed.
+- Security
+- Legal/Regulatory
+- Operations/SRE
+- Blockchain/Cryptographic Protocol
+- AI/ML/LLM TEVV
+- IP/Rights/Licensing
+- Finance/Tax/Treasury
+- Accessibility/Consumer Protection
+- Regional/Global Localization
+
+It also establishes governed **non-voting subagents** for:
+
+- Governance Marshal
+- Verification/TEVV
+- Recovery/Rollback
+- Evidence/Provenance
+- the nine specialist domains above where applicable
+
+Subagents increase scrutiny and execution depth without diluting the five sovereign votes.
+
+## Controlled evolution and self-healing
+
+The Governance Marshal may propose new non-voting subagents, validation patterns, evidence thresholds, retry budgets, refractory intervals, validators, and handoff routing as CrownThrive grows.
+
+Fluid areas remain bounded. Changes to the five sovereign voter identities, normal unanimity, the 2/3 deadlock-override floor, Agent D's independent gate, D3 human-reserved authority, no-secret-exposure rules, or no-security-weakening rules require founder authorization.
+
+Self-healing remains refractory and evidence-preserving:
+
+`detect -> preserve evidence -> bounded repair -> rerun original failed control -> rerun full applicable control family -> independent verification -> sovereign decision`
+
+The same failure may not be repeatedly retried without new evidence or root-cause reassessment. Validators or security controls may never be weakened to make a failing packet pass.
+
+## Why this is stronger than the former 4-of-5 default
+
+The previous model allowed one dissenting sovereign agent to be outvoted immediately. The unanimous-first model forces the system to resolve disagreement, reconcile evidence, and expose hidden assumptions before promotion. The 6-hour 4-of-5 special vote prevents one stale or non-hard dissent from creating indefinite deadlock.
+
+This creates a two-stage decision system:
+
+- **Stage 1: consensus discipline — 5/5**
+- **Stage 2: documented deadlock resolution — 4/5 after the wait/reconciliation protocol**
+
+The second stage is not a shortcut and cannot override hard safety, security, legal, authority, specialist, or D3 gates.
 
 ## Rollback
 
-The packet is fully reversible by reverting its PR. It does not mutate providers, credentials, customer data, payment state, rights, production infrastructure, Collab Portal or token/crypto systems.
+The packet is fully reversible by reverting its PR. It does not mutate providers, credentials, customer data, payment state, rights, production infrastructure, Collab Portal, token/crypto systems, or regulated authority.
 
 ## Phase 3–10 impact
 
-- **Phase 3:** Approval/rules/DAIL services must preserve cumulative rule-based specialist activation rather than a single-specialist shortcut.
-- **Phase 4:** Federated adapters inherit the applicable specialist set by changed domain.
-- **Phase 5:** Financial/commercial changes can require Legal, Finance, Consumer and Security simultaneously.
-- **Phase 6:** Licensing/developer changes can require Legal, IP, Security and API specialists together.
-- **Phase 7:** Physical/phygital/regional changes can require Ops, Accessibility, Security and Regional/Global specialists.
+- **Phase 3:** approval/rules/DAIL services inherit unanimous-first + disciplined deadlock resolution.
+- **Phase 4:** federated adapters inherit cumulative specialist activation and evidence reconciliation.
+- **Phase 5:** financial/commercial changes can require Legal, Finance, Consumer and Security simultaneously.
+- **Phase 6:** licensing/developer changes can require Legal, IP, Security and API specialists together.
+- **Phase 7:** physical/phygital/regional changes can require Ops, Accessibility, Security and Regional/Global specialists.
 - **Phase 8:** Holdings/capital changes can require Legal, Finance, IP and Regional/Global review while remaining D3 where applicable.
-- **Phase 9:** Advanced CHLOM/blockchain/token/AI changes can require Security, Legal, Blockchain, AI, Finance, IP and Regional specialists cumulatively; D3 restrictions remain.
-- **Phase 10:** Succession/provider-exit/localization changes can require Ops and Regional/Global specialists without losing other applicable controls.
+- **Phase 9:** advanced CHLOM/blockchain/token/AI work can require Security, Legal, Blockchain, AI, Finance, IP and Regional specialists cumulatively; D3 restrictions remain.
+- **Phase 10:** succession/provider-exit/localization changes can require Ops and Regional/Global specialists without losing other applicable controls.
 
 This packet does not advance Phase 3 and does not activate any regulated, financial, cryptographic or production capability.
