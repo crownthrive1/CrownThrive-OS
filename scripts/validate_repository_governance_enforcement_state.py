@@ -11,6 +11,7 @@ defense-in-depth.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,7 @@ CHLOM = ROOT / "chlom/overview.mdx"
 DSCAAS = ROOT / "governance/ds-caas.mdx"
 SECURITY = ROOT / "SECURITY.md"
 SECURITY_POLICY = ROOT / "developers/manifests/security-self-healing-policy.v1.json"
+ADVANCED_CODEQL_USE = re.compile(r"^\s*uses:\s*github/codeql-action/", re.MULTILINE)
 
 
 def fail(message: str) -> None:
@@ -151,7 +153,7 @@ def main() -> int:
         "actions/setup-python@v7",
     ):
         require(SECURITY_WORKFLOW, fragment)
-    if "github/codeql-action/" in text(SECURITY_WORKFLOW):
+    if ADVANCED_CODEQL_USE.search(text(SECURITY_WORKFLOW)):
         fail("Conflicting advanced CodeQL workflow present while provider default setup is registered")
 
     require(ADR, "# CT-ADR-GOV-011")
