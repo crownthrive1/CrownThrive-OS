@@ -1,0 +1,154 @@
+---
+title: "Agent Definition Schema and Source Templates"
+sidebarTitle: "Agent Definition Templates"
+description: "The human-readable and machine-ingestible CrownThrive templates for scheduled agents, embedded subagents, source lineage, authority, tools, tests, handoffs and version control."
+icon: "file-code"
+keywords: ["agent schema", "YAML template", "subagent template", "source code", "machine readable", "agent definition"]
+---
+
+# Agent definition schema and source templates
+
+The CrownThrive agent factory uses a stable machine schema so an agent can be reconstructed without depending on one chat, model, provider or scheduler.
+
+## Required definition fields
+
+```yaml
+agent_id: ct.specialist.example
+version: 1.0.0
+name: Example Specialist
+execution_form: scheduled | embedded
+status: CONTROLLED_TEST
+owner: CrownThrive Operations
+canonical_phase: 2.99
+phase_gate_scope: []
+mission: "One bounded institutional mission"
+parent_roles: []
+vote_eligible: false
+authority:
+  maximum_class: D1
+  production_write: false
+  destructive_action: false
+allowed_data_classes: [PUBLIC, INTERNAL]
+allowed_tools: []
+allowed_actions: []
+prohibited_actions: []
+evidence_requirements: []
+source_precedence: []
+stop_conditions: []
+escalation_targets: []
+evaluations: []
+rollback_contract: "..."
+docs_impact: required
+changelog_id: null
+supersedes: null
+effective_at: null
+```
+
+No template field can grant authority above institutional policy. The registry and current run packet may narrow a template further.
+
+## Scheduled-agent template
+
+A scheduled agent adds cadence and collision controls:
+
+```yaml
+execution:
+  form: scheduled
+  cadence: hourly
+  minute_offset: 20
+  collision_key: "phase-2.99/domain-engine-certification"
+  next_handoff: ct.relay.agent-b
+  current_truth_sources:
+    - canonical_main
+    - github_98_99_100
+    - mintlify
+    - phase_2_99_hard_exit
+```
+
+The schedule is transport. It does not become authority, truth or evidence merely because it ran.
+
+## Embedded-subagent template
+
+An embedded subagent is invoked only by an authorized parent:
+
+```yaml
+execution:
+  form: embedded
+  invocation: parent_run_packet_only
+  allowed_parents:
+    - ct.relay.agent-a
+    - ct.relay.agent-c
+  scheduler_slot_required: false
+  result_type: evidence_packet
+  creates_vote: false
+```
+
+Embedded roles must be just as visible to governance as scheduled roles.
+
+## Evidence packet contract
+
+Every specialist/subagent result should return a normalized packet:
+
+```yaml
+agent_id: ct.subagent.example
+agent_version: 1.0.0
+run_id: run_x
+baseline_main_sha: null
+active_pr: null
+scope: []
+what_was_inspected: []
+what_changed: []
+evidence_refs: []
+unknowns: []
+gates_affected: []
+validation:
+  state: passed | failed | blocked | not_applicable
+security:
+  state: passed | failed | blocked | not_applicable
+risk:
+  class: D0 | D1 | D2 | D3
+  score: null
+rollback: null
+docs_impact: docs_updated | docs_no_change | docs_delta_opened
+next_safe_action: null
+```
+
+## Template source versus instantiated agent
+
+The **template** defines reusable structure. The **agent definition** binds a stable role. The **run packet** binds one task. The **runtime identity** binds one execution. These are separate records.
+
+```text
+source template
+→ versioned agent definition
+→ current registry state
+→ run packet
+→ runtime execution
+→ evidence packet
+→ independent verification
+→ changelog / correction / next version
+```
+
+## Source-code generation
+
+Repository source includes `scripts/scaffold_crownthrive_agent.py`. The scaffold accepts a stable ID, execution form and role metadata and emits a non-secret YAML draft that still requires registry review. It may never auto-create credentials, widen tool permissions, enable writes, register a sovereign vote or mark a phase gate passed.
+
+`developers/templates/agent-definition.template.yaml` and `developers/templates/subagent-definition.template.yaml` are the canonical source templates. `scripts/validate_agent_topology.py` validates the current topology against the fixed A/B/C/D/S voter pool and known specialist/subagent boundaries.
+
+## Prompt continuity
+
+Prompts are versioned implementation artifacts, not the full agent identity. A prompt update records:
+
+- source definition version;
+- reason for change;
+- changed permissions or unchanged authority declaration;
+- changed evidence/stop rules;
+- evaluations rerun;
+- previous prompt/source reference;
+- effective date and rollback target.
+
+A provider/model migration that leaves these institutional semantics unchanged can be a technical revision. A change to authority, mission, phase-gate ownership or protected data scope is a material governance revision.
+
+## ML and retrieval projection
+
+Machine retrieval should prefer the structured fields before free-form prose: `agent_id`, `version`, `status`, `execution_form`, `vote_eligible`, `authority.maximum_class`, `phase_gate_scope`, `allowed_actions`, `prohibited_actions`, `evidence_requirements`, `supersedes`, and `effective_at`.
+
+See [Agent Factory and Template Library](/automation/agent-factory-and-template-library) and [Institutional Record and Format Standard](/standards/record-and-format-standard).
