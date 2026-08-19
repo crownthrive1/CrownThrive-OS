@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:crownthrive:chlom:evidence-reference:v1",
+  "title": "CHLOM Evidence Reference v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "evidence_ref_id",
+    "kind",
+    "classification",
+    "source_ref",
+    "locator_ref",
+    "digest_sha256",
+    "content_included",
+    "public_projection_allowed",
+    "retention_class"
+  ],
+  "properties": {
+    "schema_id": {"const": "ct.contract.chlom.evidence-reference.v1"},
+    "schema_version": {"const": "1.0.0"},
+    "evidence_ref_id": {"type": "string", "pattern": "^ct\\.evidence\\.ref\\.[A-Za-z0-9._-]+$"},
+    "kind": {
+      "type": "string",
+      "enum": ["source_reference", "content_hash", "attestation", "restricted_pointer", "public_proof"]
+    },
+    "classification": {
+      "type": "string",
+      "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED", "SEALED"]
+    },
+    "source_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+    "locator_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+    "digest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "content_included": {"const": false},
+    "public_projection_allowed": {"type": "boolean"},
+    "retention_class": {
+      "type": "string",
+      "enum": ["transient", "operational", "long_term", "legal_hold", "sealed_archive"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"classification": {"enum": ["RESTRICTED", "SEALED"]}}},
+      "then": {"properties": {"public_projection_allowed": {"const": false}}}
+    }
+  ]
+}
