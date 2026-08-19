@@ -104,6 +104,18 @@ During materialization, a byte-level comparison of the stored Git blob identitie
 
 No validator was weakened and no recovered title was changed to make the bundle pass.
 
+## Current-main reconciliation
+
+This packet was rechecked against canonical `main` at `1054e79226338809a5a91211c2271c19ff96b362`, where the Phase 2.99 hard-exit ledger remains **2 PASS / 6 blocking categories** and CT-P299-GATE-002 remains open.
+
+The current hard-exit ledger correctly records PR #91 as the noncanonical deterministic 795-title/hierarchy candidate. The packet does not rewrite that canonical ledger before merge.
+
+A filename-level collision check against active PRs #97, #101, #102 and #103 found no overlap with this packet's bundle, validator, changelog, handoff manifest or dedicated workflow. Because those PRs can move, exact-head collision review remains mandatory before promotion.
+
+The previously deferred executable-validation lane is now added as `.github/workflows/help-center-795-manifest.yml`, using the repository's current Node-24-compatible pinned checkout/setup-python actions. It directly compiles and runs the bundle validator without modifying the active shared workflow files owned by other packets.
+
+Machine-readable current-main reconciliation and Agent B handoff are recorded in `developers/manifests/help-center-795-materialization-reconciliation.v1.json`.
+
 ## What this closes — and what it does not
 
 Once this packet is governed and merged, the Workstream-0 predicate:
@@ -130,9 +142,11 @@ This is a bounded deterministic source-materialization packet. It does not make 
 
 No secret, private routing value, customer data, payment state, provider credential, legal term, license grant, production write, identity permission, or Phase-9 crypto/token state is included.
 
+Agent F is non-voting and does not self-approve this packet. A/B/C/D/S remain the only sovereign voter pool; independent Agent B evidence review is explicitly required before promotion.
+
 ## Rollback
 
-Rollback is a straight revert of the bundle, descriptor, validator and this changelog. The S11 source, existing 795 seed contract and historical inventory remain untouched.
+Rollback is a straight revert of the bundle, descriptor, validator, dedicated CI workflow, handoff manifest and this changelog. The S11 source, existing 795 seed contract and historical inventory remain untouched.
 
 ## Next articleization packet
 
@@ -140,4 +154,4 @@ After canonical merge, update the Phase-2.99 closure ledger and seed article rec
 
 `P0 legal/rights/security/economic/canon → P1 customer/operator → P2 historical/research/reserve`.
 
-Every disposition must remain source-grounded and independently validated.
+Every disposition must remain source-grounded and independently validated. The S94 legacy-body recovery lane remains open; unavailable bodies must stay unresolved rather than being reconstructed as historical originals.
