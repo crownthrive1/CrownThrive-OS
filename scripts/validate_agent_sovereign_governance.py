@@ -159,8 +159,10 @@ def main() -> int:
         fail("GitHub enforcement must not become sovereign authority")
 
     target = github_target.get("required_target", {})
-    if github_target.get("phase_3_entry") != "blocked_until_provider_enforcement_verified":
-        fail("GitHub main target must block Phase 3 until provider enforcement is verified")
+    if github_target.get("phase_3_entry") != "github_main_perimeter_passed_but_phase3_still_blocked_pending_all_phase_2_99_hard_exit":
+        fail("GitHub main target must record perimeter passed while preserving the overall Phase 2.99 hard gate")
+    if github_target.get("activation_state") != "ruleset_enforced_behavior_verified":
+        fail("GitHub ruleset enforcement must be behaviorally verified before this state can pass")
     if target.get("pull_request_required") is not True:
         fail("Main target must require pull requests")
     if target.get("required_status_check", {}).get("job") != "CrownThrive governed merge gate":
@@ -169,6 +171,13 @@ def main() -> int:
         fail("Required check must emit on every pull request")
     if target.get("force_pushes_allowed") is not False or target.get("branch_deletion_allowed") is not False:
         fail("Main target must block force pushes and deletion")
+    behavioral = github_target.get("provider_evidence", {}).get("behavioral_negative_test", {})
+    if behavioral.get("state") != "passed" or behavioral.get("provider_mergeable_state") != "blocked":
+        fail("GitHub main perimeter requires a passed behavioral negative proof with provider mergeable_state=blocked")
+    if behavioral.get("required_job") != "CrownThrive governed merge gate" or behavioral.get("required_job_conclusion") != "failure":
+        fail("Behavioral proof must demonstrate the exact required governed-merge job failed")
+    if behavioral.get("test_branch_closed_without_merge") is not True:
+        fail("Behavioral test PR must remain closed without merge")
 
     never = set(agent.get("self_healing", {}).get("never", []))
     for item in {
@@ -182,10 +191,17 @@ def main() -> int:
 
     if repo.get("agent_merge_policy") != "fail_closed_quorum_and_validation":
         fail("Repository state must register the agent fail-closed merge policy")
-    if repo.get("github_merge_gate_enforced") is not False:
-        fail("Observed GitHub merge gate remains false until provider configuration is verified")
+    if repo.get("github_merge_gate_enforced") is not True:
+        fail("Ruleset-based GitHub merge gate must remain enforced after behavioral verification")
     if repo.get("github_branch_protection_required_for_phase_3") is not True:
         fail("GitHub branch protection must now remain a Phase 3 dependency")
+    observed = repo.get("observed_enforcement", {})
+    if observed.get("branch_protected") is not True:
+        fail("Current branch read must remain protected=true while the verified ruleset is active")
+    if observed.get("classic_branch_protection_enabled") is not False:
+        fail("Classic branch protection observation must remain explicit and distinct from ruleset enforcement")
+    if observed.get("ruleset_behavioral_evidence", {}).get("evidence_state") != "passed":
+        fail("Repository state must preserve passed ruleset behavioral evidence")
 
     for fragment in (
         "python scripts/validate_github_actions_runtime_policy.py",
@@ -229,7 +245,7 @@ def main() -> int:
 
     print("Agent-sovereign governance validation passed.")
     print("Eligible voters: 5; 75% quorum: 4 approvals; Agent D remains independent gatekeeper.")
-    print("GitHub: always-run governed merge gate is bootstrapped; provider main enforcement is required before Phase 3 but is not sovereign authority.")
+    print("GitHub: ruleset-based main perimeter behaviorally verified; exact required gate remains defense-in-depth, not sovereign authority.")
     print("GitHub Actions: Node 24 fail-closed runtime gate; full-SHA action refs; governed dependency repair.")
     print("GitHub CodeQL: provider-managed default setup; duplicate advanced workflow prohibited.")
     print("D3: reserved human/specialist authority; no agent quorum substitution.")
