@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from dataclasses import dataclass, asdict
 from typing import Any
 
@@ -9,6 +11,7 @@ KERNEL_DECISION_CONTRACT_ID = "ct.contract.chlom.kernel.decision.v1"
 KERNEL_CONTRACT_VERSION = "1.0.0"
 KERNEL_PROTOTYPE_STATE = "phase_2_99_semantic_oracle"
 _ALLOWED_RISK_CLASSES = {"D0", "D1", "D2", "D3"}
+_GOVERNED_EVIDENCE_REF = re.compile(r"^ct\.(?:evidence|proof)\.ref\.[A-Za-z0-9._:-]+$")
 
 
 def canonical_json(value: Any) -> str:
@@ -41,6 +44,41 @@ def _require_string_list(value: Any, field: str) -> tuple[str, ...]:
     if not isinstance(value, list):
         raise KernelContractError(f"{field} must be an array")
     return tuple(_require_string(item, f"{field}[]") for item in value)
+
+
+def sanitize_evidence_references(values: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    """Persist governed references or opaque digests, never caller-provided free text."""
+
+    sanitized: list[str] = []
+    for item in values:
+        value = _require_string(item, "authority_evidence[]")
+        if _GOVERNED_EVIDENCE_REF.fullmatch(value):
+            sanitized.append(value)
+        else:
+            digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+            sanitized.append(f"ct.evidence.digest.sha256.{digest}")
+    return tuple(sanitized)
+
+
+@dataclass(frozen=True)
+class VerifiedAuthorityContext:
+    """Out-of-band authority resolved by a trusted authority/relationship adapter.
+
+    Caller request fields are claims/evidence only. The semantic oracle consumes
+    this context separately so untrusted payloads cannot self-create roles,
+    relationships, delegations or approvals.
+    """
+
+    actor_id: str
+    organization_id: str
+    roles: tuple[str, ...]
+    relationships: tuple[str, ...]
+    delegations: tuple[str, ...]
+    approvals: tuple[str, ...]
+    evidence_refs: tuple[str, ...] = tuple()
+
+    def sanitized_evidence_refs(self) -> tuple[str, ...]:
+        return sanitize_evidence_references(self.evidence_refs)
 
 
 @dataclass(frozen=True)
@@ -130,6 +168,10 @@ class Decision:
     observed_resource_version: int | None
     expected_resource_version: int | None
     authority_evidence: tuple[str, ...]
+    authority_context_verified: bool
+    relationship_refs: tuple[str, ...]
+    delegation_refs: tuple[str, ...]
+    verified_approvals: tuple[str, ...]
     prototype_state: str = KERNEL_PROTOTYPE_STATE
 
     def to_dict(self) -> dict[str, Any]:
@@ -138,4 +180,7 @@ class Decision:
         value["reasons"] = list(self.reasons)
         value["required_approvals"] = list(self.required_approvals)
         value["authority_evidence"] = list(self.authority_evidence)
+        value["relationship_refs"] = list(self.relationship_refs)
+        value["delegation_refs"] = list(self.delegation_refs)
+        value["verified_approvals"] = list(self.verified_approvals)
         return value

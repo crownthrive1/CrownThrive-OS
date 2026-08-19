@@ -1,5 +1,5 @@
 {
-  "packet_version": "1.0.0",
+  "packet_version": "1.1.0",
   "packet_id": "ct.packet.chlom.cell.kernel.contract-v1",
   "program_id": "ct.program.chlom-executable-build",
   "cell_id": "ct.chlom.cell.kernel",
@@ -20,6 +20,8 @@
   },
   "invariants": [
     "strict_v1_missing_or_invalid_contract_fields_fail_closed",
+    "untrusted_request_cannot_implicitly_downgrade_to_legacy_semantics",
+    "legacy_compatibility_is_exact_parent_test_fixture_only",
     "authentication_required_but_not_sufficient",
     "cross_organization_access_denied",
     "reference_kernel_never_executes_provider_mutation",
@@ -27,10 +29,29 @@
     "identical_idempotent_retry_returns_same_decision_without_new_dail_event",
     "idempotency_key_reuse_with_different_payload_fails_closed",
     "d3_never_resolves_to_autonomous_allow",
-    "authority_and_approval_references_are_carried_not_self_proving",
+    "caller_asserted_roles_approval_labels_and_evidence_do_not_create_strict_v1_authority",
+    "authority_sensitive_allow_requires_verified_actor_org_relationship_delegation_and_approval_context",
+    "free_form_or_restricted_authority_evidence_is_not_persisted_verbatim",
     "docs_impact_outcome_is_normalized",
     "decision_is_recorded_to_dail_hash_chain"
   ],
+  "authority_boundary": {
+    "request_actor_roles_are_claims": true,
+    "request_approval_evidence_is_authority": false,
+    "request_authority_evidence_is_authority": false,
+    "strict_v1_verified_context_required_for_authority_sensitive_allow": true,
+    "verified_context_requires_identity_org_match": true,
+    "verified_relationship_required": true,
+    "verified_delegation_required": true,
+    "verified_approval_required_when_policy_requires_approval": true,
+    "provider_implementation_owner": "cell-03-identity-relationship-authority"
+  },
+  "evidence_boundary": {
+    "governed_reference_pattern": "ct.evidence.ref.* or ct.proof.ref.*",
+    "non_governed_input_persistence": "opaque_sha256_digest_only",
+    "raw_private_evidence_in_public_git": false,
+    "broader_evidence_schema_owner": "cell-04-evidence-dail"
+  },
   "dail_mapping": {
     "event_type": "ct.chlom.reference.decision.v1",
     "fields": [
@@ -49,6 +70,10 @@
       "observed_resource_version",
       "expected_resource_version",
       "authority_evidence",
+      "authority_context_verified",
+      "relationship_refs",
+      "delegation_refs",
+      "verified_approvals",
       "effect",
       "matched_rule_ids",
       "reasons",
@@ -71,15 +96,26 @@
     "unit_test": "contracts/chlom/kernel/test_kernel_contract.py",
     "fixture": "contracts/chlom/kernel/conformance.v1.json",
     "negative_cases": [
+      "missing_contract_identity_implicit_legacy_downgrade",
       "missing_idempotency_key",
       "cross_org",
       "provider_mutation_intent",
       "resource_version_conflict",
       "d3_reserved_authority",
-      "idempotency_key_conflict"
+      "idempotency_key_conflict",
+      "caller_self_asserted_authority",
+      "verified_authority_missing_relationship_or_delegation",
+      "restricted_evidence_verbatim_persistence"
     ],
-    "existing_reference_tests_must_remain_green": true
+    "existing_reference_tests_must_remain_green": true,
+    "cell_local_suite_governed_parent_workflow_state": "not_directly_invoked",
+    "tevv_owner_revalidation_required": "PR-87-owner-must-reconcile-finding-expectations-after-kernel-head-change"
   },
+  "tevv_findings_addressed_on_kernel_surface": [
+    "ct.finding.tevv.authority-approval-self-assertion",
+    "ct.finding.tevv.restricted-evidence-reference-unsanitized",
+    "agent-d-implicit-legacy-downgrade-fail-closed-gap"
+  ],
   "specialists_required": [
     "security_privacy",
     "ai_ml_llm_tevv"
@@ -106,15 +142,17 @@
   },
   "source_lineage": [
     "issue-68-kernel-contract",
+    "issue-75-cell-08-tevv",
+    "pr-87-tevv-invariant-findings",
     "issue-78-master-integration-board",
     "pr-67-reference-runtime",
     "CT-ADR-ROADMAP-010",
     "CT-ADR-GOV-011"
   ],
   "integration_handoff": {
-    "first_joint_dependency": "cell-04-evidence-dail",
+    "first_joint_dependency": "cell-04-evidence-dail-after-independent-kernel-tevv-acceptance",
     "then": "cell-02-policy-plus-cell-03-authority",
     "constraint": "Agent A integration packet required for cross-cell surface changes",
-    "promotion_hold": "PR-64 then PR-65 governance/security reconciliation before PR-67 canonical promotion"
+    "promotion_hold": "PR-64 then github_main_perimeter certification then PR-65 governance/security reconciliation before normal canonical promotion"
   }
 }
