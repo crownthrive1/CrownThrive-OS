@@ -114,12 +114,15 @@ def main() -> int:
     if actual_gates != required_collab_gates:
         fail("Collab fallback disable gates drifted")
 
+    github_security = security.get("github_security_evidence", {})
     if security.get("crypto_blockchain_guardrails", {}).get("production_token_or_currency_status") != "research_target_not_activated":
         fail("CHLOM crypto/token status must remain research_target_not_activated")
     if security.get("crypto_blockchain_guardrails", {}).get("phase_9_dependency") is not True:
         fail("Advanced blockchain/crypto activation must remain Phase 9-gated")
-    if security.get("github_security_evidence", {}).get("github_blocking") != "not_relied_upon_as_sovereign_merge_authority":
+    if github_security.get("github_blocking") != "not_relied_upon_as_sovereign_merge_authority":
         fail("GitHub security evidence must not become sovereign merge authority")
+    if github_security.get("codeql_execution_mode") != "github_default_setup_provider_managed":
+        fail("CodeQL provider execution mode drifted")
 
     if repo.get("agent_merge_policy") != "fail_closed_quorum_and_validation":
         fail("Repository state must register the agent fail-closed merge policy")
@@ -133,16 +136,22 @@ def main() -> int:
         "python scripts/governed_merge_decision.py --self-test",
         "python scripts/resolve_pm_notification_recipients.py --self-test",
         "python scripts/security_self_heal_plan.py --self-test",
+        "actions/checkout@v7",
+        "actions/setup-python@v7",
     ):
         require(DOCS_WORKFLOW, fragment)
     for fragment in (
         "name: Security Governance",
-        "github/codeql-action/init@v4",
-        "github/codeql-action/analyze@v4",
+        "name: Validate provider-managed CodeQL compatibility",
+        "CodeQL default setup is provider-managed",
         "actions/dependency-review-action@v4",
+        "actions/checkout@v7",
+        "actions/setup-python@v7",
         "python scripts/validate_security_governance.py",
     ):
         require(SECURITY_WORKFLOW, fragment)
+    if "github/codeql-action/" in SECURITY_WORKFLOW.read_text(encoding="utf-8"):
+        fail("Advanced CodeQL configuration conflicts with registered GitHub default setup")
 
     require(RELAY, "Agent S — Security & Resilience Sentinel")
     require(RELAY, "75% quorum")
@@ -152,6 +161,7 @@ def main() -> int:
     print("Agent-sovereign governance validation passed.")
     print("Eligible voters: 5; 75% quorum: 4 approvals; Agent D remains independent gatekeeper.")
     print("GitHub branch protection: non-sovereign defense-in-depth, not a Phase 3 dependency.")
+    print("GitHub CodeQL: provider-managed default setup; duplicate advanced workflow prohibited.")
     print("D3: reserved human/specialist authority; no agent quorum substitution.")
     return 0
 
