@@ -1,33 +1,66 @@
 {
-  "manifest_version": "1.1.0",
+  "manifest_version": "1.3.0",
   "manifest_id": "ct.manifest.repository-governance-enforcement.v1",
   "source_id": "S106",
   "phase": "2.99",
   "repository": "crownthrive1/CrownThrive-Support",
   "branch": "main",
-  "observed_at": "2026-08-18/19",
+  "observed_at": "2026-08-19",
+  "canonical_main_sha": "1a07a8755e3b18d01ec6720ec2522b1727780c01",
+  "canonical_main_sha_semantics": "verification_baseline_sha_not_dynamic_current_head",
+  "verification_baseline_main_sha": "1a07a8755e3b18d01ec6720ec2522b1727780c01",
+  "verification_baseline_evidence": "PR64 bootstrap merge and PR93 negative behavioral proof were verified against this main state; later canonical main heads are derived externally and do not invalidate this historical verification baseline.",
+  "runtime_control_plane_evidence_ref": "github_main_perimeter_provider_evidence_reconciled_2026-08-19",
+  "bootstrap_pr": 64,
   "workflow": {
     "documentation_name": "Documentation Governance",
     "documentation_job": "Validate institutional documentation",
     "security_name": "Security Governance",
+    "governed_merge_name": "Governed Merge Gate",
+    "governed_merge_job": "CrownThrive governed merge gate",
     "pull_request_validation": true,
+    "pull_request_checks_always_emit": true,
     "push_to_main_revalidation": true,
     "scheduled_security_revalidation": true
   },
   "observed_enforcement": {
-    "branch_protected": false,
+    "branch_protected": true,
     "classic_branch_protection_enabled": false,
-    "required_status_checks_enforcement": "off",
-    "required_contexts": [],
-    "required_checks": [],
-    "ruleset_inventory": "not_directly_enumerated_by_current_connector"
+    "classic_required_status_checks_enforcement": "off",
+    "classic_required_contexts": [],
+    "classic_required_checks": [],
+    "ruleset_inventory": "not_directly_enumerated_by_current_connector",
+    "ruleset_configuration_evidence": {
+      "evidence_class": "founder_admin_ruleset_evidence",
+      "target": "default_main_only",
+      "pull_request_required": true,
+      "required_status_context": "CrownThrive governed merge gate",
+      "strict_up_to_date_with_main": true,
+      "force_pushes_allowed": false,
+      "branch_deletion_allowed": false,
+      "routine_bypass_disabled": true,
+      "bypass_authority": "explicit_D3_break_glass_only"
+    },
+    "ruleset_behavioral_evidence": {
+      "evidence_state": "passed",
+      "disposable_pr": 93,
+      "base_sha": "1a07a8755e3b18d01ec6720ec2522b1727780c01",
+      "governed_merge_run_id": 32226237376,
+      "required_job": "CrownThrive governed merge gate",
+      "required_job_id": 95986383138,
+      "required_job_conclusion": "failure",
+      "failure_cause": "deliberate_conflict_marker_test",
+      "provider_mergeable_state": "blocked",
+      "git_graph_mergeable": true,
+      "closed_without_merge": true
+    }
   },
-  "current_state": "agent_sovereign_policy_with_github_monitoring_scanning_and_post_merge_defense_in_depth",
-  "merge_gate_enforced": false,
-  "github_merge_gate_enforced": false,
+  "current_state": "ruleset_enforcement_behavior_verified_machine_reconciled",
+  "merge_gate_enforced": true,
+  "github_merge_gate_enforced": true,
   "agent_merge_policy": "fail_closed_quorum_and_validation",
-  "github_branch_protection_required_for_phase_3": false,
-  "policy_transition_enforcement": "agent_sovereign_with_independent_ci_and_security_evidence",
+  "github_branch_protection_required_for_phase_3": true,
+  "policy_transition_enforcement": "agent_sovereign_plus_required_provider_merge_perimeter",
   "agent_policy": {
     "decision_id": "CT-ADR-GOV-011",
     "eligible_voters": 5,
@@ -46,7 +79,8 @@
     "dependency_review_evidence": true,
     "secret_scanning_evidence_when_enabled": true,
     "post_merge_revalidation": true,
-    "branch_protection": "optional_defense_in_depth_not_trust_anchor"
+    "branch_protection": "required_defense_in_depth_merge_perimeter_not_trust_anchor",
+    "required_check_target": "CrownThrive governed merge gate"
   },
   "target": {
     "branch": "main",
@@ -54,12 +88,18 @@
     "agent_failed_validation_mergeability": "blocked",
     "agent_failed_security_scan_mergeability": "blocked_when_applicable",
     "post_merge_revalidation": true,
-    "github_branch_protection": "optional_defense_in_depth",
-    "bypass_authority": "explicit_D3_decision"
+    "github_branch_protection": "required_defense_in_depth",
+    "pull_request_required": true,
+    "strict_required_status_checks": true,
+    "required_status_context": "CrownThrive governed merge gate",
+    "force_pushes_allowed": false,
+    "branch_deletion_allowed": false,
+    "bypass_authority": "explicit_D3_break_glass_only"
   },
   "promotion_requirements": [
     "successful_institutional_validation",
     "successful_security_governance_validation",
+    "successful_always_run_governed_merge_gate",
     "applicable_provider_security_scan_evidence_or_documented_not_applicable",
     "risk_score_at_or_above_threshold",
     "required_specialist_endorsements",
@@ -67,11 +107,12 @@
     "independent_gatekeeper_approval",
     "rollback_or_recovery_path",
     "documentation_and_downstream_phase_reconciliation",
+    "github_main_required_check_enforcement_verified_before_phase_3",
     "reserved_human_authority_for_D3"
   ],
   "forbidden_promotions": [
     "github_ci_success_to_sovereign_authority",
-    "github_branch_unprotected_to_governance_failure_when_agent_policy_passes",
+    "github_branch_protection_to_sovereign_authority",
     "historical_to_current_without_effective_source_authority",
     "unverified_to_production_verified_without_runtime_evidence",
     "provider_capability_to_crownthrive_deployed_without_account_deployment_evidence",
@@ -81,6 +122,12 @@
     "agent_quorum_to_D3_authority_without_authorized_human",
     "security_failure_to_pass_by_disabling_or_weakening_the_check"
   ],
+  "known_provider_visibility_limitations": [
+    "classic_branch_protection_subobject_reports_off_no_contexts_while_ruleset_based_protection_is_active",
+    "ruleset_inventory_not_directly_enumerated_by_current_connector",
+    "codeql_alert_inventory_unavailable_to_current_audit_surface",
+    "secret_scanning_push_protection_inventory_unavailable_to_current_audit_surface"
+  ],
   "docs_impact": "docs_updated",
-  "phase_3_entry_effect": "github_branch_protection_nonblocking; other_phase_2_99_hard_exit_requirements_remain_binding"
+  "phase_3_entry_effect": "github_main_perimeter_verified; all_other_phase_2_99_hard_exit_requirements_remain_binding"
 }
