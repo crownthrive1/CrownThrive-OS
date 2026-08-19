@@ -42,7 +42,7 @@ It also establishes 12 governed non-voting subagents: Governance Marshal, Verifi
 
 The Governance Marshal may propose new non-voting subagents, validation patterns, evidence thresholds, retry budgets, refractory intervals, validators, and handoff routing as CrownThrive grows.
 
-Fluid areas remain bounded. Changes to the five sovereign voter identities, normal unanimity, the 2/3 deadlock-override floor, Agent D's independent gate, D3 human-reserved authority, no-secret-exposure rules, or no-security-weakening rules require founder authorization.
+Fluid areas remain bounded. The Governance Marshal can evolve implementation detail, but cannot self-amend the core constitution. Changes to the five sovereign voter identities, normal unanimity, the 2/3 deadlock-override floor, Agent D's independent gate, D3 human-reserved authority, or the secret/security non-weakening invariants require explicit founder authorization.
 
 Self-healing remains refractory and evidence-preserving:
 
