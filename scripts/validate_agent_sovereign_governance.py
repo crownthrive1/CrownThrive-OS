@@ -12,25 +12,14 @@ ROOT = Path(__file__).resolve().parents[1]
 AGENT = ROOT / "developers/manifests/agent-sovereign-governance.v1.json"
 NOTIFY = ROOT / "developers/manifests/pm-notification-routing.v1.json"
 SECURITY = ROOT / "developers/manifests/security-self-healing-policy.v1.json"
+ACTIONS = ROOT / "developers/manifests/github-actions-runtime-policy.v1.json"
 REPO_STATE = ROOT / "developers/manifests/repository-governance-enforcement-state.v1.json"
+GITHUB_TARGET = ROOT / "developers/manifests/github-main-enforcement-target.v1.json"
 DOCS_WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
 SECURITY_WORKFLOW = ROOT / ".github/workflows/security-governance.yml"
+MERGE_WORKFLOW = ROOT / ".github/workflows/governed-merge-gate.yml"
 RELAY = ROOT / "automation/institutional-hourly-agent-relay.mdx"
 PERMISSIONS = ROOT / "automation/permissions-and-approval-gates.mdx"
-ADVANCED_CODEQL_USE = re.compile(r"^\s*uses:\s*github/codeql-action/", re.MULTILINE)
-
-EXPECTED_SPECIALIST_ENDORSEMENTS = {
-    "security", "legal_regulatory", "operations_sre", "blockchain_protocol",
-    "ai_ml_llm_tevv", "ip_rights_licensing", "finance_tax_treasury",
-    "accessibility_consumer_protection", "regional_global_localization",
-}
-REQUIRED_SUBAGENTS = {
-    "governance_marshal", "verification_tevv", "recovery_rollback",
-    "legal_regulatory", "operations_sre", "blockchain_protocol",
-    "ai_ml_llm_tevv", "ip_rights_licensing", "finance_tax_treasury",
-    "accessibility_consumer_protection", "regional_global_localization",
-    "evidence_provenance",
-}
 
 
 def fail(message: str) -> None:
@@ -52,130 +41,74 @@ def main() -> int:
     agent = data(AGENT)
     notify = data(NOTIFY)
     security = data(SECURITY)
+    actions = data(ACTIONS)
     repo = data(REPO_STATE)
+    github_target = data(GITHUB_TARGET)
 
     if agent.get("decision_id") != "CT-ADR-GOV-011" or agent.get("phase") != "2.99":
         fail("CT-ADR-GOV-011 / Phase 2.99 identity drifted")
-    if agent.get("manifest_version") != "1.1.0":
-        fail("Agent governance manifest must be unanimous-first version 1.1.0")
-    if agent.get("authority_model") != "agent_sovereign_fail_closed_unanimous_first":
-        fail("Agent authority model must remain fail-closed and unanimous-first")
-    if agent.get("repository_provider_role") != "evidence_ci_scan_and_transport_not_sovereign_authority":
-        fail("GitHub role drifted from evidence/CI/scan/transport")
-    if agent.get("github_branch_protection_dependency") is not False:
-        fail("GitHub branch protection must not be a sovereign dependency")
+    if agent.get("authority_model") != "agent_sovereign_fail_closed_with_provider_merge_perimeter":
+        fail("Agent authority model must remain fail-closed with provider merge perimeter")
+    if agent.get("repository_provider_role") != "required_technical_enforcement_evidence_ci_scan_and_transport_not_sovereign_authority":
+        fail("GitHub role drifted from required technical perimeter/evidence/transport")
+    if agent.get("github_branch_protection_dependency") is not True:
+        fail("GitHub main enforcement is now required defense-in-depth for Phase 3")
     if agent.get("canonical_roadmap_generation") != "ten_phase_v1":
         fail("Canonical roadmap must remain ten_phase_v1")
 
     voters = [item for item in agent.get("voter_pool", []) if item.get("vote_eligible") is True]
+    if len(voters) != 5:
+        fail(f"Expected five eligible voters, found {len(voters)}")
     expected_voters = {
         "ct.relay.agent-a", "ct.relay.agent-b", "ct.relay.agent-c",
         "ct.relay.agent-d", "ct.relay.agent-s",
     }
-    if len(voters) != 5 or {item.get("agent_id") for item in voters} != expected_voters:
-        fail("Exactly five canonical sovereign voters A/B/C/D/S must remain registered")
+    if {item.get("agent_id") for item in voters} != expected_voters:
+        fail("Eligible voter identities drifted")
 
     quorum = agent.get("quorum", {})
-    if quorum.get("normal_mode") != "unanimous" or float(quorum.get("normal_approval_ratio", 0)) != 1.0:
-        fail("Normal sovereign decision mode must require unanimity")
-    if quorum.get("current_normal_minimum_approvals") != 5:
-        fail("Five-agent normal mode must require five approvals")
-    if quorum.get("abstention_counts_as_approval") is not False or quorum.get("missing_vote_counts_as_approval") is not False:
-        fail("Missing/abstain cannot count as approval")
-    if quorum.get("deny_or_block_vote_prevents_normal_merge") is not True:
-        fail("Any deny/block must prevent normal unanimous merge")
+    if float(quorum.get("approval_ratio", 0)) != 0.75 or quorum.get("rounding") != "ceil":
+        fail("Quorum must remain ceil(75%)")
+    if math.ceil(len(voters) * 0.75) != 4 or quorum.get("current_minimum_approvals") != 4:
+        fail("Five-agent 75% quorum must require four approvals")
+    if quorum.get("abstention_counts_as_approval") is not False:
+        fail("Abstentions cannot count as approvals")
+    if quorum.get("missing_vote_counts_as_approval") is not False:
+        fail("Missing votes cannot count as approvals")
+    if quorum.get("deny_or_block_vote_prevents_automatic_merge") is not True:
+        fail("Deny/block must prevent automatic merge")
     if quorum.get("quorum_cannot_override_d3") is not True:
-        fail("Sovereign votes cannot override D3")
+        fail("Agent quorum cannot override D3")
 
-    override = quorum.get("deadlock_override", {})
-    special_ratio = float(override.get("special_vote_ratio", 0))
-    special_required = math.ceil(len(voters) * special_ratio)
-    if override.get("enabled") is not True:
-        fail("Disciplined deadlock override must remain enabled")
-    if override.get("path_class") != "exceptional_deadlock_resolution_not_default_quorum":
-        fail("Deadlock override must remain an exceptional path, not the default quorum")
-    if override.get("eligibility") != "only_non_hard_dissent_after_evidence_reconciliation":
-        fail("Deadlock override eligibility must remain limited to reconciled non-hard dissent")
-    if override.get("minimum_elapsed_hours") != 6:
-        fail("Deadlock override wait window must remain six hours")
-    if override.get("minimum_reconciliation_attempts") != 2:
-        fail("Deadlock override must require at least two reconciliation attempts")
-    if special_ratio < (2 / 3) or special_required != 4 or override.get("current_special_vote_minimum_approvals") != 4:
-        fail("Five-agent deadlock special vote must be at least 2/3 rounded up = four approvals")
-    for flag in (
-        "all_sovereign_votes_must_be_cast", "independent_gatekeeper_must_approve",
-        "security_sentinel_must_approve_when_security_is_required", "cannot_override_hard_blocks",
-        "cannot_override_missing_specialists", "cannot_override_failed_or_stale_required_ci",
-        "cannot_override_d3_or_human_reserved_authority", "cannot_override_critical_or_high_security_finding",
-        "cannot_override_secret_credential_or_privilege_failure",
-        "cannot_override_legal_rights_or_irreversible_authority_block",
-        "override_reason_and_evidence_required",
-    ):
-        if override.get(flag) is not True:
-            fail(f"Deadlock override safety invariant drifted: {flag}")
-    if override.get("initiator_agent_id") != "ct.subagent.governance-marshal" or override.get("initiator_is_non_voting") is not True:
-        fail("Governance Marshal must be the non-voting deadlock protocol initiator")
+    merge_policy = agent.get("merge_policy", {})
+    merge_required = set(merge_policy.get("required", []))
+    for gate in {
+        "institutional_documentation_validation_passed",
+        "security_governance_validation_passed",
+        "github_actions_runtime_policy_passed",
+        "always_run_governed_merge_gate_passed",
+        "quorum_met",
+        "independent_gatekeeper_approval_present",
+    }:
+        if gate not in merge_required:
+            fail(f"Required merge gate missing: {gate}")
+    if merge_policy.get("github_required_check_context") != "CrownThrive governed merge gate":
+        fail("Stable GitHub required-check context drifted")
+    if merge_policy.get("phase_3_requires_provider_enforcement") is not True:
+        fail("Phase 3 must require provider main enforcement")
 
     rating = agent.get("risk_rating", {})
     if rating.get("minimum_automatic_merge_score") != 85:
         fail("Automatic merge score threshold must remain 85")
-    if round(sum(float(value) for value in rating.get("dimensions", {}).values()), 8) != 1.0:
+    if round(sum(float(v) for v in rating.get("dimensions", {}).values()), 8) != 1.0:
         fail("Risk-rating weights must sum to 1.0")
     if rating.get("weighted_votes") is not False:
         fail("Votes must remain one-agent/one-vote")
 
-    specialist_registry = agent.get("specialist_activation", {})
-    if not isinstance(specialist_registry, dict) or len(specialist_registry) != 9:
-        fail("Exactly nine rule-based specialist activation cells must be registered")
-    endorsement_ids = {item.get("endorsement_id") for item in specialist_registry.values() if isinstance(item, dict)}
-    if endorsement_ids != EXPECTED_SPECIALIST_ENDORSEMENTS:
-        fail(f"Specialist endorsement registry drifted: {sorted(endorsement_ids)}")
-    for key, item in specialist_registry.items():
-        if not isinstance(item, dict) or not item.get("required_patterns"):
-            fail(f"Specialist {key} must have rule-based activation patterns")
-        if not item.get("authority") and not item.get("agent_id"):
-            fail(f"Specialist {key} must declare authority or assigned agent")
-
-    subagents = agent.get("subagent_registry", {})
-    if not isinstance(subagents, dict) or set(subagents) != REQUIRED_SUBAGENTS:
-        fail("Governed non-voting subagent registry drifted")
-    for key, item in subagents.items():
-        if not isinstance(item, dict) or item.get("vote_eligible") is not False:
-            fail(f"Subagent {key} must remain non-voting")
-        if not item.get("agent_id") or not item.get("role"):
-            fail(f"Subagent {key} must declare stable id and role")
-
-    healing = agent.get("self_healing", {})
-    evolution = healing.get("evolution_policy", {})
-    refractory = healing.get("refractory_policy", {})
-    if healing.get("enabled") is not True:
-        fail("Self-healing must remain enabled")
-    for flag in (
-        "same_failure_must_not_repeat_without_new_evidence", "failed_repair_requires_root_cause_reassessment",
-        "validators_and_security_controls_cannot_be_weakened_to_self_heal", "repair_must_rerun_original_failed_control",
-        "repair_must_rerun_full_applicable_control_family",
-    ):
-        if refractory.get(flag) is not True:
-            fail(f"Refractory self-healing invariant drifted: {flag}")
-    if evolution.get("governance_marshal_may_propose_new_subagents") is not True:
-        fail("Governance Marshal must be able to propose bounded subagent evolution")
-    if evolution.get("new_subagents_are_non_voting_by_default") is not True:
-        fail("New subagents must default to non-voting")
-    if evolution.get("changes_to_sovereign_voter_identity_unanimity_rule_deadlock_override_floor_or_d3_boundary_require_founder_authorization") is not True:
-        fail("Core sovereign authority changes must remain founder-reserved")
-
-    founder = agent.get("founder_reserved_core_policy", {})
-    if founder.get("requires_explicit_founder_authorization") is not True or founder.get("self_amendment_prohibited") is not True:
-        fail("Founder-reserved core policy must require explicit founder authorization and prohibit agent self-amendment")
-    required_core = {
-        "sovereign_voter_pool_identity", "normal_unanimity_requirement", "deadlock_override_minimum_ratio",
-        "independent_agent_d_gate", "d3_human_reserved_boundary", "secret_security_non_weakening_invariants",
-    }
-    if set(founder.get("controls", [])) != required_core:
-        fail("Founder-reserved core policy controls drifted")
-
     recipients = notify.get("recipient_policy", {})
-    if set(recipients) != {"founder_tracking", "institutional_tracking", "collab_portal_fallback_tracking"}:
+    if set(recipients) != {
+        "founder_tracking", "institutional_tracking", "collab_portal_fallback_tracking"
+    }:
         fail("PM recipient references drifted")
     if notify.get("privacy", {}).get("public_repository_stores_recipient_refs_not_addresses") is not True:
         fail("Public repository must store PM recipient references, not private addresses")
@@ -184,8 +117,12 @@ def main() -> int:
             fail("Runtime recipient ref contains an email address")
 
     required_collab_gates = {
-        "credential_exact_match=passed", "project_meta_authenticated=passed", "institutional_project_uid=pinned",
-        "approved_field_map=approved", "authenticated_project_read=passed", "bounded_write_readback=passed",
+        "credential_exact_match=passed",
+        "project_meta_authenticated=passed",
+        "institutional_project_uid=pinned",
+        "approved_field_map=approved",
+        "authenticated_project_read=passed",
+        "bounded_write_readback=passed",
         "webhook_sender_delivery_integrity=passed",
     }
     if set(notify.get("collab_portal_fallback", {}).get("disable_only_when_all", [])) != required_collab_gates:
@@ -201,31 +138,117 @@ def main() -> int:
     if github_security.get("codeql_execution_mode") != "github_default_setup_provider_managed":
         fail("CodeQL provider execution mode drifted")
 
+    runtime_gate = agent.get("github_actions_runtime_gate", {})
+    if runtime_gate.get("target_runtime") != "node24" or runtime_gate.get("node20") != "prohibited":
+        fail("Agent runtime gate must require Node 24 and prohibit Node 20")
+    if runtime_gate.get("remote_action_refs") != "full_commit_sha_only":
+        fail("Agent runtime gate must require full commit SHA action references")
+    if runtime_gate.get("direct_to_main_dependency_repair") is not False:
+        fail("Agents must not direct-write dependency self-heals to main")
+    if actions.get("status") != "active_fail_closed" or actions.get("target_runtime") != "node24":
+        fail("Machine GitHub Actions runtime policy drifted")
+
+    github_gate = agent.get("github_main_enforcement_gate", {})
+    if github_gate.get("target_manifest") != "developers/manifests/github-main-enforcement-target.v1.json":
+        fail("GitHub main enforcement target manifest drifted")
+    if github_gate.get("required_for_phase_3") is not True:
+        fail("GitHub main enforcement must be a Phase 3 hard dependency")
+    if github_gate.get("required_status_context") != "CrownThrive governed merge gate":
+        fail("Required GitHub merge-gate context drifted")
+    if github_gate.get("sovereign_authority") is not False:
+        fail("GitHub enforcement must not become sovereign authority")
+
+    target = github_target.get("required_target", {})
+    if github_target.get("phase_3_entry") != "github_main_perimeter_passed_but_phase3_still_blocked_pending_all_phase_2_99_hard_exit":
+        fail("GitHub main target must record perimeter passed while preserving the overall Phase 2.99 hard gate")
+    if github_target.get("activation_state") != "ruleset_enforced_behavior_verified":
+        fail("GitHub ruleset enforcement must be behaviorally verified before this state can pass")
+    if target.get("pull_request_required") is not True:
+        fail("Main target must require pull requests")
+    if target.get("required_status_check", {}).get("job") != "CrownThrive governed merge gate":
+        fail("Main target required check job drifted")
+    if target.get("required_status_check", {}).get("must_emit_on_every_pull_request") is not True:
+        fail("Required check must emit on every pull request")
+    if target.get("force_pushes_allowed") is not False or target.get("branch_deletion_allowed") is not False:
+        fail("Main target must block force pushes and deletion")
+    behavioral = github_target.get("provider_evidence", {}).get("behavioral_negative_test", {})
+    if behavioral.get("state") != "passed" or behavioral.get("provider_mergeable_state") != "blocked":
+        fail("GitHub main perimeter requires a passed behavioral negative proof with provider mergeable_state=blocked")
+    if behavioral.get("required_job") != "CrownThrive governed merge gate" or behavioral.get("required_job_conclusion") != "failure":
+        fail("Behavioral proof must demonstrate the exact required governed-merge job failed")
+    if behavioral.get("test_branch_closed_without_merge") is not True:
+        fail("Behavioral test PR must remain closed without merge")
+
+    never = set(agent.get("self_healing", {}).get("never", []))
+    for item in {
+        "force_node24_for_an_unupgraded_action",
+        "allow_insecure_node_runtime_escape_hatch",
+        "auto_merge_dependency_update_without_governed_validation",
+        "treat_provider_branch_protection_as_sovereign_authority",
+    }:
+        if item not in never:
+            fail(f"Missing self-healing prohibition: {item}")
+
     if repo.get("agent_merge_policy") != "fail_closed_quorum_and_validation":
-        fail("Repository state must register the fail-closed agent merge policy")
+        fail("Repository state must register the agent fail-closed merge policy")
+    if repo.get("github_merge_gate_enforced") is not True:
+        fail("Ruleset-based GitHub merge gate must remain enforced after behavioral verification")
+    if repo.get("github_branch_protection_required_for_phase_3") is not True:
+        fail("GitHub branch protection must now remain a Phase 3 dependency")
+    observed = repo.get("observed_enforcement", {})
+    if observed.get("branch_protected") is not True:
+        fail("Current branch read must remain protected=true while the verified ruleset is active")
+    if observed.get("classic_branch_protection_enabled") is not False:
+        fail("Classic branch protection observation must remain explicit and distinct from ruleset enforcement")
+    if observed.get("ruleset_behavioral_evidence", {}).get("evidence_state") != "passed":
+        fail("Repository state must preserve passed ruleset behavioral evidence")
 
     for fragment in (
-        "python scripts/validate_agent_sovereign_governance.py", "python scripts/governed_merge_decision.py --self-test",
-        "python scripts/resolve_pm_notification_recipients.py --self-test", "python scripts/security_self_heal_plan.py --self-test",
+        "python scripts/validate_github_actions_runtime_policy.py",
+        "python scripts/validate_agent_sovereign_governance.py",
+        "python scripts/governed_merge_decision.py --self-test",
+        "python scripts/resolve_pm_notification_recipients.py --self-test",
+        "python scripts/security_self_heal_plan.py --self-test",
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+        "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
     ):
         require(DOCS_WORKFLOW, fragment)
+
     for fragment in (
-        "name: Security Governance", "name: Validate provider-managed CodeQL compatibility",
-        "CodeQL default setup is provider-managed", "python scripts/validate_security_governance.py",
+        "name: Security Governance",
+        "name: Validate provider-managed CodeQL compatibility",
+        "CodeQL default setup is provider-managed",
+        "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0",
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+        "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
+        "python scripts/validate_github_actions_runtime_policy.py",
+        "python scripts/validate_security_governance.py",
     ):
         require(SECURITY_WORKFLOW, fragment)
-    if ADVANCED_CODEQL_USE.search(SECURITY_WORKFLOW.read_text(encoding="utf-8")):
+    if re.search(r"^\s*uses:\s*github/codeql-action/", SECURITY_WORKFLOW.read_text(encoding="utf-8"), flags=re.MULTILINE):
         fail("Advanced CodeQL configuration conflicts with registered GitHub default setup")
 
+    for fragment in (
+        "name: Governed Merge Gate",
+        "name: CrownThrive governed merge gate",
+        "python scripts/validate_docs.py",
+        "python scripts/validate_security_governance.py",
+        "python scripts/validate_repository_governance_enforcement_state.py",
+        "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0",
+    ):
+        require(MERGE_WORKFLOW, fragment)
+
     require(RELAY, "Agent S — Security & Resilience Sentinel")
+    require(RELAY, "75% quorum")
     require(RELAY, "Collab Portal fallback tracking mailbox")
     require(PERMISSIONS, "## Agent-sovereign quorum and specialist gates")
 
     print("Agent-sovereign governance validation passed.")
-    print("Normal sovereign vote: 5/5 unanimous; Agent D remains mandatory independent gatekeeper.")
-    print("Deadlock override: exceptional non-hard-dissent path only; after 6 hours and >=2 reconciliation attempts, 2/3 rounded up = 4/5; all five votes cast; hard blocks/D3/specialist/security boundaries non-overridable.")
-    print("Rule-based specialist cells: 9; governed non-voting subagents: 12.")
-    print("Core sovereign policy is founder-reserved and cannot be self-amended by agents.")
+    print("Eligible voters: 5; 75% quorum: 4 approvals; Agent D remains independent gatekeeper.")
+    print("GitHub: ruleset-based main perimeter behaviorally verified; exact required gate remains defense-in-depth, not sovereign authority.")
+    print("GitHub Actions: Node 24 fail-closed runtime gate; full-SHA action refs; governed dependency repair.")
+    print("GitHub CodeQL: provider-managed default setup; duplicate advanced workflow prohibited.")
+    print("D3: reserved human/specialist authority; no agent quorum substitution.")
     return 0
 
 

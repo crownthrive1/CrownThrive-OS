@@ -45,8 +45,11 @@ def plan(findings: list[dict[str, Any]], policy: dict[str, Any]) -> dict[str, An
             needs_human = True
             action = "human_reserved_remediation"
         normalized.append({
-            "severity": sev, "rule_id": rule_id, "path": path,
-            "authority_class": authority, "autofix_safe": autofix_safe,
+            "severity": sev,
+            "rule_id": rule_id,
+            "path": path,
+            "authority_class": authority,
+            "autofix_safe": autofix_safe,
             "action": action,
         })
     normalized.sort(key=lambda x: (-RANK[x["severity"]], x["path"], x["rule_id"]))
@@ -60,17 +63,30 @@ def plan(findings: list[dict[str, Any]], policy: dict[str, Any]) -> dict[str, An
             "suppress_a_high_or_critical_finding_without_evidence",
             "expose_or_reconstruct_secrets",
             "self_approve_the_originating_material_change",
+            "force_node24_runtime_without_upgrading_the_action",
+            "allow_insecure_node_runtime_escape_hatch",
+            "direct_to_main_dependency_self_heal",
         ],
     }
 
 
 def self_test(policy: dict[str, Any]) -> None:
+    runtime_rule = "github_actions_node20_or_mutable_ref_drift"
     result = plan([
-        {"severity": "high", "rule_id": "x", "path": "a.py", "autofix_safe": True, "authority_class": "D1"},
+        {
+            "severity": "high",
+            "rule_id": runtime_rule,
+            "path": ".github/workflows/example.yml",
+            "autofix_safe": True,
+            "authority_class": "D1",
+        },
         {"severity": "low", "rule_id": "y", "path": "b.md", "autofix_safe": True, "authority_class": "D1"},
     ], policy)
     assert result["merge_blocked"] is True
+    assert result["findings"][0]["rule_id"] == runtime_rule
     assert result["findings"][0]["action"] == "bounded_patch_then_full_revalidation"
+    assert "rerun_github_actions_runtime_policy" in result["post_heal_requirements"]
+    assert "force_node24_runtime_without_upgrading_the_action" in result["prohibited_shortcuts"]
     d3 = plan([{"severity": "medium", "rule_id": "cred", "path": "runtime", "authority_class": "D3"}], policy)
     assert d3["human_authority_required"] is True
 
@@ -83,7 +99,7 @@ def main() -> int:
     policy = load(POLICY)
     if args.self_test:
         self_test(policy)
-        print("Security self-heal planner self-test passed; high/critical and D3 remain fail-closed.")
+        print("Security self-heal planner self-test passed; Node runtime drift is fail-closed and D3 remains human-reserved.")
         return 0
     if not args.findings_json:
         parser.error("--findings-json is required unless --self-test is used")
