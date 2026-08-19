@@ -1,16 +1,19 @@
 {
-  "manifest_version": "1.1.0",
+  "manifest_version": "1.2.0",
   "manifest_id": "ct.manifest.repository-governance-enforcement.v1",
   "source_id": "S106",
   "phase": "2.99",
   "repository": "crownthrive1/CrownThrive-Support",
   "branch": "main",
-  "observed_at": "2026-08-18/19",
+  "observed_at": "2026-08-19",
   "workflow": {
     "documentation_name": "Documentation Governance",
     "documentation_job": "Validate institutional documentation",
     "security_name": "Security Governance",
+    "governed_merge_name": "Governed Merge Gate",
+    "governed_merge_job": "CrownThrive governed merge gate",
     "pull_request_validation": true,
+    "pull_request_checks_always_emit": true,
     "push_to_main_revalidation": true,
     "scheduled_security_revalidation": true
   },
@@ -22,12 +25,12 @@
     "required_checks": [],
     "ruleset_inventory": "not_directly_enumerated_by_current_connector"
   },
-  "current_state": "agent_sovereign_policy_with_github_monitoring_scanning_and_post_merge_defense_in_depth",
+  "current_state": "always_run_pr_gates_bootstrapped_provider_main_enforcement_pending",
   "merge_gate_enforced": false,
   "github_merge_gate_enforced": false,
   "agent_merge_policy": "fail_closed_quorum_and_validation",
-  "github_branch_protection_required_for_phase_3": false,
-  "policy_transition_enforcement": "agent_sovereign_with_independent_ci_and_security_evidence",
+  "github_branch_protection_required_for_phase_3": true,
+  "policy_transition_enforcement": "agent_sovereign_plus_required_provider_merge_perimeter",
   "agent_policy": {
     "decision_id": "CT-ADR-GOV-011",
     "eligible_voters": 5,
@@ -46,7 +49,8 @@
     "dependency_review_evidence": true,
     "secret_scanning_evidence_when_enabled": true,
     "post_merge_revalidation": true,
-    "branch_protection": "optional_defense_in_depth_not_trust_anchor"
+    "branch_protection": "required_defense_in_depth_merge_perimeter_not_trust_anchor",
+    "required_check_target": "CrownThrive governed merge gate"
   },
   "target": {
     "branch": "main",
@@ -54,12 +58,18 @@
     "agent_failed_validation_mergeability": "blocked",
     "agent_failed_security_scan_mergeability": "blocked_when_applicable",
     "post_merge_revalidation": true,
-    "github_branch_protection": "optional_defense_in_depth",
-    "bypass_authority": "explicit_D3_decision"
+    "github_branch_protection": "required_defense_in_depth",
+    "pull_request_required": true,
+    "strict_required_status_checks": true,
+    "required_status_context": "CrownThrive governed merge gate",
+    "force_pushes_allowed": false,
+    "branch_deletion_allowed": false,
+    "bypass_authority": "explicit_D3_break_glass_only"
   },
   "promotion_requirements": [
     "successful_institutional_validation",
     "successful_security_governance_validation",
+    "successful_always_run_governed_merge_gate",
     "applicable_provider_security_scan_evidence_or_documented_not_applicable",
     "risk_score_at_or_above_threshold",
     "required_specialist_endorsements",
@@ -67,11 +77,12 @@
     "independent_gatekeeper_approval",
     "rollback_or_recovery_path",
     "documentation_and_downstream_phase_reconciliation",
+    "github_main_required_check_enforcement_verified_before_phase_3",
     "reserved_human_authority_for_D3"
   ],
   "forbidden_promotions": [
     "github_ci_success_to_sovereign_authority",
-    "github_branch_unprotected_to_governance_failure_when_agent_policy_passes",
+    "github_branch_protection_to_sovereign_authority",
     "historical_to_current_without_effective_source_authority",
     "unverified_to_production_verified_without_runtime_evidence",
     "provider_capability_to_crownthrive_deployed_without_account_deployment_evidence",
@@ -82,5 +93,5 @@
     "security_failure_to_pass_by_disabling_or_weakening_the_check"
   ],
   "docs_impact": "docs_updated",
-  "phase_3_entry_effect": "github_branch_protection_nonblocking; other_phase_2_99_hard_exit_requirements_remain_binding"
+  "phase_3_entry_effect": "blocked_until_github_main_required_check_enforcement_is_enabled_and_provider_verified; all_other_phase_2_99_hard_exit_requirements_remain_binding"
 }
