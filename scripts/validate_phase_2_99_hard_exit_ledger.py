@@ -33,6 +33,15 @@ ARTICLE_OPEN_FIELDS = (
     "navigation_or_intentionally_unlisted_795",
     "p0_p1_substantive_or_explicit_unresolved_closure",
 )
+CANONICAL_COLLAB = {
+    "credential_exact_match": "passed",
+    "project_meta_authenticated": "passed",
+    "institutional_project_uid": "passed",
+    "approved_field_map": "blocked",
+    "authenticated_project_read": "passed",
+    "bounded_write_readback": "closed",
+    "webhook_sender_delivery_integrity": "blocked",
+}
 
 
 def fail(message: str) -> None:
@@ -49,6 +58,8 @@ def require_equal(actual, expected, label: str) -> None:
 
 
 def validate(data: dict, root: Path, check_files: bool = True) -> None:
+    require_equal(data.get("manifest_version"), "1.1.0", "manifest version")
+
     authority = data.get("authority", {})
     for key, expected in {
         "roadmap_decision_id": "CT-ADR-ROADMAP-010",
@@ -122,31 +133,44 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
         True,
         "PR #64 -> issue #83 sequence",
     )
-    require_equal(
-        sequence.get("pr_66_issue_79", {}).get("critical_defense_in_depth_finding_resolved"),
-        False,
-        "integration-control RLS security disposition",
-    )
+    rls = sequence.get("pr_66_issue_79", {})
+    require_equal(rls.get("critical_defense_in_depth_finding_resolved"), True, "integration-control RLS resolution")
+    require_equal(rls.get("rls_enabled_on_all_six_tables"), True, "integration-control RLS table state")
+    require_equal(rls.get("client_acl_denial_preserved"), True, "integration-control client ACL denial")
+    require_equal(rls.get("service_role_smoke_passed"), True, "integration-control service-role smoke")
+    require_equal(rls.get("supabase_security_advisor_lints"), 0, "Supabase security-advisor lints")
+    require_equal(rls.get("machine_gate_state"), "passed", "integration-control machine gate")
+    if "founder_authorized_D3" not in str(rls.get("production_mutation_authority", "")):
+        fail("RLS production remediation must retain explicit founder D3 authority evidence")
 
     collab = data.get("collab_portal", {})
     require_equal(collab.get("state"), "fail_closed", "Collab Portal state")
+    require_equal(collab.get("canonical_predicate_count"), 7, "Collab canonical predicate count")
+    require_equal(collab.get("predicates_passed_count"), 4, "Collab passed predicate count")
     require_equal(
         collab.get("all_seven_certification_predicates_passed"),
         False,
         "Collab seven-predicate certification",
     )
+    for key, expected in CANONICAL_COLLAB.items():
+        require_equal(collab.get(key), expected, f"collab_portal.{key}")
+    require_equal(collab.get("request_budget_august", {}).get("consumed"), 9, "Collab request count")
+    require_equal(collab.get("request_budget_august", {}).get("limit"), 20000, "Collab request limit")
     require_equal(collab.get("private_fallback_tracking"), "active", "Collab fallback tracking")
 
     gates = data.get("open_hard_gates", [])
     gate_ids = [row.get("gate_id") for row in gates]
     if len(gates) < 8 or len(gate_ids) != len(set(gate_ids)):
         fail("hard-exit gate registry is incomplete or contains duplicate IDs")
+    by_id = {row["gate_id"]: row for row in gates}
+    require_equal(by_id["CT-P299-GATE-005"].get("state"), "pass", "RLS hard gate")
+    require_equal(by_id["CT-P299-GATE-006"].get("state"), "not_met", "Collab hard gate")
     blocking_open = [row for row in gates if row.get("blocking") is True and row.get("state") != "pass"]
-    if not blocking_open:
-        fail("observed ledger must preserve open blocking hard-exit gates")
+    require_equal(len(blocking_open), 7, "open blocking hard-exit gate count")
 
     hard_exit = data.get("hard_exit", {})
     require_equal(hard_exit.get("state"), "not_met", "Phase 2.99 hard exit")
+    require_equal(hard_exit.get("blocking_gate_count"), 7, "hard-exit blocking gate count")
     require_equal(hard_exit.get("phase_2_complete"), False, "Phase 2 completion")
     require_equal(hard_exit.get("phase_3_entry_open"), False, "Phase 3 entry-open flag")
     require_equal(
@@ -157,18 +181,13 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     require_equal(hard_exit.get("final_certification_recorded"), False, "final certification")
 
     ladder = data.get("external_assessment_ladder", {})
-    require_equal(
-        ladder.get("authority"),
-        "non_authoritative_progress_metric_only",
-        "external assessment authority",
-    )
-    grade = ladder.get("current_external_grade")
-    if not isinstance(grade, (int, float)) or isinstance(grade, bool) or not 0 <= grade <= 100:
-        fail("external grade observation must be numeric 0..100")
+    require_equal(ladder.get("authority"), "non_authoritative_progress_metric_only", "external assessment authority")
+    require_equal(ladder.get("current_external_grade"), 97, "external grade observation")
+    require_equal(ladder.get("current_external_letter_grade"), "A+", "external letter grade observation")
+    require_equal(ladder.get("97_certification_reconciliation_program_operating"), "observed", "97 assessment meaning")
     for key in (
-        "97_macro_certification",
-        "98_articleization_p0_p1_closure",
-        "99_final_adversarial_reconciliation",
+        "98_stable_id_provider_domain_api_export_identity_closure",
+        "99_articleization_specialists_agents_collab_retroactive_final_reconciliation",
         "100_phase_2_99_hard_exit_certification",
     ):
         require_equal(ladder.get(key), "not_met", f"external ladder {key}")
@@ -244,6 +263,16 @@ def self_test(data: dict) -> None:
         lambda d: d["articleization"].__setitem__("terminal_disposition_assigned_795", True),
         "false articleization completion",
     )
+    expect_failure(
+        data,
+        lambda d: d["collab_portal"].__setitem__("approved_field_map", "passed"),
+        "false Collab completion",
+    )
+    expect_failure(
+        data,
+        lambda d: d["repository_security_sequence"]["pr_66_issue_79"].__setitem__("critical_defense_in_depth_finding_resolved", False),
+        "stale RLS state",
+    )
 
 
 def main() -> int:
@@ -254,7 +283,7 @@ def main() -> int:
 
     if args.self_test:
         self_test(data)
-        print("Phase 2.99 closure-ledger self-test passed; false phase/count/article promotion remains blocked.")
+        print("Phase 2.99 closure-ledger self-test passed; stale RLS/Collab and false phase/count/article promotion remain blocked.")
         return 0
 
     validate(data, ROOT, check_files=True)
@@ -264,6 +293,7 @@ def main() -> int:
     )
     print("Phase 2.99 closure-ledger consistency validation: PASS")
     print(f"Open blocking hard-exit gates preserved: {open_count}")
+    print("RLS defense-in-depth gate: PASS; Collab Portal: 4/7 canonical predicates PASS, fail-closed.")
     print("Institutional state: Phase 2 / 2.99; Phase 3 blocked_pending_phase_2_99_hard_exit.")
     print("Important: validator PASS != Phase 2.99 hard-exit PASS.")
     return 0
