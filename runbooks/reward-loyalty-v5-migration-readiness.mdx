@@ -1,0 +1,195 @@
+---
+title: "Reward Loyalty v5 Migration Readiness"
+sidebarTitle: "Reward Loyalty v5 Migration"
+description: "Fail-closed migration-preparation runbook for moving My CrownRewards from the preserved Reward Loyalty v4 production estate to a separately certified v5 staging and production path."
+icon: "arrow-up-right-dots"
+---
+
+# Reward Loyalty v5 Migration Readiness
+
+## Objective
+
+Prepare **My CrownRewards / CrownRewards** for Reward Loyalty v5 without disturbing the currently preserved v4 production installation. Preparation is authorized. Purchase and production cutover are not authorized by this runbook.
+
+```yaml
+platform_id: ct.platform.crownrewards
+engine_id: S100-ENG-024
+current_production_family: v4
+target_family: v5
+preparation_authorized: true
+purchase_authorized: false
+production_cutover_authorized: false
+provider_writes_enabled: false
+```
+
+## Stage 0 — freeze and inventory
+
+Record, without exposing secrets:
+
+- current application version/build if discoverable;
+- hosting provider, hostname, PHP version and enabled extensions;
+- web server and `.htaccess` compatibility;
+- database engine/version and database size;
+- scheduler/cron state;
+- queue mode;
+- mail provider/configuration class;
+- storage/upload paths and sizes;
+- current custom themes, templates, plugins, code changes and local patches;
+- active partner/member/program/reward configuration;
+- current integrations, domains, webhooks, payment links and external scripts;
+- current data/export/restore methods.
+
+Any unknown remains `unknown`, never guessed.
+
+## Stage 1 — backup and restore proof
+
+Before staging migration:
+
+1. Export/backup the production database.
+2. Back up the complete application tree including hidden configuration files using a restricted recovery location.
+3. Back up user-upload/media directories.
+4. Record file/database hashes or equivalent evidence without copying credentials into documentation.
+5. Restore into an isolated non-public staging environment.
+6. Verify restored member, partner, program, card/reward, ledger/balance and media counts against the source snapshot.
+7. Record rollback owner and expected recovery time.
+
+A backup that has never been restored is not sufficient migration evidence.
+
+## Stage 2 — v5 runtime compatibility
+
+Current official v5 documentation requires PHP 8.4.1 or newer, HTTPS, and the provider-listed PHP extensions. Verify the actual staging host rather than assuming the production plan supports the target runtime.
+
+Required checks include:
+
+- PHP >= 8.4.1;
+- production-compatible MySQL/MariaDB target;
+- Apache/LiteSpeed rewrite support or equivalent governed configuration;
+- required PHP extensions;
+- writable Laravel storage/cache paths with least privilege;
+- HTTPS certificate and redirect;
+- scheduler capability, ideally every minute where hosting permits;
+- updater/manual-update path;
+- sufficient disk/temp space;
+- email/OTP delivery in staging.
+
+Do not modify production PHP solely to satisfy staging.
+
+## Stage 3 — private v5 staging
+
+- Use a private staging hostname/environment.
+- Install/deploy the entitled v5 package only after the package/license is available.
+- Do not enable demo data against copied production records.
+- Migrate configuration/data using provider-supported mechanisms.
+- Preserve the v4 source snapshot independently.
+- Keep external outgoing integrations disabled or pointed at dedicated sandbox/test destinations.
+
+## Stage 4 — reconciliation tests
+
+At minimum reconcile:
+
+- partners and partner roles;
+- members/accounts;
+- clubs/program structures;
+- loyalty cards/member cards;
+- points/reward balances and ledger/history;
+- earn/redemption rules;
+- reward catalog;
+- expiration/reversal/refund behavior;
+- QR/member-card behavior;
+- staff/admin roles and permissions;
+- email/OTP;
+- uploads/media;
+- reporting/analytics;
+- CrownThrive handoffs.
+
+Record count differences and semantic differences separately. A successful page load does not prove ledger equivalence.
+
+## Stage 5 — Agent API and REST certification
+
+The v5 Agent API is machine-to-machine and uses `X-Agent-Key`; the normal REST API remains a user/session-context integration surface.
+
+### Agent API first-enable rule
+
+The Agent API begins disabled. When staging is otherwise healthy:
+
+1. enable the feature only in staging;
+2. enable Agent API permission only for the intended staging partner/integration;
+3. create the narrowest key type that can perform the test;
+4. store the raw key only in Supabase Vault or another governed secret manager;
+5. register separate primary/recovery references;
+6. never log or persist the raw key in Mintlify/GitHub/email.
+
+### Read certification sequence
+
+1. `GET /api/agent/v1/health`
+2. inspect returned role/scopes/rate-limit/owner identity;
+3. retrieve `/api/agent/docs.json` and version/hash the schema;
+4. retrieve `/api/agent/v1/tools?format=generic`;
+5. retrieve `/api/agent/v1/tools?format=mcp`;
+6. compare provider tool exposure with key role/scopes;
+7. create a CrownThrive allowlist that is narrower than or equal to provider capability;
+8. perform bounded read-only calls only;
+9. validate output schemas, tenant/partner boundaries, timeouts and response-size limits.
+
+Provider tool discovery is capability evidence, not CrownThrive authorization.
+
+## Stage 6 — mutation TEVV
+
+Before any mutating loyalty operation is eligible for production:
+
+- duplicate/idempotent purchase events must not double-award;
+- replayed redemption requests must fail safely;
+- insufficient balance must fail closed;
+- stale/expired keys must fail;
+- wrong partner/member scope must fail;
+- rate-limit behavior must be deterministic;
+- mutations must receive authoritative readback/reconciliation;
+- reversals/refunds must preserve evidence and accounting relationship;
+- audit/event evidence must persist before a success is considered final;
+- outages/timeouts must not create ambiguous double execution.
+
+High-value adjustments, rule/economic changes and destructive actions remain separately governed.
+
+## Stage 7 — rollback drill
+
+Prove that CrownThrive can return to the preserved v4/known-good state or restore the v5 pre-cutover snapshot if production migration fails. Define:
+
+- database restore procedure;
+- application-file rollback;
+- DNS/hostname rollback if changed;
+- scheduler/queue restoration;
+- integration disable/re-enable order;
+- member/partner communication threshold;
+- ledger reconciliation after rollback.
+
+## Stage 8 — cutover gate
+
+Production cutover requires a separate explicit decision after the readiness evidence is complete.
+
+Required packet:
+
+```yaml
+backup_restore_proof: pass
+runtime_compatibility: pass
+staging_migration: pass
+data_reconciliation: pass
+security_privacy_regression: pass
+agent_api_read_certification: pass
+rate_idempotency_reconciliation: pass
+rollback_drill: pass
+purchase_or_license_entitlement: verified
+production_cutover_authority: required
+```
+
+Until then, My CrownRewards remains v4 in production and all Reward Loyalty v5 MCP/API mutation tools remain disabled.
+
+## Post-cutover
+
+After a separately authorized cutover:
+
+- rerun health, OpenAPI and tool-discovery checks;
+- compare production counts/balances/rules to the approved staging snapshot;
+- rotate or reissue production Agent API keys separately from staging;
+- enable only approved read tools first;
+- monitor ledger anomalies, scheduler/queue health and API errors;
+- update CrownRewards docs, changelog, THIVEBASE registry and CHLOM evidence in the same governed cycle.
