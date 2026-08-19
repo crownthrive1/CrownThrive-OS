@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Validate deterministic CrownThrive security-governance controls.
 
-This complements GitHub CodeQL, dependency review and provider secret scanning.
-It does not claim those provider scans ran merely because this validator passes.
+This complements GitHub provider-managed CodeQL default setup, dependency
+review, and provider secret scanning. It never synthesizes a provider scan pass.
 """
 
 from __future__ import annotations
@@ -41,16 +41,28 @@ def main() -> int:
     if policy["crypto_blockchain_guardrails"].get("phase_9_dependency") is not True:
         fail("advanced crypto/blockchain activation must remain Phase 9-gated")
 
+    github_evidence = policy.get("github_security_evidence", {})
+    if github_evidence.get("codeql") != "required_when_applicable":
+        fail("CodeQL evidence requirement drifted")
+    if github_evidence.get("codeql_execution_mode") != "github_default_setup_provider_managed":
+        fail("CodeQL execution mode must remain provider-managed default setup")
+    if github_evidence.get("advanced_codeql_workflow") != "prohibited_while_default_setup_enabled":
+        fail("Advanced CodeQL workflow conflict guard drifted")
+
     workflow = SECURITY_WORKFLOW.read_text(encoding="utf-8")
     for fragment in (
         "name: Security Governance",
-        "github/codeql-action/init@v4",
-        "github/codeql-action/analyze@v4",
+        "name: Validate provider-managed CodeQL compatibility",
+        "CodeQL default setup is provider-managed",
         "actions/dependency-review-action@v4",
+        "actions/checkout@v7",
+        "actions/setup-python@v7",
         "python scripts/validate_security_governance.py",
     ):
         if fragment not in workflow:
             fail(f"security workflow missing {fragment!r}")
+    if "github/codeql-action/" in workflow:
+        fail("Conflicting advanced CodeQL action detected while provider default setup is registered")
 
     findings = []
     for path in ROOT.rglob("*"):
@@ -71,7 +83,8 @@ def main() -> int:
 
     print("Deterministic security-governance validation passed.")
     print("No literal GitHub/OpenAI/Stripe high-risk token patterns detected.")
-    print("Provider CodeQL/dependency/secret scans remain independent evidence sources.")
+    print("CodeQL mode: GitHub provider-managed default setup; duplicate advanced setup prohibited.")
+    print("Provider CodeQL findings, dependency review, and secret scans remain independent evidence sources.")
     return 0
 
 
