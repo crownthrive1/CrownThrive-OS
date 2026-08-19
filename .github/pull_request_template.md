@@ -29,6 +29,16 @@ Describe the exact outcome and why this change is required.
 
 ## Institutional impact
 
+### Homepage, propagation, and control-plane state
+
+- Homepage impact: `updated | no_change | delta_opened`
+- Documentation impact: `docs_updated | docs_no_change | docs_delta_opened`
+- [ ] Current phase / hard-gate posture remains accurate
+- [ ] Material source pulls, provider/domain/API verification, roadmap changes, and corrections were propagated beyond directly edited files
+- [ ] Affected macro/corridor/platform/object/article/changelog/machine-seed/phase-gate records were updated or explicitly classified no-change
+- [ ] The homepage was updated when a headline institutional claim, primary control state, source census, ruleset posture, or primary navigation path changed
+- [ ] Evidence references support the propagation decision
+
 ### Rights, IP, culture, and canon
 
 - [ ] Chain of title / license scope checked where applicable
@@ -73,6 +83,7 @@ Describe the exact outcome and why this change is required.
 - [ ] Diff reviewed for unrelated changes
 - [ ] Internal links and navigation verified
 - [ ] Secret/template-residue checks pass
+- [ ] Homepage control-state invariant passes
 - [ ] Additional tests:
 
 Evidence / logs / screenshots / release references:
