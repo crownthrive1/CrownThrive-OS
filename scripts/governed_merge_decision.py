@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,34 @@ VALID_VOTES = {"approve", "deny", "block", "abstain"}
 def load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def normalize_domain(value: Any) -> str:
+    text = str(value).strip().lower()
+    return re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+
+
+def required_specialists_for(changed_domains: set[str], policy: dict[str, Any]) -> set[str]:
+    normalized_domains = {normalize_domain(value) for value in changed_domains if normalize_domain(value)}
+    required: set[str] = set()
+    registry = policy.get("specialist_activation", {})
+    if not isinstance(registry, dict):
+        return required
+
+    for specialist_key, config in registry.items():
+        if not isinstance(config, dict):
+            continue
+        endorsement_id = normalize_domain(config.get("endorsement_id", specialist_key))
+        patterns = {
+            normalize_domain(value)
+            for value in config.get("required_patterns", [])
+            if normalize_domain(value)
+        }
+        patterns.add(normalize_domain(specialist_key))
+        patterns.add(endorsement_id)
+        if normalized_domains & patterns:
+            required.add(endorsement_id)
+    return required
 
 
 def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
@@ -66,21 +95,9 @@ def decide(packet: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     risk_class = str(packet.get("risk_class", "")).upper()
     d3 = risk_class == "D3"
     hard_blocks = [str(x) for x in packet.get("hard_blocks", []) if str(x).strip()]
-    endorsements = set(map(str, packet.get("specialist_endorsements", [])))
-    changed_domains = set(map(str, packet.get("changed_domains", [])))
-
-    required_specialists: set[str] = set()
-    if changed_domains & {
-        "auth", "secret", "credential", "security", "crypto", "blockchain",
-        "wallet", "key", "production", "dependency", "workflow", "api"
-    }:
-        required_specialists.add("security")
-    if changed_domains & {
-        "license", "rights", "legal", "contract", "token", "cryptocurrency",
-        "securities", "investment", "royalty", "franchise", "privacy",
-        "cross-border", "sanctions", "aml", "kyc"
-    }:
-        required_specialists.add("legal_regulatory")
+    endorsements = {normalize_domain(value) for value in packet.get("specialist_endorsements", [])}
+    changed_domains = {str(value) for value in packet.get("changed_domains", [])}
+    required_specialists = required_specialists_for(changed_domains, policy)
 
     missing_endorsements = sorted(required_specialists - endorsements)
     gatekeeper_ok = votes_by_agent.get("ct.relay.agent-d") == "approve"
@@ -187,6 +204,49 @@ def self_test(policy: dict[str, Any]) -> None:
         "changed_domains": ["security"], "specialist_endorsements": [], "hard_blocks": []
     }, policy)
     assert security_without_specialist["agent_auto_merge_authorized"] is False
+    assert "security" in security_without_specialist["missing_specialists"]
+
+    blockchain_partial = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_domains": ["blockchain"], "specialist_endorsements": ["security"], "hard_blocks": []
+    }, policy)
+    assert blockchain_partial["agent_auto_merge_authorized"] is False
+    assert "blockchain_protocol" in blockchain_partial["missing_specialists"]
+
+    blockchain_full = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_domains": ["blockchain"],
+        "specialist_endorsements": ["security", "blockchain_protocol"], "hard_blocks": []
+    }, policy)
+    assert blockchain_full["agent_auto_merge_authorized"] is True
+
+    ip_partial = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_domains": ["rights"], "specialist_endorsements": ["legal_regulatory"], "hard_blocks": []
+    }, policy)
+    assert ip_partial["agent_auto_merge_authorized"] is False
+    assert "ip_rights_licensing" in ip_partial["missing_specialists"]
+
+    finance_without_specialist = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_domains": ["tax"], "specialist_endorsements": [], "hard_blocks": []
+    }, policy)
+    assert finance_without_specialist["agent_auto_merge_authorized"] is False
+    assert "finance_tax_treasury" in finance_without_specialist["missing_specialists"]
+
+    consumer_without_specialist = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_domains": ["accessibility"], "specialist_endorsements": [], "hard_blocks": []
+    }, policy)
+    assert consumer_without_specialist["agent_auto_merge_authorized"] is False
+    assert "accessibility_consumer_protection" in consumer_without_specialist["missing_specialists"]
+
+    regional_without_specialist = decide({
+        "risk_class": "D2", "scores": common_scores, "votes": four_yes,
+        "changed_domains": ["localization"], "specialist_endorsements": [], "hard_blocks": []
+    }, policy)
+    assert regional_without_specialist["agent_auto_merge_authorized"] is False
+    assert "regional_global_localization" in regional_without_specialist["missing_specialists"]
 
     d3 = decide({
         "risk_class": "D3", "scores": common_scores, "votes": four_yes,
@@ -204,7 +264,7 @@ def main() -> int:
     policy = load_json(MANIFEST)
     if args.self_test:
         self_test(policy)
-        print("Agent-sovereign merge-decision self-test passed: 75% quorum is 4/5; D3 cannot auto-merge.")
+        print("Agent-sovereign merge-decision self-test passed: 75% quorum is 4/5; all registered specialist gates enforce; D3 cannot auto-merge.")
         return 0
     if not args.packet:
         parser.error("--packet is required unless --self-test is used")
