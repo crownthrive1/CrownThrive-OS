@@ -1,0 +1,138 @@
+{
+  "manifest_version": "1.0.0",
+  "manifest_id": "ct.manifest.chlom-agent-identity-assurance.v1",
+  "authority_issue": 148,
+  "ip_governance_issue": 131,
+  "canonical_parent_repository": "crownthrive1/CrownThrive-Support",
+  "supabase_project_ref": "tzajnzshmtzjenqulehq",
+  "public_directory_url": "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/public-agent-identity-directory",
+  "source_contract": {
+    "public_did": true,
+    "fingerprint_id_public": false,
+    "fingerprint_commitment_public": false,
+    "credentials_public": false,
+    "public_did_note": "CHLOM source doctrine permits the public-facing DID while keeping Fingerprint ID private. Current did:chlom records remain candidate/internal until an accepted resolver method makes them externally resolvable."
+  },
+  "auto_assignment": {
+    "source_table": "institutional_federation.repository_agent_bindings",
+    "identity_registry": "chlom_identity.agent_identity_records",
+    "did_registry": "chlom_identity.did_bindings",
+    "private_attestation_history": "chlom_identity.agent_identity_attestations",
+    "public_projection": "public.ct_public_agent_identity_directory",
+    "on_agent_binding": true,
+    "on_repository_identity_change": true,
+    "on_repository_heartbeat": true,
+    "uuid_generated": true,
+    "sha256_public_identity_digest": true,
+    "private_fingerprint_commitment": true
+  },
+  "public_required_fields": [
+    "agent_uuid",
+    "repo_id",
+    "agent_id",
+    "did_uri",
+    "did_state",
+    "github_repository_id",
+    "repo_full_name",
+    "head_sha",
+    "heartbeat_at",
+    "heartbeat_fresh",
+    "public_identity_digest_sha256",
+    "assurance_state"
+  ],
+  "private_prohibited_public_fields": [
+    "fingerprint_record_uuid",
+    "fingerprint_salt",
+    "fingerprint_commitment_sha256",
+    "key_ref",
+    "private_key",
+    "secret",
+    "seed",
+    "mnemonic",
+    "credential"
+  ],
+  "lifecycle_rules": {
+    "prospective_unprovisioned": {
+      "did_and_uuid_required": true,
+      "public_digest_required": true,
+      "github_repository_id_must_be_null": true,
+      "head_sha_may_be_null": true,
+      "heartbeat_may_be_null": true,
+      "operational_claim_allowed": false
+    },
+    "transport_verified_current": {
+      "github_repository_id_required": true,
+      "head_sha_required": true,
+      "heartbeat_required": true,
+      "heartbeat_must_be_fresh": true,
+      "public_digest_required": true,
+      "did_required": true
+    }
+  },
+  "documentation_review": {
+    "hard_gate": true,
+    "validator": "scripts/chlom_identity_assurance.py",
+    "workflow": ".github/workflows/docs-governance.yml",
+    "missing_public_identity_fields": "FAIL",
+    "fingerprint_or_secret_leak": "FAIL",
+    "active_agent_without_repository_sha_or_heartbeat": "FAIL",
+    "planned_child_claimed_operational_without_physical_repository": "FAIL",
+    "fresh_heartbeat_required_on_default_branch_runtime_check": true
+  },
+  "assigned_agents": [
+    {
+      "agent_id": "ct.agent.framework-factory",
+      "role": "orchestrate identity-assurance contract across framework children",
+      "vote_effect": "none"
+    },
+    {
+      "agent_id": "ct.subagent.governance-marshal",
+      "role": "auto-register and reconcile non-voting D0-D2 agent bindings",
+      "vote_effect": "none"
+    },
+    {
+      "agent_id": "ct.subagent.evidence-provenance",
+      "role": "verify source lineage, UUID/DID binding and digest provenance",
+      "vote_effect": "none"
+    },
+    {
+      "agent_id": "ct.subagent.verification-tevv",
+      "role": "independently verify identity fields, SHA linkage and heartbeat behavior",
+      "vote_effect": "none"
+    },
+    {
+      "agent_id": "ct.subagent.operations-sre",
+      "role": "monitor heartbeat freshness, drift and recovery",
+      "vote_effect": "none"
+    },
+    {
+      "agent_id": "ct.subagent.blockchain-protocol",
+      "role": "review DID/cryptographic method correctness without exposing Fingerprint internals",
+      "vote_effect": "none"
+    },
+    {
+      "agent_id": "ct.agent.documentation-sentinel",
+      "role": "block stale or incomplete public identity documentation",
+      "vote_effect": "none"
+    },
+    {
+      "agent_id": "ct.agent.documentation-steward",
+      "role": "maintain the public-safe identity documentation projection",
+      "vote_effect": "none"
+    },
+    {
+      "agent_id": "ct.relay.agent-d",
+      "role": "independent parent certification after repository/OIDC/identity evidence passes",
+      "vote_effect": "existing constitutional vote only"
+    }
+  ],
+  "authority_locks": {
+    "identity_record_creates_vote": false,
+    "did_creates_vote": false,
+    "heartbeat_creates_vote": false,
+    "repository_id_creates_vote": false,
+    "fingerprint_record_creates_vote": false,
+    "d3_human_reserved": true,
+    "agent_d_parent_certification_required": true
+  }
+}
