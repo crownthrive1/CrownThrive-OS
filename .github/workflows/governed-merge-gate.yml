@@ -25,9 +25,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Pull-request checkout uses a synthetic merge commit. Depth 2 retains
-          # both exact parents so the trusted base/head diff can be derived
-          # without granting network/API authority to the decision engine.
           fetch-depth: 2
 
       - name: Set up Python
@@ -47,10 +44,15 @@ jobs:
           python -m py_compile scripts/validate_repository_governance_enforcement_state.py
           python -m py_compile scripts/validate_phase_namespace_and_api_control.py
           python -m py_compile scripts/validate_agent_sovereign_governance.py
+          python -m py_compile scripts/validate_agent_sovereign_governance_v2.py
           python -m py_compile scripts/validate_security_governance.py
           python -m py_compile scripts/validate_github_actions_runtime_policy.py
           python -m py_compile scripts/governed_merge_decision.py
+          python -m py_compile scripts/governed_merge_decision_v2.py
           python -m py_compile scripts/governed_current_pr_preflight.py
+          python -m py_compile scripts/governed_current_pr_preflight_v2.py
+          python -m py_compile scripts/cie_scan.py
+          python -m py_compile scripts/validate_cie_framework_agent.py
           python -m py_compile scripts/resolve_pm_notification_recipients.py
           python -m py_compile scripts/security_self_heal_plan.py
 
@@ -67,7 +69,11 @@ jobs:
             --verify-git-diff \
             --git-base "$CT_GIT_BASE_SHA" \
             --git-head "$CT_GIT_HEAD_SHA"
-          python scripts/governed_current_pr_preflight.py \
+          python scripts/governed_merge_decision_v2.py \
+            --verify-git-diff \
+            --git-base "$CT_GIT_BASE_SHA" \
+            --git-head "$CT_GIT_HEAD_SHA"
+          python scripts/governed_current_pr_preflight_v2.py \
             --git-base "$CT_GIT_BASE_SHA" \
             --git-head "$CT_GIT_HEAD_SHA"
 
@@ -95,13 +101,23 @@ jobs:
       - name: Validate ten-phase namespace and API/MCP control plane
         run: python scripts/validate_phase_namespace_and_api_control.py
 
-      - name: Validate agent-sovereign governance
+      - name: Validate predecessor agent-sovereign governance
         run: python scripts/validate_agent_sovereign_governance.py
+
+      - name: Validate CIE framework contract and scanner
+        run: |
+          python scripts/cie_scan.py --self-test
+          python scripts/validate_cie_framework_agent.py
+
+      - name: Validate foundational framework governance v2
+        run: |
+          python scripts/validate_agent_sovereign_governance_v2.py
+          python scripts/governed_merge_decision_v2.py --self-test
 
       - name: Validate deterministic security governance
         run: python scripts/validate_security_governance.py
 
-      - name: Validate sovereign merge decision invariants
+      - name: Validate predecessor sovereign merge decision invariants
         run: python scripts/governed_merge_decision.py --self-test
 
       - name: Validate PM routing invariants
