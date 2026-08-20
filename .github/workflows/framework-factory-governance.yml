@@ -1,0 +1,74 @@
+name: Framework Factory Governance
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/framework-factory.v1.json"
+      - "automation/framework-factory.mdx"
+      - "scripts/framework_factory.py"
+      - "developers/manifests/repository-federation.v1.json"
+      - "scripts/validate_repository_federation.py"
+      - ".github/workflows/framework-factory-governance.yml"
+  push:
+    branches:
+      - main
+      - "admin-mcp/**"
+    paths:
+      - "developers/manifests/framework-factory.v1.json"
+      - "automation/framework-factory.mdx"
+      - "scripts/framework_factory.py"
+      - "developers/manifests/repository-federation.v1.json"
+      - "scripts/validate_repository_federation.py"
+      - ".github/workflows/framework-factory-governance.yml"
+  schedule:
+    - cron: "37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: framework-factory-governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-framework-factory:
+    name: Validate Framework Factory
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile Framework Factory controls
+        run: |
+          python -m py_compile scripts/framework_factory.py
+          python -m py_compile scripts/validate_repository_federation.py
+
+      - name: Validate Framework Factory manifest
+        run: python scripts/framework_factory.py --validate
+
+      - name: Run Framework Factory invariant self-test
+        run: python scripts/framework_factory.py --self-test
+
+      - name: Emit the next bounded safe packet
+        run: python scripts/framework_factory.py --next
+
+      - name: Validate repository-federation dependency
+        run: python scripts/validate_repository_federation.py
+
+      - name: Verify Convergent Ecosystem plan remains blocked from sovereign activation
+        run: python scripts/framework_factory.py --plan ct.framework.convergent-ecosystem
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
