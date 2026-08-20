@@ -65,6 +65,25 @@ SECRET_PATTERNS = (
     ),
 )
 
+PRIVATE_LOCATOR_PATTERNS = (
+    re.compile(
+        r"(?i)https?://(?:drive|docs)\.google\.com/(?:"
+        r"file/d/|drive/(?:u/\d+/)?folders/|document/d/|spreadsheets/d/|"
+        r"presentation/d/|open\?id=)[A-Za-z0-9_-]{10,}"
+    ),
+    re.compile(r"(?i)https?://[a-z0-9-]+\.supabase\.co/storage/v1/object/"),
+    re.compile(r"(?i)\bsupabase(?:_storage)?://\S+"),
+    re.compile(
+        r"(?i)\b(?:private[_-]?)?(?:drive[_-]?)?(?:file|folder|object|bucket|project)"
+        r"[_-]?id\s*[:=]\s*['\"]?[A-Za-z0-9_-]{10,}"
+    ),
+    re.compile(r"(?i)\bobject[_-]?path\s*[:=]\s*['\"]?[^\s'\"]{3,}"),
+    re.compile(
+        r"(?i)(?:[?&](?:token|sig|signature|x-amz-signature|x-amz-credential|apikey)="
+        r"[A-Za-z0-9%+/_=-]{8,})"
+    ),
+)
+
 
 def add_error(errors: list[str], message: str) -> None:
     errors.append(message)
@@ -311,6 +330,20 @@ def validate_schema_contract(schema: dict[str, Any]) -> list[str]:
         elif definition.get("additionalProperties") is not False:
             add_error(errors, f"{SCHEMA_PATH}: $defs.{name}.additionalProperties must be false")
 
+    require_equal(
+        errors,
+        nested(
+            schema,
+            "$defs",
+            "sourceRecord",
+            "properties",
+            "public_reference",
+            "x-crownthrive-private-provider-locators",
+        ),
+        "prohibited",
+        f"{SCHEMA_PATH}: public_reference private-provider-locator policy",
+    )
+
     forbidden_exact = {
         "api_key",
         "access_token",
@@ -498,10 +531,32 @@ def validate_record_semantics(record: dict[str, Any]) -> list[str]:
     return errors
 
 
+def iter_record_strings(value: Any, location: str = "record") -> Iterable[tuple[str, str]]:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from iter_record_strings(child, f"{location}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from iter_record_strings(child, f"{location}[{index}]")
+    elif isinstance(value, str):
+        yield location, value
+
+
+def validate_public_safe_record_values(record: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    for location, value in iter_record_strings(record):
+        if any(pattern.search(value) for pattern in SECRET_PATTERNS):
+            add_error(errors, f"{location}: credential-like value is forbidden")
+        if any(pattern.search(value) for pattern in PRIVATE_LOCATOR_PATTERNS):
+            add_error(errors, f"{location}: private provider locator is forbidden")
+    return errors
+
+
 def validate_record(record: dict[str, Any], schema: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     validate_instance(record, schema, schema, "record", errors)
     errors.extend(validate_record_semantics(record))
+    errors.extend(validate_public_safe_record_values(record))
     return errors
 
 
@@ -570,6 +625,11 @@ def validate_secret_absence(root: Path, errors: list[str]) -> None:
             if match:
                 line = text.count("\n", 0, match.start()) + 1
                 add_error(errors, f"{relative_path}:{line}: credential-like material is forbidden")
+        for pattern in PRIVATE_LOCATOR_PATTERNS:
+            match = pattern.search(text)
+            if match:
+                line = text.count("\n", 0, match.start()) + 1
+                add_error(errors, f"{relative_path}:{line}: private provider locator is forbidden")
 
 
 def validate_packet(root: Path) -> tuple[list[str], dict[str, Any], dict[str, Any]]:
@@ -698,6 +758,18 @@ def run_self_test(
     secret_field = copy.deepcopy(valid_record)
     secret_field["api_key"] = "not-a-real-secret"
     expect_failure("schema secret field", validate_record(secret_field, schema), errors)
+
+    secret_value = copy.deepcopy(valid_record)
+    secret_value["source_records"][0]["public_reference"] = (
+        "gh" + "p_" + ("A" * 40)
+    )
+    expect_failure("secret in allowed value", validate_record(secret_value, schema), errors)
+
+    private_locator = copy.deepcopy(valid_record)
+    private_locator["source_records"][0]["public_reference"] = (
+        "https://drive." + "google.com/file/d/" + ("A" * 24)
+    )
+    expect_failure("private locator in allowed value", validate_record(private_locator, schema), errors)
 
     verified_without_digest = copy.deepcopy(valid_record)
     verified_without_digest["versions"][0]["sha256"] = None
