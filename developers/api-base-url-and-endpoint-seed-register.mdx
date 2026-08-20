@@ -444,6 +444,79 @@ state:
 
 Current public API families include Campaigns, Campaign notifications, Notification handlers and Custom domains. Full API documentation, concrete schemas, delivery side effects, rate limits, consent/suppression behavior and provider integrations still require verification.
 
+## Phase 2.99 API control-plane reconciliation — August 19, 2026
+
+### ThrivePush
+
+```yaml
+platform_id: ct.platform.thrivepush
+service_id: thrivepush
+base_url: https://thrivepush.io/api
+docs_url: https://thrivepush.io/api-documentation
+auth_scheme: bearer_api_key
+timezone: UTC
+credential_ref: vault:thrivepush_api_key
+credential_vault_binding: blocked_pending_approved_secret_write
+adapter: thrivepush-api-control@1
+adapter_scaffold: passed
+provider_dispatch: disabled
+authenticated_read: open
+provider_writes: closed
+service_worker:
+  repository_path: developers/assets/thrivepush/thrivepusher.js
+  sha256: 19970f0e27cb3eb4d17fb093a25fb0efd7208b36e1336578616d96d8d6ef4788
+  supabase_mirror: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/thrivepush-service-worker
+```
+
+Current documented families are User, Websites, Subscribers, Subscribers statistics/logs, Campaigns, Personal notifications, RSS automations, Recurring campaigns, Flows, Segments, Notification handlers, Custom domains, My teams, Team members, Teams member, Account payments and Account logs. Exact concrete paths/methods/schemas remain to be extracted. See [ThrivePush API Adapter](/developers/thrivepush-api-adapter).
+
+### CrownLytics
+
+```yaml
+platform_id: ct.platform.crownlytics
+service_id: crownlytics
+base_url: https://crownlytics.com/api
+docs_url: https://crownlytics.com/api-documentation
+auth_scheme: bearer_api_key
+timezone: UTC
+credential_ref: vault:crownlytics_api_key
+credential_vault_binding: blocked_pending_approved_secret_write
+adapter: crownlytics-api-control@1
+adapter_scaffold: passed
+provider_dispatch: disabled
+authenticated_read: open
+provider_writes: closed
+branding_context_reconciliation: open
+```
+
+Current documented families are User, Websites, Pageviews, Visitors, Goals, Goal conversions, Annotations, Website statistics, Custom domains, Account payments and Account logs. The founder-supplied capture's `locticians.com` chrome is preserved as source-context drift; current first-party API identity remains CrownLytics. See [CrownLytics API Adapter](/developers/crownlytics-api-adapter).
+
+### CrownPulse privileged Admin API
+
+```yaml
+platform_id: ct.platform.crownpulse
+service_id: crownpulse_admin
+api_surface: privileged_admin
+base_url: https://crownpulse.com/admin-api
+docs_url: https://crownpulse.com/admin/api-documentation
+auth_scheme: bearer_api_key
+credential_ref: vault:crownpulse_admin_api_key
+credential_vault_binding: blocked_pending_approved_secret_write
+adapter: crownpulse-admin-api-control@1
+adapter_scaffold: passed
+provider_dispatch: disabled
+authenticated_admin_read: open
+privileged_mutations: closed
+provider_lineage: AltumCode
+update_available_observed: v61.0.0
+installed_version: unverified
+support_status_observed: expired
+```
+
+The supplied Admin API explicitly covers Users, Plans, Payments and Domains. User/domain mutations and one-time-login generation remain D2/D3 closed. The v61.0.0 notice is an available-update observation rather than installed-version proof. See [CrownPulse Admin API Adapter](/developers/crownpulse-admin-api-adapter).
+
+For all three services, founder-supplied raw keys are restricted runtime material. The connected secret-write path rejected direct Vault insertion, so no key is claimed stored; provider dispatch remains fail-closed until an approved secret-binding action succeeds.
+
 ## CrownThrive IO and domains
 
 Phase 2.98 verified the current public CrownThrive IO host and API documentation.
