@@ -51,9 +51,14 @@ jobs:
           python -m py_compile scripts/validate_repository_governance_enforcement_state.py
           python -m py_compile scripts/validate_phase_namespace_and_api_control.py
           python -m py_compile scripts/validate_agent_sovereign_governance.py
+          python -m py_compile scripts/validate_agent_sovereign_governance_v2.py
           python -m py_compile scripts/validate_security_governance.py
           python -m py_compile scripts/validate_github_actions_runtime_policy.py
           python -m py_compile scripts/governed_merge_decision.py
+          python -m py_compile scripts/governed_merge_decision_v2.py
+          python -m py_compile scripts/governed_current_pr_preflight_v2.py
+          python -m py_compile scripts/cie_scan.py
+          python -m py_compile scripts/validate_cie_framework_agent.py
           python -m py_compile scripts/resolve_pm_notification_recipients.py
           python -m py_compile scripts/security_self_heal_plan.py
 
@@ -84,13 +89,23 @@ jobs:
       - name: Validate ten-phase namespace and API/MCP control plane
         run: python scripts/validate_phase_namespace_and_api_control.py
 
-      - name: Validate agent-sovereign governance
+      - name: Validate predecessor agent-sovereign governance
         run: python scripts/validate_agent_sovereign_governance.py
+
+      - name: Validate CIE framework contract and scanner
+        run: |
+          python scripts/cie_scan.py --self-test
+          python scripts/validate_cie_framework_agent.py
+
+      - name: Validate foundational framework governance v2
+        run: |
+          python scripts/validate_agent_sovereign_governance_v2.py
+          python scripts/governed_merge_decision_v2.py --self-test
 
       - name: Validate deterministic security governance
         run: python scripts/validate_security_governance.py
 
-      - name: Validate agent merge decision invariants
+      - name: Validate predecessor agent merge decision invariants
         run: python scripts/governed_merge_decision.py --self-test
 
       - name: Validate PM notification routing invariants
