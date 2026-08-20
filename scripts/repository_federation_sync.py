@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """CrownThrive repository-federation API client.
 
-The client uses GitHub Actions OIDC. It never accepts a long-lived Supabase or
-federation secret. Repository identity is proved by the GitHub-issued token and
-authority is resolved by the parent-governed runtime registry.
+GitHub Actions OIDC proves repository identity. The federation runtime then
+requires a governed repository<->agent binding for every agent-scoped action.
+No long-lived federation or Supabase credential is accepted by this client.
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 FEDERATION_MANIFEST = ROOT / "developers/manifests/repository-federation.v1.json"
+AGENT_BINDINGS = ROOT / "developers/manifests/agent-federation-bindings.v1.json"
 DEFAULT_FEDERATION_URL = "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus"
 OIDC_AUDIENCE = "crownthrive-repository-federation"
 MAX_RESPONSE_BYTES = 256 * 1024
@@ -67,7 +68,7 @@ def federation_call(action: str, payload: dict[str, Any], *, federation_url: str
     req = urllib.request.Request(
         url,
         data=data,
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "CrownThrive-Repository-Federation/1.0"},
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "CrownThrive-Repository-Federation/1.1"},
         method="POST",
     )
     try:
@@ -89,12 +90,37 @@ def redact_for_ci(value: dict[str, Any]) -> dict[str, Any]:
     result = json.loads(json.dumps(value))
     payload = result.get("result")
     if isinstance(payload, dict) and isinstance(payload.get("messages"), list):
-        result["result"] = {"repo_id": payload.get("repo_id"), "message_count": len(payload["messages"]), "messages_redacted": True}
+        result["result"] = {
+            "repo_id": payload.get("repo_id"),
+            "agent_id": payload.get("agent_id"),
+            "message_count": len(payload["messages"]),
+            "messages_redacted": True,
+        }
     return result
+
+
+def default_sync_bindings() -> list[dict[str, Any]]:
+    inventory = json_load(AGENT_BINDINGS)
+    rows = inventory.get("parent_non_voting_transport_bindings", [])
+    if not isinstance(rows, list):
+        raise ValueError("agent_binding_inventory_invalid")
+    output: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("agent_binding_row_invalid")
+        output.append({
+            "agent_id": str(row.get("agent_id", "")),
+            "agent_role": str(row.get("role", "")),
+            "source_ref": str(row.get("source_ref", "")),
+            "authority_ceiling": str(row.get("authority_ceiling", "D2")),
+            "metadata": ({"legacy_role_label": row["legacy_role_label"]} if row.get("legacy_role_label") else {}),
+        })
+    return output
 
 
 def self_test() -> None:
     manifest = json_load(FEDERATION_MANIFEST)
+    inventory = json_load(AGENT_BINDINGS)
     auth = manifest["runtime"]["auth"]
     assert auth["scheme"] == "github_actions_oidc"
     assert auth["audience"] == OIDC_AUDIENCE
@@ -104,14 +130,27 @@ def self_test() -> None:
     assert child["operationally_enabled"] is False
     assert manifest["framework_child_policy"]["transport_messages_create_votes"] is False
     assert manifest["framework_child_policy"]["framework_subagents_create_votes"] is False
+    assert inventory["rules"]["agent_repository_binding_required"] is True
+    assert inventory["rules"]["non_voting_sync_may_not_create_vote"] is True
+    assert inventory["rules"]["child_certification_agent"] == "ct.relay.agent-d"
+    assert all(item.get("vote_eligible") is not True for item in inventory["parent_non_voting_transport_bindings"])
+    prospective = inventory["prospective_cie_child_bindings"]
+    assert prospective[0]["agent_id"] == "ct.framework-agent.cie" and prospective[0]["binding_state"] == "prospective"
+    assert all(item["vote_eligible"] is False for item in prospective[1:])
     forbidden_static = "SUPABASE_" + "SERVICE_ROLE_KEY"
     assert forbidden_static not in Path(__file__).read_text(encoding="utf-8")
-    print(f"Repository federation client self-test PASS: OIDC-only; contract_sha256={manifest_digest()}; pending child remains disabled; message ACK lifecycle supported.")
+    print(
+        "Repository federation client self-test PASS: OIDC + repository-agent bindings; "
+        f"contract_sha256={manifest_digest()}; non-voting sync bounded; pending CIE child disabled."
+    )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", nargs="?", choices=("state", "bootstrap", "heartbeat", "publish", "pull", "ack", "reference", "authority", "cie-score", "certify-child"))
+    parser.add_argument("command", nargs="?", choices=(
+        "state", "bootstrap", "heartbeat", "publish", "pull", "ack", "reference",
+        "authority", "cie-score", "certify-child", "sync-agents",
+    ))
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--agent-id")
     parser.add_argument("--input", type=Path)
@@ -156,9 +195,16 @@ def main() -> int:
     elif action == "publish":
         if not args.message_type:
             parser.error("--message-type required")
-        payload = {"agent_id": agent_id, "receiver_repo_id": args.receiver_repo_id, "message_type": args.message_type, "severity": args.severity, "payload": json_load(args.input) if args.input else {}, "requires_ack": args.requires_ack}
+        payload = {
+            "agent_id": agent_id,
+            "receiver_repo_id": args.receiver_repo_id,
+            "message_type": args.message_type,
+            "severity": args.severity,
+            "payload": json_load(args.input) if args.input else {},
+            "requires_ack": args.requires_ack,
+        }
     elif action == "pull":
-        payload = {"limit": max(1, min(args.limit, 200))}
+        payload = {"agent_id": agent_id, "limit": max(1, min(args.limit, 200))}
     elif action == "ack":
         if not args.message_id or not args.ack_state:
             parser.error("--message-id and --ack-state required")
@@ -167,7 +213,16 @@ def main() -> int:
         for name, value in (("target-repo-id", args.target_repo_id), ("reference-type", args.reference_type), ("source-ref", args.source_ref), ("target-ref", args.target_ref)):
             if not value:
                 parser.error(f"--{name} required")
-        payload = {"agent_id": agent_id, "target_repo_id": args.target_repo_id, "reference_type": args.reference_type, "source_ref": args.source_ref, "target_ref": args.target_ref, "source_sha": args.source_sha, "target_sha": args.target_sha, "contract_version": args.contract_version}
+        payload = {
+            "agent_id": agent_id,
+            "target_repo_id": args.target_repo_id,
+            "reference_type": args.reference_type,
+            "source_ref": args.source_ref,
+            "target_ref": args.target_ref,
+            "source_sha": args.source_sha,
+            "target_sha": args.target_sha,
+            "contract_version": args.contract_version,
+        }
     elif action == "authority":
         if not args.authority_key:
             parser.error("--authority-key required")
@@ -181,8 +236,25 @@ def main() -> int:
         required = (args.child_repo_id, args.child_sha, args.child_contract_digest, args.parent_contract_digest)
         if not all(required):
             parser.error("--child-repo-id, --child-sha, --child-contract-digest and --parent-contract-digest required")
-        payload = {"agent_id": agent_id, "child_repo_id": args.child_repo_id, "child_sha": args.child_sha, "child_contract_digest": args.child_contract_digest, "parent_contract_digest": args.parent_contract_digest}
+        payload = {
+            "agent_id": agent_id,
+            "child_repo_id": args.child_repo_id,
+            "child_sha": args.child_sha,
+            "child_contract_digest": args.child_contract_digest,
+            "parent_contract_digest": args.parent_contract_digest,
+        }
         action = "certify_child"
+    elif action == "sync-agents":
+        target = args.target_repo_id or "ct.repo.crownthrive-support"
+        if args.input:
+            source = json_load(args.input)
+            bindings = source.get("bindings")
+            if not isinstance(bindings, list):
+                parser.error("--input for sync-agents must contain a bindings array")
+        else:
+            bindings = default_sync_bindings()
+        payload = {"agent_id": agent_id, "target_repo_id": target, "bindings": bindings}
+        action = "sync_agents"
     else:
         raise AssertionError("unreachable")
 
