@@ -1,0 +1,199 @@
+---
+title: "Website Surface, Contact Interaction and Creative Asset Automation"
+sidebarTitle: "Website Surface Control"
+description: "The governed CrownThrive control plane for Sites-backed and API-connected websites, contact/CTA health checks, Figma/Canva asset routing, remediation queues, autonomous read-side scans and fail-closed external mutations."
+icon: "browser"
+keywords: ["Sites", "website automation", "contact forms", "Canva", "Figma", "MCP", "website health", "autonomous updates", "DAIL", "interaction checks"]
+---
+
+# Website Surface, Contact Interaction and Creative Asset Automation
+
+## Purpose
+
+CrownThrive websites are operating surfaces, not isolated content silos. Every API-connected or Sites-backed property should consume governed institutional identity, claims, design contracts, creative assets, analytics and interaction rules through explicit records rather than copying state manually between websites.
+
+This control plane extends the [Design Control Plane](/technology/design-control-plane-and-creative-production) and [IO / MCP](/technology/io-mcp) architecture into public web surfaces.
+
+```text
+CHLOM / CIE / institutional records
+              ↓
+     Figma design contracts
+              ↓
+   Canva approved derivatives
+              ↓
+ creative asset route registry
+              ↓
+   Sites / API-connected website
+              ↓
+ contact · CTA · forms · links · events
+              ↓
+ read-only autonomous checks
+              ↓
+ DAIL / CrownLytics / remediation queue
+              ↓
+ bounded update plan
+              ↓
+ provider write adapter only after certification
+```
+
+## Machine implementation — August 20, 2026
+
+THIVEBASE/Supabase now contains service-role-only RLS tables for:
+
+- `integration_control.website_surfaces`;
+- `integration_control.creative_asset_routes`;
+- `integration_control.site_interaction_checks`;
+- `integration_control.site_interaction_check_results`;
+- `integration_control.site_update_queue`.
+
+The `website_surface_control` service is registered as CrownThrive-owned infrastructure. External website writes remain closed.
+
+A dedicated `website-surface-control` Supabase Edge Function is deployed with JWT enforcement and MCP protocol target `2026-07-28`. Its direct MCP supports:
+
+- `sites.surface.list`;
+- `sites.interaction.check`;
+- `sites.asset_routes.list`;
+- `sites.update_queue.list`;
+- `sites.update.plan`.
+
+`sites.update.apply` is registered but disabled. Central `crownthrive-api-control` federation also remains disabled for the Website Surface tool family until central dispatch certification is completed. A direct MCP server existing is not the same as central federation being complete.
+
+## Current seeded surfaces
+
+### CrownThrive.com
+
+Stable surface ID: `ct.surface.crownthrive.production`<br />Platform ID: `ct.platform.crownthrive`<br />Canonical host: `https://crownthrive.com`<br />Contact route: `https://crownthrive.com/contact-us`
+
+The provider/engine relationship remains `unverified` rather than being inferred from the public site alone.
+
+### KJV Visualized
+
+Stable surface ID: `ct.surface.kjv-visualized.production`<br />Platform ID: `ct.platform.kjv-sermon-toolkit`<br />Canonical host: `https://kjvsermontoolkit.crownthrive.com`<br />Provider family: `Sites`<br />Protected Sites project: `appgprj_6a7a0322f3b08191b964bc65aeeebb26`<br />Saved version: `48`
+
+This preserves the existing KJV release evidence. It does not imply the editable source repository, Sites write API or deployment mutation path is certified.
+
+## Creative asset routing
+
+Website assets must preserve source lineage. The initial CrownThrive.com mappings include:
+
+- canonical Figma design-system file `So4C4ltkiKn786ikT7rwAP` as a design-contract source;
+- Canva CrownThrive brand kit `kAGI40OPjnM` as a downstream production source;
+- Canva Crownthrive Dark brand kit `kAGSbAK_NWw` as a downstream production source.
+
+These mappings do **not** make Canva the master design authority and do not permit automatic replacement of site assets. Figma foundations remain gated until authoritative CrownThrive token values are proven. Asset routes carry rights, accessibility, publication and synchronization states separately.
+
+Future routes may add Locticians, Melanin Magic, Virality Music, AdLuxe, KJV/Sermon and MM Suites assets only after the exact source asset, rights state, destination slot and platform/provider relationship are established.
+
+## Contact and interaction checks
+
+The first autonomous checks verify public reachability and interaction expectations without submitting real forms.
+
+The checker may verify:
+
+- HTTP status and response type;
+- expected forms;
+- `mailto:` and `tel:` interaction links;
+- required public text/CTA markers;
+- expected contact routes;
+- route integrity;
+- declared data class and purpose;
+- whether separate marketing consent is required before downstream reuse;
+- result checksum and latency;
+- remediation risk class.
+
+It must **not** submit a production contact form as a health check. Live submission tests require a synthetic/test identity, approved destination, anti-spam controls and a separately governed test packet.
+
+## First live results
+
+The first machine run checked three registered interactions:
+
+- CrownThrive home contact handoff: `PASS`, HTTP 200;
+- KJV Visualized `/contact`: `PASS`, HTTP 200;
+- CrownThrive primary contact page: HTTP 200, form present and `contact@crownthrive.com` text present, but no `mailto:` interaction was detected in the returned HTML, producing a D1 remediation candidate.
+
+That D1 candidate is stored in `site_update_queue`. It is eligible for autonomous planning, **not autonomous external mutation**, because the Sites/provider write adapter is not certified.
+
+## Autonomous cadence
+
+Two pg\_cron jobs now operate daily:
+
+1. `crownthrive_site_interaction_checks_daily` — runs due read-only website interaction checks;
+2. `crownthrive_site_update_planner_daily` — creates remediation plans from failed checks.
+
+The external update executor remains disabled. Once a Sites/provider write adapter passes authentication, field-scope, rollback and read-after-write tests, D0/D1 provider mutations may be considered for bounded automation. D2/D3 changes remain approval-controlled.
+
+## Contact-data boundary
+
+A public contact form can collect personal data. The checker records structure and availability but does not retain form payloads.
+
+Operational contact does not automatically authorize promotional reuse. Where a contact event is later routed into ThrivePush, Collab Portal, CrownLytics, CRM, email automation or other systems, the data flow must preserve:
+
+- source surface and form version;
+- purpose;
+- fields collected;
+- consent basis;
+- suppression/unsubscribe state where promotional messaging is involved;
+- destination systems;
+- retention profile;
+- event/correlation ID;
+- correction/delete path.
+
+## Claim and namespace drift
+
+Website automation also watches for public statements that may no longer align with institutional records. A mismatch opens a reconciliation record; it does not automatically rewrite the website.
+
+For example, current CrownThrive.com public pages expose multiple platform-count statements and public phase language. Because CrownThrive maintains separate count universes and phase/maturity namespaces, a scanner must first determine whether a difference is a genuine stale claim or a correctly scoped different namespace. Arithmetic convenience is not permission to auto-correct a public claim.
+
+## Autonomous update classes
+
+| Class | Website behavior |
+| --- | --- |
+| D0 | read/crawl/check/hash/compare; may run autonomously |
+| D1 | deterministic repair plan or bounded reversible change after provider adapter certification |
+| D2 | material content, public promise, campaign, design-contract or user-flow change; approval required |
+| D3 | legal, rights, security, money, identity, destructive or reserved-authority mutation; explicit approval required |
+
+Before the external write adapter is certified, **all provider-side website mutations fail closed regardless of conceptual class**.
+
+## Required provider write certification
+
+A Sites or other website-provider adapter cannot enable mutation until it proves:
+
+1. exact provider/API identity and current version;
+2. authentication and least-privilege scopes;
+3. exact project/site ID;
+4. allowed page/field/asset mutations;
+5. prohibited fields and data classes;
+6. dry-run or bounded test path;
+7. read-before-write and read-after-write verification;
+8. idempotency/concurrency behavior;
+9. rollback/restore path;
+10. asset rights/accessibility checks;
+11. request/cost limits;
+12. DAIL/audit evidence;
+13. provider-exit/export path;
+14. kill switch and degraded/read-only mode.
+
+## Phase inheritance
+
+**Phase 2.99:** register surfaces, provider/project references, contact/interaction checks, creative routes, MCP contracts, cron jobs and write-adapter gates.
+
+**Phase 3:** make surface/interaction/claim/asset/event schemas part of the executable core and certify at least one bounded provider adapter.
+
+**Phase 4:** federate websites through shared identity, entitlements, support, analytics, consent and design patterns while preserving platform-specific roles.
+
+**Phase 5:** measure contact conversion, CTA performance, form reliability, update latency, asset reuse, accessibility defects and support/revenue outcomes.
+
+**Phase 6:** expose certified website/design templates and APIs to approved developers/licensees.
+
+**Phase 7:** extend the same interaction contracts to kiosks, TapStations, event screens and MM Suites phygital surfaces.
+
+**Phase 8:** enforce portfolio-wide provider custody, asset ownership, export and operational continuity.
+
+**Phase 9:** add advanced provenance/interoperability only when justified.
+
+**Phase 10:** preserve site/project mappings, design/asset lineage, interaction definitions, provider exports, recovery and autonomous-agent instructions so websites can be rebuilt without undocumented operator memory.
+
+## Permanent rule
+
+A website is not considered integrated merely because it renders. CrownThrive integration means the surface has a stable identity, governed content/design sources, contact and interaction evidence, data-purpose controls, observable events, a recovery path, and a certified mutation boundary appropriate to its risk.
