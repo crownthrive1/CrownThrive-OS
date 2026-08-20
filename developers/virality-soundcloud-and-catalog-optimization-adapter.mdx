@@ -1,0 +1,90 @@
+---
+title: "Virality SoundCloud and Catalog Optimization Adapter"
+sidebarTitle: "Virality SoundCloud Adapter"
+description: "Governed API and MCP contracts joining the Virality catalog, SoundCloud evidence, CrownLytics metrics, and shadow recommendations."
+icon: "plug"
+keywords: ["SoundCloud", "Virality Music", "MCP", "API", "adapter", "recommendations"]
+---
+
+# Virality SoundCloud and Catalog Optimization Adapter
+
+## Status
+
+**Service state:** documented<br />**SoundCloud credential state:** unverified<br />**Provider read certification:** blocked<br />**Provider write gate:** closed<br />**Promotion execution:** not implemented<br />**Public-document posture:** contracts and safeguards only; no secrets or private object references
+
+This adapter connects Virality Music catalog identity, dated SoundCloud evidence, CrownLytics measurement, and shadow-mode recommendations. It does not create a general-purpose provider proxy.
+
+## Service boundaries
+
+- Supabase holds the private operational registry and dated evidence rows.
+- Virality supplies stable work identity and approved public projection.
+- SoundCloud is an external measurement source.
+- CrownLytics supplies definitions and recommendation evaluation.
+- GSO and CHLOM remain outside the adapter's authority but provide mandatory readiness gates.
+
+## Proposed MCP surface
+
+All tools are disabled until their individual certification packets pass.
+
+| Tool | Risk | Intended behavior | Current state |
+| --- | --- | --- | --- |
+| `virality.assets.list` | D0 | bounded public-safe or service-role catalog list | disabled |
+| `virality.assets.get` | D0 | one identifier, explicit field projection | disabled |
+| `virality.stats.current` | D0 | latest verified dated snapshot | disabled |
+| `virality.stats.history` | D0 | cursor-paginated evidence history | disabled |
+| `virality.recommendations.list` | D1 | shadow recommendations only | disabled |
+| `virality.recommendations.decide` | D2 | human approval or rejection event | disabled |
+| `soundcloud.sync.daily` | D1 | bounded authenticated provider read | blocked |
+| `virality.promotion.execute` | D3 | consequential public mutation | not implemented |
+
+## Read contract
+
+Every read tool must enforce:
+
+- stable identifiers;
+- explicit allowed fields;
+- service or user scope;
+- bounded page size and cursor pagination;
+- request budget and timeout;
+- evidence date and evidence state;
+- deterministic ordering;
+- no private file identifiers, credentials, raw provider payloads, or customer records;
+- audit receipt with request class, actor, tool version, and result count.
+
+## Daily sync contract
+
+`soundcloud.sync.daily` is idempotent on provider, scheduled date, and attempt. One run records request count, response count, raw digest, evidence state, completion state, and error code. A snapshot is unique by date, entity type, and provider entity ID.
+
+The adapter must not treat HTML or a public profile observation as equivalent to authenticated Artist Studio/API evidence. Public observations are recorded as `observed_unverified`; an unavailable or unauthorized read is `blocked`.
+
+Before the tool can be enabled, the certification packet must prove:
+
+1. a least-privilege read credential or repeatable signed export;
+2. token storage outside code and docs;
+3. pagination and field mapping;
+4. rate, timeout, retry, and backoff behavior;
+5. stale and partial response handling;
+6. idempotent replay;
+7. raw-evidence retention and deletion policy;
+8. a bounded read in production with no provider mutation.
+
+## Recommendation write contract
+
+A recommendation request includes asset ID, target surface, action type, score, evidence window, evidence digest, reasons, safeguards, expiry, and algorithm version. It must fail closed when rights, release, canon, audience, commerce, freshness, cooldown, balance, or rollback evidence is absent.
+
+Approval creates an append-only decision event. It does not execute a placement. Execution requires a separate tool, separate scope, separate approval, target-specific preflight, and target-specific rollback.
+
+## Security and rollback
+
+- No anonymous or authenticated end-user role can access the private control schema.
+- Operational tables use RLS and service-role-only policies.
+- The private storage bucket has no public listing or object-read policy.
+- Credentials belong in a managed secret store, not GitHub, Mintlify, logs, prompts, or database metadata.
+- Rollback first disables the schedule and MCP tool, then revokes execute privilege if needed. Evidence rows are preserved for audit.
+
+## Related contracts
+
+- [Platform API Adapter Matrix](/developers/platform-api-adapter-matrix)
+- [Virality Asset Catalog and Metrics Registry](/platforms/virality-asset-catalog-and-metrics-registry)
+- [CrownLytics](/platforms/crownlytics-institutional-registry)
+- [Daily Runbook](/runbooks/virality-daily-metrics-and-placement-optimization)

@@ -1,0 +1,100 @@
+---
+title: "Virality Daily Metrics and Placement Optimization"
+sidebarTitle: "Virality Daily Metrics"
+description: "Daily governed evidence scan, shadow recommendation, failure-handling, and rollback runbook for Virality Music."
+icon: "rotate"
+keywords: ["Virality Music", "SoundCloud", "daily scan", "runbook", "optimization", "rollback"]
+---
+
+# Virality Daily Metrics and Placement Optimization
+
+## Objective
+
+Run one governed daily evidence cycle for the CrownThrive SoundCloud account, preserve evidence precedence, calculate shadow-mode placement recommendations, and report blockers without changing a live catalog, provider account, price, license, or entitlement.
+
+## Schedule and ownership
+
+- **Cadence:** daily, flexible around 8:00 AM America/New\_York
+- **Measurement authority:** CrownLytics
+- **Catalog authority:** Virality Music
+- **Rights authority:** CHLOM
+- **Commerce/license authority:** GSO
+- **Automation owners:** Growth & Analytics Agent plus Virality Rights/Canon Agent
+- **Human owner:** CrownThrive founder/operator
+
+## Preconditions
+
+1. The private registry and RLS policies are healthy.
+2. The latest verified baseline is queryable.
+3. The provider credential is certified for bounded reads, or the run is explicitly limited to public observation.
+4. Provider writes and promotion execution remain disabled.
+5. The job has a request budget, timeout, retry cap, and idempotency key.
+
+## Daily procedure
+
+1. Create an idempotent sync-run row for the scheduled date.
+2. Attempt the authenticated bounded SoundCloud read only when the credential gate is verified.
+3. If authenticated evidence is unavailable, record `blocked` or `observed_unverified`; do not overwrite the latest verified snapshot.
+4. Validate nonnegative values, identifier stability, pagination completeness, response freshness, and field mapping.
+5. Store one dated metric snapshot and its digest.
+6. Compare against the nearest verified snapshot using the current metric definitions.
+7. Evaluate catalog eligibility before calculating a score.
+8. Generate expiring shadow recommendations with reasons and safeguards.
+9. Do not execute the recommendation.
+10. Report `SUCCESS`, `FAILURE`, or `ACTION NEEDED` with exact blockers and evidence dates.
+
+## Initial scoring model
+
+Scoring runs only after binary eligibility passes.
+
+```text
+score = 0.30 × momentum
+      + 0.20 × engagement_quality
+      + 0.15 × freshness
+      + 0.15 × conversion_or_inquiry_quality
+      + 0.10 × strategic_priority
+      + 0.10 × catalog_balance
+      - fatigue_penalty
+      - uncertainty_penalty
+```
+
+Each component is normalized to `[0,1]`. Missing data increases uncertainty; it does not receive a neutral or optimistic substitute. Weight changes require a versioned algorithm decision and a controlled-test comparison.
+
+## Recommendation safeguards
+
+- verified or explicitly labeled evidence only;
+- no action on rights-pending, canon-pending, blocked, mature-audience-incompatible, or fulfillment-incomplete assets;
+- minimum sample size and stable measurement window;
+- seven-day default cooldown after a placement change;
+- per-world and per-format caps;
+- no deletion or silent master replacement;
+- no title, price, license, territory, exclusivity, audience, or entitlement mutation;
+- human approval and reversible target-specific plan before any future execution;
+- append-only event log.
+
+## Documentation rule
+
+Daily numbers belong in the private metric ledger and approved dynamic projections. GitHub and Mintlify receive a checkpoint only when the method, schema, evidence status, gate, or operating decision materially changes. This avoids noisy commits and copied-forward stale statistics.
+
+## Failure handling
+
+| Failure | Required response |
+| --- | --- |
+| credential absent or rejected | mark run `blocked`; preserve verified baseline; notify owner |
+| partial pagination or rate limit | mark `partial`; store no verified replacement; retry within cap |
+| value regression or schema drift | quarantine snapshot; open field-mapping review |
+| rights/canon/commerce gate missing | suppress recommendation for that asset |
+| storage or database write fails | fail the run; do not publish new metrics |
+| suspected credential exposure | disable schedule and tools; rotate credential; open security incident |
+| live target differs from approved plan | do not execute; require a new preflight |
+
+## Rollback
+
+Disable the daily schedule and related MCP tool, revoke its execute permission if necessary, and preserve sync runs, snapshots, recommendations, and decision events. Rollback may stop automation; it must not erase evidence.
+
+## Cross-references
+
+- [Virality SoundCloud and Catalog Adapter](/developers/virality-soundcloud-and-catalog-optimization-adapter)
+- [CrownLytics](/platforms/crownlytics-institutional-registry)
+- [Agent Registry](/automation/agent-registry)
+- [Permissions and Approval Gates](/automation/permissions-and-approval-gates)
