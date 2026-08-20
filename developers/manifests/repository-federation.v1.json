@@ -1,5 +1,5 @@
 {
-  "manifest_version": "1.0.2",
+  "manifest_version": "1.1.0",
   "manifest_id": "ct.manifest.repository-federation.v1",
   "authority": {
     "canonical_parent_repository": "crownthrive1/CrownThrive-Support",
@@ -15,8 +15,9 @@
   "runtime": {
     "service_id": "repository_federation_bus",
     "api_url": "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus",
+    "edge_function_version": 3,
     "edge_function_state": "active_controlled_test",
-    "parent_oidc_validation": "passed_exact_pr_head_2026_08_20",
+    "parent_oidc_validation": "passed_v2_revalidation_pending_v3_exact_head",
     "auth": {
       "scheme": "github_actions_oidc",
       "issuer": "https://token.actions.githubusercontent.com",
@@ -29,11 +30,23 @@
       "api",
       "mcp_registry",
       "github_actions_script",
+      "repository_agent_bindings",
       "repository_messages",
       "message_acknowledgements",
       "hash_chained_events",
       "cross_repository_references"
     ]
+  },
+  "agent_identity": {
+    "binding_manifest": "developers/manifests/agent-federation-bindings.v1.json",
+    "private_binding_registry": "institutional_federation.repository_agent_bindings",
+    "repository_oidc_plus_agent_binding_required": true,
+    "agent_claim_by_string_prefix_only_prohibited": true,
+    "pull_is_agent_scoped": true,
+    "non_voting_sync_operation": "repository_federation.sync_agents",
+    "non_voting_sync_can_create_vote": false,
+    "child_certification_agent": "ct.relay.agent-d",
+    "future_agent_sync_authority": ["ct.relay.agent-a", "ct.subagent.governance-marshal"]
   },
   "state_machine": [
     "pending_provisioning",
@@ -60,7 +73,7 @@
     "may_self_add_vote": false,
     "may_self_certify": false,
     "may_create_d3_authority": false,
-    "all_governed_agents_transport_access": true,
+    "all_governed_agents_transport_access": "only_when_explicitly_bound_to_repository_and_capability",
     "transport_messages_create_votes": false,
     "framework_subagents_create_votes": false,
     "parent_may_suspend_child": true,
@@ -131,20 +144,28 @@
       "repository_federation.pull",
       "repository_federation.ack",
       "repository_federation.reference",
+      "repository_federation.sync_agents",
       "cie.score"
     ],
-    "current_state": "registered_parent_oidc_verified_child_link_pending"
+    "current_state": "registered_parent_oidc_verified_v3_agent_binding_enabled_child_link_pending"
   },
   "algorithms": {
     "registry_manifest": "developers/manifests/framework-algorithm-registry.v1.json",
     "public_repositories_store_calibration": false,
     "vault_runtime_policy": true,
-    "all_governed_agents_may_invoke_eligible_algorithms": true,
+    "eligible_algorithm_invocation_requires_agent_binding": true,
     "algorithm_authority_never_exceeds_calling_repo_and_agent_authority": true,
     "future_framework_algorithm_registration_required": true
   },
+  "live_negative_controls": {
+    "unbound_agent_heartbeat": "denied_agent_not_bound_to_repository",
+    "agent_a_child_certification": "denied_agent_capability_not_authorized_certify",
+    "agent_d_child_certification_without_physical_child": "denied_child_not_bootstrapped",
+    "prospective_cie_bootstrap_capability": "allowed",
+    "prospective_cie_publish_capability": "denied"
+  },
   "phase_effect": {
-    "phase_2_99": "federation_control_plane_and_framework_factory_controlled_test_parent_oidc_verified; child_repo_still_pending",
+    "phase_2_99": "federation_control_plane_framework_factory_and_agent_binding_controlled_test; child_repo_still_pending",
     "phase_3_entry": "unchanged_blocked_pending_phase_2_99_hard_exit",
     "convergent_ecosystem_framework_agent": "research_preparation_allowed_but_sovereign_activation_blocked_until_cie_governed_acceptance_and_linked_governed_child_certification"
   }
