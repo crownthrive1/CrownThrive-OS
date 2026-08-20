@@ -1,0 +1,128 @@
+---
+title: "CrownPulse Admin API Adapter"
+sidebarTitle: "CrownPulse Admin API"
+description: "Privileged CrownPulse Admin REST API contract for users, plans, payments and domains, with update/support observations, server-side credential requirements and fail-closed mutation controls."
+icon: "user-shield"
+keywords: ["CrownPulse", "Admin API", "AltumCode", "users", "plans", "payments", "domains", "Bearer API", "CrownThrive"]
+---
+
+# CrownPulse Admin API Adapter
+
+<Warning>
+  The CrownPulse Admin API credential is a privileged runtime secret. It is never published in documentation, examples, GitHub, logs, screenshots, generated artifacts, email, or client-side code.
+</Warning>
+
+## Current institutional state
+
+```yaml
+platform_id: ct.platform.crownpulse
+service_id: crownpulse_admin
+api_surface: privileged_admin_api
+api_base_url: https://crownpulse.com/admin-api
+docs_url: https://crownpulse.com/admin/api-documentation
+architecture: REST
+response_format: JSON
+authentication: Bearer API key
+credential_ref: vault:crownpulse_admin_api_key
+credential_vault_binding: blocked_pending_approved_secret_write
+adapter: crownpulse-admin-api-control
+adapter_version: 1
+adapter_auth: jwt_required
+adapter_scaffold: passed
+provider_dispatch: disabled
+privileged_mutations: closed
+authenticated_admin_read: open
+exact_path_reconciliation: open
+provider_lineage: AltumCode
+update_available_observed: v61.0.0
+installed_version: unverified
+support_status_observed: expired
+phase_3_promotion: false
+```
+
+The current founder-observed Admin UI establishes the privileged API surface, not permission to execute it. CrownPulse's ordinary public API remains a separate interface from this admin API.
+
+## Admin API resources and supplied operations
+
+### Users
+
+- Retrieve all
+- Retrieve one
+- Create
+- Update
+- Delete
+- Generate a one-time login code
+
+### Plans
+
+- Retrieve all
+- Retrieve one
+
+### Payments
+
+- Retrieve all
+- Retrieve one
+
+### Domains
+
+- Retrieve all
+- Retrieve one
+- Update
+- Delete
+
+The Admin UI also exposes settings, languages, broadcasts, user notifications, plugins, statistics, resources, codes, taxes, teams, campaigns, notification handlers and user logs. Those UI modules are not automatically represented as Admin API endpoints; only explicitly documented operations are in the current API contract.
+
+## Risk model
+
+| Operation class | Risk | Current state |
+| --- | --- | --- |
+| Retrieve user/plan/domain records | D0/D1 depending returned data | disabled pending Vault binding, exact paths and data-class review |
+| Retrieve payment records | D1 financial/transaction data | disabled pending Vault binding, exact paths and access review |
+| Create/update/delete users | D2 privileged mutation | closed |
+| Generate one-time login code | D3 authentication/security mutation | closed |
+| Update/delete domains | D2 infrastructure mutation | closed |
+
+No admin mutation becomes executable merely because the provider documents it.
+
+## Version and support observation
+
+The founder-observed Admin UI reports **Update available — v61.0.0** and **Support expired**. That proves an available-update/support observation, not the currently installed application version.
+
+```yaml
+available_update: v61.0.0
+installed_version: unverified
+support_state: expired_observed
+upgrade_action: not_authorized_by_observation
+```
+
+Before any upgrade: identify installed version, release delta, database/schema migrations, customizations, backup/restore point, PHP/runtime requirements, provider/license entitlement, test environment and rollback path. Do not auto-upgrade production solely to clear an update notice.
+
+## Credential state
+
+The founder supplied the current Admin API key, but the connected secure-write layer rejected direct Vault insertion. The attempted write did not persist the value. Intended aliases:
+
+```text
+crownpulse_admin_api_key
+crownpulse_admin_api_key_recovery
+```
+
+Authenticated Admin API dispatch stays disabled until an approved secret-write path binds the aliases and continuity verification passes.
+
+## Certification sequence
+
+1. securely bind primary and recovery Vault aliases;
+2. extract exact path/method/body/query schemas from each documented operation;
+3. classify returned fields and role boundaries;
+4. certify only bounded read operations first;
+5. add timeout, output-schema, request-audit and least-privilege enforcement;
+6. keep payment access separately purpose-limited;
+7. require explicit D2/D3 packet, rollback, audit and independent approval for any user/domain mutation or login-code generation;
+8. reconcile installed version/support/upgrade requirements separately from API certification.
+
+## Provider and platform boundary
+
+AltumCode is the observed software/provider lineage. CrownPulse remains the CrownThrive platform identity. Provider branding or an update notice does not transfer CrownThrive data, domain, account or institutional authority to the vendor.
+
+## Page changelog
+
+- **2026-08-19 v1.0:** registered the privileged Admin API, operation families, D0–D3 risk separation, server-side secret requirement, fail-closed adapter, observed v61.0.0 update availability, expired-support state and installed-version uncertainty.
