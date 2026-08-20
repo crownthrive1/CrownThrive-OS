@@ -8,6 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 FED=ROOT/"developers/manifests/repository-federation.v1.json"; BIND=ROOT/"developers/manifests/agent-federation-bindings.v1.json"; ALG=ROOT/"developers/manifests/framework-algorithm-registry.v1.json"; FACTORY=ROOT/"developers/manifests/framework-factory.v1.json"; TEMPLATE=ROOT/"developers/templates/framework-child-federation-contract.v1.json"
 EXPECTED_PARENT={"ct.relay.agent-a","ct.relay.agent-b","ct.relay.agent-c","ct.relay.agent-d","ct.relay.agent-s"}
 EXPECTED_CIE={"ct.framework-agent.cie","ct.subagent.cie.identity-fit","ct.subagent.cie.community-value","ct.subagent.cie.story-alignment","ct.subagent.cie.brand-safety","ct.subagent.cie.legacy-impact","ct.subagent.cie.remediation-escalation"}
+EXPECTED_SYNC_CALLERS={"ct.subagent.governance-marshal"}
 DIGEST="e5e6ac0e9cf6749ba361435bb65ad212f78562960d0b5522898e06583b8d86c2"
 def fail(m:str)->None: raise SystemExit(f"ERROR: {m}")
 def load(p:Path)->dict[str,Any]:
@@ -22,21 +23,29 @@ def main()->int:
     if auth.get("framework_transport_identity_is_non_voting_until_separate_acceptance") is not True: fail("framework transport vote boundary missing")
     if runtime.get("constitutional_vote_activation_guard")!="blocked_current_constitution_five_voters": fail("constitutional vote activation guard missing")
     if not str(runtime.get("canonical_parent_ref_integrity","")).startswith("blocked_"): fail("canonical parent ref integrity must remain blocked until independently bound")
-    oidc=runtime.get("auth",{}); 
+    oidc=runtime.get("auth",{})
     if oidc.get("scheme")!="github_actions_oidc" or oidc.get("long_lived_shared_secret_required") is not False: fail("OIDC boundary drift")
     rules=bindings.get("rules",{})
-    for key in ("repository_oidc_identity_required","agent_repository_binding_required","transport_identity_does_not_create_vote","non_voting_sync_may_not_create_vote","framework_subagents_non_voting","framework_parent_agent_non_voting_until_separate_constitutional_acceptance","child_transport_disabled_until_parent_certification"):
+    for key in ("repository_oidc_identity_required","agent_repository_binding_required","transport_identity_does_not_create_vote","non_voting_sync_may_not_create_vote","sync_agents_callers_must_be_non_voting","framework_subagents_non_voting","framework_parent_agent_non_voting_until_separate_constitutional_acceptance","child_transport_disabled_until_parent_certification","framework_factory_participation_required"):
         if rules.get(key) is not True: fail(f"binding rule missing: {key}")
     parents=bindings.get("parent_sovereign_bindings",[])
     if {x.get("agent_id") for x in parents}!=EXPECTED_PARENT or len(parents)!=5 or any(x.get("vote_eligible") is not True for x in parents): fail("parent sovereign bindings must remain A/B/C/D/S")
     if {x.get("agent_id") for x in parents if x.get("certify_child") is True}!={"ct.relay.agent-d"}: fail("Agent D must be sole child certifier")
+    sync_callers=set(rules.get("non_voting_inventory_sync_agents",[]))
+    if sync_callers!=EXPECTED_SYNC_CALLERS or sync_callers & EXPECTED_PARENT: fail("sync_agents caller must be governed non-voting transport only")
+    nonvoting_ids={x.get("agent_id") for x in bindings.get("parent_non_voting_transport_bindings",[])}
+    if not sync_callers <= nonvoting_ids: fail("sync_agents caller missing from non-voting transport inventory")
+    participation=bindings.get("factory_participation_contract",{})
+    if participation.get("framework_identity_default_vote_state")!="non_voting" or participation.get("d3")!="human_reserved": fail("factory participation authority drift")
+    cii=participation.get("implementation_backed_research_candidates",[])
+    if len(cii)!=1 or cii[0].get("framework_id")!="ct.framework.cii-thrivefund" or cii[0].get("existing_agent_id")!="ct.agent.impact-allocation" or cii[0].get("candidate_state")!="RESEARCH_CANDIDATE" or cii[0].get("research_preparation_allowed_now") is not True or cii[0].get("framework_implementation_allowed_now") is not False: fail("CII implementation-backed research-candidate boundary drift")
     cie=bindings.get("prospective_cie_child_bindings",[])
     if {x.get("agent_id") for x in cie}!=EXPECTED_CIE: fail("CIE binding topology drift")
     if any(x.get("vote_eligible") is not False for x in cie): fail("CIE parent/subagent bindings must remain non-voting")
     parent_cie=next(x for x in cie if x.get("agent_id")=="ct.framework-agent.cie")
     if parent_cie.get("bootstrap_enabled") is not False or parent_cie.get("binding_state")!="prospective": fail("CIE transport must remain disabled before physical child certification")
     sync=bindings.get("future_sync_contract",{})
-    if sync.get("operation")!="repository_federation.sync_agents" or sync.get("sync_can_create_sovereign_vote") is not False or set(sync.get("allowed_authority_ceiling",[]))!={"D0","D1","D2"}: fail("sync_agents authority drift")
+    if sync.get("operation")!="repository_federation.sync_agents" or sync.get("calling_identity_must_be_non_voting") is not True or set(sync.get("allowed_calling_agents",[]))!=EXPECTED_SYNC_CALLERS or sync.get("sync_can_create_sovereign_vote") is not False or set(sync.get("allowed_authority_ceiling",[]))!={"D0","D1","D2"}: fail("sync_agents authority drift")
     repos={x.get("repo_id"):x for x in fed.get("repositories",[])}; child=repos.get("ct.repo.cie")
     if set(repos)!={"ct.repo.crownthrive-support","ct.repo.cie"} or not child: fail("repository set drift")
     if child.get("governance_state")!="pending_provisioning" or child.get("operationally_enabled") is not False or child.get("can_vote") is not False: fail("CIE child must remain pending/non-operational/non-voting")
@@ -54,6 +63,6 @@ def main()->int:
     if "vault_policy_ref" in row or row.get("private_runtime_reference_state")!="registered_not_public": fail("private runtime locator must not be public")
     if row.get("mcp_enabled") is not False: fail("CIE MCP must remain disabled")
     if factory.get("constitutional_invariants",{}).get("current_sovereign_voters")!=5 or factory.get("constitutional_invariants",{}).get("framework_identity_acceptance_does_not_create_vote") is not True: fail("factory/current constitution mismatch")
-    print("Repository federation validation PASS: current five-voter constitution preserved; CIE child pending/non-operational/non-voting; OIDC/parent certification required; protected algorithm calibration remains private; sync_agents non-voting.")
+    print("Repository federation validation PASS: A/B/C/D/S constitution preserved; sync_agents caller restricted to non-voting D0-D2 Governance Marshal; CII research preparation implementation-backed/non-voting; CIE child pending/non-operational/non-voting; protected calibration private.")
     return 0
 if __name__=="__main__": raise SystemExit(main())
