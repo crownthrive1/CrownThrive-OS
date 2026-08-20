@@ -1,0 +1,70 @@
+name: Authoritative Expert Source Fabric
+
+on:
+  pull_request:
+    paths:
+      - "knowledge/authoritative-expert-source-fabric.mdx"
+      - "developers/manifests/authoritative-expert-source-router.v1.json"
+      - "developers/schemas/authoritative-expert-source-router.v1.schema.json"
+      - "scripts/expert_source_router.py"
+      - "scripts/validate_authoritative_expert_source_router.py"
+      - "changelog/phase-2-99-authoritative-expert-source-fabric.mdx"
+      - "index.mdx"
+      - "automation/agentic-operating-model.mdx"
+      - "developers/overview.mdx"
+      - ".github/workflows/authoritative-expert-source-router.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "knowledge/authoritative-expert-source-fabric.mdx"
+      - "developers/manifests/authoritative-expert-source-router.v1.json"
+      - "developers/schemas/authoritative-expert-source-router.v1.schema.json"
+      - "scripts/expert_source_router.py"
+      - "scripts/validate_authoritative_expert_source_router.py"
+      - "changelog/phase-2-99-authoritative-expert-source-fabric.mdx"
+      - "index.mdx"
+      - "automation/agentic-operating-model.mdx"
+      - "developers/overview.mdx"
+      - ".github/workflows/authoritative-expert-source-router.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-expert-source-fabric:
+    name: Validate expert source fabric
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify Python syntax
+        run: |
+          python -m py_compile scripts/expert_source_router.py
+          python -m py_compile scripts/validate_authoritative_expert_source_router.py
+
+      - name: Validate source router contract
+        run: python scripts/validate_authoritative_expert_source_router.py
+
+      - name: Exercise deterministic routing
+        run: |
+          python scripts/expert_source_router.py --domain cybersecurity
+          python scripts/expert_source_router.py --task "Review a federal regulation and compliance implications"
+          python scripts/expert_source_router.py --task "Find peer-reviewed papers and DOI metadata"
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
