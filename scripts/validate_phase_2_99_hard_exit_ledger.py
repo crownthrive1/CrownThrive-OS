@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 2.99 hard-exit ledger v1.3.3 validator. PASS != hard-exit PASS."""
+"""Phase 2.99 hard-exit ledger v1.3.4 validator. PASS != hard-exit PASS."""
 from __future__ import annotations
 import argparse, copy, json, re
 from datetime import datetime
@@ -12,6 +12,15 @@ COUNTS={"holdings_portfolio_rows":68,"holdings_domain_rows":82,"holdings_engine_
 ARTICLE_OPEN=("terminal_disposition_assigned_795","section_and_category_mapping_795","exposure_classified_795","risk_classified_795","owner_or_owner_queue_795","canonical_route_or_explicit_nonpublic_state_795","source_mapping_795","navigation_or_intentionally_unlisted_795","p0_p1_substantive_or_explicit_unresolved_closure")
 PUBLIC_CLASSES={"PUBLIC_STANDARD","PUBLIC_DOCTRINE"}
 FORBIDDEN_PUBLIC_FLAGS=("contains_trade_secret_candidate_or_controlled","contains_patent_candidate_mechanism","contains_restricted_institutional","contains_credentials_or_fingerprints","contains_private_policy_or_economic_calibration","contains_proprietary_eval_corpora","contains_private_dail_or_evidence")
+EXPECTED_NON_DEBT_IDS={
+    "gate:thrivetools_opt:api_adapter_deployed",
+    "gate:thrivetools_opt:api_documentation",
+    "gate:thrivetools_opt:authenticated_status_read",
+    "gate:thrivetools_opt:credential_vault_binding",
+    "gate:thrivetools_opt:parent_child_identity",
+    "gate:thrivetools_opt:provider_writes",
+    "gate:thrivetools_opt:ip_publication_classification",
+}
 
 def bad(m): raise ValueError(m)
 def eq(a,b,n):
@@ -30,7 +39,7 @@ def gate_map(d):
     m={r.get("gate_id"):r for r in rows}; eq(len(m),8,"unique gates"); return m
 
 def validate(d,check_files=True):
-    eq(d.get("manifest_version"),"1.3.3","manifest version"); ts(d["observed_at"],"observed_at"); sh(d["observed_main_sha"],"main")
+    eq(d.get("manifest_version"),"1.3.4","manifest version"); ts(d["observed_at"],"observed_at"); sh(d["observed_main_sha"],"main")
     a=d["authority"]
     for k,v in {"roadmap_decision_id":"CT-ADR-ROADMAP-010","governance_decision_id":"CT-ADR-GOV-011","roadmap_generation":"ten_phase_v1","top_level_phase_count":10,"current_phase":2,"current_subphase":"2.99","phase_3_entry":"blocked_pending_phase_2_99_hard_exit"}.items(): eq(a.get(k),v,f"authority.{k}")
     r2=d["roadmap_v2_pending"]; eq(r2["founder_direction_issue"],123,"roadmap v2 issue"); eq(r2["target_top_level_phase_count"],20,"roadmap v2 target"); eq(r2["state"],"founder_direction_pending_governed_adr_and_machine_namespace","roadmap v2 state"); eq(r2["canonical_roadmap_remains"],"CT-ADR-ROADMAP-010/ten_phase_v1","roadmap v2 boundary"); eq(r2["full_documentation_estate_gate_nondeferrable"],True,"full docs gate"); eq(r2["gate_008_dependency"],True,"roadmap v2 gate008")
@@ -61,15 +70,24 @@ def validate(d,check_files=True):
     if r["deferred_routing_tag_count_snapshot"]<=r["approved_deferral_count_snapshot"]: bad("deferred routing tags must preserve extra non-governed Phase20 route")
 
     t=r["reconciliation_tag_snapshot"]; ts(t["observed_at"],"tag time")
-    for k in ("total","pass","open","blocked","closed","deferred","authoritative","scan_required","reconcile_required"): ni(t[k],f"tag.{k}")
-    eq(t["pass"]+t["open"]+t["blocked"]+t["closed"]+t["deferred"],t["total"],"tag arithmetic"); eq(t["authoritative"],t["total"],"tag authoritative"); eq(t["scan_required"],t["total"],"tag scan"); eq(t["reconcile_required"],t["total"],"tag reconcile"); eq(t["deferred"],r["deferred_routing_tag_count_snapshot"],"tag deferred"); eq(t["pass_remains_drift_watched"],True,"PASS watch"); eq(t["deferral_is_not_pass"],True,"deferral semantics"); eq(t["unknown_never_becomes_zero_or_pass"],True,"unknown semantics"); eq(t["absence_of_unknown_tag_does_not_prove_zero_unknown_state"],True,"unknown absence")
-    delta=r["material_tag_delta"]; ni(delta["prior_snapshot_total"],"delta prior"); ni(delta["current_snapshot_total"],"delta current"); eq(delta["current_snapshot_total"],t["total"],"delta current/ledger"); eq(delta["net_growth"],delta["current_snapshot_total"]-delta["prior_snapshot_total"],"tag net growth"); eq(delta["new_scopes_state"],"OPEN","new tag state"); eq(delta["research_registry_growth_not_counted_as_certification_gap"],True,"research growth accounting")
-    if not delta["new_current_governed_scopes"]: bad("material current-scope delta missing")
+    for k in ("total","pass","open","blocked","closed","deferred","authoritative","scan_required","reconcile_required","non_reconcile_required"): ni(t[k],f"tag.{k}")
+    eq(t["pass"]+t["open"]+t["blocked"]+t["closed"]+t["deferred"],t["total"],"tag arithmetic"); eq(t["authoritative"],t["total"],"tag authoritative"); eq(t["scan_required"],t["total"],"tag scan")
+    if t["reconcile_required"]>t["total"]: bad("reconcile-required count exceeds registry")
+    eq(t["non_reconcile_required"],t["total"]-t["reconcile_required"],"non-debt count")
+    eq(t["formal_reconciliation_debt_basis"],"reconcile_required_only","formal debt basis")
+    eq(t["deferred"],r["deferred_routing_tag_count_snapshot"],"tag deferred"); eq(t["pass_remains_drift_watched"],True,"PASS watch"); eq(t["deferral_is_not_pass"],True,"deferral semantics"); eq(t["unknown_never_becomes_zero_or_pass"],True,"unknown semantics"); eq(t["absence_of_unknown_tag_does_not_prove_zero_unknown_state"],True,"unknown absence")
 
-    s=r["latest_formal_reconciliation_scan"]; eq(s["scanner_id"],"ct.reconciliation.lmno.agent-e","scanner"); eq(s["status"],"partial","scan status")
+    delta=r["material_tag_delta"]; ni(delta["prior_snapshot_total"],"delta prior"); ni(delta["current_snapshot_total"],"delta current"); ni(delta["new_reconcile_required_scopes_count"],"new debt scopes"); ni(delta["new_non_reconcile_required_scopes_count"],"new non-debt scopes")
+    eq(delta["current_snapshot_total"],t["total"],"delta current/ledger"); eq(delta["net_growth"],delta["current_snapshot_total"]-delta["prior_snapshot_total"],"tag net growth"); eq(delta["new_reconcile_required_scopes_count"]+delta["new_non_reconcile_required_scopes_count"],delta["net_growth"],"new-scope debt split")
+    eq(delta["new_non_reconcile_required_scopes_count"],t["non_reconcile_required"],"new non-debt/registry count"); eq(set(delta["non_reconcile_required_scope_ids"]),EXPECTED_NON_DEBT_IDS,"non-debt scope identities"); eq(len(delta["non_reconcile_required_scope_ids"]),len(EXPECTED_NON_DEBT_IDS),"non-debt scope count")
+    eq(delta["research_registry_growth_not_counted_as_certification_gap"],True,"research growth accounting")
+    if not delta["new_reconcile_required_scope_examples"]: bad("new reconciliation debt evidence missing")
+
+    s=r["latest_formal_reconciliation_scan"]; eq(s["scanner_id"],"ct.reconciliation.lmno.agent-e","scanner"); eq(s["status"],"partial","scan status"); eq(s["coverage_denominator"],"current_reconcile_required_scopes","scan denominator")
     for k in ("tagged_scopes","reconciled_scopes","drift_scopes","unresolved_scopes","formal_scan_coverage_gap"): ni(s[k],f"scan.{k}")
-    if s["tagged_scopes"]>t["total"] or s["reconciled_scopes"]>t["total"]: bad("formal scan exceeds current tag universe")
-    eq(s["formal_scan_coverage_gap"],t["total"]-s["reconciled_scopes"],"scan gap"); eq(s["formal_scan_coverage_complete"],s["formal_scan_coverage_gap"]==0,"scan complete"); eq(s["formal_scan_stale_against_current_tags"],s["formal_scan_coverage_gap"]>0,"scan stale"); ts(s["completed_at"],"scan completed")
+    if s["tagged_scopes"]>t["reconcile_required"] or s["reconciled_scopes"]>t["reconcile_required"]: bad("formal scan exceeds reconciliation-debt universe")
+    eq(s["formal_scan_coverage_gap"],t["reconcile_required"]-s["reconciled_scopes"],"scan gap"); eq(s["formal_scan_coverage_complete"],s["formal_scan_coverage_gap"]==0,"scan complete"); eq(s["formal_scan_stale_against_current_tags"],s["formal_scan_coverage_gap"]>0,"scan stale"); ts(s["completed_at"],"scan completed")
+
     sup=r["supplemental_reconciliation_scans"]
     if not sup: bad("supplemental evidence missing")
     ids={v.get("scanner_id") for v in sup}
@@ -97,11 +115,11 @@ def validate(d,check_files=True):
     for k,v in pd.items(): eq(v["technical_state"],"unproven",f"{k}.technical"); eq(v["technical_pass_claimed"],False,f"{k}.pass")
 
     g=gate_map(d); eq(g["CT-P299-GATE-004"]["state"],"pass","GATE004"); eq(g["CT-P299-GATE-005"]["state"],"pass","GATE005"); eq(g["CT-P299-GATE-006"]["state"],"deferred_accepted_not_passed","GATE006"); eq(g["CT-P299-GATE-006"]["blocking"],False,"GATE006 block"); eq(g["CT-P299-GATE-008"]["state"],"not_met","GATE008"); eq(g["CT-P299-GATE-008"]["full_documentation_estate_gate"],"nondeferrable_not_met","GATE008 docs")
-    if s["formal_scan_coverage_gap"]>0: eq(g["CT-P299-GATE-003"]["state"],"not_met","GATE003"); eq(g["CT-P299-GATE-003"]["blocking"],True,"GATE003 block"); eq(g["CT-P299-GATE-003"]["formal_scan_coverage_gap"],s["formal_scan_coverage_gap"],"GATE003 gap")
+    if s["formal_scan_coverage_gap"]>0: eq(g["CT-P299-GATE-003"]["state"],"not_met","GATE003"); eq(g["CT-P299-GATE-003"]["blocking"],True,"GATE003 block"); eq(g["CT-P299-GATE-003"]["formal_scan_coverage_gap"],s["formal_scan_coverage_gap"],"GATE003 gap"); eq(g["CT-P299-GATE-003"]["coverage_denominator"],"reconcile_required_only","GATE003 denominator")
     eq(len([v for v in g.values() if v.get("blocking") and v.get("state")!="pass"]),5,"blocking gate count")
     h=d["hard_exit"]; eq(h["state"],"not_met","hard exit"); eq(h["blocking_gate_count"],5,"hard blockers"); eq(h["deferred_not_passed_gate_count"],1,"hard deferred"); eq(h["phase_2_complete"],False,"Phase2"); eq(h["phase_3_entry_open"],False,"Phase3 open"); eq(h["phase_3_entry"],"blocked_pending_phase_2_99_hard_exit","Phase3"); eq(h["gate_008_fail_closed_while_upstream_unresolved"],True,"GATE008 fail closed")
     i=d["integration"]; eq(i["workflow_wiring_state"],"active_governed_ci","workflow"); eq(i["rollback"],"revert_bounded_closure_ledger_packet","rollback")
-    for trig in ("reconciliation tag total/distribution drift","IP disclosure classification or publication-state change"):
+    for trig in ("reconciliation tag total/distribution/reconcile_required drift","IP disclosure classification or publication-state change"):
         if trig not in i["reopen_triggers"]: bad(f"reopen trigger missing: {trig}")
     if check_files:
         for p in d["evidence_paths"]+[i["workflow_path"]]:
@@ -132,12 +150,14 @@ def self_test(d):
     expect_fail(d,lambda x:x["ip_disclosure"].__setitem__("publication_state","HOLD"),"unresolved IP published")
     expect_fail(d,lambda x:x["commercialization"].__setitem__("checkout_enabled",True),"commercial activation from ledger")
     expect_fail(d,lambda x:x["reconciliation"]["material_tag_delta"].__setitem__("research_registry_growth_not_counted_as_certification_gap",False),"research registry growth misclassified")
+    expect_fail(d,lambda x:x["reconciliation"]["material_tag_delta"].__setitem__("non_reconcile_required_scope_ids",[]),"scan-only registry states converted into proof debt")
+    expect_fail(d,lambda x:x["reconciliation"]["latest_formal_reconciliation_scan"].__setitem__("formal_scan_coverage_gap",70),"formal debt calculated from total registry instead of reconcile-required scopes")
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument("--self-test",action="store_true"); a=p.parse_args(); d=load(LEDGER)
     if a.self_test:
         self_test(d); t=d["reconciliation"]["reconciliation_tag_snapshot"]; s=d["reconciliation"]["latest_formal_reconciliation_scan"]
-        print(f"Phase 2.99 ledger v1.3.3 self-test PASS: tags={t['total']}; formal gap={s['formal_scan_coverage_gap']}; IP=PUBLIC_STANDARD/PUBLIC_DOCTRINE; commercialization inactive; GATE008 fail-closed."); return 0
+        print(f"Phase 2.99 ledger v1.3.4 self-test PASS: registry={t['total']}; reconcile-required={t['reconcile_required']}; formal gap={s['formal_scan_coverage_gap']}; IP=PUBLIC_STANDARD/PUBLIC_DOCTRINE; commercialization inactive; GATE008 fail-closed."); return 0
     validate(d); t=d["reconciliation"]["reconciliation_tag_snapshot"]; s=d["reconciliation"]["latest_formal_reconciliation_scan"]
-    print("Phase 2.99 ledger v1.3.3 consistency PASS"); print(f"Current tags={t['total']}; formal-LMNO gap={s['formal_scan_coverage_gap']}; governed deferrals={d['reconciliation']['approved_deferral_count_snapshot']}; deferred tags={d['reconciliation']['deferred_routing_tag_count_snapshot']}"); print("Hard exit NOT MET; GATE006 deferred/NOT-PASS; Phase3 blocked."); return 0
+    print("Phase 2.99 ledger v1.3.4 consistency PASS"); print(f"Current registry={t['total']}; reconcile-required={t['reconcile_required']}; scan-only/non-debt={t['non_reconcile_required']}; formal-LMNO gap={s['formal_scan_coverage_gap']}"); print(f"Governed deferrals={d['reconciliation']['approved_deferral_count_snapshot']}; deferred routing tags={d['reconciliation']['deferred_routing_tag_count_snapshot']}"); print("Hard exit NOT MET; GATE006 deferred/NOT-PASS; Phase3 blocked."); return 0
 if __name__=="__main__": raise SystemExit(main())
