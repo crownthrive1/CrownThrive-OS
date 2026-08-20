@@ -1,4 +1,4 @@
-name: CrownThrive Framework Child Bootstrap
+name: CrownThrive Framework Package Bootstrap
 
 on:
   workflow_dispatch:
@@ -7,6 +7,14 @@ on:
       - main
     paths:
       - ".crownthrive/federation.json"
+      - "framework/manifest.json"
+      - "engine/**"
+      - "skills/**"
+      - "tools/**"
+      - "api/**"
+      - "mcp/**"
+      - "evals/**"
+      - "commercial/**"
       - "scripts/federation_client.py"
       - "scripts/validate_child_repository.py"
       - ".github/workflows/framework-child-bootstrap.yml"
@@ -16,12 +24,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: framework-child-bootstrap-${{ github.repository }}-${{ github.ref }}
+  group: framework-package-bootstrap-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   bootstrap:
-    name: Validate and bootstrap child identity
+    name: Validate and bootstrap framework package identity
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -33,8 +41,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate child repository contract
+      - name: Validate framework package contract
         run: python scripts/validate_child_repository.py
 
-      - name: Bootstrap repository identity with GitHub Actions OIDC
+      - name: Run local package health
+        run: python engine/engine.py health
+
+      - name: Bootstrap framework package identity with GitHub Actions OIDC
         run: python scripts/federation_client.py bootstrap
