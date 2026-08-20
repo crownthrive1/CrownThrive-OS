@@ -45,6 +45,7 @@ At minimum, inspect the applicable current versions of:
 - `standards/mcp-api-governance.mdx` when interfaces/tools are involved
 - `standards/search-seo-metadata-robots.mdx` when public routes or metadata are involved
 - `technology/phase-3-readiness-gate.mdx` for Phase 3 preparation
+- `technology/design-control-plane-and-creative-production.mdx` when product/UI/design-system, design-to-code, Figma, Canva, creative-production, or interface-accessibility work is involved
 - the relevant platform, corridor, CHLOM, Legal Depot, workflow, and runbook records.
 
 Do not rely on a summary when the controlling page is available.
@@ -185,6 +186,31 @@ Prefer supported APIs over brittle automation. Record exact provider/product/ver
 New production MCP designs target the `2026-07-28` protocol profile. Earlier versions require explicit compatibility and migration records. Tool descriptions must disclose side effects, data class, autonomy class, approval, and rollback or compensation behavior.
 
 A vendor implementation is replaceable. The CrownThrive stable platform/service identity survives it.
+
+### Design-control and creative-production routing
+
+For product/UI/design-system work, Figma is the governed visual and interaction design-control plane and Canva is a downstream creative-production layer. Neither supersedes CHLOM/CIE institutional, cultural, rights or policy authority; GitHub remains implementation authority for code.
+
+When a run contains UI/UX architecture, tokens/components, design↔code mapping, Code Connect, creative derivatives or interface accessibility, the Agent Router/Factory may instantiate these task-scoped specialists:
+
+- `ct.agent.design-system-architect`;
+- `ct.agent.design-code-connect`;
+- `ct.agent.brand-content-production`;
+- `ct.agent.design-quality-auditor`.
+
+Permanent rules:
+
+- never invent canonical brand/design tokens to fill a Figma system;
+- approximate visual values remain research/prototype state until authoritative provenance exists;
+- never create a Code Connect mapping from name similarity or a guessed repository/source path;
+- Canva output cannot silently redefine canonical Figma/CHLOM design contracts;
+- provider-managed OAuth sessions remain provider-managed; do not manufacture or copy unavailable token values into Vault;
+- future CrownThrive-controlled connector secrets use Vault-backed references, least privilege, rotation and runtime-consumer records;
+- connector authentication, provider action verification, MCP tool registration, central dispatch certification and production write-gate state are separate evidence dimensions;
+- meter provider request/cost budgets and avoid repeated exploratory scans when reusable context exists;
+- design-system changes inherit documentation impact, accessibility, rights/provenance, recovery, DAIL and phase-gate obligations.
+
+The controlling public-safe standard is `technology/design-control-plane-and-creative-production.mdx` plus `standards/mcp-api-governance.mdx`.
 
 ## 13. Search, metadata, robots, and sitemaps
 
