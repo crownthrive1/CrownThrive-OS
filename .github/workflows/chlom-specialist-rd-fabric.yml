@@ -1,0 +1,60 @@
+name: CHLOM Specialist R&D Fabric
+
+on:
+  pull_request:
+    paths:
+      - "automation/chlom-specialist-rd-fabric.mdx"
+      - "chlom/specialist-rd-integration-and-paper-pipeline.mdx"
+      - "standards/documentation-linking-and-machine-ingestion.mdx"
+      - "developers/agents/specialists/**"
+      - "developers/manifests/chlom-specialist-rd-subagents.v1.json"
+      - "scripts/validate_chlom_specialist_rd_subagents.py"
+      - ".github/workflows/chlom-specialist-rd-fabric.yml"
+      - "changelog/phase-2-99-chlom-specialist-rd-fabric.md"
+  push:
+    branches:
+      - main
+    paths:
+      - "automation/chlom-specialist-rd-fabric.mdx"
+      - "chlom/specialist-rd-integration-and-paper-pipeline.mdx"
+      - "standards/documentation-linking-and-machine-ingestion.mdx"
+      - "developers/agents/specialists/**"
+      - "developers/manifests/chlom-specialist-rd-subagents.v1.json"
+      - "scripts/validate_chlom_specialist_rd_subagents.py"
+      - ".github/workflows/chlom-specialist-rd-fabric.yml"
+      - "changelog/phase-2-99-chlom-specialist-rd-fabric.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-specialist-rd-fabric:
+    name: Validate specialist R&D contracts and docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile validator
+        run: python -m py_compile scripts/validate_chlom_specialist_rd_subagents.py
+
+      - name: Validate specialist fabric
+        run: python scripts/validate_chlom_specialist_rd_subagents.py
+
+      - name: Run documentation governance
+        run: python scripts/validate_docs.py
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
