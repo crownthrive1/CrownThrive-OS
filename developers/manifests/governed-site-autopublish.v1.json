@@ -1,6 +1,8 @@
 {
   "schema_version": "1.0.0",
   "stable_id": "ct.manifest.governed-site-autopublish.v1",
+  "public_projection": true,
+  "private_runtime_topology_excluded": true,
   "policy": {
     "policy_id": "ct.site.autopublish.v1",
     "auto_publish_if_release_pass": true,
@@ -30,33 +32,16 @@
     "originator_self_vote_prohibited": true,
     "vote_requests_are_routed_not_fabricated": true
   },
-  "runtime_tables": [
-    "integration_control.release_policies",
-    "integration_control.governed_releases",
-    "integration_control.governed_release_certifications",
-    "integration_control.governed_release_votes",
-    "integration_control.site_provider_adapters",
-    "integration_control.site_publish_routes",
-    "integration_control.site_publish_jobs",
-    "integration_control.site_publish_attempts",
-    "integration_control.site_catalog_projection"
-  ],
-  "dynamic_feed": {
-    "edge_function": "site-catalog-feed",
-    "verify_jwt": false,
+  "catalog_projection": {
     "public_read_only": true,
-    "adapter_id": "ct.adapter.dynamic-feed.v1",
     "adapter_state": "certified",
     "read_capability_state": "pass",
     "write_canary_state": "pass",
     "rollback_canary_state": "pass",
     "read_after_write_state": "pass",
-    "committed_write_readback": true,
-    "cache_busted_canary": true
+    "committed_write_readback": true
   },
   "canary": {
-    "surface_id": "ct.surface.autopublish-canary.preview",
-    "release_ref": "CT-AUTOPUBLISH-CANARY-001",
     "quorum_acceptance": "pass",
     "pre_adapter_quarantine": "pass",
     "automatic_queue_after_adapter_certification": "pass",
@@ -68,54 +53,45 @@
   },
   "production_sites": [
     {
-      "surface_id": "ct.surface.crownthrive-developer-marketplace.production",
-      "platform_id": "ct.platform.crownthrive-developer-marketplace",
-      "provider_system": "ChatGPT Sites",
-      "provider_project_ref": "appgprj_6a87550e93508191b748e5acd2265ce1",
-      "dynamic_feed_route": "ct.route.developer-marketplace.dynamic-feed",
-      "feed_consumer_state": "pending",
-      "provider_mutation_adapter": "ct.adapter.sites.developer-marketplace.v1",
-      "provider_mutation_adapter_state": "candidate",
-      "auto_update_enabled": false
+      "platform": "Developer Marketplace",
+      "provider_class": "Sites",
+      "catalog_destination_registered": true,
+      "consumer_bootstrap_state": "pending",
+      "provider_source_write_state": "candidate",
+      "automatic_production_publish": false
     },
     {
-      "surface_id": "ct.surface.kjv-visualized.production",
-      "platform_id": "ct.platform.kjv-sermon-toolkit",
-      "provider_system": "ChatGPT Sites",
-      "provider_project_ref": "appgprj_6a7a0322f3b08191b964bc65aeeebb26",
-      "dynamic_feed_route": "ct.route.kjv.dynamic-feed",
-      "feed_consumer_state": "pending",
-      "provider_mutation_adapter": "ct.adapter.sites.kjv.v1",
-      "provider_mutation_adapter_state": "candidate",
-      "auto_update_enabled": false
+      "platform": "KJV Visualized / Sermon Toolkit",
+      "provider_class": "Sites",
+      "catalog_destination_registered": true,
+      "consumer_bootstrap_state": "pending",
+      "provider_source_write_state": "candidate",
+      "automatic_production_publish": false
     },
     {
-      "surface_id": "ct.surface.virality-music.production",
-      "platform_id": "ct.platform.virality-music",
-      "provider_system": "ChatGPT Sites",
-      "provider_project_ref": "appgprj_6a61943ed76081919d48d754b13d8252",
-      "dynamic_feed_route": "ct.route.virality.dynamic-feed",
-      "feed_consumer_state": "pending",
-      "provider_mutation_adapter": "ct.adapter.sites.virality.v1",
-      "provider_mutation_adapter_state": "candidate",
-      "auto_update_enabled": false,
+      "platform": "Virality Music",
+      "provider_class": "Sites",
+      "catalog_destination_registered": true,
+      "consumer_bootstrap_state": "pending",
+      "provider_source_write_state": "candidate",
+      "automatic_production_publish": false,
       "soundcloud_api": "REMOVED_BY_FOUNDER_OVERRIDE"
     }
   ],
   "product_factory": {
-    "downloadable_asset_trigger": true,
-    "membership_catalog_digest_trigger": true,
-    "generic_platform_release_registration_rpc": true,
-    "developer_marketplace_seeded_releases": 7,
-    "developer_marketplace_current_release_state": "quarantined_hold",
+    "downloadable_asset_projection": true,
+    "membership_catalog_digest_projection": true,
+    "generic_platform_release_registration": true,
+    "current_commercial_release_state": "quarantined_hold",
     "synthetic_pass_promotes_to_live_pass": false
   },
-  "schedules": [
-    {"job": "governed_site_autopublish_dispatcher", "schedule": "*/2 * * * *"},
-    {"job": "governed_release_vote_router", "schedule": "*/5 * * * *"},
-    {"job": "governed_dynamic_feed_adapter_canary", "schedule": "57 * * * *"},
-    {"job": "governed_site_feed_bootstrap_verifier", "schedule": "7 * * * *"}
-  ],
+  "persistent_automation": {
+    "publication_dispatch": true,
+    "vote_request_routing": true,
+    "adapter_recertification": true,
+    "storefront_bootstrap_verification": true,
+    "exact_cadence_public": false
+  },
   "rollback": {
     "authorization_loss_withdraws_projection": true,
     "negative_vote_can_withdraw": true,
@@ -127,9 +103,9 @@
   },
   "commerce_boundaries": {
     "license_authority": "CHLOM_THIVEBASE",
-    "stripe_metadata_grants_license": false,
+    "payment_provider_metadata_grants_license": false,
     "store_credit_program_live": false,
-    "store_credit_legal_tax_state": "specialist_review_required_before_live_activation",
+    "store_credit_activation_state": "hold",
     "publication_equals_commerce_activation": false
   },
   "phase": {
@@ -142,8 +118,8 @@
     "originator_self_vote",
     "fabricate_independent_votes",
     "reuse_votes_after_exact_hash_change",
-    "dynamic_feed_certification_equals_provider_source_write_certification",
-    "enable_production_surface_before_feed_consumer_verification",
+    "catalog_projection_certification_equals_provider_source_write_certification",
+    "enable_production_surface_before_consumer_verification",
     "publish_without_rollback_and_read_after_write",
     "payment_provider_metadata_grants_license",
     "synthetic_canary_represented_as_live_provider_proof",
