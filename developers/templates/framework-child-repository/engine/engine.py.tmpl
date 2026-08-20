@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Public-safe framework engine shell.
+
+The package is independently executable for validation, health, deterministic public
+contract checks and governed runtime dispatch. Proprietary calibration, private eval
+corpora and restricted decision logic remain in the approved private runtime.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+FRAMEWORK_MANIFEST = ROOT / "framework/manifest.json"
+FEDERATION = ROOT / ".crownthrive/federation.json"
+
+
+def load(path: Path) -> dict:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise RuntimeError(f"invalid_object:{path}")
+    return value
+
+
+def health() -> dict:
+    manifest = load(FRAMEWORK_MANIFEST)
+    return {
+        "ok": True,
+        "package_id": manifest["package_id"],
+        "framework_id": manifest["framework_id"],
+        "package_state": manifest["package_state"],
+        "vote_eligible": False,
+        "public_activation_allowed": False,
+        "manifest_sha256": hashlib.sha256(FRAMEWORK_MANIFEST.read_bytes()).hexdigest(),
+    }
+
+
+def evaluate_contract_only(payload: dict) -> dict:
+    """Fail-closed public-contract entry point.
+
+    This function proves the package engine boundary works without embedding protected
+    CrownThrive calibration. Material scoring/decision execution must use the governed
+    private runtime/API/MCP path registered for the framework.
+    """
+    manifest = load(FRAMEWORK_MANIFEST)
+    if not isinstance(payload, dict):
+        raise RuntimeError("payload_object_required")
+    return {
+        "ok": False,
+        "state": "HOLD_PRIVATE_RUNTIME_REQUIRED",
+        "framework_id": manifest["framework_id"],
+        "reason": "Protected decision logic is not duplicated in the public package.",
+        "next": "invoke_governed_private_runtime_via_registered_api_mcp_federation_path",
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("action", choices=("health", "evaluate-contract-only"))
+    parser.add_argument("--input", default="{}")
+    args = parser.parse_args()
+    if args.action == "health":
+        result = health()
+    else:
+        result = evaluate_contract_only(json.loads(args.input))
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
