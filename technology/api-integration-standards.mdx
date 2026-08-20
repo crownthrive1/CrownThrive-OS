@@ -44,6 +44,17 @@ For critical state changes, prefer durable queue/outbox patterns over best-effor
 
 Remote MCP authorization should follow the protocol's current authorization specification when authorization is implemented, using established OAuth patterns, secure token storage, HTTPS and appropriate PKCE/resource protections. MCP tools should expose domain actions—not unrestricted database or shell access.
 
+## Current first-party adapter reference
+
+The Collab Portal Secure API is the first live application of these standards to a first-party interface. Treat it as the reference example when applying this standard to a new integration.
+
+- **Adapter contract:** [Collab Portal Secure API adapter](/developers/collab-portal-secure-api-adapter) documents the bounded project-manager read/write surface, header-based `X-Public-ID`/`X-Secret-Key` authentication and the closed gates that keep provider writes disabled.
+- **Authoritative OpenAPI evidence:** source `S101` pins the recovered Collab Portal Secure API OpenAPI 3.0.3 specification, a fixed base URL and a snapshot checksum. See the [Phase 2.99 Collab Portal Secure API integration changelog](/changelog/phase-2-99-collab-portal-secure-api-integration) for the exact identifiers.
+- **Webhook state (S102):** the Collab Portal UI exposes configurable webhook endpoints with distinct Project Created, Project Updated and Project Deleted event selection. The Secure API OpenAPI does not expose webhook registration or event schemas, and no signing secret, retry, replay or dead-letter behavior has been recovered. The [Phase 2.99 S102 webhook state reconciliation changelog](/changelog/phase-2-99-s102-webhook-state-reconciliation) records both facts without merging them.
+- **Runtime posture:** the `collab-portal-pm` runtime is fail-closed until credential, project UID, field-mapping, authenticated-read and write-readback gates pass.
+
+Reference the underlying manifest at `developers/manifests/collab-portal-secure-api.adapter.json` for the machine contract; this page does not inline its schema.
+
 ## Contract testing
 
 Each integration needs synthetic fixtures, schema tests, auth tests, retry/idempotency tests, negative permission tests, timeout/failure tests and a documented mock/test environment where feasible.
