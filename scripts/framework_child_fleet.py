@@ -269,8 +269,9 @@ def render_framework(data: dict[str, Any], framework_id: str, output_dir: Path) 
         text = (TEMPLATE_ROOT / template_rel).read_text(encoding="utf-8")
         for key, value in repl.items():
             text = text.replace(key, value)
-        if "{{" in text or "}}" in text:
-            fail(f"unresolved framework package placeholder in {template_rel}")
+        unresolved = sorted(key for key in repl if key in text)
+        if unresolved:
+            fail(f"unresolved framework package placeholders in {template_rel}: {unresolved}")
         dst = output_dir / output_rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text(text, encoding="utf-8")
