@@ -303,7 +303,7 @@ def main() -> int:
         "agent_registry": ["A/B/C/D/S", "Agent I", "Agent K"],
         "relay": ["Agent E", "Agent H", "ct.subagent.phase3-snapshot-packet"],
         "permissions": ["Scheduled specialist and embedded subagent delegation"],
-        "factory": ["Agent factory template system", "Agent K"],
+        "factory": ["Agent factory template system", "ct.subagent.roadmap-transition"],
         "templates": ["Fluid cognition, rigid authority", "RESEARCH_CANDIDATE", "same governed root", "CT:CERTIFICATION-SCOPE"],
         "factory_delegation": ["Agent Factory Delegation", "independence family", "TTL", "budget"],
         "lineage_archive": ["Generation 5", "Template generation 1.1.0"],
