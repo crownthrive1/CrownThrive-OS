@@ -1,0 +1,182 @@
+---
+title: "Phase 2.99 WS3A — ThriveTools Child API Reconciliation"
+sidebarTitle: "2.99 WS3A — ThriveTools APIs"
+description: "Governed reconciliation of ThriveTools SEO and ThriveTools OPT as distinct child applications, including OPT v4.0.0 API evidence, dual Vault continuity, disabled-by-default MCP contracts and fail-closed runtime gates."
+icon: "plug-circle-check"
+keywords: ["Phase 2.99", "ThriveTools OPT", "ThriveTools SEO", "API", "Supabase Vault", "Workstream 3A", "v4.0.0"]
+---
+
+# Phase 2.99 Workstream 3A — ThriveTools Child API Reconciliation
+
+## Run identity
+
+```yaml
+phase: 2.99
+workstream: 3A
+cohort: thrivetools_child_api_reconciliation
+founder_evidence_date: 2026-08-19
+documentation_impact: docs_updated
+phase_2_99_hard_exit: not_met
+phase_3_entry: blocked_pending_phase_2_99_hard_exit_and_full_docs_reconciliation
+```
+
+## Decision
+
+Direct CrownThrive application/API evidence now resolves **ThriveTools SEO** and **ThriveTools OPT** as distinct child applications inside the `ct.platform.thrivetools` family:
+
+```text
+ct.platform.thrivetools
+├── ct.platform.thrivetools-seo
+└── ct.platform.thrivetools-opt
+```
+
+The child identities do **not** merge into the root platform, and their credentials, engines, API contracts, quotas, deployment state and runtime evidence do not promote to the root by inheritance.
+
+## ThriveTools OPT evidence added
+
+Founder-supplied developer documentation establishes:
+
+- product identity: **ThriveTools OPT**;
+- displayed version: `v4.0.0`;
+- API base: `https://optimize.thrivetools.io/api`;
+- authentication through the `Authorization` header;
+- six documented endpoint URLs;
+- source-visible request parameter and response shapes;
+- source-visible optimization/storage status example.
+
+The supplied material does **not explicitly state HTTP verbs**. No verb is inferred from route names or content type.
+
+Documented paths:
+
+- `/get-images`;
+- `/get-media`;
+- `/upload`;
+- `/delete`;
+- `/get-single-image`;
+- `/check-status`.
+
+## Credential handling
+
+The founder-supplied API credential is classified **restricted runtime-only**.
+
+```yaml
+service_id: thrivetools_opt
+credential_reference: vault:thrivetools_opt_api_key
+primary_vault_alias: configured
+recovery_vault_alias: configured
+fingerprints_match: true
+raw_secret_publication: prohibited
+```
+
+The raw credential is excluded from GitHub, Mintlify, source examples, logs, screenshots, CI output and client-side code.
+
+## Runtime scaffold
+
+Supabase Edge Function `thrivetools-opt-api-control` v1 is deployed with JWT verification enabled.
+
+Current behavior is deliberately fail-closed:
+
+- health/configuration reporting is allowed without exposing the credential;
+- capabilities expose only the governed operation catalog;
+- provider read dispatch is disabled until exact HTTP methods and authenticated D0 behavior are certified;
+- provider upload/delete dispatch is disabled.
+
+## Machine tool contracts
+
+Six machine/MCP contracts are pre-registered but disabled:
+
+### D0 read targets
+
+- `opt.status.check`;
+- `opt.images.list`;
+- `opt.media.list`;
+- `opt.image.get`.
+
+### D2 mutation targets
+
+- `opt.images.upload` — disabled and human approval required;
+- `opt.images.delete` — disabled and human approval required.
+
+Schemas are bounded with `additionalProperties: false`. Disabled registration prepares future automation without representing the provider interface as certified.
+
+## THIVEBASE gate state
+
+```yaml
+api_documentation: passed
+credential_vault_binding: passed
+parent_child_identity: passed
+endpoint_method_reconciliation: open
+authenticated_read: open
+mcp_adapter: open
+provider_writes: closed
+```
+
+`passed` above means the named evidence/control passed. It does not mean the entire OPT integration passed.
+
+## Source-visible status example
+
+The supplied developer interface shows a status example containing:
+
+- optimization capacity: `Unlimited`;
+- available optimization: `Unlimited`;
+- storage capacity: `20GB`;
+- example used storage: `0`.
+
+Those values are preserved as **source-visible documentation/account evidence**, not as a fresh live runtime certification.
+
+## Portfolio and edge impact
+
+The Holdings 68-row identity cohort now resolves:
+
+- `S100-PORT-016` Ecosystem Status → `ct.platform.crownthrive-ecosystem-status` from founder lineage evidence;
+- `S100-PORT-018` ThriveTools SEO → `ct.platform.thrivetools-seo`;
+- `S100-PORT-019` ThriveTools OPT → `ct.platform.thrivetools-opt`;
+- `S100-PORT-023` NeuralCraft → `ct.platform.neuralcraft-ai-studio` from founder adjudication.
+
+This reduces the canonical/child identity-pending cohort from six source rows to two. It does **not** close current provider/account/domain/runtime certification for the 68/82/85 estate.
+
+The current engine/domain edge projection advances from 25 to 27 stable identities and from 30 to 32 unique effective S100 engine rows while preserving the 24 unique S100 domain rows. Direct child hosts such as `seo.thrivetools.io` and `optimize.thrivetools.io` are current host evidence, not retroactive additions to the historical 82-domain S100 table.
+
+## Security and destructive-action controls
+
+Upload and Delete are not activated by possession of a credential.
+
+Future upload certification requires, as applicable:
+
+- exact HTTP method;
+- bounded file references, file types and sizes;
+- compression-ratio constraints;
+- source-asset rights and provenance;
+- privacy/data classification;
+- response/output validation;
+- audit/DAIL evidence;
+- read-after-write or equivalent confirmation;
+- provider/object-store recovery and exit behavior.
+
+Future deletion certification requires target validation, retention/recovery policy and explicit scoped authority. `permanent_delete=true` remains a high-scrutiny destructive operation.
+
+## Exact next steps
+
+1. obtain authoritative HTTP-method evidence for all six OPT paths;
+2. certify `/check-status` as the first bounded authenticated D0 provider request;
+3. validate JSON content type and response schema;
+4. certify `/get-images`, `/get-media` and `/get-single-image` reads;
+5. only then consider enabling D0 MCP tools;
+6. leave upload/delete closed until a separate D2 authorization and certification packet;
+7. reconcile OPT object/export/provider-exit behavior into GATE-007 continuity evidence.
+
+## Non-goals
+
+This packet does not:
+
+- expose the API credential;
+- claim a fresh live storage/quota value;
+- infer HTTP verbs;
+- enable provider writes;
+- mark the full ThriveTools OPT integration PASS;
+- make the root ThriveTools platform inherit child API state;
+- close GATE-001, Workstream 3A, Phase 2.99 or Phase 3.
+
+### Page changelog
+
+- **2026-08-19 v1.0:** resolved ThriveTools SEO/OPT child identities, registered the founder-supplied OPT v4.0.0 API contract, added dual Vault continuity, fail-closed JWT adapter scaffold, disabled machine tool contracts, portfolio/edge propagation and explicit runtime/write gates.
