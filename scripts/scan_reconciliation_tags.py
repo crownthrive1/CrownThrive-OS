@@ -15,6 +15,10 @@ A moving open draft head is itself reconciliation evidence, not necessarily a
 CI defect. Head drift is reported and requires Agent O reconciliation; it only
 fails this scanner when the stale indexed row still claims ``CT:CI-PASS``,
 because exact-head technical proof must never silently follow a changed head.
+
+R&D tags are governed routing state. RESEARCH_CANDIDATE and PROMOTION_PENDING
+cannot become PASS by tag convenience, and research-only registry growth is not
+formal certification coverage until a governed promotion boundary is crossed.
 """
 from __future__ import annotations
 
@@ -58,31 +62,47 @@ def load_json(path: Path) -> dict[str, Any]:
     return data
 
 
-def validate_tag_set(tags: list[str], allowed: set[str], context: str) -> None:
+def validate_tag_set(tags: list[str], tag_defs: dict[str, Any], context: str) -> None:
     if len(tags) != len(set(tags)):
         fail(f"Duplicate reconciliation tag in {context}")
+    allowed = set(tag_defs)
     unknown = sorted(set(tags) - allowed)
     if unknown:
         fail(f"Unknown reconciliation tag(s) in {context}: {unknown}")
     s = set(tags)
+
+    # Enforce machine-declared requires/prohibits for every tag so future tag
+    # additions fail closed without requiring a second hand-maintained rule set.
+    for tag in s:
+        definition = tag_defs.get(tag)
+        if not isinstance(definition, dict):
+            fail(f"Invalid tag definition for {tag} in manifest")
+        requires = set(definition.get("requires") or [])
+        prohibits = set(definition.get("prohibits") or [])
+        missing = sorted(requires - s)
+        if missing:
+            fail(f"{tag} missing required tags {missing} in {context}")
+        conflicts = sorted(prohibits & s)
+        if conflicts:
+            fail(f"{tag} conflicts with {conflicts} in {context}")
+
     if "CT:PASS" in s:
-        required = {"CT:RECONCILE", "CT:SOURCE-SCAN", "CT:DRIFT-WATCH"}
-        if not required.issubset(s):
-            fail(f"CT:PASS missing required drift/source tags in {context}")
         if s & {"CT:OPEN", "CT:BLOCKED", "CT:DEFERRAL", "CT:NOT-PASS"}:
             fail(f"CT:PASS conflicts with unresolved state in {context}")
-    if "CT:DEFERRAL" in s:
-        required = {"CT:NOT-PASS", "CT:RECONCILE", "CT:SOURCE-SCAN", "CT:REOPEN-WATCH"}
-        if not required.issubset(s):
-            fail(f"CT:DEFERRAL missing required non-pass/reopen tags in {context}")
-        if "CT:PASS" in s:
-            fail(f"Deferral cannot be PASS in {context}")
+        if "CT:RND" in s and "CT:CERTIFICATION-SCOPE" not in s:
+            fail(f"R&D-lineage PASS requires governed CT:CERTIFICATION-SCOPE in {context}")
+    if "CT:DEFERRAL" in s and "CT:PASS" in s:
+        fail(f"Deferral cannot be PASS in {context}")
     if "CT:STALE-BASE" in s and not {"CT:DRAFT", "CT:RECONCILE"}.issubset(s):
         fail(f"CT:STALE-BASE must be a reconciled draft in {context}")
     if "CT:CI-PASS" in s and "CT:CI-FAIL" in s:
         fail(f"CI cannot be both PASS and FAIL in {context}")
     if "CT:SUPERSEDED" in s and "CT:RECONCILE" not in s:
         fail(f"Superseded record must remain reconciliation-addressable in {context}")
+    if "CT:RESEARCH-CANDIDATE" in s and "CT:PASS" in s:
+        fail(f"RESEARCH_CANDIDATE cannot be PASS in {context}")
+    if "CT:PROMOTION-PENDING" in s and "CT:PASS" in s:
+        fail(f"PROMOTION_PENDING cannot be PASS in {context}")
 
 
 def parse_tag_blocks(text: str) -> list[list[str]]:
@@ -99,7 +119,7 @@ def github_get(url: str, token: str) -> Any:
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "crownthrive-reconciliation-tag-scanner/1.0",
+            "User-Agent": "crownthrive-reconciliation-tag-scanner/1.1",
         },
     )
     with urllib.request.urlopen(req, timeout=15) as response:  # noqa: S310 - validated fixed GitHub host
@@ -174,9 +194,20 @@ def main() -> int:
         "CT:RECONCILE", "CT:SOURCE-SCAN", "CT:DRIFT-WATCH", "CT:REOPEN-WATCH",
         "CT:DRAFT", "CT:STALE-BASE", "CT:CI-PASS", "CT:CI-FAIL", "CT:QUORUM-PENDING",
         "CT:SPECIALIST-PENDING", "CT:DEPENDENCY-PENDING", "CT:SUPERSEDED",
+        "CT:RND", "CT:RESEARCH-CANDIDATE", "CT:PROMOTION-PENDING", "CT:CERTIFICATION-SCOPE",
     }
     if not required_allowed.issubset(allowed):
         fail(f"Required reconciliation tags missing: {sorted(required_allowed - allowed)}")
+
+    research = tag_manifest.get("research_promotion", {})
+    if research.get("default_state") != "RESEARCH_CANDIDATE":
+        fail("R&D default state must remain RESEARCH_CANDIDATE")
+    if research.get("direct_pass_prohibited") is not True:
+        fail("R&D direct transition to PASS must remain prohibited")
+    if research.get("research_registry_growth_is_formal_coverage_gap") is not False:
+        fail("R&D registry growth may not be treated as formal coverage drift by count alone")
+    if research.get("research_candidate_excluded_from_hard_exit_denominator") is not True:
+        fail("R&D candidates must remain outside hard-exit denominator until promotion/material touch")
 
     validate_agent_contracts(tag_manifest)
 
@@ -215,7 +246,7 @@ def main() -> int:
         tags = row.get("tags")
         if not isinstance(tags, list) or not all(isinstance(x, str) for x in tags):
             fail(f"PR #{pr} tags must be strings")
-        validate_tag_set(tags, allowed, f"PR #{pr}")
+        validate_tag_set(tags, tag_defs, f"PR #{pr}")
         s = set(tags)
         if "CT:DRAFT" not in s:
             fail(f"Open draft index entry #{pr} lacks CT:DRAFT")
@@ -237,7 +268,7 @@ def main() -> int:
         tags = row.get("tags")
         if not isinstance(tags, list) or not all(isinstance(x, str) for x in tags):
             fail(f"Closed PR #{row.get('pr')} tags must be strings")
-        validate_tag_set(tags, allowed, f"closed PR #{row.get('pr')}")
+        validate_tag_set(tags, tag_defs, f"closed PR #{row.get('pr')}")
         if "CT:SUPERSEDED" not in tags:
             fail(f"Closed superseded PR #{row.get('pr')} lacks CT:SUPERSEDED")
         if row.get("disposition") != "closed_unmerged_history_preserved":
@@ -257,7 +288,7 @@ def main() -> int:
             texts.append(("comment.body", str(comment.get("body") or "")))
         for context, text in texts:
             for block in parse_tag_blocks(text):
-                validate_tag_set(block, allowed, context)
+                validate_tag_set(block, tag_defs, context)
 
     drift_messages: list[str] = []
     if args.github_open_prs:
@@ -299,6 +330,7 @@ def main() -> int:
             print(f"DRIFT: {message}")
     print("Agents L/M/N/O are non-voting, least-privilege, self-auditing and phase-gated.")
     print("PASS remains drift-watched; DEFERRAL remains explicitly NOT-PASS.")
+    print("R&D candidates remain outside formal certification accounting until governed promotion/material touch.")
     return 0
 
 
