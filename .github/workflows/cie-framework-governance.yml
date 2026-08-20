@@ -1,0 +1,103 @@
+name: CIE Framework Governance
+
+on:
+  pull_request:
+    paths:
+      - "doctrine/cultural-imprint-engine.mdx"
+      - "automation/cie-framework-agent.mdx"
+      - "automation/framework-agent-registry.mdx"
+      - "automation/institutional-agent-relay-v2.mdx"
+      - "automation/permissions-and-approval-gates.mdx"
+      - "chlom/cie-cultural-governance-pallet.mdx"
+      - "developers/manifests/cie-framework-agent.v1.json"
+      - "developers/manifests/agent-sovereign-governance.v2.json"
+      - "scripts/cie_scan.py"
+      - "scripts/validate_cie_framework_agent.py"
+      - "scripts/governed_merge_decision_v2.py"
+      - "scripts/validate_agent_sovereign_governance_v2.py"
+      - "scripts/governed_current_pr_preflight_v2.py"
+      - ".github/workflows/cie-framework-governance.yml"
+      - ".github/workflows/docs-governance.yml"
+      - ".github/workflows/governed-merge-gate.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "doctrine/cultural-imprint-engine.mdx"
+      - "automation/cie-framework-agent.mdx"
+      - "automation/framework-agent-registry.mdx"
+      - "automation/institutional-agent-relay-v2.mdx"
+      - "automation/permissions-and-approval-gates.mdx"
+      - "chlom/cie-cultural-governance-pallet.mdx"
+      - "developers/manifests/cie-framework-agent.v1.json"
+      - "developers/manifests/agent-sovereign-governance.v2.json"
+      - "scripts/cie_scan.py"
+      - "scripts/validate_cie_framework_agent.py"
+      - "scripts/governed_merge_decision_v2.py"
+      - "scripts/validate_agent_sovereign_governance_v2.py"
+      - "scripts/governed_current_pr_preflight_v2.py"
+      - ".github/workflows/cie-framework-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cie-framework-governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-cie:
+    name: Validate CIE framework agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile CIE and governance-v2 scripts
+        run: |
+          python -m py_compile scripts/cie_scan.py
+          python -m py_compile scripts/validate_cie_framework_agent.py
+          python -m py_compile scripts/governed_merge_decision_v2.py
+          python -m py_compile scripts/validate_agent_sovereign_governance_v2.py
+          python -m py_compile scripts/governed_current_pr_preflight_v2.py
+
+      - name: Run CIE deterministic scanner self-test
+        run: python scripts/cie_scan.py --self-test
+
+      - name: Validate CIE framework contract and 92-point readiness
+        run: python scripts/validate_cie_framework_agent.py
+
+      - name: Validate foundational framework voter constitution
+        run: |
+          python scripts/validate_agent_sovereign_governance_v2.py
+          python scripts/governed_merge_decision_v2.py --self-test
+
+      - name: Validate current PR exact-diff preflight
+        if: github.event_name == 'pull_request'
+        env:
+          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python scripts/governed_current_pr_preflight_v2.py \
+            --git-base "$CT_GIT_BASE_SHA" \
+            --git-head "$CT_GIT_HEAD_SHA"
+
+      - name: Re-run institutional documentation governance
+        run: python scripts/validate_docs.py
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
