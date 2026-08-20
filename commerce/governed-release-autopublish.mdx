@@ -3,14 +3,14 @@ title: "Governed Release Auto-Publish"
 description: "How CrownThrive automatically routes fully certified, quorum-accepted digital releases to the correct site while quarantining HOLD, UNKNOWN and unproven provider paths."
 sidebarTitle: "Governed Auto-Publish"
 icon: "paper-plane"
-keywords: ["auto-publish", "governed release", "Store Credits", "release vote", "site catalog", "quarantine"]
+keywords: ["auto-publish", "governed release", "release vote", "site catalog", "quarantine"]
 ---
 
 # Governed release auto-publish
 
-CrownThrive treats publication as the terminal effect of a governed release decision, not as a side effect of building a file or creating a price.
+CrownThrive treats publication as the terminal effect of a governed release decision, not as a side effect of building a file, creating a price or registering a provider project.
 
-The policy identifier is `ct.site.autopublish.v1`.
+The governed auto-publish policy is fail-closed.
 
 ## Core invariant
 
@@ -19,122 +19,77 @@ A digital release may publish automatically only when all applicable conditions 
 1. the subject and destination have stable registered identities;
 2. the release is bound to an exact version and SHA-256 content digest;
 3. every required certification dimension is `pass` or explicitly `not_applicable`;
-4. the release has the required independent quorum;
-5. the independent gatekeeper vote is present;
-6. there are no disqualifying negative votes;
-7. any D3 release has the required human approval;
-8. the destination route is active;
-9. the destination adapter is certified for its exact operation;
-10. rollback and read-after-write requirements are satisfied; and
-11. the destination surface has `auto_update_enabled=true` only after its own bootstrap/capability evidence passes.
+4. the required independent quorum is satisfied, including the independent gatekeeper;
+5. there are no disqualifying negative votes;
+6. any D3 release has the required human approval;
+7. the destination route is active;
+8. the destination adapter is certified for its exact operation;
+9. rollback and read-after-write requirements are satisfied; and
+10. the destination surface has passed its own bootstrap/capability evidence.
 
-If any applicable state is `HOLD`, `UNKNOWN`, `pending`, `fail`, stale, superseded or mismatched to the exact release snapshot, publication fails closed into quarantine.
+If any applicable state is `HOLD`, `UNKNOWN`, pending, failed, stale, superseded or mismatched to the exact release snapshot, publication remains quarantined.
 
 ## Release and vote model
 
-The machine record separates:
+The machine record keeps release identity, specialist certifications, eligible votes, human approval, destination routing, provider-adapter certification and publication evidence as separate dimensions.
 
-- release identity and exact snapshot;
-- specialist certifications;
-- eligible votes;
-- human approval where required;
-- destination route;
-- provider adapter certification;
-- publication jobs; and
-- append-only publication attempts.
-
-The default policy requires at least three eligible YES votes and includes `ct.relay.agent-d` as a required independent gatekeeper. A negative vote blocks acceptance under the current policy. The originating agent cannot vote on its own release.
-
-A rebuild, new asset hash, material catalog digest, changed license/price snapshot, or changed destination creates a different authorization snapshot. A prior vote is not silently inherited by a changed artifact.
+The originating agent cannot vote on its own release. A rebuild, new asset hash, material catalog digest, changed license/economic snapshot or changed destination creates a different authorization snapshot. Prior votes are not silently inherited by a changed artifact.
 
 ## Product factory
 
-For the Developer Marketplace, current downloadable asset certification records automatically project into governed release records. The projection carries only public-safe catalog data; storage paths, provider secrets and restricted evidence are not publication payloads.
+Eligible product and asset records automatically project into governed release candidates. Public publication payloads contain public-safe catalog data only; credentials, storage paths, restricted evidence and protected economic calibration remain in private governed custody.
 
-Memberships use a deterministic catalog digest rather than a file hash. A catalog change therefore creates a new exact release snapshot.
-
-When all required certification dimensions become PASS, the release factory sends vote requests to the active vote-eligible relay agents. The database does not impersonate independent voters or manufacture quorum.
+When all required certification dimensions become PASS, the release factory routes vote requests to eligible relay agents. The database does not impersonate independent voters or manufacture quorum.
 
 ## Publication modes
 
-### Dynamic catalog feed
+### Governed catalog projection
 
-Routine digital products use a governed site catalog projection and the read-only `site-catalog-feed` service. This avoids requiring a full page-code mutation for every new product.
+Routine digital products use a surface-scoped governed catalog projection. This lets a verified storefront consume accepted releases without requiring a new page-code mutation for every product.
 
-Once a site has a verified feed-consumer bootstrap, a quorum-accepted release can flow:
+Once a storefront has a verified consumer bootstrap, the logical path is:
 
-`release PASS → publish job → site catalog projection → registered storefront`
-
-The projection is surface-scoped and includes only releases whose publication state is current.
+`release PASS → governed publication → registered storefront`
 
 ### Provider mutation
 
-Page, layout, code or one-time site bootstrap changes use a separate provider-mutation adapter. A dynamic-feed certification does not certify ChatGPT Sites source mutation.
+Page, layout, code or one-time site-bootstrap changes use a separate provider-mutation adapter. Certification of the catalog projection does not certify a website provider's source-write capability.
 
-Each Sites project has its own project-bound adapter candidate and rollback baseline. Those adapters remain `candidate` until an executable project-scoped write, rollback and read-after-write canary succeeds.
+Each provider-backed site is certified against its own project and rollback evidence before source mutation can become autonomous.
 
-## Current Sites bootstrap state
+## Current production boundary
 
-As of the 2026-08-20 implementation snapshot:
+The Developer Marketplace, KJV Visualized / Sermon Toolkit and Virality Music have governed destination records and bootstrap plans. Their provider-source mutation paths remain unproven, so production auto-publication remains off until the one-time storefront consumer bootstrap is independently verified.
 
-| Surface | Catalog route | Feed bootstrap | Automatic production publish |
-| --- | --- | --- | --- |
-| CrownThrive Developer Marketplace | registered | pending provider write | off |
-| KJV Visualized / Sermon Toolkit | registered | pending provider write | off |
-| Virality Music | registered | pending provider write | off |
+Virality continues to treat SoundCloud API use as `REMOVED_BY_FOUNDER_OVERRIDE`; the release system does not reintroduce that dependency.
 
-The public pages currently return HTTP 200, but the required feed marker and feed URL are not yet present in their rendered HTML. They therefore remain `observe_only` with `auto_update_enabled=false`.
+## Adapter certification
 
-Virality continues to treat SoundCloud API use as `REMOVED_BY_FOUNDER_OVERRIDE`; the release system does not reintroduce a SoundCloud API dependency.
+The governed catalog adapter has passed a committed write/readback/rollback canary. An earlier invalid same-transaction proof was rejected rather than being promoted to PASS; provider-visible evidence must represent committed state.
 
-## Adapter certification canary
-
-The CrownThrive dynamic-feed adapter passed a committed canary that:
-
-1. wrote a synthetic preview release projection;
-2. read the public feed through a cache-busted URL;
-3. verified the exact subject and SHA-256 digest;
-4. withdrew the projection as rollback; and
-5. verified the public feed no longer returned that subject.
-
-The first implementation also caught and rejected an invalid same-transaction readback design before certification. Provider-visible state must be committed before readback can prove it.
+Provider-source adapters remain separate certifications.
 
 ## Automatic rollback
 
-Authorization is continuously re-evaluated. If a published release loses required certification or quorum, the system automatically:
+Authorization is continuously re-evaluated. If a published release loses required certification or quorum, the system withdraws the current projection, preserves rollback evidence and quarantines the release. Restoring PASS does not erase prior publication or rollback history.
 
-1. appends a rollback-started attempt;
-2. withdraws the current site projection;
-3. records the rollback reason;
-4. appends a rolled-back attempt; and
-5. quarantines the release until authorization becomes valid again.
+A newer accepted exact release supersedes the prior release instead of rewriting its evidence lineage.
 
-A synthetic canary proved `PASS → published → certification HOLD → withdrawn/quarantined → PASS restored → republished` without deleting prior history.
+## Scheduled operation
 
-A newer accepted release for the same subject/surface supersedes the prior release instead of rewriting its evidence history.
-
-## Scheduler
-
-THIVEBASE currently schedules:
-
-- governed publication dispatch every two minutes;
-- release vote-request routing every five minutes;
-- dynamic-feed adapter canary hourly; and
-- production feed-bootstrap verification hourly.
-
-These schedules operate independently of an open ChatGPT conversation.
+Publication dispatch, vote-request routing, adapter health proof and storefront-bootstrap verification run as persistent THIVEBASE automation. Public documentation intentionally omits private execution cadence, internal queue identifiers and endpoint topology.
 
 ## Provider loss and degraded mode
 
-If a certified adapter becomes non-certified, affected surfaces are automatically removed from bounded-auto mode and queued jobs return to quarantine. If a previously verified feed consumer can no longer be verified, its automatic publication flag is disabled.
+If a certified adapter loses certification, affected automatic-publication paths disable themselves and queued work returns to quarantine. If a previously verified storefront consumer can no longer be verified, the surface returns to a non-autonomous state.
 
 No provider-health failure may silently convert into a PASS.
 
 ## Relationship to Store Credits
 
-Publication and commerce activation are separate certification dimensions. A storefront listing must not grant entitlement from payment-provider metadata. CHLOM/THIVEBASE remains the license and entitlement authority.
+Publication and commerce activation remain separate certification dimensions. A storefront listing must not grant entitlement from payment-provider metadata. CHLOM/THIVEBASE remains the license and entitlement authority.
 
-The Store Credit rail remains separately gated until its own legal/tax and live-rail requirements pass. A technically deliverable package is not sufficient to publish a purchasable offer.
+Store Credits remain separately gated until the applicable legal, tax and live-rail requirements pass. A technically deliverable package is not sufficient to publish a purchasable offer.
 
 ## Absolute no-go rules
 
@@ -142,10 +97,10 @@ The Store Credit rail remains separately gated until its own legal/tax and live-
 - Never count a non-voting specialist as an independent vote.
 - Never let an originating agent self-approve its release.
 - Never carry votes across a changed exact version/hash.
-- Never equate a dynamic-feed adapter with a provider source-write adapter.
-- Never enable a production surface before its route/consumer bootstrap is verified.
+- Never equate catalog-projection certification with provider source-write certification.
+- Never enable a production surface before its consumer bootstrap is verified.
 - Never remove rollback or read-after-write evidence to increase automation throughput.
-- Never grant a CrownThrive license from Stripe or another payment provider's metadata.
+- Never grant a CrownThrive license from payment-provider metadata.
 - Never reintroduce a retired provider/API dependency through publication automation.
 
 The intended steady state is highly automated, but automation remains downstream of evidence and authority.
