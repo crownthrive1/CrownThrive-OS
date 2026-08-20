@@ -3,28 +3,50 @@
 
 Supported actions are deliberately narrow: state, bootstrap and heartbeat.
 This client cannot certify a child, sync agents, cast votes or mutate providers.
+Every successful call also verifies the public-safe CHLOM identity directory.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / ".crownthrive/federation.json"
 FEDERATION_URL = "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus"
+PUBLIC_IDENTITY_URL = "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/public-agent-identity-directory"
 OIDC_AUDIENCE = "crownthrive-repository-federation"
 MAX_RESPONSE_BYTES = 256 * 1024
+SHA40 = re.compile(r"^[0-9a-f]{40}$")
+SHA64 = re.compile(r"^[0-9a-f]{64}$")
+FORBIDDEN_PUBLIC_KEYS = {
+    "fingerprint_record_uuid",
+    "fingerprint_salt",
+    "fingerprint_commitment_sha256",
+    "key_ref",
+    "private_key",
+    "secret",
+    "seed",
+    "mnemonic",
+    "credential",
+}
 
 
 def load_contract() -> dict[str, Any]:
     value = json.loads(CONTRACT.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise RuntimeError("federation_contract_invalid")
+    identity = value.get("identity_assurance")
+    if not isinstance(identity, dict) or identity.get("auto_assign_via_chlom_identity") is not True:
+        raise RuntimeError("identity_assurance_contract_missing")
+    if identity.get("public_did") is not True or identity.get("private_fingerprint_id") is not True:
+        raise RuntimeError("identity_privacy_contract_invalid")
     return value
 
 
@@ -36,9 +58,7 @@ def oidc_token() -> str:
     parsed = urllib.parse.urlsplit(request_url)
     query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
     query.append(("audience", OIDC_AUDIENCE))
-    url = urllib.parse.urlunsplit(
-        (parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), parsed.fragment)
-    )
+    url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), parsed.fragment))
     req = urllib.request.Request(
         url,
         headers={"Authorization": f"Bearer {request_token}", "Accept": "application/json"},
@@ -66,7 +86,7 @@ def call(action: str, payload: dict[str, Any]) -> dict[str, Any]:
             "Authorization": f"Bearer {oidc_token()}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "CrownThrive-Framework-Child/1.0",
+            "User-Agent": "CrownThrive-Framework-Child/1.1",
         },
         method="POST",
     )
@@ -78,6 +98,47 @@ def call(action: str, payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(body, dict) or body.get("ok") is not True:
         raise RuntimeError("federation_response_not_ok")
     return body
+
+
+def verify_public_identity(agent_id: str, contract: dict[str, Any]) -> dict[str, Any]:
+    url = PUBLIC_IDENTITY_URL + "?agent_id=" + urllib.parse.quote(agent_id, safe="")
+    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "CrownThrive-Framework-Child/1.1"})
+    with urllib.request.urlopen(req, timeout=30) as response:
+        raw = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_RESPONSE_BYTES:
+        raise RuntimeError("identity_directory_response_too_large")
+    body = json.loads(raw.decode("utf-8"))
+    if not isinstance(body, dict):
+        raise RuntimeError("identity_directory_invalid")
+    privacy = body.get("privacy_contract")
+    if not isinstance(privacy, dict) or privacy.get("did_public") is not True or privacy.get("fingerprint_id_public") is not False:
+        raise RuntimeError("identity_directory_privacy_mismatch")
+    records = body.get("records")
+    if not isinstance(records, list):
+        raise RuntimeError("identity_directory_records_invalid")
+    expected_repo_id = str(contract["repo_id"])
+    record = next((item for item in records if isinstance(item, dict) and item.get("agent_id") == agent_id and item.get("repo_id") == expected_repo_id), None)
+    if record is None:
+        raise RuntimeError("agent_identity_record_missing")
+    leaked = FORBIDDEN_PUBLIC_KEYS.intersection(record)
+    if leaked:
+        raise RuntimeError("private_identity_field_public")
+    uuid.UUID(str(record.get("agent_uuid", "")))
+    if not str(record.get("did_uri", "")).startswith("did:"):
+        raise RuntimeError("public_did_missing")
+    if not SHA64.fullmatch(str(record.get("public_identity_digest_sha256", ""))):
+        raise RuntimeError("public_identity_digest_invalid")
+    if record.get("vote_eligible") is not False:
+        raise RuntimeError("framework_identity_must_remain_non_voting")
+    physical_id = record.get("github_repository_id")
+    if physical_id is not None:
+        if not SHA40.fullmatch(str(record.get("head_sha", ""))):
+            raise RuntimeError("physical_child_sha_missing")
+        if not record.get("heartbeat_at"):
+            raise RuntimeError("physical_child_heartbeat_missing")
+    if contract.get("operationally_enabled") is True and record.get("heartbeat_fresh") is not True:
+        raise RuntimeError("operational_child_heartbeat_stale")
+    return record
 
 
 def main() -> int:
@@ -97,13 +158,23 @@ def main() -> int:
     elif args.action == "heartbeat":
         if args.if_enabled and contract.get("operationally_enabled") is not True:
             print("Heartbeat skipped: child is not yet parent-certified/operational.")
+            verify_public_identity(agent_id, contract)
             return 0
         payload = {"agent_id": agent_id, "contract_digest": __import__("hashlib").sha256(CONTRACT.read_bytes()).hexdigest()}
     else:
         payload = {}
 
     result = call(args.action, payload)
-    print(json.dumps({"ok": True, "action": args.action, "repository": result.get("repository")}, sort_keys=True))
+    identity = verify_public_identity(agent_id, contract)
+    print(json.dumps({
+        "ok": True,
+        "action": args.action,
+        "repository": result.get("repository"),
+        "agent_uuid": identity.get("agent_uuid"),
+        "did_uri": identity.get("did_uri"),
+        "assurance_state": identity.get("assurance_state"),
+        "public_identity_digest_sha256": identity.get("public_identity_digest_sha256"),
+    }, sort_keys=True))
     return 0
 
 
