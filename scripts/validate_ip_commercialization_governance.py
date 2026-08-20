@@ -165,6 +165,19 @@ def main() -> int:
         "ip_disclosure_gate_state: required",
     )
     require_text(
+        "developers/offers/phase-2-99-packageable-agentic-offers.v1.yaml",
+        "ct.offer.reference-architecture-license",
+        "ct.offer.agent-factory-sdk",
+        "ct.offer.capability-pallets",
+        "ct.offer.institutional-agent-packs",
+        "ct.offer.implementation-services",
+        "ct.offer.crownthriveu-agentic-training",
+        "ct.offer.mcp-a2a-governance",
+        "ct.offer.enterprise-support-updates",
+        "price_status: not_authorized",
+        "checkout_enabled: false",
+    )
+    require_text(
         "standards/ip-protection-chain-of-title-and-trade-secret.mdx",
         "Pre-publication IP disclosure gate",
         "publish first",
@@ -179,6 +192,7 @@ def main() -> int:
 
     print("IP disclosure and commercialization governance validation passed.")
     print(f"Offer families: {len(offers)}")
+    print("Phase 2.99 packageable offer backlog is present and remains non-live.")
     print("Public/licensed/restricted/trade-secret projections remain separated.")
     print("No offer is live; price and checkout authority remain separately gated.")
     print("Phase 2.99 through Phase 20 commercialization responsibilities are mapped.")
