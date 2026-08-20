@@ -65,8 +65,8 @@ A return URL is not payment evidence. The service must retrieve the Checkout Ses
 1. mode matches the configured Stripe key and explicit enable flag;
 2. Checkout and payment status are complete and paid;
 3. top-up record, customer identity, client reference, metadata, Price, amount, currency, and quantity match;
-4. the top-up and program remain active and approved;
-5. one stable idempotency key produces at most one credit entry.
+4. immutable creation-time program, offer, Product, Price, `exclusive` tax behavior, terms, amount, currency, identity, and credit snapshots match;
+5. the customer account is not held or closed, and one stable idempotency key produces at most one credit entry. A paid in-flight Checkout may settle from its approved creation snapshot after a later catalog disable so collected funds are not stranded.
 
 Append credits atomically. Never edit historical ledger entries to hide mistakes.
 
@@ -93,7 +93,7 @@ Before enabling test funding, and again before live funding, collect evidence fo
 - membership expiry;
 - dependency failure, retry, monitoring, and rollback.
 
-Current August 20, 2026 status is fail-closed: eight assets are packaged but uncertified, five top-ups and eight offers are unavailable, both funding flags are false, no live orders or active entitlements exist, and anonymous top-up/purchase probes fail as required. This supports an MVP control checkpoint, not commercial activation.
+Current August 20, 2026 status is fail-closed: eight assets are packaged but uncertified, five top-ups and eight offers are unavailable, both funding flags are false, no live orders or active entitlements exist, and anonymous top-up/purchase probes fail as required. The staged webhook/runtime controls are deployed; ten signature/contract tests pass; direct health/catalog readback passes. No credit webhook endpoint is registered, test mappings and secrets are unbound, the inactive live Prices remain tax-behavior `unspecified`, and the Sites hosted status bridge fails safely on outbound fetch. This supports an MVP control checkpoint, not commercial activation.
 
 ## 8. Publish and maintain
 

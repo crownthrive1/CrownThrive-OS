@@ -48,6 +48,8 @@ The staged top-up denominations are 1,000, 2,500, 5,000, 10,000, and 25,000 cred
 - Anonymous and ordinary authenticated database roles cannot execute the service-only purchase function.
 - No live orders or active entitlements exist. Two revoked, non-live synthetic credit canaries are retained as audit evidence.
 - The candidate package builder can create packaged ZIPs only; it cannot certify, publish, enable checkout, or approve terms.
+- The staged raw-body webhook, durable receipts, immutable settlement snapshots, atomic review holds, and exact reconciliation bindings are deployed fail-closed; the signature/contract suite passes 10/10.
+- Direct control health/catalog readback passes, but the Sites hosted public-status bridge currently returns a safe 503 because its outbound fetch fails. Static unavailable states remain authoritative.
 
 <Note>
   SoundCloud API access is excluded. By founder override, authenticated SoundCloud APIs, credentials, account metrics, and read/write operations are NOT\_APPLICABLE or REMOVED\_BY\_FOUNDER\_OVERRIDE. Public embeds may be used with autoplay off.
@@ -55,7 +57,7 @@ The staged top-up denominations are 1,000, 2,500, 5,000, 10,000, and 25,000 cred
 
 ## Transaction authority
 
-A client redirect never creates credits. The server retrieves the Checkout Session and verifies environment, payment state, amount, currency, quantity, bound price, customer identity, and metadata before appending a credit entry.
+A client redirect never creates credits. The signed-event webhook and bounded reconciler retrieve Checkout, PaymentIntent, Charge, and Price evidence server-side. They verify mode, payment state, immutable creation snapshot, explicit `exclusive` tax behavior, amount, currency, quantity, bound Product/Price, customer identity, and metadata before persisting provider evidence and the credit entry in one transaction.
 
 A credit purchase is a second, atomic transaction. It locks the account, validates the exact offer and certified asset, debits credits once, and creates one order, entitlement, and versioned license. Private delivery is authorized at request time and uses a short-lived signed URL.
 
@@ -78,9 +80,9 @@ Live activation requires current evidence for all of the following:
 1. counsel-approved credit, terms, privacy, refund, and license language;
 2. specialist-approved digital-product/top-up tax treatment and required registrations;
 3. tested Supabase Auth identity, recovery, abuse, and privacy controls;
-4. least-privilege Stripe and Supabase secret bindings with explicit mode separation;
+4. least-privilege Stripe and Supabase secret bindings, independent test/live mappings, an explicit `exclusive` Price tax behavior, and one stable Stripe Customer per verified commerce identity;
 5. per-asset provenance, dependency, license, deterministic ZIP, checksum, private readback, and fulfillment certification;
-6. test-mode top-up, readback, credit, purchase, replay, cross-identity, download, refund, dispute, expiry, and rollback canaries;
+6. test-mode top-up, signed webhook, provider readback, credit, purchase, replay, async completion after deactivation, committed-retry convergence, concurrency, cross-identity, download, refund, partial-refund hold, dispute, expiry, and rollback canaries;
 7. explicit owner approval for the exact environment after the evidence packet is reviewed.
 
 ## Support and licensing
