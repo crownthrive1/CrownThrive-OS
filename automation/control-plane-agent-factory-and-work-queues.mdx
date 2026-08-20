@@ -1,13 +1,13 @@
 ---
 title: "Automation Control Plane, Agent Factory and Work Queues"
 sidebarTitle: "Automation Control Plane"
-description: "The architecture for CrownThrive's orchestrator, agent registry, run queues, approvals, watchers, budgets, tool routing, evaluation, recovery and human escalation."
+description: "The architecture for CrownThrive's orchestrator, governed agent factory, persistent and ephemeral roles, R&D promotion, run queues, approvals, watchers, budgets, tool routing, evaluation, recovery and human escalation."
 icon: "tower-control"
 ---
 
 # Automation Control Plane, Agent Factory and Work Queues
 
-The automation control plane coordinates work across CrownThrive without giving one model, connector or vendor universal authority.
+The automation control plane coordinates CrownThrive work without giving one model, connector, vendor or spawned child universal authority.
 
 ## Core services
 
@@ -15,15 +15,29 @@ The automation control plane coordinates work across CrownThrive without giving 
 2. **Run-packet compiler** — converts the objective into scoped workstreams, sources, roles, tools, approvals, tests and rollback.
 3. **Institutional retrieval** — resolves current records, source authority, audience, visibility and unresolved conflicts.
 4. **Policy/authority evaluator** — CHLOM Rights, Rules, Roles, Risk and approval checks.
-5. **Agent router/factory** — selects or instantiates registered specialist agents.
-6. **Work queues** — priority, dependency, retry, dead-letter, hold and scheduled queues.
-7. **Tool/MCP broker** — issues scoped credentials and routes tools to approved services.
+5. **Governed agent router/factory** — selects registered roles or instantiates bounded ephemeral children under a machine delegation contract.
+6. **Work queues** — priority, dependency, retry, dead-letter, hold, research and scheduled queues.
+7. **Tool/MCP broker** — issues scoped capabilities and routes approved services.
 8. **Approval service** — machine and human approvals with expiration and conditions.
 9. **Verification/evaluation** — tests outputs, claims, rights, security, accessibility and audience fit.
 10. **Execution gateway** — performs changes through versioned APIs/MCPs/adapters.
 11. **DAIL recorder** — append-only event, evidence, correction and decision trail.
 12. **Knowledge updater** — updates registries, docs, search, runbooks and next-run baseline.
 13. **Watchdog/recovery** — detects failure, retries safely, rolls back or escalates.
+
+## Authority versus cognition
+
+CrownThrive permits **fluid cognition with rigid authority**. An orchestrator may discover that a packet needs several specialties, and a specialist may fan out into bounded subchecks, but delegation never expands the sovereign voter pool or bypasses D3 authority.
+
+```text
+capability ≠ permission
+child count ≠ quorum
+confidence ≠ authority
+research ≠ certification
+successful build ≠ production approval
+```
+
+The fixed sovereign voter pool remains A/B/C/D/S. Children and specialists are non-voting unless a separately governed future change explicitly changes the constitution.
 
 ## Queue classes
 
@@ -56,6 +70,7 @@ The automation control plane coordinates work across CrownThrive without giving 
 - `phase_gate_reconciliation`
 - `source_recovery`
 - `research_backlog`
+- `research_promotion`
 - `scheduled_health`
 - `monthly_api_heartbeat`
 - `credential_continuity`
@@ -69,6 +84,95 @@ The automation control plane coordinates work across CrownThrive without giving 
 - `third_party_license_attribution`
 
 Each job carries tenant/platform, priority, deadline, autonomy class, required authority, correlation ID, idempotency key, source snapshot, budget and retry policy.
+
+## Governed agent factory
+
+The machine delegation contract is `developers/manifests/agent-factory-delegation-policy.v1.json`.
+
+Every ephemeral child requires:
+
+```yaml
+child_run_id:
+parent_agent_id:
+root_agent_id:
+delegation_path: []
+independence_family:
+role_class:
+scope_key:
+source_snapshot:
+allowed_tools: []
+allowed_data_classes: []
+authority_ceiling:
+budget:
+ttl:
+output_class:
+promotion_route: []
+termination_state:
+```
+
+Default child behavior is non-voting, no production write and a D1-or-lower authority ceiling unless a registered parent contract explicitly permits bounded D2 preparation. Material child output must remain reconstructable.
+
+### Persistent versus ephemeral roles
+
+**Persistent roles** require stable identity, owner, versioned contract, lifecycle, tools/data classes, eval suite, escalation path, lineage and governed activation.
+
+**Ephemeral roles** exist only for a bounded run. They inherit an authority ceiling, budget and TTL and terminate as completed, expired, cancelled, failed or escalated.
+
+A runtime cannot create permanent institutional authority merely by inventing a name.
+
+### Spawn matrix
+
+- **A** — strongest bounded dispatcher; may route research/retrieval/analysis/domain/coordination children to depth 2.
+- **B** — read-only retrieval/audit children to depth 1; descendants cannot independently verify B-originated material.
+- **C** — schema/validator/adapter/test/docs builder cells to depth 2; one implementation family, no self-approval.
+- **D** — checks-only children to depth 1; no builder children and no delegated D vote.
+- **S** — scanners/TEVV/dependency/threat-model children to depth 2; no security-vote multiplication.
+- **E/F/G/H** — narrow specialist fan-out to depth 1.
+- **I** — backup/export/restore collectors only.
+- **J** — minimal snapshot collection only; late gate cannot be relaxed.
+- **K** — dependency/impact analyzers; no phase advancement.
+- **L** — scanner/parser helpers; tags create no authority.
+- **M** — source-family fan-out to depth 2; retrieval is not verification.
+- **N** — deterministic proof/expiry/contradiction subchecks only; no manufactured independence.
+- **O** — branch/diff/collision/supersession helpers; no self-merge or history erasure.
+- **operational probes** — no durable child-spawn role.
+- **R&D specialists** — bounded ephemeral research children to depth 2, default `RESEARCH_CANDIDATE`.
+
+## Same-family independence
+
+Every delegated output retains `parent_agent_id`, `root_agent_id`, `delegation_path` and `independence_family`.
+
+Descendants of one governed root do not become independent reviewers by using different prompts, models, tools or runtime IDs. Siblings of the same root do not satisfy separation-of-duties requirements against one another unless a higher governed policy explicitly recognizes distinct independence families. Children never count toward sovereign quorum.
+
+## R&D specialist fabric
+
+The R&D registry is `developers/manifests/agent-rnd-specialist-fabric.v1.json` and contains six permanent non-voting role identities:
+
+- Legal / Regulatory
+- IP / Rights / Licensing
+- Finance / Tax / Treasury
+- Blockchain / Cryptographic Protocol
+- Accessibility / Consumer Protection
+- Regional / Global Localization
+
+Their default lifecycle state is `RESEARCH_CANDIDATE`. Their job is to research, model, challenge assumptions, discover requirements, propose architecture and create candidate work. They do not certify current institutional state.
+
+### Research promotion
+
+R&D growth is expected and is **not formal proof-coverage drift by count alone**. A research scope enters certification only after deliberate promotion or material contact with governed scope, including hard-exit impact, change to an existing governed disposition, canonical/production relevance or authoritative phase-entry evidence.
+
+```text
+RESEARCH_CANDIDATE
+→ PROMOTION_PENDING
+→ source reconciliation
+→ independent proof
+→ domain specialist
+→ sovereign evidence/build/security/gate chain
+→ CERTIFICATION_SCOPE
+→ governed disposition
+```
+
+The reconciliation tags `CT:RND`, `CT:RESEARCH-CANDIDATE`, `CT:PROMOTION-PENDING` and `CT:CERTIFICATION-SCOPE` preserve this boundary.
 
 ## Agent team templates
 
@@ -104,36 +208,32 @@ AdLuxe Inventory/Campaign Agent, provider/API researcher, consent/privacy review
 
 ### Institutional relay specialist ring
 
-The current relay adds four scheduled non-voting specialists around the five-agent sovereign voter pool:
+- **E — API/MCP:** read conformance, endpoint reconciliation, budgets, credential/integration evidence.
+- **F — Source/Articleization:** source recovery, article disposition, contradiction/effective-state and docs-impact evidence.
+- **G — Domain/Engine/Vendor:** registrar/domain, installed-versus-target engine state, license/support and vendor-exit evidence.
+- **H — Webhook/Delivery:** sender/delivery, signature/auth, bounded-body, retry/replay/idempotency and readback certification.
 
-- **Agent E — API/MCP Integration Specialist:** API/MCP read conformance, endpoint reconciliation, budgets, credentials and adapter evidence.
-- **Agent F — Source & Articleization Specialist:** source/body recovery, article disposition, contradiction/effective-state and docs-impact evidence.
-- **Agent G — Domain/Engine/Vendor Certifier:** registrar/domain, installed-versus-target engine state, license/support, provider account and vendor-exit evidence.
-- **Agent H — Webhook & Delivery Certifier:** sender/delivery, signature/auth, bounded-body, retry/replay/idempotency and readback certification.
-
-They may execute bounded D0/D1 specialist work but **never add sovereign votes**.
+They may execute bounded D0/D1 specialist work but never add sovereign votes.
 
 ### Embedded specialist subagents
 
-Three named non-voting specialist identities are instantiated inside existing schedules when their exact function is required:
-
-- **Agent I — Continuity & Recovery** / `ct.subagent.continuity-recovery`: backup, restore, export, restricted-source custody and provider-exit evidence for `CT-P299-GATE-007`.
-- **Agent J — Phase 3 Snapshot & Entry Packet** / `ct.subagent.phase3-snapshot-packet`: exact current commit/schema/infrastructure/source freeze and Phase 3 packet for `CT-P299-GATE-008`, only after upstream readiness.
-- **Agent K — Roadmap Transition & Downstream Reconciliation** / `ct.subagent.roadmap-transition`: ten-phase dependency and downstream Phase 3–10 reconciliation after every material change.
-
-The reusable build method, source templates, archive contract and commercialization boundary are documented in [Agent Templates & Pallets](/automation/agent-templates-pallets-and-commercialization) and [Agent Lineage & Version Archive](/automation/agent-lineage-version-archive).
+- **I** / `ct.subagent.continuity-recovery` — GATE-007 continuity/recovery.
+- **J** / `ct.subagent.phase3-snapshot-packet` — GATE-008 exact snapshot/entry packet after upstream readiness.
+- **K** / `ct.subagent.roadmap-transition` — downstream roadmap dependency reconciliation.
+- **L/M/N/O** — routing, retrieval, proof and draft-integration separation documented in [Reconciliation Tag Agents](/automation/reconciliation-tag-subagents).
 
 ### Agent factory template system
 
-The factory does not generate unrestricted prompts. It instantiates stable, versioned contracts from:
+The factory instantiates versioned contracts from:
 
-- `developers/templates/agent-role-template.v1.yaml`;
-- `developers/templates/subagent-role-template.v1.yaml`;
-- `developers/templates/agent-pack-manifest-template.v1.json`;
-- `developers/templates/chlom-capability-pallet-template.v1.yaml`;
-- `developers/templates/third-party-attribution-template.v1.yaml`.
+- `developers/templates/agent-role-template.v1.yaml`
+- `developers/templates/subagent-role-template.v1.yaml`
+- `developers/templates/agent-pack-manifest-template.v1.json`
+- `developers/templates/chlom-capability-pallet-template.v1.yaml`
+- `developers/templates/chlom-runtime-adapter-template.v1.yaml`
+- `developers/templates/third-party-attribution-template.v1.yaml`
 
-Every generated role must inherit its phase/gates, vote eligibility, allowed/prohibited actions, evidence policy, tests, rollback, documentation impact, archive lineage and commercial/IP restrictions. Scheduler runtime IDs and prompt text are projections of that stable contract, not the identity itself.
+Every role inherits phase/gates, vote eligibility, allowed/prohibited actions, evidence policy, delegation limits, independence lineage, tests, rollback, documentation impact, archive lineage and commercial/IP restrictions. Scheduler task IDs and prompt wording are projections, not institutional identity.
 
 ### KJV/Sermon release team
 
@@ -143,70 +243,46 @@ KJV Room/Release Agent, Scripture/source verifier, theological/cultural steward,
 
 Education/Community Progression Agent, CrownThriveU Curriculum/Credential Agent, challenge/scoring reviewer, quiz/source/AI-review specialist, expert-scope/licensure verifier, alumni-policy/authority reviewer, Commons privacy/moderation reviewer, Digital Business Academy lineage adjudicator, Documentation Steward, Phase Gate Agent and Evidence Auditor.
 
-The team preserves separate records for completion, score/rank, CrownThrive credential, professional license, mentor/expert eligibility, alumni/community title, affiliate/ambassador role, CHLOM permission and corporate authority. It blocks silent Digital Business Academy merger, unsupported professional claims, historical-government-language reuse and Commons-to-CrownThrive-ID authority escalation.
-
 ### CrownFluence creator campaign team
 
-CrownFluence Creator Campaign Agent, creator/brand identity verifier, rights/release/AI/voice reviewer, disclosure/claims reviewer, AdLuxe handoff operator, performance reconciler, economic/payout verifier, Documentation Steward and Evidence Auditor.
+Creator/brand identity verifier, rights/release/AI/voice reviewer, disclosure/claims reviewer, AdLuxe handoff operator, performance reconciler, economic/payout verifier, Documentation Steward and Evidence Auditor.
 
 ### ThrivePeer mentorship team
 
-ThrivePeer Match/Safety Agent, mentor-scope/credential verifier, relationship/privacy reviewer, scheduling/session operator, safeguarding/minor reviewer, economic/reward verifier, Documentation Steward and Evidence Auditor.
+Mentor-scope/credential verifier, relationship/privacy reviewer, scheduling/session operator, safeguarding/minor reviewer, economic/reward verifier, Documentation Steward and Evidence Auditor.
 
 ### ThriveGather room and event team
 
-ThriveGather Access/Recording Agent, provider/account researcher, workspace/room operator, membership/entitlement verifier, host/moderator reviewer, sponsor/recording-rights reviewer, attendance/analytics reconciler, Documentation Steward and Evidence Auditor.
+Provider/account researcher, workspace/room operator, membership/entitlement verifier, host/moderator reviewer, sponsor/recording-rights reviewer, attendance/analytics reconciler, Documentation Steward and Evidence Auditor.
 
 ### ThriveTickets commerce and admission team
 
-ThriveTickets Inventory/Admission Agent, organizer/venue verifier, price/fee/inventory reviewer, processor/order/ticket reconciler, QR/scan/access tester, refund/dispute/settlement verifier, recording/minor/accessibility reviewer, Documentation Steward and Evidence Auditor.
+Organizer/venue verifier, price/fee/inventory reviewer, processor/order/ticket reconciler, QR/scan/access tester, refund/dispute/settlement verifier, recording/minor/accessibility reviewer, Documentation Steward and Evidence Auditor.
 
 ## Tool credentials
 
-Agents receive task-scoped capabilities, not standing universal credentials. Credentials should be short-lived where feasible and reference a secret manager. Tool access is bound to:
-
-- actor/agent;
-- role;
-- run ID;
-- platform/tenant;
-- environment;
-- scopes;
-- expiration;
-- maximum actions/cost;
-- approval state.
+Agents receive task-scoped capabilities, not standing universal credentials. Tool access is bound to actor/agent, role, run ID, platform/tenant, environment, scopes, expiration where supported, maximum actions/cost and approval state. Production secret values remain in approved secret management and are referenced rather than emitted.
 
 ## Work isolation
 
-Parallel agents may work from the same source snapshot but must not concurrently mutate the same record/file without a merge/lock strategy. Shared writes use optimistic concurrency, ETags/version preconditions or workflow locks.
+Parallel agents may work from the same source snapshot but must not concurrently mutate the same record/file without merge/lock strategy. Shared writes use optimistic concurrency, ETags/version preconditions or workflow locks.
 
 ## Quality gates
 
-Every run selects applicable gates:
+Every run selects applicable source authority, factual evidence, rights/provenance, legal-policy, privacy/security, cultural alignment, accessibility, SEO, API/schema, tests/build, commerce/entitlement, docs/changelog, provider/account/deployment separation, phase-gate, delegation/independence and rollback/continuity gates.
 
-- source authority;
-- factual/claim evidence;
-- rights/provenance;
-- legal-policy applicability;
-- privacy/security;
-- content/cultural alignment;
-- accessibility;
-- SEO/metadata;
-- API/schema compatibility;
-- tests/build/lint;
-- commerce/entitlement;
-- documentation-impact/article/changelog consistency;
-- provider capability/account entitlement/deployment-state separation;
-- phase-gate reconciliation;
-- rollback/continuity.
+## Scheduler and probe discipline
+
+Operational probes are cheap telemetry. Where possible, specialists consume recent sanitized probe outputs rather than duplicating the same provider read. Live schedules should avoid same-minute bursts where practical. A cadence change does not create a new agent identity or vote.
 
 ## Minimal-human-input target
 
-The control plane should auto-approve only actions explicitly covered by policy. Humans receive concise exception packets, not entire raw workflows. An exception packet states the decision, evidence, alternatives, risk, recommended action and consequence of delay.
+Auto-approve only actions explicitly covered by policy. Humans receive concise exception packets stating decision, evidence, alternatives, risk, recommended action and consequence of delay.
 
 ## Observability
 
-Track run success, latency, queue age, retries, cost, model/tool usage, approval delay, failure class, rollback, correction rate, human intervention rate and business outcome. Automation is successful when it reduces work without hiding risk or degrading institutional truth.
+Track run success, latency, queue age, retries, cost, model/tool use, approval delay, failure class, rollback, correction rate, human intervention rate, child count/depth, child expiry, same-family independence violations, R&D promotion state and business outcome.
 
 ## Phase 3 implementation
 
-Phase 3.0 seeds run, agent, role, tool, approval and event schemas. Phase 3A implements DAIL/approvals. Phase 3D connects MCPs/APIs. Phase 4 activates cross-platform work queues. Phase 5 allows certified external builders and partners to participate under CHLOM.
+Phase 3 can seed run, agent, child-lineage, role, tool, approval and event schemas only after the Phase 2.99 hard exit is genuinely satisfied. Phase 4 can activate federated work queues. Later phases can expand external builders and partners under CHLOM without changing the lower-level authority rules by implication.
