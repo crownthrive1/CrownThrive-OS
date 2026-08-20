@@ -13,20 +13,28 @@ import copy
 import json
 import re
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
 
 EXPECTED_FILES = (
-    ".github/agents/institutional-memory-asset-steward.agent.md",
-    ".github/skills/institutional-memory-asset-steward/SKILL.md",
+    "developers/agent-templates/institutional-memory-asset-steward.agent.template.md",
+    "developers/skill-templates/institutional-memory-asset-steward/SKILL.template.md",
     ".github/workflows/institutional-memory-asset-steward.yml",
     "automation/institutional-memory-asset-steward.mdx",
     "developers/manifests/institutional-memory-asset-steward.v1.json",
     "developers/schemas/institutional-asset-custody-record.v1.schema.json",
     "scripts/validate_institutional_memory_asset_steward.py",
     "changelog/phase-2-99-institutional-memory-asset-steward-seed.mdx",
+)
+
+EXPECTED_PACKET_FILE_COUNT = 8
+
+EXPECTED_WORKFLOW_PATHS = EXPECTED_FILES + (
+    ".github/agents/**",
+    ".github/skills/**",
 )
 
 AGENT_PATH = EXPECTED_FILES[0]
@@ -36,6 +44,16 @@ DOC_PATH = EXPECTED_FILES[3]
 MANIFEST_PATH = EXPECTED_FILES[4]
 SCHEMA_PATH = EXPECTED_FILES[5]
 CHANGELOG_PATH = EXPECTED_FILES[7]
+
+EXPECTED_ROLE_COLLISION_BOUNDARY = {
+    "documentation_sentinel": "does_not_replace_drift_detection_or_read_only_evidence_ownership",
+    "documentation_steward": "does_not_own_navigation_registry_merge_or_canonical_documentation_approval",
+    "platform_registry_agent": "does_not_promote_provider_platform_or_integration_state",
+    "evidence_auditor": "does_not_count_as_its_own_independent_verifier",
+    "rights_and_governance_agent": "does_not_adjudicate_rights_provenance_license_or_canon",
+    "publishing_agent": "does_not_publish_or_release_source_masters_or_products",
+    "chief_of_staff_orchestrator": "does_not_self_assign_work_parentage_or_completion_authority",
+}
 
 EXPECTED_ACTIONS = {
     "actions/checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -150,6 +168,12 @@ def nested(value: dict[str, Any], *keys: str) -> Any:
 
 
 def validate_required_files(root: Path, errors: list[str]) -> None:
+    if (
+        len(EXPECTED_FILES) != EXPECTED_PACKET_FILE_COUNT
+        or len(set(EXPECTED_FILES)) != EXPECTED_PACKET_FILE_COUNT
+    ):
+        add_error(errors, "packet inventory: EXPECTED_FILES must contain exactly eight unique paths")
+
     for relative_path in EXPECTED_FILES:
         path = root / relative_path
         if not path.is_file():
@@ -159,11 +183,58 @@ def validate_required_files(root: Path, errors: list[str]) -> None:
     # bundled. In a full repository they may already exist, so their absence is
     # instead enforced by the packet manifest and workflow path set.
     if not (root / "AGENTS.md").exists():
+        actual_files = {
+            path.relative_to(root).as_posix()
+            for path in root.rglob("*")
+            if path.is_file()
+        }
+        expected_files = set(EXPECTED_FILES)
+        if actual_files != expected_files:
+            unexpected = sorted(actual_files - expected_files)
+            missing = sorted(expected_files - actual_files)
+            add_error(
+                errors,
+                f"packet inventory: exact standalone surface mismatch; unexpected={unexpected!r}, missing={missing!r}",
+            )
         if (root / "docs.json").exists():
             add_error(errors, "docs.json: shared navigation must not be in the bounded packet")
         migrations = root / "supabase" / "migrations"
         if migrations.exists():
             add_error(errors, "supabase/migrations: private implementation is outside this packet")
+
+    validate_recognized_installations(root, errors)
+
+
+def validate_recognized_installations(root: Path, errors: list[str]) -> None:
+    agents_root = root / ".github" / "agents"
+    if agents_root.exists():
+        for path in agents_root.rglob("*.md"):
+            if not path.is_file():
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                continue
+            if "ct.agent.institutional-memory-asset-steward" in text:
+                add_error(
+                    errors,
+                    f"{path.relative_to(root)}: recognized provider profile for the inert steward is forbidden",
+                )
+
+    skills_root = root / ".github" / "skills"
+    if skills_root.exists():
+        for path in skills_root.rglob("SKILL.md"):
+            if not path.is_file():
+                continue
+            skill_errors: list[str] = []
+            text = read_text(root, path.relative_to(root).as_posix(), skill_errors)
+            errors.extend(skill_errors)
+            frontmatter = scalar_frontmatter(text, path.relative_to(root).as_posix(), errors)
+            if frontmatter.get("name") == "institutional-memory-asset-steward":
+                add_error(
+                    errors,
+                    f"{path.relative_to(root)}: recognized provider skill for the inert steward is forbidden",
+                )
 
 
 def validate_frontmatter(root: Path, errors: list[str]) -> None:
@@ -171,18 +242,14 @@ def validate_frontmatter(root: Path, errors: list[str]) -> None:
     agent = scalar_frontmatter(agent_text, AGENT_PATH, errors)
     require_equal(errors, agent.get("name"), "Institutional Memory & Asset Steward", f"{AGENT_PATH}: name")
     require_equal(errors, agent.get("target"), "github-copilot", f"{AGENT_PATH}: target")
-    require_equal(errors, agent.get("user-invocable"), "true", f"{AGENT_PATH}: user-invocable")
-    require_equal(errors, agent.get("disable-model-invocation"), "false", f"{AGENT_PATH}: disable-model-invocation")
+    require_equal(errors, agent.get("user-invocable"), "false", f"{AGENT_PATH}: user-invocable")
+    require_equal(errors, agent.get("disable-model-invocation"), "true", f"{AGENT_PATH}: disable-model-invocation")
     if not re.search(r"(?m)^\s+institutional-id:\s+ct\.agent\.institutional-memory-asset-steward\s*$", agent_text):
         add_error(errors, f"{AGENT_PATH}: stable institutional ID is missing")
     if not re.search(r"(?m)^\s+vote-eligible:\s+['\"]?false['\"]?\s*$", agent_text):
         add_error(errors, f"{AGENT_PATH}: agent must be explicitly non-voting")
-    tools_line = agent.get("tools", "")
-    for tool in ("read", "search", "edit"):
-        if tool not in tools_line:
-            add_error(errors, f"{AGENT_PATH}: required tool {tool!r} is missing")
-    if any(tool in tools_line.lower() for tool in ("execute", "shell", "terminal")):
-        add_error(errors, f"{AGENT_PATH}: execution tools are outside the public preparation profile")
+    tools_line = re.sub(r"\s+", "", agent.get("tools", "")).lower()
+    require_equal(errors, tools_line, '["read","search"]', f"{AGENT_PATH}: tools")
 
     skill_text = read_text(root, SKILL_PATH, errors)
     skill = scalar_frontmatter(skill_text, SKILL_PATH, errors)
@@ -194,6 +261,10 @@ def validate_frontmatter(root: Path, errors: list[str]) -> None:
     )
     if not skill.get("description"):
         add_error(errors, f"{SKILL_PATH}: triggering description is required")
+    require_equal(errors, skill.get("x-crownthrive-user-invocable"), "false", f"{SKILL_PATH}: x-crownthrive-user-invocable")
+    require_equal(errors, skill.get("x-crownthrive-disable-model-invocation"), "true", f"{SKILL_PATH}: x-crownthrive-disable-model-invocation")
+    skill_tools = re.sub(r"\s+", "", skill.get("allowed-tools", "")).lower()
+    require_equal(errors, skill_tools, '["read","search"]', f"{SKILL_PATH}: allowed-tools")
     if "provider writes" not in skill_text.lower() and "provider mutation" not in skill_text.lower():
         add_error(errors, f"{SKILL_PATH}: provider-write boundary is not explicit")
     for phrase in ("non-voting", "A1", "D1", "D2", "D3"):
@@ -215,6 +286,8 @@ def validate_manifest_data(manifest: dict[str, Any]) -> list[str]:
         (manifest.get("agent_id"), "ct.agent.institutional-memory-asset-steward", "agent_id"),
         (manifest.get("effective_state"), "candidate_public_packet_not_activated", "effective_state"),
         (manifest.get("visibility"), "PUBLIC_STANDARD", "visibility"),
+        (nested(manifest, "packet_inventory", "file_count"), 8, "packet_inventory.file_count"),
+        (nested(manifest, "packet_inventory", "files"), list(EXPECTED_FILES), "packet_inventory.files"),
         (nested(manifest, "source_baseline", "repository"), "crownthrive1/CrownThrive-Support", "source_baseline.repository"),
         (nested(manifest, "source_baseline", "branch"), "main", "source_baseline.branch"),
         (nested(manifest, "source_baseline", "mintlify_deploy_branch"), "main", "source_baseline.mintlify_deploy_branch"),
@@ -229,11 +302,41 @@ def validate_manifest_data(manifest: dict[str, Any]) -> list[str]:
         (nested(manifest, "authority", "d3", "authority"), "authorized_human_only", "authority.d3.authority"),
         (nested(manifest, "authority", "github_or_provider_capability_is_authority"), False, "authority.github_or_provider_capability_is_authority"),
         (nested(manifest, "authority", "quorum_can_override_d3"), False, "authority.quorum_can_override_d3"),
+        (nested(manifest, "provider_profile", "profile_template_path"), AGENT_PATH, "provider_profile.profile_template_path"),
+        (nested(manifest, "provider_profile", "skill_template_path"), SKILL_PATH, "provider_profile.skill_template_path"),
+        (nested(manifest, "provider_profile", "activation_profile_target_path"), ".github/agents/institutional-memory-asset-steward.agent.md", "provider_profile.activation_profile_target_path"),
+        (nested(manifest, "provider_profile", "activation_skill_target_path"), ".github/skills/institutional-memory-asset-steward/SKILL.md", "provider_profile.activation_skill_target_path"),
+        (nested(manifest, "provider_profile", "target"), "github-copilot", "provider_profile.target"),
+        (nested(manifest, "provider_profile", "candidate_templates_present"), True, "provider_profile.candidate_templates_present"),
+        (nested(manifest, "provider_profile", "candidate_branch_recognized_profile_present"), False, "provider_profile.candidate_branch_recognized_profile_present"),
+        (nested(manifest, "provider_profile", "candidate_branch_recognized_skill_present"), False, "provider_profile.candidate_branch_recognized_skill_present"),
+        (nested(manifest, "provider_profile", "default_branch_profile_present_at_baseline"), False, "provider_profile.default_branch_profile_present_at_baseline"),
+        (nested(manifest, "provider_profile", "user_invocable"), False, "provider_profile.user_invocable"),
+        (nested(manifest, "provider_profile", "model_invocation_disabled"), True, "provider_profile.model_invocation_disabled"),
+        (nested(manifest, "provider_profile", "tools"), ["read", "search"], "provider_profile.tools"),
+        (nested(manifest, "provider_profile", "skill_inertness_basis"), "outside_recognized_project_skill_root", "provider_profile.skill_inertness_basis"),
+        (nested(manifest, "provider_profile", "skill_template_governance_annotations", "x-crownthrive-user-invocable"), False, "provider_profile.skill_template_governance_annotations.x-crownthrive-user-invocable"),
+        (nested(manifest, "provider_profile", "skill_template_governance_annotations", "x-crownthrive-disable-model-invocation"), True, "provider_profile.skill_template_governance_annotations.x-crownthrive-disable-model-invocation"),
+        (nested(manifest, "provider_profile", "skill_allowed_tools"), ["read", "search"], "provider_profile.skill_allowed_tools"),
+        (nested(manifest, "provider_profile", "programmatic_invocation_authorized"), False, "provider_profile.programmatic_invocation_authorized"),
+        (nested(manifest, "provider_profile", "provider_capability_is_activation"), False, "provider_profile.provider_capability_is_activation"),
+        (nested(manifest, "provider_profile", "activation_requires_separate_exact_head_installation_change"), True, "provider_profile.activation_requires_separate_exact_head_installation_change"),
+        (nested(manifest, "parent_and_inventory", "operational_parent_agent_id"), "ct.relay.agent-a", "parent_and_inventory.operational_parent_agent_id"),
+        (nested(manifest, "parent_and_inventory", "parent_relationship"), "routing_and_orchestration_only_not_vote_or_approval_control", "parent_and_inventory.parent_relationship"),
+        (nested(manifest, "parent_and_inventory", "parent_evidence_ref"), "developers/manifests/agent-sovereign-governance.v1.json", "parent_and_inventory.parent_evidence_ref"),
+        (nested(manifest, "parent_and_inventory", "parent_state"), "candidate_assigned_pending_runtime_and_inventory_readback", "parent_and_inventory.parent_state"),
+        (nested(manifest, "parent_and_inventory", "canonical_inventory_ref"), "automation/agent-registry.mdx", "parent_and_inventory.canonical_inventory_ref"),
+        (nested(manifest, "parent_and_inventory", "inventory_source_ref"), MANIFEST_PATH, "parent_and_inventory.inventory_source_ref"),
+        (nested(manifest, "parent_and_inventory", "public_agent_registry_entry_state"), "pending_ordered_collision_reconciliation_not_registered", "parent_and_inventory.public_agent_registry_entry_state"),
+        (nested(manifest, "parent_and_inventory", "runtime_binding_state"), "prospective_disabled", "parent_and_inventory.runtime_binding_state"),
+        (nested(manifest, "parent_and_inventory", "runtime_parent_agent_id_state"), "null_unassigned", "parent_and_inventory.runtime_parent_agent_id_state"),
+        (nested(manifest, "parent_and_inventory", "activation_blocked_until_runtime_parent_and_inventory_verified"), True, "parent_and_inventory.activation_blocked_until_runtime_parent_and_inventory_verified"),
         (nested(manifest, "record_contract", "schema_path"), SCHEMA_PATH, "record_contract.schema_path"),
         (nested(manifest, "record_contract", "validator_path"), EXPECTED_FILES[6], "record_contract.validator_path"),
         (nested(manifest, "record_contract", "raw_secret_fields_permitted"), False, "record_contract.raw_secret_fields_permitted"),
         (nested(manifest, "record_contract", "raw_private_locator_fields_permitted"), False, "record_contract.raw_private_locator_fields_permitted"),
         (nested(manifest, "workflow", "provider_mutation_default"), "disabled", "workflow.provider_mutation_default"),
+        (nested(manifest, "workflow", "mode"), "read_inventory_prepare_validate_handoff", "workflow.mode"),
         (nested(manifest, "documentation", "operating_page"), DOC_PATH, "documentation.operating_page"),
         (nested(manifest, "documentation", "checkpoint"), CHANGELOG_PATH, "documentation.checkpoint"),
         (nested(manifest, "documentation", "hidden"), True, "documentation.hidden"),
@@ -261,6 +364,43 @@ def validate_manifest_data(manifest: dict[str, Any]) -> list[str]:
     ):
         if gate not in required_d2:
             add_error(errors, f"{MANIFEST_PATH}: authority.d2.required lacks {gate!r}")
+
+    expected_activation_gates = {
+        "exact_head_governance_acceptance",
+        "public_restricted_ip_classification",
+        "canonical_parent_and_inventory_binding",
+        "role_collision_boundary_acceptance",
+        "separate_profile_and_skill_installation_activation_change",
+        "private_runtime_implementation_packet",
+        "least_privilege_secret_references_outside_public_files",
+        "read_before_write_and_readback_controls",
+        "adversarial_and_recovery_test_fixtures",
+        "registered_owner_budget_rate_limit_retention_backup_and_vendor_exit",
+        "collision_safe_navigation_and_agent_registry_reconciliation",
+    }
+    activation_gate_list = manifest.get("activation_gates") or []
+    if (
+        not isinstance(activation_gate_list, list)
+        or len(activation_gate_list) != len(expected_activation_gates)
+        or set(activation_gate_list) != expected_activation_gates
+    ):
+        add_error(errors, f"{MANIFEST_PATH}: activation_gates must exactly match the fail-closed gate set")
+
+    require_equal(
+        errors,
+        manifest.get("role_collision_boundary"),
+        EXPECTED_ROLE_COLLISION_BOUNDARY,
+        f"{MANIFEST_PATH}: role_collision_boundary",
+    )
+
+    expected_rollback = {
+        "public_packet": "revert_the_eight_additive_paths",
+        "github_templates": "revert_the_uninstalled_templates; no_recognized_agent_or_skill_path_exists_in_this_candidate",
+        "prospective_runtime_binding": "retain_as_disabled_history_or_retire_remove_through_governed_D1_runtime_reconciliation_if_candidate_is_abandoned",
+        "provider_rollback": "no_provider_write_capability_was_enabled_but_external_prospective_binding_requires_explicit_reconciliation",
+        "evidence_preservation_required": True,
+    }
+    require_equal(errors, manifest.get("rollback"), expected_rollback, f"{MANIFEST_PATH}: rollback")
 
     topology = manifest.get("custody_topology")
     expected_planes = {"google_drive", "thivebase", "supabase_storage", "github", "mintlify"}
@@ -584,9 +724,31 @@ def validate_workflow(root: Path, errors: list[str]) -> None:
                 f"{WORKFLOW_PATH}: {action} must retain version comment {expected_version}",
             )
 
-    for relative_path in EXPECTED_FILES:
-        if relative_path not in text:
-            add_error(errors, f"{WORKFLOW_PATH}: path filter lacks {relative_path!r}")
+    workflow_lines = text.splitlines()
+    path_blocks: list[list[str]] = []
+    for index, line in enumerate(workflow_lines):
+        if line != "    paths:":
+            continue
+        paths: list[str] = []
+        cursor = index + 1
+        while cursor < len(workflow_lines) and workflow_lines[cursor].startswith("      - "):
+            match = re.fullmatch(r'      - "([^"]+)"', workflow_lines[cursor])
+            if not match:
+                add_error(errors, f"{WORKFLOW_PATH}: malformed path filter line {workflow_lines[cursor]!r}")
+                break
+            paths.append(match.group(1))
+            cursor += 1
+        path_blocks.append(paths)
+
+    if len(path_blocks) != 2:
+        add_error(errors, f"{WORKFLOW_PATH}: expected exactly two paths blocks, found {len(path_blocks)}")
+    for index, paths in enumerate(path_blocks):
+        require_equal(
+            errors,
+            paths,
+            list(EXPECTED_WORKFLOW_PATHS),
+            f"{WORKFLOW_PATH}: paths block {index + 1}",
+        )
 
     required_commands = (
         "python -m py_compile scripts/validate_institutional_memory_asset_steward.py",
@@ -755,6 +917,59 @@ def run_self_test(
     provider_mutation["custody_topology"]["google_drive"]["write_enabled_by_this_packet"] = True
     expect_failure("provider write escalation", validate_manifest_data(provider_mutation), errors)
 
+    user_invocation = copy.deepcopy(manifest)
+    user_invocation["provider_profile"]["user_invocable"] = True
+    expect_failure("user invocation escalation", validate_manifest_data(user_invocation), errors)
+
+    model_invocation = copy.deepcopy(manifest)
+    model_invocation["provider_profile"]["model_invocation_disabled"] = False
+    expect_failure("model invocation escalation", validate_manifest_data(model_invocation), errors)
+
+    edit_tool = copy.deepcopy(manifest)
+    edit_tool["provider_profile"]["tools"].append("edit")
+    expect_failure("agent edit tool escalation", validate_manifest_data(edit_tool), errors)
+
+    recognized_profile = copy.deepcopy(manifest)
+    recognized_profile["provider_profile"]["candidate_branch_recognized_profile_present"] = True
+    expect_failure("recognized agent profile installation", validate_manifest_data(recognized_profile), errors)
+
+    recognized_skill = copy.deepcopy(manifest)
+    recognized_skill["provider_profile"]["candidate_branch_recognized_skill_present"] = True
+    expect_failure("recognized skill installation", validate_manifest_data(recognized_skill), errors)
+
+    parent_escalation = copy.deepcopy(manifest)
+    parent_escalation["parent_and_inventory"]["parent_relationship"] = "vote_and_approval_control"
+    expect_failure("parent authority escalation", validate_manifest_data(parent_escalation), errors)
+
+    inventory_promotion = copy.deepcopy(manifest)
+    inventory_promotion["parent_and_inventory"]["public_agent_registry_entry_state"] = "registered"
+    expect_failure("unverified inventory promotion", validate_manifest_data(inventory_promotion), errors)
+
+    parent_gate_removed = copy.deepcopy(manifest)
+    parent_gate_removed["parent_and_inventory"]["activation_blocked_until_runtime_parent_and_inventory_verified"] = False
+    expect_failure("parent and inventory activation gate removal", validate_manifest_data(parent_gate_removed), errors)
+
+    activation_gate_removed = copy.deepcopy(manifest)
+    activation_gate_removed["activation_gates"].pop()
+    expect_failure("activation gate removal", validate_manifest_data(activation_gate_removed), errors)
+
+    workflow_mode_escalation = copy.deepcopy(manifest)
+    workflow_mode_escalation["workflow"]["mode"] = "mutate_and_publish"
+    expect_failure("workflow mode escalation", validate_manifest_data(workflow_mode_escalation), errors)
+
+    rollback_removed = copy.deepcopy(manifest)
+    rollback_removed["rollback"].pop("prospective_runtime_binding")
+    expect_failure("external binding rollback removal", validate_manifest_data(rollback_removed), errors)
+
+    collision_removed = copy.deepcopy(manifest)
+    collision_removed["role_collision_boundary"].pop("evidence_auditor")
+    expect_failure("role collision boundary removal", validate_manifest_data(collision_removed), errors)
+
+    packet_inventory_extra = copy.deepcopy(manifest)
+    packet_inventory_extra["packet_inventory"]["files"].append("unexpected.txt")
+    packet_inventory_extra["packet_inventory"]["file_count"] = 9
+    expect_failure("packet inventory expansion", validate_manifest_data(packet_inventory_extra), errors)
+
     secret_field = copy.deepcopy(valid_record)
     secret_field["api_key"] = "not-a-real-secret"
     expect_failure("schema secret field", validate_record(secret_field, schema), errors)
@@ -770,6 +985,30 @@ def run_self_test(
         "https://drive." + "google.com/file/d/" + ("A" * 24)
     )
     expect_failure("private locator in allowed value", validate_record(private_locator, schema), errors)
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        temporary_root = Path(temporary_directory)
+        renamed_agent = temporary_root / ".github" / "agents" / "memory-steward.md"
+        renamed_agent.parent.mkdir(parents=True)
+        renamed_agent.write_text(
+            "---\nname: renamed\n---\nct.agent.institutional-memory-asset-steward\n",
+            encoding="utf-8",
+        )
+        recognized_errors: list[str] = []
+        validate_recognized_installations(temporary_root, recognized_errors)
+        expect_failure("renamed recognized agent installation", recognized_errors, errors)
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        temporary_root = Path(temporary_directory)
+        renamed_skill = temporary_root / ".github" / "skills" / "memory-steward" / "SKILL.md"
+        renamed_skill.parent.mkdir(parents=True)
+        renamed_skill.write_text(
+            "---\nname: institutional-memory-asset-steward\ndescription: test\n---\n",
+            encoding="utf-8",
+        )
+        recognized_errors = []
+        validate_recognized_installations(temporary_root, recognized_errors)
+        expect_failure("renamed recognized skill installation", recognized_errors, errors)
 
     verified_without_digest = copy.deepcopy(valid_record)
     verified_without_digest["versions"][0]["sha256"] = None

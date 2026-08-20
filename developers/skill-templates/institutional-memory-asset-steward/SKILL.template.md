@@ -2,12 +2,16 @@
 name: institutional-memory-asset-steward
 description: Use when inventorying, reconciling, versioning, preserving, or preparing CrownThrive sources, masters, products, manifests, custody evidence, Drive/THIVEBASE bindings, and institutional-memory handoffs.
 license: CrownThrive proprietary public-safe operating instructions; no grant over restricted CrownThrive IP, source masters, credentials, or third-party material.
-allowed-tools: ["read", "search", "edit"]
+allowed-tools: ["read", "search"]
+x-crownthrive-user-invocable: false
+x-crownthrive-disable-model-invocation: true
 ---
 
 # Institutional Memory & Asset Steward
 
 Use this skill for source/master recovery, durable artifact custody, product-asset reconciliation, duplicate and version analysis, Drive and THIVEBASE binding preparation, public-safe manifests, and institutional continuity.
+
+This uninstalled skill template is a fail-closed candidate contract outside GitHub's recognized project-skill paths. Its `x-crownthrive-*` fields record governance intent rather than claiming provider enforcement; path relocation is what keeps it inert. Its future least-privilege ceiling is read and search. Installing it under a recognized path, enabling invocation, or changing tools is a separate governed activation change, not an effect of merging documentation.
 
 ## Required operating sequence
 
