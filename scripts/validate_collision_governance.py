@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate CrownThrive collision-governance and Founder Orchestrator boundaries."""
+"""Validate CrownThrive collision, convergence, refactor and Founder Orchestrator boundaries."""
 
 from __future__ import annotations
 
@@ -9,12 +9,15 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers" / "manifests" / "collision-governance-founder-orchestration.v1.json"
+CONVERGENCE = ROOT / "developers" / "manifests" / "convergence-refactor-policy.v1.json"
 DOC = ROOT / "automation" / "collision-avoidance-founder-orchestration.mdx"
 WORKFLOW = ROOT / ".github" / "workflows" / "collision-governance.yml"
 CHANGELOG = ROOT / "changelog" / "phase-2-99-collision-governance-founder-orchestration.mdx"
+REFRACTOR = ROOT / "scripts" / "governed_convergence_refactor.py"
 
 sys.path.insert(0, str(ROOT / "scripts"))
 import governed_collision_control as gcc  # noqa: E402
+import governed_convergence_refactor as gcr  # noqa: E402
 
 EXPECTED_VOTERS = {
     "ct.relay.agent-a",
@@ -29,6 +32,10 @@ EXPECTED_AGENT_IDS = {
     "ct.subagent.collision.postmerge-reconciler",
     "ct.subagent.queue.priority-throttle",
     "ct.subagent.quorum.session-router",
+}
+EXPECTED_EXTENSION_AGENT_IDS = {
+    "ct.subagent.convergence.rotor",
+    "ct.subagent.refactor.steward",
 }
 FORBIDDEN_BOUNDED_PRIVILEGE_FRAGMENTS = (
     "cast_sovereign_vote",
@@ -54,10 +61,8 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    require(MANIFEST.exists(), f"missing {MANIFEST.relative_to(ROOT)}")
-    require(DOC.exists(), f"missing {DOC.relative_to(ROOT)}")
-    require(WORKFLOW.exists(), f"missing {WORKFLOW.relative_to(ROOT)}")
-    require(CHANGELOG.exists(), f"missing {CHANGELOG.relative_to(ROOT)}")
+    for path in (MANIFEST, CONVERGENCE, DOC, WORKFLOW, CHANGELOG, REFRACTOR):
+        require(path.exists(), f"missing {path.relative_to(ROOT)}")
 
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     require(data["manifest_id"] == "ct.manifest.collision-governance-founder-orchestration.v1", "manifest id drift")
@@ -133,8 +138,73 @@ def main() -> int:
     require(integration["supabase_runtime_binding"] == "not_mutated_by_this_public_packet", "public packet must not fabricate live Supabase agent binding")
     require(integration["phase_3_advancement"] is False, "packet may not advance Phase 3")
 
+    convergence = json.loads(CONVERGENCE.read_text(encoding="utf-8"))
+    require(convergence["manifest_id"] == "ct.manifest.convergence-refactor-policy.v1", "convergence manifest id drift")
+    require(convergence["phase"] == "2.99", "convergence policy must remain Phase 2.99")
+    require(convergence["parent_packet"] == data["manifest_id"], "convergence policy must extend existing collision governor")
+    extension_ids = {item["agent_id"] for item in convergence["extension_agents"]}
+    require(extension_ids == EXPECTED_EXTENSION_AGENT_IDS, "convergence/refactor extension-agent set drift")
+    require(all(item["vote_eligible"] is False for item in convergence["extension_agents"]), "convergence/refactor agents must remain non-voting")
+
+    authority = convergence["authority"]
+    for key in (
+        "sovereign_voter_pool_changes",
+        "provider_write_authority",
+        "merge_authority",
+        "branch_delete_authority",
+        "file_delete_authority",
+        "force_push_authority",
+        "silent_pr_close_authority",
+        "unknown_to_pass_authority",
+    ):
+        require(authority[key] is False, f"forbidden convergence authority enabled: {key}")
+    require(authority["d3_remains_human_reserved"] is True, "convergence policy cannot alter D3")
+
+    preservation = convergence["knowledge_preservation"]
+    for key in (
+        "never_silently_destroy_knowledge",
+        "never_silently_overwrite_history",
+        "no_automation_branch_deletion",
+        "no_automation_file_deletion",
+        "no_force_push",
+        "no_silent_pr_closure",
+        "supersession_requires_successor_or_reason",
+        "supersession_requires_predecessor_reference",
+        "material_current_page_change_requires_version_or_changelog",
+        "historical_claims_remain_preserved_even_when_no_longer_current",
+    ):
+        require(preservation[key] is True, f"knowledge-preservation invariant disabled: {key}")
+
+    modes = convergence["attention_modes"]
+    require(set(modes) == {"EXPANSION", "BALANCED", "CONVERGENCE", "INCIDENT"}, "attention mode set drift")
+    for mode, budget in modes.items():
+        require(sum(int(v) for v in budget.values()) == 100, f"attention budget must equal 100 for {mode}")
+    require(modes["CONVERGENCE"]["closure_percent"] >= 70, "convergence mode must devote at least 70% attention to closure")
+
+    whole = convergence["whole_system_refactor_rule"]
+    require(whole["prefer_update_existing_owner_over_create_parallel_owner"] is True, "must prefer existing owner update")
+    require(whole["prefer_extract_unique_delta_over_wholesale_stale_pr_promotion"] is True, "must extract unique stale deltas")
+    require(whole["registry_growth_alone_is_not_certification_debt"] is True, "registry growth must not become proof debt by count alone")
+
     tests = gcc.self_test()
     require(tests["status"] == "PASS", "collision controller self-test failed")
+
+    fake = {
+        "open_pr_count": 24,
+        "collisions": [{"severity": 2}] * 9,
+        "throttle": {
+            "main_sha": "abc",
+            "ranked": [
+                {"number": 1, "title": "Phase 2.99 hard-exit reconciliation", "draft": True, "stale_base": True, "collision_severity": 2, "priority": {"score": 80, "band": "P1"}},
+                {"number": 2, "title": "Future framework experiment", "draft": True, "stale_base": False, "collision_severity": 0, "priority": {"score": 20, "band": "P4"}},
+            ],
+        },
+    }
+    plan = gcr.build_plan(fake)
+    require(plan["pressure"]["mode"] == "CONVERGENCE", "convergence rotor threshold test failed")
+    require(all(item["automatic_delete"] is False for item in plan["all_open_pr_dispositions"]), "refactor plan may not auto-delete")
+    require(all(item["force_push"] is False for item in plan["all_open_pr_dispositions"]), "refactor plan may not force-push")
+    require(any(item["disposition"] == "continue_research_without_promotion" for item in plan["all_open_pr_dispositions"]), "attention rotation must preserve throttled research")
 
     workflow_text = WORKFLOW.read_text(encoding="utf-8")
     require("40 * * * *" in workflow_text and "50 * * * *" in workflow_text, "workflow schedule mismatch")
@@ -142,6 +212,9 @@ def main() -> int:
     require("push:" in workflow_text and "main" in workflow_text, "post-merge main trigger missing")
     require("contents: read" in workflow_text and "pull-requests: read" in workflow_text, "workflow must remain read-only")
     require("contents: write" not in workflow_text and "pull-requests: write" not in workflow_text, "workflow may not gain write authority")
+    require("governed_convergence_refactor.py --self-test" in workflow_text, "convergence self-test missing")
+    require("Rotate attention and emit whole-estate refactor plan" in workflow_text, "attention-rotation workflow step missing")
+    require("Post-merge convergence/refactor refresh" in workflow_text, "post-merge refactor refresh missing")
 
     doc_text = DOC.read_text(encoding="utf-8")
     for phrase in (
@@ -152,15 +225,19 @@ def main() -> int:
         "Policy Assembly",
         "Adjudication and Precedent",
         "Issue #157",
+        "Convergence Rotor",
+        "Refactor Steward",
+        "never silently deletes",
     ):
         require(phrase in doc_text, f"documentation missing required concept: {phrase}")
 
-    print("PASS: collision governance / founder orchestration controls validated")
-    print(f"PASS: {len(agents)} non-voting collision/queue subagents")
+    print("PASS: collision/convergence/refactor founder-orchestration controls validated")
+    print(f"PASS: {len(agents)} base non-voting collision/queue subagents + {len(extension_ids)} non-voting convergence/refactor extensions")
     print("PASS: special quorum preserves A/B/C/D/S 4-of-5 + Agent D and D3 human boundary")
-    print("PASS: queue throttle 2 D2 / 1 same-domain / 1 D3")
-    print("PASS: scheduled lanes :40 and :50 avoid current known relay minutes")
-    print(f"PASS: controller deterministic self-tests={tests['tests']}")
+    print("PASS: convergence mode rotates >=70% attention to closure without deleting work")
+    print("PASS: no branch/file deletion, force push, silent PR closure, or UNKNOWN->PASS authority")
+    print("PASS: scheduled lanes :40 and :50 reused; no new workflow family created")
+    print(f"PASS: collision controller deterministic self-tests={tests['tests']}")
     return 0
 
 
