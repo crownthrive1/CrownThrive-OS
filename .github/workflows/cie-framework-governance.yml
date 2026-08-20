@@ -6,17 +6,25 @@ on:
       - "doctrine/cultural-imprint-engine.mdx"
       - "automation/cie-framework-agent.mdx"
       - "automation/framework-agent-registry.mdx"
+      - "automation/framework-repository-governance-standard.mdx"
       - "automation/institutional-agent-relay-v2.mdx"
       - "automation/permissions-and-approval-gates.mdx"
       - "chlom/cie-cultural-governance-pallet.mdx"
+      - "technology/repository-federation-control-plane.mdx"
       - "developers/manifests/cie-framework-agent.v1.json"
       - "developers/manifests/agent-sovereign-governance.v2.json"
+      - "developers/manifests/repository-federation.v1.json"
+      - "developers/manifests/framework-algorithm-registry.v1.json"
+      - "developers/templates/framework-child-federation-contract.v1.json"
       - "scripts/cie_scan.py"
+      - "scripts/repository_federation_sync.py"
+      - "scripts/validate_repository_federation.py"
       - "scripts/validate_cie_framework_agent.py"
       - "scripts/governed_merge_decision_v2.py"
       - "scripts/validate_agent_sovereign_governance_v2.py"
       - "scripts/governed_current_pr_preflight_v2.py"
       - ".github/workflows/cie-framework-governance.yml"
+      - ".github/workflows/repository-federation-governance.yml"
       - ".github/workflows/docs-governance.yml"
       - ".github/workflows/governed-merge-gate.yml"
   push:
@@ -26,17 +34,25 @@ on:
       - "doctrine/cultural-imprint-engine.mdx"
       - "automation/cie-framework-agent.mdx"
       - "automation/framework-agent-registry.mdx"
+      - "automation/framework-repository-governance-standard.mdx"
       - "automation/institutional-agent-relay-v2.mdx"
       - "automation/permissions-and-approval-gates.mdx"
       - "chlom/cie-cultural-governance-pallet.mdx"
+      - "technology/repository-federation-control-plane.mdx"
       - "developers/manifests/cie-framework-agent.v1.json"
       - "developers/manifests/agent-sovereign-governance.v2.json"
+      - "developers/manifests/repository-federation.v1.json"
+      - "developers/manifests/framework-algorithm-registry.v1.json"
+      - "developers/templates/framework-child-federation-contract.v1.json"
       - "scripts/cie_scan.py"
+      - "scripts/repository_federation_sync.py"
+      - "scripts/validate_repository_federation.py"
       - "scripts/validate_cie_framework_agent.py"
       - "scripts/governed_merge_decision_v2.py"
       - "scripts/validate_agent_sovereign_governance_v2.py"
       - "scripts/governed_current_pr_preflight_v2.py"
       - ".github/workflows/cie-framework-governance.yml"
+      - ".github/workflows/repository-federation-governance.yml"
   workflow_dispatch:
 
 permissions:
@@ -62,19 +78,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile CIE and governance-v2 scripts
+      - name: Compile CIE, federation and governance-v2 scripts
         run: |
           python -m py_compile scripts/cie_scan.py
+          python -m py_compile scripts/repository_federation_sync.py
+          python -m py_compile scripts/validate_repository_federation.py
           python -m py_compile scripts/validate_cie_framework_agent.py
           python -m py_compile scripts/governed_merge_decision_v2.py
           python -m py_compile scripts/validate_agent_sovereign_governance_v2.py
           python -m py_compile scripts/governed_current_pr_preflight_v2.py
 
-      - name: Run CIE deterministic scanner self-test
+      - name: Run CIE public-contract client self-test
         run: python scripts/cie_scan.py --self-test
 
       - name: Validate CIE framework contract and 92-point readiness
         run: python scripts/validate_cie_framework_agent.py
+
+      - name: Validate parent-child repository federation and Vault boundary
+        run: |
+          python scripts/repository_federation_sync.py --self-test
+          python scripts/validate_repository_federation.py
 
       - name: Validate foundational framework voter constitution
         run: |
