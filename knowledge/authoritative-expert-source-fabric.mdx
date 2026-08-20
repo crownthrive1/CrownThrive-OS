@@ -1,0 +1,174 @@
+---
+title: "Authoritative Expert Source Fabric"
+sidebarTitle: "Expert Source Fabric"
+description: "Institution-wide routing contract for government APIs, standards bodies, official provider documentation, open research registries, evidence envelopes, and subject-matched expert review."
+icon: "satellite-dish"
+keywords: ["authoritative sources", "government APIs", "expert routing", "MCP", "evidence", "source authority", "open data", "research"]
+---
+
+# Authoritative Expert Source Fabric
+
+CrownThrive agents, projects and MCP surfaces need subject-matched expertise without turning the open internet into institutional truth. The **Authoritative Expert Source Fabric** is the public-safe Phase 2.99 routing contract that sits between a task and any external research source.
+
+<Info>
+  **Current state:** `prepared_not_activated`. The source catalog and deterministic routing contract are governed and reusable now. Provider-specific network adapters, credentials, account entitlements and central MCP dispatch are **not** represented as production-certified. Phase 3 remains blocked pending the complete Phase 2.99 hard exit.
+</Info>
+
+## Macro architecture
+
+```text
+TASK / QUESTION / CHANGE / INCIDENT
+                ↓
+       classify subject + risk
+                ↓
+   Authoritative Expert Source Router
+                ↓
+ ┌──────────────┼────────────────┐
+ │              │                │
+Government   Standards       Open registries
+primary      bodies          + research graphs
+APIs/web     + specs         for discovery
+ │              │                │
+ └──────────────┼────────────────┘
+                ↓
+       evidence envelope
+                ↓
+ source authority + freshness + scope
+                ↓
+ specialist review when consequential
+                ↓
+      CrownThrive IO / MCP
+                ↓
+ project / agent / registry / article
+                ↓
+ validation → approval → governed change
+```
+
+The router does **not** decide that a source is true merely because it is official. It decides which source is authoritative for the specific claim class, what it can prove, what it cannot prove, and which review lane must remain involved.
+
+## Institution-wide inheritance
+
+The machine contract is scoped to:
+
+- **all registered CrownThrive agents**;
+- **all current and future CrownThrive projects**;
+- CrownThrive IO / MCP and project-level MCP adapters;
+- governed framework child repositories and future federation clients;
+- documentation, research, security, rights, commerce, legal, policy, finance, health, accessibility, procurement and public-claim workflows.
+
+The inheritance rule is a preflight requirement: consequential research or state promotion must first identify the task domain, use the governed source profile, preserve provenance and apply the correct specialist gate.
+
+This is deliberately broader than one "research agent." A security agent should route CVE work differently from a licensing agent evaluating copyright, a growth agent validating market data, or an operator checking federal procurement.
+
+## Initial subject profiles
+
+| Subject profile | Primary routing | Consequential review |
+| --- | --- | --- |
+| Economics & demographics | U.S. Census, BLS, BEA, World Bank | Data/economic interpretation as needed |
+| Securities & public-company filings | SEC EDGAR, Federal Register, Congress.gov | Finance/legal |
+| Cybersecurity | NVD, CISA KEV, NIST | Security/SRE |
+| Legal & regulatory | Federal Register, Regulations.gov, Congress.gov, FTC, DOJ ADA | Legal/regulatory |
+| Health & biomedical research | openFDA, ClinicalTrials.gov, NCBI | Health/safety; source evidence is not treatment advice |
+| Energy & environment | EIA, NASA Open APIs | Domain review when consequential |
+| Federal procurement | SAM.gov | Contract/procurement review |
+| Research & scholarship | Crossref, OpenAlex, NCBI | Underlying primary work remains controlling |
+| IP, rights & licensing | U.S. Copyright Office plus governing legal sources | Rights/legal |
+| Accessibility & consumer protection | DOJ ADA, FTC, W3C | Accessibility/legal/consumer-protection |
+| Standards & protocols | NIST, W3C and authoritative specifications | Technical/security review |
+| Open discovery | OpenAlex and Crossref | Discovery only; never overrides a primary source |
+
+The machine manifest currently contains **23 source records** across **12 routing profiles**. That count is a versioned catalog fact, not a promise that every provider has a live CrownThrive adapter.
+
+## Evidence contract
+
+Every external-source result intended to support a material record should preserve an evidence envelope with, at minimum:
+
+```yaml
+source_id: stable provider/source identifier
+retrieved_at: timestamp
+source_url: exact record or query surface
+authority_class: government_primary | standards_body | open_registry | ...
+claim_scope: what this source can actually prove
+effective_date_if_known: date
+request_or_query_summary: redacted/public-safe query description
+record_identifier_if_available: provider record ID
+hash_or_etag_if_available: integrity hint
+agent_or_workflow: originating agent/workflow
+downstream_claim_or_decision: what this evidence is being used to support
+```
+
+A later correction appends lineage. It does not erase the earlier evidence record.
+
+## Provider capability is not CrownThrive integration
+
+The existing [Institutional Source Authority Hierarchy](/knowledge/source-authority-hierarchy) remains controlling.
+
+For every external API, three states stay separate:
+
+1. **Provider capability** — the official source says an API or dataset exists.
+2. **CrownThrive entitlement** — the verified CrownThrive account/plan/key/scopes are allowed to use it.
+3. **CrownThrive deployed integration** — code/configuration/tests/monitoring prove the adapter is actually running.
+
+Cataloging an API in this fabric proves only the first layer unless stronger evidence exists.
+
+## MCP surface
+
+The v1 contract defines four bounded tool families:
+
+```text
+expert_sources.route   deterministic local source selection
+expert_sources.search  scoped provider read/search adapter
+expert_sources.fetch   scoped provider record retrieval
+expert_sources.health  read-only adapter/reachability verification
+```
+
+`expert_sources.route` is implementable as a local deterministic router without provider credentials. The remaining network-facing contracts are `prepared_not_activated` until the relevant adapter, entitlement, secret custody, request budget, error handling, evidence capture and security checks are certified.
+
+<Warning>
+  **No external write authority is introduced.** Phase 2.99 permits only read-oriented `GET` / `HEAD` source behavior in this contract. No provider mutation, filing, comment submission, account change, legal acceptance, payment, entitlement, license grant or other consequential external action is authorized.
+</Warning>
+
+## Credential and privacy boundary
+
+- No API keys, bearer tokens, client secrets, customer data or private evidence belong in public Git or Mintlify.
+- Keys required by providers must bind through Vault or another approved runtime secret store.
+- Agent prompts receive scoped tool capability, not raw credentials.
+- Query logs must not leak restricted CrownThrive material merely to obtain outside expertise.
+- Public/open sources may support discovery, but restricted institutional material remains in its governed plane.
+
+## Founder override — SoundCloud API
+
+`SoundCloud API` is an explicit denied provider for CrownThrive/Virality workflows under the current founder override.
+
+```yaml
+provider: SoundCloud API
+status: removed_by_founder_override
+route_allowed: false
+credential_allowed: false
+dependency_allowed: false
+```
+
+Publicly observable SoundCloud pages or separately governed non-API evidence do not reverse this rule.
+
+## Project and child-repository propagation
+
+Every project should inherit the router contract rather than maintaining a private list of "trusted websites." A project may narrow the allowed source set for its domain, but it may not silently weaken the central source-authority, evidence, secret, risk or correction rules.
+
+The current child-repository factory work is being developed on a separate governed branch. This packet therefore records child-repository binding as **pending collision-safe reconciliation** rather than editing that branch's owned template files or pretending the federation has already propagated.
+
+## Validation
+
+The companion validator fails closed if the packet:
+
+- advances beyond Phase 2.99 or claims Phase 3 entry;
+- enables provider writes;
+- stores credential-shaped values;
+- drops institution-wide agent/project inheritance;
+- removes required high-consequence review;
+- activates network MCP contracts;
+- routes through SoundCloud API;
+- references unknown source IDs;
+- introduces non-HTTPS API/documentation endpoints;
+- or loses required subject coverage.
+
+This is the required pattern for CrownThrive expertise: **route to the right authority, preserve evidence, keep scope explicit, then let governed agents act only within their actual authority.**
