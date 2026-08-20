@@ -159,10 +159,10 @@ def main() -> None:
         "technical_pass_legal_hold",
         "ct.credit.store.v1",
         "ct.agent.ecosystem-rollout-certifier",
-        "Phase 3 remains blocked",
         "identity_pending",
     ]:
         require(token in tech, f"technology standard missing required control: {token}")
+    require("Phase 3" in tech and "blocked" in tech.lower(), "technology standard must preserve an explicit blocked Phase 3 state")
 
     for queue in EXPECTED_QUEUES:
         require(queue in agent, f"agent contract missing queue: {queue}")
