@@ -71,7 +71,7 @@ jobs:
     steps:
       - name: Create or update idempotent drift issue
         run: |
-          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --json number,title --jq '.[] | select(.title == env.DRIFT_TITLE) | .number' | head -n1)"
+          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"${DRIFT_TITLE}\") | .number" | head -n1)"
           body="Automated governed-child validation failed for run ${GITHUB_RUN_ID} on ${GITHUB_SHA}. This is an internal WATCH/HOLD, not a sovereign vote or parent certification. Inspect the failed workflow, preserve evidence, repair root cause through a reviewed PR, and rerun."
           if [ -z "$existing" ]; then
             gh issue create --title "$DRIFT_TITLE" --body "$body"
@@ -94,7 +94,7 @@ jobs:
     steps:
       - name: Close recovered drift issue when present
         run: |
-          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --json number,title --jq '.[] | select(.title == env.DRIFT_TITLE) | .number' | head -n1)"
+          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"${DRIFT_TITLE}\") | .number" | head -n1)"
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "Automated governed-child validation recovered on run ${GITHUB_RUN_ID} at ${GITHUB_SHA}. Closing the drift issue does not certify the child or create a sovereign vote."
             gh issue close "$existing" --reason completed
