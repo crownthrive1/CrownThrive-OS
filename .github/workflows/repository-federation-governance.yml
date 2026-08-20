@@ -2,23 +2,42 @@ name: Repository Federation Governance
 
 on:
   pull_request:
+    paths:
+      - "developers/manifests/repository-federation.v1.json"
+      - "developers/manifests/agent-federation-bindings.v1.json"
+      - "developers/manifests/framework-algorithm-registry.v1.json"
+      - "developers/manifests/framework-factory.v1.json"
+      - "developers/templates/framework-child-federation-contract.v1.json"
+      - "technology/repository-federation-control-plane.mdx"
+      - "automation/framework-repository-governance-standard.mdx"
+      - "automation/framework-factory.mdx"
+      - "scripts/repository_federation_sync.py"
+      - "scripts/validate_repository_federation.py"
+      - "scripts/cie_scan.py"
+      - "scripts/framework_factory.py"
+      - ".github/workflows/repository-federation-governance.yml"
+      - ".github/workflows/docs-governance.yml"
+      - ".github/workflows/governed-merge-gate.yml"
+      - ".github/workflows/cie-framework-governance.yml"
+      - ".github/workflows/framework-factory-governance.yml"
   push:
     branches:
       - main
       - "admin-mcp/**"
     paths:
       - "developers/manifests/repository-federation.v1.json"
+      - "developers/manifests/agent-federation-bindings.v1.json"
       - "developers/manifests/framework-algorithm-registry.v1.json"
+      - "developers/manifests/framework-factory.v1.json"
       - "developers/templates/framework-child-federation-contract.v1.json"
       - "technology/repository-federation-control-plane.mdx"
       - "automation/framework-repository-governance-standard.mdx"
+      - "automation/framework-factory.mdx"
       - "scripts/repository_federation_sync.py"
       - "scripts/validate_repository_federation.py"
       - "scripts/cie_scan.py"
+      - "scripts/framework_factory.py"
       - ".github/workflows/repository-federation-governance.yml"
-      - ".github/workflows/docs-governance.yml"
-      - ".github/workflows/governed-merge-gate.yml"
-      - ".github/workflows/cie-framework-governance.yml"
   schedule:
     - cron: "7 * * * *"
   workflow_dispatch:
@@ -35,7 +54,7 @@ jobs:
   validate:
     name: Validate repository federation
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     steps:
       - name: Check out repository
@@ -51,6 +70,7 @@ jobs:
           python -m py_compile scripts/repository_federation_sync.py
           python -m py_compile scripts/validate_repository_federation.py
           python -m py_compile scripts/cie_scan.py
+          python -m py_compile scripts/framework_factory.py
 
       - name: Validate repository federation contract
         run: python scripts/validate_repository_federation.py
@@ -61,17 +81,87 @@ jobs:
       - name: Validate public-safe CIE client
         run: python scripts/cie_scan.py --self-test
 
+      - name: Validate Framework Factory dependency
+        run: python scripts/framework_factory.py --self-test
+
       - name: Verify parent repository state through GitHub OIDC
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
         run: python scripts/repository_federation_sync.py state
 
+      - name: Synchronize non-voting parent agent transport bindings
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+        run: python scripts/repository_federation_sync.py sync-agents --agent-id ct.relay.agent-a --target-repo-id ct.repo.crownthrive-support
+
       - name: Emit parent federation heartbeat
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
         run: python scripts/repository_federation_sync.py heartbeat --agent-id ct.relay.agent-a
+
+      - name: Prove agent-scoped message pull
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+        run: python scripts/repository_federation_sync.py pull --agent-id ct.relay.agent-a --limit 5
+
+      - name: Prove protected CIE runtime through bound parent agent
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+        run: |
+          cat > /tmp/cie-bound-agent-test.json <<'JSON'
+          {
+            "subject_id": "ct.test.federation.bound-agent",
+            "subject_type": "digital_asset",
+            "dimension_evidence": {
+              "identity_fit": ["ct.test.identity"],
+              "community_value": ["ct.test.community"],
+              "story_alignment": ["ct.test.story"],
+              "brand_safety": ["ct.test.brand"],
+              "legacy_impact": ["ct.test.legacy"]
+            },
+            "findings": []
+          }
+          JSON
+          python scripts/repository_federation_sync.py cie-score --agent-id ct.relay.agent-a --input /tmp/cie-bound-agent-test.json
+          rm -f /tmp/cie-bound-agent-test.json
+
+      - name: Prove unbound agent is denied
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+        run: |
+          if python scripts/repository_federation_sync.py heartbeat --agent-id ct.agent.unregistered-federation-test; then
+            echo "Unbound agent unexpectedly received federation capability."
+            exit 1
+          fi
+          echo "Expected unbound-agent denial observed."
+
+      - name: Prove Agent A cannot certify a child
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+        run: |
+          if python scripts/repository_federation_sync.py certify-child --agent-id ct.relay.agent-a --child-repo-id ct.repo.cie --child-sha unavailable --child-contract-digest test --parent-contract-digest test; then
+            echo "Agent A unexpectedly received child-certification authority."
+            exit 1
+          fi
+          echo "Expected Agent-A certification denial observed."
+
+      - name: Prove Agent D still cannot certify nonexistent CIE repository
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+        run: |
+          if python scripts/repository_federation_sync.py certify-child --agent-id ct.relay.agent-d --child-repo-id ct.repo.cie --child-sha unavailable --child-contract-digest test --parent-contract-digest test; then
+            echo "Missing physical CIE child was unexpectedly certified."
+            exit 1
+          fi
+          echo "Expected child-not-bootstrapped denial observed after Agent-D authority check."
 
       - name: Check whitespace and conflict markers
         run: |
