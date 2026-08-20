@@ -161,6 +161,53 @@ After editing:
 4. use a reviewed PR for material changes;
 5. update the release/changelog/ADR when required.
 
+## 10a. Governed merge gate
+
+Every pull request into `main` must pass the required GitHub status check `CrownThrive governed merge gate`. The check is fail-closed and covers, at minimum:
+
+- documentation governance (`scripts/validate_docs.py` and homepage control-plane projection);
+- security governance (`scripts/validate_security_governance.py` and repository governance enforcement state);
+- specialist classification against the nine-domain registry in `developers/manifests/agent-sovereign-governance.v1.json`;
+- trusted Git diff binding — the changed-file set is derived from the exact base and head SHAs, and any packet-declared `changed_files` list must match the trusted diff exactly.
+
+The gate is defense-in-depth. It does not replace A/B/C/D/S sovereign voting, Agent D independence, specialist endorsements, risk threshold, D3 authorized-human authority, or rollback and downstream reconciliation. GitHub status is not sovereign authority.
+
+## 10b. GitHub Actions runtime and supply-chain rule
+
+Any change under `.github/workflows/` must comply with `/standards/github-actions-runtime-supply-chain-standard`:
+
+- Node 24 is the runtime floor. Node 20 action runtimes are prohibited.
+- Every remote `uses:` reference must be pinned to a full 40-character commit SHA from the approved action inventory, with the human-readable version retained as an inline comment.
+- Mutable tags, moving majors, abbreviated SHAs, unattested self-hosted runners, and runtime escape-hatch variables such as `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` or `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` are not valid repairs.
+- `scripts/validate_github_actions_runtime_policy.py` runs inside the governed merge gate and blocks drift.
+
+Adding or upgrading an action requires a corresponding entry in the approved inventory before the pin can pass validation.
+
+## 10c. Nine specialist endorsement domains
+
+Material contributions are classified per file against nine specialist domains. Endorsements from every applicable domain are required for automatic D0–D2 promotion; unknown endorsement IDs fail closed. The domains are:
+
+1. Security & Privacy
+2. Legal / Regulatory
+3. Operations / SRE
+4. Blockchain / Cryptographic Protocol
+5. AI / ML / LLM TEVV
+6. IP / Rights / Licensing
+7. Finance / Tax / Treasury
+8. Accessibility / Consumer Protection
+9. Regional / Global Localization
+
+The applicable specialist set is derived from the union of per-file classifications over the trusted Git diff, not from any caller-supplied `changed_domains` array. Known sensitive surfaces (workflows, the sovereign merge engine and manifest, governance validators, CHLOM policy/authority/evidence/rights/economics/API contracts) carry deterministic minimum-domain requirements. Documentation-only work may classify as neutral `documentation` when no specialist pattern matches. D3 remains authorized-human / qualified-professional authority and cannot be produced by agent quorum. See `/standards/autonomy-operating-constitution` and the `CT-ADR-GOV-011` amendment for the full contract.
+
+## 10d. PR template impact fields
+
+The repository pull-request template records propagation reach through two impact fields:
+
+- `docs_impact` — `docs_updated`, `docs_no_change`, or `docs_delta_opened`. Use `docs_delta_opened` when a documentation change is required but tracked as a linked follow-up.
+- `homepage_impact` — `updated`, `no_change`, or `delta_opened`. Set `updated` whenever a headline institutional claim, primary control state, source census, ruleset posture, or primary navigation path changes.
+
+Both fields are read together with the propagation checklist. `scripts/validate_homepage_control_plane.py` runs inside the governed merge gate and blocks stale homepage state, so a `no_change` selection must be defensible against the actual diff.
+
 ## 11. Mintlify and navigation
 
 `docs.json` is the navigation and presentation configuration, not the private source of institutional truth.

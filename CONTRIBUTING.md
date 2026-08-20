@@ -60,6 +60,55 @@ A material pull request should identify:
 8. **Open the pull request.** Complete the repository template and request the necessary reviewers.
 9. **Reconcile after acceptance.** Update release notes, ADRs, registries, redirects, search, support, and next-run records where applicable.
 
+## Governed merge gate
+
+Every pull request into `main` must pass the required GitHub status check `CrownThrive governed merge gate`. The check is fail-closed. It validates, at minimum:
+
+- documentation governance (`scripts/validate_docs.py` and the homepage control-plane projection);
+- security governance (`scripts/validate_security_governance.py` and repository governance enforcement state);
+- specialist classification against the nine-domain registry in `developers/manifests/agent-sovereign-governance.v1.json`;
+- trusted Git diff binding — the changed-file set is derived from the exact base and head SHAs, and any packet-supplied `changed_files` list must match that trusted set exactly.
+
+The gate is defense-in-depth. It does not replace A/B/C/D/S sovereign voting, Agent D independence, specialist endorsements, D3 human authority, or rollback and documentation reconciliation. It exists so those authorities cannot be silently bypassed by an unclassified file, a stale workflow, or a mismatched diff.
+
+## GitHub Actions runtime and supply-chain rule
+
+Any change under `.github/workflows/` must comply with `/standards/github-actions-runtime-supply-chain-standard`:
+
+- Node 24 is the runtime floor. Node 20 action runtimes are prohibited.
+- Every remote `uses:` reference must be pinned to a full 40-character commit SHA from the approved action inventory, with the human-readable version kept as a comment beside the SHA.
+- Mutable tags, moving majors, abbreviated SHAs, self-hosted runners without attestation, and runtime escape-hatch variables (`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`, `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION`) are not valid repairs.
+- `scripts/validate_github_actions_runtime_policy.py` runs inside the governed merge gate and blocks drift.
+
+New or updated actions require an entry in the approved inventory before the pin can pass validation.
+
+## Specialist endorsement domains
+
+Material contributions are classified against nine specialist domains. Endorsements from every applicable domain are required for automatic D0–D2 promotion; unknown endorsement IDs fail closed. The domains are:
+
+1. Security & Privacy
+2. Legal / Regulatory
+3. Operations / SRE
+4. Blockchain / Cryptographic Protocol
+5. AI / ML / LLM TEVV
+6. IP / Rights / Licensing
+7. Finance / Tax / Treasury
+8. Accessibility / Consumer Protection
+9. Regional / Global Localization
+
+The set of required specialists is derived from a per-file classification of the trusted Git diff, not from a caller-supplied domain list. Known sensitive surfaces (workflows, the sovereign merge engine and manifest, governance validators, CHLOM policy/authority/evidence/rights/economics/API contracts) carry deterministic minimum-domain requirements. A documentation-only change may classify as neutral `documentation` when no specialist pattern matches. D3 changes remain authorized-human authority and cannot be produced by agent quorum.
+
+See `/standards/autonomy-operating-constitution` and the `CT-ADR-GOV-011` amendment for the full authority contract.
+
+## Pull request template fields
+
+The repository template records the change's institutional reach. Two impact fields govern propagation:
+
+- `docs_impact` — one of `docs_updated`, `docs_no_change`, or `docs_delta_opened`. Use `docs_delta_opened` when a documentation change is required but tracked as a follow-up, and link the follow-up.
+- `homepage_impact` — one of `updated`, `no_change`, or `delta_opened`. Set `updated` whenever a headline institutional claim, primary control state, source census, ruleset posture, or primary navigation path changes. `scripts/validate_homepage_control_plane.py` runs inside the governed merge gate and blocks stale homepage state.
+
+Both fields are read alongside the propagation checklist. A `no_change` selection must be defensible against the actual diff.
+
 ## Documentation rules
 
 Every navigated MDX page requires:
