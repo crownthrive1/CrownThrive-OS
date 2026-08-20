@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Validate and optionally materialize the compact 795-record Help Center article seed bundle.
+"""Validate and optionally materialize the canonical compact 795-record Help Center seed bundle.
 
-This validator proves that the recovered title/hierarchy machine manifest is complete
-and byte-stable. It deliberately does NOT claim that article bodies were recovered,
-terminal dispositions are complete, or Phase 2.99 has passed.
+This validator proves that the recovered title/hierarchy machine manifest is complete,
+byte-stable and canonically materialized. It deliberately does NOT claim that article
+bodies were recovered, terminal dispositions are complete, blanket publication is safe,
+or Phase 2.99 has passed.
 """
 
 from __future__ import annotations
@@ -19,8 +20,10 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DESCRIPTOR_PATH = ROOT / "data/help_center_article_manifest.v1.bundle.json"
+SEED_PATH = ROOT / "support/help-center-795-article-disposition-seed.mdx"
 
 EXPECTED_SCHEMA_VERSION = "1.3.0-compact"
+EXPECTED_CANONICAL_MERGE = "8fcb68bf209e32ba2cd265e1b6ca730cb8da64d7"
 EXPECTED_RECORD_FIELDS = [
     "inventory_id",
     "recovered_order",
@@ -98,7 +101,7 @@ def load_bundle() -> tuple[dict[str, Any], bytes, bytes, dict[str, Any]]:
 
     try:
         compressed = base64.b64decode(encoded, validate=True)
-    except Exception as exc:  # pragma: no cover - fail-closed parser path
+    except Exception as exc:  # pragma: no cover
         fail(f"bundle base64 is invalid: {exc}")
 
     if len(compressed) != descriptor.get("gzip_bytes"):
@@ -124,6 +127,34 @@ def load_bundle() -> tuple[dict[str, Any], bytes, bytes, dict[str, Any]]:
         fail("manifest root must be an object")
 
     return descriptor, compressed, raw, manifest
+
+
+def validate_seed_current_truth() -> None:
+    if not SEED_PATH.is_file():
+        fail("Help Center 795 seed page is missing")
+    seed = SEED_PATH.read_text(encoding="utf-8")
+
+    required = [
+        "`source_not_recovered`;",
+        "complete_machine_manifest_generated_in_repo: true",
+        "simplebase_state: retired_historical_only",
+        "source_not_recovered_terminal_state_allowed: true",
+        "per_record_exposure_ip_classification: pending",
+        "blocked_pending_phase_2_99_hard_exit_and_full_docs_reconciliation",
+        EXPECTED_CANONICAL_MERGE,
+    ]
+    for token in required:
+        if token not in seed:
+            fail(f"795 seed current-truth invariant missing: {token}")
+
+    forbidden = [
+        "complete_machine_manifest_generated_in_repo: pending_governed_merge",
+        "legacy_help_center_live_access_state: auth_required",
+        "candidate remains **noncanonical until independently governed and merged**",
+    ]
+    for token in forbidden:
+        if token in seed:
+            fail(f"stale pre-merge 795 seed state remains: {token}")
 
 
 def validate_manifest(descriptor: dict[str, Any], manifest: dict[str, Any]) -> None:
@@ -206,8 +237,10 @@ def validate_manifest(descriptor: dict[str, Any], manifest: dict[str, Any]) -> N
     if len(sections) != source.get("top_level_section_count"):
         fail("top-level section count drifted")
 
-    if descriptor.get("publication_state") != "machine_manifest_materialized_candidate_not_canonical_until_merge":
-        fail("publication state must remain candidate until governed merge")
+    if descriptor.get("publication_state") != "machine_manifest_materialized_canonical":
+        fail("publication state must reflect the governed PR #91 canonical merge")
+    if descriptor.get("canonical_merge_sha") != EXPECTED_CANONICAL_MERGE:
+        fail("canonical PR #91 merge SHA drifted")
     if descriptor.get("terminal_disposition_state") != "incomplete":
         fail("terminal disposition may not be falsely promoted")
     if descriptor.get("p0_p1_reconstruction_state") != "incomplete":
@@ -225,6 +258,7 @@ def main() -> int:
 
     descriptor, _compressed, raw, manifest = load_bundle()
     validate_manifest(descriptor, manifest)
+    validate_seed_current_truth()
 
     if args.materialize_output:
         output = args.materialize_output
@@ -234,11 +268,13 @@ def main() -> int:
         output.write_bytes(raw)
         print(f"Validated compact JSON materialized at {output}")
 
-    print("Help Center 795 compact machine-manifest bundle validation: PASS")
+    print("Help Center 795 canonical machine-manifest bundle validation: PASS")
     print("Recovered records: 795; stable article identities derivable: 795; section census: 9 sections.")
+    print(f"Canonical materialization merge: {EXPECTED_CANONICAL_MERGE}")
     print("Source authority: S11; original article bodies remain unrecovered unless separately proven.")
+    print("SimpleBase: retired historical-only; S94 remains partial historical/index evidence.")
     print("Terminal disposition: INCOMPLETE; P0/P1 substantive reconstruction: INCOMPLETE.")
-    print("Important: bundle PASS != Phase 2.99 Workstream 0 completion or hard-exit PASS.")
+    print("Important: bundle PASS != GATE-002, full-documentation hard-gate, or Phase 2.99 hard-exit PASS.")
     return 0
 
 
