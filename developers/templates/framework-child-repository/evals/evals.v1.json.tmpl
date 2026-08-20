@@ -1,0 +1,42 @@
+{
+  "eval_version": "1.0.0",
+  "package_id": "{{PACKAGE_ID}}",
+  "framework_id": "{{FRAMEWORK_ID}}",
+  "public_safe_suite": [
+    {
+      "case_id": "package_health",
+      "kind": "positive",
+      "command": "python3 engine/engine.py health",
+      "expected": "ok=true"
+    },
+    {
+      "case_id": "package_validator",
+      "kind": "positive",
+      "command": "python3 scripts/validate_child_repository.py",
+      "expected": "PASS"
+    },
+    {
+      "case_id": "protected_runtime_absent",
+      "kind": "negative",
+      "command": "python3 engine/engine.py evaluate-contract-only --input {}",
+      "expected": "HOLD_PRIVATE_RUNTIME_REQUIRED"
+    },
+    {
+      "case_id": "sovereign_vote_not_created",
+      "kind": "negative",
+      "expected": "vote_eligible=false"
+    },
+    {
+      "case_id": "d3_remains_human_reserved",
+      "kind": "negative",
+      "expected": "d3_human_reserved=true"
+    },
+    {
+      "case_id": "pr_validation_no_oidc",
+      "kind": "security_negative",
+      "expected": "pull_request validation path has no id-token: write authority"
+    }
+  ],
+  "private_eval_corpora_in_public_package": false,
+  "private_eval_execution": "governed_private_runtime_only"
+}
