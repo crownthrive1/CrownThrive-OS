@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Validate the Phase 2.99 hard-exit closure ledger.
+"""Validate the Phase 2.99 hard-exit closure ledger v1.3.
 
-PASS means the ledger is coherent and fail-closed. It does not mean the
-Phase 2.99 hard exit itself has passed. Volatile/provider observations are
-validated as timestamped snapshots and may not become timeless CI authority.
+PASS means the versioned ledger is internally coherent and fail-closed.
+It does not mean Phase 2.99 hard exit has passed. Accepted governance
+DEFERRED state remains explicitly distinct from technical PASS.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -35,16 +36,8 @@ ARTICLE_OPEN_FIELDS = (
     "navigation_or_intentionally_unlisted_795",
     "p0_p1_substantive_or_explicit_unresolved_closure",
 )
-CANONICAL_COLLAB = {
-    "credential_exact_match": "passed",
-    "project_meta_authenticated": "passed",
-    "institutional_project_uid": "passed",
-    "approved_field_map": "passed",
-    "authenticated_project_read": "passed",
-    "bounded_write_readback": "passed",
-    "webhook_sender_delivery_integrity": "blocked",
-}
 VOLATILE_SNAPSHOT_SEMANTICS = "volatile_runtime_snapshot_not_ci_locked_counter"
+SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def fail(message: str) -> None:
@@ -76,10 +69,16 @@ def require_nonnegative_int(value, label: str) -> None:
         fail(f"{label} must be a non-negative integer")
 
 
+def require_sha40(value, label: str) -> None:
+    if not isinstance(value, str) or not SHA40_RE.fullmatch(value):
+        fail(f"{label} must be a 40-character lowercase commit SHA")
+
+
 def validate(data: dict, root: Path, check_files: bool = True) -> None:
-    require_equal(data.get("manifest_version"), "1.2.2", "manifest version")
+    require_equal(data.get("manifest_version"), "1.3.0", "manifest version")
     require_equal(data.get("observation_semantics"), "verification_baseline_snapshot_not_dynamic_post_merge_assertion", "observation semantics")
     require_timestamp(data.get("observed_at"), "observed_at")
+    require_sha40(data.get("observed_main_sha"), "observed main SHA")
 
     authority = data.get("authority", {})
     for key, expected in {
@@ -127,22 +126,48 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     candidate = article.get("noncanonical_candidate", {})
     require_equal(candidate.get("pr"), 91, "article candidate PR")
     require_equal(candidate.get("state"), "deterministic_795_title_hierarchy_manifest_candidate_only", "article candidate state")
+    require_sha40(candidate.get("exact_head"), "article candidate head")
 
     reconciliation = data.get("reconciliation", {})
     require_equal(reconciliation.get("retroactive_phase_2_0_through_2_9_lane"), "active_until_hard_exit", "retroactive lane")
     require_equal(reconciliation.get("explicit_deferral_ledger_complete"), False, "deferral ledger")
     require_equal(reconciliation.get("restricted_source_final_audit"), "pending", "restricted-source audit")
     require_equal(reconciliation.get("continuity_recovery_final_reproducibility_audit"), "pending", "recovery audit")
+    require_nonnegative_int(reconciliation.get("approved_deferral_count_snapshot"), "approved deferral count")
+
+    tags = reconciliation.get("reconciliation_tag_snapshot", {})
+    require_timestamp(tags.get("observed_at"), "tag snapshot observed_at")
+    for key in ("total", "pass", "open", "blocked", "closed", "deferred", "authoritative", "scan_required", "reconcile_required"):
+        require_nonnegative_int(tags.get(key), f"tag snapshot {key}")
+    require_equal(tags["pass"] + tags["open"] + tags["blocked"] + tags["closed"] + tags["deferred"], tags["total"], "tag state arithmetic")
+    require_equal(tags.get("authoritative"), tags["total"], "all reconciliation tags authoritative")
+    require_equal(tags.get("scan_required"), tags["total"], "all reconciliation tags scan-required")
+    require_equal(tags.get("reconcile_required"), tags["total"], "all reconciliation tags reconcile-required")
+    require_equal(tags.get("pass_remains_drift_watched"), True, "PASS drift watch")
+    require_equal(tags.get("deferral_is_not_pass"), True, "DEFERRAL not PASS")
+    require_equal(tags.get("unknown_never_becomes_zero_or_pass"), True, "UNKNOWN semantics")
+
+    scan = reconciliation.get("latest_reconciliation_scan", {})
+    require_equal(scan.get("scanner_id"), "ct.reconciliation.lmno.agent-e", "latest scanner")
+    require_equal(scan.get("status"), "partial", "latest reconciliation scan state")
+    for key in ("tagged_scopes", "reconciled_scopes", "drift_scopes", "unresolved_scopes"):
+        require_nonnegative_int(scan.get(key), f"latest scan {key}")
+    require_equal(scan.get("tagged_scopes"), tags["total"], "scan/tag total")
+    require_equal(scan.get("reconciled_scopes"), tags["total"], "scan reconciled total")
+    if scan.get("unresolved_scopes", 0) <= 0:
+        fail("latest reconciliation scan must preserve unresolved scopes while hard exit remains incomplete")
+    require_timestamp(scan.get("completed_at"), "latest reconciliation scan completed_at")
 
     sequence = data.get("repository_security_sequence", {})
     require_equal(sequence.get("verification_baseline_main_sha"), data.get("observed_main_sha"), "repository baseline")
     require_equal(sequence.get("canonicalization_complete"), True, "repository canonicalization")
     require_equal(sequence.get("github_role"), "technical_defense_in_depth_not_sovereign_authority", "GitHub role")
-    require_equal(sequence.get("pr_64", {}).get("state"), "merged_canonical", "PR64 state")
+    for key in ("pr_64", "pr_95", "pr_65", "pr_117", "pr_119"):
+        require_equal(sequence.get(key, {}).get("state"), "merged_canonical", f"{key} state")
+        require_sha40(sequence.get(key, {}).get("merge_sha"), f"{key} merge SHA")
     require_equal(sequence.get("issue_83", {}).get("state"), "closed_completed", "issue83 state")
     require_equal(sequence.get("issue_83", {}).get("behavioral_negative_proof_pr"), 93, "issue83 negative proof")
-    require_equal(sequence.get("pr_95", {}).get("state"), "merged_canonical", "PR95 state")
-    require_equal(sequence.get("pr_65", {}).get("state"), "merged_canonical", "PR65 state")
+    require_equal(sequence["pr_119"]["merge_sha"], data.get("observed_main_sha"), "current main matches PR119")
 
     rls = sequence.get("pr_66_issue_79", {})
     require_equal(rls.get("issue_79_state"), "closed_completed", "issue79 state")
@@ -165,12 +190,21 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
         fail("RLS remediation must retain founder-authorized D3 evidence")
 
     collab = data.get("collab_portal", {})
-    require_equal(collab.get("state"), "fail_closed", "Collab state")
+    require_equal(collab.get("state"), "fail_closed_deferred_point_of_use", "Collab state")
     require_equal(collab.get("canonical_predicate_count"), 7, "Collab predicate count")
     require_equal(collab.get("predicates_passed_count"), 6, "Collab passed count")
     require_equal(collab.get("all_seven_certification_predicates_passed"), False, "Collab all seven")
-    for key, expected in CANONICAL_COLLAB.items():
-        require_equal(collab.get(key), expected, f"collab.{key}")
+    for key in ("credential_exact_match", "project_meta_authenticated", "institutional_project_uid", "approved_field_map", "authenticated_project_read", "bounded_write_readback"):
+        require_equal(collab.get(key), "passed", f"collab.{key}")
+    require_equal(collab.get("webhook_sender_delivery_integrity"), "governed_deferred_not_passed", "Collab webhook disposition")
+    require_equal(collab.get("technical_webhook_delivery_state"), "unproven", "Collab technical delivery")
+    require_equal(collab.get("hard_exit_blocking_effect"), "deferred_accepted_by_explicit_founder_override", "Collab hard-exit effect")
+    require_equal(collab.get("deferral_id"), "CT-DEF-GATE006-OVERRIDE-001", "Collab deferral ID")
+    if "GitHub #120" not in str(collab.get("deferral_authority", "")):
+        fail("Collab deferral must retain explicit founder #120 authority")
+    if not str(collab.get("mandatory_reopen_trigger", "")).strip():
+        fail("Collab deferral must retain a mandatory point-of-use reopen trigger")
+    require_equal(collab.get("private_fallback_tracking"), "active", "Collab fallback tracking")
     collab_budget = collab.get("request_budget_august", {})
     require_nonnegative_int(collab_budget.get("consumed"), "Collab request snapshot")
     require_nonnegative_int(collab_budget.get("limit"), "Collab request limit")
@@ -180,6 +214,22 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     require_timestamp(collab_budget.get("observed_at"), "Collab request snapshot observed_at")
     require_equal(collab_budget.get("semantics"), VOLATILE_SNAPSHOT_SEMANTICS, "Collab request snapshot semantics")
 
+    delivery = data.get("provider_delivery_deferrals", {})
+    require_equal(set(delivery), {"collab_portal", "partnero", "stripe"}, "provider delivery deferral set")
+    expected_ids = {
+        "collab_portal": "CT-DEF-GATE006-OVERRIDE-001",
+        "partnero": "CT-DEF-WEBHOOK-PARTNERO-001",
+        "stripe": "CT-DEF-WEBHOOK-STRIPE-001",
+    }
+    for service, deferral_id in expected_ids.items():
+        row = delivery[service]
+        require_equal(row.get("deferral_id"), deferral_id, f"{service} deferral ID")
+        require_equal(row.get("technical_state"), "unproven", f"{service} technical delivery")
+        require_equal(row.get("blocking_effect"), "deferred_accepted_point_of_use", f"{service} blocking effect")
+        require_equal(row.get("technical_pass_claimed"), False, f"{service} technical PASS claim")
+        if not str(row.get("reopen_trigger", "")).strip():
+            fail(f"{service} deferral must retain a non-empty reopen trigger")
+
     api = data.get("api_mcp_runtime_closure", {})
     io_state = api.get("crownthrive_io", {})
     require_equal(io_state.get("state"), "read_verified_write_closed", "IO state")
@@ -187,8 +237,8 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     require_equal(io_state.get("request_period_start"), "2026-08-01", "IO request period")
     require_timestamp(io_state.get("request_count_observed_at"), "IO request snapshot observed_at")
     require_equal(io_state.get("request_count_semantics"), VOLATILE_SNAPSHOT_SEMANTICS, "IO request snapshot semantics")
-    require_equal(io_state.get("monthly_request_budget_ceiling"), "open", "IO monthly request ceiling")
-    require_equal(io_state.get("scheduled_health_probe_budget_policy"), "open", "IO scheduled health budget policy")
+    require_equal(io_state.get("monthly_request_budget_ceiling"), "passed_founder_unlimited_policy", "IO monthly request ceiling")
+    require_equal(io_state.get("scheduled_health_probe_budget_policy"), "passed", "IO scheduled health budget policy")
     api_control = api.get("crownthrive_api_control", {})
     require_equal(api_control.get("write_gate"), False, "API write gate")
     require_equal(api_control.get("hard_exit_certified"), False, "API hard exit")
@@ -198,8 +248,9 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     open_acceptance = api.get("open_acceptance_items", [])
     if not open_acceptance:
         fail("API/MCP open acceptance items must remain explicit while hard exit is incomplete")
-    if "monthly_request_budget_ceiling" not in open_acceptance:
-        fail("API/MCP closure must preserve the open monthly request budget ceiling")
+    for closed_item in ("monthly_request_budget_ceiling", "scheduled_health_probe_budget_policy"):
+        if closed_item in open_acceptance:
+            fail(f"closed IO acceptance item remains incorrectly open: {closed_item}")
 
     gates = data.get("open_hard_gates", [])
     require_equal(len(gates), 8, "hard-gate registry count")
@@ -207,18 +258,30 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     require_equal(len(by_id), 8, "unique hard-gate IDs")
     require_equal(by_id["CT-P299-GATE-004"].get("state"), "pass", "repository canonicalization gate")
     require_equal(by_id["CT-P299-GATE-005"].get("state"), "pass", "RLS gate")
-    require_equal(by_id["CT-P299-GATE-006"].get("state"), "not_met", "Collab gate")
-    require_equal(by_id["CT-P299-GATE-006"].get("progress"), "6_of_7_passed", "Collab gate progress")
+    gate6 = by_id["CT-P299-GATE-006"]
+    require_equal(gate6.get("state"), "deferred_accepted_not_passed", "Collab gate disposition")
+    require_equal(gate6.get("blocking"), False, "Collab gate blocking effect")
+    require_equal(gate6.get("progress"), "6_of_7_passed", "Collab gate progress")
+    require_equal(gate6.get("deferral_id"), "CT-DEF-GATE006-OVERRIDE-001", "Collab gate deferral")
+    require_equal(gate6.get("technical_state"), "unproven", "Collab gate technical state")
+    if not str(gate6.get("reopen_trigger", "")).strip():
+        fail("GATE-006 deferred disposition must preserve point-of-use reopen trigger")
+    require_equal(by_id["CT-P299-GATE-008"].get("state"), "not_met", "GATE-008 fail closed")
+    require_equal(by_id["CT-P299-GATE-008"].get("blocking"), True, "GATE-008 blocking")
     open_blocking = [row for row in gates if row.get("blocking") is True and row.get("state") != "pass"]
-    require_equal(len(open_blocking), 6, "open blocking gate count")
+    require_equal(len(open_blocking), 5, "open blocking gate count")
+    deferred_not_passed = [row for row in gates if str(row.get("state", "")).startswith("deferred_")]
+    require_equal(len(deferred_not_passed), 1, "deferred-not-pass gate count")
 
     hard_exit = data.get("hard_exit", {})
     require_equal(hard_exit.get("state"), "not_met", "hard exit")
-    require_equal(hard_exit.get("blocking_gate_count"), 6, "hard-exit blocker count")
+    require_equal(hard_exit.get("blocking_gate_count"), 5, "hard-exit blocker count")
+    require_equal(hard_exit.get("deferred_not_passed_gate_count"), 1, "hard-exit deferred count")
     require_equal(hard_exit.get("phase_2_complete"), False, "Phase2 complete")
     require_equal(hard_exit.get("phase_3_entry_open"), False, "Phase3 open")
     require_equal(hard_exit.get("phase_3_entry"), "blocked_pending_phase_2_99_hard_exit", "Phase3 state")
     require_equal(hard_exit.get("final_certification_recorded"), False, "final certification")
+    require_equal(hard_exit.get("gate_008_fail_closed_while_upstream_unresolved"), True, "GATE-008 upstream fail-closed rule")
 
     ladder = data.get("external_assessment_ladder", {})
     require_equal(ladder.get("authority"), "non_authoritative_progress_metric_only", "external ladder authority")
@@ -260,7 +323,7 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
         fail("PR #62 five-phase snapshot must remain superseded lineage")
 
     article_text = (root / article["evidence_path"]).read_text(encoding="utf-8")
-    for fragment in ("source_inventory_count: 795", "complete_machine_manifest_generated_in_repo: pending", "P0_P1_disposition_completion: pending"):
+    for fragment in ("source_inventory_count: 795", "P0_P1_disposition_completion: pending"):
         if fragment not in article_text:
             fail(f"article evidence missing: {fragment!r}")
 
@@ -295,17 +358,23 @@ def self_test(data: dict) -> None:
     expect_failure(data, lambda d: d["hard_exit"].__setitem__("phase_3_entry_open", True), "premature Phase3")
     expect_failure(data, lambda d: d["macro_count_universes"]["holdings_domain_rows"].__setitem__("count", 68), "count collapse")
     expect_failure(data, lambda d: d["articleization"].__setitem__("terminal_disposition_assigned_795", True), "false article completion")
-    expect_failure(data, lambda d: d["collab_portal"].__setitem__("all_seven_certification_predicates_passed", True), "false Collab completion")
+    expect_failure(data, lambda d: d["reconciliation"]["reconciliation_tag_snapshot"].__setitem__("total", 169), "reconciliation tag arithmetic drift")
+    expect_failure(data, lambda d: d["reconciliation"]["reconciliation_tag_snapshot"].__setitem__("deferral_is_not_pass", False), "deferral promoted by tag semantics")
+    expect_failure(data, lambda d: d["collab_portal"].__setitem__("all_seven_certification_predicates_passed", True), "false Collab 7/7")
+    expect_failure(data, lambda d: d["collab_portal"].__setitem__("technical_webhook_delivery_state", "passed"), "deferred delivery promoted to technical pass")
+    expect_failure(data, lambda d: d["provider_delivery_deferrals"]["stripe"].__setitem__("technical_pass_claimed", True), "provider deferral promoted to pass")
+    expect_failure(data, lambda d: d["open_hard_gates"][5].__setitem__("state", "pass"), "GATE-006 falsely promoted to pass")
+    expect_failure(data, lambda d: d["open_hard_gates"][5].__setitem__("reopen_trigger", ""), "GATE-006 missing reopen trigger")
+    expect_failure(data, lambda d: d["open_hard_gates"][7].__setitem__("state", "pass"), "premature GATE-008")
     expect_failure(data, lambda d: d["repository_security_sequence"].__setitem__("canonicalization_complete", False), "repository regression")
-    expect_failure(data, lambda d: d["repository_security_sequence"]["pr_65"].__setitem__("state", "open"), "stale PR65 state")
     expect_failure(data, lambda d: d["repository_security_sequence"]["pr_66_issue_79"].__setitem__("rls_enabled_on_all_current_tables", False), "RLS regression")
-    expect_failure(data, lambda d: d["repository_security_sequence"]["pr_66_issue_79"].__setitem__("current_rls_policy_count", 11), "RLS policy/table mismatch")
+    expect_failure(data, lambda d: d["repository_security_sequence"]["pr_66_issue_79"].__setitem__("current_rls_policy_count", 14), "RLS policy/table mismatch")
     expect_failure(data, lambda d: d["collab_portal"]["request_budget_august"].__setitem__("consumed", -1), "negative Collab snapshot")
     expect_failure(data, lambda d: d["api_mcp_runtime_closure"]["crownthrive_io"].__setitem__("request_count_observed_at", "not-a-timestamp"), "invalid IO snapshot timestamp")
     expect_failure(data, lambda d: d["external_assessment_ladder"].__setitem__("hard_exit_decision_input", True), "external assessment authority escalation")
     expect_failure(data, lambda d: d["external_assessment_ladder"].__setitem__("current_external_grade", 101), "external grade range")
     expect_success(data, lambda d: d["external_assessment_ladder"].update({"current_external_grade": 96, "current_external_letter_grade": "A"}), "external regrade is non-authoritative")
-    expect_success(data, lambda d: d["api_mcp_runtime_closure"]["crownthrive_io"].__setitem__("august_request_count_observed", 34), "IO request counter is a volatile snapshot")
+    expect_success(data, lambda d: d["api_mcp_runtime_closure"]["crownthrive_io"].__setitem__("august_request_count_observed", 42), "IO request counter is a volatile snapshot")
 
 
 def main() -> int:
@@ -315,14 +384,15 @@ def main() -> int:
     data = load_json(LEDGER)
     if args.self_test:
         self_test(data)
-        print("Phase 2.99 closure-ledger self-test passed; false phase/count/article/Collab/repository/RLS promotion remains blocked while volatile grades/request counters remain non-authoritative snapshots.")
+        print("Phase 2.99 closure-ledger v1.3 self-test passed; deferred webhook proof remains NOT-PASS, GATE-008 stays fail-closed, and false phase/count/article/RLS promotion is blocked.")
         return 0
     validate(data, ROOT, check_files=True)
-    open_count = sum(1 for row in data["open_hard_gates"] if row.get("blocking") is True and row.get("state") != "pass")
-    print("Phase 2.99 closure-ledger consistency validation: PASS")
-    print(f"Open blocking hard-exit gates preserved: {open_count}")
-    print("Repository canonicalization: PASS; RLS defense-in-depth snapshot: PASS; Collab: 6/7 PASS, fail-closed.")
-    print("External assessment and request counters are timestamped non-authoritative/volatile snapshots, not timeless hard-exit predicates.")
+    blocking = sum(1 for row in data["open_hard_gates"] if row.get("blocking") is True and row.get("state") != "pass")
+    deferred = sum(1 for row in data["open_hard_gates"] if str(row.get("state", "")).startswith("deferred_"))
+    print("Phase 2.99 closure-ledger v1.3 consistency validation: PASS")
+    print(f"Open blocking hard-exit gates preserved: {blocking}")
+    print(f"Governed deferred / technically NOT-PASS gates: {deferred}")
+    print("Repository canonicalization: PASS; RLS defense-in-depth: PASS; Collab: 6/7 technical with point-of-use deferral, not 7/7 PASS.")
     print("Institutional state: Phase 2 / 2.99; Phase 3 blocked_pending_phase_2_99_hard_exit.")
     print("Important: validator PASS != Phase 2.99 hard-exit PASS.")
     return 0
