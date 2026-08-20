@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Validate and render CrownThrive framework child repository scaffolds.
+"""Validate and render CrownThrive framework execution packages.
 
-This is a provisioning/scaffold controller. It cannot create GitHub repositories,
-certify children, activate sovereign voters, or bypass predecessor gates.
+A framework child is an independently executable package (workflow, validator, engine,
+skill, tools, API/MCP contracts, evals, federation and commercial manifest). A separate
+physical GitHub repository is optional distribution packaging, not the child identity.
 """
 from __future__ import annotations
 
@@ -23,6 +24,14 @@ TEMPLATE_MAP = {
     "AGENTS.md.tmpl": "AGENTS.md",
     "SECURITY.md.tmpl": "SECURITY.md",
     ".crownthrive/federation.json.tmpl": ".crownthrive/federation.json",
+    "framework/manifest.json.tmpl": "framework/manifest.json",
+    "engine/engine.py.tmpl": "engine/engine.py",
+    "skills/framework/SKILL.md.tmpl": "skills/framework/SKILL.md",
+    "tools/tools.v1.json.tmpl": "tools/tools.v1.json",
+    "api/api-contract.v1.json.tmpl": "api/api-contract.v1.json",
+    "mcp/mcp-tools.v1.json.tmpl": "mcp/mcp-tools.v1.json",
+    "evals/evals.v1.json.tmpl": "evals/evals.v1.json",
+    "commercial/offer-manifest.v1.json.tmpl": "commercial/offer-manifest.v1.json",
     ".github/CODEOWNERS.tmpl": ".github/CODEOWNERS",
     ".github/dependabot.yml.tmpl": ".github/dependabot.yml",
     ".github/pull_request_template.md.tmpl": ".github/pull_request_template.md",
@@ -43,7 +52,7 @@ EXPECTED_SEQUENCE = [
     "ct.framework.one-seat-multiple-industries",
 ]
 
-TERMINAL_LINKED = {"LINKED_GOVERNED", "CONTROLLED_TEST", "MAINTAINED"}
+IMPLEMENTED_STATES = {"CONTROLLED_TEST", "PARENT_CERTIFICATION_PENDING", "GOVERNED_FRAMEWORK_ACCEPTANCE", "PUBLIC_PACKAGE_CANDIDATE", "MAINTAINED"}
 FORBIDDEN_TEMPLATE_FRAGMENTS = (
     "vote_eligible: true",
     '"vote_eligible": true',
@@ -76,46 +85,60 @@ def children(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def next_child(data: dict[str, Any]) -> dict[str, Any]:
-    rows = children(data)
-    for row in rows:
-        if row.get("current_state") not in TERMINAL_LINKED:
+    for row in children(data):
+        if row.get("current_state") not in IMPLEMENTED_STATES:
             return row
-    return rows[-1]
+    return children(data)[-1]
 
 
 def validate_manifest(data: dict[str, Any]) -> None:
     if data.get("manifest_id") != "ct.manifest.framework-child-fleet.v1":
         fail("child fleet manifest identity drift")
+    if data.get("manifest_version") != "2.0.0":
+        fail("framework child fleet must use package-model v2")
     if data.get("program_authority_issue") != 148 or data.get("stacked_on_parent_pr") != 145:
         fail("factory authority/stack dependency drift")
     if data.get("canonical_parent_repository") != "crownthrive1/CrownThrive-Support":
         fail("canonical parent repository drift")
     if data.get("current_constitution") != "CT-ADR-GOV-011":
         fail("current constitution must remain CT-ADR-GOV-011")
+    if data.get("child_definition") != "independently_executable_framework_package_not_physical_repository":
+        fail("framework child definition drift")
     if data.get("provisioning_mode") != "one_at_a_time":
-        fail("framework child provisioning must remain one_at_a_time")
+        fail("framework package implementation must remain one_at_a_time")
+
+    host = data.get("host_model", {})
+    if host.get("physical_child_repository_required") is not False:
+        fail("physical child repository must not be required")
+    if host.get("repository_identity_is_not_framework_identity") is not True:
+        fail("repository identity must remain distinct from framework identity")
 
     inv = data.get("fleet_invariants", {})
     required_true = (
-        "repository_name_is_not_existence_evidence",
-        "physical_repository_id_required_before_bootstrap",
-        "github_actions_oidc_required",
-        "parent_certification_required",
+        "framework_package_is_primary_child_identity",
+        "github_actions_oidc_required_for_federation_mutation",
+        "pull_request_validation_must_not_receive_oidc_authority",
+        "workflow_ref_environment_agent_capability_binding_required_before_mutation",
+        "parent_certification_required_before_operational_or_public_activation",
         "agent_d_is_only_parent_certifier",
         "sovereign_vote_requires_separate_constitutional_acceptance",
         "sync_agents_only_non_voting_d0_d2_transport",
         "d3_human_reserved",
         "protected_calibration_public_copy_prohibited",
         "future_framework_activation_must_follow_sequence",
+        "public_package_requires_ip_classification",
+        "exact_price_checkout_entitlement_require_separate_authority",
     )
     for key in required_true:
         if inv.get(key) is not True:
             fail(f"required fleet invariant missing: {key}")
     required_false = (
+        "physical_repository_required_for_framework_existence",
+        "physical_repository_required_for_controlled_test",
         "child_operational_before_oidc_and_parent_certification",
         "child_self_certification",
         "child_self_activation",
-        "repository_or_workflow_creates_sovereign_vote",
+        "package_or_workflow_creates_sovereign_vote",
         "framework_acceptance_creates_sovereign_vote",
         "child_certification_creates_sovereign_vote",
     )
@@ -125,61 +148,51 @@ def validate_manifest(data: dict[str, Any]) -> None:
 
     rows = children(data)
     if len(rows) != 8:
-        fail("initial framework child fleet must contain exactly eight repositories")
+        fail("initial framework package fleet must contain exactly eight frameworks")
     ids = [str(row.get("framework_id", "")) for row in rows]
     if ids != EXPECTED_SEQUENCE:
         fail(f"framework sequence drift: {ids}")
 
-    repo_ids: set[str] = set()
-    repo_names: set[str] = set()
+    package_ids: set[str] = set()
     minutes: set[int] = set()
-    bootstrap_rows: list[dict[str, Any]] = []
+    materialization_rows: list[dict[str, Any]] = []
     for index, row in enumerate(rows, 1):
         if row.get("order") != index:
             fail(f"framework order drift at {index}")
-        if row.get("activation_allowed") is not False:
-            fail(f"activation must remain false in provisioning manifest: {row.get('framework_id')}")
-        repo_id = str(row.get("repo_id", ""))
-        repo_name = str(row.get("repo_full_name", ""))
-        if not repo_id.startswith("ct.repo.") or repo_id in repo_ids:
-            fail(f"invalid or duplicate repo_id: {repo_id}")
-        if not repo_name.startswith("crownthrive1/CrownThrive-") or repo_name in repo_names:
-            fail(f"invalid or duplicate repo_full_name: {repo_name}")
-        repo_ids.add(repo_id)
-        repo_names.add(repo_name)
+        package_id = str(row.get("package_id", ""))
+        if not package_id.startswith("ct.framework-package.") or package_id in package_ids:
+            fail(f"invalid or duplicate package_id: {package_id}")
+        package_ids.add(package_id)
+        if row.get("public_activation_allowed") is not False:
+            fail(f"public activation must remain false in factory candidate manifest: {row.get('framework_id')}")
         minute = row.get("schedule_minute")
         if not isinstance(minute, int) or not (0 <= minute <= 59) or minute in minutes:
-            fail(f"invalid/duplicate schedule minute for {repo_id}")
+            fail(f"invalid/duplicate schedule minute for {package_id}")
         minutes.add(minute)
-
-        predecessor = row.get("predecessor_framework_id")
         expected_predecessor = None if index == 1 else rows[index - 2]["framework_id"]
-        if predecessor != expected_predecessor:
+        if row.get("predecessor_framework_id") != expected_predecessor:
             fail(f"predecessor drift for {row.get('framework_id')}")
-        if row.get("bootstrap_allowed") is True:
-            bootstrap_rows.append(row)
+        if row.get("package_materialization_allowed") is True:
+            materialization_rows.append(row)
+        if row.get("optional_repository_projection_state") not in {"not_required_not_observed", "optional_not_required"}:
+            fail(f"optional repository state drift: {package_id}")
 
-        physical_id = row.get("physical_repository_id")
-        if physical_id is not None and (not isinstance(physical_id, int) or physical_id <= 0):
-            fail(f"physical_repository_id must be null or positive integer: {repo_id}")
-        if row.get("current_state") == "PLANNED" and physical_id is not None:
-            fail(f"planned repository cannot already carry a physical repository id: {repo_id}")
+    if len(materialization_rows) != 1 or materialization_rows[0]["framework_id"] != EXPECTED_SEQUENCE[0]:
+        fail("only CIE may be the current package-materialization implementation packet")
+    if rows[1].get("scaffold_preview_allowed") is not True or rows[1].get("package_materialization_allowed") is not False:
+        fail("Convergent must remain scaffold-preview-only")
 
-    if len(bootstrap_rows) > 1:
-        fail("only one child repository may have bootstrap_allowed=true")
-    expected_next = next_child(data)
-    if bootstrap_rows and bootstrap_rows[0]["framework_id"] != expected_next["framework_id"]:
-        fail("bootstrap eligibility must point at the first non-linked framework child")
-
-    bundle = data.get("bootstrap_bundle", [])
+    bundle = data.get("required_package_bundle", [])
     if bundle != list(TEMPLATE_MAP.values()):
-        fail("bootstrap bundle/template output mapping drift")
+        fail("required package bundle/template output mapping drift")
 
     sustain = data.get("self_sustain_contract", {})
     if sustain.get("github_hosted_runner") != "ubuntu-latest":
-        fail("child workflows must use approved literal ubuntu-latest runner")
-    if sustain.get("bootstrap_auth") != "github_actions_oidc":
-        fail("child bootstrap authentication must remain GitHub Actions OIDC")
+        fail("framework workflows must use approved literal ubuntu-latest runner")
+    if sustain.get("federation_auth") != "github_actions_oidc":
+        fail("framework federation authentication must remain GitHub Actions OIDC")
+    if sustain.get("pr_validation_oidc") is not False:
+        fail("pull request validation must not receive OIDC")
     for key in ("automatic_direct_to_main_repair", "automatic_merge", "automatic_sovereign_vote", "provider_or_customer_mutation", "secrets_in_git"):
         if sustain.get(key) is not False:
             fail(f"self-sustain fail-closed invariant drift: {key}")
@@ -195,7 +208,7 @@ def template_files() -> list[Path]:
     for rel in TEMPLATE_MAP:
         path = TEMPLATE_ROOT / rel
         if not path.is_file():
-            fail(f"missing child repository template: {path.relative_to(ROOT)}")
+            fail(f"missing framework package template: {path.relative_to(ROOT)}")
         output.append(path)
     return output
 
@@ -207,52 +220,57 @@ def validate_templates() -> None:
             continue
         for fragment in FORBIDDEN_TEMPLATE_FRAGMENTS:
             if fragment in text:
-                fail(f"{path.relative_to(ROOT)} contains forbidden child authority/secret fragment: {fragment}")
-    workflow_text = "\n".join(
-        (TEMPLATE_ROOT / rel).read_text(encoding="utf-8")
-        for rel in (
-            ".github/workflows/framework-child-bootstrap.yml.tmpl",
-            ".github/workflows/framework-child-governance.yml.tmpl",
-        )
-    )
+                fail(f"{path.relative_to(ROOT)} contains forbidden authority/secret fragment: {fragment}")
+    governance = (TEMPLATE_ROOT / ".github/workflows/framework-child-governance.yml.tmpl").read_text(encoding="utf-8")
+    bootstrap = (TEMPLATE_ROOT / ".github/workflows/framework-child-bootstrap.yml.tmpl").read_text(encoding="utf-8")
+    workflow = governance + "\n" + bootstrap
     for pinned in PINNED_ACTIONS:
-        if pinned not in workflow_text:
-            fail(f"child workflows missing pinned action reference: {pinned}")
-    if "contents: write" in workflow_text or "pull-requests: write" in workflow_text:
-        fail("child governance templates may not direct-write contents or PRs")
-    if "id-token: write" not in workflow_text:
-        fail("child OIDC workflows must request id-token: write")
+        if pinned not in workflow:
+            fail(f"framework workflows missing pinned action reference: {pinned}")
+    if "contents: write" in workflow or "pull-requests: write" in workflow:
+        fail("framework templates may not direct-write contents or PRs")
+    if "id-token: write" in governance.split("jobs:", 1)[0]:
+        fail("governance workflow cannot grant OIDC at workflow scope")
+    validate_segment = governance.split("  validate:", 1)[1].split("  federation-runtime:", 1)[0]
+    if "id-token: write" in validate_segment:
+        fail("pull-request validation job cannot receive OIDC")
+    federation_segment = governance.split("  federation-runtime:", 1)[1]
+    if "id-token: write" not in federation_segment or "github.event_name != 'pull_request'" not in federation_segment:
+        fail("trusted federation runtime OIDC isolation missing")
 
 
 def replacements(row: dict[str, Any], data: dict[str, Any]) -> dict[str, str]:
     parent_pr = row.get("parent_packet_pr")
+    optional_repo = row.get("optional_repository_projection") or ""
     return {
         "{{FRAMEWORK_ID}}": str(row["framework_id"]),
         "{{CANONICAL_NAME}}": str(row["canonical_name"]),
         "{{FRAMEWORK_AGENT_ID}}": str(row["framework_agent_id"]),
-        "{{REPO_ID}}": str(row["repo_id"]),
-        "{{REPO_FULL_NAME}}": str(row["repo_full_name"]),
+        "{{PACKAGE_ID}}": str(row["package_id"]),
+        "{{PACKAGE_STATE}}": str(row["current_state"]),
+        "{{OPTIONAL_REPOSITORY_PROJECTION}}": str(optional_repo),
         "{{PARENT_REPOSITORY}}": str(data["canonical_parent_repository"]),
         "{{PARENT_PR}}": "null" if parent_pr is None else str(parent_pr),
         "{{SCHEDULE_MINUTE}}": str(row["schedule_minute"]),
-        "{{BOOTSTRAP_ALLOWED}}": "true" if row.get("bootstrap_allowed") is True else "false",
+        "{{RUNTIME_INTEGRATION_ALLOWED}}": "true" if row.get("runtime_integration_allowed") is True else "false",
         "{{PREDECESSOR_FRAMEWORK_ID}}": "" if row.get("predecessor_framework_id") is None else str(row["predecessor_framework_id"]),
+        "{{REPO_ID}}": str(row["package_id"]),
+        "{{REPO_FULL_NAME}}": str(optional_repo),
+        "{{BOOTSTRAP_ALLOWED}}": "true" if row.get("runtime_integration_allowed") is True else "false",
     }
 
 
 def render_framework(data: dict[str, Any], framework_id: str, output_dir: Path) -> None:
     row = next((item for item in children(data) if item.get("framework_id") == framework_id), None)
     if row is None:
-        fail(f"framework not in authorized child fleet: {framework_id}")
+        fail(f"framework not in authorized package fleet: {framework_id}")
     repl = replacements(row, data)
     for template_rel, output_rel in TEMPLATE_MAP.items():
-        src = TEMPLATE_ROOT / template_rel
-        text = src.read_text(encoding="utf-8")
+        text = (TEMPLATE_ROOT / template_rel).read_text(encoding="utf-8")
         for key, value in repl.items():
             text = text.replace(key, value)
-        unresolved = sorted(set(part for part in text.split() if part.startswith("{{") and part.endswith("}}")))
-        if unresolved:
-            fail(f"unresolved child template placeholders in {template_rel}: {unresolved}")
+        if "{{" in text or "}}" in text:
+            fail(f"unresolved framework package placeholder in {template_rel}")
         dst = output_dir / output_rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text(text, encoding="utf-8")
@@ -267,27 +285,26 @@ def run_rendered_validator(root: Path) -> None:
         check=False,
     )
     if proc.returncode != 0:
-        fail(f"rendered child validation failed:\n{proc.stdout}")
+        fail(f"rendered framework package validation failed:\n{proc.stdout}")
 
 
 def self_test(data: dict[str, Any]) -> None:
     validate_manifest(data)
     validate_templates()
-    nxt = next_child(data)
-    assert nxt["framework_id"] == "ct.framework.cultural-imprint-engine"
-    assert nxt["bootstrap_allowed"] is True
-    assert children(data)[1]["bootstrap_allowed"] is False
-    assert children(data)[1]["predecessor_framework_id"] == "ct.framework.cultural-imprint-engine"
-    with tempfile.TemporaryDirectory(prefix="ct-framework-child-fleet-") as td:
+    cie = children(data)[0]
+    convergent = children(data)[1]
+    assert cie["framework_id"] == "ct.framework.cultural-imprint-engine"
+    assert cie["package_materialization_allowed"] is True
+    assert cie["current_state"] == "CONTROLLED_TEST"
+    assert convergent["scaffold_preview_allowed"] is True
+    assert convergent["package_materialization_allowed"] is False
+    with tempfile.TemporaryDirectory(prefix="ct-framework-package-fleet-") as td:
         root = Path(td)
-        for fid in (EXPECTED_SEQUENCE[0], EXPECTED_SEQUENCE[1]):
-            target = root / fid.rsplit(".", 1)[-1]
-            render_framework(data, fid, target)
+        for row in (cie, convergent):
+            target = root / row["execution_slug"]
+            render_framework(data, row["framework_id"], target)
             run_rendered_validator(target)
-    print(
-        "Framework child fleet self-test PASS: one-at-a-time bootstrap, CIE current, "
-        "Convergent scaffold-only, non-voting/OIDC/Agent-D/D3 boundaries preserved."
-    )
+    print("Framework package fleet self-test PASS: CIE current controlled-test package, Convergent preview-only, physical repo optional, PR OIDC isolated, non-voting/Agent-D/D3/IP/commercial locks preserved.")
 
 
 def main() -> int:
@@ -309,13 +326,13 @@ def main() -> int:
         row = next_child(data)
         print(json.dumps({
             "framework_id": row["framework_id"],
-            "repo_full_name": row["repo_full_name"],
+            "package_id": row["package_id"],
             "current_state": row["current_state"],
-            "bootstrap_allowed": row["bootstrap_allowed"],
-            "activation_allowed": False,
-            "physical_repository_id": row["physical_repository_id"],
-            "provider_visibility": row["provider_visibility"],
-            "next_safe_action": "discover_physical_repository_then_stage_oidc_bootstrap" if row["bootstrap_allowed"] else "hold",
+            "package_materialization_allowed": row.get("package_materialization_allowed", False),
+            "scaffold_preview_allowed": row.get("scaffold_preview_allowed", False),
+            "physical_repository_required": False,
+            "public_activation_allowed": False,
+            "next_safe_action": "implement_next_governed_package_packet" if row.get("package_materialization_allowed") else "research_or_scaffold_preview_only",
         }, indent=2, sort_keys=True))
     if args.render:
         if not args.output_dir:
@@ -323,9 +340,9 @@ def main() -> int:
         render_framework(data, args.render, args.output_dir)
         print(f"Rendered {args.render} -> {args.output_dir}")
     if args.validate and not (args.self_test or args.next or args.render):
-        print("Framework child fleet validation PASS")
+        print("Framework package fleet validation PASS")
     if not any((args.validate, args.self_test, args.next, args.render)):
-        print("Framework child fleet validation PASS")
+        print("Framework package fleet validation PASS")
     return 0
 
 
