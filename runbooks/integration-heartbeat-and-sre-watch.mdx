@@ -1,0 +1,92 @@
+---
+title: "Integration Heartbeat and SRE Watch"
+sidebarTitle: "Integration Heartbeat"
+description: "Developer runbook for read-first integration health checks across databases, schedulers, services, APIs, MCP tools, federation links, deferrals, and failure queues."
+icon: "heart-pulse"
+---
+
+# Integration heartbeat and SRE watch
+
+Use this runbook for a recurring, non-voting operational heartbeat over a multi-service platform estate.
+
+## Goal
+
+Produce a current, sanitized health summary without creating authority, changing credentials, consuming unnecessary provider calls, or converting unresolved certification work into a false incident.
+
+## Minimum inspection surface
+
+- project/database health;
+- scheduled-job/cron success and failure counts;
+- security advisor findings;
+- performance advisor findings;
+- registered services and control states;
+- provider-write gates;
+- governed deferrals and review dates;
+- API/MCP registry, enabled tools, and risk level;
+- recent request health and last known failures;
+- repository/federation heartbeat freshness when applicable;
+- message, ACK, and reference-chain continuity when applicable;
+- child-resource states, without inferring existence from planned names.
+
+## Read-first sequence
+
+1. Refresh canonical service and governance state.
+2. Use an approved health-snapshot path to create bounded database activity when a freshness proof is warranted.
+3. Inspect cron history for non-success results.
+4. Read security and performance advisor outputs.
+5. Census services and controls by state.
+6. Confirm write gates remain in their intended state.
+7. Inspect active governed deferrals and upcoming reviews.
+8. Verify API/MCP registrations, enabled set, and maximum enabled risk class.
+9. Inspect request-audit health without treating old certification probes as current outages.
+10. Inspect federation/OIDC/parent-heartbeat/message continuity if the platform uses repository federation.
+11. Record unavailable sources and UNKNOWNs.
+12. Route only material deltas to the owning agent or operator.
+
+## Health classification
+
+- `SUCCESS` - no material internal or human action is required;
+- `WATCH` - system is healthy, but a bounded internal follow-up or upcoming review exists;
+- `ACTION_NEEDED` - a concrete human/founder action is required and automated work cannot safely continue without it;
+- `FAILURE` - a current operational control or service is materially failing.
+
+Do not label ordinary internal backlog as human action needed.
+
+## Request-budget discipline
+
+- Prefer cached or database evidence when it is current enough.
+- Use external provider reads only when they materially improve certification or freshness.
+- Never execute provider writes from a heartbeat.
+- Record provider requests consumed when known.
+- Treat usage counters according to the provider/account policy; do not invent exhaustion percentages.
+
+## Federation-specific checks
+
+Where repository federation is used, verify:
+
+- parent heartbeat age;
+- expected canonical ref semantics;
+- OIDC audience/issuer/repository/ref constraints;
+- child operational/voting flags;
+- message and ACK presence;
+- canonical parent/child SHA references;
+- Vault algorithm/secret-reference registry presence without reading secret bodies.
+
+A pre-registered child record is not proof that the child repository exists.
+
+## Verification checklist
+
+- [ ] Database/project health is current.
+- [ ] Cron failures were inspected.
+- [ ] Security and performance findings were classified.
+- [ ] Service/control census is current.
+- [ ] Provider-write gates were verified.
+- [ ] Deferrals remain NOT-PASS unless their technical control passes.
+- [ ] API/MCP enabled-risk ceiling is known.
+- [ ] Federation freshness and reference integrity were checked when applicable.
+- [ ] UNKNOWNs and unavailable sources are explicit.
+- [ ] Human-facing status label reflects actual human action requirement.
+
+## Commercialization state
+
+Public-safe pattern candidate. Production account identifiers, private repository topology, OIDC claims, credential references, security findings, and internal incident evidence must be stripped or synthetic in the commercial edition.
