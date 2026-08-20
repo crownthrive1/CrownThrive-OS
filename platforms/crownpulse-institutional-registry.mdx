@@ -146,6 +146,38 @@ Still required: full API docs and paths/schemas, authorized API testing, engine/
 
 Required records include `campaign`, `widget`, `notification`, `notification_event`, `notification_handler`, `channel`, `consent`, `suppression`, `template`, `delivery_attempt`, `custom_domain`, `team`, `plan`, `quota`, `api`, `endpoint`, `api_key_reference`, `mcp_tool`, `truth_provenance` and `retention_rule`.
 
+## Privileged Admin API reconciliation — 2026-08-19
+
+Founder-observed current Admin UI evidence adds a distinct privileged interface alongside the ordinary public API:
+
+```yaml
+service_id: crownpulse_admin
+admin_api_base_url: https://crownpulse.com/admin-api
+admin_docs_url: https://crownpulse.com/admin/api-documentation
+authentication: Bearer API key
+credential_ref: vault:crownpulse_admin_api_key
+credential_state: blocked_pending_approved_secret_write
+adapter: crownpulse-admin-api-control@1
+adapter_scaffold: passed
+provider_dispatch: disabled
+privileged_mutations: closed
+authenticated_admin_read: open
+provider_lineage: AltumCode
+update_available_observed: v61.0.0
+installed_version: unverified
+support_status_observed: expired
+```
+
+The supplied Admin API surface explicitly covers Users (retrieve all/one, create, update, delete, generate one-time login code), Plans (retrieve all/one), Payments (retrieve all/one) and Domains (retrieve all/one, update, delete). UI modules such as settings, broadcasts, plugins, taxes, teams, campaigns, notification handlers and logs are preserved as UI observations, not silently promoted into API operations.
+
+This is a privileged administration plane. User/account mutations, one-time login generation and domain mutation remain D2/D3 and closed. Payment reads require purpose-limited financial access. See [CrownPulse Admin API Adapter](/developers/crownpulse-admin-api-adapter).
+
+The UI's **Update available — v61.0.0** and **Support expired** notices are current administrative observations, not proof that v61.0.0 is already installed. Upgrade assessment must identify the installed version, database/runtime/customization delta, backup, staging validation and rollback before production change.
+
 ## Current conclusion
 
-CrownPulse is verified as a live engagement/social-proof platform with campaigns, widgets, multi-channel notification handlers, custom domains and a public Bearer-key API example. Its Phase 2.98 priority is establishing truth provenance, consent/suppression, safe channel routing and side-effect boundaries so automation can scale without manufacturing social proof or uncontrolled outreach.
+CrownPulse is verified as a live engagement/social-proof platform with campaigns, widgets, multi-channel notification handlers, custom domains and a public Bearer-key API example. A separate privileged Admin API is now documented and adapter-ready but remains fail-closed pending approved secret binding, exact path/schema extraction and bounded read certification. Its Phase 2.99 priority remains truth provenance, consent/suppression, safe channel routing, privileged-operation control and version/support reconciliation.
+
+### Page changelog
+
+- **2026-08-19:** added privileged Admin API contract, AltumCode lineage, update-available/support-expired observations, fail-closed adapter state and explicit D2/D3 admin mutation boundaries.
