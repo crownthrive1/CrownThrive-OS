@@ -30,13 +30,21 @@ EXPECTED_AGENT_IDS = {
     "ct.subagent.queue.priority-throttle",
     "ct.subagent.quorum.session-router",
 }
-FORBIDDEN_PRIVILEGE_FRAGMENTS = (
+FORBIDDEN_BOUNDED_PRIVILEGE_FRAGMENTS = (
     "cast_sovereign_vote",
     "waive_agent_d",
     "waive_specialist",
     "merge_blocked",
     "override_d3",
     "self_approve",
+)
+REQUIRED_FORBIDDEN_GUARDS = (
+    "cast_sovereign_vote_by_orchestration_action",
+    "waive_agent_d",
+    "waive_applicable_specialist",
+    "merge_blocked_pr",
+    "change_d3_authority_without_explicit_human_authorization",
+    "self_approve_originating_material_change",
 )
 
 
@@ -71,12 +79,11 @@ def main() -> int:
     require(parent["binding_state"] == "pending_identity_and_runtime_reconciliation", "Founder Orchestrator must reconcile identity/runtime before activation")
     require(parent["vote_eligible"] is False, "Founder Orchestrator queue privileges may not create a sixth vote")
     privileges = "\n".join(parent["bounded_privileges"]).lower()
-    for fragment in FORBIDDEN_PRIVILEGE_FRAGMENTS:
+    for fragment in FORBIDDEN_BOUNDED_PRIVILEGE_FRAGMENTS:
         require(fragment not in privileges, f"forbidden privilege leaked into bounded privileges: {fragment}")
     forbidden = "\n".join(parent["forbidden"]).lower()
-    for fragment in FORBIDDEN_PRIVILEGE_FRAGMENTS:
-        require(fragment in forbidden or fragment == "waive_specialist", f"forbidden authority list missing guard: {fragment}")
-    require("waive_applicable_specialist" in forbidden, "specialist non-waiver guard missing")
+    for guard in REQUIRED_FORBIDDEN_GUARDS:
+        require(guard in forbidden, f"forbidden authority list missing guard: {guard}")
 
     agents = data["agents"]
     agent_ids = {item["agent_id"] for item in agents}
