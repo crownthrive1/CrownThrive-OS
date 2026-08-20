@@ -253,7 +253,8 @@ def main() -> int:
     for fragment in (
         "name: Governed Merge Gate",
         "name: CrownThrive governed merge gate",
-        "fetch-depth: 2",
+        "fetch-depth: 0",
+        "persist-credentials: false",
         "name: Bind governed changed files to trusted Git diff",
         "--verify-git-diff",
         "CT_GIT_BASE_SHA",
