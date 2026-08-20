@@ -1,0 +1,136 @@
+---
+title: "Phase 2.99 — Website Surface, Sites & Contact Automation"
+sidebarTitle: "2.99 Website Surface"
+description: "Phase 2.99 execution checkpoint for Sites-backed/API-connected website surfaces, Figma/Canva asset routing, contact/CTA checks, Website Surface MCP, daily read-only scans, and fail-closed provider mutations."
+icon: "browser"
+keywords: ["Phase 2.99", "Sites", "website automation", "contact forms", "Canva", "Figma", "MCP", "autonomous updates"]
+---
+
+# Phase 2.99 — Website Surface, Sites & Contact Automation
+
+**Date:** August 20, 2026  
+**Program namespace:** `institutional_build_phase`  
+**Current subphase:** `2.99`  
+**Disposition:** `read_probe_and_planning_active / external_provider_mutation_gated`
+
+## Objective
+
+Extend CrownThrive's governed design/API architecture into websites so Sites-backed and other API-connected public properties can consume approved Figma/Canva assets, expose reliable contact/CTA interactions, emit evidence, detect drift, and prepare autonomous remediations without giving an agent uncontrolled website authority.
+
+## Machine state implemented
+
+The existing THIVEBASE/Supabase `integration_control` boundary now contains:
+
+- `website_surfaces`;
+- `creative_asset_routes`;
+- `site_interaction_checks`;
+- append-oriented `site_interaction_check_results`;
+- `site_update_queue`;
+- service `website_surface_control`.
+
+All new tables have RLS enabled and service-role-only policies consistent with the private integration-control schema.
+
+## Website Surface MCP
+
+Supabase Edge Function `website-surface-control` version 1 is deployed with JWT enforcement and protocol target `2026-07-28`.
+
+Direct tools:
+
+- `sites.surface.list` — D0;
+- `sites.interaction.check` — D0;
+- `sites.asset_routes.list` — D0;
+- `sites.update_queue.list` — D0;
+- `sites.update.plan` — D1.
+
+Central MCP registry entries are deliberately disabled until `crownthrive-api-control` can actually dispatch the service. `sites.update.apply` remains disabled and approval-gated.
+
+The direct Edge Function deployment and underlying RPC path are verified; end-to-end authenticated external MCP-client invocation remains pending. This checkpoint does not promote that pending predicate to PASS.
+
+## Website Surface Agent
+
+Machine service metadata now registers `ct.agent.website-surface-interaction` with queue classes:
+
+- `website_surface_health`;
+- `contact_interaction_drift`;
+- `creative_asset_distribution`;
+- `site_update_remediation`;
+- `public_claim_namespace_drift`.
+
+Autonomous capability is limited to reads, probes, comparisons, interaction checks, route reads, and remediation planning. `external_mutation_allowed=false`.
+
+## Seeded surfaces
+
+### CrownThrive.com
+
+`ct.surface.crownthrive.production` → `ct.platform.crownthrive` → `https://crownthrive.com`
+
+Current site-engine/provider state remains unverified. The surface is monitored and plan-enabled; external mutation is not.
+
+### KJV Visualized / Sermon Toolkit
+
+`ct.surface.kjv-visualized.production` → `ct.platform.kjv-sermon-toolkit` → `https://kjvsermontoolkit.crownthrive.com`
+
+Source-backed Sites evidence preserved:
+
+- project `appgprj_6a7a0322f3b08191b964bc65aeeebb26`;
+- saved version `48`;
+- saved-version ID `appgprj_6a7a0322f3b08191b964bc65aeeebb26~appgver_1b15da170290819186f22937af3d72e3`;
+- rollback revision `aa0e1b659f7a20452aa84f163b71cdfc59b48ada`;
+- deployment SHA-256 `633479e20d257d3c0a98f14387a52828394897289dcfc609e0dd8f32f2863b0e`.
+
+These prove project/release lineage, not a certified write API.
+
+## Figma and Canva routing
+
+Initial CrownThrive.com creative routes reference:
+
+- Figma `So4C4ltkiKn786ikT7rwAP`;
+- Canva CrownThrive kit `kAGI40OPjnM`;
+- Canva Crownthrive Dark kit `kAGSbAK_NWw`.
+
+All routes default `auto_sync_allowed=false`. Figma's canonical token layer remains gated pending authoritative token values. Canva is downstream production and does not become website/design authority through automation.
+
+## First machine interaction run
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| CrownThrive home `Get In Touch` handoff | PASS | HTTP 200; required text present |
+| KJV `/contact` route | PASS | HTTP 200; mail interaction detected |
+| CrownThrive primary contact page | D1 finding | HTTP 200; form + contact email text present; expected `mailto:` affordance not detected |
+
+The CrownThrive contact finding created planned update `72e0a3ad-d6a1-42b5-b6f2-30ff6c8cebea` with operation `site.interaction.remediation.plan`, risk D1, and `external_mutation_allowed=false`.
+
+Ordinary monitoring does not submit live customer forms.
+
+## Automated cadence
+
+Daily jobs:
+
+- `crownthrive_site_interaction_checks_daily`;
+- `crownthrive_site_update_planner_daily`.
+
+These run read-only checks and internal plan generation only.
+
+## Contact and consent boundary
+
+Operational contact is not promotional consent. Any future routing from a website contact into ThrivePush, Collab Portal, CRM, analytics, or automated email must preserve source/form version, purpose, fields, consent basis, suppression state, destination, retention, and correction/delete path.
+
+## Claim/namespace drift
+
+Current public CrownThrive surfaces expose multiple platform-count statements and phase language. Because CrownThrive maintains separate count universes and phase/maturity namespaces, the Website Surface Agent opens evidence-controlled reconciliation when public statements differ from institutional records. It does not pick a number/phase by arithmetic convenience and rewrite the website automatically.
+
+## Security evidence
+
+The Supabase security advisor was rerun after the website-control migration and Edge Function deployment and reported no current security lints.
+
+## Provider-write hard gate
+
+Production mutation requires exact provider/version, project identity, auth/scopes, allowed fields/assets, rollback checkpoint, read-before-write, read-after-write, idempotency/concurrency, budgets, DAIL evidence, and provider-exit certification.
+
+## Downstream phase propagation
+
+The controlling additive phase contract is [Website Surface Automation Phase Amendment](/standards/website-surface-automation-phase-amendment). It binds website-specific requirements through Phases 2.99 and 3–10 without weakening any existing gate.
+
+## Gate impact
+
+This checkpoint advances website-surface readiness but does **not** close Phase 2.99, authorize Phase 3 entry, certify central MCP federation, or authorize autonomous provider-side website changes.
