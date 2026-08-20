@@ -1,163 +1,86 @@
 ---
 title: "Commerce Rails"
-description: "How CrownThrive routes direct products, hosted readers, subscriptions, services, creator commerce, credits, and commercial rights."
+description: "How CrownThrive routes Virality Credits, payment confirmation, entitlements, protected delivery, subscriptions, services, and governed rights."
 sidebarTitle: "Commerce Rails"
 icon: "credit-card"
-keywords: ["Stripe Direct", "Good Shit Only", "Go Flipbooks", "commerce rails", "licensing"]
+keywords: ["Virality Credits", "Stripe top-ups", "CHLOM", "commerce rails", "licensing"]
 ---
 
 # Commerce rails
 
-CrownThrive uses different commerce rails because a personal-use file, a hosted book, a subscription, a service engagement, a creator marketplace sale, and a commercial license are not the same transaction.
+CrownThrive separates tender, payment confirmation, entitlement, license, and delivery. A successful redirect or a product card is never proof of payment, authority, or access.
 
-## Routing decision
+## Virality first-party digital products
+
+Virality Credits are the sole customer tender for eligible first-party digital products.
 
 ```mermaid
 flowchart TD
-    A[What is the buyer receiving?] --> B{Finished first-party product?}
-    B -->|Yes| C{Personal or household use only?}
-    C -->|Yes| D[Stripe Direct]
-    C -->|No| E[Good Shit Only or signed agreement]
-    B -->|No| F{Hosted reader edition?}
-    F -->|Yes| G[Go Flipbooks or assigned reader rail]
-    F -->|No| H{Subscription or membership?}
-    H -->|Yes| I[Stripe Billing]
-    H -->|No| J{Third-party creator sale?}
-    J -->|Yes| K[Stripe Connect when approved]
-    J -->|No| L[Service, sponsorship, partnership, or negotiated rights workflow]
+  A[Signed-in member] --> B[Verified credit balance]
+  B --> C[Atomic credit debit]
+  C --> D[Order and entitlement]
+  D --> E[CHLOM license]
+  E --> F[Expiring protected download]
 ```
 
-## Stripe Direct
-
-Stripe Direct is the first-party commerce rail for eligible CrownThrive-owned products and services.
-
-Typical uses:
-
-- personal-use printables
-- downloadable workbooks and journals
-- digital art sold for personal use
-- selected books and bundles
-- memberships and subscriptions
-- approved one-time first-party services
-- internal credit top-ups where implemented
+The catalog and server select the fixed credit price. The browser cannot submit a USD price, grant an entitlement, or select a different rail.
 
 Required controls:
 
-- server-side product and price mapping
-- Stripe-hosted or otherwise approved Checkout
-- signed webhook verification
-- idempotent fulfillment
-- entitlement creation
-- protected delivery
-- download-limit enforcement where applicable
-- refund and dispute reconciliation
-- clear personal-use terms
+- server-side SKU, version, and fixed-credit mapping;
+- append-only purchased and promotional credit ledgers;
+- atomic debit and wallet-limit enforcement;
+- idempotent order and entitlement creation;
+- active member and license checks;
+- immutable artifact fingerprints;
+- expiring, limited-use delivery tokens;
+- refund, dispute, and revocation reconciliation.
 
-A browser redirect does not prove payment and must not create an entitlement by itself.
+## Credit top-ups and Stripe
 
-## Good Shit Only
+Stripe is retained only as the hosted payment and signed event-confirmation provider for approved credit top-ups, subscriptions, and persisted legacy transactions. It is not the product checkout rail for the Virality digital catalog.
 
-Good Shit Only is the governed commercial-rights and marketplace rail.
+A top-up is staged locally before redirect. Credits post only after a verified, idempotent webhook matches the pending intent, expected amount, currency, environment, and integration identifier. Refunds and disputes reconcile the wallet and may lock future credit availability.
 
-Use GSO or a signed rights workflow for:
+Do not remove signed webhook verification. Removing it would make payment confirmation, refunds, and chargebacks untrustworthy.
 
-- commercial reproduction
-- synchronization and broadcast
-- public performance
-- institutional or multi-seat use
-- source files, stems, isolated vocals, or project files
-- remix, sampling, derivative, or training permissions
-- character, voice, visual, merchandise, or adaptation rights
-- enterprise use
-- creator or partner listings requiring a governed rights class
+## CHLOM licensing
 
-Payment does not expand the license beyond the approved scope.
+CHLOM is the sole active authority for license state, permission, evidence, fingerprints, holds, and remedies.
 
-## Go Flipbooks
+A purchase may create personal access only when:
 
-Go Flipbooks is the hosted-reader rail for editions assigned to it.
+1. the product version and artifact fingerprint are immutable;
+2. the member and entitlement are active;
+3. CHLOM-compatible license issuance succeeds;
+4. the delivery token is bound to the entitlement and file.
 
-A hosted-reader state is separate from:
+Commercial, institutional, performance, adaptation, source-file, character, voice, training, or derivative permissions require an approved CHLOM rights workflow or signed agreement. Payment never expands scope by itself.
 
-- downloadable-file status
-- print status
-- commercial-rights status
-- source readiness
-- canon approval
+Good Shit Only may remain in historical records and marketplace provenance. It is not the active Virality licensing authority.
 
-Do not invent a reader URL or mark a reader active until the actual hosted experience is verified.
+## Private file custody and delivery
 
-## Stripe Billing
+Google Drive is the private canonical custody layer for source masters and governed release candidates. Files must remain unshared.
 
-Stripe Billing or an approved subscription system handles recurring plans.
+Runtime delivery uses a private, integrity-checked delivery cache until a production server-side Drive delivery identity and equivalent audit controls are verified. Public Drive links are prohibited. Every delivered object must match the registered SHA-256 digest and byte count.
 
-Required states include:
+## Other rails
 
-- trial where applicable
-- active
-- past due
-- grace period
-- canceled
-- expired
-- payment-recovery state
+- **Subscriptions:** Stripe Billing or another approved recurring system, governed by signed state changes.
+- **Third-party creators:** an approved marketplace/Connect architecture with explicit seller, tax, payout, refund, and dispute ownership. Internal credits must not fund third-party connected-account products.
+- **Services and partnerships:** signed scopes, invoices, milestones, or controlled checkout for bounded offers.
+- **Hosted readers:** a verified reader rail, separate from download, source ownership, and rights status.
 
-Entitlements must follow webhook-confirmed subscription state, not a client-side claim.
+## Release and handoff rules
 
-## Stripe Connect
-
-Stripe Connect is reserved for approved third-party creator or seller commerce.
-
-It is distinct from CrownThrive first-party sales.
-
-The charge architecture must intentionally define:
-
-- seller identity
-- merchant-of-record responsibilities
-- statement descriptors
-- platform fees
-- payout ownership
-- refund and dispute responsibilities
-- tax responsibilities
-- connected-account requirements
-
-Internal CrownThrive credits must not purchase third-party connected-account products.
-
-## Services and partnerships
-
-Services, commissions, sponsorships, development engagements, and partnerships may use:
-
-- proposals
-- statements of work
-- signed agreements
-- invoices
-- approved deposits or milestones
-- controlled checkout for clearly bounded offers
-
-A service checkout must identify what is included, what is not included, the delivery conditions, revision limits, rights ownership, and escalation path.
-
-## CrownThrive Credits
-
-Credits are a closed-loop internal value system for eligible CrownThrive-owned products.
-
-Purchased credits should be:
-
-- nontransferable
-- non-cashable
-- non-interest-bearing
-- explicitly priced per product
-- recorded through an append-only ledger
-
-Promotional credits must be tracked separately and may have disclosed restrictions or expiration.
-
-## Commerce handoff rules
-
-1. The product registry selects the rail; the browser does not.
-2. The rights class determines what the buyer may do.
-3. Fulfillment and licensing are separate records.
-4. Refunds and disputes update access according to policy.
-5. A listing is not active until every required downstream dependency is verified.
-6. Cross-rail migrations require versioned mapping and regression testing.
+1. The registry selects the rail; the client does not.
+2. Tender, payment, order, entitlement, license, and delivery are separate records.
+3. A listing stays fail-closed until every required dependency and canary is verified.
+4. Refunds, disputes, suspension, or license revocation update access without erasing evidence.
+5. Google Drive custody does not imply public delivery.
+6. Cross-rail changes require versioned mappings, regression tests, and audit evidence.
 
 <Warning>
-  Never use a low-cost direct-download product to imply commercial, institutional, performance, adaptation, source-file, character, voice, or derivative rights.
+  Never use a personal-access product, a credit balance, or a successful payment to imply broader commercial or institutional rights.
 </Warning>
