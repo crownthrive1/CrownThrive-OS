@@ -1,68 +1,54 @@
-# Phase 2.99 — Founder Strategy Orchestrator controlled candidate
+# Phase 2.99 — Founder Strategy & Audit capability reconciliation
 
 **Date:** 2026-08-20  
 **Phase:** 2 / 2.99  
-**State:** candidate prepared on a governed branch; not activated, merged, deployed, or scheduled as an independent task  
+**State:** prepared, stacked capability; not activated or sovereign  
 **Risk:** D2 governance/agent-control proposal; D3 remains human-reserved
 
-## Outcome
+## Identity decision
 
-This packet prepares `ct.agent.founder-strategy-orchestrator` as a non-voting founder-aligned scrutiny and orchestration candidate. It does not create a founder impersonator, a permanent administrator, a sixth sovereign voter, a self-approving agent, or a direct production executor.
+The earlier candidate identity `ct.agent.founder-strategy-orchestrator` is preserved as predecessor history and is **not** promoted as a second master orchestrator.
 
-The requested analytical style is represented as strategic systems thinking, evidence depth, source skepticism, option generation, decisive boundaries, and accountable escalation. The candidate may draft recommendations in that style but cannot claim human identity, founder approval, or signature authority.
+The single canonical master candidate is:
 
-## Additive artifacts
+`ct.agent.founder-orchestrator`
 
-- `developers/manifests/founder-strategy-orchestrator.v1.json` — machine-readable candidate, authority, activation, subagent, schedule, evidence, report, and kill-switch contract.
-- `developers/schemas/founder-audit-report.v1.schema.json` — fail-closed report/assignment/delivery manifest schema.
-- `automation/founder-strategy-orchestrator.mdx` — public-safe operating and routing runbook.
-- `scripts/validate_founder_strategy_orchestrator.py` — deterministic invariant and vote-model self-test.
-- `.github/workflows/founder-strategy-orchestrator-candidate.yml` — pinned, read-only CI path for the candidate validator and institutional docs validator.
+The former strategy candidate's useful scope continues as:
 
-This packet intentionally does not modify the controlling agent registry, sovereign-governance manifest, shared relay, shared merge workflow, or `docs.json`. Open PRs #101, #102, #125, and #145 overlap those surfaces. Registry insertion and navigation propagation must follow current-main and exact-head reconciliation rather than overwriting or duplicating pending agent work.
+`ct.capability.founder-strategy-audit`
 
-## Activation rule
+under the canonical master.
 
-Activation requires one immutable proposal hash, four of five A/B/C/D/S approvals, Agent D approval, no deny/block/security veto, risk score at least 85, applicable AI/ML TEVV, security, operations/SRE, and IP/licensing endorsements, explicit founder ratification for first activation, live vote-receipt ingestion, current-baseline proof, topology reconciliation, three supervised dry runs, and a rollback drill.
+Queue, collision and convergence coordination remains the sibling capability family owned by PR #158. Strategy/audit remains the capability packet owned by PR #159.
 
-The candidate and its descendants are non-voting. Votes do not grant provider permissions. A material change resets the vote.
+Nothing is silently deleted or overwritten. The former agent ID, its original candidate packet, rationale, children and prior validation remain queryable as lineage.
 
-## Authority ceiling
+## Capability children preserved
 
-The default is read-only. After activation, the maximum automated mutation is an additive draft branch or draft PR inside a task envelope. The candidate cannot write to `main`, merge, deploy, publish, email, sign, pay, move money, transfer rights, change credentials or privileged access, execute D3 work, weaken controls, or approve itself.
+The Strategy & Audit capability retains:
 
-## Scheduled-task disposition
+- `ct.subagent.founder-evidence-provenance`
+- `ct.subagent.founder-architecture-impact`
+- `ct.subagent.founder-drift-sprawl`
+- `ct.subagent.founder-security-permissions`
+- `ct.subagent.founder-vote-clerk`
+- `ct.subagent.founder-report-compiler`
+- `ct.subagent.founder-verification-evals`
 
-No new automation task is requested because the active-task ceiling is already occupied. The contract consolidates candidate readiness review and, after activation, a once-per-day idempotent report into the existing `CrownThrive Agent A` dispatcher.
+All remain non-voting.
 
-Until a verified activation receipt exists, scheduled behavior is evaluation/reporting only. It cannot spawn this candidate or mutate project state. Model and reasoning-mode binding remain declared targets until a task provider receipt verifies them.
+## Authority boundary
 
-## Evidence snapshot and unresolved contradictions
+The canonical master and both capability families remain subordinate to A/B/C/D/S governance. They do not add a vote, impersonate the founder, create signature authority, merge, write directly to `main`, move money, grant rights, broaden privileged access, convert UNKNOWN to PASS, or execute D3.
 
-The supplied recovery corpus was inspected as a dated 2026-08-17 baseline:
+First activation still requires exact-head governance, four of five A/B/C/D/S approvals with Agent D mandatory, no deny/block, applicable specialists, founder ratification, verified live vote receipts, supervised dry runs and rollback evidence.
 
-- 10 chat-reconciliation rows have no raw transcripts;
-- 18 ADRs are Accepted as of the baseline date;
-- 52 source-register rows include unavailable/raw-missing sources;
-- the v1 recovered Help Center inventory contains 795 unique records and 795 reconstruction-required internal stubs;
-- the supplied `validation-report.json` describes an absent v2 tree with 794 manifest records and 793 unique titles.
+## Packet relationship
 
-The 795/794/793 discrepancy remains `NEED_TO_DO`; it is not normalized away. The v2 PASS cannot certify the supplied v1 package or current repository. The v1 package is a recovery baseline, not proof of a standalone current deployment.
-
-Live GitHub review at the packet baseline found 24 open PRs, 44 open issues, current `main` at `8fcb68bf209e32ba2cd265e1b6ca730cb8da64d7`, and Phase 3 still blocked pending the complete Phase 2.99 hard exit. Ruleset behavior is repository-documented, but live ruleset inventory was not exposed by the connected read surface.
-
-## First report routing
-
-The first non-canonical founder audit assigns:
-
-- Agent A — sequence, dependencies, collision resolution, and capacity.
-- Agent B — source recovery, claim freshness, raw transcript gaps, and 795/794/793 reconciliation.
-- Agent C — controlled registry-insertion plan, validation/evals, documentation propagation, and rollback.
-- Agent D — independent authority/quorum/phase review and completion-theater gate.
-- Agent S — permissions, credentials, secret scanning, runtime binding, resilience, and kill-switch posture.
-
-External Google Docs and email delivery are independent provider actions. They are complete only when those providers return a document ID/URL and message/thread receipt respectively.
+- PR #158 — canonical master identity plus Queue/Collision/Convergence capability family.
+- PR #159 — Strategy & Audit capability family and report schema.
+- PR #159 must be stacked on the exact accepted/current head of PR #158 rather than compete as a parallel master packet.
 
 ## Phase effect
 
-None. Phase 3 remains blocked. A candidate artifact, passing validator, branch, PR, report, Google Doc, email, or schedule edit is not proof of registry activation, merge, deployment, publication, delivery, or implementation.
+None. Phase 3 remains blocked. This reconciliation removes an agent-identity collision; it does not close a Phase 2.99 hard gate by itself.
