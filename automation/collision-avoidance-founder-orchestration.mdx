@@ -1,0 +1,260 @@
+---
+title: "Collision Avoidance, Adjudication & Founder Orchestration"
+description: "Preflight collision detection, post-merge reconciliation, PR throttling, special-quorum routing, and the controlled-test institutional separation model."
+hidden: true
+noindex: true
+---
+
+# Collision Avoidance, Adjudication & Founder Orchestration
+
+## Status
+
+This page defines a **Phase 2.99 controlled-test architecture**. It does not by itself create a new sovereign voter, authorize Phase 3, or supersede `CT-ADR-GOV-011`.
+
+Canonical baseline at packet creation: `8fcb68bf209e32ba2cd265e1b6ca730cb8da64d7`.
+
+The current accepted sovereign voter pool remains Agents A/B/C/D/S. Ordinary automatic promotion remains 4-of-5 including Agent D, with no deny/block, all applicable specialists, exact-head evidence, rollback, documentation impact, and all other adopted controls. D3 remains human-reserved.
+
+The purpose of this layer is narrower and operationally important: **prevent avoidable collisions before work starts, adjudicate unavoidable collisions before they cause destructive branch churn, and reconcile the estate immediately after a material merge so the next packet inherits current truth.**
+
+Founder Orchestrator reconciliation is tracked in **Issue #157**.
+
+## Why this layer exists
+
+CrownThrive now has enough simultaneous agents, subagents, specialist packets, provider adapters, documentation lanes, runtime work, machine manifests, and stacked PRs that collision risk is itself a first-class control-plane problem. A merge can be technically valid and still create downstream churn if ten other branches were built against the state it replaced. A new agent can be correctly scoped and still collide semantically with an identity already being created elsewhere. A documentation update can be harmless in isolation and still overwrite a shared navigation or registry surface owned by another packet.
+
+The system therefore treats collision prevention as part of planning, not as a cleanup activity after Git reports a conflict.
+
+## Collision lifecycle
+
+The governed lifecycle is:
+
+`intent -> preflight -> ownership/sequence -> build -> PR -> collision recheck -> quorum -> merge -> post-merge sweep -> requeue/rebase/adjudicate -> inherit new baseline`
+
+A collision is not limited to a Git merge conflict. It may exist at the file, stable-identity, policy, provider, runtime, schedule, evidence, approval, or institutional-authority layer.
+
+### Collision classes
+
+| Class | Meaning | Default response |
+| --- | --- | --- |
+| `CT-COLL-0` | Clear | Continue |
+| `CT-COLL-1` | Soft shared surface | Coordinate or rebase |
+| `CT-COLL-2` | Direct file or sequencing collision | Serialize, stack, split, or rebase |
+| `CT-COLL-3` | Semantic or stable-identity collision | Hold for adjudication |
+| `CT-COLL-4` | Runtime/provider mutation collision | Establish exclusive owner and serialize execution |
+| `CT-COLL-5` | Constitutional or D3 collision | Founder or authorized-human adjudication |
+
+The severity is about institutional consequence, not just whether Git can auto-merge.
+
+Examples include:
+
+- two PRs editing `docs.json` even if Git can merge both;
+- separate branches creating the same agent or stable platform identity;
+- multiple packets changing the same governance manifest or validator;
+- two automations attempting to own the same minute slot or provider resource;
+- concurrent Supabase schema migrations against the same tables;
+- one packet changing quorum semantics while another assumes the current constitution;
+- stale exact-head votes being reused after a rebase;
+- a stacked child PR being promoted before its parent is canonical.
+
+## Collision Preflight Sentinel
+
+Stable candidate identity: `ct.subagent.collision.preflight-sentinel`.
+
+The **Collision Preflight Sentinel** runs before material work is promoted and should be consulted before a consequential branch is opened whenever the execution environment can do so.
+
+Its preflight contract is:
+
+1. resolve current canonical `main`;
+2. resolve the intended target base and candidate head;
+3. inventory open material PRs and active branch ownership;
+4. compare exact changed-file sets;
+5. compare high-risk shared surfaces such as workflows, governance manifests, validators, navigation, agent registries, standards, CHLOM contracts, runtime migrations, and provider-control files;
+6. compare stable identities, manifest authority, routes, schedules, provider resources, and runtime ownership when those signals are available;
+7. classify the collision;
+8. assign or recognize a single owner for an exclusive collision domain;
+9. emit a deterministic collision fingerprint;
+10. recommend `continue`, `coordinate`, `serialize`, `stack`, `rebase`, `split`, `transfer ownership`, `hold`, or human adjudication.
+
+Unknown collision evidence does not become `clear` merely because the scanner cannot see enough. It becomes `hold_or_escalate_not_clear` for the affected material surface.
+
+Force-pushing over another packet is not an accepted collision-resolution technique.
+
+## Collision Adjudicator
+
+Stable candidate identity: `ct.subagent.collision.adjudicator`.
+
+The **Collision Adjudicator** handles collisions that cannot be resolved mechanically. Its job is to preserve both histories and choose the least-destructive sequence, not to reward whichever branch moved fastest.
+
+The adjudicator may recommend:
+
+- one PR becomes the parent and the other is stacked;
+- one PR takes ownership of a shared file while the other removes that file from scope;
+- a large packet is split into independently governable tranches;
+- a stale packet is rebased and all head-bound evidence is refreshed;
+- a redundant packet is closed after its useful evidence is migrated;
+- a constitutional, D3, security-exception, or reserved-human collision is escalated rather than interpreted away.
+
+Adjudication output is a governed recommendation and precedent record. It is not a sovereign vote and does not replace Agent D.
+
+## Post-Merge Reconciler
+
+Stable candidate identity: `ct.subagent.collision.postmerge-reconciler`.
+
+The **Post-Merge Reconciler** treats every material merge as a state transition that may invalidate assumptions elsewhere.
+
+After a material `main` merge, it must:
+
+1. capture the new canonical SHA and merged PR;
+2. enumerate remaining open PRs;
+3. mark exact-head or base-bound evidence stale when its binding changed;
+4. recompute direct and semantic collision state;
+5. recompute queue priority and throttle state;
+6. identify redundant, superseded, or newly dependent packets;
+7. request rebase, stack, close, transfer, or adjudication as needed;
+8. reconcile documentation, registry, runtime, schedule, and downstream-phase effects;
+9. append the post-merge record instead of deleting the history that led to it.
+
+A successful merge therefore becomes the next inherited baseline rather than a surprise that every other agent rediscovers independently.
+
+## Priority and Throttle Coordinator
+
+Stable candidate identity: `ct.subagent.queue.priority-throttle`.
+
+The **Priority and Throttle Coordinator** exists because unlimited parallelism creates its own bottleneck. The objective is not to slow development. The objective is to stop promotion, review, and rebasing from becoming a self-generated denial of service.
+
+The Founder Orchestrator owns the final queue-level routing decision after this packet is accepted and reconciled. The coordinator supplies the machine recommendation.
+
+### Priority bands
+
+- `P0`: critical security incident or explicit founder-reserved emergency;
+- `P1`: Phase 2.99 hard-exit blocker or major dependency-unblock packet;
+- `P2`: material current-phase build or reconciliation;
+- `P3`: normal improvement or low-fanout maintenance;
+- `P4`: research, experiment, or noncritical future work.
+
+The score considers hard-exit impact, security/integrity urgency, dependency fanout, explicit founder priority, evidence staleness/rebase pressure, queue fairness, and reversibility. Collision, stale-base, missing-specialist, and unclassified-scope penalties reduce queue priority. A hard block overrides the score.
+
+### Work-in-progress limits
+
+The controlled-test defaults are:
+
+- no more than **two D2 packets in final quorum at once**;
+- no more than **one packet per shared collision domain** in final promotion at once;
+- no more than **one D3 packet** in the reserved-human lane at once;
+- exploratory work may continue while throttled, but a throttled packet cannot request final quorum merely to compete for attention;
+- a critical security event may preempt normal queue order;
+- the Founder Orchestrator may temporarily widen the D2 final-quorum window from two to three only when the collision domains are disjoint, specialists are available, no D3 packet owns the same domain, and the reason is recorded.
+
+Widening the review window does **not** change quorum math.
+
+## Founder Orchestrator privilege contract
+
+Candidate parent identity: `ct.agent.founder-orchestrator`.
+
+This identity is reserved as a **candidate binding** and must be reconciled against the upcoming Master Founder Orchestrator implementation before activation. The intent is to give that parent enough control to resolve bottlenecks without accidentally creating a sixth sovereign vote.
+
+Bounded orchestration privileges are:
+
+- set PR priority bands;
+- throttle the final promotion queue;
+- serialize shared collision domains;
+- allocate merge windows;
+- require rebase, stack, split, or ownership transfer;
+- request a Special Quorum session;
+- assign a collision-adjudication owner;
+- pause or resume noncritical governed work;
+- require fresh exact-head review when staleness is detected;
+- request post-merge reconciliation;
+- preempt the normal queue for a critical security or founder-reserved incident.
+
+Those privileges are **routing and coordination authority**, not voting authority.
+
+The Founder Orchestrator may not:
+
+- cast or manufacture a sovereign vote;
+- waive Agent D;
+- waive an applicable specialist;
+- weaken a validator or security control;
+- merge a blocked PR;
+- convert UNKNOWN into PASS;
+- alter D3 authority without explicit authorized-human action;
+- expose restricted material;
+- self-approve an originating material change.
+
+This is the central distinction between **master orchestration** and **unchecked sovereignty**.
+
+## Special Quorum
+
+Stable candidate router identity: `ct.subagent.quorum.session-router`.
+
+A **Special Quorum** is an expedited exact-head review session. It is not a separate constitution, weighted vote, emergency bypass, or substitute for missing evidence.
+
+The existing voter pool and threshold remain unchanged. Agent D remains mandatory. Applicable specialists remain mandatory. A base or head change expires the session.
+
+The Founder Orchestrator or Special-Quorum Session Router may request one when:
+
+- a critical/high security sequence decision needs immediate coordinated review;
+- a Phase 2.99 hard-exit blocker has major downstream fanout;
+- two or more material PRs are deadlocked on the same collision domain;
+- a `main` merge invalidates three or more promotion-ready packets;
+- a named founder priority/override requires rapid adjudication.
+
+It should not be used for routine research, cosmetic documentation cleanup, manufacturing missing evidence, or bypassing a deny/block.
+
+A Special Quorum request must carry current `main` SHA, exact PR head/base SHA, collision fingerprint, requested decision, owner/competing packet references, specialists, rollback/recovery path, routing reason, and expiration conditions.
+
+## CrownThrive three-lane institutional experiment
+
+The user-directed judicial/legislative/executive concept is retained here only as **secondary experimental institutional knowledge**. CrownThrive does not need to copy a governmental model literally. The useful concept is separation of functions and challenge paths.
+
+### Executive Coordination
+
+Owner candidate: Founder Orchestrator. Role: queue priority, throttling, merge-window assignment, execution routing, and incident preemption within adopted rules.
+
+### Policy Assembly
+
+Default owner: Governance Marshal. Role: draft ADR, standard, policy, validator, and institutional-rule amendments; compare consequences; maintain change proposals; prepare adoption packets.
+
+### Adjudication and Precedent
+
+Default owner: Collision Adjudicator. Role: interpret current adopted rules for collision disposition, preserve precedent/reasoning, and identify when ambiguity requires a Policy Assembly amendment.
+
+The experiment is deliberately non-sovereign.
+
+## Convergence Rotor
+
+Stable candidate identity: `ct.subagent.convergence.rotor`.
+
+The **Convergence Rotor** reuses the existing queue and collision machinery. It detects when CrownThrive is producing work faster than canonical `main`, documentation, review, or recovery proof can absorb it, then rotates final-review attention toward closure without discarding work.
+
+Attention modes are `EXPANSION` (35/45/20 closure/current-build/research), `BALANCED` (50/35/15), `CONVERGENCE` (70/20/10), and `INCIDENT` (80/15/5). Controlled-test convergence begins when there are at least 20 open PRs, at least eight stale main-based PRs, or at least eight material `CT-COLL-2+` collisions. Incident mode requires an explicit critical-security or founder-priority signal.
+
+Research may continue while promotion is throttled. The rotor changes attention allocation, not truth, history, authorship, evidence, or sovereignty.
+
+## Refactor Steward
+
+Stable candidate identity: `ct.subagent.refactor.steward`.
+
+The **Refactor Steward** converts sprawl into lineage-preserving current ownership. It prefers updating an existing current owner over creating another parallel owner and prefers extracting the unique useful delta from a stale packet over promoting stale state wholesale.
+
+It may recommend `preserve_active`, `preserve_and_rebase`, `preserve_and_stack_on_current_owner`, `preserve_and_extract_unique_delta`, `preserve_as_superseded_history_with_successor_link`, `hold_for_adjudication`, or `continue_research_without_promotion`.
+
+The Refactor Steward **never silently deletes** a branch, file, page, PR history, Canon, Doctrine, evidence packet, rejected experiment, prior current state, or institutional decision. It cannot force-push, automatically close a PR, weaken a validator, or turn UNKNOWN into PASS. Supersession requires predecessor lineage plus a successor or explicit reason; material current-page changes retain version/changelog continuity.
+
+Whole-estate refactoring follows: `canonical main/merge perimeter -> Phase 2.99 hard exit/full-docs gate -> current-truth docs/source registry -> runtime/API/MCP/provider state -> agent/framework/federation state -> product/platform verticals -> future R&D`.
+
+## Scheduling
+
+The existing hourly estate already uses the known minute slots `:00`, `:02`, `:05`, `:10`, `:12`, `:15`, `:17`, `:20`, `:25`, `:30`, `:35`, `:45`, and `:55`.
+
+This packet therefore reuses two non-overlapping lanes:
+
+- `:40` — hourly queue/collision review plus whole-estate convergence/refactor plan;
+- `:50` — hourly post-merge/staleness reconciliation plus refreshed refactor plan.
+
+GitHub pull-request events also run the preflight immediately, and pushes to `main` run the post-merge path immediately. No third schedule lane or competing workflow family is created.
+
+The dedicated workflow is intentionally read-only. It may fail a preflight when a material collision requires serialization/adjudication, but it does not write comments, merge PRs, alter branch protection, cast votes, delete branches/files, or silently close history.
+
+The executable extension is `developers/manifests/convergence-refactor-policy.v1.json` plus `scripts/governed_convergence_refactor.py`. It exists to refactor the control plane as a whole while preserving every predecessor state.
