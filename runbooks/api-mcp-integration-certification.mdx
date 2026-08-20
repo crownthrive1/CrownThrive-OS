@@ -1,0 +1,126 @@
+---
+title: "API and MCP Integration Certification"
+sidebarTitle: "API/MCP Certification"
+description: "Developer runbook for certifying read-first API adapters and MCP tools using least privilege, evidence, rate budgets, schema controls, and fail-closed writes."
+icon: "plug-circle-check"
+---
+
+# API and MCP integration certification
+
+Use this runbook when connecting a provider API, internal API, MCP server, agent tool, or adapter into a governed platform.
+
+## Certification objective
+
+Prove the integration can perform its intended bounded function safely and reproducibly. Provider documentation proves capability, not account entitlement or CrownThrive deployment.
+
+## Phase 1 - capability discovery
+
+Record:
+
+- provider and product name;
+- authoritative documentation source;
+- base URL/version when verified;
+- authentication method;
+- endpoint/method inventory;
+- read/write distinction;
+- sensitive-data surfaces;
+- rate/usage limits;
+- webhook/event support;
+- export/exit capability;
+- provider support/version status.
+
+## Phase 2 - least-privilege adapter contract
+
+Define an explicit allowlist. Start with the smallest useful reads, for example:
+
+```yaml
+adapter_id: example.provider.read.v1
+auth: server_side_secret_ref
+allowed_methods:
+  - GET
+allowed_paths:
+  - /health
+  - /account/profile
+writes_enabled: false
+sensitive_data_enabled: false
+request_budget_per_hour: 12
+timeout_ms: 5000
+max_response_bytes: 1048576
+```
+
+Do not inherit broad provider permissions merely because the credential supports them.
+
+## Phase 3 - runtime controls
+
+Verify:
+
+- server-side authentication;
+- explicit administrator/service authorization;
+- pre-parse request-body bounds;
+- provider timeout and retry policy;
+- response-size bounds;
+- least-data projection;
+- rate/request budget accounting;
+- durable request/audit commit;
+- secret redaction in logs and errors;
+- idempotency/replay controls where writes or webhooks exist;
+- disabled write paths fail closed.
+
+## Phase 4 - MCP exposure
+
+Each MCP tool should declare:
+
+- tool ID and version;
+- risk class;
+- mutating vs non-mutating behavior;
+- schemas;
+- data accessed;
+- required actor/role;
+- provider dependency;
+- rate budget;
+- approval requirement;
+- enablement state.
+
+Registration is not enablement. A tool may remain registered and disabled until certification passes.
+
+## Phase 5 - evidence packet
+
+Required proof may include:
+
+- successful bounded read;
+- authenticated account/provider response;
+- expected negative authorization test;
+- request-budget record;
+- schema/field validation;
+- error-handling test;
+- log redaction proof;
+- write-disabled proof;
+- recovery/exit evidence where continuity is part of the gate.
+
+## Failure classes
+
+- provider capability documented but account permission unknown;
+- credential exists but safe runtime binding is unproved;
+- endpoint works but returns excessive sensitive data;
+- provider write capability leaks into a read-only adapter;
+- tool is enabled before schema or authority review;
+- retry logic can create duplicate mutations;
+- timeout or response body is unbounded;
+- usage limits are represented incorrectly.
+
+## Verification checklist
+
+- [ ] First-party provider docs were distinguished from account evidence.
+- [ ] Read/write surfaces are explicit.
+- [ ] Initial allowlist is least privilege.
+- [ ] Secrets are server-side and absent from artifacts.
+- [ ] Body/response/timeout/rate controls are bounded.
+- [ ] Sensitive data is minimized.
+- [ ] MCP registration and enablement are distinct.
+- [ ] Write paths remain disabled until separately authorized.
+- [ ] Evidence includes positive and negative tests.
+- [ ] Export/exit continuity is recorded when required.
+
+## Commercialization state
+
+Public-safe developer pattern candidate. Provider-specific credentials, private endpoint mappings, account IDs, production request logs, and restricted negative-test corpora are excluded.
