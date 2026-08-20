@@ -54,6 +54,19 @@ def main() -> None:
     require(post["hard_exit_ledger_owner_collision"]["active_pr"] == 122, "active ledger owner drift")
     require(post["hard_exit_ledger_owner_collision"]["agent_f_action"] == "handoff_only_no_competing_ledger_edit", "Agent F must not collide with PR122 ledger ownership")
 
+    tags = packet["reconciliation_tag_scan"]
+    require(tags["policy"]["deferral_is_never_pass"] is True, "deferral semantics weakened")
+    require(tags["policy"]["unknown_is_never_zero_or_pass"] is True, "UNKNOWN semantics weakened")
+    require(tags["phase_gate_tags"]["CT-P299-GATE-002"]["state"] == "OPEN", "GATE-002 tag unexpectedly promoted")
+    require(tags["phase_gate_tags"]["CT-P299-GATE-003"]["state"] == "OPEN", "GATE-003 tag unexpectedly promoted")
+    gate2_policies = tags["governed_gate_002_policies"]
+    require(gate2_policies["source_not_recovered_terminal_policy"]["state"] == "PASS", "source-not-recovered policy missing")
+    require(gate2_policies["p0_p1_current_rebuild_policy"]["state"] == "PASS", "P0/P1 current rebuild policy missing")
+    require(gate2_policies["p0_p1_current_rebuild_policy"]["autopublish_without_required_approval"] is False, "P0/P1 reconstruction cannot bypass approval")
+    require(gate2_policies["governed_reconstruction_quorum"]["independent_quorum_required_for_material_acceptance"] is True, "material reconstruction quorum weakened")
+    require(gate2_policies["full_documentation_hard_gate"]["non_deferrable"] is True, "full documentation hard gate cannot become deferrable")
+    require(gate2_policies["full_documentation_hard_gate"]["phase3_entry_blocked_until_complete"] is True, "documentation gate cannot permit premature Phase 3")
+
     closure = packet["closure_state"]
     require(all(closure[key] is False for key in (
         "terminal_disposition_assigned_795",
@@ -66,8 +79,10 @@ def main() -> None:
         "navigation_or_intentionally_unlisted_795",
         "p0_p1_substantive_or_explicit_unresolved_closure",
         "s94_body_recovery_complete",
+        "source_not_recovered_applied_to_all_eligible_records",
     )), "unresolved articleization state was falsely promoted")
     require(closure["body_records_recovered_this_pass"] == 0, "body recovery count must remain zero without source evidence")
+    require(closure["source_not_recovered_policy_available"] is True, "governed source-not-recovered disposition path must be represented")
     require(packet["gate_scope"]["gate_002_pass"] is False, "GATE-002 must remain not passed")
 
     retired = packet["retired_provider_state"]["simplebase"]
@@ -79,7 +94,7 @@ def main() -> None:
     require(hard_exit["open_hard_gates"][1]["gate_id"] == "CT-P299-GATE-002", "GATE-002 position/identity drift")
     require(hard_exit["open_hard_gates"][1]["state"] == "not_met", "GATE-002 unexpectedly changed state")
 
-    print("PASS: Agent F post-PR91 merge reconciliation packet is internally consistent and fail-closed.")
+    print("PASS: Agent F post-PR91 merge reconciliation packet is internally consistent, tag-aware and fail-closed.")
 
 
 if __name__ == "__main__":
