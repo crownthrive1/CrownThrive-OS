@@ -39,6 +39,7 @@ At minimum, inspect the applicable current versions of:
 - `standards/versioning-change-control-and-correction.mdx`
 - `standards/evidence-claims-and-proof-standard.mdx`
 - `standards/ip-protection-chain-of-title-and-trade-secret.mdx`
+- `governance/ip-disclosure-and-commercialization-gate.mdx` when public disclosure, licensing, packaging, open-source distribution or commercialization is involved
 - `standards/human-agent-hybrid-alignment.mdx`
 - `standards/autonomy-operating-constitution.mdx`
 - `standards/run-packet-project-management.mdx`
@@ -203,6 +204,24 @@ Agents may not represent that legal sufficiency, registration, filing, franchise
 CrownThrive-specific original documentation, CHLOM, CIE, the Thrive Flywheel, MM Suites architecture, registries, research summaries, platform systems, imprints, universes, characters, policies, and confidential methods remain governed CrownThrive intellectual property unless a specific written license says otherwise.
 
 Do not copy restricted CrownThrive source into public outputs. Do not remove author/source/ownership notices. Do not interpret a third-party template or dependency license as a grant over CrownThrive-specific content.
+
+### Pre-publication IP disclosure gate
+
+Before materially publishing, distributing, licensing, open-sourcing, partner-sharing or otherwise externally disclosing detailed CrownThrive technical, agentic, CHLOM, policy, software, research, security, economic or operating material, classify the exact artifact under the permanent IP disclosure gate.
+
+Use `governance/ip-disclosure-and-commercialization-gate.mdx` and `developers/manifests/ip-disclosure-commercialization-policy.v1.json`.
+
+At minimum distinguish `PUBLIC_STANDARD`, `PUBLIC_DOCTRINE`, `COPYRIGHT_LICENSED`, `TRADE_SECRET_CANDIDATE`, `TRADE_SECRET_CONTROLLED`, `PATENT_CANDIDATE`, `TRADEMARK_CANDIDATE`, `CERTIFICATION_MARK_CANDIDATE`, `RESTRICTED_INSTITUTIONAL`, `THIRD_PARTY_LICENSED` and `RIGHTS_REVIEW` as applicable.
+
+When classification is uncertain, **hold rather than publish first**. Patent-candidate mechanisms, trade-secret candidates/controlled material, restricted institutional detail, unknown rights, production credentials/fingerprints, private economic calibration, internal security findings, proprietary evaluation/adversarial corpora and private DAIL/evidence bodies cannot become public merely because an agent can generate a clean-looking document.
+
+Public specification, licensed implementation, restricted institutional implementation and trade-secret kernel are separate projections. A commercial license never transfers CrownThrive sovereign authority by implication.
+
+### Commercialization
+
+Commercial opportunity does not authorize a sale. CrownThrive offers progress independently through `concept -> candidate -> packaged -> rights_cleared -> pricing_authorized -> fulfillment_certified -> checkout_staged -> live`.
+
+The candidate offer catalog is `developers/manifests/chlom-agentic-commercial-offer-catalog.v1.json`. No agent may invent a live price, package license, Stripe Product/Price authority, checkout, certification status or customer entitlement because an item is monetizable in principle.
 
 ## 16. Completion standard
 
