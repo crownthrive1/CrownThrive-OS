@@ -1,0 +1,93 @@
+---
+title: "Scheduled Follow-Up and Deadline Watch"
+sidebarTitle: "Follow-Up Watch"
+description: "Developer runbook for reminders, conditional follow-ups, retries, and deadline watches that avoid duplicate action and preserve sensitive context."
+icon: "clock"
+---
+
+# Scheduled follow-up and deadline watch
+
+Use this runbook for one-time reminders, recurring retries, approval follow-ups, refund/service watches, grant/application watches, operational deadlines, and other time-dependent workflows.
+
+## Goal
+
+Trigger the right next step at the right time without duplicating completed work, escalating too early, exposing sensitive context, or continuing a watch after its condition has resolved.
+
+## Choose the schedule type
+
+- **exact schedule** - explicit date/time or fixed cadence;
+- **flexible schedule** - a daypart or non-critical recurring window;
+- **condition watch** - notify/act only when a monitored condition becomes true.
+
+A condition watch should suppress output when no material change exists.
+
+## Workflow
+
+1. Record the target condition, deadline, or follow-up objective.
+2. Identify the authoritative state source.
+3. Define success, failure, stale, and unknown states.
+4. Choose schedule/cadence appropriate to how quickly the state can change.
+5. Add deduplication/idempotency logic.
+6. Check current state before sending a reminder or retrying an action.
+7. Stop or downgrade the watch when the condition is satisfied, superseded, or no longer relevant.
+8. Preserve a minimal audit trail.
+
+## Watch record
+
+```yaml
+watch_id: example.followup.001
+mode: condition_watch
+source: approved_system
+condition: status == complete
+cadence: daily
+last_checked_at: timestamp
+last_known_state: pending
+notify_on_no_change: false
+deduplication_key: stable-key
+stop_condition: complete_or_cancelled
+```
+
+## Retry policy
+
+Retries should be bounded. Define:
+
+- maximum attempts;
+- backoff/cadence;
+- idempotency key;
+- provider/API rate limits;
+- what state means "already done";
+- escalation point;
+- stop condition.
+
+Do not retry a mutating action merely because the prior response was ambiguous; reconcile provider/system state first.
+
+## Sensitive-context boundary
+
+Private scheduled workflows may refer to legal, family, health, finance, school, customer, partner, or account-specific matters. The commercial version of this runbook must use synthetic examples and generic state fields. Source messages, names, attachments, case details, addresses, account identifiers, and private deadlines stay isolated.
+
+## Failure classes
+
+- reminder fires after completion;
+- duplicate mutation from blind retry;
+- watch never stops;
+- timezone is interpreted incorrectly;
+- notification exposes private context;
+- condition source is stale/unavailable but the workflow assumes success;
+- cadence exceeds provider/task limits;
+- failed action is treated as completed because a task executed.
+
+## Verification checklist
+
+- [ ] Condition/deadline is explicit.
+- [ ] Authoritative state source is known.
+- [ ] Schedule mode matches the requirement.
+- [ ] Timezone is explicit when relevant.
+- [ ] Deduplication/idempotency exists.
+- [ ] Retry policy is bounded.
+- [ ] Stop condition exists.
+- [ ] Sensitive source context is isolated.
+- [ ] UNKNOWN/unavailable state does not become success.
+
+## Commercialization state
+
+Public-safe developer pattern candidate. Personal schedules, private correspondence, legal/financial/health/customer details, provider credentials, and internal task identifiers are excluded from customer-facing editions.
