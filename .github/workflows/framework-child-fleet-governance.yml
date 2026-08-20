@@ -1,4 +1,4 @@
-name: Framework Child Fleet Governance
+name: Framework Package Fleet Governance
 
 on:
   pull_request:
@@ -28,14 +28,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: framework-child-fleet-${{ github.workflow }}-${{ github.ref }}
+  group: framework-package-fleet-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
-    name: Validate framework child fleet
+    name: Validate framework package fleet
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    permissions:
+      contents: read
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,30 +50,32 @@ jobs:
       - name: Compile fleet controller
         run: python -m py_compile scripts/framework_child_fleet.py
 
-      - name: Validate fleet manifest and templates
+      - name: Validate package manifest and templates
         run: python scripts/framework_child_fleet.py --validate
 
       - name: Run one-at-a-time and negative-case self-test
         run: python scripts/framework_child_fleet.py --self-test
 
-      - name: Emit current next-safe child packet
+      - name: Emit current next-safe framework packet
         run: python scripts/framework_child_fleet.py --next
 
-      - name: Render and validate current CIE bootstrap bundle
+      - name: Render and validate current CIE package
         run: |
-          rm -rf /tmp/ct-child-cie
+          rm -rf /tmp/ct-framework-cie
           python scripts/framework_child_fleet.py \
             --render ct.framework.cultural-imprint-engine \
-            --output-dir /tmp/ct-child-cie
-          python /tmp/ct-child-cie/scripts/validate_child_repository.py --root /tmp/ct-child-cie
+            --output-dir /tmp/ct-framework-cie
+          python /tmp/ct-framework-cie/scripts/validate_child_repository.py --root /tmp/ct-framework-cie
+          python /tmp/ct-framework-cie/engine/engine.py health
 
-      - name: Render and validate Convergent scaffold-only bundle
+      - name: Render and validate Convergent preview package
         run: |
-          rm -rf /tmp/ct-child-convergent
+          rm -rf /tmp/ct-framework-convergent
           python scripts/framework_child_fleet.py \
             --render ct.framework.convergent-ecosystem \
-            --output-dir /tmp/ct-child-convergent
-          python /tmp/ct-child-convergent/scripts/validate_child_repository.py --root /tmp/ct-child-convergent
+            --output-dir /tmp/ct-framework-convergent
+          python /tmp/ct-framework-convergent/scripts/validate_child_repository.py --root /tmp/ct-framework-convergent
+          python /tmp/ct-framework-convergent/engine/engine.py health
 
       - name: Check whitespace and conflict markers
         run: |
@@ -82,7 +86,7 @@ jobs:
           fi
 
   route-drift:
-    name: Route framework fleet drift
+    name: Route framework package fleet drift
     needs: validate
     if: ${{ always() && needs.validate.result == 'failure' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
@@ -92,12 +96,12 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      DRIFT_TITLE: "CT Framework Child Fleet Governance Drift"
+      DRIFT_TITLE: "CT Framework Package Fleet Governance Drift"
     steps:
       - name: Create or update one governed drift issue
         run: |
           existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"${DRIFT_TITLE}\") | .number" | head -n1)"
-          body="Framework Child Fleet Governance failed on run ${GITHUB_RUN_ID} at ${GITHUB_SHA}. This is an internal WATCH/HOLD only. It creates no sovereign vote, framework acceptance, child certification, repository existence claim, or Phase-3 authority. Repair root cause through a reviewed packet and rerun the unchanged controls."
+          body="Framework Package Fleet Governance failed on run ${GITHUB_RUN_ID} at ${GITHUB_SHA}. This is an internal WATCH/HOLD only. It creates no sovereign vote, framework acceptance, package certification, provider write, price, checkout or Phase-3 authority. Repair root cause through a reviewed packet and rerun unchanged controls."
           if [ -z "$existing" ]; then
             gh issue create --title "$DRIFT_TITLE" --body "$body"
           else
@@ -105,7 +109,7 @@ jobs:
           fi
 
   reconcile-drift:
-    name: Reconcile recovered framework fleet drift
+    name: Reconcile recovered framework package fleet drift
     needs: validate
     if: ${{ always() && needs.validate.result == 'success' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
@@ -115,12 +119,12 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      DRIFT_TITLE: "CT Framework Child Fleet Governance Drift"
+      DRIFT_TITLE: "CT Framework Package Fleet Governance Drift"
     steps:
       - name: Close recovered drift issue when present
         run: |
           existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"${DRIFT_TITLE}\") | .number" | head -n1)"
           if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body "Framework Child Fleet Governance recovered on run ${GITHUB_RUN_ID} at ${GITHUB_SHA}. Closing this operational drift record does not certify any child or create a sovereign vote."
+            gh issue comment "$existing" --body "Framework Package Fleet Governance recovered on run ${GITHUB_RUN_ID} at ${GITHUB_SHA}. Closing this operational drift record does not certify any package or create a sovereign vote."
             gh issue close "$existing" --reason completed
           fi
