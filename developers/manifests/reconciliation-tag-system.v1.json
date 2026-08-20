@@ -1,5 +1,5 @@
 {
-  "manifest_version": "1.0.0",
+  "manifest_version": "1.1.0",
   "manifest_id": "ct.manifest.reconciliation-tag-system.v1",
   "roadmap_generation": "ten_phase_v1",
   "governance_decision": "CT-ADR-GOV-011",
@@ -26,7 +26,11 @@
     "CT:QUORUM-PENDING": {"meaning":"sovereign quorum incomplete"},
     "CT:SPECIALIST-PENDING": {"meaning":"required specialist disposition incomplete"},
     "CT:DEPENDENCY-PENDING": {"meaning":"another branch/gate/provider dependency must resolve first"},
-    "CT:SUPERSEDED": {"meaning":"record/draft retained as history but superseded by later canonical evidence"}
+    "CT:SUPERSEDED": {"meaning":"record/draft retained as history but superseded by later canonical evidence"},
+    "CT:RND": {"meaning":"research-and-development lineage; exploratory work without certification authority"},
+    "CT:RESEARCH-CANDIDATE": {"meaning":"exploratory/incubation scope not in the formal certification denominator by default","requires":["CT:RND","CT:RECONCILE","CT:SOURCE-SCAN"],"prohibits":["CT:PASS","CT:CERTIFICATION-SCOPE"]},
+    "CT:PROMOTION-PENDING": {"meaning":"R&D scope proposed for governed promotion into certification","requires":["CT:RND","CT:RECONCILE","CT:SOURCE-SCAN"],"prohibits":["CT:PASS"]},
+    "CT:CERTIFICATION-SCOPE": {"meaning":"scope deliberately promoted into governed certification/hard-exit accounting","requires":["CT:RECONCILE","CT:SOURCE-SCAN"]}
   },
   "subagents": [
     {
@@ -92,6 +96,20 @@
   "proof_packet_required_fields": [
     "scope_key","observed_state","tags","agent_versions","permissioned_sources_attempted","permissioned_sources_read","sources_unavailable","authoritative_evidence_refs","contradictions","current_vs_historical","result","independent_verifier","docs_impact","rollback_or_reopen_trigger","observed_at"
   ],
+  "research_promotion": {
+    "default_state": "RESEARCH_CANDIDATE",
+    "direct_pass_prohibited": true,
+    "research_registry_growth_is_formal_coverage_gap": false,
+    "research_candidate_excluded_from_hard_exit_denominator": true,
+    "promotion_triggers": [
+      "explicit_governance_promotion",
+      "touches_phase_2_99_hard_exit_predicate",
+      "changes_existing_governed_disposition",
+      "becomes_canonical_or_production_relevant",
+      "enters_authoritative_phase_entry_evidence"
+    ],
+    "promotion_manifest": "developers/manifests/agent-factory-delegation-policy.v1.json"
+  },
   "phase_state": {
     "current": "2.99",
     "phase_3_entry": "blocked_pending_phase_2_99_hard_exit"
