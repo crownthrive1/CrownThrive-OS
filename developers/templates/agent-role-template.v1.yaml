@@ -1,4 +1,4 @@
-template_version: 1.0.0
+template_version: 1.1.0
 template_id: ct.template.agent-role.v1
 classification: public_safe_template
 license_model: CrownThrive proprietary template unless a package-specific license says otherwise
@@ -11,6 +11,7 @@ identity:
   vote_eligible: false
   owner: CrownThrive Operations
   lifecycle: DESIGN
+  independence_family: ct.independence.example
 
 roadmap:
   roadmap_generation: ten_phase_v1
@@ -27,6 +28,21 @@ governance:
   fail_closed: true
   human_reserved_actions: [D3]
 
+delegation:
+  spawn_mode: none | registered_or_ephemeral_bounded | builder_cells | bounded_specialist | checks_only
+  allowed_child_classes: []
+  max_depth: 0
+  child_authority_ceiling: D0
+  child_vote_default: false
+  child_production_write_default: false
+  child_ttl_required: true
+  child_budget_required: true
+  lineage_required: true
+  same_family_counts_as_independent_verifier: false
+  children_count_toward_sovereign_quorum: false
+  persistent_child_registration_required: true
+  promotion_route: []
+
 scope:
   mission: Describe the bounded institutional outcome.
   allowed_actions: []
@@ -37,6 +53,8 @@ scope:
     - unauthorized_provider_write
     - unsupported_unknown_to_pass
     - waive_hard_gate
+    - manufacture_independent_verification
+    - child_vote_multiplication
   allowed_data_classes: [PUBLIC, INTERNAL]
   forbidden_data_classes: [SEALED]
 
@@ -63,11 +81,25 @@ outputs:
     - docs_impact
     - rollback
     - exact_next_packet
+  delegated_child_required_fields:
+    - child_run_id
+    - parent_agent_id
+    - root_agent_id
+    - delegation_path
+    - independence_family
+    - authority_ceiling
+    - budget
+    - ttl
+    - output_class
+    - termination_state
 
 validation:
   required_tests: []
   negative_tests: []
   independent_verifier_required_for_d2: true
+  verify_delegation_lineage: true
+  verify_child_authority_ceiling: true
+  reject_same_family_independence_claim: true
 
 continuity:
   version_history_required: true
