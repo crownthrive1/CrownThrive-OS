@@ -44,11 +44,7 @@ def request_oidc_token() -> str:
     query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
     query.append(("audience", OIDC_AUDIENCE))
     url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), parsed.fragment))
-    req = urllib.request.Request(
-        url,
-        headers={"Authorization": f"Bearer {request_token}", "Accept": "application/json"},
-        method="GET",
-    )
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {request_token}", "Accept": "application/json"}, method="GET")
     with urllib.request.urlopen(req, timeout=15) as response:
         raw = response.read(MAX_RESPONSE_BYTES + 1)
     if len(raw) > MAX_RESPONSE_BYTES:
@@ -71,12 +67,7 @@ def federation_call(action: str, payload: dict[str, Any], *, federation_url: str
     req = urllib.request.Request(
         url,
         data=data,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "CrownThrive-Repository-Federation/1.0",
-        },
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "CrownThrive-Repository-Federation/1.0"},
         method="POST",
     )
     try:
@@ -95,15 +86,10 @@ def federation_call(action: str, payload: dict[str, Any], *, federation_url: str
 
 
 def redact_for_ci(value: dict[str, Any]) -> dict[str, Any]:
-    """Remove message bodies and other potentially restricted payloads from CI output."""
     result = json.loads(json.dumps(value))
     payload = result.get("result")
     if isinstance(payload, dict) and isinstance(payload.get("messages"), list):
-        result["result"] = {
-            "repo_id": payload.get("repo_id"),
-            "message_count": len(payload["messages"]),
-            "messages_redacted": True,
-        }
+        result["result"] = {"repo_id": payload.get("repo_id"), "message_count": len(payload["messages"]), "messages_redacted": True}
     return result
 
 
@@ -120,12 +106,12 @@ def self_test() -> None:
     assert manifest["framework_child_policy"]["framework_subagents_create_votes"] is False
     forbidden_static = "SUPABASE_" + "SERVICE_ROLE_KEY"
     assert forbidden_static not in Path(__file__).read_text(encoding="utf-8")
-    print(f"Repository federation client self-test PASS: OIDC-only; contract_sha256={manifest_digest()}; pending child remains disabled.")
+    print(f"Repository federation client self-test PASS: OIDC-only; contract_sha256={manifest_digest()}; pending child remains disabled; message ACK lifecycle supported.")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", nargs="?", choices=("state", "bootstrap", "heartbeat", "publish", "pull", "reference", "authority", "cie-score", "certify-child"))
+    parser.add_argument("command", nargs="?", choices=("state", "bootstrap", "heartbeat", "publish", "pull", "ack", "reference", "authority", "cie-score", "certify-child"))
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--agent-id")
     parser.add_argument("--input", type=Path)
@@ -133,6 +119,9 @@ def main() -> int:
     parser.add_argument("--message-type")
     parser.add_argument("--severity", default="info")
     parser.add_argument("--requires-ack", action="store_true")
+    parser.add_argument("--message-id")
+    parser.add_argument("--ack-state", choices=("received", "accepted", "rejected", "completed", "escalated"))
+    parser.add_argument("--reason")
     parser.add_argument("--authority-key")
     parser.add_argument("--target-repo-id")
     parser.add_argument("--reference-type")
@@ -167,31 +156,18 @@ def main() -> int:
     elif action == "publish":
         if not args.message_type:
             parser.error("--message-type required")
-        message_payload = json_load(args.input) if args.input else {}
-        payload = {
-            "agent_id": agent_id,
-            "receiver_repo_id": args.receiver_repo_id,
-            "message_type": args.message_type,
-            "severity": args.severity,
-            "payload": message_payload,
-            "requires_ack": args.requires_ack,
-        }
+        payload = {"agent_id": agent_id, "receiver_repo_id": args.receiver_repo_id, "message_type": args.message_type, "severity": args.severity, "payload": json_load(args.input) if args.input else {}, "requires_ack": args.requires_ack}
     elif action == "pull":
         payload = {"limit": max(1, min(args.limit, 200))}
+    elif action == "ack":
+        if not args.message_id or not args.ack_state:
+            parser.error("--message-id and --ack-state required")
+        payload = {"agent_id": agent_id, "message_id": args.message_id, "ack_state": args.ack_state, "reason": args.reason}
     elif action == "reference":
         for name, value in (("target-repo-id", args.target_repo_id), ("reference-type", args.reference_type), ("source-ref", args.source_ref), ("target-ref", args.target_ref)):
             if not value:
                 parser.error(f"--{name} required")
-        payload = {
-            "agent_id": agent_id,
-            "target_repo_id": args.target_repo_id,
-            "reference_type": args.reference_type,
-            "source_ref": args.source_ref,
-            "target_ref": args.target_ref,
-            "source_sha": args.source_sha,
-            "target_sha": args.target_sha,
-            "contract_version": args.contract_version,
-        }
+        payload = {"agent_id": agent_id, "target_repo_id": args.target_repo_id, "reference_type": args.reference_type, "source_ref": args.source_ref, "target_ref": args.target_ref, "source_sha": args.source_sha, "target_sha": args.target_sha, "contract_version": args.contract_version}
     elif action == "authority":
         if not args.authority_key:
             parser.error("--authority-key required")
@@ -205,13 +181,7 @@ def main() -> int:
         required = (args.child_repo_id, args.child_sha, args.child_contract_digest, args.parent_contract_digest)
         if not all(required):
             parser.error("--child-repo-id, --child-sha, --child-contract-digest and --parent-contract-digest required")
-        payload = {
-            "agent_id": agent_id,
-            "child_repo_id": args.child_repo_id,
-            "child_sha": args.child_sha,
-            "child_contract_digest": args.child_contract_digest,
-            "parent_contract_digest": args.parent_contract_digest,
-        }
+        payload = {"agent_id": agent_id, "child_repo_id": args.child_repo_id, "child_sha": args.child_sha, "child_contract_digest": args.child_contract_digest, "parent_contract_digest": args.parent_contract_digest}
         action = "certify_child"
     else:
         raise AssertionError("unreachable")
@@ -220,8 +190,7 @@ def main() -> int:
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        summary = result.get("result", {})
-        print(json.dumps({"ok": True, "action": result.get("action"), "repository": result.get("repository"), "result": summary}, sort_keys=True))
+        print(json.dumps({"ok": True, "action": result.get("action"), "repository": result.get("repository"), "result": result.get("result", {})}, sort_keys=True))
     return 0
 
 
