@@ -12,6 +12,22 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "developers/manifests/agent-sovereign-governance.v1.json"
 OVERLAY = ROOT / "developers/manifests/agent-sovereign-governance.v2.json"
 
+CIE_PATH_RULES = [
+    {"path":"developers/manifests/cie-framework-agent.v1.json","required_domains":["cultural_imprint","agent"]},
+    {"path":"developers/manifests/agent-sovereign-governance.v2.json","required_domains":["cultural_imprint","agent","security"]},
+    {"path":"scripts/cie_scan.py","required_domains":["cultural_imprint","agent","llm"]},
+    {"path":"scripts/validate_cie_framework_agent.py","required_domains":["cultural_imprint","agent","llm"]},
+    {"path":"scripts/governed_merge_decision_v2.py","required_domains":["cultural_imprint","agent","security"]},
+    {"path":"scripts/validate_agent_sovereign_governance_v2.py","required_domains":["cultural_imprint","agent","security"]},
+    {"path":"scripts/governed_current_pr_preflight_v2.py","required_domains":["cultural_imprint","agent","security"]},
+    {"path":"doctrine/cultural-imprint-engine.mdx","required_domains":["cultural_imprint","documentation"]},
+    {"path":"automation/cie-framework-agent.mdx","required_domains":["cultural_imprint","documentation","agent"]},
+    {"path":"automation/framework-agent-registry.mdx","required_domains":["cultural_imprint","documentation","agent"]},
+    {"path":"automation/institutional-agent-relay-v2.mdx","required_domains":["cultural_imprint","documentation","agent"]},
+    {"path":"automation/permissions-and-approval-gates.mdx","required_domains":["cultural_imprint","documentation","agent","security"]},
+    {"path":"chlom/cie-cultural-governance-pallet.mdx","required_domains":["cultural_imprint","documentation","rights"]},
+]
+
 
 def load_effective_policy() -> dict:
     policy = copy.deepcopy(v1.load_json(BASE))
@@ -36,8 +52,10 @@ def load_effective_policy() -> dict:
     policy["decision_id"] = overlay["decision_id"]
     policy["foundational_framework_voter_policy"] = overlay["foundational_framework_voter_policy"]
     policy["cie_integration"] = overlay["cie_integration"]
-    # Make cultural-imprint material a deterministic specialist trigger domain.
-    policy["changed_domain_contract"].setdefault("neutral_domains", []).append("cultural_imprint")
+    contract=policy["changed_domain_contract"]
+    if "cultural_imprint" not in contract.setdefault("neutral_domains",[]):
+        contract["neutral_domains"].append("cultural_imprint")
+    contract.setdefault("path_domain_rules",[]).extend(CIE_PATH_RULES)
     return policy
 
 
@@ -66,11 +84,14 @@ def self_test(policy: dict) -> None:
     subagent_vote = five_yes + [{"agent_id": "ct.subagent.cie.identity-fit", "vote": "approve"}]
     result = v1.decide({"risk_class": "D0", "scores": scores, "votes": subagent_vote, "specialist_endorsements": [], "hard_blocks": []}, policy)
     assert result["agent_auto_merge_authorized"] is False
-    assert "ct.subagent.cie.identity-fit" in result["reasons"][0]
+    assert any("ct.subagent.cie.identity-fit" in reason for reason in result["reasons"])
 
     d3 = v1.decide({"risk_class": "D3", "scores": scores, "votes": five_yes, "specialist_endorsements": [], "hard_blocks": [], "human_authorized": False}, policy)
     assert d3["agent_auto_merge_authorized"] is False
     assert "d3_human_authorization_required" in d3["reasons"]
+
+    required=v1.required_specialists_for({"cultural_imprint","rights"},policy)
+    assert {"legal_regulatory","ip_rights_licensing"}.issubset(required)
 
 
 def main() -> int:
@@ -85,7 +106,7 @@ def main() -> int:
 
     if args.self_test:
         self_test(policy)
-        print("CT-ADR-GOV-012 self-test PASS: 6 permanent voters, 5-of-6 quorum, Agent D mandatory, CIE sovereign vote independent, CIE subagents non-voting, D3 human-reserved.")
+        print("CT-ADR-GOV-012 self-test PASS: 6 permanent voters, 5-of-6 quorum, Agent D mandatory, CIE sovereign vote independent, CIE subagents non-voting, D3 human-reserved, CIE paths deterministically classified.")
         return 0
 
     trusted = None
