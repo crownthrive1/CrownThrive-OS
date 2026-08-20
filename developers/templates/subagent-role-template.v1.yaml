@@ -1,4 +1,4 @@
-template_version: 1.0.0
+template_version: 1.1.0
 template_id: ct.template.subagent-role.v1
 classification: public_safe_template
 purpose: Reusable non-voting specialist/subagent template for delegated CrownThrive automation.
@@ -7,15 +7,50 @@ identity:
   subagent_id: ct.subagent.example
   display_name: Example Subagent
   parent_agents: []
+  root_agent_id: ct.agent.example
+  independence_family: ct.independence.example
   vote_eligible: false
   lifecycle: DESIGN
+  runtime_lifecycle: persistent_registered | ephemeral_child
 
 assignment:
   trigger_conditions: []
-  mission: One narrow evidence, certification, recovery, roadmap or build function.
+  mission: One narrow evidence, certification, recovery, roadmap, research or build function.
   owned_gate_support: []
   may_close_gate: false
   may_advance_phase: false
+  default_state: WORK_CANDIDATE
+
+delegation:
+  spawn_mode: none
+  allowed_child_classes: []
+  max_depth: 0
+  child_authority_ceiling: D0
+  child_vote_default: false
+  child_production_write_default: false
+  child_ttl_required: true
+  child_budget_required: true
+  lineage_required: true
+  same_family_counts_as_independent_verifier: false
+  children_count_toward_sovereign_quorum: false
+  persistent_child_registration_required: true
+
+runtime_child_contract:
+  child_run_id:
+  parent_agent_id:
+  root_agent_id:
+  delegation_path: []
+  independence_family:
+  scope_key:
+  source_snapshot:
+  allowed_tools: []
+  allowed_data_classes: []
+  authority_ceiling: D0
+  budget:
+  ttl:
+  output_class:
+  promotion_route: []
+  termination_state:
 
 allowed:
   - read_current_state
@@ -26,6 +61,8 @@ allowed:
 
 prohibited:
   - sovereign_vote
+  - child_vote_multiplication
+  - manufacture_independent_verification
   - self_approve_originating_material_change
   - expose_secret_or_fingerprint
   - rotate_provider_credentials_without_reserved_authority
@@ -33,6 +70,7 @@ prohibited:
   - purchase_or_accept_vendor_terms
   - deploy_unverified_target_version
   - convert_unknown_to_pass_without_evidence
+  - research_candidate_to_pass_without_promotion
   - waive_phase_gate
 
 handoff:
@@ -45,6 +83,8 @@ handoff:
     - safety_or_rights_impact
     - rollback
     - next_safe_action
+    - delegation_lineage
+    - termination_state
 
 continuity:
   archive_prior_versions: true
