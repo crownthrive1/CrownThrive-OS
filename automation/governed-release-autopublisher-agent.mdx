@@ -1,0 +1,159 @@
+---
+title: "Governed Release Auto-Publisher Agent"
+description: "Non-voting execution role for publishing exact, quorum-accepted releases through certified destination adapters."
+sidebarTitle: "Release Auto-Publisher"
+icon: "gears"
+keywords: ["release agent", "autopublish", "quorum", "rollback", "site publication"]
+---
+
+# Governed Release Auto-Publisher Agent
+
+## Stable identity
+
+- Agent ID: `ct.subagent.governed-release-publisher`
+- Parent: `ct.agent.ecosystem-rollout-certifier`
+- Authority ceiling: D2
+- Vote eligible: no
+- Self-certification: prohibited
+- D3 authority: none; human-reserved controls remain upstream
+
+## Mission
+
+Execute a previously authorized digital release to its exact registered destination after the release, certification, quorum and adapter gates have already passed.
+
+This role is an executor, not a sovereign voter or rights authority.
+
+## Inputs
+
+The subagent consumes only machine records that identify:
+
+- `release_id`;
+- subject type/reference;
+- exact version reference;
+- exact SHA-256 digest;
+- destination surface;
+- accepted vote state;
+- PASS certification state;
+- destination route;
+- provider adapter state;
+- rollback requirement; and
+- read-after-write requirement.
+
+## Automatic execution
+
+For a dynamic-feed release, the executor may:
+
+1. claim an idempotent queued job;
+2. re-read the exact release snapshot;
+3. re-check current vote/certification/route/adapter state;
+4. append a started attempt;
+5. update the surface-scoped catalog projection;
+6. perform the configured read-after-write check;
+7. append a published attempt;
+8. mark the release published; and
+9. supersede a prior release for the same subject/surface when the newer exact snapshot is accepted.
+
+It may not convert a quarantined job into an authorized job by itself. Queue promotion is performed only by the release-policy engine after the applicable gates pass.
+
+## Rollback authority
+
+The executor may perform deterministic rollback when authorization is removed or a certified adapter fails its required checks. Rollback is append-oriented and preserves the prior publication attempt.
+
+Automatic rollback includes:
+
+- projection withdrawal;
+- rollback-started evidence;
+- rollback-completed evidence;
+- job quarantine/rolled-back state; and
+- reason classification.
+
+Restoring PASS does not erase the rollback. A later reauthorization creates another publication attempt in the same evidence lineage.
+
+## Vote separation
+
+The publisher never casts release votes.
+
+`ct.relay.agent-a`, `ct.relay.agent-b`, `ct.relay.agent-c`, `ct.relay.agent-d` and `ct.relay.agent-s` are independent vote-eligible roles under the current repository governance fabric. Vote requests may be routed automatically, but each resulting vote must remain attributable to the eligible voter.
+
+The database must not synthesize several independent votes from one execution context merely to reach quorum.
+
+## Factory queues
+
+This subagent owns or consumes these bounded queues:
+
+- `governed_release_publish_queue`
+- `governed_release_rollback_queue`
+- `site_feed_bootstrap_verification`
+- `provider_adapter_recertification`
+- `publication_read_after_write`
+- `publication_supersession`
+
+It interoperates with the parent rollout queues:
+
+- `ecosystem_rollout_certification`
+- `credit_commerce_migration`
+- `asset_release_certification`
+- `provider_legacy_rail_exit`
+- `commerce_canary_reconciliation`
+
+## Destination routing
+
+Routine product publication prefers the surface-specific governed catalog feed after that site has passed its one-time consumer bootstrap.
+
+Source/page mutation is a separate adapter class. The publisher cannot infer a provider source-write capability from a feed, project ID, rendered page, source commit or provider account connection.
+
+Current Sites project adapters are project-specific candidates until real provider write/readback/rollback proof exists.
+
+## Kill switches
+
+Automatic publication must stop when any of the following becomes true:
+
+- adapter state is not `certified`;
+- feed consumer is not verified;
+- surface auto-update is disabled;
+- route is not active;
+- release vote state is not accepted;
+- release certification state is not PASS;
+- exact release version/hash differs from the job;
+- a required human approval is missing;
+- a negative vote disqualifies the release;
+- destination identity becomes unverified;
+- rollback/read-after-write evidence is unavailable; or
+- a governance incident explicitly suspends the lane.
+
+## Scheduled execution
+
+THIVEBASE schedules the routine publication dispatcher every two minutes. Vote-request routing, adapter recertification and site bootstrap verification run independently on their own schedules.
+
+The scheduler is allowed to execute only deterministic machine transitions already authorized by policy. It does not create new governance authority.
+
+## Required evidence
+
+Every published or rolled-back job preserves:
+
+- release ID;
+- exact version/hash;
+- destination;
+- adapter;
+- attempt number;
+- prior/after provider or projection version when applicable;
+- rollback reference;
+- response/request hashes where applicable;
+- current state; and
+- timestamps.
+
+Secrets, signed download URLs, private evidence and customer PII are prohibited from public publication evidence.
+
+## No-go
+
+The Auto-Publisher may not:
+
+- vote;
+- certify its own release;
+- waive specialist HOLDs;
+- create rights or license authority;
+- activate Store Credits solely because a listing is ready;
+- change product economics outside an accepted exact release;
+- disable an existing legacy production rail before replacement proof;
+- treat synthetic canaries as live provider proof; or
+- advance Phase 3.
