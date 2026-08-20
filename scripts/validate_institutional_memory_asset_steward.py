@@ -34,8 +34,16 @@ EXPECTED_PACKET_FILE_COUNT = 8
 
 EXPECTED_WORKFLOW_PATHS = EXPECTED_FILES + (
     ".github/agents/**",
-    ".github/skills/**",
+    "**/SKILL.md",
 )
+
+RECOGNIZED_SKILL_ROOTS = (
+    ".github/skills",
+    ".claude/skills",
+    ".agents/skills",
+)
+
+STEWARD_SEMANTIC_TERMS = ("institutional", "memory", "asset", "steward")
 
 AGENT_PATH = EXPECTED_FILES[0]
 SKILL_PATH = EXPECTED_FILES[1]
@@ -53,6 +61,216 @@ EXPECTED_ROLE_COLLISION_BOUNDARY = {
     "rights_and_governance_agent": "does_not_adjudicate_rights_provenance_license_or_canon",
     "publishing_agent": "does_not_publish_or_release_source_masters_or_products",
     "chief_of_staff_orchestrator": "does_not_self_assign_work_parentage_or_completion_authority",
+}
+
+EXPECTED_PROVIDER_PROFILE = {
+    "profile_template_path": "developers/agent-templates/institutional-memory-asset-steward.agent.template.md",
+    "skill_template_path": "developers/skill-templates/institutional-memory-asset-steward/SKILL.template.md",
+    "activation_profile_target_path": ".github/agents/institutional-memory-asset-steward.agent.md",
+    "activation_skill_target_path": ".github/skills/institutional-memory-asset-steward/SKILL.md",
+    "target": "github-copilot",
+    "candidate_templates_present": True,
+    "candidate_branch_recognized_profile_present": False,
+    "candidate_branch_recognized_skill_present": False,
+    "default_branch_profile_present_at_baseline": False,
+    "user_invocable": False,
+    "model_invocation_disabled": True,
+    "tools": ["read", "search"],
+    "skill_inertness_basis": "outside_all_recognized_project_skill_roots",
+    "skill_template_governance_annotations": {
+        "x-crownthrive-user-invocable": False,
+        "x-crownthrive-disable-model-invocation": True,
+    },
+    "skill_allowed_tools": ["read", "search"],
+    "programmatic_invocation_authorized": False,
+    "provider_capability_is_activation": False,
+    "activation_requires_separate_exact_head_installation_change": True,
+}
+
+EXPECTED_PARENT_AND_INVENTORY = {
+    "operational_parent_agent_id": "ct.relay.agent-a",
+    "parent_relationship": "routing_and_orchestration_only_not_vote_or_approval_control",
+    "parent_evidence_ref": "developers/manifests/agent-sovereign-governance.v1.json",
+    "parent_state": "runtime_readback_verified_pending_inventory_reconciliation",
+    "canonical_inventory_ref": "automation/agent-registry.mdx",
+    "inventory_source_ref": MANIFEST_PATH,
+    "public_agent_registry_entry_state": "pending_ordered_collision_reconciliation_not_registered",
+    "runtime_binding_state": "prospective_disabled",
+    "runtime_parent_agent_id_state": "ct.relay.agent-a_readback_verified",
+    "activation_blocked_until_runtime_parent_and_inventory_verified": True,
+}
+
+EXPECTED_TOP_LEVEL_KEYS = {
+    "activation_gates",
+    "agent_id",
+    "authority",
+    "custody_topology",
+    "documentation",
+    "effective_state",
+    "identity",
+    "manifest_id",
+    "manifest_version",
+    "mission",
+    "observed_at",
+    "outputs",
+    "packet_inventory",
+    "parent_and_inventory",
+    "phase",
+    "provider_profile",
+    "record_contract",
+    "role_collision_boundary",
+    "rollback",
+    "self_healing",
+    "source_baseline",
+    "source_precedence",
+    "state_model",
+    "state_separation",
+    "validation",
+    "visibility",
+    "workflow",
+}
+
+EXPECTED_LIFECYCLE_OBJECTS = {
+    "phase": {
+        "current_phase": 2,
+        "current_subphase": "2.99",
+        "phase_3_entry": "blocked_pending_phase_2_99_hard_exit_and_full_docs_reconciliation",
+        "packet_advances_phase": False,
+    },
+    "identity": {
+        "name": "Institutional Memory & Asset Steward",
+        "role": "institutional_memory_source_master_lineage_and_custody_preparation",
+        "owner_ref": "ct.owner.crownthrive-founding-member",
+        "parent_control_plane": "ct.control-plane.crownthrive-institutional",
+        "stable_across_provider_changes": True,
+        "vote_eligible": False,
+    },
+    "authority": {
+        "autonomy_class": "A1_prepare",
+        "default_risk_class": "D1",
+        "d0_d1": "deterministic_reversible_public_safe_preparation_only",
+        "d2": {
+            "may_prepare": True,
+            "may_self_approve": False,
+            "required": [
+                "current_main_and_collision_reconciliation",
+                "trusted_exact_changed_file_classification",
+                "independent_verifier",
+                "applicable_specialist_endorsements",
+                "four_of_five_sovereign_approvals",
+                "mandatory_agent_d_approval",
+                "no_deny_or_block",
+                "unchanged_required_controls_pass",
+                "rollback_or_recovery_path",
+                "documentation_and_downstream_phase_reconciliation",
+            ],
+        },
+        "d3": {
+            "permitted": False,
+            "authority": "authorized_human_only",
+            "prohibited_actions": [
+                "legal_terms_or_binding_contract",
+                "rights_grant_assignment_or_ownership_change",
+                "production_credential_or_privileged_access_change",
+                "destructive_or_irreversible_production_change",
+                "money_movement_or_material_price_payout_change",
+                "privacy_or_security_policy_exception",
+                "cross_border_regulatory_activation",
+                "public_release_of_restricted_material",
+            ],
+        },
+        "github_or_provider_capability_is_authority": False,
+        "quorum_can_override_d3": False,
+    },
+    "workflow": {
+        "mode": "read_inventory_prepare_validate_handoff",
+        "provider_mutation_default": "disabled",
+        "read_before_write_required": True,
+        "provider_readback_required_for_verified_custody": True,
+        "idempotency_required_for_future_mutations": True,
+        "unknown_outcome_fails_closed": True,
+        "routine_private_metrics_committed_to_public_docs": False,
+        "collision_check_required": True,
+        "exact_head_review_required": True,
+    },
+    "self_healing": {
+        "enabled_for": ["D0", "D1"],
+        "default_mode": "detect_preserve_evidence_bounded_repair_rerun_original_gate_full_suite_independent_verify",
+        "same_failure_requires_new_evidence_or_root_cause_reassessment": True,
+        "validator_or_security_weakening_prohibited": True,
+        "secret_reconstruction_prohibited": True,
+        "master_deletion_or_replacement_prohibited": True,
+        "self_approval_prohibited": True,
+        "phase_promotion_prohibited": True,
+    },
+    "custody_topology": {
+        "google_drive": {
+            "service_id": "ct.service.google-drive",
+            "role": "durable_human_operable_source_and_distribution_custody",
+            "write_enabled_by_this_packet": False,
+            "public_projection": "stable_identity_evidence_state_and_reference_digest_only",
+            "forbidden_public_fields": [
+                "private_folder_id",
+                "private_file_id",
+                "private_path",
+                "signed_url",
+            ],
+        },
+        "thivebase": {
+            "service_id": "ct.service.thivebase",
+            "role": "canonical_identity_digest_relationship_state_evidence_and_run_registry",
+            "write_enabled_by_this_packet": False,
+            "public_projection": "logical_contract_only",
+            "forbidden_public_fields": [
+                "service_role_secret",
+                "private_schema_ddl",
+                "private_project_id",
+                "restricted_evidence_body",
+            ],
+        },
+        "supabase_storage": {
+            "service_id": "ct.service.supabase-storage",
+            "role": "optional_private_binary_parity_and_controlled_delivery",
+            "write_enabled_by_this_packet": False,
+            "public_projection": "verification_state_and_digest_only",
+            "forbidden_public_fields": [
+                "bucket_internal_id",
+                "object_path",
+                "signed_url",
+                "access_token",
+            ],
+        },
+        "github": {
+            "service_id": "ct.repository.crownthrive-support",
+            "role": "versioned_public_safe_contract_schema_validator_and_correction_history",
+            "write_enabled_by_this_packet": False,
+            "raw_masters_allowed": False,
+            "secrets_allowed": False,
+        },
+        "mintlify": {
+            "service_id": "ct.documentation.crown-thrive",
+            "role": "searchable_public_safe_institutional_projection",
+            "write_enabled_by_this_packet": False,
+            "documentation_proves_runtime": False,
+        },
+    },
+    "documentation": {
+        "operating_page": DOC_PATH,
+        "checkpoint": CHANGELOG_PATH,
+        "hidden": True,
+        "noindex": True,
+        "docs_json_changed_by_this_packet": False,
+        "docs_impact": "docs_delta_prepared_hidden_not_canonical",
+    },
+    "validation": {
+        "workflow": WORKFLOW_PATH,
+        "self_test_required": True,
+        "institutional_docs_validation_required": True,
+        "agent_governance_validation_required": True,
+        "github_actions_runtime_policy_required": True,
+        "all_remote_actions_full_commit_sha_pinned": True,
+        "target_github_actions_runtime": "node24",
+    },
 }
 
 EXPECTED_ACTIONS = {
@@ -215,14 +433,23 @@ def validate_recognized_installations(root: Path, errors: list[str]) -> None:
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeError):
                 continue
-            if "ct.agent.institutional-memory-asset-steward" in text:
+            semantic_fingerprint = all(
+                re.search(rf"\b{re.escape(term)}\b", text, flags=re.IGNORECASE)
+                for term in STEWARD_SEMANTIC_TERMS
+            )
+            if (
+                "ct.agent.institutional-memory-asset-steward" in text
+                or semantic_fingerprint
+            ):
                 add_error(
                     errors,
                     f"{path.relative_to(root)}: recognized provider profile for the inert steward is forbidden",
                 )
 
-    skills_root = root / ".github" / "skills"
-    if skills_root.exists():
+    for relative_root in RECOGNIZED_SKILL_ROOTS:
+        skills_root = root / relative_root
+        if not skills_root.exists():
+            continue
         for path in skills_root.rglob("SKILL.md"):
             if not path.is_file():
                 continue
@@ -230,7 +457,14 @@ def validate_recognized_installations(root: Path, errors: list[str]) -> None:
             text = read_text(root, path.relative_to(root).as_posix(), skill_errors)
             errors.extend(skill_errors)
             frontmatter = scalar_frontmatter(text, path.relative_to(root).as_posix(), errors)
-            if frontmatter.get("name") == "institutional-memory-asset-steward":
+            semantic_fingerprint = all(
+                re.search(rf"\b{re.escape(term)}\b", text, flags=re.IGNORECASE)
+                for term in STEWARD_SEMANTIC_TERMS
+            )
+            if (
+                frontmatter.get("name") == "institutional-memory-asset-steward"
+                or semantic_fingerprint
+            ):
                 add_error(
                     errors,
                     f"{path.relative_to(root)}: recognized provider skill for the inert steward is forbidden",
@@ -293,6 +527,7 @@ def validate_manifest_data(manifest: dict[str, Any]) -> list[str]:
         (nested(manifest, "source_baseline", "mintlify_deploy_branch"), "main", "source_baseline.mintlify_deploy_branch"),
         (nested(manifest, "phase", "current_subphase"), "2.99", "phase.current_subphase"),
         (nested(manifest, "phase", "packet_advances_phase"), False, "phase.packet_advances_phase"),
+        (nested(manifest, "identity", "parent_control_plane"), "ct.control-plane.crownthrive-institutional", "identity.parent_control_plane"),
         (nested(manifest, "identity", "vote_eligible"), False, "identity.vote_eligible"),
         (nested(manifest, "authority", "autonomy_class"), "A1_prepare", "authority.autonomy_class"),
         (nested(manifest, "authority", "default_risk_class"), "D1", "authority.default_risk_class"),
@@ -302,35 +537,6 @@ def validate_manifest_data(manifest: dict[str, Any]) -> list[str]:
         (nested(manifest, "authority", "d3", "authority"), "authorized_human_only", "authority.d3.authority"),
         (nested(manifest, "authority", "github_or_provider_capability_is_authority"), False, "authority.github_or_provider_capability_is_authority"),
         (nested(manifest, "authority", "quorum_can_override_d3"), False, "authority.quorum_can_override_d3"),
-        (nested(manifest, "provider_profile", "profile_template_path"), AGENT_PATH, "provider_profile.profile_template_path"),
-        (nested(manifest, "provider_profile", "skill_template_path"), SKILL_PATH, "provider_profile.skill_template_path"),
-        (nested(manifest, "provider_profile", "activation_profile_target_path"), ".github/agents/institutional-memory-asset-steward.agent.md", "provider_profile.activation_profile_target_path"),
-        (nested(manifest, "provider_profile", "activation_skill_target_path"), ".github/skills/institutional-memory-asset-steward/SKILL.md", "provider_profile.activation_skill_target_path"),
-        (nested(manifest, "provider_profile", "target"), "github-copilot", "provider_profile.target"),
-        (nested(manifest, "provider_profile", "candidate_templates_present"), True, "provider_profile.candidate_templates_present"),
-        (nested(manifest, "provider_profile", "candidate_branch_recognized_profile_present"), False, "provider_profile.candidate_branch_recognized_profile_present"),
-        (nested(manifest, "provider_profile", "candidate_branch_recognized_skill_present"), False, "provider_profile.candidate_branch_recognized_skill_present"),
-        (nested(manifest, "provider_profile", "default_branch_profile_present_at_baseline"), False, "provider_profile.default_branch_profile_present_at_baseline"),
-        (nested(manifest, "provider_profile", "user_invocable"), False, "provider_profile.user_invocable"),
-        (nested(manifest, "provider_profile", "model_invocation_disabled"), True, "provider_profile.model_invocation_disabled"),
-        (nested(manifest, "provider_profile", "tools"), ["read", "search"], "provider_profile.tools"),
-        (nested(manifest, "provider_profile", "skill_inertness_basis"), "outside_recognized_project_skill_root", "provider_profile.skill_inertness_basis"),
-        (nested(manifest, "provider_profile", "skill_template_governance_annotations", "x-crownthrive-user-invocable"), False, "provider_profile.skill_template_governance_annotations.x-crownthrive-user-invocable"),
-        (nested(manifest, "provider_profile", "skill_template_governance_annotations", "x-crownthrive-disable-model-invocation"), True, "provider_profile.skill_template_governance_annotations.x-crownthrive-disable-model-invocation"),
-        (nested(manifest, "provider_profile", "skill_allowed_tools"), ["read", "search"], "provider_profile.skill_allowed_tools"),
-        (nested(manifest, "provider_profile", "programmatic_invocation_authorized"), False, "provider_profile.programmatic_invocation_authorized"),
-        (nested(manifest, "provider_profile", "provider_capability_is_activation"), False, "provider_profile.provider_capability_is_activation"),
-        (nested(manifest, "provider_profile", "activation_requires_separate_exact_head_installation_change"), True, "provider_profile.activation_requires_separate_exact_head_installation_change"),
-        (nested(manifest, "parent_and_inventory", "operational_parent_agent_id"), "ct.relay.agent-a", "parent_and_inventory.operational_parent_agent_id"),
-        (nested(manifest, "parent_and_inventory", "parent_relationship"), "routing_and_orchestration_only_not_vote_or_approval_control", "parent_and_inventory.parent_relationship"),
-        (nested(manifest, "parent_and_inventory", "parent_evidence_ref"), "developers/manifests/agent-sovereign-governance.v1.json", "parent_and_inventory.parent_evidence_ref"),
-        (nested(manifest, "parent_and_inventory", "parent_state"), "candidate_assigned_pending_runtime_and_inventory_readback", "parent_and_inventory.parent_state"),
-        (nested(manifest, "parent_and_inventory", "canonical_inventory_ref"), "automation/agent-registry.mdx", "parent_and_inventory.canonical_inventory_ref"),
-        (nested(manifest, "parent_and_inventory", "inventory_source_ref"), MANIFEST_PATH, "parent_and_inventory.inventory_source_ref"),
-        (nested(manifest, "parent_and_inventory", "public_agent_registry_entry_state"), "pending_ordered_collision_reconciliation_not_registered", "parent_and_inventory.public_agent_registry_entry_state"),
-        (nested(manifest, "parent_and_inventory", "runtime_binding_state"), "prospective_disabled", "parent_and_inventory.runtime_binding_state"),
-        (nested(manifest, "parent_and_inventory", "runtime_parent_agent_id_state"), "null_unassigned", "parent_and_inventory.runtime_parent_agent_id_state"),
-        (nested(manifest, "parent_and_inventory", "activation_blocked_until_runtime_parent_and_inventory_verified"), True, "parent_and_inventory.activation_blocked_until_runtime_parent_and_inventory_verified"),
         (nested(manifest, "record_contract", "schema_path"), SCHEMA_PATH, "record_contract.schema_path"),
         (nested(manifest, "record_contract", "validator_path"), EXPECTED_FILES[6], "record_contract.validator_path"),
         (nested(manifest, "record_contract", "raw_secret_fields_permitted"), False, "record_contract.raw_secret_fields_permitted"),
@@ -349,6 +555,33 @@ def validate_manifest_data(manifest: dict[str, Any]) -> list[str]:
     )
     for actual, expected, location in checks:
         require_equal(errors, actual, expected, f"{MANIFEST_PATH}: {location}")
+
+    require_equal(
+        errors,
+        set(manifest),
+        EXPECTED_TOP_LEVEL_KEYS,
+        f"{MANIFEST_PATH}: top-level keys",
+    )
+    for object_name, expected_object in EXPECTED_LIFECYCLE_OBJECTS.items():
+        require_equal(
+            errors,
+            manifest.get(object_name),
+            expected_object,
+            f"{MANIFEST_PATH}: {object_name}",
+        )
+
+    require_equal(
+        errors,
+        manifest.get("provider_profile"),
+        EXPECTED_PROVIDER_PROFILE,
+        f"{MANIFEST_PATH}: provider_profile",
+    )
+    require_equal(
+        errors,
+        manifest.get("parent_and_inventory"),
+        EXPECTED_PARENT_AND_INVENTORY,
+        f"{MANIFEST_PATH}: parent_and_inventory",
+    )
 
     baseline_commit = nested(manifest, "source_baseline", "commit")
     if not isinstance(baseline_commit, str) or not FULL_COMMIT_SHA.fullmatch(baseline_commit):
@@ -909,6 +1142,11 @@ def run_self_test(
     vote_mutation["identity"]["vote_eligible"] = True
     expect_failure("vote eligibility escalation", validate_manifest_data(vote_mutation), errors)
 
+    phase_promotion = copy.deepcopy(manifest)
+    phase_promotion["phase"]["current_phase"] = 3
+    phase_promotion["phase"]["phase_3_entry"] = "approved"
+    expect_failure("phase promotion", validate_manifest_data(phase_promotion), errors)
+
     d3_mutation = copy.deepcopy(manifest)
     d3_mutation["authority"]["d3"]["permitted"] = True
     expect_failure("D3 escalation", validate_manifest_data(d3_mutation), errors)
@@ -937,6 +1175,38 @@ def run_self_test(
     recognized_skill["provider_profile"]["candidate_branch_recognized_skill_present"] = True
     expect_failure("recognized skill installation", validate_manifest_data(recognized_skill), errors)
 
+    unknown_provider_activation = copy.deepcopy(manifest)
+    unknown_provider_activation["provider_profile"]["activation_authorized"] = True
+    expect_failure(
+        "unknown provider activation field",
+        validate_manifest_data(unknown_provider_activation),
+        errors,
+    )
+
+    authority_activation = copy.deepcopy(manifest)
+    authority_activation["authority"]["activation_authorized"] = True
+    expect_failure(
+        "unknown authority activation field",
+        validate_manifest_data(authority_activation),
+        errors,
+    )
+
+    top_level_activation = copy.deepcopy(manifest)
+    top_level_activation["activation_authorized"] = True
+    expect_failure(
+        "unknown top-level activation field",
+        validate_manifest_data(top_level_activation),
+        errors,
+    )
+
+    parent_control_plane_drift = copy.deepcopy(manifest)
+    parent_control_plane_drift["identity"]["parent_control_plane"] = "ct.control-plane.untrusted"
+    expect_failure(
+        "parent control plane drift",
+        validate_manifest_data(parent_control_plane_drift),
+        errors,
+    )
+
     parent_escalation = copy.deepcopy(manifest)
     parent_escalation["parent_and_inventory"]["parent_relationship"] = "vote_and_approval_control"
     expect_failure("parent authority escalation", validate_manifest_data(parent_escalation), errors)
@@ -949,6 +1219,14 @@ def run_self_test(
     parent_gate_removed["parent_and_inventory"]["activation_blocked_until_runtime_parent_and_inventory_verified"] = False
     expect_failure("parent and inventory activation gate removal", validate_manifest_data(parent_gate_removed), errors)
 
+    unknown_parent_control = copy.deepcopy(manifest)
+    unknown_parent_control["parent_and_inventory"]["vote_or_approval_control"] = True
+    expect_failure(
+        "unknown parent authority field",
+        validate_manifest_data(unknown_parent_control),
+        errors,
+    )
+
     activation_gate_removed = copy.deepcopy(manifest)
     activation_gate_removed["activation_gates"].pop()
     expect_failure("activation gate removal", validate_manifest_data(activation_gate_removed), errors)
@@ -956,6 +1234,48 @@ def run_self_test(
     workflow_mode_escalation = copy.deepcopy(manifest)
     workflow_mode_escalation["workflow"]["mode"] = "mutate_and_publish"
     expect_failure("workflow mode escalation", validate_manifest_data(workflow_mode_escalation), errors)
+
+    exact_head_gate_removed = copy.deepcopy(manifest)
+    exact_head_gate_removed["workflow"]["exact_head_review_required"] = False
+    expect_failure(
+        "exact-head review gate removal",
+        validate_manifest_data(exact_head_gate_removed),
+        errors,
+    )
+
+    self_healing_phase_promotion = copy.deepcopy(manifest)
+    self_healing_phase_promotion["self_healing"]["phase_promotion_prohibited"] = False
+    expect_failure(
+        "self-healing phase promotion",
+        validate_manifest_data(self_healing_phase_promotion),
+        errors,
+    )
+
+    new_write_provider = copy.deepcopy(manifest)
+    new_write_provider["custody_topology"]["new_provider"] = {
+        "write_enabled_by_this_packet": True
+    }
+    expect_failure(
+        "unknown write-enabled provider",
+        validate_manifest_data(new_write_provider),
+        errors,
+    )
+
+    public_route_activation = copy.deepcopy(manifest)
+    public_route_activation["documentation"]["public_route_activated"] = True
+    expect_failure(
+        "documentation route activation",
+        validate_manifest_data(public_route_activation),
+        errors,
+    )
+
+    governance_validation_removed = copy.deepcopy(manifest)
+    governance_validation_removed["validation"]["agent_governance_validation_required"] = False
+    expect_failure(
+        "agent governance validation removal",
+        validate_manifest_data(governance_validation_removed),
+        errors,
+    )
 
     rollback_removed = copy.deepcopy(manifest)
     rollback_removed["rollback"].pop("prospective_runtime_binding")
@@ -1000,15 +1320,54 @@ def run_self_test(
 
     with tempfile.TemporaryDirectory() as temporary_directory:
         temporary_root = Path(temporary_directory)
-        renamed_skill = temporary_root / ".github" / "skills" / "memory-steward" / "SKILL.md"
-        renamed_skill.parent.mkdir(parents=True)
-        renamed_skill.write_text(
-            "---\nname: institutional-memory-asset-steward\ndescription: test\n---\n",
+        renamed_agent = temporary_root / ".github" / "agents" / "memory-steward.agent.md"
+        renamed_agent.parent.mkdir(parents=True)
+        renamed_agent.write_text(
+            "---\nname: Institutional Memory and Asset Steward\ndescription: preserved\n---\n",
             encoding="utf-8",
         )
         recognized_errors = []
         validate_recognized_installations(temporary_root, recognized_errors)
-        expect_failure("renamed recognized skill installation", recognized_errors, errors)
+        expect_failure(
+            "institutional-ID-stripped recognized agent installation",
+            recognized_errors,
+            errors,
+        )
+
+    for recognized_root in RECOGNIZED_SKILL_ROOTS:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary_root = Path(temporary_directory)
+            renamed_skill = temporary_root / recognized_root / "memory-steward" / "SKILL.md"
+            renamed_skill.parent.mkdir(parents=True)
+            renamed_skill.write_text(
+                "---\nname: institutional-memory-asset-steward\ndescription: test\n---\n",
+                encoding="utf-8",
+            )
+            recognized_errors = []
+            validate_recognized_installations(temporary_root, recognized_errors)
+            expect_failure(
+                f"renamed recognized skill installation under {recognized_root}",
+                recognized_errors,
+                errors,
+            )
+
+    for recognized_root in RECOGNIZED_SKILL_ROOTS:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary_root = Path(temporary_directory)
+            renamed_skill = temporary_root / recognized_root / "memory-steward" / "SKILL.md"
+            renamed_skill.parent.mkdir(parents=True)
+            renamed_skill.write_text(
+                "---\nname: renamed-steward\ndescription: preserved\n---\n"
+                "# Institutional Memory and Asset Steward\n",
+                encoding="utf-8",
+            )
+            recognized_errors = []
+            validate_recognized_installations(temporary_root, recognized_errors)
+            expect_failure(
+                f"name-stripped recognized skill installation under {recognized_root}",
+                recognized_errors,
+                errors,
+            )
 
     verified_without_digest = copy.deepcopy(valid_record)
     verified_without_digest["versions"][0]["sha256"] = None
