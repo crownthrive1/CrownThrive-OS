@@ -11,7 +11,7 @@ import argparse
 import hashlib
 import json
 import os
-import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -118,7 +118,8 @@ def self_test() -> None:
     assert child["operationally_enabled"] is False
     assert manifest["framework_child_policy"]["transport_messages_create_votes"] is False
     assert manifest["framework_child_policy"]["framework_subagents_create_votes"] is False
-    assert "SUPABASE_SERVICE_ROLE_KEY" not in Path(__file__).read_text(encoding="utf-8")
+    forbidden_static = "SUPABASE_" + "SERVICE_ROLE_KEY"
+    assert forbidden_static not in Path(__file__).read_text(encoding="utf-8")
     print(f"Repository federation client self-test PASS: OIDC-only; contract_sha256={manifest_digest()}; pending child remains disabled.")
 
 
