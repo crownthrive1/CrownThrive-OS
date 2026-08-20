@@ -1,0 +1,82 @@
+name: Framework Child Fleet Governance
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/framework-child-fleet.v1.json"
+      - "developers/templates/framework-child-repository/**"
+      - "scripts/framework_child_fleet.py"
+      - "automation/framework-child-repository-factory.mdx"
+      - "changelog/phase-2-99-framework-child-fleet-self-sustain.mdx"
+      - ".github/workflows/framework-child-fleet-governance.yml"
+  push:
+    branches:
+      - main
+      - "admin-mcp/**"
+    paths:
+      - "developers/manifests/framework-child-fleet.v1.json"
+      - "developers/templates/framework-child-repository/**"
+      - "scripts/framework_child_fleet.py"
+      - "automation/framework-child-repository-factory.mdx"
+      - "changelog/phase-2-99-framework-child-fleet-self-sustain.mdx"
+      - ".github/workflows/framework-child-fleet-governance.yml"
+  schedule:
+    - cron: "42 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: framework-child-fleet-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate framework child fleet
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile fleet controller
+        run: python -m py_compile scripts/framework_child_fleet.py
+
+      - name: Validate fleet manifest and templates
+        run: python scripts/framework_child_fleet.py --validate
+
+      - name: Run one-at-a-time and negative-case self-test
+        run: python scripts/framework_child_fleet.py --self-test
+
+      - name: Emit current next-safe child packet
+        run: python scripts/framework_child_fleet.py --next
+
+      - name: Render and validate current CIE bootstrap bundle
+        run: |
+          rm -rf /tmp/ct-child-cie
+          python scripts/framework_child_fleet.py \
+            --render ct.framework.cultural-imprint-engine \
+            --output-dir /tmp/ct-child-cie
+          python /tmp/ct-child-cie/scripts/validate_child_repository.py --root /tmp/ct-child-cie
+
+      - name: Render and validate Convergent scaffold-only bundle
+        run: |
+          rm -rf /tmp/ct-child-convergent
+          python scripts/framework_child_fleet.py \
+            --render ct.framework.convergent-ecosystem \
+            --output-dir /tmp/ct-child-convergent
+          python /tmp/ct-child-convergent/scripts/validate_child_repository.py --root /tmp/ct-child-convergent
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi

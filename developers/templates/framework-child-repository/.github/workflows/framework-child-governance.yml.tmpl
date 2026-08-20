@@ -1,0 +1,101 @@
+name: CrownThrive Framework Child Governance
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "{{SCHEDULE_MINUTE}} * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+concurrency:
+  group: framework-child-governance-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate governed child repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile child controls
+        run: |
+          python -m py_compile scripts/federation_client.py
+          python -m py_compile scripts/validate_child_repository.py
+
+      - name: Validate child contract and authority locks
+        run: python scripts/validate_child_repository.py
+
+      - name: Verify federation registration through GitHub OIDC
+        if: github.event_name != 'pull_request'
+        run: python scripts/federation_client.py state
+
+      - name: Emit heartbeat only after parent-certified operational state
+        if: github.event_name != 'pull_request'
+        run: python scripts/federation_client.py heartbeat --if-enabled
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- .; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+  route-drift:
+    name: Route governance drift
+    needs: validate
+    if: ${{ always() && needs.validate.result == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DRIFT_TITLE: "CT Framework Child Governance Drift — {{CANONICAL_NAME}}"
+    steps:
+      - name: Create or update idempotent drift issue
+        run: |
+          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --json number,title --jq '.[] | select(.title == env.DRIFT_TITLE) | .number' | head -n1)"
+          body="Automated governed-child validation failed for run ${GITHUB_RUN_ID} on ${GITHUB_SHA}. This is an internal WATCH/HOLD, not a sovereign vote or parent certification. Inspect the failed workflow, preserve evidence, repair root cause through a reviewed PR, and rerun."
+          if [ -z "$existing" ]; then
+            gh issue create --title "$DRIFT_TITLE" --body "$body"
+          else
+            gh issue comment "$existing" --body "$body"
+          fi
+
+  reconcile-drift:
+    name: Reconcile recovered drift
+    needs: validate
+    if: ${{ always() && needs.validate.result == 'success' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DRIFT_TITLE: "CT Framework Child Governance Drift — {{CANONICAL_NAME}}"
+    steps:
+      - name: Close recovered drift issue when present
+        run: |
+          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --json number,title --jq '.[] | select(.title == env.DRIFT_TITLE) | .number' | head -n1)"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Automated governed-child validation recovered on run ${GITHUB_RUN_ID} at ${GITHUB_SHA}. Closing the drift issue does not certify the child or create a sovereign vote."
+            gh issue close "$existing" --reason completed
+          fi

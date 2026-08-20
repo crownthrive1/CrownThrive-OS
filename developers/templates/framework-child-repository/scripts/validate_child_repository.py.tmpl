@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Fail-closed validator for a CrownThrive framework child repository scaffold."""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path
+
+EXPECTED_REPO_ID = "{{REPO_ID}}"
+EXPECTED_REPO = "{{REPO_FULL_NAME}}"
+EXPECTED_FRAMEWORK = "{{FRAMEWORK_ID}}"
+EXPECTED_AGENT = "{{FRAMEWORK_AGENT_ID}}"
+EXPECTED_PARENT = "{{PARENT_REPOSITORY}}"
+EXPECTED_BOOTSTRAP = json.loads("{{BOOTSTRAP_ALLOWED}}")
+
+REQUIRED = (
+    "README.md",
+    "AGENTS.md",
+    "SECURITY.md",
+    ".crownthrive/federation.json",
+    ".github/CODEOWNERS",
+    ".github/dependabot.yml",
+    ".github/pull_request_template.md",
+    ".github/workflows/framework-child-bootstrap.yml",
+    ".github/workflows/framework-child-governance.yml",
+    "scripts/federation_client.py",
+    "scripts/validate_child_repository.py",
+)
+FORBIDDEN = (
+    "vote_eligible" + ": true",
+    '"vote_eligible"' + ": true",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION",
+    "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24",
+)
+PINNED = (
+    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+    "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
+)
+
+
+def fail(message: str) -> None:
+    raise SystemExit(f"ERROR: {message}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    args = parser.parse_args()
+    root = args.root.resolve()
+
+    for rel in REQUIRED:
+        if not (root / rel).is_file():
+            fail(f"missing child repository file: {rel}")
+
+    contract = json.loads((root / ".crownthrive/federation.json").read_text(encoding="utf-8"))
+    expected = {
+        "repo_id": EXPECTED_REPO_ID,
+        "repo_full_name": EXPECTED_REPO,
+        "repo_role": "framework_child",
+        "framework_id": EXPECTED_FRAMEWORK,
+        "framework_agent_id": EXPECTED_AGENT,
+        "parent_repository": EXPECTED_PARENT,
+        "bootstrap_allowed": EXPECTED_BOOTSTRAP,
+        "operationally_enabled": False,
+        "vote_eligible": False,
+        "d3_human_reserved": True,
+        "parent_certification_agent": "ct.relay.agent-d",
+        "parent_certification_state": "pending",
+    }
+    for key, value in expected.items():
+        if contract.get(key) != value:
+            fail(f"federation contract drift for {key}: expected {value!r}, got {contract.get(key)!r}")
+    oidc = contract.get("oidc", {})
+    if oidc.get("issuer") != "https://token.actions.githubusercontent.com":
+        fail("GitHub OIDC issuer drift")
+    if oidc.get("audience") != "crownthrive-repository-federation":
+        fail("GitHub OIDC audience drift")
+    if oidc.get("long_lived_shared_secret_required") is not False:
+        fail("long-lived federation shared secret must remain unnecessary")
+    locks = contract.get("locks", {})
+    for key in (
+        "child_self_activation",
+        "child_self_certification",
+        "child_may_change_quorum",
+        "child_may_remove_agent_d",
+        "child_may_create_sovereign_vote",
+        "sync_agents_allowed",
+    ):
+        if locks.get(key) is not False:
+            fail(f"child authority lock drift: {key}")
+
+    texts = []
+    for rel in REQUIRED:
+        path = root / rel
+        text = path.read_text(encoding="utf-8")
+        texts.append((rel, text))
+        if rel == "scripts/validate_child_repository.py":
+            continue
+        for fragment in FORBIDDEN:
+            if fragment in text:
+                fail(f"{rel} contains forbidden authority/secret fragment: {fragment}")
+
+    workflow = "\n".join(
+        (root / rel).read_text(encoding="utf-8")
+        for rel in (
+            ".github/workflows/framework-child-bootstrap.yml",
+            ".github/workflows/framework-child-governance.yml",
+        )
+    )
+    for pinned in PINNED:
+        if pinned not in workflow:
+            fail(f"workflow missing pinned Node-24-compatible action: {pinned}")
+    for forbidden_permission in ("contents: write", "pull-requests: write", "packages: write", "actions: write"):
+        if forbidden_permission in workflow:
+            fail(f"child workflow contains forbidden permission: {forbidden_permission}")
+    for required_permission in ("contents: read", "id-token: write", "issues: write"):
+        if required_permission not in workflow:
+            fail(f"child governance workflow missing permission: {required_permission}")
+
+    client = (root / "scripts/federation_client.py").read_text(encoding="utf-8")
+    if 'action not in {"state", "bootstrap", "heartbeat"}' not in client:
+        fail("federation client action allowlist drift")
+    if '"certify_child"' in client or '"sync_agents"' in client:
+        fail("child federation client contains prohibited certification/sync operation")
+
+    joined = "\n".join(text for _rel, text in texts)
+    credential_patterns = (
+        r"\bgh[pousr]_[A-Za-z0-9]{20,}\b",
+        r"\bgithub_pat_[A-Za-z0-9_]{20,}\b",
+        r"\bsb_secret_[A-Za-z0-9_-]{16,}\b",
+        r"\bsk-[A-Za-z0-9]{20,}\b",
+    )
+    for pattern in credential_patterns:
+        if re.search(pattern, joined):
+            fail("credential-shaped value detected in child scaffold")
+
+    print(
+        f"Framework child validation PASS: {EXPECTED_FRAMEWORK}; repo={EXPECTED_REPO}; "
+        f"bootstrap_allowed={str(EXPECTED_BOOTSTRAP).lower()}; non-voting; D3 human-reserved."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
