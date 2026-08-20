@@ -11,6 +11,7 @@ on:
       - "technology/repository-federation-control-plane.mdx"
       - "automation/framework-repository-governance-standard.mdx"
       - "automation/framework-factory.mdx"
+      - "automation/framework-agent-registry.mdx"
       - "scripts/repository_federation_sync.py"
       - "scripts/validate_repository_federation.py"
       - "scripts/cie_scan.py"
@@ -33,6 +34,7 @@ on:
       - "technology/repository-federation-control-plane.mdx"
       - "automation/framework-repository-governance-standard.mdx"
       - "automation/framework-factory.mdx"
+      - "automation/framework-agent-registry.mdx"
       - "scripts/repository_federation_sync.py"
       - "scripts/validate_repository_federation.py"
       - "scripts/cie_scan.py"
@@ -94,7 +96,18 @@ jobs:
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
-        run: python scripts/repository_federation_sync.py sync-agents --agent-id ct.relay.agent-a --target-repo-id ct.repo.crownthrive-support
+        run: python scripts/repository_federation_sync.py sync-agents --agent-id ct.subagent.governance-marshal --target-repo-id ct.repo.crownthrive-support
+
+      - name: Prove sovereign Agent A cannot invoke sync_agents
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+        run: |
+          if python scripts/repository_federation_sync.py sync-agents --agent-id ct.relay.agent-a --target-repo-id ct.repo.crownthrive-support; then
+            echo "Sovereign Agent A unexpectedly received sync_agents transport authority."
+            exit 1
+          fi
+          echo "Expected sovereign-caller sync_agents denial observed."
 
       - name: Emit parent federation heartbeat
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
