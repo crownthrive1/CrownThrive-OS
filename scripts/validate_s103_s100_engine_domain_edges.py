@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Validate S103/S100 engine-domain identity edge tranche 2.
+"""Validate current S103/S100 identity→engine/domain edges.
 
-This validator protects referential integrity, shared-provider semantics,
-projection boundaries, child-capability blocking and anti-promotion rules. It
-validates dated source relationships only; it does not perform network calls or
-claim current provider, deployment, entitlement, DNS, TLS or runtime state.
+This validator preserves historical source rows while enforcing the current
+post-founder-adjudication graph. ThriveTools SEO and OPT are distinct child
+applications. Child evidence never promotes to the ThriveTools root, and
+identity resolution never substitutes for current provider/runtime proof.
 """
-
 from __future__ import annotations
 
 import json
@@ -20,10 +19,9 @@ PORT = ROOT / "knowledge/phase-2-99-workstream-3a-holdings-68-source-row-identit
 ENG = ROOT / "knowledge/phase-2-99-workstream-3a-holdings-85-engine-service-source-seed.mdx"
 DOM = ROOT / "knowledge/phase-2-99-workstream-3a-holdings-82-domain-source-seed.mdx"
 EDGE_DOC = ROOT / "knowledge/phase-2-99-workstream-3a-engine-domain-identity-edge-register.mdx"
-CHANGELOG = ROOT / "changelog/phase-2-99-workstream-3a-engine-domain-identity-edge-tranche-2.mdx"
+OPT_DOC = ROOT / "developers/thrivetools-opt-api-adapter.mdx"
 PLAN = ROOT / "changelog/phase-2-99-plan.mdx"
 GATE = ROOT / "technology/phase-3-readiness-gate.mdx"
-CHARTER = ROOT / "standards/ten-phase-institutional-program-charter.mdx"
 
 EXPECTED_IDS = [
     "ct.platform.crownapps-thriveapps",
@@ -37,6 +35,8 @@ EXPECTED_IDS = [
     "ct.platform.tame-gallery",
     "ct.asset.artful-mane-gallery",
     "ct.platform.thrivetools",
+    "ct.platform.thrivetools-seo",
+    "ct.platform.thrivetools-opt",
     "ct.platform.thriverelay",
     "ct.platform.the-mane-experience",
     "ct.platform.thrivemaps",
@@ -65,6 +65,8 @@ EXPECTED = {
     "ct.platform.tame-gallery": ({"S103-PF-034"}, {"S100-PORT-031"}, {"S100-ENG-059"}, {"S100-DOM-042", "S100-DOM-043"}),
     "ct.asset.artful-mane-gallery": ({"S103-PF-035"}, {"S100-PORT-036"}, set(), {"S100-DOM-076"}),
     "ct.platform.thrivetools": ({"S103-PF-009"}, {"S100-PORT-017"}, {"S100-ENG-006"}, {"S100-DOM-057"}),
+    "ct.platform.thrivetools-seo": (set(), {"S100-PORT-018"}, {"S100-ENG-083"}, set()),
+    "ct.platform.thrivetools-opt": (set(), {"S100-PORT-019"}, {"S100-ENG-062"}, set()),
     "ct.platform.thriverelay": ({"S103-PF-010"}, set(), {"S100-ENG-003"}, {"S100-DOM-003"}),
     "ct.platform.the-mane-experience": ({"S103-PF-022"}, {"S100-PORT-030"}, {"S100-ENG-035"}, {"S100-DOM-054"}),
     "ct.platform.thrivemaps": ({"S103-PF-069"}, {"S100-PORT-015"}, {"S100-ENG-038"}, {"S100-DOM-009"}),
@@ -87,193 +89,116 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
-def text(path: Path) -> str:
+def read(path: Path) -> str:
     if not path.is_file():
         fail(f"Missing required file: {path.relative_to(ROOT)}")
     return path.read_text(encoding="utf-8")
 
 
 def require(path: Path, fragment: str) -> None:
-    if fragment not in text(path):
+    if fragment not in read(path):
         fail(f"Required fragment {fragment!r} missing from {path.relative_to(ROOT)}")
 
 
 def main() -> int:
-    if not MANIFEST.is_file():
-        fail(f"Missing manifest: {MANIFEST.relative_to(ROOT)}")
-    data = json.loads(MANIFEST.read_text(encoding="utf-8"))
-
-    if data.get("manifest_version") != "1.1.0":
+    data = json.loads(read(MANIFEST))
+    if data.get("manifest_version") != "1.2.0":
         fail("Unexpected edge manifest version")
     if data.get("phase") != "2.99" or data.get("workstream") != "3A":
         fail("Unexpected phase/workstream identity")
-    if data.get("baseline_commit") != "461fb7085510c29b4a605bdb1996903b534a7996":
-        fail("Baseline commit drifted")
-    if data.get("edge_state") != "source_relationship_only":
-        fail("Edge state must remain source_relationship_only")
+    if data.get("edge_state") != "source_relationship_plus_governed_child_identity":
+        fail("Unexpected edge state")
     if data.get("current_integration_certification") != "incomplete":
         fail("Current integration certification must remain incomplete")
 
     records = data.get("records", [])
-    stable_ids = [record.get("stable_id") for record in records]
-    if stable_ids != EXPECTED_IDS:
-        fail(f"Stable-ID order/set drifted: {stable_ids}")
-    if len(set(stable_ids)) != 25:
-        fail("Expected 25 unique stable identities in tranche 2")
+    ids = [r.get("stable_id") for r in records]
+    if ids != EXPECTED_IDS or len(set(ids)) != 27:
+        fail(f"Stable-ID order/set drifted: {ids}")
+    by_id = {r["stable_id"]: r for r in records}
 
-    record_by_id = {record["stable_id"]: record for record in records}
     for stable_id, expected in EXPECTED.items():
-        record = record_by_id[stable_id]
-        actual = (
-            set(record.get("s103_rows", [])),
-            set(record.get("s100_portfolio_rows", [])),
-            set(record.get("engine_rows", [])),
-            set(record.get("domain_rows", [])),
-        )
+        r = by_id[stable_id]
+        actual = (set(r.get("s103_rows", [])), set(r.get("s100_portfolio_rows", [])), set(r.get("engine_rows", [])), set(r.get("domain_rows", [])))
         if actual != expected:
             fail(f"Edge drift for {stable_id}: {actual!r} != {expected!r}")
 
-    s103_text = text(S103)
-    port_text = text(PORT)
-    eng_text = text(ENG)
-    dom_text = text(DOM)
+    s103_text, port_text, eng_text, dom_text = read(S103), read(PORT), read(ENG), read(DOM)
+    refs_s103, refs_port, refs_eng, refs_dom = set(), set(), set(), set()
+    for r in records:
+        refs_s103.update(r.get("s103_rows", [])); refs_port.update(r.get("s100_portfolio_rows", [])); refs_eng.update(r.get("engine_rows", [])); refs_dom.update(r.get("domain_rows", []))
+    if len(refs_eng) != 32:
+        fail(f"Expected 32 unique effective engine source rows, found {len(refs_eng)}")
+    if len(refs_dom) != 24:
+        fail(f"Expected 24 unique effective domain source rows, found {len(refs_dom)}")
+    for rid in refs_s103 | {"S103-PF-028"}:
+        if f"id: {rid};" not in s103_text: fail(f"Missing S103 row {rid}")
+    for rid in refs_port:
+        if rid not in port_text: fail(f"Missing S100 portfolio row {rid}")
+    for rid in refs_eng:
+        if f"id: {rid};" not in eng_text: fail(f"Missing S100 engine row {rid}")
+    for rid in refs_dom:
+        if f"id: {rid};" not in dom_text: fail(f"Missing S100 domain row {rid}")
 
-    referenced_s103: set[str] = set()
-    referenced_ports: set[str] = set()
-    referenced_engines: set[str] = set()
-    referenced_domains: set[str] = set()
-    for record in records:
-        referenced_s103.update(record.get("s103_rows", []))
-        referenced_ports.update(record.get("s100_portfolio_rows", []))
-        referenced_engines.update(record.get("engine_rows", []))
-        referenced_domains.update(record.get("domain_rows", []))
+    # Shared providers stay many-to-many without identity collapse.
+    viloud = {r["stable_id"] for r in records if "S100-ENG-025" in r.get("engine_rows", [])}
+    if viloud != {"ct.platform.melanated-tv", "ct.platform.melanated-voices-tv", "ct.platform.locticians-tv"}:
+        fail(f"Viloud holder set drifted: {viloud}")
+    partnero = {r["stable_id"] for r in records if "S100-ENG-030" in r.get("engine_rows", [])}
+    if partnero != {"ct.platform.crown-affiliates", "ct.platform.crown-ambassadors"}:
+        fail(f"Partnero holder set drifted: {partnero}")
 
-    if len(referenced_engines) != 30:
-        fail(f"Expected 30 unique effective engine source rows, found {len(referenced_engines)}")
-    if len(referenced_domains) != 24:
-        fail(f"Expected 24 unique effective domain source rows, found {len(referenced_domains)}")
+    # Family/projection and root/child boundaries.
+    if by_id["ct.platform.thrivesupport"].get("engine_rows") or by_id["ct.platform.thrivesupport"].get("domain_rows"):
+        fail("ThriveSupport family inherited implementation edges")
+    if set(by_id["ct.platform.crownthrive-support"].get("engine_rows", [])) != {"S100-ENG-043", "S100-ENG-044", "S100-ENG-045"}:
+        fail("CrownThrive Support projection engine set drifted")
+    if set(by_id["ct.platform.thrivetools"].get("engine_rows", [])) != {"S100-ENG-006"}:
+        fail("ThriveTools root must retain only its root engine edge")
+    if set(by_id["ct.platform.thrivetools-seo"].get("engine_rows", [])) != {"S100-ENG-083"}:
+        fail("ThriveTools SEO child engine drifted")
+    if set(by_id["ct.platform.thrivetools-opt"].get("engine_rows", [])) != {"S100-ENG-062"}:
+        fail("ThriveTools OPT child engine drifted")
+    if by_id["ct.platform.thrivetools-seo"].get("relationship_to_parent") != "child_of:ct.platform.thrivetools":
+        fail("ThriveTools SEO parent relationship missing")
+    if by_id["ct.platform.thrivetools-opt"].get("relationship_to_parent") != "child_of:ct.platform.thrivetools":
+        fail("ThriveTools OPT parent relationship missing")
 
-    for row_id in referenced_s103 | {"S103-PF-028"}:
-        if f"id: {row_id};" not in s103_text:
-            fail(f"Missing referenced S103 source row {row_id}")
-    for row_id in referenced_ports | {"S100-PORT-018", "S100-PORT-019", "S100-PORT-027", "S100-PORT-028"}:
-        if row_id not in port_text:
-            fail(f"Missing referenced S100 portfolio row {row_id}")
-    for row_id in referenced_engines | {"S100-ENG-062", "S100-ENG-083"}:
-        if f"id: {row_id};" not in eng_text:
-            fail(f"Missing referenced S100 engine row {row_id}")
-    for row_id in referenced_domains:
-        if f"id: {row_id};" not in dom_text:
-            fail(f"Missing referenced S100 domain row {row_id}")
-
-    viloud_holders = {
-        record["stable_id"]
-        for record in records
-        if "S100-ENG-025" in record.get("engine_rows", [])
-    }
-    expected_viloud = {
-        "ct.platform.melanated-tv",
-        "ct.platform.melanated-voices-tv",
-        "ct.platform.locticians-tv",
-    }
-    if viloud_holders != expected_viloud:
-        fail(f"Viloud shared-engine invariant drifted: {viloud_holders}")
-    if "S100-ENG-025" in record_by_id["ct.platform.melanated-voices-platform"].get("engine_rows", []):
-        fail("MVP orchestration must not inherit Viloud by naming proximity")
-
-    partnero_holders = {
-        record["stable_id"]
-        for record in records
-        if "S100-ENG-030" in record.get("engine_rows", [])
-    }
-    expected_partnero = {"ct.platform.crown-affiliates", "ct.platform.crown-ambassadors"}
-    if partnero_holders != expected_partnero:
-        fail(f"Partnero shared-provider invariant drifted: {partnero_holders}")
-
-    support_family = record_by_id["ct.platform.thrivesupport"]
-    if support_family.get("engine_rows") or support_family.get("domain_rows"):
-        fail("ThriveSupport family must not inherit CrownThrive Support implementation edges")
-    support_projection = record_by_id["ct.platform.crownthrive-support"]
-    if set(support_projection.get("engine_rows", [])) != {"S100-ENG-043", "S100-ENG-044", "S100-ENG-045"}:
-        fail("CrownThrive Support implementation engine set drifted")
-    if set(support_projection.get("domain_rows", [])) != {"S100-DOM-011"}:
-        fail("CrownThrive Support implementation domain set drifted")
-
-    root_tools = record_by_id["ct.platform.thrivetools"]
-    if "S100-ENG-083" in root_tools.get("engine_rows", []) or "S100-ENG-062" in root_tools.get("engine_rows", []):
-        fail("ThriveTools root must not silently inherit SEO/OPT child engines")
-    if record_by_id["ct.platform.collab-portal"].get("engine_rows"):
-        fail("Collab Portal must not invent an S100 85-engine row")
-    if record_by_id["ct.platform.locticians"].get("engine_rows"):
-        fail("Locticians must not invent Brilliant Directories as an S100 85-engine row")
-
-    blocked = data.get("blocked_relationships", [])
-    if len(blocked) != 3:
-        fail(f"Expected exactly three blocked relationships in tranche 2, found {len(blocked)}")
-
-    mvp = blocked[0]
-    if mvp.get("source_row") != "S103-PF-028" or mvp.get("source_name") != "MVP (Roku)":
-        fail("MVP Roku blocked relationship identity drifted")
-    if mvp.get("relationship_state") != "unresolved_fail_closed":
-        fail("MVP Roku must remain unresolved_fail_closed")
-    if mvp.get("effective_engine_rows") or mvp.get("effective_domain_rows"):
-        fail("MVP Roku must not receive effective engine/domain edges")
-    if set(mvp.get("candidate_portfolio_rows", [])) != {"S100-PORT-027", "S100-PORT-028"}:
-        fail("MVP Roku candidate portfolio context drifted")
-
-    expected_children = {
-        "ThriveTools SEO": ("S100-PORT-018", "S100-ENG-083"),
-        "ThriveTools OPT": ("S100-PORT-019", "S100-ENG-062"),
-    }
-    child_rows = {entry.get("source_name"): entry for entry in blocked[1:]}
-    if set(child_rows) != set(expected_children):
-        fail(f"Blocked ThriveTools child set drifted: {set(child_rows)}")
-    for name, (portfolio_row, engine_row) in expected_children.items():
-        entry = child_rows[name]
-        if entry.get("portfolio_row") != portfolio_row or entry.get("engine_row") != engine_row:
-            fail(f"Blocked source relationship drifted for {name}")
-        if entry.get("relationship_state") != "parent_child_resolution_pending":
-            fail(f"{name} must remain parent_child_resolution_pending")
-        if entry.get("candidate_parent") != "ct.platform.thrivetools":
-            fail(f"Unexpected candidate parent for {name}")
-        if entry.get("effective_engine_rows") or entry.get("effective_domain_rows"):
-            fail(f"{name} must not receive effective engine/domain edges before adjudication")
+    if data.get("blocked_relationships") != []:
+        fail("Current identity relationship layer must have zero blocked relationships")
+    history = {x.get("key"): x for x in data.get("historical_resolved_relationships", [])}
+    if set(history) != {"mvp_roku", "thrivetools_seo", "thrivetools_opt"}:
+        fail("Historical resolved relationship set drifted")
+    if history["mvp_roku"].get("current_resolution") != "merged_into_melanated_tv_lineage":
+        fail("MVP Roku historical resolution drifted")
+    if history["thrivetools_seo"].get("stable_id") != "ct.platform.thrivetools-seo":
+        fail("ThriveTools SEO history resolution drifted")
+    opt = history["thrivetools_opt"]
+    if opt.get("stable_id") != "ct.platform.thrivetools-opt" or opt.get("documented_version") != "v4.0.0":
+        fail("ThriveTools OPT history/version resolution drifted")
+    if opt.get("http_method_certification") != "pending" or opt.get("authenticated_read") != "open" or opt.get("provider_writes") != "closed":
+        fail("ThriveTools OPT fail-closed runtime state drifted")
 
     rules = data.get("rules", {})
-    required_false_rules = [
-        "source_relationship_is_current_certification",
-        "shared_engine_collapses_platform_identity",
-        "source_absence_allows_inference",
-        "shared_provider_collapses_program_identity",
-        "family_inherits_projection_implementation",
-        "child_capability_promotes_to_parent",
-    ]
-    for rule in required_false_rules:
-        if rules.get(rule) is not False:
-            fail(f"Rule {rule} must remain false")
-    if rules.get("mvp_roku_fail_closed") is not True:
-        fail("MVP Roku fail-closed rule missing")
+    for key in ["source_relationship_is_current_certification", "shared_engine_collapses_platform_identity", "source_absence_allows_inference", "mvp_roku_current_provider_edge_inference", "shared_provider_collapses_program_identity", "family_inherits_projection_implementation", "child_capability_promotes_to_parent"]:
+        if rules.get(key) is not False: fail(f"Rule {key} must remain false")
+    if rules.get("child_identity_may_have_independent_edges") is not True:
+        fail("Child independent-edge rule missing")
 
-    require(EDGE_DOC, "resolved_identity_records: 25")
-    require(EDGE_DOC, "blocked_relationship_records: 3")
-    require(EDGE_DOC, "engine_source_rows_referenced: 30")
+    require(PORT, "ct.platform.thrivetools-seo")
+    require(PORT, "ct.platform.thrivetools-opt")
+    require(EDGE_DOC, "resolved_identity_records: 27")
+    require(EDGE_DOC, "blocked_relationship_records: 0")
+    require(EDGE_DOC, "engine_source_rows_referenced: 32")
     require(EDGE_DOC, "domain_source_rows_referenced: 24")
-    require(EDGE_DOC, "relationship_state: parent_child_resolution_pending")
-    require(CHANGELOG, "documentation_impact: docs_updated")
-    require(CHANGELOG, "No downstream hard gate is widened")
-    require(PLAN, "Tranche 2")
-    require(GATE, "Tranche 2")
-    require(GATE, "blocked_pending_phase_2_99_hard_exit")
-    require(CHARTER, "Tranche 2")
-    require(CHARTER, "Partnero")
+    require(OPT_DOC, "observed_product_version: v4.0.0")
+    require(OPT_DOC, "http_method_certification: pending")
+    require(OPT_DOC, "provider_writes_enabled: false")
+    require(GATE, "current_owner_identity_disposition_unresolved: 0")
+    require(GATE, "blocked_pending_phase_2_99_hard_exit_and_full_docs_reconciliation")
+    require(PLAN, "Workstream 3A")
 
-    print(
-        "S103/S100 engine-domain edge validation PASSED: "
-        "25 stable identities, 30 unique effective engine rows, 24 unique effective domain rows, "
-        "Viloud and Partnero shared-provider sets preserved, ThriveSupport projection boundary preserved, "
-        "ThriveTools child capabilities remain blocked, MVP Roku remains fail-closed, "
-        "current integration certification remains incomplete."
-    )
+    print("S103/S100 engine-domain edge validation PASSED: 27 stable identities, 32 unique effective engine rows, 24 unique S100 domain rows, ThriveTools SEO/OPT resolved as child applications without root inheritance, historical blocked relationships preserved, provider/runtime certification still fail-closed where unproved, Phase 3 blocked.")
     return 0
 
 
