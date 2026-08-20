@@ -1,0 +1,268 @@
+---
+title: "ThriveTools OPT API Adapter"
+sidebarTitle: "ThriveTools OPT API"
+description: "Governed API contract and fail-closed adapter state for ThriveTools OPT v4.0.0, including server-side credential handling, image/media read surfaces, upload/delete mutations, storage/status responses and certification gates."
+icon: "image"
+keywords: ["ThriveTools OPT", "image optimization", "API", "v4.0.0", "Supabase Vault", "image upload", "WebP", "CrownThrive"]
+---
+
+# ThriveTools OPT API Adapter
+
+<Warning>
+  The API credential is **restricted runtime-only material**. It is stored server-side in Supabase Vault and is never published in Mintlify, GitHub, examples, logs, screenshots, generated artifacts or client-side code.
+</Warning>
+
+## Current institutional state
+
+```yaml
+platform_id: ct.platform.thrivetools-opt
+platform_family: ct.platform.thrivetools
+service_id: thrivetools_opt
+product: ThriveTools OPT
+observed_product_version: v4.0.0
+api_base_url: https://optimize.thrivetools.io/api
+authentication:
+  header: Authorization
+  value: restricted_runtime_api_key
+credential_storage: Supabase Vault
+credential_continuity: primary_and_recovery_aliases_fingerprint_matched
+adapter: thrivetools-opt-api-control
+adapter_version: 1
+adapter_auth: jwt_required
+provider_reads_enabled: false
+provider_writes_enabled: false
+http_method_certification: pending
+integration_state: configured_fail_closed
+```
+
+The supplied developer interface verifies a distinct **ThriveTools OPT** application under the CrownThrive/ThriveTools family and displays version `v4.0.0`. This resolves the earlier parent/child identity ambiguity without turning the child API into the root ThriveTools API.
+
+## Source boundary
+
+The founder-supplied developer documentation establishes:
+
+- the exact API host and six endpoint URLs;
+- use of the `Authorization` header with the API key;
+- JSON request content type for Delete and Get Single Image;
+- form/data request content type for Upload;
+- request parameter names and example value shapes;
+- response object shapes;
+- a displayed `v4.0.0` product version.
+
+The supplied material **does not explicitly show HTTP verbs**. The institutional contract therefore records each verb as `pending_source_verification`; agents may not infer a verb merely from endpoint naming or request-body shape.
+
+## Endpoint catalog
+
+| Operation | Endpoint | Parameters | Source-visible response | Risk / current state |
+| --- | --- | --- | --- | --- |
+| Get optimized images | `/get-images` | none shown | overall/today counts, optimized-size summary, image records | D0 read; dispatch disabled pending method \+ authenticated-read certification |
+| Get Media images | `/get-media` | none shown | media-image counts and image records | D0 read; dispatch disabled pending method \+ authenticated-read certification |
+| Upload images | `/upload` | `images[]`, `compression_ratio`, `media_upload` | `status`, `download_url[]` | D2 mutation; write gate closed |
+| Delete | `/delete` | `image_id[]`, `permanent_delete` | `status`, `delete[]` booleans | D2 destructive mutation; write gate closed |
+| Get Single Image | `/get-single-image` | `image_id` | `status`, `single_image` object | D0 read; dispatch disabled pending method \+ authenticated-read certification |
+| Check Status | `/check-status` | none shown | optimization quota \+ storage status | D0 read; dispatch disabled pending method \+ authenticated-read certification |
+
+### Common image record
+
+The supplied response examples use this shape:
+
+```json
+{
+  "image_id": "10772022359773",
+  "name": "example.webp",
+  "width": 1000,
+  "height": 564,
+  "url": "https://provider-storage.example/files/.../optimize/example.webp",
+  "size": 14326,
+  "created_at": "2023-02-09T12:50:19.000000Z"
+}
+```
+
+The example above intentionally replaces the original provider object URL with a neutral placeholder. Provider-hosted object URLs are response data, not CrownThrive infrastructure authority.
+
+## Get optimized images
+
+```text
+https://optimize.thrivetools.io/api/get-images
+Authorization: <runtime API key>
+```
+
+No request parameters are shown in the supplied documentation.
+
+Source-visible response fields:
+
+```yaml
+status: boolean
+overall_optimized_images: integer
+today: integer
+today_optimized_size: string
+all_images: image_record[]
+```
+
+## Get Media images
+
+```text
+https://optimize.thrivetools.io/api/get-media
+Authorization: <runtime API key>
+```
+
+Source-visible response fields:
+
+```yaml
+status: boolean
+overall_media_images: integer
+today: integer
+all_images: image_record[]
+```
+
+## Upload images
+
+```text
+https://optimize.thrivetools.io/api/upload
+Authorization: <runtime API key>
+Content-type: form/data
+```
+
+Source-visible parameters:
+
+```yaml
+images[]: array<file>
+compression_ratio: integer
+media_upload: string # example values shown as true / false
+```
+
+Source-visible response:
+
+```json
+{
+  "status": true,
+  "download_url": [
+    "https://provider-storage.example/files/.../optimize/example.webp"
+  ]
+}
+```
+
+<Warning>
+  Upload is a provider mutation. The institutional adapter does **not** expose it today. Enabling it requires exact method certification, bounded file/type/size/compression rules, malware/content checks as appropriate, request budgets, provenance/rights handling, output validation, DAIL/audit evidence and rollback/recovery behavior.
+</Warning>
+
+## Delete
+
+```text
+https://optimize.thrivetools.io/api/delete
+Authorization: <runtime API key>
+Content-type: application/json
+```
+
+Source-visible parameters:
+
+```yaml
+image_id: array<string>
+permanent_delete: boolean
+```
+
+Source-visible response:
+
+```json
+{
+  "status": true,
+  "delete": [true, true]
+}
+```
+
+<Warning>
+  Delete is a destructive D2 surface. `permanent_delete=true` must never be dispatched by autonomous tooling without explicit scoped authority, exact target validation, audit evidence and a recovery/retention decision appropriate to the asset.
+</Warning>
+
+## Get Single Image
+
+```text
+https://optimize.thrivetools.io/api/get-single-image
+Authorization: <runtime API key>
+Content-type: application/json
+```
+
+Source-visible parameter:
+
+```yaml
+image_id: string
+```
+
+Source-visible response:
+
+```yaml
+status: boolean
+single_image: image_record
+```
+
+## Check Status
+
+```text
+https://optimize.thrivetools.io/api/check-status
+Authorization: <runtime API key>
+```
+
+The supplied documentation displays the following account/status example:
+
+```json
+{
+  "status": true,
+  "maximum_optimize": "Unlimited",
+  "available_optimize": "Unlimited",
+  "current_storage": "20GB",
+  "used_storage": 0,
+  "available_storage": "20GB"
+}
+```
+
+This is retained as **source-visible documentation/account evidence**, not a fresh live certification. A future authorized `check-status` request must confirm current quota/storage state before automation depends on it.
+
+## Runtime and secret architecture
+
+```text
+caller with valid CrownThrive/Supabase JWT
+        ↓
+thrivetools-opt-api-control
+        ↓
+server-side get_runtime_secret
+        ↓
+Supabase Vault primary credential
+        ↓
+ThriveTools OPT API
+```
+
+A matching recovery alias is stored separately in Vault for credential continuity. The adapter reports only whether configuration exists; it never returns the credential value.
+
+## Current adapter behavior
+
+`thrivetools-opt-api-control` v1 is intentionally fail-closed:
+
+- `health` reports adapter/configuration state without exposing the key;
+- `capabilities` returns the documented endpoint catalog and risk classes;
+- all provider read dispatch returns `provider_dispatch_not_certified` until HTTP methods and authenticated read behavior are certified;
+- all upload/delete mutation dispatch remains disabled.
+
+## Certification sequence
+
+1. verify exact HTTP verb for each endpoint from authoritative provider/application evidence;
+2. execute `check-status` as the first bounded authenticated D0 read;
+3. validate status code, JSON content type and response schema;
+4. certify `get-images`, `get-media` and `get-single-image` with bounded schemas;
+5. register read operations in the central API/MCP control plane only after exact contract validation;
+6. leave upload/delete disabled unless separately authorized;
+7. if upload is later enabled, certify file-size/type/compression/media-upload semantics and read-after-write evidence;
+8. if delete is later enabled, test reversible/non-permanent behavior first and govern permanent deletion separately;
+9. record request hashes/latency/status without logging provider payloads containing restricted data;
+10. preserve export/provider-exit and object-custody behavior for GATE-007 continuity.
+
+## Phase wiring
+
+- **Phase 2.99:** document contract, bind credentials server-side, resolve child identity, keep dispatch fail-closed, reconcile stale API/engine/domain records.
+- **Phase 3:** the Institutional Core may register certified D0 OPT tools after method/read proof; this does not make OPT the first Phase 3 pilot or bypass the A → B → C sequence.
+- **Phase 4:** OPT may become a shared media/image adapter used by approved platform cohorts after data/rights/storage boundaries are accepted.
+- **Phase 5\+:** commerce/publication workflows may use OPT only when their source-asset rights, output custody, costs/quotas and recovery paths are governed.
+- **Phase 10/20 continuity:** provider exit, credential recovery, source/original preservation and image-object portability must be reproducible.
+
+### Page changelog
+
+- **2026-08-19 v1.0:** registered the founder-supplied ThriveTools OPT v4.0.0 API contract, server-side Vault-only credential model, six endpoint schemas, child-platform identity, JWT adapter scaffold, fail-closed method/read certification and closed upload/delete write gates.
