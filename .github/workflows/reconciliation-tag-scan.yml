@@ -4,20 +4,42 @@ on:
   pull_request:
     paths:
       - "automation/reconciliation-tag-subagents.mdx"
+      - "automation/agent-templates-pallets-and-commercialization.mdx"
+      - "automation/agent-lineage-version-archive.mdx"
+      - "automation/control-plane-agent-factory-and-work-queues.mdx"
+      - "automation/permissions-and-approval-gates.mdx"
       - "developers/agents/reconciliation/**"
+      - "developers/templates/agent-role-template.v1.yaml"
+      - "developers/templates/subagent-role-template.v1.yaml"
       - "developers/manifests/reconciliation-tag-system.v1.json"
       - "developers/manifests/draft-reconciliation-index.v1.json"
+      - "developers/manifests/agent-template-library.v1.json"
+      - "developers/manifests/agent-lineage-archive.v1.json"
+      - "developers/manifests/agent-factory-delegation-policy.v1.json"
+      - "developers/manifests/agent-rnd-specialist-fabric.v1.json"
       - "scripts/scan_reconciliation_tags.py"
+      - "scripts/validate_agent_template_library.py"
       - ".github/workflows/reconciliation-tag-scan.yml"
   push:
     branches:
       - main
     paths:
       - "automation/reconciliation-tag-subagents.mdx"
+      - "automation/agent-templates-pallets-and-commercialization.mdx"
+      - "automation/agent-lineage-version-archive.mdx"
+      - "automation/control-plane-agent-factory-and-work-queues.mdx"
+      - "automation/permissions-and-approval-gates.mdx"
       - "developers/agents/reconciliation/**"
+      - "developers/templates/agent-role-template.v1.yaml"
+      - "developers/templates/subagent-role-template.v1.yaml"
       - "developers/manifests/reconciliation-tag-system.v1.json"
       - "developers/manifests/draft-reconciliation-index.v1.json"
+      - "developers/manifests/agent-template-library.v1.json"
+      - "developers/manifests/agent-lineage-archive.v1.json"
+      - "developers/manifests/agent-factory-delegation-policy.v1.json"
+      - "developers/manifests/agent-rnd-specialist-fabric.v1.json"
       - "scripts/scan_reconciliation_tags.py"
+      - "scripts/validate_agent_template_library.py"
       - ".github/workflows/reconciliation-tag-scan.yml"
 
 permissions:
@@ -27,7 +49,7 @@ permissions:
 
 jobs:
   reconciliation-tag-scan:
-    name: Reconciliation tag and draft audit
+    name: Reconciliation tag, factory and draft audit
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact repository state
@@ -40,11 +62,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile scanner
-        run: python -m py_compile scripts/scan_reconciliation_tags.py
+      - name: Compile governed scanners
+        run: |
+          python -m py_compile scripts/scan_reconciliation_tags.py
+          python -m py_compile scripts/validate_agent_template_library.py
 
       - name: Validate tag contracts and local draft index
         run: python scripts/scan_reconciliation_tags.py
+
+      - name: Validate agent factory, templates and R&D promotion policy
+        run: python scripts/validate_agent_template_library.py
 
       - name: Reconcile draft index against live open PRs
         env:
