@@ -80,3 +80,47 @@ jobs:
             echo "Unresolved merge-conflict markers detected."
             exit 1
           fi
+
+  route-drift:
+    name: Route framework fleet drift
+    needs: validate
+    if: ${{ always() && needs.validate.result == 'failure' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DRIFT_TITLE: "CT Framework Child Fleet Governance Drift"
+    steps:
+      - name: Create or update one governed drift issue
+        run: |
+          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"${DRIFT_TITLE}\") | .number" | head -n1)"
+          body="Framework Child Fleet Governance failed on run ${GITHUB_RUN_ID} at ${GITHUB_SHA}. This is an internal WATCH/HOLD only. It creates no sovereign vote, framework acceptance, child certification, repository existence claim, or Phase-3 authority. Repair root cause through a reviewed packet and rerun the unchanged controls."
+          if [ -z "$existing" ]; then
+            gh issue create --title "$DRIFT_TITLE" --body "$body"
+          else
+            gh issue comment "$existing" --body "$body"
+          fi
+
+  reconcile-drift:
+    name: Reconcile recovered framework fleet drift
+    needs: validate
+    if: ${{ always() && needs.validate.result == 'success' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DRIFT_TITLE: "CT Framework Child Fleet Governance Drift"
+    steps:
+      - name: Close recovered drift issue when present
+        run: |
+          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"${DRIFT_TITLE}\") | .number" | head -n1)"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Framework Child Fleet Governance recovered on run ${GITHUB_RUN_ID} at ${GITHUB_SHA}. Closing this operational drift record does not certify any child or create a sovereign vote."
+            gh issue close "$existing" --reason completed
+          fi
