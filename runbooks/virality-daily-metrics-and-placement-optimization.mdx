@@ -20,21 +20,21 @@ The cycle does not change a live catalog, Sites project, provider account, price
 
 ## Schedule and ownership
 
-- **Cadence:** daily, once per America/New_York calendar day through existing agents
+- **Cadence:** daily, once per America/New\_York calendar day through existing agents
 - **Measurement authority:** CrownLytics
 - **Catalog authority:** Virality Music
 - **Rights authority:** CHLOM
 - **Commerce/license authority:** GSO
-- **Public-surface authority:** Website Surface & Interaction Agent + `ct.subagent.virality-public-surface-visual-qa`
+- **Public-surface authority:** Website Surface & Interaction Agent \+ `ct.subagent.virality-public-surface-visual-qa`
 - **Automation owners:** existing scheduled Agents G, E, F, C, D, S and the Integration Heartbeat subagent
 - **Human owner:** CrownThrive founder/operator
 
 ## Scheduled execution integration
 
-The daily lane is embedded in the existing hourly institutional agents; it does not create another active automation. Each role applies a once-per-America/New_York-calendar-day guard for the Virality-specific work:
+The daily lane is embedded in the existing hourly institutional agents; it does not create another active automation. Each role applies a once-per-America/New\_York-calendar-day guard for the Virality-specific work:
 
 1. **Agent G — provider evidence:** creates one sanitized SoundCloud provider/public-evidence packet only when the current-day packet is absent.
-2. **Agent E — API/MCP and registry:** reconciles the authenticated measurement lane into private Supabase with provider/date/attempt idempotency and evidence precedence; it preserves the public-embed/authenticated-read distinction.
+2. **Agent E — API/MCP and registry:** reconciles the non-API SoundCloud evidence lane into private Supabase with source/date/attempt idempotency and evidence precedence; it enforces the founder override prohibiting SoundCloud API credentials, reads, writes, adapters, and scheduled API syncs.
 3. **Agent F — public knowledge/content projection:** checks public wording, evidence dating, cognitive load and documentation effects; routine numeric noise does not become a commit.
 4. **Agent C — build and documentation:** creates only material GitHub/Mintlify/site-remediation changes, preserves Drive custody and never self-merges.
 5. **Agent S — security/privacy:** verifies third-party media/loading/privacy and protected-data boundaries.
@@ -47,12 +47,12 @@ The evidence path is fail-closed. The heartbeat observes the chain but does not 
 
 1. The private registry and RLS policies are healthy.
 2. The latest verified metric and public-surface baselines are queryable.
-3. Authenticated SoundCloud reads occur only when the credential/export gate is verified; public embed/playback inspection does not require that credential.
+3. SoundCloud API use is `REMOVED_BY_FOUNDER_OVERRIDE`; no SoundCloud credential, authenticated API read/write, adapter, or API-dependent schedule may be introduced. Public embed/playback inspection remains independently allowed through supported public surfaces.
 4. Provider writes, Sites writes and promotion execution remain disabled unless their separate adapter/authority gates pass.
-5. The job has a request budget, timeout, retry cap and idempotency key where provider/API requests occur.
+5. Any permitted non-API evidence acquisition uses bounded execution, provenance capture, retry limits where applicable and idempotent evidence keys.
 6. The public surface has a rollback/version reference before any future mutation is considered.
 
-## SoundCloud public playback versus authenticated measurement
+## SoundCloud public playback versus non-API measurement evidence
 
 These are separate controls.
 
@@ -65,20 +65,22 @@ Virality may use SoundCloud's supported public embed stack without a CrownThrive
 - autoplay remains off by default;
 - responsive, accessible, privacy-aware loading rules follow the [Public Surface Visual Quality & Media Embed Standard](/standards/public-surface-visual-quality-and-media-embed).
 
-### Authenticated measurement
+### Non-API measurement evidence
 
-`soundcloud.sync.daily` remains blocked until a least-privilege credential or repeatable signed export is certified. A working iframe, public profile or public count can never substitute for authenticated Artist Studio/API evidence.
+By founder override dated August 20, 2026, CrownThrive and Virality Music will not use SoundCloud APIs. `soundcloud.sync.daily` is `REMOVED_BY_FOUNDER_OVERRIDE` and must not be implemented, scheduled, credentialed, invoked, or certified.
+
+Metrics may be reconciled only from permitted non-API evidence sources with explicit provenance and evidence-state labeling. A working iframe, public profile, public count, screenshot, export, or report is classified only at the evidence strength actually proved; none is to be represented as authenticated SoundCloud API evidence.
 
 ## Daily procedure
 
 ### A. Provider/metric lane
 
-1. Create an idempotent sync-run row for the scheduled date.
-2. Attempt the authenticated bounded SoundCloud read only when the credential gate is verified.
-3. If authenticated evidence is unavailable, record `blocked` or `observed_unverified`; do not overwrite the latest verified snapshot.
-4. Validate nonnegative values, identifier stability, pagination completeness, response freshness and field mapping.
-5. Store one dated metric snapshot and its digest only at the evidence class actually proved.
-6. Compare against the nearest verified snapshot using current metric definitions.
+1. Create an idempotent evidence-run row for the scheduled date and governed source class.
+2. Acquire only permitted non-API evidence; never attempt a SoundCloud API read, OAuth flow, token exchange, API adapter call, or API-dependent sync.
+3. Classify the evidence exactly as proved. Public observations remain `observed_unverified` unless an independently governed non-API source supports a stronger state; missing material evidence remains `NEED_TO_DO`/`HOLD`/`unknown` as applicable.
+4. Validate nonnegative values, metric identity/definition, source date, provenance completeness, freshness and field mapping where the source provides structured fields.
+5. Store one dated metric snapshot and its digest/provenance reference only at the evidence class actually proved.
+6. Compare against the nearest accepted snapshot using current metric definitions without silently promoting evidence strength.
 
 ### B. Public-surface lane
 
@@ -121,7 +123,7 @@ Visual and accessibility QA remain separate inspectable controls. Every recommen
 
 - HTTP success is not visual PASS;
 - desktop success is not mobile PASS;
-- a working public embed is not authenticated provider evidence;
+- a working public embed is playback evidence only and does not upgrade metric provenance or evidence strength;
 - a beautiful placement cannot override rights/canon/audience/commerce restrictions;
 - dated evidence must stay visibly dated/scoped;
 - primary user and business CTAs must remain distinguishable within deep archive pages;
@@ -140,21 +142,22 @@ Every durable document, report, manifest, migration, source page or other file p
 
 | Failure | Required response |
 | --- | --- |
-| authenticated credential absent/rejected | mark metric lane `blocked`; preserve verified baseline; public embeds remain separately evaluated |
-| public SoundCloud embed broken | open public-surface remediation; do not mislabel as credential failure |
+| SoundCloud API dependency or credential request detected | mark the path `REMOVED_BY_FOUNDER_OVERRIDE`, stop it, and route governance drift for correction; do not convert it into a blocker requiring credentials |
+| permitted non-API metric evidence unavailable | preserve the accepted baseline; record `NEED_TO_DO`/`HOLD`/`unknown` or the applicable evidence state; public embeds remain separately evaluated |
+| public SoundCloud embed broken | open public-surface remediation; do not mislabel as API/credential failure |
 | visual breakpoint unavailable to inspector | record `unknown`; do not synthesize visual PASS |
 | mobile/desktop layout regression | open P1/P2 visual remediation according to impact; preserve rollback reference |
 | third-party player creates overlay/focus/consent defect | hold material public promotion; route C/S/public-surface QA |
-| partial pagination or provider rate limit | mark metric lane `partial`; store no verified replacement; retry within cap |
-| value regression or schema drift | quarantine snapshot; open field-mapping review |
+| incomplete permitted export/report or provenance gap | mark metric lane `partial`/`unknown`; store no stronger replacement; retry only through the permitted non-API path |
+| value regression or source/field drift | quarantine snapshot; open field/provenance review |
 | rights/canon/commerce gate missing | suppress recommendation or public offer implication for that asset |
 | storage/database write fails | fail the evidence run; do not publish new metrics |
-| suspected credential exposure | disable authenticated tools/schedule path and open security incident; follow approved credential process |
+| SoundCloud API credential/token found in CrownThrive custody | treat as prohibited configuration/security drift; do not use it; remove it through the approved secret-governance process |
 | live target differs from approved plan | do not execute; require a new preflight |
 
 ## Rollback
 
-For metric automation, disable the affected schedule/tool and preserve sync runs, snapshots, recommendations and decisions. For a future site mutation, restore the last governed Sites/release baseline through the certified provider path and re-run functional + visual + accessibility checks. Rollback may stop automation or restore presentation; it must not erase evidence.
+For metric automation, disable the affected schedule/tool and preserve sync runs, snapshots, recommendations and decisions. For a future site mutation, restore the last governed Sites/release baseline through the certified provider path and re-run functional \+ visual \+ accessibility checks. Rollback may stop automation or restore presentation; it must not erase evidence.
 
 ## Cross-references
 

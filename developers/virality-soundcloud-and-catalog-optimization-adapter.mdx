@@ -64,18 +64,20 @@ Implementation across every applicable Virality route remains a separate Sites/p
 
 ## Proposed MCP surface
 
-All provider/API tools remain disabled until their individual certification packets pass. The public widget does not require an MCP tool.
+Virality internal/catalog MCP tools remain separately governed. **No SoundCloud API/MCP tool is authorized or planned under the current founder override.** The public SoundCloud widget does not require an MCP tool.
 
 | Tool | Risk | Intended behavior | Current state |
 | --- | --- | --- | --- |
 | `virality.assets.list` | D0 | bounded public-safe or service-role catalog list | disabled |
 | `virality.assets.get` | D0 | one identifier, explicit field projection | disabled |
-| `virality.stats.current` | D0 | latest verified dated snapshot | disabled |
+| `virality.stats.current` | D0 | latest dated snapshot at its proved evidence class | disabled |
 | `virality.stats.history` | D0 | cursor-paginated evidence history | disabled |
 | `virality.recommendations.list` | D1 | shadow recommendations only | disabled |
 | `virality.recommendations.decide` | D2 | human approval or rejection event | disabled |
-| `soundcloud.sync.daily` | D1 | bounded authenticated provider read | blocked |
+| `soundcloud.sync.daily` | D1 | retired authenticated SoundCloud API read identifier | `REMOVED_BY_FOUNDER_OVERRIDE` |
 | `virality.promotion.execute` | D3 | consequential public mutation | not implemented |
+
+The retired `soundcloud.sync.daily` identifier is retained only as a drift-detection marker. Agents must not implement, invoke, credential, schedule, or certify it.
 
 ## Read contract
 
@@ -91,24 +93,22 @@ Every read tool must enforce:
 - no private file identifiers, credentials, raw provider payloads or customer records;
 - audit receipt with request class, actor, tool version and result count.
 
-## Daily authenticated-sync contract
+## Daily non-API evidence contract
 
-`soundcloud.sync.daily` is idempotent on provider, scheduled date and attempt. One run records request count, response count, raw digest, evidence state, completion state and error code. A snapshot is unique by date, entity type and provider entity ID.
+The daily SoundCloud lane is an observation/provenance workflow, not an authenticated API synchronization job. Each run is idempotent on source class, scheduled date and evidence reference. One run records the source class, evidence date, provenance reference/digest where permitted, evidence state, completion state and any validation error. A snapshot remains unique by date, metric family and governed source identity.
 
-The authenticated metric adapter must not treat HTML, an iframe, oEmbed output or a public profile observation as equivalent to authenticated Artist Studio/API evidence. Public observations are recorded as `observed_unverified`; an unavailable or unauthorized read is `blocked`.
+Public HTML, an iframe, oEmbed output or a public profile observation must never be represented as authenticated provider evidence. Public observations remain `observed_unverified` unless another permitted non-API source independently supports a stronger governed classification.
 
-Before the authenticated tool can be enabled, the certification packet must prove:
+Permitted non-API evidence sources may include:
 
-1. a least-privilege read credential or repeatable signed export;
-2. token storage outside code and docs;
-3. pagination and field mapping;
-4. rate, timeout, retry and backoff behavior;
-5. stale and partial response handling;
-6. idempotent replay;
-7. raw-evidence retention and deletion policy;
-8. a bounded read in production with no provider mutation.
+1. founder-supplied or otherwise authorized reports/screenshots with provenance;
+2. permitted account exports or reports that do not require CrownThrive to integrate the SoundCloud API;
+3. public observations captured with date, source URL/surface and method;
+4. previously accepted evidence retained as a dated baseline.
 
-None of those prerequisites is necessary merely to display an official public SoundCloud widget.
+If a material metric cannot be supported by a permitted non-API source, record `NEED_TO_DO`, `HOLD`, `unknown`, or the applicable evidence state. Do not reintroduce a SoundCloud API requirement to close the gap.
+
+Official public SoundCloud widgets remain independently allowed under the public-embed contract.
 
 ## Recommendation write contract
 
@@ -120,7 +120,7 @@ Approval creates an append-only decision event. It does not execute a placement.
 
 Any proposed change to public SoundCloud presentation is handed to `ct.subagent.virality-public-surface-visual-qa` under the Website Surface & Interaction Agent. The child checks responsive fit, player overlap, keyboard/focus behavior, visual hierarchy, third-party loading, accessibility, layout stability and Virality brand coherence.
 
-A successful API/read test cannot substitute for visual QA. A successful visual QA cannot substitute for provider-read certification.
+A metric/evidence observation cannot substitute for visual QA. A successful visual QA cannot upgrade metric provenance or waive any non-API evidence requirement.
 
 ## Security and rollback
 
