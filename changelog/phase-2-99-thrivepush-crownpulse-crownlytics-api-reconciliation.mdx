@@ -1,0 +1,138 @@
+---
+title: "Phase 2.99 — ThrivePush, CrownPulse & CrownLytics API Reconciliation"
+sidebarTitle: "2.99 — Push/Pulse/Lytics APIs"
+description: "Governed Phase 2.99 reconciliation of ThrivePush, CrownPulse Admin and CrownLytics APIs, fail-closed adapters, credential-binding blockers, MCP candidate contracts and the ThrivePush service-worker artifact."
+icon: "plug-circle-check"
+keywords: ["Phase 2.99", "ThrivePush", "CrownPulse", "CrownLytics", "API", "service worker", "Supabase", "MCP"]
+---
+
+# Phase 2.99 — ThrivePush, CrownPulse & CrownLytics API Reconciliation
+
+## Decision state
+
+```yaml
+date: 2026-08-19
+phase: 2.99
+thrivepush_api_docs: passed
+crownlytics_api_docs: passed
+crownpulse_admin_api_docs: passed_from_founder_admin_evidence
+adapter_scaffolds: passed
+credential_vault_bindings: blocked_by_connected_secure_write_policy
+authenticated_provider_reads: open
+provider_writes: closed
+mcp_family_contracts: registered_disabled_by_default
+phase_3_entry: blocked_pending_phase_2_99_hard_exit_and_full_docs_reconciliation
+```
+
+This packet consumes current founder account/API evidence and current first-party public documentation without exposing raw credentials or promoting documentation into live runtime certification.
+
+## ThrivePush
+
+- REST/JSON API at `https://thrivepush.io/api`;
+- Bearer API key authentication;
+- UTC result semantics;
+- 18 documented API families covering account, websites, subscribers, campaigns, automations, flows, segments, handlers, domains, teams, payments and logs;
+- JWT-protected `thrivepush-api-control@1` scaffold deployed with provider dispatch disabled;
+- 13 strict disabled MCP family candidates registered;
+- provider writes closed;
+- exact path/method/schema extraction and authenticated read remain open.
+
+### `thrivepusher.js`
+
+The founder-supplied service-worker bootstrap is preserved byte-for-byte as a public-safe integration asset:
+
+```yaml
+repository_path: developers/assets/thrivepush/thrivepusher.js
+sha256: 19970f0e27cb3eb4d17fb093a25fb0efd7208b36e1336578616d96d8d6ef4788
+supabase_mirror_function: thrivepush-service-worker@1
+google_drive_continuity_copy: CrownThrive_ThrivePush_Service-Worker_thrivepusher_2026-08-19_v1.js
+live_website_root_install: unverified
+```
+
+The Supabase mirror is public intentionally because the worker itself is a website bootstrap asset, not a private API credential. The API key is never embedded in it.
+
+## CrownLytics
+
+- REST/JSON API at `https://crownlytics.com/api`;
+- Bearer API key authentication;
+- UTC result semantics;
+- documented families for User, Websites, Pageviews, Visitors, Goals, Goal conversions, Annotations, Website statistics, Custom domains, Account payments and Account logs;
+- JWT-protected `crownlytics-api-control@1` scaffold deployed, provider dispatch disabled;
+- 11 strict disabled MCP read-family candidates registered;
+- provider writes closed;
+- exact paths/methods/schemas and authenticated reads remain open.
+
+The founder-supplied capture included a `locticians.com` header immediately before CrownLytics API content. That observation is preserved as source-context drift; current first-party API identity remains CrownLytics and no identity merge is allowed.
+
+## CrownPulse Admin API
+
+Founder-observed privileged Admin UI evidence establishes:
+
+```yaml
+admin_base_url: https://crownpulse.com/admin-api
+admin_docs: https://crownpulse.com/admin/api-documentation
+authentication: Bearer API key
+provider_lineage: AltumCode
+update_available_observed: v61.0.0
+installed_version: unverified
+support_status_observed: expired
+```
+
+Supplied resource operations:
+
+- Users: retrieve all/one, create, update, delete, generate one-time login code;
+- Plans: retrieve all/one;
+- Payments: retrieve all/one;
+- Domains: retrieve all/one, update, delete.
+
+`crownpulse-admin-api-control@1` is JWT-protected and fail-closed. Fourteen strict disabled MCP contracts are registered, including six that explicitly require human approval. User/domain mutation and one-time login generation remain D2/D3 closed.
+
+The update notice does not prove the installed version and does not authorize an upgrade. Upgrade work requires installed-version discovery, compatibility analysis, backups, staging validation and rollback.
+
+## Credential security blocker
+
+The founder supplied current API keys for all three services. A direct Supabase Vault write was attempted through the connected database tool and was rejected by the secure-write policy before persistence. No raw value is stored or exposed by this packet.
+
+Intended secret references:
+
+```text
+vault:thrivepush_api_key
+vault:crownlytics_api_key
+vault:crownpulse_admin_api_key
+```
+
+Each also has a planned `_recovery` alias. The credential-continuity registry is `blocked_missing_secret` until an approved secret-write path succeeds. Encoding or committing a secret to bypass the control is prohibited.
+
+## Documentation and machine impact
+
+Updated/created surfaces include:
+
+- [ThrivePush API Adapter](/developers/thrivepush-api-adapter)
+- [CrownLytics API Adapter](/developers/crownlytics-api-adapter)
+- [CrownPulse Admin API Adapter](/developers/crownpulse-admin-api-adapter)
+- [API Base URL and Endpoint Seed Register](/developers/api-base-url-and-endpoint-seed-register)
+- [Platform API and Adapter Matrix](/developers/platform-api-adapter-matrix)
+- [ThrivePush Institutional Registry](/platforms/thrivepush-institutional-registry)
+- [CrownLytics Institutional Registry](/platforms/crownlytics-institutional-registry)
+- [CrownPulse Institutional Registry](/platforms/crownpulse-institutional-registry)
+
+THIVEBASE now tracks service state, credential-continuity blockers, adapter-scaffold PASS, read OPEN, write CLOSED and disabled MCP candidates.
+
+## Exact next certification order
+
+1. approved server-side secret binding for all three services;
+2. exact path/method/schema extraction from authoritative docs/account interfaces;
+3. bounded D0/D1 authenticated reads;
+4. output-schema, timeout, audit and purpose/data-class validation;
+5. enable only independently certified read tools;
+6. separately govern any D2/D3 mutation;
+7. assess CrownPulse version/support upgrade risk;
+8. prove ThrivePush root worker deployment if the live property is intended to consume this exact worker.
+
+## Gate statement
+
+This packet advances current API readiness and institutional knowledge. It does **not** technically certify authenticated provider operation and does not open Phase 3.
+
+## Page changelog
+
+- **2026-08-19 v1.0:** initial governed reconciliation of ThrivePush, CrownLytics and CrownPulse Admin APIs plus the ThrivePush service-worker artifact and fail-closed control plane.

@@ -1,7 +1,7 @@
 ---
 title: "Phase 2.99 WS3A — ThriveTools Child API Reconciliation"
 sidebarTitle: "2.99 WS3A — ThriveTools APIs"
-description: "Governed Workstream 3A reconciliation of ThriveTools SEO/OPT child identities, OPT v4.0.0 API evidence, dual Vault continuity, disabled MCP contracts, and exact fail-closed runtime gates."
+description: "Governed Workstream 3A reconciliation of ThriveTools SEO/OPT identities, v4.0.0 API evidence, primary Vault binding, open recovery continuity, and fail-closed runtime gates."
 icon: "plug-circle-check"
 keywords: ["Phase 2.99", "ThriveTools OPT", "ThriveTools SEO", "API", "Supabase Vault", "Workstream 3A", "v4.0.0"]
 ---
@@ -63,8 +63,8 @@ The founder-supplied API credential is classified **restricted runtime-only**.
 service_id: thrivetools_opt
 credential_reference: vault:thrivetools_opt_api_key
 primary_vault_alias: configured
-recovery_vault_alias: configured
-fingerprints_match: true
+recovery_vault_alias: not_established
+credential_continuity: open
 raw_secret_publication: prohibited
 ```
 
@@ -78,7 +78,7 @@ Current behavior is deliberately fail-closed:
 
 - health/configuration reporting is allowed without exposing the credential;
 - capabilities expose only the governed operation catalog;
-- provider read dispatch is disabled until exact HTTP methods and authenticated D0 behavior are certified;
+- the authenticated `GET /check-status` behavior is independently certified, but the control-plane provider-read dispatch remains disabled while the remaining D0 methods, response bounds and error semantics are certified;
 - provider upload/delete dispatch is disabled.
 
 ## Machine tool contracts
@@ -105,8 +105,13 @@ Schemas are bounded with `additionalProperties: false`. Disabled registration pr
 api_documentation: passed
 credential_vault_binding: passed
 parent_child_identity: passed
+authenticated_status_read: passed
+credential_continuity: open
 endpoint_method_reconciliation: open
-authenticated_read: open
+provider_reads: open
+control_plane_request_body_bounding: open
+provider_response_body_bounding: open
+auth_failure_semantics: open
 mcp_adapter: open
 provider_writes: closed
 ```
@@ -157,11 +162,11 @@ Future deletion certification requires target validation, retention/recovery pol
 
 ## Exact next steps
 
-1. obtain authoritative HTTP-method evidence for all six OPT paths;
-2. certify `/check-status` as the first bounded authenticated D0 provider request;
-3. validate JSON content type and response schema;
-4. certify `/get-images`, `/get-media` and `/get-single-image` reads;
-5. only then consider enabling D0 MCP tools;
+1. preserve the live-certified `GET /check-status` evidence as the only currently verified method/read surface;
+2. obtain authoritative HTTP-method evidence for the remaining five OPT paths without inference;
+3. establish a governed recovery credential reference and keep credential continuity OPEN until independently verified;
+4. certify bounded response/error behavior for `/get-images`, `/get-media` and `/get-single-image` before enabling provider-read dispatch;
+5. add request/response body ceilings and least-data projections before enabling broader adapter or MCP exposure;
 6. leave upload/delete closed until a separate D2 authorization and certification packet;
 7. reconcile OPT object/export/provider-exit behavior into GATE-007 continuity evidence.
 
@@ -179,4 +184,5 @@ This packet does not:
 
 ### Page changelog
 
-- **2026-08-19 v1.0:** resolved ThriveTools SEO/OPT child identities, registered the founder-supplied OPT v4.0.0 API contract, added dual Vault continuity, fail-closed JWT adapter scaffold, disabled machine tool contracts, portfolio/edge propagation and explicit runtime/write gates.
+- **2026-08-20 v1.1:** reconciled the public-safe OPT state to connected Supabase truth: primary Vault binding and live `GET /check-status` remain PASS, recovery continuity and five endpoint methods remain OPEN, provider reads/MCP remain gated, and writes remain CLOSED.
+- **2026-08-19 v1.0:** resolved ThriveTools SEO/OPT child identities, registered the founder-supplied OPT v4.0.0 API contract, added the initial Vault/runtime scaffold and disabled machine tool contracts, portfolio/edge propagation and explicit runtime/write gates.
