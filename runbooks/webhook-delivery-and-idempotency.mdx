@@ -1,0 +1,110 @@
+---
+title: "Webhook Delivery Integrity and Idempotency"
+sidebarTitle: "Webhook Integrity"
+description: "Developer runbook for receiver hardening, signature verification, replay control, durable receipts, idempotency, and real provider-delivery proof."
+icon: "webhook"
+---
+
+# Webhook delivery integrity and idempotency
+
+Use this runbook for inbound provider webhooks, event callbacks, and delivery receivers where correctness depends on source authenticity, bounded parsing, durable receipt evidence, and replay-safe processing.
+
+## Core distinction
+
+A configured webhook endpoint is not proof of delivery. A synthetic receipt is not proof of provider delivery. A provider dashboard configuration screenshot is not proof that the runtime verified the signature or safely processed the event.
+
+## Receiver pipeline
+
+```text
+request
+  ↓
+network / route allowability
+  ↓
+pre-parse body-size bound
+  ↓
+provider signature verification
+  ↓
+event-type allowlist
+  ↓
+receipt persistence
+  ↓
+idempotency / replay decision
+  ↓
+business handler
+  ↓
+canonical state update
+  ↓
+acknowledgment / response
+```
+
+## Required controls
+
+- TLS endpoint under the expected domain;
+- explicit method and content-type handling;
+- pre-parse maximum body size;
+- raw-body preservation where signature algorithms require it;
+- provider-supported signature verification;
+- timestamp/replay-window validation where supported;
+- event-type allowlist;
+- durable receipt ID and provider event ID;
+- idempotency key or deterministic replay key;
+- duplicate detection;
+- bounded retries and dead-letter/reconciliation path;
+- least-data event projection;
+- safe logging with secret/header redaction;
+- failure telemetry and operator visibility.
+
+## Receipt record
+
+```yaml
+receipt_id: local-receipt-id
+provider: example
+provider_event_id: external-event-id
+event_type: order.updated
+signature_valid: true
+body_bounded: true
+received_at: timestamp
+idempotency_state: first_seen
+processing_state: accepted
+canonical_effect: reference-only
+```
+
+Commercial examples must use synthetic identifiers.
+
+## Certification sequence
+
+1. Verify provider-side webhook configuration and selected event scope.
+2. Verify receiver route and bounded-body behavior.
+3. Verify signature handling using provider-supported test material or a real bounded provider delivery.
+4. Verify duplicate/replay behavior.
+5. Verify durable receipt persistence.
+6. Verify canonical handler output or fail-closed no-op behavior.
+7. Verify retry/dead-letter/reconciliation behavior.
+8. Obtain at least one real provider delivery when the technical gate requires provider-origin proof.
+9. Keep the technical gate NOT-PASS if only synthetic delivery exists.
+
+## Failure classes
+
+- signature secret configured but runtime binding unproved;
+- request parsed before size check;
+- receiver accepts unsigned or malformed events;
+- duplicate event creates duplicate entitlement/payment/state mutation;
+- provider retries are dropped with no reconciliation path;
+- event scope is broader than needed;
+- secret/signature material leaks into logs;
+- provider delivery is assumed from configuration alone.
+
+## Verification checklist
+
+- [ ] Body bound occurs before unsafe parsing.
+- [ ] Signature verification uses provider-supported semantics.
+- [ ] Replay/idempotency behavior is tested.
+- [ ] Receipt persistence is durable.
+- [ ] Event allowlist is bounded.
+- [ ] Failure/retry path is observable.
+- [ ] Logs are redacted.
+- [ ] Real provider delivery is separately distinguished from synthetic tests.
+
+## Commercialization state
+
+Public-safe developer pattern candidate and capability-pallet candidate. Private provider signing architecture, secret references, live receipt bodies, customer data, and proprietary conformance corpora remain restricted.
