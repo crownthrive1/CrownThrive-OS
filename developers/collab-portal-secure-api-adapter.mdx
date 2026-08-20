@@ -104,7 +104,7 @@ Because the verified API can **read and update existing projects but cannot crea
 2. discover the account-specific project schema with `GET /project/meta`;
 3. resolve the project with `GET /project/uid/{uid}` or exact-name lookup;
 4. preserve current fields and calculate a bounded update;
-5. write approved project status/information/custom-field values with `PUT /project/uid/{uid}`;
+5. write only the currently approved `status` and `info_description` fields with `PUT /project/uid/{uid}`; `project_custom_fields` remain outside the automated write map;
 6. immediately read the project back and verify the expected values;
 7. record the request/response evidence reference and result in the institutional changelog/DAIL layer;
 8. on 401/404/422/429 or semantic mismatch, do not retry mutation blindly; open a governed delta and fall back to GitHub \+ Gmail reporting.
@@ -314,23 +314,16 @@ Until then, hourly authenticated reads/project-status projection remain the reco
 
 ## Phase 2.99 hard checkpoint
 
-Collab Portal moves from `vendor_api_candidate` to **`api_contract_verified / live_auth_pending`**.
+Collab Portal is currently **`api_contract_verified / authenticated_reads_verified / bounded_write_readback_verified / webhook_delivery_not_passed`**.
 
-Phase 2.99 must now produce:
+Completed current checkpoints include the stable adapter/platform relationship, public-safe contract evidence, base URL/auth contract, endpoint inventory, account-specific project metadata, pinned institutional project UID, exact server-side credential binding, authenticated reads, a founder-authorized one-shot bounded `status`/`info_description` update with readback, provider-side webhook UI configuration, split receiver v2 hardening, request-body bounds and synthetic local deduplication.
 
-- stable adapter ID and platform relationship;
-- public-safe OpenAPI source reference and checksum;
-- base URL/auth-header contract;
-- endpoint inventory;
-- account-specific `/project/meta` evidence;
-- stable institutional project UID;
-- credential binding through a server-side secret store;
-- authenticated read test;
-- bounded update test on approved project-management fields;
-- read-after-write test;
-- 401/404/422/429 fixtures;
-- request-budget/incident rules;
-- `S102` webhook UI/event contract pinned separately from S101, with sender-integrity, delivery-attempt, retry/replay, receiver-idempotency and receiver-certification requirements tracked as the remaining event-driven lane;
-- rollback/fallback to GitHub \+ Gmail.
+The remaining current webhook lane is narrower and explicit:
 
-No future phase may continue describing Collab Portal as having no verified API contract. Conversely, no future phase may describe the integration as production-write-ready until authenticated evidence completes the remaining checkpoints.
+- provider sender/live-delivery proof;
+- live retry/replay/failed-delivery semantics as observed against CrownThrive, not merely documented by a provider;
+- point-of-use certification before any production workflow depends on provider-push events;
+- security reconciliation of credential-source precedence in the active PM runtime;
+- continued rollback/fallback to authenticated provider reads, GitHub/Mintlify and notification continuity where enabled.
+
+`CT-P299-GATE-006` remains technically **6 of 7 / NOT PASS**. The approved governed deferral changes blocking disposition only; it does not certify the missing provider callback. Phase 2 / 2.99 remains current and Phase 3 remains blocked by the canonical hard-exit program.
