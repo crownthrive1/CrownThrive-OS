@@ -12,8 +12,7 @@ const ALLOWED_OPERATIONS = new Set([
   'tools/list',
   'resources/list',
   'resources/templates/list',
-  'prompts/list',
-  'logging/setLevel'
+  'prompts/list'
 ]);
 const BLOCKED_RESPONSE_HEADERS = new Set([
   'authentication-info',
@@ -97,6 +96,9 @@ export function createProxyServer(options = {}) {
       if (req.method !== 'POST' || req.url !== '/mcp') {
         res.setHeader('allow', 'POST');
         return respondJson(res, 405, 'method_or_path_not_allowed');
+      }
+      if (req.headers['x-http-method-override'] || req.headers['x-method-override']) {
+        return respondJson(res, 400, 'method_override_not_allowed');
       }
       const declared = Number(req.headers['content-length'] ?? 0);
       if (Number.isFinite(declared) && declared > requestLimit) return respondJson(res, 413, 'request_body_too_large');
