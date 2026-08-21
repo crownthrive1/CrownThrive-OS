@@ -25,7 +25,7 @@ assert.equal(run('contracts/mcp/verify-founder-signature-envelope.mjs').status, 
 let upstreamHits = 0;
 const upstream = http.createServer((req, res) => { upstreamHits += 1; res.end('{}'); });
 const upstreamPort = await listen(upstream);
-const proxy = createProxyServer({ target: `http://127.0.0.1:${upstreamPort}`, bearer: 'test-only', requestLimit: 32, responseLimit: 64, timeoutMs: 500 });
+const proxy = createProxyServer({ target: `http://127.0.0.1:${upstreamPort}`, requestLimit: 32, responseLimit: 64, timeoutMs: 500 });
 const proxyPort = await listen(proxy);
 const oversized = await request(proxyPort, 'x'.repeat(33));
 assert.equal(oversized.status, 413);
@@ -35,7 +35,7 @@ await close(upstream);
 
 const largeUpstream = http.createServer((req, res) => res.end('x'.repeat(65)));
 const largePort = await listen(largeUpstream);
-const largeProxy = createProxyServer({ target: `http://127.0.0.1:${largePort}`, bearer: 'test-only', requestLimit: 32, responseLimit: 64, timeoutMs: 500 });
+const largeProxy = createProxyServer({ target: `http://127.0.0.1:${largePort}`, requestLimit: 32, responseLimit: 64, timeoutMs: 500 });
 const largeProxyPort = await listen(largeProxy);
 assert.equal((await request(largeProxyPort, '{}')).status, 502);
 await close(largeProxy);
@@ -43,7 +43,7 @@ await close(largeUpstream);
 
 const slowUpstream = http.createServer((req, res) => setTimeout(() => res.end('{}'), 250));
 const slowPort = await listen(slowUpstream);
-const slowProxy = createProxyServer({ target: `http://127.0.0.1:${slowPort}`, bearer: 'test-only', requestLimit: 32, responseLimit: 64, timeoutMs: 50 });
+const slowProxy = createProxyServer({ target: `http://127.0.0.1:${slowPort}`, requestLimit: 32, responseLimit: 64, timeoutMs: 50 });
 const slowProxyPort = await listen(slowProxy);
 assert.equal((await request(slowProxyPort, '{}')).status, 504);
 await close(slowProxy);
