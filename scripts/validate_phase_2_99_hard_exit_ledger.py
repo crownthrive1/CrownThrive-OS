@@ -77,7 +77,7 @@ def require_nonnegative_int(value, label: str) -> None:
 
 
 def validate(data: dict, root: Path, check_files: bool = True) -> None:
-    require_equal(data.get("manifest_version"), "1.2.2", "manifest version")
+    require_equal(data.get("manifest_version"), "1.2.3", "manifest version")
     require_equal(data.get("observation_semantics"), "verification_baseline_snapshot_not_dynamic_post_merge_assertion", "observation semantics")
     require_timestamp(data.get("observed_at"), "observed_at")
 
@@ -260,7 +260,7 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
         fail("PR #62 five-phase snapshot must remain superseded lineage")
 
     article_text = (root / article["evidence_path"]).read_text(encoding="utf-8")
-    for fragment in ("source_inventory_count: 795", "complete_machine_manifest_generated_in_repo: pending", "P0_P1_disposition_completion: pending"):
+    for fragment in ("source_inventory_count: 795", "complete_machine_manifest_generated_in_repo: complete_merged_pr_91", "P0_P1_disposition_completion: pending"):
         if fragment not in article_text:
             fail(f"article evidence missing: {fragment!r}")
 
