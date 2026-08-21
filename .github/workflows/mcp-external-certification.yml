@@ -29,14 +29,18 @@ jobs:
     name: Pre-signature MCP certification preflight
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Record runner toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          python3 --version
       - name: Validate certification manifest and fail-closed boundary
-        run: node contracts/mcp/external-certification-runner.mjs > mcp-preflight.json
+        run: node contracts/mcp/external-certification-runner.mjs | tee mcp-preflight.json
       - name: Verify exact authorized payload digest
-        run: node contracts/mcp/verify-founder-signature-envelope.mjs > mcp-signature-payload-check.json
+        run: node contracts/mcp/verify-founder-signature-envelope.mjs | tee mcp-signature-payload-check.json
       - name: Verify no production writes are authorized
         run: |
           node - <<'NODE'
@@ -56,18 +60,17 @@ jobs:
             echo 'Potential secret material found in certification packet' >&2
             exit 1
           fi
-      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
-        with:
-          deno-version: v2.x
       - name: Type-check post-signature v4.1 release candidate
-        run: deno check reference/mcp/crownthrive-api-control.v4.1.0.release.ts
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: mcp-pre-signature-preflight
-          path: |
-            mcp-preflight.json
-            mcp-signature-payload-check.json
-          if-no-files-found: error
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes deno@2.9.5 check reference/mcp/crownthrive-api-control.v4.1.0.release.ts
+      - name: Preserve pre-signature evidence in governed job log
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum mcp-preflight.json mcp-signature-payload-check.json 2>/dev/null || true
 
   capture:
     name: Post-signature bounded schema capture
@@ -77,10 +80,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Require exact founder-signed payload
         run: node contracts/mcp/verify-founder-signature-envelope.mjs --require-signed
       - name: Mint repository-bound GitHub OIDC token
@@ -101,14 +101,16 @@ jobs:
         run: node contracts/mcp/infer-bounded-output-schemas.mjs mcp-output-shape-captures.json > mcp-bounded-output-schemas.json
       - name: Generate reviewed-only SQL migration artifact
         run: node contracts/mcp/generate-output-schema-migration.mjs mcp-bounded-output-schemas.json mcp-output-schema-migration.sql
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: mcp-post-signature-schema-capture
-          path: |
-            mcp-output-shape-captures.json
-            mcp-bounded-output-schemas.json
-            mcp-output-schema-migration.sql
-          if-no-files-found: error
+      - name: Preserve privacy-safe capture evidence in governed job log
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Capture body is intentionally not printed to public CI logs.'
+          sha256sum mcp-output-shape-captures.json mcp-bounded-output-schemas.json mcp-output-schema-migration.sql
+          echo '--- bounded output schemas ---'
+          cat mcp-bounded-output-schemas.json
+          echo '--- generated migration ---'
+          cat mcp-output-schema-migration.sql
 
   final:
     name: Post-signature final external MCP certification
@@ -118,10 +120,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Require exact founder-signed payload
         run: node contracts/mcp/verify-founder-signature-envelope.mjs --require-signed
       - name: Mint repository-bound GitHub OIDC token
@@ -139,7 +138,7 @@ jobs:
           MCP_CERTIFICATION_ALLOW_PROVIDER_READS: 'true'
           MCP_CERTIFICATION_SERVER_URL: ${{ inputs.server_url }}
           MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
-        run: node contracts/mcp/external-certification-runner.mjs > crownthrive-overlay.json
+        run: node contracts/mcp/external-certification-runner.mjs | tee crownthrive-overlay.json
       - name: Start non-provider official-conformance auth proxy
         env:
           MCP_CONFORMANCE_SERVER_URL: ${{ inputs.server_url }}
@@ -150,18 +149,16 @@ jobs:
           nohup node contracts/mcp/external-certification-auth-proxy.mjs > mcp-auth-proxy.log 2>&1 &
           echo $! > mcp-auth-proxy.pid
           sleep 2
-      - name: Run official MCP 2026-07-28 server conformance suite
+      - name: Run pinned official MCP 2026-07-28 server conformance suite
         shell: bash
         run: |
           set -euo pipefail
-          npx -y @modelcontextprotocol/conformance server --url http://127.0.0.1:8787/mcp --suite all --spec-version 2026-07-28 --verbose 2>&1 | tee official-mcp-conformance.txt
-      - name: Preserve certification evidence
+          npx --yes @modelcontextprotocol/conformance@0.1.16 server --url http://127.0.0.1:8787/mcp --suite all --spec-version 2026-07-28 --verbose 2>&1 | tee official-mcp-conformance.txt
+      - name: Preserve final evidence in governed job log
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: mcp-final-external-certification
-          path: |
-            crownthrive-overlay.json
-            official-mcp-conformance.txt
-            mcp-auth-proxy.log
-          if-no-files-found: warn
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum crownthrive-overlay.json official-mcp-conformance.txt mcp-auth-proxy.log 2>/dev/null || true
+          echo '--- auth proxy log ---'
+          cat mcp-auth-proxy.log 2>/dev/null || true
