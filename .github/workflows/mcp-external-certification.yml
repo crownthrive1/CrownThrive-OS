@@ -1,4 +1,4 @@
-name: MCP External Certification
+name: MCP External Certification Security Hold
 
 on:
   pull_request:
@@ -6,181 +6,35 @@ on:
       - 'contracts/mcp/**'
       - 'reference/mcp/crownthrive-api-control.v4.1.0*.ts'
       - '.github/workflows/mcp-external-certification.yml'
-  workflow_dispatch:
-    inputs:
-      stage:
-        description: 'Post-signature certification stage'
-        required: true
-        type: choice
-        options:
-          - capture
-          - final
-      server_url:
-        description: 'Exact CrownThrive MCP server URL'
-        required: true
-        default: 'https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control'
-        type: string
 
 permissions:
   contents: read
 
 jobs:
-  pre-signature-static:
-    name: Pre-signature MCP certification preflight
+  public-safe-security-hold:
+    name: Verify fail-closed public projection
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Record runner toolchain
+      - name: Verify security hold and negative controls
+        run: node contracts/mcp/test-external-certification-security-hold.mjs
+      - name: Type-check public-safe fail-closed reference
+        run: npx --yes deno@2.9.5 check reference/mcp/crownthrive-api-control.v4.1.0.release.ts
+      - name: Reject prohibited public projection classes
         shell: bash
         run: |
           set -euo pipefail
-          node --version
-          npm --version
-          python3 --version
-      - name: Validate certification manifest and fail-closed boundary
-        run: node contracts/mcp/external-certification-runner.mjs | tee mcp-preflight.json
-      - name: Verify exact authorized payload digest
-        run: node contracts/mcp/verify-founder-signature-envelope.mjs | tee mcp-signature-payload-check.json
-      - name: Verify no production writes are authorized
-        run: |
-          node - <<'NODE'
-          const m = JSON.parse(require('fs').readFileSync('contracts/mcp/external-certification-plan.v1.json','utf8'));
-          const e = JSON.parse(require('fs').readFileSync('contracts/mcp/founder-signature-envelope.v1.json','utf8'));
-          if (m.server.provider_writes_enabled !== false) throw new Error('provider writes must remain disabled');
-          if (m.post_signature_execution.provider_read_budget.provider_writes !== 0) throw new Error('provider write budget must be zero');
-          if (m.server.sovereign_vote_authority !== false) throw new Error('certification runner must remain non-sovereign');
-          if (e.authorized_effect.provider_write_budget !== 0) throw new Error('signature envelope write budget must be zero');
-          if (e.authorized_effect.non_d0_tool_enablement !== false) throw new Error('signature envelope cannot enable non-D0 tools');
-          NODE
-      - name: Reject obvious secret material in certification packet
-        shell: bash
-        run: |
-          set -euo pipefail
-          if grep -RInE --exclude='mcp-external-certification.yml' '(whsec_[A-Za-z0-9]|sk_(live|test)_[A-Za-z0-9]|sb_secret_|SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=|Bearer[[:space:]]+[A-Za-z0-9._-]{40,})' contracts/mcp reference/mcp/crownthrive-api-control.v4.1.0*.ts; then
-            echo 'Potential secret material found in certification packet' >&2
+          if grep -RInE '(SUPABASE_SERVICE_ROLE_KEY|ADMIN_EMAILS|GITHUB_CERT_REPOSITORY_ID|/functions/v1/|authorization:[[:space:]]*`Bearer|integration_control\.mcp_tools)' contracts/mcp reference/mcp/crownthrive-api-control.v4.1.0*.ts; then
+            echo 'Restricted runtime or identity material remains in the current public projection.' >&2
             exit 1
           fi
-      - name: Type-check post-signature v4.1 release candidate
+      - name: Record public-safe evidence digests only
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes deno@2.9.5 check reference/mcp/crownthrive-api-control.v4.1.0.release.ts
-      - name: Preserve pre-signature evidence in governed job log
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          sha256sum mcp-preflight.json mcp-signature-payload-check.json 2>/dev/null || true
+          sha256sum \
+            contracts/mcp/external-certification-plan.v1.json \
+            contracts/mcp/external-certification-auth-proxy.mjs \
+            contracts/mcp/test-external-certification-security-hold.mjs \
+            reference/mcp/crownthrive-api-control.v4.1.0.release.ts
 
-  capture:
-    name: Post-signature bounded schema capture
-    if: github.event_name == 'workflow_dispatch' && inputs.stage == 'capture'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Require exact founder-signed payload
-        run: node contracts/mcp/verify-founder-signature-envelope.mjs --require-signed
-      - name: Lock exact certification destination before minting OIDC
-        env:
-          REQUESTED_CERTIFICATION_SERVER_URL: ${{ inputs.server_url }}
-          CANONICAL_CERTIFICATION_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "$REQUESTED_CERTIFICATION_SERVER_URL" != "$CANONICAL_CERTIFICATION_SERVER_URL" ]; then
-            echo 'Certification destination is not the canonical governed MCP endpoint.' >&2
-            exit 1
-          fi
-      - name: Lock exact certification destination before minting OIDC
-        env:
-          REQUESTED_CERTIFICATION_SERVER_URL: ${{ inputs.server_url }}
-          CANONICAL_CERTIFICATION_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "$REQUESTED_CERTIFICATION_SERVER_URL" != "$CANONICAL_CERTIFICATION_SERVER_URL" ]; then
-            echo 'Certification destination is not the canonical governed MCP endpoint.' >&2
-            exit 1
-          fi
-      - name: Mint repository-bound GitHub OIDC token
-        id: oidc
-        shell: bash
-        run: |
-          set -euo pipefail
-          response="$(curl --fail-with-body --silent --show-error -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=crownthrive-mcp-certification")"
-          token="$(printf '%s' "$response" | jq -er '.value')"
-          echo "::add-mask::$token"
-          echo "token=$token" >> "$GITHUB_OUTPUT"
-      - name: Capture one bounded sanitized result per enabled central D0 tool
-        env:
-          MCP_CERTIFICATION_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
-          MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
-        run: node contracts/mcp/capture-mcp-output-shapes.mjs mcp-output-shape-captures.json
-      - name: Infer bounded JSON Schema 2020-12 contracts
-        run: node contracts/mcp/infer-bounded-output-schemas.mjs mcp-output-shape-captures.json > mcp-bounded-output-schemas.json
-      - name: Generate reviewed-only SQL migration artifact
-        run: node contracts/mcp/generate-output-schema-migration.mjs mcp-bounded-output-schemas.json mcp-output-schema-migration.sql
-      - name: Preserve privacy-safe capture evidence in governed job log
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo 'Capture body is intentionally not printed to public CI logs.'
-          sha256sum mcp-output-shape-captures.json mcp-bounded-output-schemas.json mcp-output-schema-migration.sql
-          echo '--- bounded output schemas ---'
-          cat mcp-bounded-output-schemas.json
-          echo '--- generated migration ---'
-          cat mcp-output-schema-migration.sql
-
-  final:
-    name: Post-signature final external MCP certification
-    if: github.event_name == 'workflow_dispatch' && inputs.stage == 'final'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Require exact founder-signed payload
-        run: node contracts/mcp/verify-founder-signature-envelope.mjs --require-signed
-      - name: Mint repository-bound GitHub OIDC token
-        id: oidc
-        shell: bash
-        run: |
-          set -euo pipefail
-          response="$(curl --fail-with-body --silent --show-error -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=crownthrive-mcp-certification")"
-          token="$(printf '%s' "$response" | jq -er '.value')"
-          echo "::add-mask::$token"
-          echo "token=$token" >> "$GITHUB_OUTPUT"
-      - name: Run CrownThrive external overlay with exactly two final provider reads
-        env:
-          MCP_CERTIFICATION_LIVE: 'true'
-          MCP_CERTIFICATION_ALLOW_PROVIDER_READS: 'true'
-          MCP_CERTIFICATION_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
-          MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
-        run: node contracts/mcp/external-certification-runner.mjs | tee crownthrive-overlay.json
-      - name: Start non-provider official-conformance auth proxy
-        env:
-          MCP_CONFORMANCE_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
-          MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          nohup node contracts/mcp/external-certification-auth-proxy.mjs > mcp-auth-proxy.log 2>&1 &
-          echo $! > mcp-auth-proxy.pid
-          sleep 2
-      - name: Run pinned official MCP 2026-07-28 server conformance suite
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes @modelcontextprotocol/conformance@0.1.16 server --url http://127.0.0.1:8787/mcp --suite all --spec-version 2026-07-28 --verbose 2>&1 | tee official-mcp-conformance.txt
-      - name: Preserve final evidence in governed job log
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          sha256sum crownthrive-overlay.json official-mcp-conformance.txt mcp-auth-proxy.log 2>/dev/null || true
-          echo '--- auth proxy log ---'
-          cat mcp-auth-proxy.log 2>/dev/null || true
