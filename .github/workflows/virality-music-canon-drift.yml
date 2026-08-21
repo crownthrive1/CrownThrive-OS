@@ -1,0 +1,28 @@
+name: Virality Music Canon Drift
+
+on:
+  pull_request:
+    paths:
+      - "platforms/virality-music-creative-canon-and-suno-standards.mdx"
+      - "knowledge/virality-music-canon-source-and-conflict-register.mdx"
+      - "registry/virality-music/**"
+      - "scripts/validate_virality_music_canon.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: virality-music-canon-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate documentation
+        run: python3 scripts/validate_docs.py
+      - name: Validate Virality Music canon projection
+        run: python3 scripts/validate_virality_music_canon.py
