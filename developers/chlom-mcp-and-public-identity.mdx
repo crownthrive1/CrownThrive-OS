@@ -1,0 +1,302 @@
+---
+title: "CHLOM MCP, Public Identity and Modular Integration"
+sidebarTitle: "CHLOM MCP & Identity"
+description: "Developer contract for CHLOM module discovery, public identity resolution, DAIL, MCP tools, algorithm/oracle registries, platform adapters and fail-closed future capabilities."
+icon: "fingerprint"
+keywords: ["CHLOM", "MCP", "DID", "public identity", "DAIL", "developer API", "oracles", "algorithms", "module discovery"]
+---
+
+# CHLOM MCP, Public Identity and Modular Integration
+
+CHLOM's developer surface follows the metaprotocol rule: integrations depend on stable CHLOM contracts, not on one storage provider or blockchain implementation.
+
+<Info>
+  Current implementation state: **controlled test**. Public resolver readback is verified. The authenticated CHLOM control-plane/MCP service is deployed; independent end-to-end authenticated MCP client certification remains open.
+</Info>
+
+## Integration model
+
+```text
+Application / Agent
+        |
+        +--> CHLOM API
+        |
+        +--> CHLOM MCP
+                  |
+             CHLOM Kernel
+                  |
+        +---------+----------+
+        |         |          |
+    Identity    DAIL      Capabilities
+        |         |          |
+        +---------+----------+
+                  |
+            platform adapters
+```
+
+## Public identity resolver
+
+CHLOM uses opaque public IDs with a DID projection:
+
+```text
+ctid_<opaque identifier>
+  -> did:chlom:ctid_<opaque identifier>
+```
+
+A resolver response may contain:
+
+```json
+{
+  "public_id": "ctid_...",
+  "did": "did:chlom:ctid_...",
+  "state": "active",
+  "public_keys": [
+    {
+      "algorithm": "Ed25519",
+      "purpose": "authentication",
+      "public_jwk": {}
+    }
+  ]
+}
+```
+
+Private signing material is not part of this contract.
+
+Public IDs are designed for stable public verification. They do not encode an SSN, email address, password, government identifier or private key.
+
+## Dedicated MCP server contract
+
+Canonical server identity:
+
+```yaml
+server_id: ct.mcp.chlom-core
+stage: controlled_test
+protocol_version: "2026-07-28"
+auth: governed authenticated service/user context
+```
+
+The dedicated server keeps CHLOM capability evolution independent from unrelated CrownThrive provider adapters.
+
+### Controlled-test tool families
+
+The capability registry currently defines low-risk tool contracts for:
+
+- `chlom.identity.resolve`
+- `chlom.module.list`
+- `chlom.module.capabilities`
+- `chlom.fingerprint.text`
+- `chlom.dail.query`
+- `chlom.dail.append`
+- `chlom.agent.list`
+- `chlom.oracle.list`
+- `chlom.algorithm.list`
+- `chlom.health.snapshot`
+- `chlom.backup.status`
+
+Some restricted administrative operations, including public-ID issuance and hosted-key generation, are intentionally not exposed as ordinary self-service MCP calls.
+
+### Future fail-closed contracts
+
+The registry also reserves names for capabilities that remain disabled until their runtime and approval gates exist:
+
+```text
+chlom.rights.inspect
+chlom.rights.claim
+chlom.dla.draft
+chlom.dla.activate
+chlom.lex.list
+chlom.lex.offer
+chlom.policy.evaluate
+chlom.oracle.submit
+chlom.dispute.open
+chlom.remedy.execute
+chlom.chain.anchor
+chlom.treasury.execute
+```
+
+Registering the contract does not activate the operation.
+
+D3 rights, binding-license, money, treasury, production-token and irreversible remedy actions remain human-reserved under CrownThrive's approval constitution.
+
+## Module discovery
+
+Clients should discover capabilities rather than hard-code assumptions about the whole CHLOM estate.
+
+A module record includes:
+
+```yaml
+module_id: ct.chlom.dail
+canonical_name: Decentralized Autonomous Information Ledger
+version: 0.1.0
+state: prototype
+authority_ceiling: D2
+self_healing_class: rollback_capable
+mcp_enabled: true
+api_enabled: true
+```
+
+A capability record adds:
+
+```yaml
+capability_id: ct.cap.chlom.dail.public-verify
+module_id: ct.chlom.dail
+kind: api
+risk_class: D0
+state: test
+public_safe: true
+hot_swappable: true
+```
+
+This structure lets CHLOM evolve without requiring every consumer to upgrade simultaneously.
+
+## DAIL developer contract
+
+DAIL is append-only from the application perspective.
+
+Applications should submit or receive events with:
+
+```yaml
+event_type:
+entity_type:
+entity_id:
+entity_version:
+correlation_id:
+causation_id:
+authority_basis:
+visibility_class:
+payload:
+```
+
+The server generates and verifies integrity metadata such as payload hashes, previous-event references and event hashes.
+
+Consumers must not treat a database UPDATE as a correction mechanism. Corrections are new DAIL events.
+
+## Fingerprint contract
+
+The first controlled-test fingerprint primitive is SHA-256 over canonical input.
+
+Fingerprinting establishes byte/text integrity; it does not by itself prove ownership, authorship or legal rights.
+
+Future media fingerprints may add acoustic, image/perceptual or semantic similarity methods, but those results remain evidence signals rather than automatic ownership judgments.
+
+## Agent registry
+
+Agent introspection is machine-readable. Consumers can inspect:
+
+- stable agent ID;
+- parent/orchestrator;
+- class;
+- autonomy level;
+- D0–D3 ceiling;
+- lifecycle state;
+- module scope;
+- schedule profile;
+- voting eligibility;
+- self-healing permission;
+- heartbeat/health state.
+
+The registry does not reveal private prompts, secrets or protected reasoning.
+
+## Oracle registry
+
+Oracle discovery returns controlled metadata about source classes and aggregation policy.
+
+Example classes:
+
+```text
+identity
+regulatory
+rights
+pricing_fx
+chain
+sanctions
+usage
+media_fingerprint
+ai_risk
+governance
+evidence
+time_finality
+```
+
+External oracle writes remain disabled until signing, freshness, quorum and source-authority controls are implemented and tested.
+
+## Algorithm registry
+
+The developer surface can expose public-safe algorithm contracts and evaluation state while keeping restricted implementation details sealed.
+
+Examples include:
+
+- fingerprint/hash integrity;
+- DAIL chain verification;
+- rights-conflict detection;
+- oracle aggregation/outlier detection;
+- anomaly ensembles;
+- graph-risk analysis;
+- Sybil-risk research;
+- model drift;
+- self-healing root-cause classification;
+- tokenomics simulation;
+- policy resolution;
+- DLA conflict checking;
+- ZK scheme selection.
+
+A registry entry marked `disabled` or `specified` must not be treated as callable production functionality.
+
+## Platform adapter rule
+
+Virality Music and KJV/Sermon Toolkit currently have controlled-test bindings to CHLOM identity/evidence continuity. Their DLA/LEX commerce bindings remain staged as specifications until rights and transaction gates close.
+
+Every future CrownThrive platform can implement the same adapter contract:
+
+```text
+platform
+  -> stable platform ID
+  -> CHLOM actor/service identity
+  -> capability discovery
+  -> scoped API/MCP credentials
+  -> DAIL events
+  -> platform-specific feature flags
+```
+
+This is how CHLOM becomes reusable across the ecosystem without forcing every platform into one application.
+
+## Security requirements
+
+Never place in browser code, public docs or client-side MCP configuration:
+
+- Vault passwords;
+- private signing keys;
+- unrestricted service-role credentials;
+- protected algorithm thresholds;
+- sealed rights evidence;
+- treasury keys;
+- production blockchain custody secrets.
+
+Public keys and opaque public IDs are intentionally public. Private keys are not.
+
+## Replication contract
+
+A future CHLOM implementation repository should be able to reconstruct runtime behavior from versioned migrations, schemas, service code, tests, ADRs and capability manifests without relying on chat history.
+
+Required repository artifacts include:
+
+```text
+AGENTS.md
+CURRENT_STATE.md
+HANDOFF.md
+adr/
+schemas/
+supabase/migrations/
+services/
+crates/
+contracts/
+policies/
+agents/
+workflows/
+tests/
+evals/
+docs-public/
+docs-restricted/
+```
+
+Public Mintlify documents the safe contract. Private GitHub/source storage owns protected implementation. Supabase owns runtime state. Google Drive holds encrypted recovery/document masters where appropriate.
