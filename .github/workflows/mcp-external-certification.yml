@@ -1,0 +1,175 @@
+name: MCP External Certification
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/mcp/**'
+      - 'reference/mcp/crownthrive-api-control.v4.1.0.ts'
+      - '.github/workflows/mcp-external-certification.yml'
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Post-signature certification stage'
+        required: true
+        type: choice
+        options:
+          - capture
+          - final
+      server_url:
+        description: 'Exact CrownThrive MCP server URL'
+        required: true
+        default: 'https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  pre-signature-static:
+    name: Pre-signature MCP certification preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate certification manifest and fail-closed boundary
+        run: node contracts/mcp/external-certification-runner.mjs > mcp-preflight.json
+      - name: Validate JSON artifacts
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('contracts/mcp/external-certification-plan.v1.json','utf8')); console.log('manifest-json-ok')"
+      - name: Verify no production writes are authorized
+        run: |
+          node - <<'NODE'
+          const m = JSON.parse(require('fs').readFileSync('contracts/mcp/external-certification-plan.v1.json','utf8'));
+          if (m.server.provider_writes_enabled !== false) throw new Error('provider writes must remain disabled');
+          if (m.post_signature_execution.provider_read_budget.provider_writes !== 0) throw new Error('provider write budget must be zero');
+          if (m.server.sovereign_vote_authority !== false) throw new Error('certification runner must remain non-sovereign');
+          NODE
+      - name: Reject obvious secret material in certification packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE --exclude='mcp-external-certification.yml' '(whsec_[A-Za-z0-9]|sk_(live|test)_[A-Za-z0-9]|sb_secret_|SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=|Bearer[[:space:]]+[A-Za-z0-9._-]{40,})' contracts/mcp reference/mcp/crownthrive-api-control.v4.1.0.ts; then
+            echo 'Potential secret material found in certification packet' >&2
+            exit 1
+          fi
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check post-signature v4.1 candidate
+        run: deno check reference/mcp/crownthrive-api-control.v4.1.0.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-pre-signature-preflight
+          path: mcp-preflight.json
+          if-no-files-found: error
+
+  capture:
+    name: Post-signature bounded schema capture
+    if: github.event_name == 'workflow_dispatch' && inputs.stage == 'capture'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require signed exact certification manifest
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const m = JSON.parse(fs.readFileSync('contracts/mcp/external-certification-plan.v1.json','utf8'));
+          if (m.founder_signature.state !== 'signed') throw new Error('founder signature is required before schema capture');
+          if (m.state !== 'signed_ready_for_final_implementation') throw new Error('certification lifecycle is not signed-ready');
+          NODE
+      - name: Mint repository-bound GitHub OIDC token
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(curl --fail-with-body --silent --show-error -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=crownthrive-mcp-certification")"
+          token="$(printf '%s' "$response" | jq -er '.value')"
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+      - name: Capture one bounded sanitized result per enabled central D0 tool
+        env:
+          MCP_CERTIFICATION_SERVER_URL: ${{ inputs.server_url }}
+          MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
+        run: node contracts/mcp/capture-mcp-output-shapes.mjs mcp-output-shape-captures.json
+      - name: Infer bounded JSON Schema 2020-12 contracts
+        run: node contracts/mcp/infer-bounded-output-schemas.mjs mcp-output-shape-captures.json > mcp-bounded-output-schemas.json
+      - name: Generate reviewed-only SQL migration artifact
+        run: node contracts/mcp/generate-output-schema-migration.mjs mcp-bounded-output-schemas.json mcp-output-schema-migration.sql
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-post-signature-schema-capture
+          path: |
+            mcp-output-shape-captures.json
+            mcp-bounded-output-schemas.json
+            mcp-output-schema-migration.sql
+          if-no-files-found: error
+
+  final:
+    name: Post-signature final external MCP certification
+    if: github.event_name == 'workflow_dispatch' && inputs.stage == 'final'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require signed exact certification manifest
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const m = JSON.parse(fs.readFileSync('contracts/mcp/external-certification-plan.v1.json','utf8'));
+          if (m.founder_signature.state !== 'signed') throw new Error('founder signature is required before final certification');
+          if (m.state !== 'signed_ready_for_final_implementation') throw new Error('certification lifecycle is not signed-ready');
+          NODE
+      - name: Mint repository-bound GitHub OIDC token
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(curl --fail-with-body --silent --show-error -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=crownthrive-mcp-certification")"
+          token="$(printf '%s' "$response" | jq -er '.value')"
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+      - name: Run CrownThrive external overlay with exactly two final provider reads
+        env:
+          MCP_CERTIFICATION_LIVE: 'true'
+          MCP_CERTIFICATION_ALLOW_PROVIDER_READS: 'true'
+          MCP_CERTIFICATION_SERVER_URL: ${{ inputs.server_url }}
+          MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
+        run: node contracts/mcp/external-certification-runner.mjs > crownthrive-overlay.json
+      - name: Start non-provider official-conformance auth proxy
+        env:
+          MCP_CONFORMANCE_SERVER_URL: ${{ inputs.server_url }}
+          MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup node contracts/mcp/external-certification-auth-proxy.mjs > mcp-auth-proxy.log 2>&1 &
+          echo $! > mcp-auth-proxy.pid
+          sleep 2
+      - name: Run official MCP 2026-07-28 server conformance suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx -y @modelcontextprotocol/conformance server --url http://127.0.0.1:8787/mcp --suite all --spec-version 2026-07-28 --verbose 2>&1 | tee official-mcp-conformance.txt
+      - name: Preserve certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-final-external-certification
+          path: |
+            crownthrive-overlay.json
+            official-mcp-conformance.txt
+            mcp-auth-proxy.log
+          if-no-files-found: warn
