@@ -29,8 +29,8 @@ jobs:
     name: Pre-signature MCP certification preflight
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
       - name: Validate certification manifest and fail-closed boundary
@@ -56,12 +56,12 @@ jobs:
             echo 'Potential secret material found in certification packet' >&2
             exit 1
           fi
-      - uses: denoland/setup-deno@v2
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
         with:
           deno-version: v2.x
       - name: Type-check post-signature v4.1 release candidate
         run: deno check reference/mcp/crownthrive-api-control.v4.1.0.release.ts
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mcp-pre-signature-preflight
           path: |
@@ -77,8 +77,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
       - name: Require exact founder-signed payload
@@ -101,7 +101,7 @@ jobs:
         run: node contracts/mcp/infer-bounded-output-schemas.mjs mcp-output-shape-captures.json > mcp-bounded-output-schemas.json
       - name: Generate reviewed-only SQL migration artifact
         run: node contracts/mcp/generate-output-schema-migration.mjs mcp-bounded-output-schemas.json mcp-output-schema-migration.sql
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mcp-post-signature-schema-capture
           path: |
@@ -118,8 +118,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
       - name: Require exact founder-signed payload
@@ -157,7 +157,7 @@ jobs:
           npx -y @modelcontextprotocol/conformance server --url http://127.0.0.1:8787/mcp --suite all --spec-version 2026-07-28 --verbose 2>&1 | tee official-mcp-conformance.txt
       - name: Preserve certification evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mcp-final-external-certification
           path: |
