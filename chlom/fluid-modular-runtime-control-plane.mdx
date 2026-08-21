@@ -1,0 +1,304 @@
+---
+title: "Fluid Modular Runtime Control Plane"
+sidebarTitle: "Fluid Runtime"
+description: "The controlled-test CHLOM runtime architecture for modular capabilities, opaque public identity, DAIL integrity, agent/oracle registries, MCP contracts, recovery, platform bindings and bounded self-healing."
+icon: "network-wired"
+keywords: ["CHLOM", "metaprotocol", "modular runtime", "DAIL", "DLA", "LEX", "MCP", "agents", "oracles", "public identity", "self healing"]
+---
+
+# Fluid Modular Runtime Control Plane
+
+CHLOM is implemented as a **fluid metaprotocol**, not as a single website, token, chain, database or smart contract. Business identities and rights objects must survive infrastructure replacement.
+
+<Warning>
+  This page reports a **controlled-test** implementation state. It does not claim production token issuance, autonomous mainnet governance, production DLA/LEX settlement, legal clearance of crypto economics, or a deployed Substrate mainnet.
+</Warning>
+
+## Controlled-test evidence added August 20–21, 2026
+
+The private institutional runtime now contains concrete machine registries for:
+
+- modular CHLOM components and dependencies;
+- capability discovery and version/state metadata;
+- opaque public CHLOM IDs and `did:chlom` identifiers;
+- public verification keys with private signing material kept outside the public resolver;
+- append-only DAIL event history with chained hashes;
+- module health and watchdog evidence;
+- agent templates, autonomy classes and health records;
+- oracle classes and aggregation policies;
+- algorithm contracts and TEVV records;
+- platform bindings for Virality Music and KJV/Sermon Toolkit pilots;
+- dedicated CHLOM MCP tool contracts;
+- encrypted cross-provider recovery manifests.
+
+## Fluid-module architecture
+
+```text
+                         +---------------------------+
+                         |     CHLOM API / MCP       |
+                         +-------------+-------------+
+                                       |
+                         +-------------v-------------+
+                         |        CHLOM Kernel       |
+                         | capability / policy router|
+                         +-------------+-------------+
+                                       |
+       +---------------+---------------+----------------+---------------+
+       |               |               |                |               |
++------v------+ +------v------+ +------v------+  +------v------+ +------v------+
+|Identity/DID | | Rights Graph| |    DLA      |  |    ACE      | |    AIE      |
++------+------+ +------+------+ +------+------+  +------+------+ +------+------+
+       |               |               |                |               |
+       +---------------+---------------+----------------+---------------+
+                                       |
+                         +-------------v-------------+
+                         |          DAIL             |
+                         | event/evidence continuity |
+                         +-------------+-------------+
+                                       |
+                         +-------------v-------------+
+                         |   Chain Adapter Fabric    |
+                         +----------+--------+-------+
+                                    |        |
+                              Polkadot     EVM
+                               target     target
+```
+
+The chain-adapter layer remains specified/target architecture. CHLOM's current controlled-test continuity does not depend on an external chain.
+
+## Public identity
+
+CHLOM public identity uses an opaque identifier rather than encoding a government identifier, password, email address or secret.
+
+Pattern:
+
+```text
+ctid_<opaque 128-bit identifier>
+        |
+        +--> did:chlom:ctid_<identifier>
+        |
+        +--> public verification key(s)
+```
+
+The public resolver may expose:
+
+- public CHLOM ID;
+- DID;
+- public display metadata approved for publication;
+- public verification keys;
+- public DAIL lineage.
+
+It must never expose:
+
+- private keys;
+- Vault secret names intended to reveal custody internals;
+- passwords;
+- government identifiers;
+- restricted source records;
+- sealed identity evidence.
+
+A public CHLOM ID is a cryptographic/operational identifier, **not a Social Security number and not a substitute for a government identity document**.
+
+## DAIL controlled-test implementation
+
+DAIL currently uses an institutional append-only event table and chained SHA-256 event commitments.
+
+```text
+Event N-1 hash
+      |
+      v
+canonical event payload --> payload SHA-256
+      |                         |
+      +-------------------------+
+                    |
+                    v
+                event hash
+                    |
+                    v
+                Event N
+```
+
+Corrections append new events. They do not rewrite historical events.
+
+A scheduled integrity watchdog recomputes the chain and records health evidence. External Merkle/testnet anchoring remains a later chain-adapter capability and must be independently read back before being promoted.
+
+## Module registry
+
+Every module carries at minimum:
+
+```yaml
+module_id: ct.chlom.*
+version: semver
+lifecycle_state: source_recovered | reconciled | specified | prototype | test | staged | production | maintained | superseded
+risk_ceiling: D0 | D1 | D2 | D3
+self_healing_class: observe_only | deterministic_repair | rollback_capable | quorum_required | human_reserved
+api_enabled: boolean
+mcp_enabled: boolean
+implementation_ref: evidence-backed reference when implemented
+```
+
+Current registry families include Kernel, Identity, Fingerprint, Credentials, Rights Graph, DLA, DAIL, LEX, Disputes/Remedies, ACE, AIE, ZKX, Oracle Fabric, ADE, Treasury, Settlement, Governance, Agent Fabric, Chain Adapters, API/MCP, Observability, Documentation and Recovery.
+
+## Two pallet namespaces
+
+CHLOM intentionally keeps two distinct meanings of `pallet`:
+
+1. **Capability pallets** — the 12 CrownThrive cloud/API packaging families used to group reusable capabilities across the ecosystem.
+2. **Substrate runtime pallets** — future Rust/Polkadot SDK runtime modules.
+
+The controlled-test registry marks these namespaces separately so documentation or agents cannot mistake a packaging pallet for a deployed blockchain runtime.
+
+## Agent fabric
+
+The machine registry now defines specialized CHLOM agent roles for orchestration, continuity, Kernel, identity/fingerprint, DAIL, DLA, LEX, disputes/remedies, ACE, AIE, ZKX, oracles, chain adapters, security, TEVV, formal methods, SRE/self-healing, red-team, documentation/papers, commerce/settlement and developer/API/MCP work.
+
+```text
+                   CHLOM Orchestrator
+                          |
+       +------------------+------------------+
+       |                  |                  |
+   Kernel/ID          Rights/DAIL         Intelligence
+       |                  |                  |
+       |            DLA / LEX / Cases    ACE / AIE / ZKX
+       |                                     |
+       +------------------+------------------+
+                          |
+                Assurance / Security
+                 TEVV / SRE / Red Team
+```
+
+Agent records include autonomy class, D0–D3 authority ceiling, module scope, tool scope, schedule profile, heartbeat state, voting eligibility and self-healing permission.
+
+No agent gains authority merely because it exists in the registry.
+
+## Self-healing boundary
+
+Self-healing is recovery, not authority expansion.
+
+Allowed low-risk patterns include:
+
+```text
+Detect -> Diagnose -> Simulate -> Canary -> Verify -> Repair or Rollback -> DAIL
+```
+
+Agents may automatically repair approved deterministic or reversible failures within their registered authority. They may not silently modify ownership, binding rights, money destinations, legal terms, production-token issuance, privileged identity or public claims to make an error disappear.
+
+## Oracle fabric
+
+The registry defines oracle classes for identity, regulatory sources, rights evidence, FX/pricing, chain finality, sanctions, usage, media fingerprints, AI risk, governance, evidence integrity and time/finality.
+
+High-impact observations are designed for freshness checks, source authority and quorum/aggregation rather than blind single-provider trust.
+
+```text
+Oracle sources
+     |
+normalize
+     |
+freshness / authority
+     |
+outlier detection
+     |
+quorum / weighted aggregation
+     |
+signed observation
+     |
+ACE / AIE / Kernel
+```
+
+The oracle registry is a controlled-test/specification surface. It does not mean every external oracle feed is connected.
+
+## Algorithm registry
+
+The CHLOM algorithm registry now separates public contracts from restricted implementation details.
+
+Recorded families include:
+
+- deterministic asset fingerprints;
+- DAIL hash-chain verification;
+- opaque public-ID generation;
+- multidimensional rights-conflict detection;
+- oracle weighted-median aggregation;
+- oracle divergence detection;
+- AIE anomaly ensembles;
+- graph-risk analysis;
+- privacy-governed Sybil-risk detection;
+- model/feature drift detection;
+- self-healing root-cause classification;
+- tokenomics Monte Carlo simulation;
+- policy-pack resolution;
+- DLA conflict checking;
+- ZK proof-scheme selection.
+
+Only algorithms with implementation and evaluation evidence may move into invocation states beyond controlled test. A registered algorithm is not proof that its full implementation exists.
+
+## Dedicated MCP surface
+
+CHLOM now has a dedicated MCP capability registry rather than forcing unfinished CHLOM operations into an unrelated general dispatcher.
+
+Controlled-test low-risk contracts include:
+
+- module discovery;
+- module-capability discovery;
+- public identity resolution;
+- deterministic text fingerprinting;
+- DAIL query/append under authorized service control;
+- agent registry inspection;
+- oracle registry inspection;
+- public-safe algorithm registry inspection;
+- health and recovery status.
+
+Future rights, DLA, LEX, policy, oracle-write, dispute, remedy, chain-anchor and treasury tools are registered as **disabled/fail-closed contracts** until their runtime, tests and authority gates exist.
+
+## Cross-platform bindings
+
+Initial controlled-test bindings now exist for:
+
+- Virality Music identity and evidence continuity;
+- KJV/Sermon Toolkit identity and evidence continuity.
+
+DLA/LEX commerce bindings remain specified rather than transactably active until rights, agreement, payment, entitlement and D3 gates close.
+
+## Recovery architecture
+
+The current recovery model separates primary secrets from cross-provider ciphertext recovery:
+
+```text
+Supabase Vault
+   | primary encrypted secret/key custody
+   |
+   +--> governed recovery process
+             |
+             v
+       encrypted recovery capsule
+             |
+             v
+         Google Drive
+       ciphertext only
+```
+
+The recovery capsule has been independently read back and checksum-verified. Public documentation records the recovery state but never the password or private-key material.
+
+## Current state summary
+
+```yaml
+metaprotocol_model: active institutional architecture
+modular_runtime_registry: controlled_test
+public_identity_resolver: controlled_test_http_verified
+dail_hash_chain: controlled_test_integrity_verified
+agent_registry: controlled_test
+oracle_registry: controlled_test/specification
+algorithm_registry: controlled_test + disabled future algorithms
+mcp_server: controlled_test deployment
+mcp_admin_invocation: verification still required
+virality_binding: controlled_test identity/evidence
+kjv_binding: controlled_test identity/evidence
+recovery_continuity: verified dual reference
+production_dla_lex: not_active
+production_token: not_active
+substrate_chain: not_deployed
+real_value_crypto: not_authorized
+```
+
+## Promotion rule
+
+Every component is promoted independently. CHLOM never receives one blanket `production` label merely because a subset is operational.
