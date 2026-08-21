@@ -96,7 +96,7 @@ def main() -> int:
     reference = federation_call("reference", {
         "agent_id": PARENT_AGENT,
         "target_repo_id": CHILD_REPO_ID,
-        "reference_type": "framework_parent_forward_link",
+        "reference_type": "parent_link",
         "source_ref": parent_ref,
         "target_ref": "refs/heads/main",
         "source_sha": parent_sha,
