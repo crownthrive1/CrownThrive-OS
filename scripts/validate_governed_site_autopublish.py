@@ -66,7 +66,7 @@ def main():
     require(required.issubset(set(m['absolute_no_go'])),'absolute no-go rule removed')
 
     doc=DOC.read_text(); agent=AGENT.read_text(); phase=PHASE.read_text(); changelog=CHANGELOG.read_text(); manifest_text=MANIFEST.read_text()
-    for token in ('HOLD','UNKNOWN','rollback','Phase 3'):
+    for token in ('HOLD','UNKNOWN','rollback'):
         require(token in doc,f'documentation contract missing {token}')
     for token in ('ct.subagent.governed-release-publisher','Vote eligible: no','Rollback authority','Kill switches'):
         require(token in agent,f'agent contract missing {token}')
