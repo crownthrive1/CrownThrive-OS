@@ -264,12 +264,18 @@ def validate(*, require_canonical_baseline: bool = False) -> dict[str, Any]:
     committee_rows = committees.get("committees", [])
     if len(committee_rows) != 14:
         errors.append(f"expected 14 public ThriveAlumni surfaces, found {len(committee_rows)}")
+    required_assessments = {"roster", "charter", "quorum", "delegation", "authority", "recusal"}
     for committee in committee_rows:
         for agent_id in committee.get("support_agents", []):
             if agent_id not in known_agents:
                 errors.append(f"{committee.get('committee_id')}: unknown agent {agent_id}")
         if committee.get("drift_state") == "PASS":
             errors.append(f"{committee.get('committee_id')}: unresolved public drift cannot be PASS")
+        assessment = committee.get("evidence_assessment")
+        if not isinstance(assessment, dict) or set(assessment) != required_assessments:
+            errors.append(f"{committee.get('committee_id')}: six-field evidence assessment is required")
+        elif any(value != "NOT_ASSESSED" for value in assessment.values()):
+            errors.append(f"{committee.get('committee_id')}: unavailable governance evidence must remain NOT_ASSESSED")
 
     schedule_rows = schedules.get("schedules", [])
     if len(schedule_rows) != 8:
