@@ -30,6 +30,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Bind run to exact current main
+        id: canonical
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          canonical_sha="$(git rev-parse origin/main)"
+          if [ "$canonical_sha" != "$GITHUB_SHA" ]; then
+            echo "main moved after this run was queued; fail closed and let the next run reconcile"
+            exit 1
+          fi
+          echo "sha=$canonical_sha" >> "$GITHUB_OUTPUT"
+
       - name: Render and validate candidate
         run: |
           python scripts/render_homepage_projection.py --write
@@ -55,6 +68,7 @@ jobs:
         if: steps.change.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          CANONICAL_SHA: ${{ steps.canonical.outputs.sha }}
           CT_BRANCH: automation/hourly-homepage-projection
         shell: bash
         run: |
@@ -65,9 +79,29 @@ jobs:
           # The first render only decides whether reconciliation is needed. Do
           # not carry that dirty worktree across the branch switch.
           git restore -- index.mdx
-          git fetch origin main
+          git fetch --no-tags origin main
+          if [ "$(git rev-parse origin/main)" != "$CANONICAL_SHA" ]; then
+            echo "main changed during reconciliation; refusing a stale projection"
+            exit 1
+          fi
+
+          prior_remote_head="absent"
           if git ls-remote --exit-code --heads origin "$CT_BRANCH" >/dev/null 2>&1; then
-            git fetch origin "$CT_BRANCH"
+            git fetch --no-tags origin "$CT_BRANCH"
+            prior_remote_head="$(git rev-parse "origin/$CT_BRANCH")"
+            lineage_base="$(git merge-base origin/main "origin/$CT_BRANCH")"
+            preexisting_paths="$(git diff --name-only "$lineage_base...origin/$CT_BRANCH")"
+            if [ "$preexisting_paths" != "index.mdx" ]; then
+              echo "automation branch has a non-homepage or empty pre-existing diff; refusing to preserve it"
+              printf '%s\n' "$preexisting_paths"
+              exit 1
+            fi
+            invalid_authors="$(git log --format='%ae' "$lineage_base..origin/$CT_BRANCH" | grep -vFx '41898282+github-actions[bot]@users.noreply.github.com' || true)"
+            if [ -n "$invalid_authors" ]; then
+              echo "automation branch contains commits outside the registered bot lineage"
+              printf '%s\n' "$invalid_authors"
+              exit 1
+            fi
             git switch --create homepage-projection-work "origin/$CT_BRANCH"
             git merge --no-edit origin/main
           else
@@ -82,23 +116,83 @@ jobs:
           python scripts/validate_security_governance.py
           git diff --check
 
+          worktree_paths="$(git status --short | sed -E 's/^...//')"
+          if [ -n "$worktree_paths" ] && [ "$worktree_paths" != "index.mdx" ]; then
+            echo "renderer changed a path outside index.mdx"
+            printf '%s\n' "$worktree_paths"
+            exit 1
+          fi
+
           if ! git diff --quiet -- index.mdx; then
             git add -- index.mdx
+            staged_paths="$(git diff --cached --name-only)"
+            if [ "$staged_paths" != "index.mdx" ]; then
+              echo "staged projection delta is not exactly index.mdx"
+              printf '%s\n' "$staged_paths"
+              exit 1
+            fi
             git commit -m "docs(homepage): reconcile governed projection"
-            git push origin "HEAD:$CT_BRANCH"
+          fi
+
+          pr_paths="$(git diff --name-only origin/main...HEAD)"
+          if [ "$pr_paths" != "index.mdx" ]; then
+            echo "candidate pull-request diff is not exactly index.mdx"
+            printf '%s\n' "$pr_paths"
+            exit 1
+          fi
+
+          candidate_sha="$(git rev-parse HEAD)"
+          rollback_sha="$CANONICAL_SHA"
+          rollback_digest="$(git show "$rollback_sha:index.mdx" | sha256sum | cut -d' ' -f1)"
+          candidate_digest="$(sha256sum index.mdx | cut -d' ' -f1)"
+          main_protected="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.protected')"
+          if [ "$main_protected" != "true" ]; then
+            echo "provider does not report main as protected; refusing mutation"
+            exit 1
+          fi
+
+          if [ "$prior_remote_head" != "absent" ] && ! git merge-base --is-ancestor "$prior_remote_head" "$candidate_sha"; then
+            echo "candidate would require a non-fast-forward update; refusing"
+            exit 1
+          fi
+          git push origin "HEAD:$CT_BRANCH"
+          git fetch --no-tags origin "$CT_BRANCH"
+          remote_sha="$(git rev-parse "origin/$CT_BRANCH")"
+          if [ "$remote_sha" != "$candidate_sha" ]; then
+            echo "branch read-after-write head mismatch"
+            exit 1
+          fi
+          remote_paths="$(git diff --name-only origin/main..."origin/$CT_BRANCH")"
+          if [ "$remote_paths" != "index.mdx" ]; then
+            echo "branch read-after-write diff is not exactly index.mdx"
+            printf '%s\n' "$remote_paths"
+            exit 1
           fi
 
           existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$CT_BRANCH" --base main --state open --json number --jq '.[0].number // empty')"
           if [ -z "$existing" ]; then
-            gh pr create \
+            pr_url="$(gh pr create \
               --repo "$GITHUB_REPOSITORY" \
               --base main \
               --head "$CT_BRANCH" \
               --draft \
               --title "DRAFT/HOLD — hourly governed homepage projection" \
-              --body "Deterministic hourly-on-change homepage reconciliation. Direct main writes, self-merge, public-deployment claims and commerce activation remain prohibited. CI is evidence, not governance acceptance."
-          else
-            gh pr comment "$existing" \
-              --repo "$GITHUB_REPOSITORY" \
-              --body "Hourly projection reconciled against the current default branch. Review the exact head and current CI; no automatic merge or deployment claim is created."
+              --body "Deterministic hourly-on-change homepage reconciliation. Direct main writes, self-merge, public-deployment claims and commerce activation remain prohibited. CI is evidence, not governance acceptance.")"
+            existing="${pr_url##*/}"
           fi
+
+          readback_head="$(gh pr view "$existing" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq '.headRefOid')"
+          if [ "$readback_head" != "$candidate_sha" ]; then
+            echo "pull-request read-after-write head mismatch"
+            exit 1
+          fi
+          readback_paths="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$existing/files" --jq '.[].filename')"
+          if [ "$readback_paths" != "index.mdx" ]; then
+            echo "pull-request read-after-write diff is not exactly index.mdx"
+            printf '%s\n' "$readback_paths"
+            exit 1
+          fi
+
+          gh pr comment "$existing" \
+            --repo "$GITHUB_REPOSITORY" \
+            --body "Hourly projection evidence receipt: actor \`$GITHUB_ACTOR\`; canonical main \`$CANONICAL_SHA\`; prior automation head \`$prior_remote_head\`; exact head \`$candidate_sha\`; complete PR diff \`index.mdx\` only; candidate digest \`sha256:$candidate_digest\`; rollback target \`$rollback_sha\` with prior homepage digest \`sha256:$rollback_digest\`; provider main protected flag \`$main_protected\`. Branch and PR read-after-write checks passed. The protected flag is not a substitute for independent required-check/ruleset evidence. Review current CI; no automatic merge, deployment acceptance or commerce authority is created."

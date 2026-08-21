@@ -74,6 +74,10 @@ Each scheduled run:
 6. opens or updates one draft pull request;
 7. leaves merge, publication and phase authority to the governed review path.
 
+The run binds itself to the exact `main` SHA that triggered it and fails closed if `main` moves before mutation. When the automation branch already exists, the workflow first proves that its complete lineage delta contains only `index.mdx` and that every branch commit belongs to the registered GitHub Actions bot identity. It then merges the exact current `main`, rerenders, proves that the complete candidate PR diff contains exactly `index.mdx`, and refuses any update that would require a non-fast-forward push.
+
+Before mutation, the workflow also requires GitHub's current branch readback to report `main` as protected. That boolean is useful provider evidence but does not replace separate required-check/ruleset proof. After the push, the workflow reads the remote branch and pull request back from GitHub. The exact head and complete changed-file set must match the candidate. Its evidence receipt records the triggering actor, canonical-main SHA, prior automation head, candidate head, homepage digest and rollback target. The rollback drill retrieves the prior canonical `index.mdx` and records its digest; it does not rewrite history or exercise a production deployment.
+
 The workflow may not force-push, write directly to `main`, self-merge, mint OIDC tokens, access production credentials, call live commerce mutations or reinterpret a failed validation as success.
 
 The repository workflow deliberately does not invent or directly mutate external observations. Public/provider changes enter through an authorized source-pull or evidence-reconciliation task that updates a registered input by pull request. The hourly renderer then proves whether the homepage matches that canonical input. If the external-source connector is unavailable, the run reports the visibility gap and leaves the last known good source state intact.
@@ -99,7 +103,7 @@ Historical, archived, reserve, target, research and unresolved rows remain expli
 
 ## Failure and recovery
 
-On missing input, duplicate marker, invalid manifest, authentication failure, merge conflict, validation error or unsafe public content, the workflow stops and preserves the last known good homepage. Recovery is a normal reviewed pull request or a revert of the bounded packet. It may not erase source history or weaken the failing check.
+On missing input, duplicate marker, invalid manifest, unexpected branch author, non-homepage branch/PR delta, stale canonical SHA, read-after-write mismatch, authentication failure, merge conflict, validation error or unsafe public content, the workflow stops and preserves the last known good homepage. Recovery is a normal reviewed pull request or a revert of the bounded packet. It may not erase source history or weaken the failing check.
 
 ## Ownership and review
 
