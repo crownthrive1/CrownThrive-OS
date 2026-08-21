@@ -6,12 +6,13 @@ It documents the governed relationship among CrownThrive doctrine, platforms, co
 
 ## Current maturity
 
-- **Human program phase:** Phase 2.97 — Governance, Standards and Protection
-- **Human patch:** Phase 2.97.1 — Institutional Hardening and Re-Audit
-- **Machine release:** `2.7.9.1`
-- **Release state:** accepted and merged into `main` as `52762bd4bd629ea8012fac6ceb3790d0955b0499`
-- **Deployment posture:** phased Mintlify working/review projection
-- **Next gates:** Phase 2.98 platform extraction, then Phase 2.99 private-core and machine-seed preparation
+- **Human program phase:** Phase 2.99 — private-core, machine-seed and hard-exit preparation
+- **Current program state:** `phase_2_99_in_progress`
+- **Phase 3 entry:** `blocked_pending_phase_2_99_hard_exit` / `NO-GO`
+- **Accepted machine baseline:** release `2.7.9.1`, preserved at historical merge `52762bd4bd629ea8012fac6ceb3790d0955b0499`
+- **Repository posture:** governed public-safe source projection with ruleset behavior verified; current head is derived from `main`, not the historical release SHA
+- **Publication posture (observed August 21, 2026):** the active default Mintlify URL redirects to authentication, so public readback and indexing remain blocked pending an intentional access decision
+- **Next gate:** complete and accept every Phase 2.99 hard-exit predicate before Phase 3
 
 This repository is **not** the Phase 3 runtime, the private evidence vault, a production secrets store, or proof that every documented service is deployed. A page may be accepted institutional architecture while its corresponding capability remains `research`, `specified`, `build`, `legal_review_required`, `unverified`, or `production` in a separate state dimension.
 

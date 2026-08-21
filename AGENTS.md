@@ -8,11 +8,12 @@ Maintain CrownThrive's institutional knowledge as a durable, versioned, public-s
 
 Current baseline:
 
-- human program phase: `2.97`
-- human patch: `2.97.1`
-- machine institutional release: `2.7.9.1`
-- release state: `accepted` at merge commit `52762bd4bd629ea8012fac6ceb3790d0955b0499`
-- next required passes: `2.98` platform extraction, then `2.99` private-core and machine-seed preparation
+- human program phase: `2.99`
+- program state: `phase_2_99_in_progress`
+- Phase 3 entry: `blocked_pending_phase_2_99_hard_exit` / `NO-GO`
+- accepted machine baseline: `2.7.9.1` at historical merge `52762bd4bd629ea8012fac6ceb3790d0955b0499`
+- current source baseline: the exact current `main` head plus its required validation evidence; do not substitute the historical release SHA
+- next required pass: complete and accept every Phase 2.99 hard-exit predicate before Phase 3
 
 ## 2. Instruction and source precedence
 
@@ -70,8 +71,9 @@ Unknown remains explicit: `uninspected`, `unverified`, `source_not_located`, `bl
 
 Use the correct namespace:
 
-- human phase: `2.97`
-- human patch: `2.97.1`
+- historical accepted human phase: `2.97`
+- current human phase: `2.99`
+- historical accepted human patch: `2.97.1`
 - institutional machine release: `2.7.9.1`
 - service/API/schema/content/policy/rights/economic/model/deployment versions: independent identifiers.
 

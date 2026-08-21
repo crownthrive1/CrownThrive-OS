@@ -1,8 +1,14 @@
 # CrownThrive Institutional Validation Receipt
 
-This record preserves machine-verifiable evidence for the current public-safe CrownThrive Operating System source tree. It does not certify the legal sufficiency, production deployment, rights clearance, security posture, or operational readiness of every platform described by the documentation.
+This record preserves machine-verifiable evidence for an accepted historical CrownThrive Operating System source baseline. It does not certify the current head, legal sufficiency, production deployment, rights clearance, security posture, or operational readiness of every platform described by the documentation.
 
-## Current baseline composition
+## Current interpretation
+
+This file is a historical receipt for the accepted `2.7.9.1` lineage, not a claim that its recorded run IDs or SHAs validate the current head. As of August 21, 2026, the human program is in Phase 2.99, Phase 3 entry remains `blocked_pending_phase_2_99_hard_exit` / `NO-GO`, and every new pull request must produce exact-head validation evidence through the current governed workflow set.
+
+The active default Mintlify URL currently redirects to authentication. A green repository run therefore proves only its stated source/build checks; it does not prove Mintlify deployment, unauthenticated reachability, indexing, or public acceptance.
+
+## Historical accepted baseline composition
 
 The combined baseline under validation contains:
 
@@ -118,7 +124,7 @@ A successful documentation-governance run does not independently prove:
 
 Those states require their own evidence, tests, approvals, and effective-dated records.
 
-## Inherited next gates
+## Gates inherited by this historical receipt
 
 After final combined validation, the repository remains in:
 
@@ -127,4 +133,4 @@ After final combined validation, the repository remains in:
 - Phase 2.99 pending private-core and machine-seed preparation;
 - Phase 3.0 not yet accepted for broad runtime implementation.
 
-The final public Help Center, authenticated role portal, custom CrownThrive support domain, restricted evidence system, centralized control-plane runtime, platform MCP fleet, and selectively decentralized CHLOM infrastructure remain separate gated releases.
+Those inherited labels have since advanced to Phase 2.99 work in progress, but the hard-exit remains unaccepted. The final public Help Center, authenticated role portal, custom CrownThrive support domain, restricted evidence system, centralized control-plane runtime, platform MCP fleet, and selectively decentralized CHLOM infrastructure remain separate gated releases.

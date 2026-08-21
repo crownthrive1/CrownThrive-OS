@@ -1,0 +1,104 @@
+name: Hourly Homepage Projection
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: hourly-homepage-projection
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    name: Render and reconcile governed homepage
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Check out canonical source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Render and validate candidate
+        run: |
+          python scripts/render_homepage_projection.py --write
+          python scripts/render_homepage_projection.py --check
+          python scripts/validate_homepage_control_plane.py
+          python scripts/validate_docs.py
+          python scripts/validate_github_actions_runtime_policy.py
+          python scripts/validate_security_governance.py
+          git diff --check
+
+      - name: Detect semantic homepage change
+        id: change
+        shell: bash
+        run: |
+          if git diff --quiet -- index.mdx; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No canonical homepage input changed; workflow run is the hourly heartbeat."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish non-force automation branch and draft pull request
+        if: steps.change.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CT_BRANCH: automation/hourly-homepage-projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "crownthrive-homepage-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # The first render only decides whether reconciliation is needed. Do
+          # not carry that dirty worktree across the branch switch.
+          git restore -- index.mdx
+          git fetch origin main
+          if git ls-remote --exit-code --heads origin "$CT_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$CT_BRANCH"
+            git switch --create homepage-projection-work "origin/$CT_BRANCH"
+            git merge --no-edit origin/main
+          else
+            git switch --create homepage-projection-work origin/main
+          fi
+
+          python scripts/render_homepage_projection.py --write
+          python scripts/render_homepage_projection.py --check
+          python scripts/validate_homepage_control_plane.py
+          python scripts/validate_docs.py
+          python scripts/validate_github_actions_runtime_policy.py
+          python scripts/validate_security_governance.py
+          git diff --check
+
+          if ! git diff --quiet -- index.mdx; then
+            git add -- index.mdx
+            git commit -m "docs(homepage): reconcile governed projection"
+            git push origin "HEAD:$CT_BRANCH"
+          fi
+
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$CT_BRANCH" --base main --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$CT_BRANCH" \
+              --draft \
+              --title "DRAFT/HOLD — hourly governed homepage projection" \
+              --body "Deterministic hourly-on-change homepage reconciliation. Direct main writes, self-merge, public-deployment claims and commerce activation remain prohibited. CI is evidence, not governance acceptance."
+          else
+            gh pr comment "$existing" \
+              --repo "$GITHUB_REPOSITORY" \
+              --body "Hourly projection reconciled against the current default branch. Review the exact head and current CI; no automatic merge or deployment claim is created."
+          fi
