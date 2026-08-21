@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -58,6 +59,12 @@ class SuiteTests(unittest.TestCase):
             missing.pop(key)
             with self.assertRaises(framework_compiler.CompileError):
                 framework_compiler.compile_candidate(missing)
+        with self.assertRaises(framework_compiler.CompileError):
+            framework_compiler.compile_candidate(dict(candidate, can_spend=True))
+        with self.assertRaises(framework_compiler.CompileError):
+            framework_compiler.compile_candidate(dict(candidate, candidate_id=["not", "an", "id"]))
+        with self.assertRaises(framework_compiler.CompileError):
+            framework_compiler.compile_candidate(dict(candidate, schema_version={"invalid": True}))
 
     def test_archive_traversal_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -137,6 +144,7 @@ class SuiteTests(unittest.TestCase):
             manifest.write_text(json.dumps({"edges": [edge]}), encoding="utf-8")
             result = internal_linkage.apply_approved(root, manifest)
             self.assertEqual(result["status"], "HOLD")
+            now = datetime.now(timezone.utc)
             receipt = {
                 "edge_id": "edge-1",
                 "decision": "APPROVED",
@@ -145,8 +153,8 @@ class SuiteTests(unittest.TestCase):
                 "reviewer_kind": "human",
                 "reviewer_id": "human:authorized-reviewer",
                 "review_execution_id": "review:test:001",
-                "issued_at": "2026-08-21T00:00:00+00:00",
-                "expires_at": "2036-08-21T00:00:00+00:00",
+                "issued_at": (now - timedelta(minutes=1)).isoformat(),
+                "expires_at": (now + timedelta(days=1)).isoformat(),
                 "source_sha256": internal_linkage.sha256_file(source),
                 "target_sha256": internal_linkage.sha256_file(target),
                 "independent": True,
@@ -162,7 +170,13 @@ class SuiteTests(unittest.TestCase):
             edge["approval_receipt_ref"] = "receipts/edge-1.json"
             edge["approval_receipt_file_sha256"] = internal_linkage.sha256_file(receipt_path)
             manifest.write_text(json.dumps({"edges": [edge]}), encoding="utf-8")
-            result = internal_linkage.apply_approved(root, manifest)
+            trusted_digest = internal_linkage.sha256_file(receipt_path)
+            result = internal_linkage.apply_approved(
+                root,
+                manifest,
+                trusted_receipt_sha256=trusted_digest,
+                authorized_reviewer_ids={"human:authorized-reviewer"},
+            )
             self.assertEqual(result["delete_count"], 0)
             self.assertIn("edge-1", result["applied"])
             self.assertIn("CT-MANAGED-LINK:edge-1", source.read_text(encoding="utf-8"))
@@ -233,8 +247,90 @@ class SuiteTests(unittest.TestCase):
             }
             manifest = root / "links.json"
             manifest.write_text(json.dumps({"edges": [edge]}), encoding="utf-8")
-            result = internal_linkage.apply_approved(root, manifest)
+            result = internal_linkage.apply_approved(
+                root,
+                manifest,
+                trusted_receipt_sha256=internal_linkage.sha256_file(receipt_path),
+                authorized_reviewer_ids={"human:authorized-reviewer"},
+            )
             self.assertEqual(result["status"], "HOLD")
+            self.assertTrue(any("expired" in row["reason"] for row in result["skipped"]))
+            self.assertEqual(source.read_text(encoding="utf-8"), "source\n")
+
+    def test_link_receipt_requires_out_of_band_trust_and_current_issuance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            docs = root / "docs"
+            receipts = root / "linkage" / "receipts"
+            docs.mkdir()
+            receipts.mkdir(parents=True)
+            source = docs / "source.mdx"
+            target = docs / "target.mdx"
+            source.write_text("source\n", encoding="utf-8")
+            target.write_text("target\n", encoding="utf-8")
+            now = datetime.now(timezone.utc)
+            receipt = {
+                "edge_id": "forged-edge",
+                "decision": "APPROVED",
+                "scope": "INTERNAL_LINK_ADD",
+                "originator_id": "ct.chlom.agent.linkage-curator",
+                "reviewer_kind": "human",
+                "reviewer_id": "human:attacker",
+                "review_execution_id": "self-asserted",
+                "issued_at": (now + timedelta(days=1)).isoformat(),
+                "expires_at": (now + timedelta(days=2)).isoformat(),
+                "source_sha256": internal_linkage.sha256_file(source),
+                "target_sha256": internal_linkage.sha256_file(target),
+                "independent": True,
+            }
+            receipt["receipt_sha256"] = hashlib.sha256(
+                internal_linkage.canonical_receipt_payload(receipt)
+            ).hexdigest()
+            receipt_path = receipts / "forged.json"
+            receipt_path.write_text(json.dumps(receipt, sort_keys=True), encoding="utf-8")
+            edge = {
+                "edge_id": "forged-edge",
+                "originator_id": "ct.chlom.agent.linkage-curator",
+                "source": "docs/source.mdx",
+                "target": "docs/target.mdx",
+                "status": "APPROVED",
+                "approval_receipt_ref": "receipts/forged.json",
+                "approval_receipt_file_sha256": internal_linkage.sha256_file(receipt_path),
+            }
+            manifest = root / "linkage" / "links.json"
+            manifest.write_text(json.dumps({"edges": [edge]}), encoding="utf-8")
+            trusted_digest = internal_linkage.sha256_file(receipt_path)
+
+            no_digest = internal_linkage.apply_approved(
+                root,
+                manifest,
+                authorized_reviewer_ids={"human:attacker"},
+            )
+            self.assertEqual(no_digest["status"], "HOLD")
+            self.assertTrue(any("trusted receipt digest absent" in row["reason"] for row in no_digest["skipped"]))
+            no_reviewer_allowlist = internal_linkage.apply_approved(
+                root,
+                manifest,
+                trusted_receipt_sha256=trusted_digest,
+            )
+            self.assertEqual(no_reviewer_allowlist["status"], "HOLD")
+            self.assertTrue(
+                any("out-of-band authorized set" in row["reason"] for row in no_reviewer_allowlist["skipped"])
+            )
+            untrusted_reviewer = internal_linkage.apply_approved(
+                root,
+                manifest,
+                trusted_receipt_sha256=trusted_digest,
+                authorized_reviewer_ids={"human:authorized-reviewer"},
+            )
+            self.assertEqual(untrusted_reviewer["status"], "HOLD")
+            future_issuance = internal_linkage.apply_approved(
+                root,
+                manifest,
+                trusted_receipt_sha256=trusted_digest,
+                authorized_reviewer_ids={"human:attacker"},
+            )
+            self.assertEqual(future_issuance["status"], "HOLD")
             self.assertEqual(source.read_text(encoding="utf-8"), "source\n")
 
             second = dict(edge, edge_id="second-edge")
@@ -266,6 +362,48 @@ class SuiteTests(unittest.TestCase):
             self.assertTrue(any("not pinned" in error for error in result["errors"]))
             self.assertTrue(any("write-capable" in error for error in result["errors"]))
 
+    def test_workflow_quoted_keys_and_spaced_uses_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "unsafe-quoted.yml"
+            path.write_text(
+                "name: unsafe\n"
+                '"on":\n  "pull_request_target":\n  workflow_dispatch:\n'
+                "permissions:\n  contents: read\n"
+                "concurrency:\n  group: test\n  cancel-in-progress: true\n"
+                'jobs:\n  test:\n    "permissions": write-all\n'
+                "    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n"
+                "      - uses : owner/action@main\n",
+                encoding="utf-8",
+            )
+            result = supply_chain_integrity.inspect_workflow(path)
+            self.assertEqual(result["status"], "FAIL")
+            self.assertTrue(any("not pinned" in error for error in result["errors"]))
+            self.assertTrue(any("write-capable" in error for error in result["errors"]))
+            self.assertTrue(any("pull_request_target" in error for error in result["errors"]))
+
+    def test_workflow_flow_style_security_keys_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            for name, trigger, steps in (
+                ("mapping", "on: {pull_request_target: {}}\n", "steps:\n      - {uses: owner/action@main}\n"),
+                ("sequence", "on: [pull_request_target]\n", "steps: [{uses: owner/action@main}]\n"),
+            ):
+                with self.subTest(name=name):
+                    path = Path(temp) / f"unsafe-flow-{name}.yml"
+                    path.write_text(
+                        "name: unsafe-flow\n"
+                        + trigger
+                        + "permissions:\n  contents: read\n"
+                        + "concurrency:\n  group: test\n  cancel-in-progress: true\n"
+                        + "jobs:\n  test:\n    runs-on: ubuntu-latest\n"
+                        + "    timeout-minutes: 5\n    "
+                        + steps,
+                        encoding="utf-8",
+                    )
+                    result = supply_chain_integrity.inspect_workflow(path)
+                    self.assertEqual(result["status"], "FAIL")
+                    self.assertTrue(any("not pinned" in error for error in result["errors"]))
+                    self.assertTrue(any("pull_request_target" in error for error in result["errors"]))
+
     def test_registry_schema_rejects_missing_and_extra_agent_fields(self) -> None:
         registry = suite.load_json(suite.REGISTRY)
         schema = suite.load_json(suite.SCHEMA)
@@ -286,7 +424,7 @@ class SuiteTests(unittest.TestCase):
             with self.assertRaises(suite.SuiteValidationError):
                 suite.resolve_baseline_agents(Path(temp), True)
 
-    def test_public_payload_manifests_are_sanitized(self) -> None:
+    def test_public_payload_targeted_manifests_and_recursive_scan_are_sanitized(self) -> None:
         schedule = suite.load_json(suite.SCHEDULES)
         self.assertEqual(schedule["dispatcher"]["external_task_reference"], "PRIVATE_CONTROL_PLANE_REFERENCE")
         self.assertFalse(any(re.fullmatch(r"[0-9a-f]{32}", value) for value in schedule["dispatcher"].values() if isinstance(value, str)))
@@ -306,6 +444,44 @@ class SuiteTests(unittest.TestCase):
         self.assertEqual(quarantine["classification"], "PUBLIC_STANDARD_METADATA_ONLY")
         self.assertFalse(any(isinstance(value, int) and not isinstance(value, bool) for value in quarantine.values()))
         self.assertIsNone(re.search(r"HC-\d{4}", json.dumps(quarantine)))
+
+        public_roots = [
+            ROOT / ".github" / "workflows",
+            ROOT / "automation",
+            ROOT / "changelog",
+            ROOT / "developers" / "agents",
+            ROOT / "developers" / "manifests",
+            ROOT / "developers" / "schemas",
+            ROOT / "framework-candidates",
+            ROOT / "governance",
+            ROOT / "linkage",
+            ROOT / "runbooks",
+            ROOT / "scripts",
+            ROOT / "tests",
+        ]
+        forbidden = {
+            "vault_locator": re.compile("vault" + r"://"),
+            "provider_folder_locator": re.compile("folder" + r":[A-Za-z0-9_-]{20,}"),
+            "provider_bucket_locator": re.compile("bucket" + r":[A-Za-z0-9._-]+"),
+            "private_control_field": re.compile(
+                r'"(?:external_task' + r'_id|destination_' + r'ref|manifest_hmac_' + r'sha256)"\s*:'
+            ),
+            "controlled_price_field": re.compile(
+                r'"(?:usd_' + r'cents|minimum_credit_' + r'transaction)"\s*:'
+            ),
+            "help_center_record_id": re.compile(r"HC-\d{4}"),
+            "opaque_32_hex_identifier": re.compile(r"(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])"),
+        }
+        violations: list[str] = []
+        for public_root in public_roots:
+            for path in sorted(public_root.rglob("*")):
+                if not path.is_file() or path.suffix.lower() not in {".json", ".md", ".mdx", ".py", ".yml", ".yaml"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                for label, pattern in forbidden.items():
+                    if pattern.search(text):
+                        violations.append(f"{path.relative_to(ROOT)}:{label}")
+        self.assertEqual(violations, [])
 
 
 if __name__ == "__main__":
