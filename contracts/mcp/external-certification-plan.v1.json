@@ -13,15 +13,12 @@
     "provider_writes_enabled": false,
     "sovereign_vote_authority": false,
     "expected_central_enabled_tool_count": 20,
-    "dispatchable_services": [
-      "crownthrive_io",
-      "thrivetools_seo"
-    ]
+    "dispatchable_services": ["crownthrive_io", "thrivetools_seo"]
   },
   "source_authority": {
     "protocol": "Model Context Protocol specification 2026-07-28",
     "official_conformance": "modelcontextprotocol/conformance",
-    "caveat": "The official conformance framework has a documented open issue in which the final 2026-07-28 release can still be treated as draft for tier arithmetic. Official-suite output is therefore necessary evidence but not sufficient by itself; CrownThrive overlay tests remain mandatory."
+    "caveat": "The official conformance framework has a documented open issue in which the final 2026-07-28 release can still be treated as draft for tier arithmetic. Official-suite output is necessary evidence but not sufficient by itself; CrownThrive overlay tests remain mandatory."
   },
   "pre_signature_boundary": {
     "allowed": [
@@ -43,107 +40,51 @@
   },
   "post_signature_execution": {
     "required_sequence": [
-      "bind the certification run to the exact canonical main SHA and active Edge deployment digest",
-      "apply only the pre-reviewed v4.1.0 conformance repairs",
-      "run the CrownThrive overlay negative/positive suite from an external client runner",
-      "run the applicable official MCP 2026-07-28 server conformance suite and preserve raw results",
-      "perform at most one D0 CrownThrive IO tool call and one D0 ThriveTools SEO tool call for real structuredContent proof",
+      "bind the certification run to the exact canonical main SHA, signed payload digest, workflow SHA and active Edge deployment digest",
+      "activate only the pre-reviewed v4.1.0 GitHub OIDC certifier lane; its authority is MCP-only, D0-only, non-sovereign, protected-main/workflow/repository-bound and provider-dispatch-disabled by default",
+      "tighten the nine permissive central input schemas to documented allowlists",
+      "perform one bounded schema-capture pass across the 20 enabled central D0 tools: 12 CrownThrive IO reads plus 8 ThriveTools SEO reads",
+      "derive and independently review bounded per-operation output schemas and least-data projections from the sanitized captures plus provider contracts",
+      "apply the reviewed bounded schemas/projections and rerun runtime output validation",
+      "run the CrownThrive external overlay negative/positive suite; only its final live-proof step may make one additional D0 read per dispatchable provider",
+      "run the applicable official MCP 2026-07-28 server conformance suite through certification mode, which does not dispatch provider reads, and preserve raw results",
       "verify provider writes remain disabled and no non-D0 central tool is exposed",
-      "verify request audit records the bounded live reads",
+      "verify request audit records every bounded live provider read",
       "independently review Security/Privacy and Operations/SRE evidence",
       "move external_client_conformance_test to PASS only if every mandatory acceptance predicate is proven",
       "keep Phase 3 blocked unless the separate Phase 2.99 hard exit and full-documentation gate also pass"
     ],
     "provider_read_budget": {
-      "crownthrive_io": 1,
-      "thrivetools_seo": 1,
+      "crownthrive_io": 13,
+      "thrivetools_seo": 9,
       "other_providers": 0,
-      "provider_writes": 0
+      "provider_writes": 0,
+      "derivation": "12 IO + 8 SEO schema-capture reads, then 1 IO + 1 SEO final live-proof reads; official conformance mode is provider-dispatch-disabled"
     }
   },
   "mandatory_acceptance": [
-    {
-      "id": "EXT-001",
-      "claim": "server/discover succeeds under protocol 2026-07-28 and returns tools capability plus private cache metadata",
-      "proof": "external_client"
-    },
-    {
-      "id": "EXT-002",
-      "claim": "tools/list is deterministic, bounded to the governed central dispatch surface, and advertises valid JSON Schema 2020-12 input/output schemas",
-      "proof": "external_client"
-    },
-    {
-      "id": "EXT-003",
-      "claim": "malformed MCP JSON returns JSON-RPC ParseError -32700 with null id",
-      "proof": "external_negative"
-    },
-    {
-      "id": "EXT-004",
-      "claim": "non-application/json MCP POST is rejected with HTTP 415 before body parsing",
-      "proof": "external_negative"
-    },
-    {
-      "id": "EXT-005",
-      "claim": "required MCP routing headers are checked against the JSON-RPC body and mismatch returns -32020",
-      "proof": "external_negative"
-    },
-    {
-      "id": "EXT-006",
-      "claim": "unsupported protocol version returns -32022 with the supported protocol list",
-      "proof": "external_negative"
-    },
-    {
-      "id": "EXT-007",
-      "claim": "unknown method returns JSON-RPC -32601 using the final 2026-07-28 transport semantics",
-      "proof": "external_negative"
-    },
-    {
-      "id": "EXT-008",
-      "claim": "all enabled central input schemas reject undeclared properties and preserve only documented bounded parameters",
-      "proof": "registry_and_external"
-    },
-    {
-      "id": "EXT-009",
-      "claim": "all enabled central output schemas are bounded operation-specific contracts and successful structuredContent validates against them",
-      "proof": "registry_and_external"
-    },
-    {
-      "id": "EXT-010",
-      "claim": "runtime endpoint catalog revocation is fail-closed at dispatch time",
-      "proof": "runtime_negative"
-    },
-    {
-      "id": "EXT-011",
-      "claim": "inbound and provider response bytes are bounded before full buffering and provider requests have explicit cancellation deadlines",
-      "proof": "static_and_runtime"
-    },
-    {
-      "id": "EXT-012",
-      "claim": "provider success requires successful JSON parsing and least-data projection; malformed provider JSON cannot be surfaced as a successful tool result",
-      "proof": "runtime_negative"
-    },
-    {
-      "id": "EXT-013",
-      "claim": "at least one real D0 tool call per dispatchable provider succeeds through the external MCP client and creates durable request evidence",
-      "proof": "external_live"
-    },
-    {
-      "id": "EXT-014",
-      "claim": "zero provider mutation tools and zero non-D0 central tools are exposed during certification",
-      "proof": "registry_and_external"
-    },
-    {
-      "id": "EXT-015",
-      "claim": "official MCP conformance output and CrownThrive overlay output are attached to the exact runtime/head evidence envelope",
-      "proof": "ci_artifacts"
-    }
+    {"id":"EXT-001","claim":"server/discover succeeds under protocol 2026-07-28 and returns tools capability plus private cache metadata","proof":"external_client"},
+    {"id":"EXT-002","claim":"tools/list is deterministic, bounded to the governed central dispatch surface, and advertises valid JSON Schema 2020-12 input/output schemas","proof":"external_client"},
+    {"id":"EXT-003","claim":"malformed MCP JSON returns JSON-RPC ParseError -32700 with null id","proof":"external_negative"},
+    {"id":"EXT-004","claim":"non-application/json MCP POST is rejected with HTTP 415 before body parsing","proof":"external_negative"},
+    {"id":"EXT-005","claim":"required MCP routing headers are checked against the JSON-RPC body and mismatch returns -32020","proof":"external_negative"},
+    {"id":"EXT-006","claim":"unsupported protocol version returns -32022 with the supported protocol list","proof":"external_negative"},
+    {"id":"EXT-007","claim":"unknown method returns in-band JSON-RPC -32601 using final 2026-07-28 transport semantics","proof":"external_negative"},
+    {"id":"EXT-008","claim":"all enabled central input schemas reject undeclared properties and preserve only documented bounded parameters","proof":"registry_and_external"},
+    {"id":"EXT-009","claim":"all enabled central output schemas are bounded operation-specific contracts and successful structuredContent validates against them","proof":"registry_and_external"},
+    {"id":"EXT-010","claim":"runtime endpoint catalog revocation is fail-closed at dispatch time","proof":"runtime_negative"},
+    {"id":"EXT-011","claim":"inbound and provider response bytes are bounded before full buffering and provider requests have explicit cancellation deadlines","proof":"static_and_runtime"},
+    {"id":"EXT-012","claim":"provider success requires successful JSON parsing and least-data projection; malformed provider JSON cannot be surfaced as a successful tool result","proof":"runtime_negative"},
+    {"id":"EXT-013","claim":"at least one real D0 tool call per dispatchable provider succeeds through the external MCP client and creates durable request evidence","proof":"external_live"},
+    {"id":"EXT-014","claim":"zero provider mutation tools and zero non-D0 central tools are exposed during certification","proof":"registry_and_external"},
+    {"id":"EXT-015","claim":"official MCP conformance output and CrownThrive overlay output are attached to the exact runtime/head/signed-payload evidence envelope","proof":"ci_artifacts"}
   ],
   "founder_signature": {
     "required": true,
     "state": "awaiting_signature",
     "signer_role": "Founding Member",
     "signer_name": "Kavonte Jones Sr.",
-    "effect": "Authorizes only the final certification implementation and bounded external live execution described in this exact artifact. It does not authorize provider writes, non-D0 tool enablement, commercial acceptance, constitutional changes, or Phase 3 advancement.",
-    "signature_text_template": "I, Kavonte Jones Sr., approve CT-MCP-EXTCERT-001 at the exact artifact SHA presented by Agent E. I authorize the bounded final external MCP certification implementation and live execution described there, with provider writes remaining closed and the stated D0 read budget enforced."
+    "effect": "Authorizes only the final certification implementation and bounded external live execution described in the exact signed payload. It does not authorize provider writes, non-D0 tool enablement, commercial acceptance, constitutional changes, or Phase 3 advancement.",
+    "signature_text_template": "I, Kavonte Jones Sr., approve CT-MCP-EXTCERT-001 at the exact authorized payload SHA-256 presented by Agent E. I authorize the bounded final external MCP certification implementation and live execution described there, with provider writes remaining closed and the stated D0 read budget enforced."
   }
 }
