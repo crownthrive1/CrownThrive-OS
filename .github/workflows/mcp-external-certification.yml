@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'contracts/mcp/**'
-      - 'reference/mcp/crownthrive-api-control.v4.1.0.ts'
+      - 'reference/mcp/crownthrive-api-control.v4.1.0*.ts'
       - '.github/workflows/mcp-external-certification.yml'
   workflow_dispatch:
     inputs:
@@ -52,15 +52,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -RInE --exclude='mcp-external-certification.yml' '(whsec_[A-Za-z0-9]|sk_(live|test)_[A-Za-z0-9]|sb_secret_|SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=|Bearer[[:space:]]+[A-Za-z0-9._-]{40,})' contracts/mcp reference/mcp/crownthrive-api-control.v4.1.0.ts; then
+          if grep -RInE --exclude='mcp-external-certification.yml' '(whsec_[A-Za-z0-9]|sk_(live|test)_[A-Za-z0-9]|sb_secret_|SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=|Bearer[[:space:]]+[A-Za-z0-9._-]{40,})' contracts/mcp reference/mcp/crownthrive-api-control.v4.1.0*.ts; then
             echo 'Potential secret material found in certification packet' >&2
             exit 1
           fi
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Type-check post-signature v4.1 candidate
-        run: deno check reference/mcp/crownthrive-api-control.v4.1.0.ts
+      - name: Type-check post-signature v4.1 release candidate
+        run: deno check reference/mcp/crownthrive-api-control.v4.1.0.release.ts
       - uses: actions/upload-artifact@v4
         with:
           name: mcp-pre-signature-preflight
