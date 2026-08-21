@@ -27,7 +27,7 @@ const GITHUB_CERT_REPOSITORY_ID = "1336348391";
 const GITHUB_CERT_OWNER = "crownthrive1";
 const GITHUB_CERT_OWNER_ID = "315660018";
 const GITHUB_CERT_REF = "refs/heads/main";
-const GITHUB_CERT_SUB = "repo:crownthrive1/CrownThrive-Support:ref:refs/heads/main";
+const GITHUB_CERT_SUB = "repo:crownthrive1@315660018/CrownThrive-Support@1336348391:ref:refs/heads/main";
 const GITHUB_CERT_WORKFLOW_REF = "crownthrive1/CrownThrive-Support/.github/workflows/mcp-external-certification.yml@refs/heads/main";
 const GITHUB_CERT_EVENT = "workflow_dispatch";
 
