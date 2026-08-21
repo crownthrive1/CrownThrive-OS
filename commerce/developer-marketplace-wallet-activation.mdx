@@ -10,74 +10,122 @@ keywords: ["developer marketplace", "ChatGPT sign-in", "Crown Credits", "Stripe"
 # Developer Marketplace wallet activation
 
 <Warning>
-  Account signup is live. Stripe funding, credit redemption, licensed delivery, and revenue attribution remain disabled until every independent runtime gate passes.
+  Identity, wallet signup, and the customer/admin/superadmin dashboards are live. Stripe funding, credit redemption, licensed delivery, and revenue attribution remain disabled until every independent runtime and exact-product gate passes.
 </Warning>
 
 ## Current production state
 
 The CrownThrive Developer Marketplace is deployed at [crownthrive-developer-marketplace.crownthrive.chatgpt.site](https://crownthrive-developer-marketplace.crownthrive.chatgpt.site).
 
-- Site release: version 13
-- ChatGPT sign-in: active on `/wallet` and `/licenses`
+- Site release: version 14
+- Sites source commit: `a252bf35e51fe4469ffa58c4b9a1732c13b02193`
+- ChatGPT sign-in: active
+- Customer dashboard: active at `/dashboard`
+- Admin operations dashboard: server-authorized at `/admin`
+- Superadmin control plane: server-authorized at `/superadmin`
 - Crown Credits wallet account readback: active
 - Credit funding: unavailable
 - Product redemption: unavailable
-- Protected delivery: unavailable without an active entitlement
+- Protected delivery: unavailable without an active exact-release entitlement
 - Credit program: inactive
 - Checkout-enabled offers: zero
 
-The wallet and license center are production account surfaces, not proof that any product or payment rail is commercially active.
+The account and operator surfaces are production controls. They are not proof that a product, tax position, license, payment rail, or commercial release is active.
 
-## Identity and data boundary
+## Identity, role, and data boundary
 
 1. Sites dispatch verifies the signed-in ChatGPT viewer.
-2. The server normalizes the viewer email and converts it to a one-way SHA-256 identity fingerprint.
-3. Only that fingerprint and a fixed action are sent through the private server-to-server gateway.
-4. Supabase creates or reads the owner-scoped wallet and remains authoritative for balance, purchases, entitlements, licenses, reversals, and delivery.
-5. Raw email, wallet fingerprints, provider object IDs, secrets, and storage paths must never appear in public markup or catalog feeds.
+2. The server normalizes the viewer email and converts it to a one-way SIWC identity fingerprint.
+3. Only that fingerprint, a fixed action, and a strictly allowlisted payload cross the server-to-server gateway.
+4. Supabase resolves the active role on every protected request and remains authoritative for wallet, balance, purchases, entitlements, releases, roles, and audit events.
+5. A customer is implicit. Admin and superadmin require an active private principal record.
+6. Superadmin can add, change, reactivate, or revoke operators. Self-revocation and removal of the final active superadmin are blocked transactionally.
+7. Raw email, marketplace passwords, wallet fingerprints, provider object IDs, secrets, and storage paths must never appear in public markup or catalog feeds.
 
-A redirect, checkout session identifier, email field, or browser claim is never accepted as payment, entitlement, license, or delivery evidence.
+A redirect, checkout identifier, email field, browser state, or client-visible link is never accepted as payment, identity authorization, entitlement, license, or delivery evidence.
 
-## Verified checkpoint
+## Verified v14 checkpoint
 
-The activation canary returned an active zero-balance account, the 100 credits per USD reference, funding unavailable, and versioned terms not accepted. Its synthetic identity was deleted after verification.
+The production suite passed 25 checks with zero failures. Coverage includes:
 
-The production test suite passed 21 checks with zero failures, including authenticated identity privacy, owner-scoped library shaping, response allowlisting, redirect safety, and secret/provider-identifier exclusion. The current Supabase security advisor reports zero security lints.
+- SIWC email normalization and non-disclosure;
+- server-authorized role-aware dashboard links;
+- private response shaping and upstream field stripping;
+- cross-origin superadmin mutation rejection;
+- protected-page `no-store` and `noindex` headers;
+- owner-scoped library shaping;
+- redirect safety;
+- secret and provider-identifier exclusion.
 
-## Gates that must remain closed
+The current Supabase security advisor reports zero security lints.
 
-The authoritative readback is currently:
+## Stripe and webhook topology
+
+The runtime controller is `credit-commerce-control` version 11. Three signed handlers are deployed:
+
+- `credit-commerce-webhook` version 3 — compatibility route, unbound;
+- `credit-commerce-webhook-test` version 1 — dedicated test route, unarmed;
+- `credit-commerce-webhook-live` version 1 — dedicated live route, unarmed.
+
+The handlers accept both Supabase Auth and SIWC customer identities, reject Connect events, read provider objects back before settlement, lease idempotent receipts, and handle only:
+
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.async_payment_failed`
+- `checkout.session.expired`
+- `charge.refunded`
+- `charge.dispute.created`
+- `charge.dispute.closed`
+
+No existing Stripe endpoint is safe to reuse. The Stripe connector can create an endpoint, but cannot create an account restricted key or safely transfer the one-time endpoint signing secret into Supabase custody. Therefore the endpoint remains unregistered and no secret was exposed.
+
+## Gates that remain closed
 
 | Control | Enabled |
 | --- | --: |
 | Product types for sale | 0 |
 | Jurisdiction rules for redemption | 0 |
-| Active release-gate evidence | 0 |
+| Independent release-gate evidence | 0 |
 | Approved exact-release bindings | 0 |
-| Checkout-enabled offers | 0 |
+| Operative license tiers | 0 |
+| Checkout-enabled credit offers | 0 |
 | Active reviewed top-ups | 0 |
 | Credit program | No |
 
-Founder approval authorizes the program direction. It does not create external tax, legal, rights, accessibility, provider, credential, fulfillment, release, or canary evidence.
+Founder approval authorizes the program direction and founder role. It does not create external tax, legal, rights, accessibility, provider, credential, fulfillment, release, or reviewer evidence.
+
+## Exact package integrity
+
+Independent nonvoting review found the seven examined ZIP archives structurally clean and hash-consistent. Four customer packages match their exact Supabase v1.0 SHA/size and custody metadata:
+
+| Package | Technical state | Commercial state |
+| --- | --- | --- |
+| `CT-DEV-BUNDLE-001` v1.0.0 | Integrity pass | HOLD — exact certification/evidence/binding absent |
+| `CT-DEV-KIT-001` v1.0.0 | Integrity pass | HOLD — exact certification/evidence/binding absent |
+| `CT-DEV-KIT-002` v1.0.0 | Technical pass | HOLD — rights/license pending; synthetic commerce |
+| `CT-DEV-RB-001` v1.0.0 | Technical pass | HOLD — rights/license pending; synthetic commerce |
+
+Malware signature scanning, rights, operative licensing, accessibility, tax/jurisdiction, price evidence, exact factory bindings, authenticated independent reviewers, commit provenance, and fresh dual-custody restore proof remain unresolved. A later version cannot certify an earlier digest.
 
 ## Funding activation runbook
 
 Complete these steps in order:
 
-1. Roll/delete the historically exposed Stripe key and review Workbench activity.
-2. Create a least-privilege restricted runtime key and install it through Supabase secret management.
-3. Register the active credit-commerce webhook for the required event set and install its signing secret through secret management.
-4. Correct and attest the Stripe merchant business profile and remediate the payout bank error.
-5. Complete jurisdiction/tax classification and registration facts.
-6. Make customer terms operative and capture versioned acceptance.
-7. Complete rights, accessibility, package-integrity, independent-review, protected-delivery, refund, dispute, reversal, and rollback evidence for an exact release.
-8. Approve the exact offer-release binding.
-9. Run a bounded test-mode canary and reconcile provider readback.
-10. Run one bounded live canary only after the preceding gates pass.
-11. Activate one approved offer, observe it, and expand in controlled tranches.
+1. Rotate any historically exposed Stripe secret.
+2. In Stripe Dashboard, create a least-privilege **test** restricted key.
+3. Transfer it directly into Supabase secret custody as the test restricted key; never expose it to chat, source, GitHub, Mintlify, Drive, or logged SQL arguments.
+4. Create the dedicated test webhook endpoint with the seven allowlisted events, `connect=false`, and API version `2026-06-24.dahlia`.
+5. Transfer its one-time signing secret directly into test webhook secret custody.
+6. Complete taxability, active registration, customer-jurisdiction, rights, accessibility, operative-terms, exact-release, competitive-pricing, malware, protected-delivery, refund, dispute, reversal, and rollback evidence.
+7. Approve an exact offer-release binding only after independently authenticated reviewer evidence passes.
+8. Run test-mode duplicate, asynchronous, expiration, refund, dispute, reversal, and reconciliation canaries.
+9. Create separate live credentials and endpoint only after test certification.
+10. Run one bounded live canary, activate one exact offer, observe it, and expand in controlled tranches.
 
-Never place secret values in chat, source, GitHub, Mintlify, Google Drive, or public Site configuration.
+The existing Stripe payout record is outside this dashboard release. It is not treated as evidence that funding works and it is not used to bypass provider readiness.
 
 ## Authority and continuity
 
-Google Drive is the human master and recovery record. Supabase/THIVEBASE is the authority for ledger state, metadata, lineage, rights, queues, checksums, and evidence. CHLOM may fingerprint an exact version and its integrity only; it must not assert authorship, ownership, legal sufficiency, access, or license validity. The agent that produced an asset cannot certify its own release.
+Google Drive is the human master and recovery record. Supabase/THIVEBASE is the authority for runtime, ledger state, metadata, lineage, rights, queues, checksums, roles, and evidence. GitHub issue [#167](https://github.com/crownthrive1/CrownThrive-Support/issues/167) is the coordination ledger. CHLOM may fingerprint an exact version and its integrity only; it must not assert authorship, ownership, legal sufficiency, access, or license validity. The agent that produced an asset cannot certify its own release.
+
+Current truthful state: **identity and dashboards live; funding, checkout, redemption, and customer delivery held**.
