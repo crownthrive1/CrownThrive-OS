@@ -186,16 +186,32 @@ def validate_manifest(data: dict[str, Any]) -> None:
             fail(f"predecessor drift for {row.get('framework_id')}")
         if row.get("package_materialization_allowed") is True:
             materialization_rows.append(row)
-        if row.get("optional_repository_projection_state") not in {"not_required_not_observed", "optional_not_required"}:
-            fail(f"optional distribution-repository state drift: {package_id}")
         if row.get("linked_governed_child_repository_required") is not True:
             fail(f"linked-governed child repository requirement missing: {package_id}")
-        if row.get("linked_governed_child_repository_state") != "UNPROVISIONED":
-            fail(f"uncertified package must remain UNPROVISIONED: {package_id}")
-        if row.get("linked_governed_child_repository_id") is not None:
-            fail(f"immutable child repository id cannot be invented: {package_id}")
-        if row.get("parent_certification_state") != "PENDING_PHYSICAL_CHILD":
-            fail(f"parent certification must remain pending physical child: {package_id}")
+        if row.get("framework_id") == EXPECTED_SEQUENCE[0]:
+            if row.get("optional_repository_projection_state") != "physical_provisioned_pre_cert":
+                fail("CIE physical repository projection must reflect observed pre-cert state")
+            if row.get("linked_governed_child_repository_state") != "PROVISIONED_UNLINKED":
+                fail("CIE child repository must remain provisioned_unlinked before certification")
+            if row.get("linked_governed_child_repository_id") != "ct.repo.cie":
+                fail("CIE stable child repository identity drift")
+            if row.get("linked_governed_child_github_repository_id") != 1341314455:
+                fail("CIE immutable GitHub repository ID drift")
+            if row.get("linked_governed_child_repository_sha") != "073da74bb6eb1fde31b9a6d0321bb85baf5ac8fd":
+                fail("CIE exact child repository SHA drift")
+            if row.get("linked_governed_child_contract_sha256") != "2c88d166607f0f280a6024c31720b14767896ef8f7a67109eb9863943490630a":
+                fail("CIE child contract digest drift")
+            if row.get("parent_certification_state") != "PENDING_PRECERT_EVIDENCE_AND_GOVERNED_ACCEPTANCE":
+                fail("CIE parent certification state drift")
+        else:
+            if row.get("optional_repository_projection_state") != "optional_not_required":
+                fail(f"later framework repository projection state drift: {package_id}")
+            if row.get("linked_governed_child_repository_state") != "UNPROVISIONED":
+                fail(f"later uncertified package must remain UNPROVISIONED: {package_id}")
+            if row.get("linked_governed_child_repository_id") is not None:
+                fail(f"later child repository identity cannot be invented: {package_id}")
+            if row.get("parent_certification_state") != "PENDING_PHYSICAL_CHILD":
+                fail(f"later parent certification must remain pending physical child: {package_id}")
 
     if len(materialization_rows) != 1 or materialization_rows[0]["framework_id"] != EXPECTED_SEQUENCE[0]:
         fail("only CIE may be the current package-materialization implementation packet")
