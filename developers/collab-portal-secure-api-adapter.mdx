@@ -235,6 +235,59 @@ A failed or ambiguous write opens `docs_delta_opened` / project-integration inci
 - client/staff assignment changes;
 - any operation whose effect cannot be verified from the contract/current object.
 
+## Sales and lead-management extension — August 21, 2026
+
+CrownThrive Sales & Email Operations V2 adds a **governed sales-record handoff** to the existing adapter without changing the credential or write gates above.
+
+Current SuiteDash first-party documentation confirms a CRM funnel with **Lead → Prospect → Client**, Company records, follow-ups, Email Marketing audiences/drip sequences, Email Cannons, Secure API and configurable webhooks. These provider capabilities do not prove every feature is enabled or automated in CrownThrive's Collab Portal account.
+
+### Safe initial sales mapping
+
+```yaml
+crownthrive_prospect_record:
+  → collab_contact_or_company: conditional_D2_write
+  → collab_role: Lead
+  → source_platform: Locticians | inbound_lead | other
+  → source_profile_or_thread_ref: restricted_reference
+  → lifecycle_state: governed_runtime
+  → suppression_state: authoritative_before_marketing
+```
+
+The verified Secure API already exposes `GET/POST/PUT` contact/company surfaces and `/marketing/subscribe`. That permits a future bounded adapter to create or reconcile researched **Lead** records after exact credential binding and D2 write certification.
+
+### Email-campaign boundary
+
+SuiteDash documents rich Email Marketing, drip sequences and one-recipient **Email Cannons** in its product UI/automation layer. The current Collab Portal Secure API specification does **not** prove a direct `send email cannon` API endpoint. Therefore:
+
+- CRM contact/company synchronization may use the Secure API only after the existing write gate passes;
+- marketing-audience subscription must honor CrownThrive suppression/opt-out state before any provider write;
+- Email Cannon or drip execution remains a separately certified Collab Portal automation capability;
+- provider UI capability must not be documented as a live CrownThrive API/MCP send path until execution evidence exists;
+- no cold campaign may bypass the private outbound-compliance gate.
+
+### MCP state
+
+No Collab Portal MCP tool is certified as installed production infrastructure by this pass. The verified integration route remains **Secure API \+ governed webhooks \+ provider-native automations**. Any future MCP must receive its own manifest, tool schemas, authority class, secret boundary, test evidence and rollback/exit path.
+
+### Sales-event contract
+
+The private sales runtime should exchange stable references rather than raw mailbox secrets or unrestricted message bodies:
+
+```yaml
+event_types:
+  - lead.researched
+  - lead.contacted
+  - lead.replied
+  - lead.qualified
+  - lead.claim_started
+  - lead.won
+  - lead.suppressed
+  - lead.risk_hold
+  - lead.founder_escalated
+```
+
+Webhook payloads must exclude credentials and should minimize personal data to the fields necessary for the receiving workflow.
+
 ## OpenAI agent boundary
 
 The Collab Portal's own OpenAI-provider setting is a **provider configuration surface**, not a secret vault for CrownThrive-wide automation. An OpenAI project API key used by portal-side agents must be newly generated, server-side, least-privilege/budgeted where supported, and independently rotatable from the portal API secret.

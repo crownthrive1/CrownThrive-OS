@@ -1,0 +1,136 @@
+---
+title: "Sales & Email Operations V2 — Locticians Claim Outreach"
+sidebarTitle: "Sales & Email V2"
+description: "August 21, 2026 implementation record for sales email triage, Locticians claim outreach, private CRM state, risk controls, Collab Portal handoff and the cold-send compliance gate."
+icon: "envelope-open-text"
+keywords: ["sales email", "Locticians", "lead desk", "cold outreach", "Collab Portal", "Supabase", "August 21 2026"]
+---
+
+# Sales & Email Operations V2 — August 21, 2026
+
+## Purpose
+
+This pass adds a governed sales and email operating lane to CrownThrive, with two primary functions:
+
+1. inbound lead triage, research, scam screening and nurture;
+2. researched one-to-one outreach to owners of claimable Locticians profiles.
+
+## Implemented in this pass
+
+### Private CRM runtime
+
+A restricted, non-public CRM schema now contains governed records for:
+
+- prospects;
+- source-backed research evidence;
+- outreach sequences;
+- category-specific templates;
+- outbound/reply events;
+- restricted email-vault entries;
+- suppression;
+- email/tag taxonomy;
+- outbound-compliance configuration;
+- founder-escalation rules.
+
+The schema is RLS-enabled and not granted to ordinary anonymous/authenticated public access. Service/backend workflows remain the intended access path.
+
+### Outreach content system
+
+The runtime contains eight category-specific first-touch Locticians claim templates plus three general follow-up templates.
+
+The default cadence is:
+
+- Day 0;
+- business Day 3;
+- business Day 7;
+- business Day 14, then stop.
+
+### Email triage and risk
+
+The Sales and Lead Desk classifies legitimate leads, routine support/vendor traffic, founder-priority legal/financial/personal/security matters, and scam/phishing risk.
+
+A current Virality Music licensing thread was converted into a private negative-evaluation case after the sender's follow-up combined malformed template text, unanswered normal commercial questions and redirection to an unexplained external form. Public docs preserve the pattern only; private message IDs/content remain in restricted evidence.
+
+### Mailbox organization
+
+A cross-provider tag taxonomy is now governed for:
+
+- P0 founder/legal/financial/personal priority;
+- P1 lead/licensing/partnership/press;
+- P2 support/vendor operations;
+- lead lifecycle;
+- Locticians outreach;
+- opt-out/suppression;
+- scam/phishing/do-not-reply risk.
+
+Provider-specific tag/category activation continues as the taxonomy is used; it is not necessary to rewrite all historical email merely to satisfy a count.
+
+### Scheduled operation
+
+The inbound Sales and Lead Desk runs as a recurring condition watch. A separate weekday Locticians Claim Outreach workflow researches bounded batches, checks duplicate/suppression/risk/claim state and manages the four-touch sequence.
+
+## Hard cold-send gate
+
+**Unsolicited Locticians marketing email is prepared but not active.**
+
+The private outbound configuration intentionally fails closed until a valid CrownThrive physical postal address is verified. The runtime constraint prevents `cold_outreach_enabled=true` while the address field is empty.
+
+Until that gate opens, the workflow may:
+
+- research profiles;
+- source lawful public business contact information;
+- score/queue prospects;
+- prepare category-specific drafts;
+- maintain suppression and lifecycle state.
+
+It may **not send cold commercial email**.
+
+This protects the production estate from silently turning a technically working mail connector into a noncompliant marketing system.
+
+## Collab Portal integration state
+
+The existing Collab Portal Secure API adapter remains the verified integration contract for CRM/project data. This pass adds the sales-record handoff model.
+
+Provider documentation also supports CRM Lead/Prospect/Client roles, Email Marketing/drip sequences, Email Cannons and webhooks. Those are provider capabilities and must not be represented as a live CrownThrive API/MCP send path without CrownThrive execution evidence.
+
+No Collab Portal MCP is certified live by this pass. The current verified architecture remains **Secure API \+ governed webhooks \+ provider-native automations**.
+
+## Email visual boundary
+
+The current direct Outlook automated write surface is plain text. Rich image/logo email is therefore not claimed as active through Outlook. Rich HTML outreach should be activated only through a separately certified sender such as the governed Collab Portal/SuiteDash marketing surface, with lawful asset use, suppression and compliance checks.
+
+## Documentation added
+
+- [Sales and Lead Desk Agent](/automation/sales-and-lead-desk-agent)
+- [Sales Lead Triage and Locticians Claim Outreach](/workflows/sales-lead-triage-and-locticians-claim-outreach)
+- [Email Scam, Opt-Out and Escalation Runbook](/runbooks/email-scam-optout-and-escalation)
+- Collab Portal Secure API adapter — sales extension
+- Locticians Institutional Registry — claim-outreach extension
+
+## Current status
+
+```yaml
+inbound_lead_desk: active
+scam_phishing_vetting: active
+founder_priority_escalation: active
+private_sales_crm: created
+category_templates: created
+locticians_research_automation: active
+cold_outreach_send: hold_pending_verified_postal_address
+collab_secure_api_contract: verified_existing
+collab_sales_write_activation: governed_by_existing_credential_and_write_gates
+collab_mcp: not_certified_live
+outlook_rich_html: not_available_on_current_direct_write_surface
+```
+
+## Exit criteria for cold-send activation
+
+Cold Locticians email may advance from HOLD only after:
+
+1. CrownThrive's valid physical postal address is entered into the private outbound configuration;
+2. sender identity and opt-out copy are verified;
+3. suppression behavior passes;
+4. a test profile is researched end-to-end without private-data guessing;
+5. a low-volume test message renders correctly;
+6. provider/CRM event logging and stop conditions are verified;
+7. no legal/privacy/security blocker remains.
