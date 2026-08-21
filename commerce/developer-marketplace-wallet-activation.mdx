@@ -17,10 +17,11 @@ keywords: ["developer marketplace", "ChatGPT sign-in", "Crown Credits", "Stripe"
 
 The CrownThrive Developer Marketplace is deployed at [crownthrive-developer-marketplace.crownthrive.chatgpt.site](https://crownthrive-developer-marketplace.crownthrive.chatgpt.site).
 
-- Site release: version 15
-- Sites source commit: `9142df21a686155ac618448094eb941d77b13b7f`
-- Production deployment: `appgdep_6a87e35b4b10819196810eb06484a2f7` — succeeded
-- Drive checkpoint v3 SHA-256: `19772232a8aecd4cda9aed444e8ee2583f1d98f4377bb0bb0de47bcd9854114c`
+- Site release: version 16
+- Sites source commit: `d8567beb8a2b2a7fddd5bdd61d86ba9a08d20dbc`
+- Public release register: [`/releases`](https://crownthrive-developer-marketplace.crownthrive.chatgpt.site/releases)
+- Release custody: exact local build plus owner-only Google Drive readback — byte-identical
+- First-ten batch SHA-256: `edfbc27ecc7474803832795c611750fa4e5a09bcca719232e9688896f25ed2d9`
 - ChatGPT sign-in: active
 - Customer dashboard: active at `/dashboard`
 - Admin operations dashboard: server-authorized at `/admin`
@@ -46,10 +47,11 @@ The account and operator surfaces are production controls. They are not proof th
 
 A redirect, checkout identifier, email field, browser state, or client-visible link is never accepted as payment, identity authorization, entitlement, license, or delivery evidence.
 
-## Verified v15 checkpoint
+## Verified v16 checkpoint
 
-The production suite passed 26 checks with zero failures. Coverage includes:
+The production suite passed 27 checks with zero failures. Coverage includes:
 
+- the exact ten-product public catalog and separate membership candidate;
 - SIWC email normalization and non-disclosure;
 - server-authorized role-aware dashboard links;
 - private response shaping and upstream field stripping;
@@ -57,13 +59,14 @@ The production suite passed 26 checks with zero failures. Coverage includes:
 - protected-page `no-store` and `noindex` headers;
 - owner-scoped library shaping;
 - redirect safety;
+- release-register fingerprints and fail-closed readiness;
 - secret and provider-identifier exclusion.
 
-The current Supabase security advisor reports zero security lints.
+These tests are producer-side technical evidence. They are not independent legal, tax, rights, accessibility, malware, payment, or release certification.
 
 ## Policy surfaces and legal-change boundary
 
-Version 15 adds public, noindex drafts at `/legal/tax`, `/legal/rights`, and `/legal/accessibility` and corrects `/legal/privacy` to describe the live SIWC and pseudonymous Supabase wallet accurately. All seven policy pages remain labeled `DRAFT · NOT EFFECTIVE`.
+Version 16 preserves public, noindex drafts at `/legal/tax`, `/legal/rights`, and `/legal/accessibility` and corrects `/legal/privacy` to describe the live SIWC and pseudonymous Supabase wallet accurately. All seven policy pages remain labeled `DRAFT · NOT EFFECTIVE`.
 
 - Digital products are not assumed to be universally tax-exempt. Product taxability, customer jurisdiction, provider configuration, and active registrations remain separate evidence gates.
 - Stripe automatic tax may be armed only after registrations and the applicable product tax code are independently confirmed; automation must not infer either.
@@ -73,51 +76,46 @@ Version 15 adds public, noindex drafts at `/legal/tax`, `/legal/rights`, and `/l
 
 ## Stripe and webhook topology
 
-The runtime controller is `credit-commerce-control` version 11. Three signed handlers are deployed:
+The runtime maintains separate default, test, and live signed-event receiver paths. All remain unarmed. The handlers reject Connect events, read provider objects back before settlement, lease idempotent receipts, and accept only the allowlisted checkout, asynchronous-payment, refund, and dispute event families.
 
-- `credit-commerce-webhook` version 3 — compatibility route, unbound;
-- `credit-commerce-webhook-test` version 1 — dedicated test route, unarmed;
-- `credit-commerce-webhook-live` version 1 — dedicated live route, unarmed.
+Stripe funds Crown Credits only. A verified top-up appends credits to the CrownThrive ledger; a later, separate atomic redemption creates the product order, exact-version entitlement, and license grant. A redirect, Stripe object, or wallet balance never creates product access by itself.
 
-The handlers accept both Supabase Auth and SIWC customer identities, reject Connect events, read provider objects back before settlement, lease idempotent receipts, and handle only:
-
-- `checkout.session.completed`
-- `checkout.session.async_payment_succeeded`
-- `checkout.session.async_payment_failed`
-- `checkout.session.expired`
-- `charge.refunded`
-- `charge.dispute.created`
-- `charge.dispute.closed`
-
-No existing Stripe endpoint is safe to reuse. The Stripe connector can create an endpoint, but cannot create an account restricted key or safely transfer the one-time endpoint signing secret into Supabase custody. Therefore the endpoint remains unregistered and no secret was exposed.
+No existing Stripe endpoint is safe to reuse. The connected tool cannot create a least-privilege account key and atomically transfer the one-time endpoint signing secret into private runtime custody. Endpoint registration therefore remains held and no secret was exposed.
 
 ## Gates that remain closed
 
-| Control | Enabled |
-| --- | --: |
-| Product types for sale | 0 |
-| Jurisdiction rules for redemption | 0 |
-| Independent release-gate evidence | 0 |
-| Approved exact-release bindings | 0 |
-| Operative license tiers | 0 |
-| Checkout-enabled credit offers | 0 |
+| Control | Current state |
+| --- | ---: |
+| Exact current first-ten packages | 10 |
+| Required release-gate requirements | 13 |
+| Independent PASS executions | 0 |
+| Required reviewer quorum | At least 2 distinct reviewers, including 1 human specialist |
+| Approved commercial releases | 0 |
+| Approved offer-release activation bindings | 0 |
+| Checkout-enabled asset offers | 0 |
 | Active reviewed top-ups | 0 |
-| Credit program | No |
+| Credit program | Inactive |
 
 Founder approval authorizes the program direction and founder role. It does not create external tax, legal, rights, accessibility, provider, credential, fulfillment, release, or reviewer evidence.
 
 ## Exact package integrity
 
-Independent nonvoting review found the seven examined ZIP archives structurally clean and hash-consistent. Four customer packages match their exact Supabase v1.0 SHA/size and custody metadata:
+The current first-ten cohort is deterministically packaged, linked to exact cohort asset versions, and byte-identical across controlled local and owner-only Google Drive custody. Producer-side archive checks passed traversal, symlink, secret-pattern, manifest, and checksum controls.
 
-| Package | Technical state | Commercial state |
+| SKU | Exact version | Commercial state |
 | --- | --- | --- |
-| `CT-DEV-BUNDLE-001` v1.0.0 | Integrity pass | HOLD — exact certification/evidence/binding absent |
-| `CT-DEV-KIT-001` v1.0.0 | Integrity pass | HOLD — exact certification/evidence/binding absent |
-| `CT-DEV-KIT-002` v1.0.0 | Technical pass | HOLD — rights/license pending; synthetic commerce |
-| `CT-DEV-RB-001` v1.0.0 | Technical pass | HOLD — rights/license pending; synthetic commerce |
+| `CT-DEV-RB-001` | 1.1.1 | CERTIFICATION_PENDING |
+| `CT-DEV-KIT-001` | 1.2.1 | CERTIFICATION_PENDING |
+| `CT-DEV-KIT-002` | 1.1.1 | CERTIFICATION_PENDING |
+| `CT-DEV-KIT-003` | 1.1.1 | CERTIFICATION_PENDING |
+| `CT-DEV-KIT-004` | 1.1.1 | CERTIFICATION_PENDING |
+| `CT-DEV-BUNDLE-001` | 1.2.1 | CERTIFICATION_PENDING |
+| `CT-DEV-KIT-005` | 1.0.1 | CERTIFICATION_PENDING |
+| `CT-DEV-KIT-006` | 1.0.1 | CERTIFICATION_PENDING |
+| `CT-DEV-WB-001` | 1.0.1 | CERTIFICATION_PENDING |
+| `CT-DEV-RB-002` | 1.0.1 | CERTIFICATION_PENDING |
 
-Malware signature scanning, rights, operative licensing, accessibility, tax/jurisdiction, price evidence, exact factory bindings, authenticated independent reviewers, commit provenance, and fresh dual-custody restore proof remain unresolved. A later version cannot certify an earlier digest.
+Structural checks and custody receipts do not certify editorial quality, originality, distribution rights, operative licensing, accessibility, tax treatment, malware safety, price authorization, protected delivery, or payment readiness. Formal release requires all 13 gates and at least two distinct independent reviewers, including one qualified human specialist. The producer cannot certify its own release.
 
 ## Funding activation runbook
 
@@ -140,4 +138,4 @@ The existing Stripe payout record is outside this dashboard release. It is not t
 
 Google Drive is the human master and recovery record. Supabase/THIVEBASE is the authority for runtime, ledger state, metadata, lineage, rights, queues, checksums, roles, and evidence. GitHub issue [#167](https://github.com/crownthrive1/CrownThrive-Support/issues/167) is the coordination ledger. CHLOM may fingerprint an exact version and its integrity only; it must not assert authorship, ownership, legal sufficiency, access, or license validity. The agent that produced an asset cannot certify its own release.
 
-Current truthful state: **identity and dashboards live; funding, checkout, redemption, and customer delivery held**.
+Current truthful state: **Site v16, identity, dashboards, and ten packaged candidates are live or staged as described; funding, checkout, redemption, licensing, and customer delivery remain held**.
