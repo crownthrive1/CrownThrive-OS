@@ -83,6 +83,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Require exact founder-signed payload
         run: node contracts/mcp/verify-founder-signature-envelope.mjs --require-signed
+      - name: Lock exact certification destination before minting OIDC
+        env:
+          REQUESTED_CERTIFICATION_SERVER_URL: ${{ inputs.server_url }}
+          CANONICAL_CERTIFICATION_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$REQUESTED_CERTIFICATION_SERVER_URL" != "$CANONICAL_CERTIFICATION_SERVER_URL" ]; then
+            echo 'Certification destination is not the canonical governed MCP endpoint.' >&2
+            exit 1
+          fi
+      - name: Lock exact certification destination before minting OIDC
+        env:
+          REQUESTED_CERTIFICATION_SERVER_URL: ${{ inputs.server_url }}
+          CANONICAL_CERTIFICATION_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$REQUESTED_CERTIFICATION_SERVER_URL" != "$CANONICAL_CERTIFICATION_SERVER_URL" ]; then
+            echo 'Certification destination is not the canonical governed MCP endpoint.' >&2
+            exit 1
+          fi
       - name: Mint repository-bound GitHub OIDC token
         id: oidc
         shell: bash
@@ -94,7 +116,7 @@ jobs:
           echo "token=$token" >> "$GITHUB_OUTPUT"
       - name: Capture one bounded sanitized result per enabled central D0 tool
         env:
-          MCP_CERTIFICATION_SERVER_URL: ${{ inputs.server_url }}
+          MCP_CERTIFICATION_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
           MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
         run: node contracts/mcp/capture-mcp-output-shapes.mjs mcp-output-shape-captures.json
       - name: Infer bounded JSON Schema 2020-12 contracts
@@ -136,12 +158,12 @@ jobs:
         env:
           MCP_CERTIFICATION_LIVE: 'true'
           MCP_CERTIFICATION_ALLOW_PROVIDER_READS: 'true'
-          MCP_CERTIFICATION_SERVER_URL: ${{ inputs.server_url }}
+          MCP_CERTIFICATION_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
           MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
         run: node contracts/mcp/external-certification-runner.mjs | tee crownthrive-overlay.json
       - name: Start non-provider official-conformance auth proxy
         env:
-          MCP_CONFORMANCE_SERVER_URL: ${{ inputs.server_url }}
+          MCP_CONFORMANCE_SERVER_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control
           MCP_CERTIFICATION_BEARER: ${{ steps.oidc.outputs.token }}
         shell: bash
         run: |
