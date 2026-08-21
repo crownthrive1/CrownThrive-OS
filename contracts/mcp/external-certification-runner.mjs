@@ -3,8 +3,10 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 
 const manifestPath = new URL('./external-certification-plan.v1.json', import.meta.url);
+const envelopePath = new URL('./founder-signature-envelope.v1.json', import.meta.url);
 const manifestBytes = fs.readFileSync(manifestPath);
 const manifest = JSON.parse(manifestBytes.toString('utf8'));
+const envelope = JSON.parse(fs.readFileSync(envelopePath, 'utf8'));
 const manifestSha256 = crypto.createHash('sha256').update(manifestBytes).digest('hex');
 const live = process.env.MCP_CERTIFICATION_LIVE === 'true';
 const allowProviderReads = process.env.MCP_CERTIFICATION_ALLOW_PROVIDER_READS === 'true';
@@ -38,19 +40,22 @@ function runStaticPreflight() {
   assert(manifest.server.sovereign_vote_authority === false, 'PRE-005', 'certification runner has no sovereign vote authority');
   assert(manifest.server.expected_central_enabled_tool_count === 20, 'PRE-006', 'central enabled-tool expectation is 20');
   assert(manifest.founder_signature.required === true, 'PRE-007', 'founder signature is mandatory before final implementation');
-  assert(manifest.founder_signature.state === 'awaiting_signature', 'PRE-008', 'pre-signature artifact is fail-closed');
-  assert(manifest.state === 'prepared_awaiting_founder_signature', 'PRE-009', 'certification lifecycle is held before final implementation');
+  assert(manifest.founder_signature.state === 'awaiting_signature', 'PRE-008', 'signable plan remains immutable and records the founder-signature requirement');
+  assert(manifest.state === 'prepared_awaiting_founder_signature', 'PRE-009', 'signable plan lifecycle remains prepared/awaiting');
   assert(manifest.post_signature_execution.provider_read_budget.crownthrive_io === 13, 'PRE-010', 'CrownThrive IO total post-signature certification budget is 13 reads');
   assert(manifest.post_signature_execution.provider_read_budget.thrivetools_seo === 9, 'PRE-011', 'ThriveTools SEO total post-signature certification budget is 9 reads');
   assert(manifest.post_signature_execution.provider_read_budget.provider_writes === 0, 'PRE-012', 'provider write budget is zero');
   assert(Array.isArray(manifest.mandatory_acceptance) && manifest.mandatory_acceptance.length === 15, 'PRE-013', 'all 15 mandatory acceptance predicates are represented');
   const ids = manifest.mandatory_acceptance.map((x) => x.id);
   assert(new Set(ids).size === ids.length, 'PRE-014', 'acceptance predicate ids are unique');
-  return { manifest_sha256: manifestSha256, mode: 'pre_signature_static', results };
+  assert(envelope.certification_id === manifest.certification_id, 'PRE-015', 'signature envelope targets the exact certification plan');
+  assert(envelope.authorized_effect?.provider_write_budget === 0, 'PRE-016', 'signature envelope cannot authorize provider writes');
+  return { manifest_sha256: manifestSha256, authorized_payload_sha256: envelope.authorized_payload_sha256, signature_state: envelope.signature_state, mode: 'static', results };
 }
 
 async function runLive() {
-  if (manifest.founder_signature.state !== 'signed') throw new Error('LIVE-000: founder signature state is not signed');
+  if (envelope.signature_state !== 'signed') throw new Error('LIVE-000: founder signature envelope is not signed');
+  if (envelope.signature_text !== envelope.signature_text_required) throw new Error('LIVE-000: founder signature text does not match the exact required attestation');
   if (!bearer) throw new Error('LIVE-000: MCP_CERTIFICATION_BEARER is required');
   const discover = await rpcRequest('discover-1', 'server/discover');
   assert(discover.status === 200, 'EXT-001A', `server/discover HTTP ${discover.status}`);
@@ -63,7 +68,7 @@ async function runLive() {
   const tools1 = list1.json?.result?.tools; const tools2 = list2.json?.result?.tools;
   assert(Array.isArray(tools1) && tools1.length === manifest.server.expected_central_enabled_tool_count, 'EXT-002B', `tools/list exposes exactly ${manifest.server.expected_central_enabled_tool_count} tools`);
   assert(JSON.stringify(tools1) === JSON.stringify(tools2), 'EXT-002C', 'tools/list is deterministic across repeated reads');
-  assert(list1.json?.result?.cacheScope === 'private' && Number(list1.json?.result?.ttlMs) > 0, 'EXT-002D', 'tools/list returns private cache hints');
+  assert(list1.json?.result?.cacheScope === 'private' && Number(list1.json?.result.ttlMs) > 0, 'EXT-002D', 'tools/list returns private cache hints');
   const names = tools1.map((t) => t.name);
   assert(names.every((name, index) => index === 0 || names[index - 1].localeCompare(name) <= 0), 'EXT-002E', 'tool order is deterministic lexicographic order');
   assert(names.length === expectedTools.size && names.every((name) => expectedTools.has(name)), 'EXT-002F', 'advertised tools match the certified central allowlist');
@@ -86,7 +91,7 @@ async function runLive() {
     const seo = await rpcRequest('seo-live-1', 'tools/call', { name: 'seo.user.read', arguments: {} }, 'seo.user.read', { 'x-crownthrive-certification-mode': 'live-proof' });
     assert(seo.status === 200 && seo.json?.result?.isError === false && seo.json?.result?.structuredContent?.ok === true, 'EXT-013B', 'external ThriveTools SEO D0 tool call succeeds with structuredContent');
   }
-  return { manifest_sha256: manifestSha256, mode: 'external_live', server_url: serverUrl, results };
+  return { manifest_sha256: manifestSha256, authorized_payload_sha256: envelope.authorized_payload_sha256, mode: 'external_live', server_url: serverUrl, results };
 }
 
 try { const report = live ? await runLive() : runStaticPreflight(); process.stdout.write(`${JSON.stringify(report, null, 2)}\n`); if (report.results.some((r) => r.pass === false && !r.skipped)) process.exit(1); }
