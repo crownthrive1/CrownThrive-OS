@@ -10,10 +10,10 @@ function run(script, args = [], env = {}) {
 }
 function listen(server) { return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server.address().port))); }
 function close(server) { return new Promise((resolve) => server.close(resolve)); }
-async function request(port, { method = 'POST', path = '/mcp', body = '{"method":"ping"}' } = {}) {
+async function request(port, { method = 'POST', path = '/mcp', body = '{"method":"ping"}', headers = {} } = {}) {
   const response = await fetch(`http://127.0.0.1:${port}${path}`, {
     method,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body: method === 'GET' || method === 'HEAD' ? undefined : body,
     redirect: 'manual'
   });
@@ -61,6 +61,8 @@ assert.equal(oversized.status, 413);
 assert.equal(upstreamHits, 0);
 assert.equal((await request(proxyPort, { method: 'GET' })).status, 405);
 assert.equal((await request(proxyPort, { path: '/other' })).status, 405);
+assert.equal((await request(proxyPort, { headers: { 'x-http-method-override': 'DELETE' } })).status, 400);
+assert.equal((await request(proxyPort, { headers: { 'x-method-override': 'PATCH' } })).status, 400);
 assert.equal((await request(proxyPort, { body: '{"method":"tools/call"}' })).status, 403);
 assert.equal((await request(proxyPort, { body: '{"method":"unknown/read"}' })).status, 403);
 assert.equal((await request(proxyPort, { body: '{not-json' })).status, 400);
@@ -129,6 +131,7 @@ console.log(JSON.stringify({
   signature_reuse_rejected: true,
   remote_target_rejected: true,
   method_path_allowlist_enforced: true,
+  method_override_rejected: true,
   operation_allowlist_enforced: true,
   oversized_request_rejected: true,
   declared_oversized_response_rejected: true,
