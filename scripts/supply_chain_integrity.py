@@ -11,12 +11,27 @@ from pathlib import Path
 from typing import Any
 
 
-ACTION_RE = re.compile(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)", re.MULTILINE)
+ACTION_RE = re.compile(r"^\s*(?:-\s*)?['\"]?uses['\"]?\s*:\s*([^\s#]+)", re.MULTILINE)
+FLOW_ACTION_RE = re.compile(
+    r"(?:^\s*(?:-\s*)?\{|^\s*['\"]?steps['\"]?\s*:\s*\[\s*\{)"
+    r"[^#\n]*?['\"]?uses['\"]?\s*:\s*([^\s,#}\]]+)",
+    re.MULTILINE,
+)
 PIN_RE = re.compile(r"^[^@\s]+@[0-9a-fA-F]{40}$")
 DOCKER_PIN_RE = re.compile(r"^docker://[^@\s]+@sha256:[0-9a-fA-F]{64}$")
+PERSIST_CREDENTIALS_RE = re.compile(
+    r"^\s*['\"]?persist-credentials['\"]?\s*:\s*([^\s#]+)", re.MULTILINE
+)
 DANGEROUS_PATTERNS = {
-    "pull_request_target": re.compile(r"^\s*pull_request_target\s*:", re.MULTILINE),
-    "id_token_write": re.compile(r"^\s*id-token\s*:\s*write\s*$", re.MULTILINE),
+    "pull_request_target": re.compile(
+        r"(?:^\s*['\"]?pull_request_target['\"]?\s*:|"
+        r"^\s*['\"]?on['\"]?\s*:\s*[\[{][^#\n]*?\bpull_request_target\b)",
+        re.MULTILINE,
+    ),
+    "flow_style_on": re.compile(r"^\s*['\"]?on['\"]?\s*:\s*[\[{]", re.MULTILINE),
+    "id_token_write": re.compile(
+        r"^\s*['\"]?id-token['\"]?\s*:\s*['\"]?write['\"]?\s*$", re.MULTILINE
+    ),
     "curl_pipe_shell": re.compile(r"\bcurl\b[^\n|]*\|\s*(?:ba)?sh\b"),
     "wget_pipe_shell": re.compile(r"\bwget\b[^\n|]*\|\s*(?:ba)?sh\b"),
     "destructive_git": re.compile(r"\bgit\s+(?:push\s+--force|reset\s+--hard)\b"),
@@ -29,7 +44,7 @@ def permission_errors(text: str) -> list[str]:
     lines = text.splitlines()
     top_level_contents_read = False
     for index, line in enumerate(lines):
-        match = re.match(r"^(\s*)permissions\s*:\s*(.*?)\s*$", line)
+        match = re.match(r"^(\s*)['\"]?permissions['\"]?\s*:\s*(.*?)\s*$", line)
         if not match:
             continue
         indent = len(match.group(1).expandtabs(2))
@@ -47,7 +62,10 @@ def permission_errors(text: str) -> list[str]:
             child_indent = len(child) - len(child.lstrip(" \t"))
             if child_indent <= indent:
                 break
-            item = re.match(r"^\s*([A-Za-z0-9_-]+)\s*:\s*([^#]+?)\s*$", child)
+            item = re.match(
+                r"^\s*['\"]?([A-Za-z0-9_-]+)['\"]?\s*:\s*([^#]+?)\s*$",
+                child,
+            )
             if item:
                 block_values[item.group(1).lower()] = item.group(2).strip().strip("'\"").lower()
         write_keys = sorted(key for key, value in block_values.items() if value in {"write", "write-all"})
@@ -64,7 +82,10 @@ def inspect_workflow(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     errors: list[str] = []
     warnings: list[str] = []
-    actions = [action.strip("'\"") for action in ACTION_RE.findall(text)]
+    actions = [
+        action.strip("'\"")
+        for action in [*ACTION_RE.findall(text), *FLOW_ACTION_RE.findall(text)]
+    ]
     for action in actions:
         if action.startswith("./"):
             if not action.startswith("./.github/actions/") or ".." in Path(action).parts:
@@ -76,10 +97,13 @@ def inspect_workflow(path: Path) -> dict[str, Any]:
             continue
         if not PIN_RE.fullmatch(action):
             errors.append(f"action is not pinned to a 40-hex commit: {action}")
-    if any(action.startswith("actions/checkout@") for action in actions) and not re.search(
-        r"^\s*persist-credentials\s*:\s*false\s*$", text, re.MULTILINE
-    ):
-        errors.append("actions/checkout must set persist-credentials: false")
+    checkout_count = sum(action.startswith("actions/checkout@") for action in actions)
+    if checkout_count:
+        persist_values = [value.strip("'\"").lower() for value in PERSIST_CREDENTIALS_RE.findall(text)]
+        if len([value for value in persist_values if value == "false"]) < checkout_count:
+            errors.append("each actions/checkout step must set persist-credentials: false")
+        if any(value != "false" for value in persist_values):
+            errors.append("persist-credentials may not be enabled anywhere in the workflow")
     errors.extend(permission_errors(text))
     if "timeout-minutes:" not in text:
         errors.append("bounded timeout-minutes is required")
