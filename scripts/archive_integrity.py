@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import stat
 import sys
 import unicodedata
@@ -30,18 +31,43 @@ def sha256_file(path: Path) -> str:
 
 
 def safe_member_name(name: str) -> tuple[bool, str | None]:
+    if not name:
+        return False, "empty name"
     if "\x00" in name:
         return False, "NUL byte"
+    if any(ord(char) < 32 for char in name):
+        return False, "control character"
     if "\\" in name:
         return False, "backslash path separator"
-    path = PurePosixPath(name)
-    if path.is_absolute() or name.startswith("/"):
+    if PurePosixPath(name).is_absolute() or name.startswith("/"):
         return False, "absolute path"
-    if any(part in {"..", ""} for part in path.parts if part != "."):
-        return False, "empty or traversal path component"
     if len(name) >= 2 and name[1] == ":":
         return False, "drive-qualified path"
+    if ":" in name:
+        return False, "colon or alternate-data-stream path"
+    core = name[:-1] if name.endswith("/") else name
+    if not core:
+        return False, "empty archive root entry"
+    if any(part in {"", ".", ".."} for part in core.split("/")):
+        return False, "empty, dot, or traversal path component"
     return True, None
+
+
+def portable_member_key(name: str) -> str:
+    core = name[:-1] if name.endswith("/") else name
+    return unicodedata.normalize("NFC", core).casefold()
+
+
+def strict_portability_error(name: str) -> str | None:
+    core = name[:-1] if name.endswith("/") else name
+    reserved = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
+    for segment in core.split("/"):
+        if segment.endswith((" ", ".")):
+            return "path component ends with a space or dot"
+        device = segment.split(".", 1)[0].casefold()
+        if device in reserved:
+            return "Windows-reserved path component"
+    return None
 
 
 def inspect_zip(
@@ -57,7 +83,7 @@ def inspect_zip(
     warnings: list[str] = []
     members: list[dict[str, Any]] = []
     seen_exact: set[str] = set()
-    seen_portable: dict[str, str] = {}
+    seen_portable: dict[str, tuple[str, bool]] = {}
     total_uncompressed = 0
 
     try:
@@ -72,16 +98,20 @@ def inspect_zip(
         for info in infos:
             name = info.filename
             normalized = unicodedata.normalize("NFC", name)
-            portable = normalized.casefold()
+            portable = portable_member_key(name)
             safe, reason = safe_member_name(name)
             if not safe:
                 errors.append(f"unsafe member {name!r}: {reason}")
+            if strict_names:
+                portability_error = strict_portability_error(name)
+                if portability_error:
+                    errors.append(f"non-portable member {name!r}: {portability_error}")
             if name in seen_exact:
                 errors.append(f"duplicate member name: {name!r}")
             seen_exact.add(name)
-            if portable in seen_portable and seen_portable[portable] != name:
-                errors.append(f"portable-name collision: {seen_portable[portable]!r} and {name!r}")
-            seen_portable[portable] = name
+            if portable in seen_portable and seen_portable[portable][0] != name:
+                errors.append(f"portable-name collision: {seen_portable[portable][0]!r} and {name!r}")
+            seen_portable[portable] = (name, info.is_dir() or name.endswith("/"))
             if normalized != name:
                 warnings.append(f"non-NFC member name: {name!r}")
             if any(ord(char) > 127 for char in name) and not (info.flag_bits & 0x800):
@@ -90,6 +120,9 @@ def inspect_zip(
             mode = (info.external_attr >> 16) & 0xFFFF
             if stat.S_ISLNK(mode):
                 errors.append(f"symbolic-link member forbidden: {name!r}")
+            file_type = stat.S_IFMT(mode)
+            if file_type not in {0, stat.S_IFREG, stat.S_IFDIR}:
+                errors.append(f"non-regular special-file member forbidden: {name!r}")
             if info.flag_bits & 0x1:
                 errors.append(f"encrypted member unsupported: {name!r}")
             if info.file_size > max_member:
@@ -108,9 +141,40 @@ def inspect_zip(
                     "uncompressed_size": info.file_size,
                 }
             )
-        bad_crc = archive.testzip()
-        if bad_crc:
-            errors.append(f"CRC failure: {bad_crc!r}")
+        for portable, (name, is_directory) in seen_portable.items():
+            parts = portable.split("/")
+            for index in range(1, len(parts)):
+                prefix = "/".join(parts[:index])
+                if prefix in seen_portable and not seen_portable[prefix][1]:
+                    errors.append(
+                        f"file/directory prefix collision: {seen_portable[prefix][0]!r} contains {name!r}"
+                    )
+        if not errors:
+            actual_total = 0
+            try:
+                for info in infos:
+                    if info.is_dir() or info.filename.endswith("/"):
+                        continue
+                    actual_member = 0
+                    with archive.open(info, "r") as member:
+                        while True:
+                            chunk = member.read(min(1024 * 1024, max_member + 1))
+                            if not chunk:
+                                break
+                            actual_member += len(chunk)
+                            actual_total += len(chunk)
+                            if actual_member > max_member:
+                                raise ValueError(f"member {info.filename!r} exceeded actual-byte limit")
+                            if actual_total > max_uncompressed:
+                                raise ValueError("actual total uncompressed size exceeded limit")
+                    if actual_member != info.file_size:
+                        raise ValueError(
+                            f"member {info.filename!r} actual size {actual_member} differs from header {info.file_size}"
+                        )
+            except (OSError, RuntimeError, ValueError, zipfile.BadZipFile, zipfile.LargeZipFile) as exc:
+                errors.append(f"stream verification failed: {exc}")
+        else:
+            warnings.append("CRC/decompression verification skipped because preflight failed")
 
     return {
         "path": str(path),
@@ -143,10 +207,21 @@ def parse_sha256sums(path: Path) -> dict[str, str]:
     return entries
 
 
-def verify_manifest(manifest: Path, base: Path) -> dict[str, Any]:
+def verify_manifest(
+    manifest: Path,
+    base: Path,
+    *,
+    exact: bool = False,
+    trusted_manifest_sha256: str | None = None,
+) -> dict[str, Any]:
     errors: list[str] = []
     checked = 0
     try:
+        if trusted_manifest_sha256 is not None:
+            if not re.fullmatch(r"[0-9a-fA-F]{64}", trusted_manifest_sha256):
+                raise ValueError("trusted manifest digest must be 64 hexadecimal characters")
+            if sha256_file(manifest) != trusted_manifest_sha256.lower():
+                raise ValueError("trusted manifest digest mismatch")
         entries = parse_sha256sums(manifest)
     except (OSError, ValueError) as exc:
         return {"status": "FAIL", "errors": [str(exc)], "checked": 0}
@@ -165,7 +240,29 @@ def verify_manifest(manifest: Path, base: Path) -> dict[str, Any]:
         checked += 1
         if actual != expected:
             errors.append(f"checksum mismatch: {relative}")
-    return {"status": "FAIL" if errors else "PASS", "checked": checked, "errors": errors}
+    if exact:
+        manifest_resolved = manifest.resolve()
+        actual_paths = {
+            path.resolve().relative_to(base_resolved).as_posix()
+            for path in base.rglob("*")
+            if path.is_file() and path.resolve() != manifest_resolved
+        }
+        declared_paths = {
+            (base / relative).resolve().relative_to(base_resolved).as_posix()
+            for relative in entries
+            if (base / relative).resolve().is_relative_to(base_resolved)
+        }
+        for relative in sorted(actual_paths - declared_paths):
+            errors.append(f"unlisted file: {relative}")
+        for relative in sorted(declared_paths - actual_paths):
+            errors.append(f"manifest-only file: {relative}")
+    return {
+        "status": "FAIL" if errors else "PASS",
+        "checked": checked,
+        "exact_file_set": exact,
+        "trusted_manifest_digest_checked": trusted_manifest_sha256 is not None,
+        "errors": errors,
+    }
 
 
 def main() -> int:
@@ -173,6 +270,8 @@ def main() -> int:
     parser.add_argument("paths", nargs="*", type=Path)
     parser.add_argument("--strict-names", action="store_true")
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--manifest-exact", action="store_true")
+    parser.add_argument("--trusted-manifest-sha256")
     parser.add_argument("--base", type=Path, default=Path.cwd())
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -187,7 +286,12 @@ def main() -> int:
         else:
             results["archives"].append(inspect_zip(path, strict_names=args.strict_names))
     if args.manifest:
-        results["manifest"] = verify_manifest(args.manifest, args.base)
+        results["manifest"] = verify_manifest(
+            args.manifest,
+            args.base,
+            exact=args.manifest_exact,
+            trusted_manifest_sha256=args.trusted_manifest_sha256,
+        )
     results["status"] = "PASS"
     for row in results["archives"]:
         if row.get("status") == "FAIL":

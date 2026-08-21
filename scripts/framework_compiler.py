@@ -15,6 +15,16 @@ class CompileError(ValueError):
     pass
 
 
+CONSEQUENTIAL_FLAGS = (
+    "activation_allowed",
+    "public_claim_allowed",
+    "commercialization_allowed",
+    "checkout_enabled",
+    "can_vote",
+    "delete_allowed",
+)
+
+
 def canonical_bytes(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
@@ -23,8 +33,31 @@ def sha256(value: Any) -> str:
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
 
 
+def require_unique_strings(source: dict[str, Any], key: str) -> list[str]:
+    value = source.get(key)
+    if not isinstance(value, list) or not value:
+        raise CompileError(f"{key} must be a non-empty list")
+    if any(not isinstance(item, str) or not item.strip() for item in value):
+        raise CompileError(f"{key} entries must be non-empty strings")
+    if len(value) != len(set(value)):
+        raise CompileError(f"{key} entries must be unique")
+    return value
+
+
 def compile_candidate(source: dict[str, Any]) -> dict[str, Any]:
-    required = {"schema_version", "candidate_id", "candidate_type", "state", "source_ids", "invariants"}
+    if not isinstance(source, dict):
+        raise CompileError("candidate must be a JSON object")
+    required = {
+        "schema_version",
+        "candidate_id",
+        "candidate_type",
+        "state",
+        "source_ids",
+        "invariants",
+        "authority_ceiling",
+        "framework_count_delta",
+        *CONSEQUENTIAL_FLAGS,
+    }
     missing = sorted(required - source.keys())
     if missing:
         raise CompileError("missing required fields: " + ", ".join(missing))
@@ -32,51 +65,58 @@ def compile_candidate(source: dict[str, Any]) -> dict[str, Any]:
         raise CompileError("compiler accepts only CANDIDATE_HOLD inputs")
     if source["candidate_type"] not in {"framework", "capability_pack", "policy_pack", "pallet"}:
         raise CompileError("unsupported candidate type")
-    if not source["source_ids"] or len(source["source_ids"]) != len(set(source["source_ids"])):
-        raise CompileError("source_ids must be non-empty and unique")
-    if not source["invariants"] or len(source["invariants"]) != len(set(source["invariants"])):
-        raise CompileError("invariants must be non-empty and unique")
-    forbidden_true = [
-        key
-        for key in ("activation_allowed", "public_claim_allowed", "commercialization_allowed", "checkout_enabled", "can_vote")
-        if source.get(key) is True
+    source_ids = require_unique_strings(source, "source_ids")
+    invariants = require_unique_strings(source, "invariants")
+    invalid_flag_types = [
+        key for key in CONSEQUENTIAL_FLAGS if key in source and type(source[key]) is not bool
     ]
+    if invalid_flag_types:
+        raise CompileError(
+            "consequential flags must be JSON booleans: " + ", ".join(invalid_flag_types)
+        )
+    forbidden_true = [key for key in CONSEQUENTIAL_FLAGS if source.get(key, False)]
     if forbidden_true:
         raise CompileError("controlled compiler refuses enabled consequential flags: " + ", ".join(forbidden_true))
-    if source.get("authority_ceiling") == "D3":
-        raise CompileError("D3 is human-reserved")
-    if source.get("framework_count_delta", 0) not in {0, 1}:
+    authority_ceiling = source.get("authority_ceiling")
+    if authority_ceiling not in {"D0", "D1", "D2"}:
+        raise CompileError("authority_ceiling must be D0, D1 or D2")
+    framework_count_delta = source.get("framework_count_delta", 0)
+    if type(framework_count_delta) is not int or framework_count_delta not in {0, 1}:
         raise CompileError("framework_count_delta must be 0 or 1")
-    if source["candidate_type"] != "framework" and source.get("framework_count_delta", 0) != 0:
+    if source["candidate_type"] != "framework" and framework_count_delta != 0:
         raise CompileError("non-framework package cannot increase framework count")
 
     tests = [
-        {"test_id": "source_ids_present", "passed": bool(source["source_ids"])},
-        {"test_id": "source_ids_unique", "passed": len(source["source_ids"]) == len(set(source["source_ids"]))},
-        {"test_id": "invariants_present", "passed": bool(source["invariants"])},
-        {"test_id": "no_D3", "passed": source.get("authority_ceiling") != "D3"},
-        {"test_id": "no_self_activation", "passed": source.get("activation_allowed") is not True},
-        {"test_id": "no_machine_vote", "passed": source.get("can_vote") is not True},
-        {"test_id": "commercial_hold", "passed": source.get("commercialization_allowed") is not True},
-        {"test_id": "no_checkout", "passed": source.get("checkout_enabled") is not True},
+        {"test_id": "source_ids_present", "passed": bool(source_ids)},
+        {"test_id": "source_ids_unique", "passed": len(source_ids) == len(set(source_ids))},
+        {"test_id": "invariants_present", "passed": bool(invariants)},
+        {"test_id": "authority_bounded_D0_D2", "passed": authority_ceiling in {"D0", "D1", "D2"}},
+        {"test_id": "no_self_activation", "passed": source.get("activation_allowed", False) is False},
+        {"test_id": "no_machine_vote", "passed": source.get("can_vote", False) is False},
+        {"test_id": "commercial_hold", "passed": source.get("commercialization_allowed", False) is False},
+        {"test_id": "no_checkout", "passed": source.get("checkout_enabled", False) is False},
     ]
     source_digest = sha256(source)
     compiled = {
-        "compiler_contract_version": "1.0.0",
+        "compiler_contract_version": "1.0.1",
         "compiled_candidate_id": source["candidate_id"],
         "compiled_from_sha256": source_digest,
         "candidate_type": source["candidate_type"],
         "release_state": "COMPILED_TEST_HOLD",
         "factory_integration": {
             "integration_state": "PENDING_PARENT_CERTIFICATION",
-            "framework_count_delta": source.get("framework_count_delta", 0),
-            "existing_eight_framework_factory_unchanged": source.get("framework_count_delta", 0) == 0,
+            "framework_count_delta": framework_count_delta,
+            "existing_eight_framework_factory_unchanged": framework_count_delta == 0,
             "parent_certifier": "ct.relay.agent-d",
         },
-        "source_ids": sorted(source["source_ids"]),
-        "invariants": sorted(source["invariants"]),
+        "source_ids": sorted(source_ids),
+        "invariants": sorted(invariants),
         "test_results": tests,
-        "test_status": "PASS" if all(row["passed"] for row in tests) else "FAIL",
+        "test_status": (
+            "SELF_TEST_PASS_PENDING_INDEPENDENT_VERIFICATION"
+            if all(row["passed"] for row in tests)
+            else "FAIL"
+        ),
         "controls": {
             "can_vote": False,
             "d3_human_reserved": True,
@@ -101,8 +141,13 @@ def self_test() -> dict[str, Any]:
         "source_ids": ["SELF-TEST-SOURCE"],
         "invariants": ["no_self_activation"],
         "framework_count_delta": 0,
+        "authority_ceiling": "D1",
         "activation_allowed": False,
+        "public_claim_allowed": False,
         "commercialization_allowed": False,
+        "checkout_enabled": False,
+        "can_vote": False,
+        "delete_allowed": False,
     }
     first = compile_candidate(valid)
     second = compile_candidate(valid)
@@ -116,7 +161,20 @@ def self_test() -> dict[str, Any]:
         rejected = True
     if not rejected:
         raise CompileError("self-activation test was not rejected")
-    return {"status": "PASS", "deterministic": True, "self_activation_rejected": True, "output_sha256": sha256(first)}
+    non_boolean_rejected = False
+    try:
+        compile_candidate(dict(valid, activation_allowed="false"))
+    except CompileError:
+        non_boolean_rejected = True
+    if not non_boolean_rejected:
+        raise CompileError("non-boolean consequential flag was not rejected")
+    return {
+        "status": "SELF_TEST_PASS_PENDING_INDEPENDENT_VERIFICATION",
+        "deterministic": True,
+        "self_activation_rejected": True,
+        "non_boolean_flag_rejected": True,
+        "output_sha256": sha256(first),
+    }
 
 
 def main() -> int:
