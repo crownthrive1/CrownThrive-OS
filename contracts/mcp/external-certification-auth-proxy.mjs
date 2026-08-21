@@ -14,7 +14,11 @@ const server = http.createServer(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const body = chunks.length ? Buffer.concat(chunks) : undefined;
-    const headers = { ...req.headers, authorization: `Bearer ${bearer}` };
+    const headers = {
+      ...req.headers,
+      authorization: `Bearer ${bearer}`,
+      'x-crownthrive-certification-mode': 'conformance'
+    };
     delete headers.host;
     delete headers['content-length'];
     const response = await fetch(target, {
