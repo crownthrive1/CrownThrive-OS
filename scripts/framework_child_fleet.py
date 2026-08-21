@@ -141,10 +141,22 @@ def validate_manifest(data: dict[str, Any]) -> None:
         "package_or_workflow_creates_sovereign_vote",
         "framework_acceptance_creates_sovereign_vote",
         "child_certification_creates_sovereign_vote",
+        "package_controlled_test_is_not_child_certification",
+        "sync_agents_cannot_satisfy_child_certification",
     )
     for key in required_false:
         if inv.get(key) is not False:
             fail(f"fail-closed fleet invariant drift: {key}")
+
+    required_true = (
+        "physical_repository_required_for_linked_governed_certification",
+        "physical_repository_required_for_parent_certification",
+        "physical_repository_required_for_operational_activation",
+        "physical_repository_required_for_sovereign_activation",
+    )
+    for key in required_true:
+        if inv.get(key) is not True:
+            fail(f"linked-governed certification invariant drift: {key}")
 
     rows = children(data)
     if len(rows) != 8:
@@ -175,7 +187,15 @@ def validate_manifest(data: dict[str, Any]) -> None:
         if row.get("package_materialization_allowed") is True:
             materialization_rows.append(row)
         if row.get("optional_repository_projection_state") not in {"not_required_not_observed", "optional_not_required"}:
-            fail(f"optional repository state drift: {package_id}")
+            fail(f"optional distribution-repository state drift: {package_id}")
+        if row.get("linked_governed_child_repository_required") is not True:
+            fail(f"linked-governed child repository requirement missing: {package_id}")
+        if row.get("linked_governed_child_repository_state") != "UNPROVISIONED":
+            fail(f"uncertified package must remain UNPROVISIONED: {package_id}")
+        if row.get("linked_governed_child_repository_id") is not None:
+            fail(f"immutable child repository id cannot be invented: {package_id}")
+        if row.get("parent_certification_state") != "PENDING_PHYSICAL_CHILD":
+            fail(f"parent certification must remain pending physical child: {package_id}")
 
     if len(materialization_rows) != 1 or materialization_rows[0]["framework_id"] != EXPECTED_SEQUENCE[0]:
         fail("only CIE may be the current package-materialization implementation packet")
@@ -305,7 +325,7 @@ def self_test(data: dict[str, Any]) -> None:
             target = root / row["execution_slug"]
             render_framework(data, row["framework_id"], target)
             run_rendered_validator(target)
-    print("Framework package fleet self-test PASS: CIE current controlled-test package, Convergent preview-only, physical repo optional, PR OIDC isolated, non-voting/Agent-D/D3/IP/commercial locks preserved.")
+    print("Framework package fleet self-test PASS: CIE current controlled-test package, Convergent preview-only, package-only repo optional, linked-governed physical child required, PR OIDC isolated, non-voting/Agent-D/D3/IP/commercial locks preserved.")
 
 
 def main() -> int:
@@ -331,7 +351,9 @@ def main() -> int:
             "current_state": row["current_state"],
             "package_materialization_allowed": row.get("package_materialization_allowed", False),
             "scaffold_preview_allowed": row.get("scaffold_preview_allowed", False),
-            "physical_repository_required": False,
+            "physical_repository_required_for_package_existence": False,
+            "physical_repository_required_for_linked_governed_certification": True,
+            "linked_governed_child_repository_state": row.get("linked_governed_child_repository_state"),
             "public_activation_allowed": False,
             "next_safe_action": "implement_next_governed_package_packet" if row.get("package_materialization_allowed") else "research_or_scaffold_preview_only",
         }, indent=2, sort_keys=True))
