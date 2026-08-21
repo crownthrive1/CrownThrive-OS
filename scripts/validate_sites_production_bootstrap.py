@@ -63,10 +63,16 @@ def main() -> int:
         fail("originating agent may not self-certify")
     if contract.get("fail_closed") is not True:
         fail("consumer contract must fail closed")
-    if contract.get("auto_update_enabled") is not False:
-        fail("production auto-update must remain disabled")
+    if contract.get("verified_surface_runtime_arming_allowed") is not True:
+        fail("full-cycle surfaces must be allowed to retain bounded runtime arming")
+    if contract.get("unverified_surface_auto_update_enabled") is not False:
+        fail("an unverified surface may not enable automatic updates")
+    if contract.get("publication_authority_created") is not False:
+        fail("Sites bootstrap must not create publication authority")
     if contract.get("current_policy_canary") != "hold_not_currently_pass":
         fail("current-policy canary may not be represented as PASS")
+    if "agent_d" not in str(contract.get("release_authority", "")):
+        fail("release authority must retain Agent D in the independent gate")
 
     surfaces = data.get("surfaces")
     if not isinstance(surfaces, list) or len(surfaces) != 3:
@@ -76,7 +82,8 @@ def main() -> int:
         fail("production surface set drifted")
 
     for surface_id, surface in indexed.items():
-        if surface.get("state") not in ALLOWED_STATES:
+        state = surface.get("state")
+        if state not in ALLOWED_STATES:
             fail(f"{surface_id}: unsupported state")
         parsed = urlparse(str(surface.get("canonical_url", "")))
         if parsed.scheme != "https" or not parsed.netloc:
@@ -89,8 +96,10 @@ def main() -> int:
         if fingerprint is not None and not SHA256_ID.fullmatch(str(fingerprint)):
             fail(f"{surface_id}: fingerprint is not a SHA-256 commitment")
 
-        if surface.get("state") == "full_cycle_pass":
+        if state == "full_cycle_pass":
             required_true = (
+                "runtime_consumer_verified",
+                "runtime_route_armed",
                 "marker_present_after_reapply",
                 "exact_surface_readback",
                 "feed_reference_present",
@@ -98,11 +107,20 @@ def main() -> int:
                 "rollback_marker_absent",
             )
             if any(surface.get(field) is not True for field in required_true):
-                fail(f"{surface_id}: full-cycle proof is incomplete")
+                fail(f"{surface_id}: full-cycle proof or bounded runtime arming is incomplete")
             if surface.get("rollback_endpoint_statuses") != [404, 404, 404]:
                 fail(f"{surface_id}: rollback absence proof drifted")
             if surface.get("proxy_http_status") != 200 or surface.get("reapply_http_status") != 200:
                 fail(f"{surface_id}: full-cycle HTTP proof is incomplete")
+        else:
+            if surface.get("runtime_consumer_verified") is not False:
+                fail(f"{surface_id}: incomplete surface cannot be consumer-verified")
+            if surface.get("runtime_route_armed") is not False:
+                fail(f"{surface_id}: incomplete surface cannot be runtime-armed")
+
+    virality = indexed["ct.surface.virality-music.production"]
+    if virality.get("soundcloud_api") != "REMOVED_BY_FOUNDER_OVERRIDE":
+        fail("Virality SoundCloud API founder override drifted")
 
     if data.get("overall_disposition") != "hold_partial_provider_bootstrap":
         fail("overall disposition must remain HOLD until every surface completes the cycle")
@@ -110,7 +128,9 @@ def main() -> int:
         fail("Sites bootstrap may not imply commerce authorization")
 
     print("Sites production bootstrap public manifest validation: PASS")
-    print("Disposition: HOLD / partial provider bootstrap; Phase 3 blocked; auto-update disabled.")
+    print("Disposition: HOLD / partial provider bootstrap; Phase 3 blocked.")
+    print("Full-cycle surfaces may retain bounded runtime arming; incomplete surfaces must remain disabled.")
+    print("Bootstrap state does not create release, commerce, or sovereign publication authority.")
     return 0
 
 
