@@ -1,0 +1,67 @@
+name: Sites Production Bootstrap Verification
+
+on:
+  pull_request:
+    paths:
+      - 'developers/manifests/sites-production-bootstrap.v1.json'
+      - 'scripts/validate_sites_production_bootstrap.py'
+      - 'standards/sites-production-bootstrap-and-rollback.mdx'
+      - 'automation/sites-bootstrap-certifier-agent.mdx'
+      - 'changelog/phase-2-99-sites-production-bootstrap.mdx'
+      - 'platforms/mintlify-documentation-service-registry.mdx'
+      - 'docs.json'
+      - '.github/workflows/sites-production-bootstrap-verification.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'developers/manifests/sites-production-bootstrap.v1.json'
+      - 'scripts/validate_sites_production_bootstrap.py'
+      - 'standards/sites-production-bootstrap-and-rollback.mdx'
+      - 'automation/sites-bootstrap-certifier-agent.mdx'
+      - 'changelog/phase-2-99-sites-production-bootstrap.mdx'
+      - 'platforms/mintlify-documentation-service-registry.mdx'
+      - 'docs.json'
+      - '.github/workflows/sites-production-bootstrap-verification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  sites-production-bootstrap:
+    name: Validate production Sites bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Compile Sites bootstrap validator
+        run: python -m py_compile scripts/validate_sites_production_bootstrap.py
+
+      - name: Validate Sites bootstrap disposition
+        run: python scripts/validate_sites_production_bootstrap.py
+
+      - name: Validate Mintlify documentation
+        run: python scripts/validate_docs.py
+
+      - name: Reject conflict markers
+        shell: bash
+        run: |
+          if grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' \
+            developers/manifests/sites-production-bootstrap.v1.json \
+            scripts/validate_sites_production_bootstrap.py \
+            standards/sites-production-bootstrap-and-rollback.mdx \
+            automation/sites-bootstrap-certifier-agent.mdx \
+            changelog/phase-2-99-sites-production-bootstrap.mdx; then
+            echo 'Conflict markers detected.' >&2
+            exit 1
+          fi
