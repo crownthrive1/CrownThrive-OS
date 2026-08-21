@@ -10,6 +10,8 @@ DOC=ROOT/'commerce/governed-release-autopublish.mdx'
 AGENT=ROOT/'automation/governed-release-autopublisher-agent.mdx'
 PHASE=ROOT/'standards/governed-release-autopublish-phase-amendment.mdx'
 CHANGELOG=ROOT/'changelog/phase-2-99-governed-site-autopublish.mdx'
+VALIDATOR=ROOT/'scripts/validate_governed_site_autopublish.py'
+WORKFLOW=ROOT/'.github/workflows/governed-site-autopublish.yml'
 
 def require(x,msg):
     if not x: raise SystemExit(f'ERROR: {msg}')
@@ -23,9 +25,13 @@ def main():
     require(p['policy_id']=='ct.site.autopublish.v1','policy ID drift')
     require(p['auto_publish_if_release_pass'] is True,'release PASS must be the auto-publish gate')
     require(p['fail_closed'] is True,'auto-publish must fail closed')
-    require(p['minimum_yes_votes']>=3,'quorum may not be weakened below three YES votes')
+    require(p['minimum_yes_votes']==4,'current constitution requires exactly four YES votes')
     require('ct.relay.agent-d' in p['required_vote_agents'],'independent gatekeeper Agent D must remain required')
     require(p['require_no_negative_votes'] is True,'negative vote blocker removed')
+    require(p['allowed_sovereign_voter_ids']==['ct.relay.agent-a','ct.relay.agent-b','ct.relay.agent-c','ct.relay.agent-d','ct.relay.agent-s'],'sovereign voter set drift')
+    require(p['synthetic_votes_count_toward_quorum'] is False,'synthetic votes may not satisfy quorum')
+    require(p['test_fixture_vote_identities_must_be_non_sovereign'] is True,'test fixtures may not impersonate sovereign voters')
+    require(p['require_repository_agent_oidc_binding'] is True,'repository/agent/OIDC vote binding removed')
     require(p['require_exact_version_hash'] is True,'exact version/hash binding removed')
     require(p['require_certified_destination'] is True,'destination certification removed')
     require(p['require_read_after_write'] is True,'read-after-write removed')
@@ -39,8 +45,9 @@ def main():
     for k in ('read_capability_state','write_canary_state','rollback_canary_state','read_after_write_state'):
         require(d[k]=='pass',f'catalog projection {k} must remain PASS in this dated snapshot')
     require(d['committed_write_readback'] is True,'valid committed canary missing')
-    for k in ('quorum_acceptance','pre_adapter_quarantine','automatic_queue_after_adapter_certification','automatic_publish','hold_causes_automatic_withdrawal','pass_restoration_causes_republish','append_only_attempt_history'):
-        require(c[k]=='pass',f'canary proof missing: {k}')
+    require(c['quorum_acceptance']=='hold_pending_independent_vote_isolation','synthetic quorum canary must remain HOLD')
+    for k in ('pre_adapter_quarantine','automatic_queue_after_adapter_certification','automatic_publish','hold_causes_automatic_withdrawal','pass_restoration_causes_republish','append_only_attempt_history'):
+        require(c[k]=='pass',f'bounded technical canary proof missing: {k}')
     require(c['production_customer_impact'] is False,'synthetic canary may not claim production impact')
     sites=m['production_sites']; require(len(sites)==3,'three Sites-backed production surfaces must be explicit')
     for s in sites:
@@ -65,7 +72,7 @@ def main():
     required={'publish_hold_unknown_pending_or_fail','originator_self_vote','fabricate_independent_votes','reuse_votes_after_exact_hash_change','catalog_projection_certification_equals_provider_source_write_certification','enable_production_surface_before_consumer_verification','publish_without_rollback_and_read_after_write','payment_provider_metadata_grants_license','synthetic_canary_represented_as_live_provider_proof','phase_3_advanced_by_publication_automation'}
     require(required.issubset(set(m['absolute_no_go'])),'absolute no-go rule removed')
 
-    doc=DOC.read_text(); agent=AGENT.read_text(); phase=PHASE.read_text(); changelog=CHANGELOG.read_text(); manifest_text=MANIFEST.read_text()
+    doc=DOC.read_text(); agent=AGENT.read_text(); phase=PHASE.read_text(); changelog=CHANGELOG.read_text(); manifest_text=MANIFEST.read_text(); validator_text=VALIDATOR.read_text(); workflow_text=WORKFLOW.read_text()
     for token in ('HOLD','UNKNOWN','rollback'):
         require(token in doc,f'documentation contract missing {token}')
     for token in ('ct.subagent.governed-release-publisher','Vote eligible: no','Rollback authority','Kill switches'):
@@ -73,29 +80,29 @@ def main():
     for token in ('Phase 2.99','Phase 3','Phase 4','Phase 5','Phase 6','Phase 10','Phase 14','Phase 20','auto_publish_if_release_pass=true'):
         require(token in phase,f'phase amendment missing {token}')
 
-    public_packet='\n'.join((doc,agent,phase,changelog,manifest_text))
-    forbidden_literals=(
-        'appgprj_',
-        'tzajnzshmtzjenqulehq',
-        'integration_control.',
-        'developer_commerce.',
-        'site-catalog-feed',
-        'governed_site_autopublish_dispatcher',
-        'governed_release_vote_router',
-        'governed_dynamic_feed_adapter_canary',
-        'governed_site_feed_bootstrap_verifier',
-        'governed_release_publish_queue',
+    public_packet='\n'.join((doc,agent,phase,changelog,manifest_text,validator_text,workflow_text))
+    # Build generic detectors from fragments so the validator does not publish the
+    # exact private identifiers that it is responsible for rejecting.
+    forbidden_patterns=(
+        r'\\bappgprj' + r'_[a-z0-9_-]+\\b',
+        r'https://[a-z]{20}\\.supabase\\.co',
+        r'\\b(?:integration' + r'_control|developer_' + r'commerce)\\.[a-z][a-z0-9_]*\\b',
+        r'\\bsite' + r'-catalog-feed\\b',
+        r'\\bgoverned_(?:site|release|dynamic)[a-z0-9_]*(?:dispatcher|router|queue|verifier|canary)\\b',
     )
-    for literal in forbidden_literals:
-        require(literal not in public_packet,f'public packet exposes restricted runtime topology: {literal}')
+    for pattern in forbidden_patterns:
+        require(not re.search(pattern,public_packet,re.IGNORECASE),f'public packet exposes restricted runtime topology class: {pattern}')
     require(not re.search(r'\*/\d+\s+\*\s+\*\s+\*\s+\*',public_packet),'public packet exposes private cron cadence')
     require('every two minutes' not in public_packet.lower() and 'every five minutes' not in public_packet.lower(),'public packet exposes private execution cadence')
 
     print('Governed site auto-publish contract: PASS')
-    print('- release PASS + quorum + certified destination required')
+    print('- release PASS + 4-of-5 quorum including D + certified destination required')
+    print('- synthetic/test votes are non-authoritative and cannot satisfy quorum')
+    print('- synthetic sovereign-identity quorum canary remains HOLD pending isolation')
     print('- HOLD/UNKNOWN remain quarantined')
     print('- catalog projection write/readback/rollback canary is proven')
     print('- production Sites consumer bootstrap remains pending; automatic publication remains off')
+    print('- validator and workflow sources are included in public-topology leakage checks')
     print('- private runtime topology remains excluded from the public packet')
     print('- Phase 3 remains blocked')
 
