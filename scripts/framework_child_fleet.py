@@ -128,6 +128,8 @@ def validate_manifest(data: dict[str, Any]) -> None:
         "future_framework_activation_must_follow_sequence",
         "public_package_requires_ip_classification",
         "exact_price_checkout_entitlement_require_separate_authority",
+        "package_controlled_test_is_not_child_certification",
+        "sync_agents_cannot_satisfy_child_certification",
     )
     for key in required_true:
         if inv.get(key) is not True:
@@ -141,8 +143,6 @@ def validate_manifest(data: dict[str, Any]) -> None:
         "package_or_workflow_creates_sovereign_vote",
         "framework_acceptance_creates_sovereign_vote",
         "child_certification_creates_sovereign_vote",
-        "package_controlled_test_is_not_child_certification",
-        "sync_agents_cannot_satisfy_child_certification",
     )
     for key in required_false:
         if inv.get(key) is not False:
