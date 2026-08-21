@@ -10,7 +10,7 @@ import os
 import re
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,8 @@ LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 TITLE_RE = re.compile(r"(?m)^title:\s*[\"']?(.+?)[\"']?\s*$")
 EDGE_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+MAX_RECEIPT_LIFETIME = timedelta(days=30)
+MAX_CLOCK_SKEW = timedelta(minutes=5)
 ALLOWED_DOCUMENT_PREFIXES = (
     ("automation",),
     ("changelog",),
@@ -64,13 +66,21 @@ def canonical_receipt_payload(receipt: dict[str, Any]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
-def load_detached_receipt(edge: dict[str, Any], manifest: Path) -> tuple[dict[str, Any] | None, str | None]:
+def load_detached_receipt(
+    edge: dict[str, Any],
+    manifest: Path,
+    trusted_receipt_sha256: str | None,
+) -> tuple[dict[str, Any] | None, str | None]:
     reference = edge.get("approval_receipt_ref")
     expected_file_sha256 = edge.get("approval_receipt_file_sha256")
     if not isinstance(reference, str) or not reference.endswith(".json"):
         return None, "detached approval receipt reference absent"
     if not isinstance(expected_file_sha256, str) or not SHA256_RE.fullmatch(expected_file_sha256):
         return None, "detached approval receipt file digest absent"
+    if not isinstance(trusted_receipt_sha256, str) or not SHA256_RE.fullmatch(trusted_receipt_sha256):
+        return None, "out-of-band trusted receipt digest absent"
+    if expected_file_sha256 != trusted_receipt_sha256:
+        return None, "manifest receipt digest is not the out-of-band trusted digest"
     requested = manifest.parent / reference
     if requested.is_symlink():
         return None, "approval receipt symlink forbidden"
@@ -91,7 +101,13 @@ def load_detached_receipt(edge: dict[str, Any], manifest: Path) -> tuple[dict[st
     return receipt, None
 
 
-def receipt_error(edge: dict[str, Any], receipt: dict[str, Any], source: Path, target: Path) -> str | None:
+def receipt_error(
+    edge: dict[str, Any],
+    receipt: dict[str, Any],
+    source: Path,
+    target: Path,
+    authorized_reviewer_ids: set[str],
+) -> str | None:
     required = {
         "receipt_sha256",
         "edge_id",
@@ -119,6 +135,8 @@ def receipt_error(edge: dict[str, Any], receipt: dict[str, Any], source: Path, t
         return "independent reviewer evidence absent"
     if receipt["reviewer_kind"] not in {"human", "agent_d"}:
         return "reviewer kind is not authorized"
+    if not isinstance(receipt["reviewer_id"], str) or receipt["reviewer_id"] not in authorized_reviewer_ids:
+        return "reviewer identity is absent from the out-of-band authorized set"
     if receipt["reviewer_kind"] == "agent_d" and receipt["reviewer_id"] != "ct.relay.agent-d":
         return "Agent D reviewer identity mismatch"
     if not isinstance(receipt["review_execution_id"], str) or not receipt["review_execution_id"].strip():
@@ -132,7 +150,12 @@ def receipt_error(edge: dict[str, Any], receipt: dict[str, Any], source: Path, t
         return "approval receipt time window lacks timezone"
     if expires_at <= issued_at:
         return "approval receipt expiry does not follow issuance"
-    if datetime.now(timezone.utc) >= expires_at:
+    now = datetime.now(timezone.utc)
+    if issued_at > now + MAX_CLOCK_SKEW:
+        return "approval receipt issuance is in the future"
+    if expires_at - issued_at > MAX_RECEIPT_LIFETIME:
+        return "approval receipt lifetime exceeds the governed maximum"
+    if now >= expires_at:
         return "approval receipt expired"
     if receipt["source_sha256"] != sha256_file(source) or receipt["target_sha256"] != sha256_file(target):
         return "approval receipt content digest mismatch"
@@ -220,7 +243,13 @@ def validate_candidates(root: Path, manifest: Path) -> dict[str, Any]:
     }
 
 
-def apply_approved(root: Path, manifest: Path) -> dict[str, Any]:
+def apply_approved(
+    root: Path,
+    manifest: Path,
+    *,
+    trusted_receipt_sha256: str | None = None,
+    authorized_reviewer_ids: set[str] | None = None,
+) -> dict[str, Any]:
     data = json.loads(manifest.read_text(encoding="utf-8"))
     skipped: list[dict[str, str]] = []
     approved_edges = [edge for edge in data.get("edges", []) if edge.get("status") == "APPROVED"]
@@ -253,11 +282,11 @@ def apply_approved(root: Path, manifest: Path) -> dict[str, Any]:
         if not governed_document(root, source) or not governed_document(root, target):
             skipped.append({"edge_id": edge_id, "reason": "path is outside governed documentation roots"})
             continue
-        receipt, load_error = load_detached_receipt(edge, manifest)
+        receipt, load_error = load_detached_receipt(edge, manifest, trusted_receipt_sha256)
         if load_error or receipt is None:
             skipped.append({"edge_id": edge_id, "reason": load_error or "approval receipt absent"})
             continue
-        approval_error = receipt_error(edge, receipt, source, target)
+        approval_error = receipt_error(edge, receipt, source, target, authorized_reviewer_ids or set())
         if approval_error:
             skipped.append({"edge_id": edge_id, "reason": approval_error})
             continue
@@ -327,6 +356,16 @@ def main() -> int:
     group.add_argument("--scan", action="store_true")
     group.add_argument("--apply-approved", type=Path)
     group.add_argument("--validate-candidates", type=Path)
+    parser.add_argument(
+        "--trusted-receipt-sha256",
+        help="receipt-file digest obtained through a separate trusted control-plane channel",
+    )
+    parser.add_argument(
+        "--authorized-reviewer-id",
+        action="append",
+        default=[],
+        help="reviewer identity authorized through a separate trusted control-plane channel",
+    )
     args = parser.parse_args()
     try:
         if args.scan:
@@ -334,7 +373,12 @@ def main() -> int:
         elif args.validate_candidates:
             result = validate_candidates(args.root, args.validate_candidates)
         else:
-            result = apply_approved(args.root, args.apply_approved)
+            result = apply_approved(
+                args.root,
+                args.apply_approved,
+                trusted_receipt_sha256=args.trusted_receipt_sha256,
+                authorized_reviewer_ids=set(args.authorized_reviewer_id),
+            )
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
         print(json.dumps({"status": "FAIL", "error": str(exc)}, indent=2), file=sys.stderr)
         return 1
