@@ -34,7 +34,9 @@ algs = {a['algorithm_id']: a for a in manifest['algorithms']}
 for aid in ('ct.alg.gen6.pdis','ct.alg.gen6.hrds','ct.alg.gen6.acbs','ct.alg.gen6.snrs'):
     assert aid in algs
     assert len(algs[aid]['public_contract_digest']) == 64
-    assert algs[aid]['invocation_state'] == 'controlled_test'
+    assert algs[aid]['implementation'] == 'RESTRICTED_INSTITUTIONAL'
+    assert algs[aid]['invocation_state'] == 'disabled'
+    assert algs[aid]['continuity_state'] == 'HOLD_PRIVATE_BUNDLE_UNBOUND'
 
 assert manifest['cie']['may_score_people'] is False
 assert manifest['cie']['may_create_vote'] is False
