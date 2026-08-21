@@ -1,0 +1,268 @@
+---
+title: "Sales Lead Triage and Locticians Claim Outreach"
+sidebarTitle: "Sales & Claim Outreach"
+description: "Governed workflow for CrownThrive inbound lead triage, scam/risk screening, Locticians claimable-profile research, one-to-one outreach, follow-up, suppression, conversion and founder escalation."
+icon: "user-magnifying-glass"
+keywords: ["sales", "lead triage", "Locticians", "claim listing", "outreach", "email", "suppression", "follow-up", "scam screening"]
+---
+
+# Sales lead triage and Locticians claim outreach
+
+This workflow adds a governed **sales-and-email operating lane** to CrownThrive without weakening the existing evidence, privacy, rights, financial, legal or founder-approval controls.
+
+The system has two distinct jobs:
+
+1. **Inbound lead desk** — classify, vet, nurture and route legitimate business-development email.
+2. **Researched claim outreach** — identify genuinely claimable Locticians profiles, research the public business identity, contact an appropriate public business address, and help the correct owner claim the profile.
+
+Neither job authorizes agents to sign contracts, grant final rights, alter banking instructions, disclose secrets, make legal determinations or bypass suppression/consent rules.
+
+## Stable operating IDs
+
+```yaml
+workflow_id: ct.workflow.sales-email-v2
+outreach_program_id: ct.program.locticians-claim-outreach-v2
+primary_platform: ct.platform.locticians
+crm_state_store: private_governed_runtime
+collab_handoff: configured_private_project_mailbox
+public_doc_state: architecture_and_governance_only
+```
+
+## Inbound triage pipeline
+
+```text
+New message
+  ↓
+Reason-for-contact classification
+  ↓
+Identity / legitimacy / risk review
+  ↓
+Priority tag + lifecycle state
+  ↓
+┌────────────────────────────┬──────────────────────────────┐
+│ Founder / reserved matter  │ Routine legitimate lead      │
+│ escalate; no commitment    │ research → reply → nurture  │
+└────────────────────────────┴──────────────────────────────┘
+  ↓
+Archive event + next action + suppression/risk state
+```
+
+### Founder-priority classes
+
+Messages are founder-routed when they materially involve:
+
+- court, hearing, subpoena, attorney, filing or legal-rights matters;
+- material money movement, wire/bank changes, tax, payment exceptions or high-consequence transactions;
+- personal or sensitive matters;
+- credentials, secrets, account-security or identity-verification incidents;
+- binding contracts, final commercial-rights grants, exclusivity or irreversible commitments.
+
+Routine receipts, ordinary support and already-governed low-risk commerce do not become founder-action items merely because an internal agent still has work to complete.
+
+## Lead legitimacy review
+
+Before an automatic lead reply, evaluate:
+
+- sender and reply-to consistency;
+- whether the business/entity can be independently corroborated;
+- specificity of the request and relevance to CrownThrive;
+- compensation, scope, timing and decision-maker information when applicable;
+- links, forms and attachments in context;
+- credential, tax, banking, payment or identity-harvest requests;
+- malformed placeholders, copied scripts, mass-solicitation artifacts or incoherent formatting;
+- whether the sender answers reasonable business questions or attempts to divert the conversation to an unexplained external flow.
+
+A single signal is not enough to declare fraud. Risk classification depends on the combined evidence.
+
+## Locticians claim-outreach qualification
+
+A profile enters outbound research only when all of the following can be supported:
+
+```yaml
+locticians_profile_exists: true
+claimable_or_unclaimed_state: verified
+category: known
+location: known
+business_identity: corroborated
+public_business_email: sourced
+email_source_url: recorded
+suppressed: false
+prior_outreach_checked: true
+risk_hold: false
+```
+
+Do not guess private email addresses or owner identities. Do not treat a search result, visual similarity, social-media handle or directory record as proof of ownership.
+
+## Current category families
+
+The current Locticians discovery surface exposes eight featured category families:
+
+- Beauty Services and Treatments;
+- Community Members;
+- Culture & Lifestyle;
+- Education and Training;
+- Fashion & Design;
+- Music & Entertainment;
+- Personal Care and Grooming;
+- Wellness and Holistic Health.
+
+Category-specific outreach changes the **reason to care**, not the underlying truth standard.
+
+| Category | Primary outreach hook |
+| --- | --- |
+| Beauty Services and Treatments | control service/contact details and visual presentation |
+| Community Members | correct identity and profile accuracy, with a low-pressure tone |
+| Culture & Lifestyle | represent the organization/creator/cultural business accurately |
+| Education and Training | maintain program/instructor/training and learner-contact information |
+| Fashion & Design | align profile details with official brand, offerings and visual identity |
+| Music & Entertainment | connect official artist/agency/venue/media details to discovery |
+| Personal Care and Grooming | improve grooming/personal-care service accuracy and contact path |
+| Wellness and Holistic Health | maintain specialties, services and appropriate business contact details |
+
+## Claim-outreach message architecture
+
+Each initial message should contain:
+
+1. a specific reason the recipient was selected;
+2. the exact Locticians profile URL;
+3. a truthful statement that the profile appears claimable/unclaimed;
+4. one category-relevant benefit of controlling the profile;
+5. one clear next action;
+6. required commercial-email disclosures and opt-out language when applicable.
+
+The dominant hooks are:
+
+- **ownership/control** — the profile is already discoverable and the real business should control its information;
+- **accuracy** — reduce stale or incorrect service/contact details;
+- **trust** — distinguish directory-indexed information from owner-maintained information;
+- **discovery** — connect category/location discovery to the right official business;
+- **conversion clarity** — make the next contact/claim action obvious without inventing referral or traffic claims.
+
+Do not claim that a business has leads waiting, guaranteed referrals, verified traffic, guaranteed ranking or guaranteed revenue unless a current governed metric explicitly supports that exact claim.
+
+## Four-touch sequence
+
+```yaml
+sequence:
+  - touch: 1
+    due: day_0
+    purpose: researched_category_specific_claim_invitation
+  - touch: 2
+    due: business_day_3
+    purpose: concise_profile_reminder
+  - touch: 3
+    due: business_day_7
+    purpose: one_specific_accuracy_or_control_value
+  - touch: 4
+    due: business_day_14
+    purpose: close_the_loop_and_stop
+```
+
+### Hard stop conditions
+
+Stop the sequence immediately on:
+
+- reply;
+- profile claimed or conversion/won state;
+- unsubscribe, opt-out, remove-me or equivalent request;
+- wrong-person notification;
+- hard bounce;
+- suppression record;
+- complaint or legal issue;
+- scam/phishing/risk hold;
+- founder hold.
+
+No later marketing automation may silently re-enroll a suppressed address.
+
+## Reply branching
+
+### Interested
+
+Verify the ownership/claim route, answer supported questions, update the lifecycle and remove unnecessary friction.
+
+### Not now
+
+Do not create an indefinite nurture loop. Ask whether a later reminder is wanted; otherwise stop.
+
+### Wrong contact
+
+Stop outreach to that person. Correct the record and research the appropriate public business contact independently.
+
+### Already claimed
+
+Verify the current listing state, mark claimed/won as appropriate and stop the sequence.
+
+### Opt out
+
+Suppress immediately and honor the request across marketing workflows.
+
+### Complaint, identity dispute or legal threat
+
+Escalate. Do not argue through an automated sales agent.
+
+## Commercial-email compliance gate
+
+Cold outreach is an A3/policy-controlled function, not an always-on permission.
+
+The runtime must verify the current outbound-compliance configuration before any unsolicited commercial email is sent. At minimum the configured sender must have:
+
+- accurate sender/header identity;
+- truthful subject lines;
+- required commercial/advertising identification;
+- a valid physical postal address;
+- an easy opt-out mechanism;
+- working suppression enforcement.
+
+If the required configuration is incomplete, the system may research and queue prospects but **must not send**.
+
+## Sender and collaboration record
+
+Locticians claim outreach is designed to originate from CrownThrive’s governed business mailbox. Founder and Collab Portal record-copy routing are configured in the private runtime rather than exposed in public documentation.
+
+The Collab Portal handoff is an institutional CRM/project continuity path, not permission to expose sensitive, privileged or credential-bearing messages to a broad project audience.
+
+## Images, logos and rich email
+
+Prospect research may use lawful public visual context to understand a business. That does not create unrestricted reuse rights.
+
+Current direct Outlook automation supports clean plain-text writes. Richly formatted visual outreach should only be activated through a separately certified HTML-capable sender such as the governed Collab Portal/SuiteDash marketing surface, and only after sender, compliance and deliverability gates pass.
+
+## Private CRM contract
+
+The current private runtime uses a restricted sales/email schema with records for:
+
+- prospects;
+- research evidence;
+- outreach sequences;
+- templates;
+- outreach events;
+- email vault entries;
+- suppression;
+- tag taxonomy;
+- outbound configuration;
+- founder-escalation rules.
+
+No private email body, prospect data, suppression record or operational sender credential belongs in this public repository.
+
+## Measurements
+
+Track quality and conversion, not just volume:
+
+- researched profiles;
+- qualified claimable profiles;
+- valid public business emails sourced;
+- messages sent;
+- bounce/delivery state;
+- reply and positive-reply rates;
+- claim-start and claim-completion rates;
+- opt-out and complaint rates;
+- touches to conversion;
+- category/location performance;
+- suppression and risk-hold counts;
+- time to first meaningful reply.
+
+## Failure rule
+
+The workflow fails closed.
+
+If identity, claim state, public contact source, compliance, suppression, authority or delivery state cannot be verified, **do not send**. Preserve the evidence gap and route it for review instead of manufacturing certainty.
