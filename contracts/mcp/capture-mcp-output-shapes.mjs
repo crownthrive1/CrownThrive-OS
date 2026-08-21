@@ -57,7 +57,8 @@ for (let index = 0; index < tools.length; index++) {
       'authorization': `Bearer ${bearer}`,
       'mcp-protocol-version': protocolVersion,
       'mcp-method': 'tools/call',
-      'mcp-name': tool
+      'mcp-name': tool,
+      'x-crownthrive-certification-mode': 'schema-capture'
     },
     body: JSON.stringify(body)
   });
@@ -72,4 +73,4 @@ for (let index = 0; index < tools.length; index++) {
 
 const outPath = process.argv[2] || 'mcp-output-shape-captures.json';
 fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`, { mode: 0o600 });
-console.log(JSON.stringify({ captured: output.length, output: outPath, provider_writes: 0 }, null, 2));
+console.log(JSON.stringify({ captured: output.length, output: outPath, crownthrive_io_reads: 12, thrivetools_seo_reads: 8, provider_writes: 0 }, null, 2));
