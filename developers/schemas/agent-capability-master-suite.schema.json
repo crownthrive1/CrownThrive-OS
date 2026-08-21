@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/agent-capability-master-suite.v1.json",
+  "title": "CrownThrive Master Governed Agent Suite",
+  "type": "object",
+  "required": ["schema_version", "suite_id", "canonical_name", "release_state", "operating_contract", "agents"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "suite_id": {"const": "ct.agent-suite.master.v1"},
+    "release_state": {"enum": ["CONTROLLED_TEST", "HOLD", "SUPERSEDED"]},
+    "operating_contract": {
+      "type": "object",
+      "required": ["human_authority_reserved", "vote_eligible", "quorum_eligible", "self_approval_forbidden", "silent_delete_forbidden", "append_only_correction_history"],
+      "properties": {
+        "human_authority_reserved": {"const": true},
+        "vote_eligible": {"const": false},
+        "quorum_eligible": {"const": false},
+        "self_approval_forbidden": {"const": true},
+        "silent_delete_forbidden": {"const": true},
+        "append_only_correction_history": {"const": true}
+      }
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["agent_id", "canonical_name", "family", "mode", "agent_class", "autonomy_class", "authority_ceiling", "schedule_profile", "mission", "allowed", "forbidden"],
+        "properties": {
+          "agent_id": {"type": "string", "pattern": "^ct\\.(chlom|thrivealumni)\\.agent\\.[a-z0-9-]+$"},
+          "canonical_name": {"type": "string", "minLength": 4},
+          "family": {"enum": ["pricing", "integrity", "knowledge", "framework_factory", "security", "assurance", "growth", "thrivealumni"]},
+          "mode": {"enum": ["rigid", "fluid", "hybrid"]},
+          "autonomy_class": {"enum": ["A0", "A1", "A2"]},
+          "authority_ceiling": {"enum": ["D0", "D1", "D2"]},
+          "allowed": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+          "forbidden": {"type": "array", "items": {"type": "string"}, "contains": {"const": "self_approve"}}
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

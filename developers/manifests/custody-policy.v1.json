@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "policy_id": "ct.policy.dual-custody.v1",
+  "state": "ENFORCED_FOR_SUITE_RECORDS",
+  "founder_rule": "Every material suite artifact requires two independent custody receipts before it can become release-eligible.",
+  "destinations": [
+    {
+      "system": "google_drive",
+      "role": "human_master_and_recovery_archive",
+      "required": true,
+      "naming_pattern": "CrownThrive_[Workstream]_[Document-Type]_[Short-Title]_[YYYY-MM-DD]_v#",
+      "secret_material_allowed": false
+    },
+    {
+      "system": "supabase",
+      "role": "replaceable_machine_custody",
+      "required": true,
+      "artifact_location": "private_storage_bucket",
+      "metadata_location": "chlom_runtime.integrity_evidence_ledger",
+      "secret_location": "vault.secrets",
+      "rule": "Vault stores only secret or cryptographic seal material; private Storage stores artifact bytes."
+    }
+  ],
+  "promotion_condition": "drive_receipt_verified AND storage_receipt_verified AND checksums_match AND restore_test_passed",
+  "failure_behavior": "HOLD, append evidence, preserve local source, never claim complete"
+}
