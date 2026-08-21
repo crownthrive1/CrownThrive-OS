@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,22 @@ CONSEQUENTIAL_FLAGS = (
     "can_vote",
     "delete_allowed",
 )
+
+CANDIDATE_ID_RE = re.compile(r"^ct\.[a-z0-9.-]+\.v[0-9]+$")
+ALLOWED_CANDIDATE_FIELDS = {
+    "schema_version",
+    "candidate_id",
+    "candidate_type",
+    "state",
+    "source_ids",
+    "public_sources",
+    "invariants",
+    "known_drift",
+    "required_tests",
+    "authority_ceiling",
+    "framework_count_delta",
+    *CONSEQUENTIAL_FLAGS,
+}
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -61,12 +78,29 @@ def compile_candidate(source: dict[str, Any]) -> dict[str, Any]:
     missing = sorted(required - source.keys())
     if missing:
         raise CompileError("missing required fields: " + ", ".join(missing))
+    unexpected = sorted(source.keys() - ALLOWED_CANDIDATE_FIELDS)
+    if unexpected:
+        raise CompileError("unsupported candidate fields: " + ", ".join(unexpected))
+    if source["schema_version"] != "1.0.0":
+        raise CompileError("schema_version must be 1.0.0")
+    if not isinstance(source["candidate_id"], str) or not CANDIDATE_ID_RE.fullmatch(source["candidate_id"]):
+        raise CompileError("candidate_id must be a versioned CrownThrive identifier")
     if source["state"] != "CANDIDATE_HOLD":
         raise CompileError("compiler accepts only CANDIDATE_HOLD inputs")
-    if source["candidate_type"] not in {"framework", "capability_pack", "policy_pack", "pallet"}:
+    if not isinstance(source["candidate_type"], str) or source["candidate_type"] not in {
+        "framework",
+        "capability_pack",
+        "policy_pack",
+        "pallet",
+    }:
         raise CompileError("unsupported candidate type")
     source_ids = require_unique_strings(source, "source_ids")
     invariants = require_unique_strings(source, "invariants")
+    for optional_string_set in ("public_sources", "required_tests"):
+        if optional_string_set in source:
+            require_unique_strings(source, optional_string_set)
+    if "known_drift" in source and not isinstance(source["known_drift"], list):
+        raise CompileError("known_drift must be an array")
     invalid_flag_types = [
         key for key in CONSEQUENTIAL_FLAGS if key in source and type(source[key]) is not bool
     ]
