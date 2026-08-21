@@ -6,9 +6,12 @@ on:
       - "automation/agent-generation-6-priority-delegation-control-plane.mdx"
       - "developers/manifests/agent-generation-6-priority-delegation.v1.json"
       - "developers/gen6-skill-factory-and-mcp-contract.mdx"
+      - "developers/chlom-vault-metaprotocol-and-custody.mdx"
+      - "developers/manifests/chlom-vault-metaprotocol.v1.json"
       - "standards/agent-schedule-governor-candidate.mdx"
       - "developers/manifests/agent-schedule-governor-candidate.v1.json"
       - "scripts/validate_agent_generation_6.py"
+      - "scripts/validate_chlom_vault_metaprotocol.py"
       - "changelog/phase-2-99-agent-generation-6-priority-delegation-2026-08-21.mdx"
       - ".github/workflows/agent-generation-6.yml"
   push:
@@ -18,9 +21,12 @@ on:
       - "automation/agent-generation-6-priority-delegation-control-plane.mdx"
       - "developers/manifests/agent-generation-6-priority-delegation.v1.json"
       - "developers/gen6-skill-factory-and-mcp-contract.mdx"
+      - "developers/chlom-vault-metaprotocol-and-custody.mdx"
+      - "developers/manifests/chlom-vault-metaprotocol.v1.json"
       - "standards/agent-schedule-governor-candidate.mdx"
       - "developers/manifests/agent-schedule-governor-candidate.v1.json"
       - "scripts/validate_agent_generation_6.py"
+      - "scripts/validate_chlom_vault_metaprotocol.py"
       - "changelog/phase-2-99-agent-generation-6-priority-delegation-2026-08-21.mdx"
       - ".github/workflows/agent-generation-6.yml"
   workflow_dispatch:
@@ -46,10 +52,15 @@ jobs:
           python-version: "3.12"
 
       - name: Verify validator syntax
-        run: python -m py_compile scripts/validate_agent_generation_6.py
+        run: |
+          python -m py_compile scripts/validate_agent_generation_6.py
+          python -m py_compile scripts/validate_chlom_vault_metaprotocol.py
 
       - name: Validate Gen-6 invariants
         run: python scripts/validate_agent_generation_6.py
+
+      - name: Validate CHLOM Vault metaprotocol invariants
+        run: python scripts/validate_chlom_vault_metaprotocol.py
 
       - name: Parse machine manifests
         run: |
@@ -59,6 +70,7 @@ jobs:
           for p in (
               'developers/manifests/agent-generation-6-priority-delegation.v1.json',
               'developers/manifests/agent-schedule-governor-candidate.v1.json',
+              'developers/manifests/chlom-vault-metaprotocol.v1.json',
           ):
               json.loads(Path(p).read_text())
               print(f'{p}: JSON PASS')
