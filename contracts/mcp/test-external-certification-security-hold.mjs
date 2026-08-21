@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { createProxyServer } from './external-certification-auth-proxy.mjs';
 
 function run(script, args = [], env = {}) {
@@ -21,6 +22,20 @@ assert.notEqual(run('contracts/mcp/external-certification-runner.mjs', [], { MCP
 assert.notEqual(run('contracts/mcp/capture-mcp-output-shapes.mjs').status, 0);
 assert.notEqual(run('contracts/mcp/verify-founder-signature-envelope.mjs', ['--require-signed']).status, 0);
 assert.equal(run('contracts/mcp/verify-founder-signature-envelope.mjs').status, 0);
+
+const correctionContract = 'contracts/mcp/oidc-immutable-subject-correction.v1.json';
+const correctionEnvelope = 'contracts/mcp/oidc-immutable-subject-correction-signature-envelope.v1.json';
+assert.equal(existsSync(correctionContract), false, 'public correction contract must remain removed');
+assert.equal(existsSync(correctionEnvelope), false, 'public correction signature envelope must remain removed');
+const reconciliation = JSON.parse(readFileSync('contracts/mcp/external-certification-security-hold-reconciliation.v1.json', 'utf8'));
+assert.equal(reconciliation.canonical_main_before_reconciliation, '0ccc6fac3d7b7028f4bd48b095c6cb4c30fe263d');
+assert.equal(reconciliation.historical_payloads[1].sha256, 'e0f403326e9dab954a323d032686f7044393b5f85fa5053b73afa36a1dec07cf');
+assert.equal(reconciliation.current_authority.execution_enabled, false);
+assert.equal(reconciliation.current_authority.oidc_minting_enabled, false);
+const envelope = JSON.parse(readFileSync('contracts/mcp/founder-signature-envelope.v1.json', 'utf8'));
+assert.equal(envelope.replacement_authorized_payload_sha256, null);
+assert.equal(envelope.superseded_correction_payload_sha256, 'e0f403326e9dab954a323d032686f7044393b5f85fa5053b73afa36a1dec07cf');
+assert.equal(envelope.observed_execution.replay_authorized, false);
 
 let upstreamHits = 0;
 const upstream = http.createServer((req, res) => { upstreamHits += 1; res.end('{}'); });
@@ -49,4 +64,4 @@ assert.equal((await request(slowProxyPort, '{}')).status, 504);
 await close(slowProxy);
 await close(slowUpstream);
 
-console.log(JSON.stringify({ security_hold: 'PASS', live_execution_rejected: true, signature_reuse_rejected: true, oversized_request_rejected: true, oversized_response_rejected: true, timeout_cancellation: true }, null, 2));
+console.log(JSON.stringify({ security_hold: 'PASS', live_execution_rejected: true, signature_reuse_rejected: true, oversized_request_rejected: true, oversized_response_rejected: true, timeout_cancellation: true, current_main_reconciled: true, correction_artifacts_removed: true }, null, 2));
