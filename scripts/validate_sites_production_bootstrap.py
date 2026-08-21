@@ -48,6 +48,19 @@ def walk_keys(value: object) -> set[str]:
     return set()
 
 
+def validate_authority_boundary(authority: dict[str, object]) -> None:
+    if "founder_authorized_provider_mutation" in authority:
+        fail("a bare founder-authorized boolean cannot institutionalize provider mutation authority")
+    if authority.get("provider_mutation_authority_effective") is not False:
+        fail("provider mutation authority must remain ineffective without governed attestation")
+    if authority.get("provider_mutation_authority_state") != "hold_pending_named_signer_attestation":
+        fail("provider mutation authority must remain HOLD pending named-signer attestation")
+    if authority.get("typed_name_attestation_ref") is not None:
+        fail("this public packet may not invent or embed an unattested signer reference")
+    if authority.get("required_human_question") != "Who is signing their name to this override?":
+        fail("the #150 missing-signer question drifted")
+
+
 def main() -> int:
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     if data.get("manifest_id") != "ct.manifest.sites-production-bootstrap.v1":
@@ -57,6 +70,10 @@ def main() -> int:
 
     authority = data.get("authority", {})
     contract = data.get("contract", {})
+    runtime = data.get("runtime_observation", {})
+    if not isinstance(authority, dict):
+        fail("authority block must be an object")
+    validate_authority_boundary(authority)
     if authority.get("phase_3_entry") != "blocked":
         fail("Phase 3 must remain blocked")
     if authority.get("originating_agent_may_self_certify") is not False:
@@ -69,10 +86,18 @@ def main() -> int:
         fail("an unverified surface may not enable automatic updates")
     if contract.get("publication_authority_created") is not False:
         fail("Sites bootstrap must not create publication authority")
+    if contract.get("runtime_reconciliation_required") is not True:
+        fail("runtime reconciliation must remain mandatory")
     if contract.get("current_policy_canary") != "hold_not_currently_pass":
         fail("current-policy canary may not be represented as PASS")
     if "agent_d" not in str(contract.get("release_authority", "")):
         fail("release authority must retain Agent D in the independent gate")
+    if runtime.get("evidence_class") != "sanitized_connected_control_plane_read":
+        fail("runtime evidence class drifted")
+    if runtime.get("verified_authority_receipts") != 0:
+        fail("this exact packet cannot claim a verified authority receipt")
+    if runtime.get("accepted_releases") != 0 or runtime.get("published_releases") != 0:
+        fail("this exact packet cannot claim an accepted or published release")
 
     surfaces = data.get("surfaces")
     if not isinstance(surfaces, list) or len(surfaces) != 3:
@@ -91,6 +116,8 @@ def main() -> int:
         did = str(surface.get("consumer_did", ""))
         if not did.startswith("did:web:") or not did.endswith(":crownthrive:catalog-consumer"):
             fail(f"{surface_id}: invalid site-consumer DID")
+        if surface.get("provider_mutation_route_armed") is not False:
+            fail(f"{surface_id}: provider mutation route must remain unarmed")
 
         fingerprint = surface.get("fingerprint_id")
         if fingerprint is not None and not SHA256_ID.fullmatch(str(fingerprint)):
@@ -122,15 +149,15 @@ def main() -> int:
     if virality.get("soundcloud_api") != "REMOVED_BY_FOUNDER_OVERRIDE":
         fail("Virality SoundCloud API founder override drifted")
 
-    if data.get("overall_disposition") != "hold_partial_provider_bootstrap":
-        fail("overall disposition must remain HOLD until every surface completes the cycle")
+    if data.get("overall_disposition") != "hold_partial_provider_bootstrap_and_authority_attestation":
+        fail("overall disposition must remain HOLD until provider and authority gaps close")
     if not str(data.get("commerce_impact", "")).startswith("none_"):
         fail("Sites bootstrap may not imply commerce authorization")
 
     print("Sites production bootstrap public manifest validation: PASS")
-    print("Disposition: HOLD / partial provider bootstrap; Phase 3 blocked.")
-    print("Full-cycle surfaces may retain bounded runtime arming; incomplete surfaces must remain disabled.")
-    print("Bootstrap state does not create release, commerce, or sovereign publication authority.")
+    print("Disposition: HOLD / partial provider bootstrap and authority attestation; Phase 3 blocked.")
+    print("Full-cycle surfaces may retain bounded consumer arming; provider mutation routes remain disabled.")
+    print("Bootstrap state does not create release, commerce, founder-override, or sovereign publication authority.")
     return 0
 
 
