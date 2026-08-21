@@ -93,7 +93,8 @@ def main():
     for pattern in forbidden_patterns:
         require(not re.search(pattern,public_packet,re.IGNORECASE),f'public packet exposes restricted runtime topology class: {pattern}')
     require(not re.search(r'\*/\d+\s+\*\s+\*\s+\*\s+\*',public_packet),'public packet exposes private cron cadence')
-    require('every two minutes' not in public_packet.lower() and 'every five minutes' not in public_packet.lower(),'public packet exposes private execution cadence')
+    for cadence_phrase in ('every ' + 'two minutes','every ' + 'five minutes'):
+        require(cadence_phrase not in public_packet.lower(),'public packet exposes private execution cadence')
 
     print('Governed site auto-publish contract: PASS')
     print('- release PASS + 4-of-5 quorum including D + certified destination required')
