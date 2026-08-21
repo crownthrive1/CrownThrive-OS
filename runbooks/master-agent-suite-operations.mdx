@@ -35,18 +35,21 @@ The compiler refuses to overwrite prior evidence and rejects self-activation, D3
 python scripts/archive_integrity.py --strict-names package.zip
 ```
 
-The verifier does not extract. It checks traversal, absolute paths, symlinks, encryption, duplicate or case-colliding names, Unicode portability, CRC, member limits, compression ratios, and SHA-256.
+The verifier does not extract. It checks traversal, absolute paths, symlinks, encryption, duplicate or case-colliding names, Unicode portability, CRC, member limits, compression ratios, and SHA-256. A digest calculated from the same untrusted package proves consistency only; authenticity requires an expected manifest digest obtained through a separate trusted channel and supplied with `--trusted-manifest-sha256`.
 
 ## Apply retroactive internal links
 
-First scan. Then obtain a separate human approval receipt for each edge. Only an `APPROVED` edge with a non-empty receipt can be added:
+First scan. Then obtain one detached, independently issued approval receipt for each edge plus its receipt digest and reviewer identity through a separate trusted control-plane channel. Never derive either trust anchor from the candidate manifest or receipt being checked:
 
 ```bash
 python scripts/internal_linkage.py . --scan
-python scripts/internal_linkage.py . --apply-approved linkage/linkage-candidates.v1.json
+python scripts/internal_linkage.py . \
+  --apply-approved linkage/linkage-candidates.v1.json \
+  --trusted-receipt-sha256 "<OUT_OF_BAND_SHA256>" \
+  --authorized-reviewer-id "<OUT_OF_BAND_REVIEWER_ID>"
 ```
 
-The applicator accepts one approved edge per transaction, requires a detached time-bounded receipt bound to both document digests and an independent reviewer, and atomically appends a marked byte block without changing the prior byte prefix.
+The applicator accepts one approved edge per transaction, requires a detached time-bounded receipt bound to both document digests, checks its exact bytes against the out-of-band digest, requires the reviewer in the out-of-band authorized set, rejects future-issued or overlong receipts, and atomically appends a marked byte block without changing the prior byte prefix. Missing trust anchors produce `HOLD` with zero writes.
 
 ## Schedules
 
