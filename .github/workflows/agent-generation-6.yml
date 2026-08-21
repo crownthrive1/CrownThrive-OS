@@ -1,0 +1,89 @@
+name: Agent Generation 6 Governance
+
+on:
+  pull_request:
+    paths:
+      - "automation/agent-generation-6-priority-delegation-control-plane.mdx"
+      - "developers/manifests/agent-generation-6-priority-delegation.v1.json"
+      - "developers/gen6-skill-factory-and-mcp-contract.mdx"
+      - "standards/agent-schedule-governor-candidate.mdx"
+      - "developers/manifests/agent-schedule-governor-candidate.v1.json"
+      - "scripts/validate_agent_generation_6.py"
+      - "changelog/phase-2-99-agent-generation-6-priority-delegation-2026-08-21.mdx"
+      - ".github/workflows/agent-generation-6.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "automation/agent-generation-6-priority-delegation-control-plane.mdx"
+      - "developers/manifests/agent-generation-6-priority-delegation.v1.json"
+      - "developers/gen6-skill-factory-and-mcp-contract.mdx"
+      - "standards/agent-schedule-governor-candidate.mdx"
+      - "developers/manifests/agent-schedule-governor-candidate.v1.json"
+      - "scripts/validate_agent_generation_6.py"
+      - "changelog/phase-2-99-agent-generation-6-priority-delegation-2026-08-21.mdx"
+      - ".github/workflows/agent-generation-6.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-gen6:
+    name: Validate Agent Generation 6 invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify validator syntax
+        run: python -m py_compile scripts/validate_agent_generation_6.py
+
+      - name: Validate Gen-6 invariants
+        run: python scripts/validate_agent_generation_6.py
+
+      - name: Parse machine manifests
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for p in (
+              'developers/manifests/agent-generation-6-priority-delegation.v1.json',
+              'developers/manifests/agent-schedule-governor-candidate.v1.json',
+          ):
+              json.loads(Path(p).read_text())
+              print(f'{p}: JSON PASS')
+          PY
+
+      - name: Enforce schedule-governor fail-closed state
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path('developers/manifests/agent-schedule-governor-candidate.v1.json').read_text())
+          assert m['state'] == 'DESIGN_CANDIDATE_GOVERNED_HOLD'
+          assert m['live_schedule_mutation'] is False
+          assert m['vote_eligible'] is False
+          assert m['scheduler_slot'] is False
+          assert m['all_agent_election']['active'] is False
+          assert m['all_agent_election']['election_blocks_normal_execution'] is False
+          assert m['ratification']['required_before_live_authority'] is True
+          print('Schedule Governor fail-closed invariants: PASS')
+          PY
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
