@@ -27,11 +27,10 @@ async function readBounded(stream, limit, controller) {
 
 export function createProxyServer(options = {}) {
   const target = options.target ?? process.env.MCP_CONFORMANCE_SERVER_URL;
-  const bearer = options.bearer ?? process.env.MCP_CERTIFICATION_BEARER;
   const requestLimit = boundedPositiveInteger(options.requestLimit ?? process.env.MCP_PROXY_REQUEST_BYTES_MAX, HARD_MAX_REQUEST_BYTES, HARD_MAX_REQUEST_BYTES);
   const responseLimit = boundedPositiveInteger(options.responseLimit ?? process.env.MCP_PROXY_RESPONSE_BYTES_MAX, HARD_MAX_RESPONSE_BYTES, HARD_MAX_RESPONSE_BYTES);
   const timeoutMs = boundedPositiveInteger(options.timeoutMs ?? process.env.MCP_PROXY_UPSTREAM_TIMEOUT_MS, HARD_MAX_TIMEOUT_MS, HARD_MAX_TIMEOUT_MS);
-  if (!target || !bearer) throw new Error('proxy target and bearer are required');
+  if (!target) throw new Error('proxy target is required');
 
   return http.createServer(async (req, res) => {
     const controller = new AbortController();
@@ -49,11 +48,12 @@ export function createProxyServer(options = {}) {
       const body = req.method === 'GET' || req.method === 'HEAD' ? undefined : await readBounded(req, requestLimit, controller);
       const headers = {
         ...req.headers,
-        authorization: `Bearer ${bearer}`,
         'x-crownthrive-certification-mode': 'conformance'
       };
       delete headers.host;
       delete headers['content-length'];
+      delete headers.authorization;
+      delete headers.cookie;
 
       timer = setTimeout(() => abort('upstream_timeout'), timeoutMs);
       const response = await fetch(target, { method: req.method, headers, body, redirect: 'manual', signal: controller.signal });
@@ -94,4 +94,3 @@ if (isMain) {
     process.exit(2);
   }
 }
-
