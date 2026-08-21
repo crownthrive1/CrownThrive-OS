@@ -35,16 +35,18 @@ jobs:
           node-version: '22'
       - name: Validate certification manifest and fail-closed boundary
         run: node contracts/mcp/external-certification-runner.mjs > mcp-preflight.json
-      - name: Validate JSON artifacts
-        run: |
-          node -e "JSON.parse(require('fs').readFileSync('contracts/mcp/external-certification-plan.v1.json','utf8')); console.log('manifest-json-ok')"
+      - name: Verify exact authorized payload digest
+        run: node contracts/mcp/verify-founder-signature-envelope.mjs > mcp-signature-payload-check.json
       - name: Verify no production writes are authorized
         run: |
           node - <<'NODE'
           const m = JSON.parse(require('fs').readFileSync('contracts/mcp/external-certification-plan.v1.json','utf8'));
+          const e = JSON.parse(require('fs').readFileSync('contracts/mcp/founder-signature-envelope.v1.json','utf8'));
           if (m.server.provider_writes_enabled !== false) throw new Error('provider writes must remain disabled');
           if (m.post_signature_execution.provider_read_budget.provider_writes !== 0) throw new Error('provider write budget must be zero');
           if (m.server.sovereign_vote_authority !== false) throw new Error('certification runner must remain non-sovereign');
+          if (e.authorized_effect.provider_write_budget !== 0) throw new Error('signature envelope write budget must be zero');
+          if (e.authorized_effect.non_d0_tool_enablement !== false) throw new Error('signature envelope cannot enable non-D0 tools');
           NODE
       - name: Reject obvious secret material in certification packet
         shell: bash
@@ -62,7 +64,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: mcp-pre-signature-preflight
-          path: mcp-preflight.json
+          path: |
+            mcp-preflight.json
+            mcp-signature-payload-check.json
           if-no-files-found: error
 
   capture:
@@ -77,14 +81,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Require signed exact certification manifest
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const m = JSON.parse(fs.readFileSync('contracts/mcp/external-certification-plan.v1.json','utf8'));
-          if (m.founder_signature.state !== 'signed') throw new Error('founder signature is required before schema capture');
-          if (m.state !== 'signed_ready_for_final_implementation') throw new Error('certification lifecycle is not signed-ready');
-          NODE
+      - name: Require exact founder-signed payload
+        run: node contracts/mcp/verify-founder-signature-envelope.mjs --require-signed
       - name: Mint repository-bound GitHub OIDC token
         id: oidc
         shell: bash
@@ -124,14 +122,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Require signed exact certification manifest
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const m = JSON.parse(fs.readFileSync('contracts/mcp/external-certification-plan.v1.json','utf8'));
-          if (m.founder_signature.state !== 'signed') throw new Error('founder signature is required before final certification');
-          if (m.state !== 'signed_ready_for_final_implementation') throw new Error('certification lifecycle is not signed-ready');
-          NODE
+      - name: Require exact founder-signed payload
+        run: node contracts/mcp/verify-founder-signature-envelope.mjs --require-signed
       - name: Mint repository-bound GitHub OIDC token
         id: oidc
         shell: bash
