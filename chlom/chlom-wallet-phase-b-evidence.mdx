@@ -1,0 +1,99 @@
+---
+title: "CHLOM Wallet Phase B Evidence"
+sidebarTitle: "Wallet Phase B"
+description: "Controlled-test evidence for CHLOM Wallet Stripe webhook verification, entitlement separation, Unified Value Receipt integrity, passkey/smart-account intents and provider-independent identity."
+icon: "flask"
+---
+
+# CHLOM Wallet Phase B evidence
+
+**Evidence state:** `CONTROLLED_TEST`  
+**Human institutional phase:** Phase 2.99  
+**Phase 3 entry:** unchanged / blocked pending the Phase 2.99 hard exit
+
+This packet advances wallet engineering without converting test evidence into production claims.
+
+## Stripe webhook canary
+
+A dedicated controlled-test webhook receiver now exists behind a database runtime gate. The receiver verifies a Stripe-format HMAC signature from the exact raw body, applies timestamp tolerance, rejects `livemode: true`, enforces an event allowlist, persists a provider receipt, prevents exact provider-event replay and appends CHLOM wallet evidence without inferring entitlement.
+
+An end-to-end canary sent the same signed synthetic event twice through the deployed Edge Function:
+
+```yaml
+first_http_status: 200
+first_state: RECORDED_TEST
+second_http_status: 200
+second_state: DUPLICATE
+result: PASS_EDGE_WEBHOOK_REPLAY_CANARY
+live_event: false
+money_movement: false
+rights_grant: false
+```
+
+The test signing secret is synthetic and restricted. It is not a Stripe live endpoint secret.
+
+## Entitlement and Unified Value Receipt canary
+
+A separate controlled-test canary proved the required rights separation:
+
+```yaml
+payment_without_independent_rights: HOLD
+payment_with_active_independent_rights: ALLOW_TEST
+unified_value_receipt_created: true
+unified_value_receipt_tamper_rejected: true
+synthetic_entitlement_final_state: revoked
+money_movement: false
+production_rights_grant: false
+result: PASS_ENTITLEMENT_UVR_CANARY
+```
+
+This is the intended CHLOM invariant: **provider evidence can participate in an entitlement decision, but it cannot be the entitlement decision by itself**.
+
+## Runtime controls
+
+The restricted runtime currently carries explicit controls:
+
+```yaml
+stripe_test_webhook_enabled: true
+stripe_live_webhook_enabled: false
+mainnet_anchor_enabled: false
+```
+
+The existence of a deployed Edge Function is therefore not equivalent to a live commerce route.
+
+## Public reference implementation
+
+Phase B adds deterministic reference code for:
+
+- Stripe-signature parsing and HMAC verification;
+- stale timestamp rejection;
+- raw-body tamper rejection;
+- controlled event allowlisting;
+- Money-class provider translation with fulfillment HOLD;
+- CAIP-2 and CAIP-10 identity normalization;
+- WebAuthn credential commitments and origin/RP binding;
+- ERC-4337/ERC-7579 smart-account registration intents with deploy/broadcast disabled;
+- Unified Value Receipt presentation invariants.
+
+## Provider continuity finding
+
+The live CrownThrive Stripe account currently contains multiple enabled and retired webhook endpoints for other CrownThrive properties. The previous Supabase institutional observer endpoint is disabled/retired. No new CHLOM Wallet live Stripe endpoint has been registered by this packet.
+
+The restricted credential-continuity registry also keeps the generic Stripe server API credential state separate from this connector session. A connected provider tool proves current authorized interaction in this environment; it does not silently repair a missing server-side Vault credential.
+
+## Phase B gates still open
+
+- live Stripe webhook endpoint registration and live signing-secret continuity;
+- complete out-of-order/refund/dispute/subscription-change canaries;
+- customer-facing Wallet/UVR application shell;
+- production passkey enrollment/recovery;
+- smart-account implementation selection and audit;
+- pinned Solidity compiler and reproducible build evidence;
+- fuzz/invariant testing beyond source-level guards;
+- testnet deployment/anchor receipt with approved signer path;
+- provider-exit drill with dual-read/replay evidence;
+- independent pricing certification;
+- tax/legal/security/rights review for the final commercial transaction model;
+- governed commercial canary and eventual checkout activation.
+
+No item above is considered complete merely because its interface or documentation now exists.
