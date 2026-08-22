@@ -48,6 +48,17 @@ jobs:
             exit 1
           fi
 
+      - name: Build deterministic artifact manifest twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          node developers/reference/chlom-wallet/contracts/build-artifact-manifest.mjs /tmp/chlom-wallet-artifacts-a.json | tee /tmp/manifest-build-a.log
+          node developers/reference/chlom-wallet/contracts/build-artifact-manifest.mjs /tmp/chlom-wallet-artifacts-b.json | tee /tmp/manifest-build-b.log
+          cmp /tmp/chlom-wallet-artifacts-a.json /tmp/chlom-wallet-artifacts-b.json
+          sha256sum /tmp/chlom-wallet-artifacts-a.json
+          python -m json.tool /tmp/chlom-wallet-artifacts-a.json >/dev/null
+          test "$(python -c 'import json; print(len(json.load(open("/tmp/chlom-wallet-artifacts-a.json"))["contracts"]))')" -eq 4
+
       - name: Re-enforce no-value-movement source boundary
         shell: bash
         run: |
@@ -60,4 +71,5 @@ jobs:
       - name: Record compiler boundary
         run: |
           echo "Compiler: Solidity 0.8.36 exact npm package version."
-          echo "PASS means source compiles under this toolchain; it is not an audit, deployment approval, testnet receipt, or mainnet certification."
+          echo "Artifact manifest is generated twice and must be byte-identical before this gate passes."
+          echo "PASS means source compiles reproducibly under this toolchain; it is not an audit, deployment approval, testnet receipt, or mainnet certification."
