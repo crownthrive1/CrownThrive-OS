@@ -1,0 +1,82 @@
+name: CHLOM Wallet Sepolia Read-Only Observation
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs"
+      - "developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs"
+      - "developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs"
+      - "developers/reference/chlom-wallet/smart-account/external-readback-observation.json"
+      - ".github/workflows/chlom-wallet-sepolia-readonly-observation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-sepolia-readonly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  observe:
+    name: Observe Sepolia EntryPoint code through two providers
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify runtime and syntax
+        run: |
+          node --version
+          node --check developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs
+          node --check developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs
+          node --check developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs
+
+      - name: Execute fixed-endpoint read-only observation
+        run: node developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs | tee /tmp/chlom-wallet-sepolia-observation.json
+
+      - name: Validate observation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool /tmp/chlom-wallet-sepolia-observation.json >/dev/null
+          python - <<'PY'
+          import json
+          result=json.load(open('/tmp/chlom-wallet-sepolia-observation.json'))
+          assert result['result']=='PASS_EXTERNAL_READ_ONLY_MULTI_PROVIDER_OBSERVATION'
+          assert result['target']['chain_id_caip2']=='eip155:11155111'
+          assert result['target']['chain_id_hex']=='0xaa36a7'
+          assert result['target']['entrypoint_address']=='0x433709009B8330FDa32311DF1C2AFA402eD8D009'
+          assert len(result['providers'])==2
+          assert {p['provider_id'] for p in result['providers']}=={'publicnode','1rpc'}
+          assert all(p['rpc_methods_used']==['eth_chainId','eth_getCode'] for p in result['providers'])
+          assert result['provider_agreement'] is True
+          assert len({p['observed_runtime_codehash'] for p in result['providers']})==1
+          assert len({p['runtime_code_bytes'] for p in result['providers']})==1
+          assert result['runtime_codehash_independently_approved'] is False
+          assert result['source_profile_promoted'] is False
+          for key in [
+            'account_implementation_selected','factory_selected','signer_used','user_operation_created',
+            'simulation_completed','broadcast_performed','deployment_performed','custody','money_movement','phase_advancement'
+          ]:
+            assert result[key] is False, (key,result[key])
+          PY
+
+      - name: Enforce fixed endpoint and RPC-method allowlist
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs
+          grep -F "https://ethereum-sepolia-rpc.publicnode.com" "$file" >/dev/null
+          grep -F "https://public.1rpc.io/sepolia" "$file" >/dev/null
+          if grep -nE 'eth_sendRawTransaction|eth_sendTransaction|wallet_sendCalls|personal_sendTransaction|private[_ -]?key|mnemonic|seed phrase' "$file"; then
+            echo "Transaction or secret-bearing path appeared in the read-only observation."
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "EXTERNAL READ ONLY: two public Sepolia RPC providers; eth_chainId and eth_getCode only."
+          echo "Provider agreement is observation evidence, not independent codehash approval."
+          echo "No signer, UserOperation, simulation, deployment, broadcast, custody, money movement, rights grant, or Phase advancement occurs."
