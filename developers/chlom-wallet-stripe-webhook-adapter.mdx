@@ -1,0 +1,116 @@
+---
+title: "CHLOM Wallet Stripe Webhook Adapter"
+sidebarTitle: "Wallet Stripe Adapter"
+description: "Public-safe contract and controlled-test evidence for Stripe webhook signature verification, replay safety, CHLOM value translation and entitlement separation."
+icon: "webhook"
+---
+
+# CHLOM Wallet Stripe Webhook Adapter
+
+**Stable adapter ID:** `ct.adapter.chlom-wallet.stripe-webhook`  
+**State:** `CONTROLLED_TEST`  
+**Live Stripe endpoint registration:** `not_armed`  
+**Live money movement:** `false`  
+**Payment-to-rights inference:** prohibited
+
+This adapter turns authenticated Stripe provider evidence into a CHLOM Wallet receipt and append-only wallet event. It does **not** make Stripe the institutional ledger or rights authority.
+
+## Provider boundary
+
+```text
+raw Stripe request body
++ Stripe-Signature header
+        ↓
+signature + timestamp verification
+        ↓
+provider event allowlist
+        ↓
+provider receipt / replay key
+        ↓
+VCTR value-class translation
+        ↓
+append-only CHLOM wallet event
+        ↓
+RISE / economic / fulfillment evaluation
+        ↓
+fulfillment or HOLD
+```
+
+The raw request body is used for signature verification before JSON interpretation. Provider event IDs are unique per provider, and wallet mutations remain separately idempotent.
+
+## Controlled-test implementation
+
+The restricted runtime currently includes:
+
+- a dedicated `chlom-wallet-stripe-webhook` Edge Function;
+- custom Stripe-signature verification against a synthetic controlled-test signing secret held in Vault;
+- a five-minute default timestamp tolerance;
+- a `262144`-byte request ceiling;
+- exact provider-event replay protection;
+- an allowlist for the initial Checkout, PaymentIntent, Invoice, Subscription, refund and dispute events required by WalletKit;
+- hard rejection of `livemode: true` events;
+- provider receipt hashing;
+- CHLOM correlation and idempotency binding;
+- VCTR translation;
+- append-only wallet event creation;
+- fulfillment forced to `HOLD` until independent entitlement/policy evaluation.
+
+The synthetic signing material is not a Stripe-issued live endpoint secret. A production/live secret remains a separate provider registration and credential-continuity gate.
+
+## Exact controlled-test evidence
+
+A full request-path canary executed through the deployed Edge Function using a synthetic Stripe-format event:
+
+```yaml
+first_delivery:
+  http_status: 200
+  state: RECORDED_TEST
+replay_delivery:
+  http_status: 200
+  state: DUPLICATE
+result: PASS_EDGE_WEBHOOK_REPLAY_CANARY
+live_event: false
+money_movement: false
+entitlement_inferred: false
+```
+
+The canary proves the tested signature/replay path. It does not prove live Stripe registration, a customer payment, production entitlement fulfillment or revenue.
+
+## Reference implementation tests
+
+The public-safe reference suite verifies:
+
+- signature over the exact raw body;
+- raw-body tamper rejection;
+- wrong-secret rejection;
+- stale-timestamp rejection;
+- malformed signature rejection;
+- live-event HOLD;
+- event-allowlist HOLD;
+- payment-success translation to Money evidence while fulfillment remains HOLD.
+
+## Stripe source alignment
+
+The adapter follows Stripe's webhook guidance requiring signature verification from the original request body and the `Stripe-Signature` header. Stripe's documentation also notes that webhook delivery must be designed for retries and that ordering should not be assumed as an application invariant.
+
+Primary provider references:
+
+- `https://docs.stripe.com/webhooks`
+- `https://docs.stripe.com/webhooks/signature`
+
+## Production gates
+
+The live adapter remains closed until all applicable gates pass:
+
+1. separately authorized live Stripe webhook endpoint registration;
+2. live signing secret stored through the approved credential-continuity path;
+3. exact event list and Stripe API-version binding;
+4. independent Agent H replay/delivery certification;
+5. Rights/Governance entitlement canary;
+6. Finance/Tax/Treasury transaction-model review;
+7. Security/Privacy review and secret-rotation/incident path;
+8. refund, dispute, subscription-change and out-of-order event tests;
+9. dead-letter/retry and reconciliation observability;
+10. exact release artifact and rollback proof.
+
+Until those gates are satisfied, the live Stripe runtime control remains fail-closed.
