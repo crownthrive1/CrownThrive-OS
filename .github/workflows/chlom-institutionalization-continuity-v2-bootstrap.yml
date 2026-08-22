@@ -44,8 +44,8 @@ jobs:
           assert spec['source_snapshot']['head_sha']=='d6187bd9a9a5af12cf1121d761d325943cc63daa'
           assert spec['provenance']['base_package_id']=='ct.package.chlom-wallet.phase-c.institutionalization.v1'
           assert spec['provenance']['base_package_digest_sha256']=='7b3be50d5541fff14127bfdd24724eb9b8b9f9ffd4b165a380dee02f2a1ef957'
-          assert len(spec['artifacts'])>=11
-          assert len(spec['algorithms'])>=4
+          assert len(spec['artifacts'])==19
+          assert len(spec['algorithms'])==4
           assert all(value is False for value in spec['hard_boundaries'].values())
           PY
 
@@ -61,7 +61,7 @@ jobs:
               print(item['path'])
           PY
           )
-          test "${#paths[@]}" -ge 11
+          test "${#paths[@]}" = 19
           for path in "${paths[@]}"; do
             git cat-file -e "${frozen}:${path}"
           done
@@ -93,7 +93,7 @@ jobs:
           set -euo pipefail
           python -m json.tool /tmp/chlom-wallet-phase-c-institutionalization.v2.a.json >/dev/null
           python - <<'PY'
-          import json,re
+          import json
           p=json.load(open('/tmp/chlom-wallet-phase-c-institutionalization.v2.a.json'))
           assert p['schema_version']=='1.0.0'
           assert p['package_id']=='ct.package.chlom-wallet.phase-c.institutionalization.v2'
@@ -122,27 +122,16 @@ jobs:
           },sort_keys=True))
           PY
 
-      - name: Stage deterministic manifest artifact
+      - name: Emit deterministic manifest for governed source-control handoff
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/chlom-continuity-v2-artifact
-          cp /tmp/chlom-wallet-phase-c-institutionalization.v2.a.json \
-            /tmp/chlom-continuity-v2-artifact/chlom-wallet-phase-c-institutionalization.v2.json
-          printf '%s\n' 'c3433c0cc3f97003a8fbe75a5308edf68bf3b2bd19882d90dfeefe2bd2e15248  chlom-wallet-phase-c-institutionalization.v2.json' \
-            >/tmp/chlom-continuity-v2-artifact/SHA256SUMS
-
-      - name: Upload deterministic manifest artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: chlom-continuity-v2-manifest
-          path: /tmp/chlom-continuity-v2-artifact
-          if-no-files-found: error
-          retention-days: 7
-          compression-level: 9
-          overwrite: true
+          echo 'CHLOM_CONTINUITY_V2_MANIFEST_BASE64_BEGIN'
+          base64 -w0 /tmp/chlom-wallet-phase-c-institutionalization.v2.a.json
+          echo
+          echo 'CHLOM_CONTINUITY_V2_MANIFEST_BASE64_END'
 
       - name: Record boundary
         run: |
-          echo 'BOOTSTRAP_ONLY: compiles an exact frozen source snapshot and uploads a deterministic manifest artifact for source-control handoff.'
-          echo 'No source write, PR comment write, THIVEBASE write, reviewer heartbeat, review receipt, provider write, credential access, Stripe object, checkout, signing, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement, or merge authority occurs.'
+          echo 'BOOTSTRAP_ONLY: compiles an exact frozen source snapshot and emits deterministic evidence through the job log for governed source-control handoff.'
+          echo 'No unapproved GitHub Action, source write, PR comment write, THIVEBASE write, reviewer heartbeat, review receipt, provider write, credential access, Stripe object, checkout, signing, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement, or merge authority occurs.'
