@@ -1,0 +1,85 @@
+---
+title: "CHLOM Wallet Phase C Threat Extension"
+sidebarTitle: "Wallet Phase C Security"
+description: "Threat extension for HARP proof capsules, EASOR settlement planning, portable wallet capsules and provider-remap workflows."
+icon: "shield-virus"
+---
+
+# CHLOM Wallet Phase C threat extension
+
+**State:** `CONTROLLED_TEST`  
+**Production authorization:** none
+
+This extension supplements the primary CHLOM Wallet threat model for the Phase C proof, economic-planning and portability primitives.
+
+## New protected assets
+
+- proof-capsule scope and policy binding;
+- leaf, node, root and manifest digest integrity;
+- public-metadata disclosure boundary;
+- allocation/reversal schedule identity;
+- largest-remainder determinism;
+- original-plan integrity during reversal;
+- portable wallet capsule identity and chain head;
+- provider alias/adaptor contract identity;
+- import/remap authorization and rollback state;
+- deterministic cross-runtime vector custody.
+
+## Threats and controls
+
+| Threat | Failure mode | Required control |
+| --- | --- | --- |
+| Proof-type confusion | leaf digest reused as root/manifest meaning | domain-separated leaf/node/manifest preimages |
+| Ambiguous concatenation | different fields produce same unframed preimage | length-prefixed ASCII framing |
+| Input-order drift | same records produce different root | stable `record_id` sort before tree construction |
+| Duplicate commitment | same record included more than once | duplicate stable-ID rejection |
+| Odd-tree inconsistency | implementations treat final unpaired leaf differently | specified duplicate-last-leaf rule |
+| Metadata leakage | credential or provider reference appears in public proof | strict field allowlist, key-name rejection, secret-shape scan, size bound |
+| False provenance | valid inclusion proof treated as source truth | proof verifies membership only; source sufficiency remains independent |
+| Schedule rounding drift | allocation sum differs across implementations | exact minor units + largest-remainder algorithm + fixed tie-break |
+| Rule-order manipulation | caller order changes who receives rounding unit | normalized leg-code ordering and deterministic remainder ranking |
+| Duplicate economic leg | one beneficiary receives ambiguous duplicate obligations | unique `leg_code` enforcement |
+| Reversal overreach | refund/dispute reverses more than original allocation | original-plan digest verification and per-leg cap |
+| Semantic collapse | reward or impact obligation presented as cash/settled | explicit non-cash/not-settled states and false inference flags |
+| Capsule credential exfiltration | export contains API/signing secrets | schema omission, strict allowed keys, secret-shape rejection |
+| Event-chain truncation | capsule silently omits or reorders wallet history | contiguous sequence and prior-chain-hash validation |
+| Provider identity capture | provider account becomes wallet identity | stable CHLOM wallet ID above provider-neutral aliases |
+| Unsafe automatic import | valid capsule triggers destination writes | import/remap output fixed to HOLD and side effects false |
+| Adapter substitution | destination adapter changed without review | exact adapter contract reference + independent certification gate |
+| Vector drift | implementation changes while old digests remain claimed | fixed machine vectors rebuilt in CI |
+
+## Required Phase C invariants
+
+1. HARP input order cannot change the root or manifest digest.
+2. HARP accepts commitments only; raw protected evidence is not an input field.
+3. A HARP inclusion proof establishes batch membership, not legal truth or chain finality.
+4. EASOR rules total exactly `10,000` basis points.
+5. EASOR allocation legs sum exactly to the gross minor-unit amount.
+6. Equal remainders resolve by stable leg code, not caller order.
+7. A reversal cannot exceed the original gross or any original leg amount.
+8. Rights remain held until independent rights policy succeeds.
+9. Rewards are not inferred to be cash.
+10. ThriveFund/Impact obligations are not represented as disbursed without evidence.
+11. A portable capsule contains no provider credentials or source payload bodies.
+12. Portable events are contiguous and preserve the original chain head.
+13. A provider remap plan performs no provider write, rights mutation or money movement.
+14. Cross-runtime vectors must reproduce the exact HARP root, EASOR plan digest and portable capsule digest.
+15. The originating Wallet Agent cannot independently certify production promotion.
+
+## Incident and rollback posture
+
+A failed proof, allocation or capsule verification must produce HOLD rather than best-effort repair. Corrections create a new capsule/plan with explicit supersession lineage; prior artifacts are not edited in place.
+
+A provider-remap incident requires:
+
+- stop destination writes;
+- preserve source-provider read access where possible;
+- snapshot in-flight provider events;
+- compare CHLOM event-chain heads;
+- invalidate affected remap approval;
+- create correction evidence;
+- rerun dual-read/replay checks before resumption.
+
+## Production gates
+
+Production promotion requires independent security review, privacy classification, cross-language parity, immutable artifact custody, authenticated API authorization, operational monitoring, provider-exit rollback evidence and any chain/provider authority specific to the promoted implementation. Phase C tests do not authorize those transitions.
