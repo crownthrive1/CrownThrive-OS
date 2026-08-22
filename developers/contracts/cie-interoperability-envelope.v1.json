@@ -1,0 +1,182 @@
+{
+  "contract_version": "1.0.0",
+  "contract_id": "ct.contract.cie.interoperability.v1",
+  "framework_id": "ct.framework.cultural-imprint-engine",
+  "package_id": "ct.framework-package.cie",
+  "framework_agent_id": "ct.framework-agent.cie",
+  "contract_state": "CONTROLLED_TEST_CANDIDATE",
+  "public_safe": true,
+  "operational_authority": false,
+  "sovereign_vote_effect": false,
+  "authority_ceiling": "D2",
+  "d3_human_reserved": true,
+  "cie_public_contract_digest": "e5e6ac0e9cf6749ba361435bb65ad212f78562960d0b5522898e06583b8d86c2",
+  "protected_runtime": {
+    "material_evaluation_requires_private_runtime": true,
+    "public_calibration_allowed": false,
+    "private_eval_corpora_allowed": false,
+    "private_reasoning_payload_allowed": false,
+    "missing_runtime_or_digest": "HOLD"
+  },
+  "public_dimensions": [
+    "identity_fit",
+    "community_value",
+    "story_alignment",
+    "brand_safety",
+    "legacy_impact"
+  ],
+  "hard_boundaries": {
+    "person_scoring_prohibited": true,
+    "sensitive_trait_inference_prohibited": true,
+    "rights_or_legal_authority_inference_prohibited": true,
+    "credential_or_private_evidence_input_prohibited": true,
+    "protected_reasoning_output_prohibited": true
+  },
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "subject_type",
+        "subject_ref",
+        "use_case",
+        "evidence_refs",
+        "rights_gate_state",
+        "requested_dimensions"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        },
+        "subject_type": {
+          "type": "string",
+          "enum": [
+            "artifact",
+            "use",
+            "context",
+            "imprint",
+            "platform_content"
+          ]
+        },
+        "subject_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "use_case": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "rights_gate_state": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "not_applicable",
+            "unknown",
+            "blocked"
+          ]
+        },
+        "requested_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "identity_fit",
+              "community_value",
+              "story_alignment",
+              "brand_safety",
+              "legacy_impact"
+            ]
+          }
+        },
+        "context_tags": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        }
+      }
+    },
+    "precheck_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "state",
+        "framework_id",
+        "request_id",
+        "runtime_authorized",
+        "cie_public_contract_digest",
+        "hard_blocks"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "VALIDATED_PUBLIC_CONTRACT_ONLY",
+            "HOLD_MISSING_EVIDENCE",
+            "HOLD_CHLOM_RIGHTS_STATE",
+            "REJECTED_UNSUPPORTED_SUBJECT",
+            "REJECTED_SCHEMA"
+          ]
+        },
+        "framework_id": {
+          "const": "ct.framework.cultural-imprint-engine"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "runtime_authorized": {
+          "const": false
+        },
+        "cie_public_contract_digest": {
+          "const": "e5e6ac0e9cf6749ba361435bb65ad212f78562960d0b5522898e06583b8d86c2"
+        },
+        "hard_blocks": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      }
+    }
+  },
+  "activation_requires": [
+    "exact_current_main_reconciliation",
+    "child_oidc_bootstrap",
+    "linked_governed_parent_certification",
+    "governed_framework_acceptance",
+    "independent_security_privacy_review",
+    "independent_ip_rights_review",
+    "independent_operations_sre_review",
+    "current_head_sovereign_quorum_including_agent_d"
+  ],
+  "rollback": "revert_or_disable_interoperability_contract_without_erasing_prior_evidence"
+}
