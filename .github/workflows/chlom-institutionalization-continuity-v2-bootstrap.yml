@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: chlom-institutionalization-continuity-v2-${{ github.workflow }}-${{ github.ref }}
@@ -102,9 +103,9 @@ jobs:
           assert p['source_snapshot']['head_sha']=='d6187bd9a9a5af12cf1121d761d325943cc63daa'
           assert p['gap_analysis']['gap_count']==0
           assert p['gap_analysis']['completeness_score']==100
-          assert p['artifact_counts']['total']>=11
-          assert len(p['algorithm_registry'])>=4
-          assert re.fullmatch(r'[0-9a-f]{64}',p['package_digest_sha256'])
+          assert p['artifact_counts']['total']==19
+          assert len(p['algorithm_registry'])==4
+          assert p['package_digest_sha256']=='c3433c0cc3f97003a8fbe75a5308edf68bf3b2bd19882d90dfeefe2bd2e15248'
           assert p['rights']['state']=='HOLD_INDEPENDENT_RIGHTS_REVIEW'
           assert p['commercialization']['state']=='PRICE_REVIEW'
           assert p['ai_governance']['advisory_only'] is True
@@ -122,16 +123,44 @@ jobs:
           },sort_keys=True))
           PY
 
-      - name: Emit bootstrap manifest for source-control handoff
+      - name: Post deterministic manifest to this PR for source-control handoff
+        if: github.event_name == 'pull_request'
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          echo 'CHLOM_CONTINUITY_V2_MANIFEST_BASE64_BEGIN'
-          base64 -w0 /tmp/chlom-wallet-phase-c-institutionalization.v2.a.json
-          echo
-          echo 'CHLOM_CONTINUITY_V2_MANIFEST_BASE64_END'
+          python - <<'PY' >/tmp/chlom-continuity-v2-comment.json
+          import json,os
+          manifest=open('/tmp/chlom-wallet-phase-c-institutionalization.v2.a.json',encoding='utf-8').read()
+          body=(
+            '<!-- chlom-continuity-v2-bootstrap-manifest -->\n'
+            '### CHLOM Institutionalization Continuity v2 deterministic manifest\n\n'
+            'Bootstrap run: `'+os.environ['GITHUB_RUN_ID']+'`  \n'
+            'Frozen source: `d6187bd9a9a5af12cf1121d761d325943cc63daa`  \n'
+            'Package digest: `c3433c0cc3f97003a8fbe75a5308edf68bf3b2bd19882d90dfeefe2bd2e15248`\n\n'
+            '```json\n'+manifest+'```\n'
+          )
+          print(json.dumps({'body':body}))
+          PY
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            --header 'Content-Type: application/json' \
+            --data-binary @/tmp/chlom-continuity-v2-comment.json \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" >/tmp/chlom-continuity-v2-comment-response.json
+          python - <<'PY'
+          import json
+          response=json.load(open('/tmp/chlom-continuity-v2-comment-response.json'))
+          assert isinstance(response.get('id'),int)
+          assert response.get('body','').startswith('<!-- chlom-continuity-v2-bootstrap-manifest -->')
+          print(json.dumps({'result':'POSTED_CONTINUITY_V2_MANIFEST_HANDOFF','comment_id':response['id']}))
+          PY
 
       - name: Record boundary
         run: |
-          echo 'BOOTSTRAP_ONLY: compiles an exact frozen source snapshot and emits a deterministic manifest for source-control handoff.'
-          echo 'No GitHub write, THIVEBASE write, reviewer heartbeat, review receipt, provider write, credential access, Stripe object, checkout, signing, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement, or merge authority occurs.'
+          echo 'BOOTSTRAP_ONLY: compiles an exact frozen source snapshot and posts a deterministic PR evidence comment for source-control handoff.'
+          echo 'No source write, THIVEBASE write, reviewer heartbeat, review receipt, provider write, credential access, Stripe object, checkout, signing, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement, or merge authority occurs.'
