@@ -1,0 +1,71 @@
+name: CIE Interoperability Continuity
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/cie-interoperability-continuity.v1.json"
+      - "developers/schemas/cie-interoperability.v1.schema.json"
+      - "developers/manifests/cie-commercialization-candidate.v1.json"
+      - "developers/manifests/convergent-ecosystem-research-handoff.v1.json"
+      - "supabase/migrations/20260822190000_cie_interoperability_continuity_candidate.sql"
+      - "scripts/validate_cie_interoperability_continuity.py"
+      - ".github/workflows/cie-interoperability-continuity.yml"
+      - "doctrine/cultural-imprint-engine.mdx"
+      - "changelog/phase-2-99-cie-interoperability-continuity-2026-08-22.mdx"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cie-interoperability-continuity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate CIE parent/child fail-closed packet
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile validator
+        run: python -m py_compile scripts/validate_cie_interoperability_continuity.py
+
+      - name: Validate packet, IP, authority and commercialization invariants
+        run: python scripts/validate_cie_interoperability_continuity.py
+
+      - name: Parse machine-readable assets
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in (
+              "developers/manifests/cie-interoperability-continuity.v1.json",
+              "developers/schemas/cie-interoperability.v1.schema.json",
+              "developers/manifests/cie-commercialization-candidate.v1.json",
+              "developers/manifests/convergent-ecosystem-research-handoff.v1.json",
+          ):
+              json.loads(Path(path).read_text())
+              print(f"{path}: JSON PASS")
+          PY
+
+      - name: Validate institutional documentation
+        run: python scripts/validate_docs.py
+
+      - name: Reject conflict markers and whitespace defects
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict marker detected."
+            exit 1
+          fi
