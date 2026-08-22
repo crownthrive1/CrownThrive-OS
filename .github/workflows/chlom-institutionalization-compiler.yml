@@ -170,3 +170,72 @@ jobs:
         run: |
           echo 'CONTROLLED_TEST: deterministic institutional packaging, completeness analysis, provenance and documentation impact only.'
           echo 'No AI decision authority, reviewer impersonation, provider write, signing, custody, token issuance, money movement, rights grant, chain broadcast, price publication, checkout, phase advancement or merge authority is created.'
+
+  reconcile-manifest:
+    name: Reconcile generated institutional manifest on same-repository PRs
+    needs: compile
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+    steps:
+      - name: Check out exact pull-request head branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Compile bounded manifest from branch head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git status --porcelain --untracked-files=all | wc -l)" -eq 0
+          git merge-base --is-ancestor 64118e61c7671a78b43999ac5f17f9eddd1226b1 HEAD
+          node automation/compile-chlom-institutionalization.mjs \
+            --spec automation/chlom-institutionalization-compiler.v1.json \
+            --repo-root . \
+            --output developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json \
+            | tee /tmp/chlom-institutionalization-reconcile.log
+          python - <<'PY'
+          import json
+          path='developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json'
+          value=json.load(open(path))
+          assert value['state']=='PASS_CONTROLLED_TEST_INSTITUTIONALIZATION'
+          assert value['gap_analysis']['gap_count']==0
+          assert value['gap_analysis']['completeness_score']==100
+          assert all(flag is False for flag in value['hard_boundaries'].values())
+          assert value['compiler']['network_access'] is False
+          assert value['compiler']['signing'] is False
+          assert value['compiler']['provider_write'] is False
+          assert value['compiler']['chain_broadcast'] is False
+          assert value['compiler']['money_movement'] is False
+          PY
+
+      - name: Commit only the deterministic manifest when changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json'
+          mapfile -t changed < <(git status --porcelain --untracked-files=all | sed -E 's/^.. //')
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo 'Manifest already matches the deterministic rebuild.'
+            exit 0
+          fi
+          if [ "${#changed[@]}" -ne 1 ] || [ "${changed[0]}" != "$target" ]; then
+            printf 'Unexpected changed paths:\n%s\n' "${changed[@]}"
+            exit 1
+          fi
+          git add -- "$target"
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          test "$(git diff --cached --name-only)" = "$target"
+          git config user.name 'CrownThrive Institutionalization Bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Reconcile deterministic CHLOM institutionalization manifest [skip ci]'
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+
+      - name: Record reconciliation boundary
+        run: |
+          echo 'The reconciler may write only the deterministic institutional manifest on a same-repository PR branch.'
+          echo 'It cannot merge, approve, publish, price, transact, sign, move funds, grant rights, broadcast to a chain, or advance a phase.'
