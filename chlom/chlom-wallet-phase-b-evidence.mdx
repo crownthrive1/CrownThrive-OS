@@ -1,7 +1,7 @@
 ---
 title: "CHLOM Wallet Phase B Evidence"
 sidebarTitle: "Wallet Phase B"
-description: "Controlled-test evidence for CHLOM Wallet Stripe webhook verification, lifecycle reconciliation, entitlement separation, Unified Value Receipt integrity, passkey/smart-account intents, provider exit and commercial canaries."
+description: "Controlled-test evidence for CHLOM Wallet Stripe verification, lifecycle reconciliation, entitlement separation, Unified Value Receipts, wallet UX, passkey challenge control, smart-account intents, contract hardening, provider exit and commercial canaries."
 icon: "flask"
 ---
 
@@ -55,7 +55,7 @@ result: PASS_PROVIDER_LIFECYCLE_CANARY
 
 The synthetic sequence covers `invoice.paid`, `customer.subscription.created`, `customer.subscription.updated`, `charge.dispute.created`, and `charge.refunded`. The invoice was delivered before an earlier-occurring subscription event to prove CHLOM preserves provider occurrence time separately from append order instead of rewriting history to make events appear ordered.
 
-The controlled VCTR mapping now also distinguishes asynchronous Checkout success/failure, invoice payment failure, and subscription create/update/delete events. None of these provider states independently creates entitlement.
+The controlled VCTR mapping also distinguishes asynchronous Checkout success/failure, invoice payment failure, and subscription create/update/delete events. None of these provider states independently creates entitlement.
 
 ## Entitlement and Unified Value Receipt canary
 
@@ -73,6 +73,70 @@ result: PASS_ENTITLEMENT_UVR_CANARY
 ```
 
 This is the intended CHLOM invariant: **provider evidence can participate in an entitlement decision, but it cannot be the entitlement decision by itself**.
+
+## Passkey challenge-control canary
+
+The restricted runtime now has a one-time passkey challenge service. It generates a random challenge, persists only the digest, binds the challenge to a relying-party ID and HTTPS origin, expires it, and prevents exact replay.
+
+```yaml
+wrong_origin_state: rp_or_origin_mismatch
+valid_consume_state: CONSUMED_TEST
+replay_state: challenge_already_consumed
+raw_challenge_persisted: false
+credential_verified: false
+smart_account_deployed: false
+money_movement: false
+result: PASS_PASSKEY_CHALLENGE_CANARY
+```
+
+This validates challenge/origin/replay control only. It deliberately does **not** claim complete WebAuthn cryptographic assertion verification, production credential enrollment, smart-account deployment or account recovery readiness.
+
+A candidate smart-account profile remains `specified_not_deployed` with an explicit CAIP-2 testnet target, WebAuthn/passkey commitment profile, modular ERC-4337/ERC-7579 direction, disabled paymaster/modules, `broadcast=false`, and `money_movement=false`.
+
+## Wallet experience and public projection
+
+The source-controlled wallet shell now models one consumer-facing surface with five separate lanes: **Money, Rights, Rewards, Impact and Proof**. Its reference tests passed with:
+
+```yaml
+unified_shell_sections: 5
+provider_detail_leak: false
+private_evidence_leak: false
+semantic_merge: false
+accessibility_landmarks_present: true
+```
+
+The shell does not create a universal value balance. Active Rights require an entitlement reference, externally settled Impact requires evidence, Rewards are not inferred to be cash, and provider internals remain hidden from the ordinary customer projection.
+
+This is a reference experience contract, not yet a deployed customer application.
+
+## Contract hardening and stress evidence
+
+The four no-value Solidity reference contracts compile under the exact `solc@0.8.36` workflow. Their source invariants were tightened so that:
+
+- entitlement revocation requires an active entitlement and nonzero reason digest;
+- split-policy supersession requires both source and replacement records and rejects self-replacement;
+- ThriveFund obligation creation rejects zero amount;
+- external-settlement and reversal transitions require evidence digests;
+- repeat invalid ThriveFund/entitlement transitions fail closed;
+- Anchor Registry keeps duplicate/zero/pause/authority guards;
+- no controlled-test contract exposes transfer/send/value-call/delegatecall/selfdestruct primitives.
+
+A deterministic source-aligned state-model fuzz suite also passed:
+
+```yaml
+result: PASS_CONTRACT_MODEL_FUZZ
+operations: 25000
+expected_rejections: 6427
+anchors: 3163
+entitlements: 2640
+split_policies: 2294
+thrivefund_obligations: 2284
+no_value_movement_primitives: true
+evm_execution: false
+audit_claimed: false
+```
+
+This is meaningful invariant testing, but it is still not EVM bytecode execution, an external audit, a testnet deployment or mainnet approval.
 
 ## Provider-exit drill
 
@@ -93,7 +157,7 @@ The drill demonstrates the intended identity model: the CrownThrive wallet ID an
 
 ## Controlled commercial canary
 
-A full synthetic offer-to-receipt path now runs against an internal `price_review` offer candidate without creating a Stripe Product, Price, Checkout Session or live payment:
+A full synthetic offer-to-receipt path runs against an internal `price_review` offer candidate without creating a Stripe Product, Price, Checkout Session or live payment:
 
 ```yaml
 result: PASS_COMMERCIAL_CANARY
@@ -110,6 +174,23 @@ money_movement: false
 
 This test proves the controlled integration order across candidate offer, signed provider evidence, CHLOM event, independent rights decision and UVR. It does not authorize the candidate price or live commerce.
 
+## Pricing-certification handoff
+
+The internal WalletKit offer cohort remains in `price_review`. A restricted independent-review request now exists:
+
+```yaml
+request_code: ct.price-review.chlom-wallet.phase-b.v1
+requester: ct.agent.chlom-wallet-settlement
+independent_reviewer: ct.chlom.agent.price-certifier
+candidate_snapshot_sha256: fa15a0979a9329e833e8ee76cd70f6e18cdaf7c944dcdb12730c1210c333a941
+state: pending_independent_review
+effective_offer_authorized: false
+stripe_object_creation_authorized: false
+live_checkout_authorized: false
+```
+
+Public Privy and Crossmint pricing pages are retained only as dated market-comparable inputs. The independent certifier must evaluate customer value, feature scope, provider costs, support/compliance burden, gross margin, usage assumptions, discounts, tax/geography, quota/overage design, entitlement cost, and refund/cancellation terms before any candidate can become an effective offer.
+
 ## Runtime controls
 
 The restricted runtime currently carries explicit controls:
@@ -124,42 +205,37 @@ The existence of a deployed Edge Function is therefore not equivalent to a live 
 
 ## Public reference implementation
 
-Phase B adds deterministic reference code for:
+Phase B includes deterministic reference code for:
 
 - Stripe-signature parsing and HMAC verification;
-- stale timestamp rejection;
-- raw-body tamper rejection;
+- stale timestamp and raw-body tamper rejection;
 - controlled event allowlisting;
 - payment, invoice, subscription, refund, dispute and asynchronous Checkout translation with fulfillment HOLD;
 - CAIP-2 and CAIP-10 identity normalization;
 - WebAuthn credential commitments and origin/RP binding;
-- ERC-4337/ERC-7579 smart-account registration intents with deploy/broadcast disabled;
-- Unified Value Receipt presentation invariants.
+- ERC-4337/ERC-7579 smart-account registration intents with deployment/broadcast disabled;
+- Unified Value Receipt presentation invariants;
+- accessible wallet-shell public-projection invariants;
+- source-aligned deterministic contract-state fuzz testing.
 
-A separate Solidity compile workflow pins compiler package version `0.8.36` and compiles the four no-value reference contracts. Exact-head compilation has passed; this proves syntax/toolchain compatibility only, not an audit or deployment approval.
-
-## Pricing research
-
-Public 2026 wallet-infrastructure benchmarks reinforce that wallet creation itself is becoming inexpensive. The internal CHLOM Wallet pricing candidates are therefore in `price_review`, with premium positioning tied to rights, policy, proof, impact and provider portability rather than wallet creation alone. The independent CrownThrive Price Certifier remains pending before any candidate becomes an effective offer.
+The dedicated controlled-test CI also now scans the wallet projection for concrete live-secret-shaped material rather than relying on ordinary words such as “private key” or “seed phrase,” which legitimately appear in security prohibitions. This keeps the check fail-closed without treating defensive documentation as a secret.
 
 ## Provider continuity finding
 
-The live CrownThrive Stripe account currently contains multiple enabled and retired webhook endpoints for other CrownThrive properties. The previous Supabase institutional observer endpoint is disabled/retired. No new CHLOM Wallet live Stripe endpoint has been registered by this packet.
+The live CrownThrive Stripe account contains enabled and retired webhook endpoints for other CrownThrive properties. The previous Supabase institutional observer endpoint is disabled/retired. No new CHLOM Wallet live Stripe endpoint has been registered by this packet.
 
-The restricted credential-continuity registry also keeps the generic Stripe server API credential state separate from this connector session. A connected provider tool proves current authorized interaction in this environment; it does not silently repair a missing server-side Vault credential.
+The restricted credential-continuity registry also keeps generic Stripe server credential continuity separate from this connector session. A connected provider tool proves authorized interaction in this environment; it does not silently repair a missing server-side Vault credential.
 
 ## Phase B gates still open
 
 - live Stripe webhook endpoint registration and live signing-secret continuity;
-- customer-facing Wallet/UVR application shell beyond the current UI-agnostic presentation model;
-- production passkey enrollment/recovery;
-- smart-account implementation selection and audit;
-- reproducible Solidity build artifact packaging and deeper contract verification;
-- fuzz/invariant testing beyond source-level guards;
-- testnet deployment/anchor receipt with approved signer path;
+- complete production WebAuthn registration/assertion verification and recovery;
+- customer-facing Wallet/UVR application deployment;
+- smart-account implementation selection, EVM execution tests and independent audit appropriate to risk;
+- reproducible Solidity artifact packaging and testnet deployment/anchor receipt with approved signer path;
 - real provider-exit dual-read/replay canary;
-- independent pricing certification;
+- independent price-certifier decision;
 - tax/legal/security/rights review for the final commercial transaction model;
 - live governed checkout canary and eventual commerce activation.
 
-No item above is considered complete merely because its interface or documentation now exists.
+No item above is considered complete merely because its interface, test or documentation now exists.
