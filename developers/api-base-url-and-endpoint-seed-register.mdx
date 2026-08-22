@@ -193,15 +193,17 @@ provider_writes_enabled: false
 source_refs:
   - S111
   - S112
+  - S113
+  - S114
 state:
   accounts_list: auth_verified
   system_load: auth_verified
   server_hostname: auth_verified
   disk_usage: docs_verified_bounded_read_pending
-  provider_native_token_acl: unverified
+  provider_native_token_acl: broad_existing_token_observed_rotation_pending
 ```
 
-The WHM API 1 connection is now authenticated from server-side Vault custody. The current certification snapshot returned **44 cPanel accounts**, including **8 suspended**, and separately verified system-load and hostname reads. Exact account rows, management endpoints, provider-host details, contact data and credentials remain restricted rather than being projected into public documentation.
+The WHM API 1 connection is authenticated from server-side Vault custody. The certification snapshot returned **44 cPanel accounts**, including **8 suspended**, and separately verified system-load and hostname reads. Exact account rows, management endpoints, provider-host details, contact data and credentials remain restricted rather than being projected into public documentation.
 
 | Method | Provider operation | Institutional state | Mutation |
 | --- | --- | --- | --- |
@@ -210,7 +212,42 @@ The WHM API 1 connection is now authenticated from server-side Vault custody. Th
 | `GET` | server hostname | authenticated read verified | no |
 | `GET` | disk usage | provider contract documented; bounded certification pending | no |
 
-The deployed adapter is JWT-protected and allowlisted. Provider-native token permissions may be broader than the adapter; that fact does not authorize any account, package, DNS, service, server or token mutation. Hosting-account evidence remains separate from registrar, DNS/TLS, application-health and source/deployment authority.
+### crownthrive.io cPanel UAPI
+
+```yaml
+service_id: ct.service.cpanel.crownthrive-io
+credential_id: ct.credential.cpanel.crownthrive-io.thrivebase-api
+adapter_id: ct.adapter.cpanel.crownthrive-io.uapi.v1
+provider_api: cPanel_UAPI
+credential_state: verified_dual_reference
+managed_token_expiry: 2026-11-20T03:49:00Z
+provider_token_scope: full_account_access
+institutional_adapter_scope: read_only
+adapter_state: deployed_read_only
+certified_operation: StatsBar/get_stats(diskusage)
+provider_writes_enabled: false
+```
+
+The managed cPanel token was created through the provider's token-management API, vaulted immediately, and verified through a direct authenticated UAPI disk-usage read. Two transient certification tokens were revoked after the managed credential passed. A separate pre-existing provider token named `THRIVEBASE` remains visible but is not the governed runtime credential; external-consumer review is required before revocation.
+
+### SSH key custody
+
+```yaml
+key_id: ct.sshkey.cpanel.crownthrive-io.thrivebase
+key_type: ssh-rsa
+key_bits: 4096
+public_fingerprint_sha256: SHA256:FAKVVWXR98wQylQpqEa1qeC8MoEzNCw356N0JJY1kXY
+private_key_state: encrypted_vault_primary_and_recovery
+private_key_cipher: aes256-ctr
+private_key_kdf: bcrypt
+passphrase_state: required_not_supplied
+provider_authorization_state: unverified
+live_ssh_test: not_run
+```
+
+The uploaded private key and supplied public key match at the OpenSSH envelope/fingerprint level. The private key is Vault-only and remains unusable for runtime SSH until the passphrase and provider-side authorization state are independently verified. No shell connection was attempted.
+
+The deployed WHM and cPanel adapters are JWT-protected and allowlisted. Provider-native permissions may be broader than the adapter; that fact does not authorize account, package, DNS, service, server, token or shell mutations. Hosting-account evidence remains separate from registrar, DNS/TLS, application-health and source/deployment authority.
 
 See [cPanel / WHM Hosting Control Plane](/technology/cpanel-whm-hosting-control-plane).
 

@@ -24,6 +24,8 @@ credential_state: vaulted_dual_reference_verified
 source_refs:
   - S111
   - S112
+  - S113
+  - S114
 ```
 
 CrownThrive's cPanel/WHM estate is now an independently governed infrastructure service rather than an informal admin-panel dependency. Provider-account evidence, server observations, credential custody, application health, domain custody and platform lifecycle remain separate records.
@@ -74,6 +76,47 @@ raw_secret_in_logs: prohibited
 
 The provider token label may be recorded for custody/recovery purposes, but the token itself is restricted runtime material. Public documentation records only opaque references and certification state.
 
+## crownthrive.io cPanel UAPI lane
+
+A separate cPanel-account credential is now managed for the `crownthrive.io` account rather than forcing account-level UAPI through the broader WHM credential.
+
+```yaml
+service_id: ct.service.cpanel.crownthrive-io
+credential_id: ct.credential.cpanel.crownthrive-io.thrivebase-api
+adapter_id: ct.adapter.cpanel.crownthrive-io.uapi.v1
+adapter_slug: cpanel-account-api-control
+adapter_auth: JWT_required
+credential_continuity: verified_dual_reference
+provider_token_scope: full_account_access
+institutional_adapter_scope: read_only
+provider_writes_enabled: false
+token_rotation_deadline: 2026-11-20T03:49:00Z
+```
+
+The managed token was created through the provider's UAPI token-management contract and immediately stored in Vault; its raw value is not recoverable from public documentation or Git history. A direct authenticated UAPI `StatsBar/get_stats` disk-usage read returned a successful provider status and is the first certified account-level operation. The deployed adapter does not expose arbitrary UAPI dispatch.
+
+Two transient token names created during certification were revoked after the managed token passed authentication. A separate pre-existing full-access token named `THRIVEBASE` remains visible in the provider token inventory but is **not** the governed runtime credential. It remains a review-before-revoke item because its external consumers, if any, are not yet established.
+
+## SSH continuity lane
+
+The uploaded `ThriveBase` SSH keypair has also been reconciled into the private hosting-control layer.
+
+```yaml
+key_id: ct.sshkey.cpanel.crownthrive-io.thrivebase
+key_type: ssh-rsa
+key_bits: 4096
+public_fingerprint_sha256: SHA256:FAKVVWXR98wQylQpqEa1qeC8MoEzNCw356N0JJY1kXY
+private_key_storage: encrypted_Vault_primary_and_recovery
+private_key_file_cipher: aes256-ctr
+private_key_kdf: bcrypt
+public_private_match: verified_from_OpenSSH_envelope
+passphrase_state: required_not_supplied
+provider_authorization_state: unverified_from_supplied_snapshot
+live_ssh_test: not_run
+```
+
+The private key is already passphrase-encrypted in OpenSSH format and is additionally stored under Vault encryption with a separate recovery reference. The public key fingerprint is safe to expose; the private key body is not. Because the passphrase was not supplied and the provided interface excerpt did not establish whether the key is currently authorized on the account, SSH runtime use remains fail-closed. No SSH connection or shell command was attempted.
+
 ## Hosting-account evidence rules
 
 A cPanel account is **hosting evidence**, not a universal platform-state assertion:
@@ -111,13 +154,15 @@ A post-migration security-advisor review produced no new finding specific to the
 
 ## Remaining certification gates
 
-- verify provider-native token ACL/privilege scope and any expiration/revocation behavior without exposing the token;
+- rotate the broad conversation-exposed WHM token to a least-privilege managed credential; provider ACL inspection shows the current token exceeds the read adapter's needs;
+- review the separate pre-existing full-access cPanel token named `THRIVEBASE` for unknown external consumers before revoke/retire;
+- verify the ThriveBase SSH passphrase and provider-side authorization state before any live SSH test or shell execution;
 - certify disk-usage read and establish server CPU/core, memory and storage capacity baselines before thresholding load;
 - reconcile the eight suspended hosting accounts against the canonical asset lifecycle/disposition register;
 - verify backup, restore, retention, account export and provider-exit procedures;
 - map hosting accounts to canonical domains, DNS authority, TLS, mail and application deployments without conflating those systems of record;
 - define monitoring cadence and alert thresholds before autonomous remediation;
-- keep all WHM mutations fail-closed until an explicit action class, approval rule, rollback plan and independent verification exist.
+- keep WHM/cPanel mutations and SSH shell execution fail-closed until an explicit action class, approval rule, rollback plan and independent verification exist.
 
 ## Downstream phase impact
 
