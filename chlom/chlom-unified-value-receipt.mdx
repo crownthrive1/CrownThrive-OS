@@ -1,0 +1,129 @@
+---
+title: "CHLOM Unified Value Receipt"
+sidebarTitle: "Unified Value Receipt"
+description: "Public-safe contract for the CHLOM Unified Value Receipt: one simple user-facing receipt across money, rights, rewards and impact without collapsing their legal or operational meaning."
+icon: "receipt"
+---
+
+# CHLOM Unified Value Receipt
+
+The **CHLOM Unified Value Receipt (UVR)** is the wallet's user-facing explanation layer for a governed CrownThrive transaction or value event.
+
+The design goal is simple:
+
+> A user should be able to understand what they paid, what they received, what they earned, what impact was allocated, and whether the underlying evidence is verified — without learning the payment, rights, rewards, impact and blockchain architecture underneath it.
+
+## The receipt card
+
+A completed wallet experience can render one card with four independently governed legs:
+
+```text
+CHLOM VALUE RECEIPT
+
+Money
+Paid / refunded / disputed / pending
+
+Rights
+What access, license or entitlement exists
+
+Rewards
+What approved loyalty/reward value was earned
+
+Impact
+What ThriveFund/CII obligation was calculated,
+approved or externally settled
+
+Proof
+CHLOM receipt fingerprint + optional anchor status
+```
+
+The card is a **unified view**, not a semantic merger. A provider payment receipt remains a provider payment receipt. A CHLOM license remains a rights record. A CrownRewards entry remains a reward. A ThriveFund obligation remains an impact/economic record.
+
+## Core invariants
+
+1. A successful Stripe/provider payment cannot make the Rights leg active by itself.
+2. A calculated ThriveFund obligation cannot display as externally settled without settlement evidence.
+3. Rewards cannot be displayed as cash, equity or transferable crypto unless a separately governed record explicitly defines that class.
+4. The UVR points to authoritative records rather than replacing them.
+5. Corrections and reversals create new lineage; historical receipts are not silently rewritten.
+6. The receipt fingerprint is deterministic for the exact underlying state/version.
+7. Public proof views exclude private agreements, credentials and sensitive evidence bodies.
+
+## Canonical receipt model
+
+```json
+{
+  "stable_id": "ct.uvr.example",
+  "wallet_id": "ct.wallet.example",
+  "source_event_ref": "ct.event.example",
+  "money": {
+    "asset": "USD",
+    "amount_minor": 4900,
+    "state": "reconciled"
+  },
+  "rights": {
+    "entitlement_ref": "ct.entitlement.example",
+    "state": "active"
+  },
+  "rewards": {
+    "reward_ref": "ct.reward.example",
+    "state": "earned"
+  },
+  "impact": {
+    "obligation_ref": "ct.impact.example",
+    "state": "calculated"
+  },
+  "policy_version": "ct.policy.uvr.v1",
+  "receipt_digest": "sha256-hex",
+  "anchor_state": "not_anchored"
+}
+```
+
+The values above are illustrative schema examples, not a live transaction, current reward rule or current ThriveFund percentage.
+
+## Why this is strategically different
+
+Most payment products stop at **payment status**. Most crypto wallets stop at **assets and transactions**. Most rights systems stop at **licenses or entitlements**.
+
+The UVR is designed around the CrownThrive/CHLOM convergence problem: one customer action can have payment, rights, reward, affiliate, partner, impact and evidence consequences across multiple ecosystem corridors.
+
+A unified receipt can therefore become a reusable product primitive for:
+
+- CrownThrive digital products and subscriptions;
+- Virality Music licenses and publishing products;
+- KJV/Sermon Toolkit entitlements;
+- Crown Affiliates and Ambassador attribution;
+- CrownRewards progression;
+- MM Suites operator and license flows;
+- AdLuxe campaign/economic records;
+- CrownThriveU credentials and licensed curriculum;
+- CHLOMLex / external licensing transactions;
+- approved ThriveFund/CII evidence paths.
+
+Each corridor keeps its specialized system. CHLOM produces one understandable proof surface.
+
+## API and product implications
+
+The UVR becomes a natural commercial primitive for:
+
+- CHLOM Proof Receipt API;
+- CHLOM Rights Wallet API;
+- CHLOM WalletKit;
+- enterprise white-label wallet experiences;
+- support/dispute evidence packages;
+- machine-readable audit/export packets.
+
+The wallet should render a human-readable card while APIs expose a structured receipt and verification endpoint.
+
+## Controlled-test implementation
+
+A restricted controlled-test implementation now includes an append-only Unified Value Receipt record and deterministic receipt-digest builder. A synthetic test proved:
+
+- four-leg receipt construction;
+- deterministic SHA-256 receipt fingerprinting;
+- linkage to an append-only wallet event;
+- fail-closed rejection of in-place receipt mutation.
+
+The synthetic receipt was rolled back after validation.
+
+This is controlled-test evidence only. It does not certify live payment processing, a rights grant, a current reward rule, a current ThriveFund allocation, a financial statement, tax treatment or a blockchain anchor.
