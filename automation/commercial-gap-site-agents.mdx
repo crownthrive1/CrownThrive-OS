@@ -55,3 +55,86 @@ commerce_fail_closed: true
 `concept -> candidate -> packaged -> rights_cleared -> pricing_authorized -> fulfillment_certified -> checkout_staged -> live`
 
 A generated product, Sites preview, ZIP, hash, Drive file, database row, Stripe object or agent vote cannot skip required states.
+
+## Governed commerce control plane
+
+As of August 22, 2026, the three agents share one platform-scoped control plane rather than three competing commerce backends.
+
+- **Service ID:** `commercial_gap_sites_control`
+- **Contract:** `1.0.0`
+- **Cohort:** `ct-commercial-gap-sites-v1`
+- **Runtime digest:** `c5960babbb0e997b9e4d042af7a4586b99f4a13741b50317c4ed28ecf6dd6d3d`
+- **Runtime state:** candidate / controlled test
+- **Authentication:** verified Supabase JWT with an additional service-role ceiling
+- **Sovereign vote authority:** none
+- **Live-money operation:** none
+- **Exact product release:** `1.0.0-candidate.4`
+
+The control plane exposes D0 status, catalog, product, site, source and release-preflight reads plus only three bounded D1 mutations: synthetic Crown Credits canaries, deterministic pricing-evidence review and authoritative-source hash refresh. None of these operations can create legal, tax, accessibility, pricing-authorization or sovereign-vote authority.
+
+### MCP exposure
+
+The following tools are registered on `ct.mcp.crownthrive-interoperability` in `test` exposure state:
+
+- `commercial_gap.status`
+- `commercial_gap.catalog.list`
+- `commercial_gap.product.get`
+- `commercial_gap.sites.get`
+- `commercial_gap.sources.get`
+- `commercial_gap.release.preflight`
+- `commercial_gap.synthetic_credit.run`
+- `commercial_gap.pricing.review`
+- `commercial_gap.sources.refresh`
+
+MCP exposure does not bypass the API's D0/D1 ceiling, service-role enforcement, independent-verifier requirements or downstream release gates.
+
+## Authoritative-source custody and change watch
+
+The 30 candidate digital products are bound to 90 exact source/claim relationships, three per SKU, and each binding includes the exact packaged `sources.json` manifest SHA. Twenty-one unique authoritative source URLs are registered across CrownThrive, W3C, NIST, FTC, SBA, Acquisition.gov/FAR, the U.S. Copyright Office, DOL and FinCEN.
+
+`developer_commerce.refresh_due_commercial_gap_sources_v1` is the bounded institutional watcher. The watcher hashes permitted authoritative sources, versions observations and creates a review event when content changes. A material source-content change may place an affected SKU on HOLD; the watcher may never auto-release a hold or turn a content hash into a legal conclusion.
+
+The scheduled control is `ct-commercial-gap-source-watch`, running daily through the existing database scheduler. A source that rejects automated retrieval remains explicitly unavailable to the hasher rather than being treated as passed.
+
+## Pricing evidence control
+
+`developer_commerce.review_commercial_gap_pricing_evidence_v1` verifies only deterministic pricing evidence under `ct-pricing-v2`: approved price-band membership, minimum comparable count and minimum independent-source count. All 30 candidate offers currently satisfy that evidence test.
+
+`price_evidence_state=reviewed` means the comparable evidence is technically sufficient. It does **not** mean the product is authorized for sale, that tax treatment is approved or that checkout may be activated.
+
+## Crown Credits canary contract
+
+The commercial-gap synthetic suite is the permitted no-money canary while live commerce remains gated. The current deterministic suite covers purchase, webhook/idempotency, entitlement-state creation, refund and dispute reversal paths without moving money or touching live customer commerce tables.
+
+A passing synthetic credit canary cannot override an unapproved customer license, missing private-delivery readback, tax review, provider availability, domain/TLS, accessibility or sovereign-release gate.
+
+## Restricted institutional assets
+
+The following implementations are registered under CHLOM/Vault custody with public fingerprints and non-public bodies:
+
+- `ct.secret.algorithm.commercial-gap-source-watch.v1` — public digest `e24bbf4ded46f06138160f110db470771e144484b2ba8787d7f307d9152ccbd0`
+- `ct.secret.algorithm.commercial-gap-pricing-evidence.v1` — public digest `94b726e8f3079c44329b89cbe5f60402083ca571f8fcc4b4aeaa57fad2d4ca5b`
+- `ct.secret.protocol.commercial-gap-sites-control.v1` — public digest `dadee7997b968551b659374be1aba8de366d724d0050b46949b7e3a4e527fc9c`
+
+Their corresponding capability IDs are:
+
+- `ct.capability.commercial-gap-source-watch.v1`
+- `ct.capability.commercial-gap-pricing-evidence.v1`
+- `ct.capability.commercial-gap-sites-control.v1`
+
+Public documentation may expose identifiers, authority boundaries and immutable digests. It must not expose Vault bodies, credentials, signing secrets, private product bytes or proprietary implementation details.
+
+## Current certification boundary
+
+The release remains fail-closed until independent evidence closes all hard gates. Current blockers include:
+
+- operative customer-license and qualified rights review;
+- qualified tax/classification authority beyond the currently observed Virginia evidence;
+- exact private Storage upload and signed readback for all 30 candidate ZIPs;
+- Stripe test-context certification before any live activation, plus dedicated credit webhook and secret custody;
+- anonymous public provider readback for each Sites surface;
+- DNS and TLS activation for `launch.crownthrive.com`, `ready.crownthrive.com` and `procure.crownthrive.com`;
+- current keyboard, screen-reader and device-matrix evidence against the accessible release candidate;
+- valid governed vote-authority receipts and required A/B/C/D/S dispositions after certification passes.
+
+Until those predicates pass, the 30 governed releases remain quarantined and commerce must remain closed.
