@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   contract:
-    name: Validate source pin and read-only chain preflight
+    name: Validate source, observation and predeployment HOLD
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
@@ -30,6 +30,7 @@ jobs:
       - name: Validate source-controlled JSON
         run: |
           python -m json.tool developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/external-readback-observation.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json >/dev/null
 
@@ -39,38 +40,77 @@ jobs:
           node --check developers/reference/chlom-wallet/smart-account/test-entrypoint-profile-verifier.mjs
           node --check developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs
           node --check developers/reference/chlom-wallet/smart-account/test-read-only-chain-code-preflight.mjs
+          node --check developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs
 
-      - name: Verify official source profile and divergence registration
+      - name: Verify official source, divergence and external observation profile
         run: node developers/reference/chlom-wallet/smart-account/test-entrypoint-profile-verifier.mjs
 
       - name: Verify read-only chain-code contract against local mock RPC
         run: node developers/reference/chlom-wallet/smart-account/test-read-only-chain-code-preflight.mjs
 
-      - name: Enforce predeployment HOLD
+      - name: Enforce observation consistency and predeployment HOLD
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
           profile=json.load(open('developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json'))
+          observation=json.load(open('developers/reference/chlom-wallet/smart-account/external-readback-observation.json'))
           gates=json.load(open('developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json'))
           readiness=json.load(open('developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json'))
+
+          expected_hash='0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
           assert profile['state']=='SOURCE_RELEASE_AND_TAG_ARTIFACT_DIVERGENCE_REGISTERED_CHAIN_CODE_UNVERIFIED'
           assert profile['verification']['release_and_artifact_addresses_match'] is False
-          assert profile['verification']['external_read_only_chain_readback_completed'] is False
+          assert profile['verification']['external_read_only_chain_readback_completed'] is True
+          assert profile['verification']['external_read_only_provider_count']==2
+          assert profile['verification']['external_read_only_provider_agreement'] is True
+          assert profile['verification']['runtime_code_present'] is True
+          assert profile['verification']['runtime_code_bytes']==22425
+          assert profile['verification']['observed_runtime_codehash']==expected_hash
           assert profile['verification']['approved_runtime_codehash'] is None
+          assert profile['verification']['runtime_codehash_independently_approved'] is False
           assert profile['verification']['runtime_codehash_verified'] is False
           assert all(value is False for value in profile['hard_boundaries'].values())
+
+          assert observation['state']=='PASS_EXTERNAL_READ_ONLY_OBSERVATION_HOLD_INDEPENDENT_APPROVAL'
+          assert observation['observation']['result']=='PASS_EXTERNAL_READ_ONLY_MULTI_PROVIDER_OBSERVATION'
+          assert observation['observation']['provider_count']==2
+          assert observation['observation']['provider_agreement'] is True
+          assert observation['observation']['runtime_code_bytes']==22425
+          assert observation['observation']['observed_runtime_codehash']==expected_hash
+          assert {p['provider_id'] for p in observation['providers']}=={'publicnode','1rpc'}
+          assert len({p['observed_runtime_codehash'] for p in observation['providers']})==1
+          assert all(p['rpc_methods_used']==['eth_chainId','eth_getCode'] for p in observation['providers'])
+          assert observation['interpretation']['runtime_codehash_independently_approved'] is False
+          assert observation['interpretation']['runtime_codehash_verified_for_deployment'] is False
+          assert all(value is False for value in observation['hard_boundaries'].values())
+
           assert gates['state']=='HOLD_PREDEPLOYMENT'
+          assert gates['observation_state']['external_read_only_chain_readback_completed'] is True
+          assert gates['observation_state']['provider_count']==2
+          assert gates['observation_state']['provider_agreement'] is True
+          assert gates['observation_state']['observed_runtime_codehash']==expected_hash
+          assert gates['observation_state']['runtime_codehash_independently_approved'] is False
+          gate_states={g['code']:g['state'] for g in gates['gates']}
+          assert gate_states['EXTERNAL_READ_ONLY_CHAIN_ID_READBACK']=='PASS_OBSERVATION'
+          assert gate_states['ENTRYPOINT_RUNTIME_CODE_PRESENT']=='PASS_OBSERVATION'
+          assert gate_states['MULTI_PROVIDER_RUNTIME_CODE_AGREEMENT']=='PASS_OBSERVATION'
+          assert gate_states['ENTRYPOINT_RUNTIME_CODEHASH_INDEPENDENTLY_APPROVED']=='PENDING'
+          assert gate_states['TESTNET_BROADCAST_AUTHORIZATION']=='PENDING'
           assert gates['hard_boundaries']['rpc_write_methods_allowed']==[]
-          assert gates['hard_boundaries']['external_rpc_readback_completed'] is False
-          assert gates['hard_boundaries']['approved_runtime_codehash_present'] is False
           assert gates['hard_boundaries']['simulation_completed'] is False
           assert gates['hard_boundaries']['broadcast_enabled'] is False
           assert gates['hard_boundaries']['deploy_enabled'] is False
           assert gates['hard_boundaries']['money_movement_enabled'] is False
+
           assert readiness['state']=='HOLD_PREDEPLOYMENT'
-          assert readiness['chain']['external_read_only_readback_completed'] is False
+          assert readiness['chain']['external_read_only_readback_completed'] is True
+          assert readiness['chain']['external_read_only_provider_count']==2
+          assert readiness['chain']['external_read_only_provider_agreement'] is True
+          assert readiness['chain']['observed_runtime_codehash']==expected_hash
+          assert readiness['chain']['approved_runtime_codehash'] is None
+          assert readiness['chain']['runtime_codehash_independently_approved'] is False
           assert readiness['chain']['runtime_code_hash_verified'] is False
           assert readiness['deployment']['user_operation_state']=='DETERMINISTIC_UNSIGNED_INTENT_ONLY'
           assert readiness['deployment']['simulation_completed'] is False
@@ -79,7 +119,7 @@ jobs:
           assert readiness['deployment']['transaction_hash'] is None
           PY
 
-      - name: Scan smart-account profile for secret-shaped material
+      - name: Scan smart-account projection for secret-shaped material
         shell: bash
         run: |
           set -euo pipefail
@@ -91,6 +131,6 @@ jobs:
 
       - name: Record boundary
         run: |
-          echo "CONTROLLED_TEST: official v0.9 source/release data and the divergent tagged artifact are both pinned."
-          echo "CONTROLLED_TEST: chain preflight permits eth_chainId and eth_getCode only."
-          echo "No signer, UserOperation submission, deployment, broadcast, paymaster, custody, rights grant, or money movement is authorized."
+          echo "CONTROLLED_TEST: official source divergence and the two-provider read-only bytecode observation are pinned."
+          echo "The observed runtime codehash is not independently approved and is not deployment-ready."
+          echo "No signer, UserOperation submission, simulation, deployment, broadcast, paymaster, custody, rights grant, or money movement is authorized."

@@ -49,6 +49,8 @@ jobs:
           node --check developers/reference/chlom-wallet/passkey/test-webauthn-assertion-verifier.mjs
           node --check developers/reference/chlom-wallet/passkey/webauthn-registration-verifier.mjs
           node --check developers/reference/chlom-wallet/passkey/test-webauthn-registration-verifier.mjs
+          node --check developers/reference/chlom-wallet/passkey/browser-canary.mjs
+          node --check developers/reference/chlom-wallet/passkey/test-browser-canary.mjs
           node --check developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs
           node --check developers/reference/chlom-wallet/smart-account/test-user-operation-intent.mjs
           node --check developers/reference/chlom-wallet/smart-account/user-operation-hash-crosscheck.mjs
@@ -56,6 +58,7 @@ jobs:
           node --check developers/reference/chlom-wallet/smart-account/test-entrypoint-profile-verifier.mjs
           node --check developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs
           node --check developers/reference/chlom-wallet/smart-account/test-read-only-chain-code-preflight.mjs
+          node --check developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs
           node --check developers/reference/chlom-wallet/ui/unified-value-receipt.mjs
           node --check developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
           node --check developers/reference/chlom-wallet/ui/wallet-shell.mjs
@@ -77,10 +80,13 @@ jobs:
       - name: Run controlled WebAuthn registration tests
         run: node developers/reference/chlom-wallet/passkey/test-webauthn-registration-verifier.mjs
 
+      - name: Run browser-canary source contract tests
+        run: node developers/reference/chlom-wallet/passkey/test-browser-canary.mjs
+
       - name: Run deterministic ERC-4337 v0.9 unsigned-intent tests
         run: node developers/reference/chlom-wallet/smart-account/test-user-operation-intent.mjs
 
-      - name: Run ERC-4337 source-profile tests
+      - name: Run ERC-4337 source and observation profile tests
         run: node developers/reference/chlom-wallet/smart-account/test-entrypoint-profile-verifier.mjs
 
       - name: Run read-only chain-code preflight contract tests
@@ -100,7 +106,9 @@ jobs:
           python -m json.tool automation/chlom-wallet-settlement-agent.json >/dev/null
           python -m json.tool chlom/chlom-wallet-commercial-catalog.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/passkey/runtime-contract.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/passkey/runtime-readiness-audit.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/external-readback-observation.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json >/dev/null
 
@@ -139,24 +147,53 @@ jobs:
           fi
           python - <<'PY'
           import json
+          expected_hash='0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
+
           runtime=json.load(open('developers/reference/chlom-wallet/passkey/runtime-contract.json'))
           assert runtime['state']=='CONTROLLED_TEST_ACTIVE'
+          assert runtime['edge_function']['version']==3
           assert runtime['edge_function']['verify_jwt'] is True
           assert runtime['edge_function']['authenticated_browser_ceremony_state']=='NOT_YET_EXECUTED'
+          assert runtime['controlled_test_evidence']['runtime_readiness_audit']=='PASS_WEBAUTHN_RUNTIME_READINESS_AUDIT'
+          assert runtime['browser_canary']['contract_test']=='PASS_WEBAUTHN_BROWSER_CANARY_CONTRACT'
+          assert runtime['browser_canary']['execution_state']=='NOT_YET_EXECUTED'
           assert all(value is False for value in runtime['hard_boundaries'].values())
 
           profile=json.load(open('developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json'))
           assert profile['state']=='SOURCE_RELEASE_AND_TAG_ARTIFACT_DIVERGENCE_REGISTERED_CHAIN_CODE_UNVERIFIED'
           assert profile['verification']['release_and_artifact_addresses_match'] is False
-          assert profile['verification']['external_read_only_chain_readback_completed'] is False
+          assert profile['verification']['external_read_only_chain_readback_completed'] is True
+          assert profile['verification']['external_read_only_provider_count']==2
+          assert profile['verification']['external_read_only_provider_agreement'] is True
+          assert profile['verification']['observed_runtime_codehash']==expected_hash
+          assert profile['verification']['approved_runtime_codehash'] is None
+          assert profile['verification']['runtime_codehash_independently_approved'] is False
           assert profile['verification']['runtime_codehash_verified'] is False
           assert all(value is False for value in profile['hard_boundaries'].values())
 
+          observation=json.load(open('developers/reference/chlom-wallet/smart-account/external-readback-observation.json'))
+          assert observation['state']=='PASS_EXTERNAL_READ_ONLY_OBSERVATION_HOLD_INDEPENDENT_APPROVAL'
+          assert observation['observation']['provider_count']==2
+          assert observation['observation']['provider_agreement'] is True
+          assert observation['observation']['observed_runtime_codehash']==expected_hash
+          assert observation['interpretation']['runtime_codehash_independently_approved'] is False
+          assert observation['interpretation']['runtime_codehash_verified_for_deployment'] is False
+          assert all(value is False for value in observation['hard_boundaries'].values())
+
           gates=json.load(open('developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json'))
           assert gates['state']=='HOLD_PREDEPLOYMENT'
+          assert gates['observation_state']['external_read_only_chain_readback_completed'] is True
+          assert gates['observation_state']['provider_count']==2
+          assert gates['observation_state']['provider_agreement'] is True
+          assert gates['observation_state']['observed_runtime_codehash']==expected_hash
+          assert gates['observation_state']['runtime_codehash_independently_approved'] is False
+          gate_states={g['code']:g['state'] for g in gates['gates']}
+          assert gate_states['EXTERNAL_READ_ONLY_CHAIN_ID_READBACK']=='PASS_OBSERVATION'
+          assert gate_states['ENTRYPOINT_RUNTIME_CODE_PRESENT']=='PASS_OBSERVATION'
+          assert gate_states['MULTI_PROVIDER_RUNTIME_CODE_AGREEMENT']=='PASS_OBSERVATION'
+          assert gate_states['ENTRYPOINT_RUNTIME_CODEHASH_INDEPENDENTLY_APPROVED']=='PENDING'
+          assert gate_states['TESTNET_BROADCAST_AUTHORIZATION']=='PENDING'
           assert gates['hard_boundaries']['rpc_write_methods_allowed']==[]
-          assert gates['hard_boundaries']['external_rpc_readback_completed'] is False
-          assert gates['hard_boundaries']['approved_runtime_codehash_present'] is False
           assert gates['hard_boundaries']['simulation_completed'] is False
           assert gates['hard_boundaries']['broadcast_enabled'] is False
           assert gates['hard_boundaries']['deploy_enabled'] is False
@@ -164,7 +201,12 @@ jobs:
 
           readiness=json.load(open('developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json'))
           assert readiness['state']=='HOLD_PREDEPLOYMENT'
-          assert readiness['chain']['external_read_only_readback_completed'] is False
+          assert readiness['chain']['external_read_only_readback_completed'] is True
+          assert readiness['chain']['external_read_only_provider_count']==2
+          assert readiness['chain']['external_read_only_provider_agreement'] is True
+          assert readiness['chain']['observed_runtime_codehash']==expected_hash
+          assert readiness['chain']['approved_runtime_codehash'] is None
+          assert readiness['chain']['runtime_codehash_independently_approved'] is False
           assert readiness['chain']['runtime_code_hash_verified'] is False
           assert readiness['deployment']['user_operation_state']=='DETERMINISTIC_UNSIGNED_INTENT_ONLY'
           assert readiness['deployment']['simulation_completed'] is False
@@ -186,8 +228,8 @@ jobs:
       - name: Record boundary
         run: |
           echo "CONTROLLED_TEST: webhook tests use synthetic signing material and do not register a live Stripe endpoint."
-          echo "CONTROLLED_TEST: WebAuthn source tests use synthetic P-256 credentials; deployed runtime activation remains disabled."
-          echo "CONTROLLED_TEST: ERC-4337 v0.9 output is an unsigned deterministic intent; simulation and broadcast remain disabled."
-          echo "CONTROLLED_TEST: source release/artifact divergence is registered and chain runtime code remains externally unverified."
+          echo "CONTROLLED_TEST: WebAuthn runtime v3 and browser source contracts pass; the real browser ceremony remains unexecuted."
+          echo "CONTROLLED_TEST: the two-provider Sepolia bytecode observation is pinned; independent codehash approval remains open."
+          echo "CONTROLLED_TEST: ERC-4337 output is an unsigned deterministic intent; simulation and broadcast remain disabled."
           echo "CONTROLLED_TEST: contract-model fuzz is source-aligned state-model testing, not an audit."
           echo "CONTROLLED_TEST: no testnet/mainnet deployment, custody, money movement, or entitlement inference is certified by this workflow."

@@ -18,6 +18,11 @@ export const PINNED = Object.freeze({
   releaseAddress: '0x433709009b8330fda32311df1c2afa402ed8d009',
   artifactAddress: '0x4337084d9e255ff0702461cf8895ce9e3b5ff108',
   caip2: 'eip155:11155111',
+  observedRuntimeCodehash: '0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0',
+  runtimeCodeBytes: 22425,
+  providerCount: 2,
+  observationRunId: 32567112049,
+  observationHeadSha: '526bb49892dff48b7ae9a50c641186ca82aaab24',
 });
 
 const READ_ONLY_RPC_METHODS = new Set(['eth_chainId', 'eth_getCode']);
@@ -68,6 +73,7 @@ export function verifyPinnedProfile(profile) {
   const verification = profile?.verification ?? {};
   const boundaries = profile?.hard_boundaries ?? {};
 
+  expect(profile?.schema_version === '1.1.0', 'schema_version_mismatch');
   expect(profile?.profile_id === 'ct.wallet.erc4337.entrypoint.v0.9.0', 'profile_id_mismatch');
   expect(profile?.state === 'SOURCE_RELEASE_AND_TAG_ARTIFACT_DIVERGENCE_REGISTERED_CHAIN_CODE_UNVERIFIED', 'state_mismatch');
   expect(source.repository === PINNED.repository, 'repository_mismatch');
@@ -83,10 +89,18 @@ export function verifyPinnedProfile(profile) {
   expect(PINNED.releaseAddress !== PINNED.artifactAddress, 'source_divergence_missing');
   expect(profile?.target?.caip2 === PINNED.caip2, 'chain_id_mismatch');
   expect(verification.release_and_artifact_addresses_match === false, 'false_source_reconciliation_claim');
-  expect(verification.external_read_only_chain_readback_completed === false, 'false_chain_readback_claim');
-  expect(verification.approved_runtime_codehash === null, 'approved_codehash_must_be_null');
-  expect(verification.observed_runtime_codehash === null, 'observed_codehash_must_be_null');
-  expect(verification.runtime_codehash_verified === false, 'false_runtime_codehash_claim');
+  expect(verification.external_read_only_chain_readback_completed === true, 'external_readback_missing');
+  expect(verification.external_read_only_provider_count === PINNED.providerCount, 'provider_count_mismatch');
+  expect(verification.external_read_only_provider_agreement === true, 'provider_agreement_missing');
+  expect(verification.runtime_code_present === true, 'runtime_code_presence_missing');
+  expect(verification.runtime_code_bytes === PINNED.runtimeCodeBytes, 'runtime_code_size_mismatch');
+  expect(verification.observed_runtime_codehash === PINNED.observedRuntimeCodehash, 'observed_runtime_codehash_mismatch');
+  expect(verification.approved_runtime_codehash === null, 'approved_codehash_must_remain_null');
+  expect(verification.runtime_codehash_independently_approved === false, 'false_independent_approval_claim');
+  expect(verification.runtime_codehash_verified === false, 'false_runtime_codehash_verification_claim');
+  expect(verification.observation_workflow_run_id === PINNED.observationRunId, 'observation_run_mismatch');
+  expect(verification.observation_head_sha === PINNED.observationHeadSha, 'observation_head_mismatch');
+  expect(verification.disposition === 'HOLD_RUNTIME_CODEHASH_INDEPENDENT_APPROVAL_REQUIRED', 'disposition_mismatch');
   expect(Array.isArray(profile.allowed_rpc_methods) && profile.allowed_rpc_methods.length === 2, 'rpc_allowlist_shape');
   expect(profile.allowed_rpc_methods.every((method) => READ_ONLY_RPC_METHODS.has(method)), 'rpc_allowlist_mismatch');
   expect(Object.values(boundaries).every((value) => value === false), 'hard_boundary_armed');
@@ -98,7 +112,11 @@ export function verifyPinnedProfile(profile) {
     release_address: PINNED.releaseAddress,
     artifact_address: PINNED.artifactAddress,
     source_divergence_registered: true,
-    chain_code_verified: false,
+    external_read_only_chain_readback_completed: true,
+    provider_agreement: true,
+    observed_runtime_codehash: PINNED.observedRuntimeCodehash,
+    runtime_codehash_independently_approved: false,
+    runtime_codehash_verified: false,
     testnet_broadcast_authorized: false,
   };
 }
@@ -109,5 +127,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error(JSON.stringify(result));
     process.exit(1);
   }
-  console.log(JSON.stringify({ result: 'PASS_ERC4337_V09_SOURCE_PROFILE', ...result }));
+  console.log(JSON.stringify({ result: 'PASS_ERC4337_V09_SOURCE_AND_OBSERVATION_PROFILE', ...result }));
 }

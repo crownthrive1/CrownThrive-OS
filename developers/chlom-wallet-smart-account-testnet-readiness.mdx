@@ -1,7 +1,7 @@
 ---
 title: "CHLOM Wallet Smart-Account Testnet Readiness"
 sidebarTitle: "Smart-Account Readiness"
-description: "Controlled-test readiness contract for CHLOM Wallet ERC-4337 v0.9 source pinning, read-only Sepolia code verification, WebAuthn gates and non-broadcast deployment preparation."
+description: "Controlled-test readiness contract for CHLOM Wallet ERC-4337 v0.9 source lineage, multi-provider Sepolia bytecode observation, WebAuthn gates and non-broadcast deployment preparation."
 icon: "diagram-project"
 ---
 
@@ -9,7 +9,8 @@ icon: "diagram-project"
 
 **State:** `HOLD_PREDEPLOYMENT`  
 **Target chain:** Sepolia / `eip155:11155111`  
-**EntryPoint chain code:** unverified  
+**External bytecode observation:** complete through two providers  
+**Runtime codehash independent approval:** pending  
 **Simulation:** not run  
 **Broadcast:** disabled  
 **Custody / money movement:** disabled
@@ -35,7 +36,7 @@ entrypoint_source_blob_sha1: 3b4feb6ec0ed1cf41310b24858c81f5012572af9
 deployment_artifact_blob_sha1: 8a1309dedf556eda7f64e7922e57b33c2581bb9e
 ```
 
-The machine profile is:
+Machine profile:
 
 `developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json`
 
@@ -47,29 +48,54 @@ The deployment artifact stored at the same `v0.9.0` tag identifies:
 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108
 ```
 
-That is the earlier v0.8 address. CHLOM therefore records both primary-source observations rather than silently selecting one as chain truth:
+That is the earlier v0.8 address. CHLOM records both primary-source observations rather than silently selecting one as chain truth:
 
 ```yaml
 state: SOURCE_RELEASE_AND_TAG_ARTIFACT_DIVERGENCE_REGISTERED_CHAIN_CODE_UNVERIFIED
 release_and_artifact_addresses_match: false
-external_read_only_chain_readback_completed: false
-approved_runtime_codehash: null
-runtime_codehash_verified: false
-disposition: HOLD_SOURCE_DIVERGENCE_AND_CHAIN_CODE_UNVERIFIED
+disposition: HOLD
 ```
 
-The release claim is a source fact. The tagged artifact is a source fact. Neither is proof of current Sepolia runtime bytecode.
+The release claim is a source fact. The tagged artifact is a source fact. Neither, by itself, proves current Sepolia runtime bytecode.
 
-## Read-only chain-code contract
+## Multi-provider external readback
 
-The preflight implementation permits exactly two JSON-RPC methods:
+A fixed-endpoint GitHub Actions observation queried the release candidate through two public Sepolia RPC providers:
+
+```yaml
+result: PASS_EXTERNAL_READ_ONLY_MULTI_PROVIDER_OBSERVATION
+observed_at: '2026-08-22T10:15:02Z'
+workflow_run_id: 32567112049
+repository_head_sha: 526bb49892dff48b7ae9a50c641186ca82aaab24
+providers:
+  - publicnode
+  - 1rpc
+provider_agreement: true
+chain_id_hex: '0xaa36a7'
+entrypoint_address: '0x433709009B8330FDa32311DF1C2AFA402eD8D009'
+runtime_code_bytes: 22425
+observed_runtime_codehash: '0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
+evidence_digest_sha256: 171b0e7e15039f28954fa41df75fbd2f044c6a15c3a204630bfd43ddf78b7624
+```
+
+Machine evidence:
+
+`developers/reference/chlom-wallet/smart-account/external-readback-observation.json`
+
+The observation used only:
 
 ```text
 eth_chainId
 eth_getCode
 ```
 
-It rejects:
+No signer, private key, UserOperation, bundler, simulation, deployment or transaction method was used.
+
+Provider agreement closes the external chain/readback and runtime-code-present gates. It does **not** independently approve the runtime codehash. The v0.9 release explicitly instructs implementers to verify the deployment address and code hash against the official security audit report before updating. That audit/codehash reconciliation is now the next EntryPoint-specific gate.
+
+## Read-only chain-code contract
+
+The preflight implementation rejects:
 
 - non-HTTPS external RPC URLs;
 - embedded URL credentials;
@@ -79,7 +105,7 @@ It rejects:
 - absent approved runtime codehash;
 - runtime-codehash mismatch.
 
-The contract test runs against an isolated local mock RPC and passes:
+Its isolated contract test passes:
 
 ```yaml
 result: PASS_READ_ONLY_CHAIN_CODE_PREFLIGHT_CONTRACT
@@ -93,29 +119,16 @@ testnet_broadcast: false
 money_movement: false
 ```
 
-That PASS validates the preflight behavior. It is not Sepolia chain evidence.
-
-## Manual Sepolia readback workflow
-
-A manual workflow exists at:
-
-`.github/workflows/chlom-wallet-sepolia-readonly-codehash.yml`
-
-It requires:
-
-- the restricted `CHLOM_SEPOLIA_RPC_URL` environment secret;
-- a governed expected runtime codehash supplied at dispatch;
-- exact Sepolia chain ID `0xaa36a7`;
-- exact candidate EntryPoint address.
-
-The workflow contains no signer, private key, UserOperation, paymaster, account deployment or broadcast step. A successful run would establish read-only chain/address/codehash compatibility only. It would not authorize testnet deployment.
+The external observation and the local contract test have different purposes: one records current public-chain evidence; the other validates fail-closed preflight behavior.
 
 ## Current candidate stack
 
 ```text
 CHLOM stable wallet ID
         ↓
-WebAuthn/passkey credential and recovery policy
+WebAuthn/passkey runtime v3 — CONTROLLED TEST
+        ↓
+Authenticated browser ceremony — NOT YET EXECUTED
         ↓
 Passkey validator — NOT SELECTED
         ↓
@@ -127,7 +140,9 @@ ERC-7579 modular interface candidate
         ↓
 ERC-4337 v0.9 source profile
         ↓
-Read-only Sepolia verification — PENDING
+Sepolia bytecode observed through two providers
+        ↓
+Official audit/codehash approval — PENDING
 ```
 
 ## Unsigned transaction-intent evidence
@@ -146,34 +161,37 @@ money_movement: false
 
 The intent proves hash construction. It does not prove account validation, factory behavior, bundler acceptance, gas sufficiency or transaction success.
 
-## Hard predeployment gates
+## Remaining hard predeployment gates
 
 The machine gate contract is:
 
 `developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json`
 
-It requires all of the following before a separate broadcast workflow may exist:
+The following remain open:
 
-1. External read-only chain ID and runtime-code receipt.
-2. Independently approved EntryPoint runtime codehash.
+1. Official v0.9 audit/codehash artifact pinning.
+2. Independent approval of the observed runtime codehash.
 3. Reviewed account implementation.
 4. Reviewed factory or deterministic deployment pattern.
 5. Reviewed passkey validator.
-6. Certified recovery policy.
-7. Reviewed call data and init code.
-8. Bundler compatibility and UserOperation simulation.
-9. Independent security review.
-10. Testnet signer and recovery authority receipt.
-11. Rollback and recovery drill.
-12. Separate governed testnet broadcast authorization.
+6. Authenticated browser WebAuthn canary.
+7. Certified production recovery and attestation policy.
+8. Reviewed call data and init code.
+9. Bundler compatibility and UserOperation simulation.
+10. Independent wallet/account security review.
+11. Testnet signer and recovery authority receipt.
+12. Rollback and recovery drill.
+13. Separate governed testnet broadcast authorization.
 
-Every required gate is snapshot-bound. Source drift, chain mismatch, stale evidence, codehash drift, recovery defects or authority withdrawal returns the profile to `HOLD_PREDEPLOYMENT`.
+Every required gate is snapshot-bound. Source drift, provider disagreement, chain mismatch, stale evidence, codehash drift, recovery defects or authority withdrawal returns the profile to `HOLD_PREDEPLOYMENT`.
 
 ## References
 
 - ERC-4337 v0.9 release: `https://github.com/eth-infinitism/account-abstraction/releases/tag/v0.9.0`
 - Tagged deployment artifact: `https://github.com/eth-infinitism/account-abstraction/blob/v0.9.0/deployments/ethereum/EntryPoint.json`
 - Tagged EntryPoint source: `https://github.com/eth-infinitism/account-abstraction/blob/v0.9.0/contracts/core/EntryPoint.sol`
+- PublicNode Sepolia: `https://ethereum-sepolia-rpc.publicnode.com/`
+- 1RPC network documentation: `https://docs.1rpc.io/using-the-web3-api/networks`
 - ERC-7579: `https://eips.ethereum.org/EIPS/eip-7579`
 - WebAuthn Level 3: `https://www.w3.org/TR/webauthn-3/`
 

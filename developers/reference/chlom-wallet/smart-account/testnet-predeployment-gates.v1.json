@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "gate_set_id": "ct.wallet.testnet-predeployment.v1",
   "state": "HOLD_PREDEPLOYMENT",
   "phase": "2.99",
@@ -10,11 +10,22 @@
     "entrypoint_profile_id": "ct.wallet.erc4337.entrypoint.v0.9.0",
     "candidate_entrypoint_address": "0x433709009B8330FDa32311DF1C2AFA402eD8D009"
   },
+  "observation_state": {
+    "external_read_only_chain_readback_completed": true,
+    "provider_count": 2,
+    "provider_agreement": true,
+    "runtime_code_present": true,
+    "runtime_code_bytes": 22425,
+    "observed_runtime_codehash": "0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0",
+    "runtime_codehash_independently_approved": false,
+    "observation_contract": "developers/reference/chlom-wallet/smart-account/external-readback-observation.json"
+  },
   "gates": [
     { "code": "OFFICIAL_RELEASE_AND_TAG_ARTIFACT_PINNED", "required": true, "state": "PASS_CONTROLLED_TEST" },
     { "code": "SOURCE_DIVERGENCE_REGISTERED", "required": true, "state": "PASS_CONTROLLED_TEST" },
-    { "code": "EXTERNAL_READ_ONLY_CHAIN_ID_READBACK", "required": true, "state": "PENDING" },
-    { "code": "ENTRYPOINT_RUNTIME_CODE_PRESENT", "required": true, "state": "PENDING" },
+    { "code": "EXTERNAL_READ_ONLY_CHAIN_ID_READBACK", "required": true, "state": "PASS_OBSERVATION" },
+    { "code": "ENTRYPOINT_RUNTIME_CODE_PRESENT", "required": true, "state": "PASS_OBSERVATION" },
+    { "code": "MULTI_PROVIDER_RUNTIME_CODE_AGREEMENT", "required": true, "state": "PASS_OBSERVATION" },
     { "code": "ENTRYPOINT_RUNTIME_CODEHASH_INDEPENDENTLY_APPROVED", "required": true, "state": "PENDING" },
     { "code": "ACCOUNT_IMPLEMENTATION_SELECTED", "required": true, "state": "PENDING" },
     { "code": "FACTORY_OR_DETERMINISTIC_DEPLOYMENT_SELECTED", "required": true, "state": "PENDING" },
@@ -31,8 +42,6 @@
   "hard_boundaries": {
     "rpc_read_methods_allowed": ["eth_chainId", "eth_getCode"],
     "rpc_write_methods_allowed": [],
-    "external_rpc_readback_completed": false,
-    "approved_runtime_codehash_present": false,
     "account_implementation_selected": false,
     "factory_selected": false,
     "funded_signer_allowed": false,
@@ -45,8 +54,8 @@
     "custody_enabled": false,
     "money_movement_enabled": false
   },
-  "promotion_rule": "Every required gate must be exact-head PASS with independent authority evidence before a separately authorized testnet-broadcast workflow may exist.",
-  "rollback_rule": "Any source drift, chain-ID mismatch, runtime-codehash mismatch, stale receipt, signer ambiguity, recovery defect, simulation divergence or governance withdrawal returns this gate set to HOLD_PREDEPLOYMENT.",
+  "promotion_rule": "PASS_OBSERVATION closes only the external readback and provider-agreement gates. Every remaining required gate must be exact-head PASS with independent authority evidence before a separately authorized testnet-broadcast workflow may exist.",
+  "rollback_rule": "Any source drift, chain-ID mismatch, provider disagreement, runtime-codehash drift, stale receipt, signer ambiguity, recovery defect, simulation divergence or governance withdrawal returns this gate set to HOLD_PREDEPLOYMENT.",
   "vote_effect": "none",
   "phase_effect": "none"
 }

@@ -26,44 +26,59 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Verify runtime and syntax
+      - name: Verify runtime, syntax and pinned evidence JSON
         run: |
           node --version
           node --check developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs
           node --check developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs
           node --check developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs
+          python -m json.tool developers/reference/chlom-wallet/smart-account/external-readback-observation.json >/dev/null
 
       - name: Execute fixed-endpoint read-only observation
         run: node developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs | tee /tmp/chlom-wallet-sepolia-observation.json
 
-      - name: Validate observation boundary
+      - name: Validate live observation and pinned evidence boundary
         shell: bash
         run: |
           set -euo pipefail
           python -m json.tool /tmp/chlom-wallet-sepolia-observation.json >/dev/null
           python - <<'PY'
           import json
-          result=json.load(open('/tmp/chlom-wallet-sepolia-observation.json'))
-          assert result['result']=='PASS_EXTERNAL_READ_ONLY_MULTI_PROVIDER_OBSERVATION'
-          assert result['target']['chain_id_caip2']=='eip155:11155111'
-          assert result['target']['chain_id_hex']=='0xaa36a7'
-          assert result['target']['entrypoint_address']=='0x433709009B8330FDa32311DF1C2AFA402eD8D009'
-          assert len(result['providers'])==2
-          assert {p['provider_id'] for p in result['providers']}=={'publicnode','1rpc'}
-          assert all(p['rpc_methods_used']==['eth_chainId','eth_getCode'] for p in result['providers'])
-          assert result['provider_agreement'] is True
-          assert len({p['observed_runtime_codehash'] for p in result['providers']})==1
-          assert len({p['runtime_code_bytes'] for p in result['providers']})==1
-          assert result['runtime_codehash_independently_approved'] is False
-          assert result['source_profile_promoted'] is False
+          live=json.load(open('/tmp/chlom-wallet-sepolia-observation.json'))
+          pinned=json.load(open('developers/reference/chlom-wallet/smart-account/external-readback-observation.json'))
+          assert live['result']=='PASS_EXTERNAL_READ_ONLY_MULTI_PROVIDER_OBSERVATION'
+          assert live['target']['chain_id_caip2']=='eip155:11155111'
+          assert live['target']['chain_id_hex']=='0xaa36a7'
+          assert live['target']['entrypoint_address']=='0x433709009B8330FDa32311DF1C2AFA402eD8D009'
+          assert len(live['providers'])==2
+          assert {p['provider_id'] for p in live['providers']}=={'publicnode','1rpc'}
+          assert all(p['rpc_methods_used']==['eth_chainId','eth_getCode'] for p in live['providers'])
+          assert live['provider_agreement'] is True
+          assert len({p['observed_runtime_codehash'] for p in live['providers']})==1
+          assert len({p['runtime_code_bytes'] for p in live['providers']})==1
+          assert live['runtime_codehash_independently_approved'] is False
+          assert live['source_profile_promoted'] is False
           for key in [
             'account_implementation_selected','factory_selected','signer_used','user_operation_created',
             'simulation_completed','broadcast_performed','deployment_performed','custody','money_movement','phase_advancement'
           ]:
-            assert result[key] is False, (key,result[key])
+            assert live[key] is False, (key,live[key])
+
+          assert pinned['state']=='PASS_EXTERNAL_READ_ONLY_OBSERVATION_HOLD_INDEPENDENT_APPROVAL'
+          assert pinned['target']==live['target'] | {'network_name':'Sepolia'}
+          assert pinned['observation']['provider_count']==2
+          assert pinned['observation']['provider_agreement'] is True
+          assert pinned['observation']['runtime_code_bytes']==live['runtime_code_bytes']
+          assert pinned['observation']['observed_runtime_codehash']==live['observed_runtime_codehash']
+          assert {p['provider_id'] for p in pinned['providers']}=={'publicnode','1rpc'}
+          assert all(p['observed_runtime_codehash']==live['observed_runtime_codehash'] for p in pinned['providers'])
+          assert all(p['runtime_code_bytes']==live['runtime_code_bytes'] for p in pinned['providers'])
+          assert pinned['interpretation']['runtime_codehash_independently_approved'] is False
+          assert pinned['interpretation']['runtime_codehash_verified_for_deployment'] is False
+          assert all(value is False for value in pinned['hard_boundaries'].values())
           PY
 
-      - name: Enforce fixed endpoint and RPC-method allowlist
+      - name: Enforce fixed endpoints and RPC-method allowlist
         shell: bash
         run: |
           set -euo pipefail
