@@ -13,11 +13,21 @@ assert m['d3_human_reserved'] is True and m['no_silent_delete'] is True
 assert m['local_monthly_request_budget_semantics']['-1']=='unlimited_local_ceiling'
 assert m['local_monthly_request_budget_semantics']['0']=='disabled'
 assert m['local_monthly_request_budget_semantics']['provider_throttles_and_billing_still_apply'] is True
-assert len(m['algorithms'])==6
+assert len(m['algorithms'])==9
 assert all(a['implementation']=='RESTRICTED_VAULT' for a in m['algorithms'])
 assert any(a['id']=='ct.alg.gen7.gds' and a.get('d3_auto') is False for a in m['algorithms'])
-assert [a['id'] for a in m['support_agents']]==['ct.gen7.agent-q','ct.gen7.agent-r','ct.gen7.agent-t']
+assert any(a['id']=='ct.alg.gen7.pcas' and a.get('auto_stop') is False for a in m['algorithms'])
+assert [a['id'] for a in m['support_agents']]==['ct.gen7.agent-q','ct.gen7.agent-r','ct.gen7.agent-t','ct.gen7.agent-u','ct.gen7.agent-red','ct.gen7.agent-blue','ct.gen7.agent-purple']
 assert all(not a['vote_eligible'] and not a['scheduler_slot'] and a['authority_ceiling']=='D2' for a in m['support_agents'])
+assert m['security_lab']['external_network'] is False
+assert m['security_lab']['production_writes'] is False
+assert m['security_lab']['public_vulnerability_detail'] is False
+assert m['security_lab']['originator_self_verification'] is False
+assert m['adserver_billing']['hard_usage_cap'] is False
+assert m['adserver_billing']['allow_overage'] is True
+assert m['adserver_billing']['local_auto_stop'] is False
+assert m['mailgun']['account_api_read_verified'] is True
+assert m['mailgun']['raw_credentials_public'] is False
 assert m['commercialization']['checkout_enabled'] is False
 assert m['commercialization']['stripe_objects_created'] is False
 assert m['commercialization']['protected_kernel_transfer'] is False
