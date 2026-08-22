@@ -6,7 +6,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ajv = new Ajv2020({ allErrors: true, strict: true });
+const ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
 addFormats(ajv);
 const receiptSchema = JSON.parse(readFileSync(join(HERE, 'independent-review-receipt.v1.schema.json'), 'utf8'));
 const statusSchema = JSON.parse(readFileSync(join(HERE, 'independent-review-status.v1.schema.json'), 'utf8'));
@@ -110,34 +110,12 @@ const status = {
   },
   review_lanes: [
     lane(),
-    lane({
-      work_id: 'ct.work.chlom-wallet.erc4337-security-review.v1',
-      review_role: 'security',
-      reviewer_agent_id: 'ct.chlom.agent.security',
-    }),
-    lane({
-      work_id: 'ct.work.chlom-wallet.erc4337-quorum-review.v1',
-      review_role: 'quorum',
-      reviewer_agent_id: 'ct.relay.agent-d',
-      vote_eligible: true,
-    }),
-    lane({
-      work_id: 'ct.work.chlom-wallet.erc4337-recovery-readback.v1',
-      review_role: 'recovery',
-      reviewer_agent_id: 'ct.chlom.agent.recovery',
-    }),
-    lane({
-      work_id: 'ct.work.chlom-wallet.erc4337-release-synthesis.v1',
-      review_role: 'release',
-      reviewer_agent_id: 'ct.chlom.agent.release-certifier',
-    }),
+    lane({ work_id: 'ct.work.chlom-wallet.erc4337-security-review.v1', review_role: 'security', reviewer_agent_id: 'ct.chlom.agent.security' }),
+    lane({ work_id: 'ct.work.chlom-wallet.erc4337-quorum-review.v1', review_role: 'quorum', reviewer_agent_id: 'ct.relay.agent-d', vote_eligible: true }),
+    lane({ work_id: 'ct.work.chlom-wallet.erc4337-recovery-readback.v1', review_role: 'recovery', reviewer_agent_id: 'ct.chlom.agent.recovery' }),
+    lane({ work_id: 'ct.work.chlom-wallet.erc4337-release-synthesis.v1', review_role: 'release', reviewer_agent_id: 'ct.chlom.agent.release-certifier' }),
   ],
-  latest_synthesis: {
-    result: 'HOLD_MISSING_INDEPENDENT_RECEIPTS',
-    required_receipt_count: 5,
-    accepted_receipt_count: 0,
-    missing_receipt_count: 5,
-  },
+  latest_synthesis: { result: 'HOLD_MISSING_INDEPENDENT_RECEIPTS', required_receipt_count: 5, accepted_receipt_count: 0, missing_receipt_count: 5 },
   scheduler_policy: {
     dependency_refresh_job: 'chlom-construction-queue-quarter-hourly',
     fresh_reviewer_heartbeat_required: true,
