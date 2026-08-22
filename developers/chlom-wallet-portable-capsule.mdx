@@ -1,0 +1,120 @@
+---
+title: "CHLOM Portable Wallet Capsule Contract"
+sidebarTitle: "Portable Wallet Capsules"
+description: "Developer contract for provider-neutral wallet continuity capsules that preserve CHLOM wallet identity and event-chain commitments without exporting credentials or executing imports."
+icon: "suitcase"
+---
+
+# CHLOM portable wallet capsule contract
+
+**Primitive:** `PWC v1`  
+**Schema:** `1.0.0`  
+**Import state:** `HOLD`  
+**Provider mutation:** disabled
+
+The CHLOM Portable Wallet Capsule separates CrownThrive's durable wallet identity from replaceable payment, chain and account providers.
+
+## Capsule contents
+
+A capsule commits to:
+
+- stable CHLOM wallet ID;
+- issuer DID reference;
+- source environment;
+- provider-neutral alias records;
+- ordered wallet event commitments;
+- event-chain head;
+- entitlement commitments;
+- optional HARP proof-capsule reference.
+
+Provider aliases identify an adapter contract, not a provider account secret:
+
+```json
+{
+  "alias_id": "stripe-fiat",
+  "provider_class": "fiat_payment_processor",
+  "adapter_contract": "ct.adapter.stripe.wallet.v1",
+  "state": "active"
+}
+```
+
+## Event-chain validation
+
+Events are sorted by `event_seq` and must satisfy:
+
+- sequence begins at `1`;
+- there are no gaps;
+- each `previous_chain_hash` equals the prior event's `chain_hash`;
+- each event hash equals `sha256(previous-or-GENESIS + '|' + payload_digest)`;
+- every non-null provider alias exists in the capsule alias table.
+
+The capsule stores commitments, not raw webhook bodies or provider object references.
+
+## Credential-free export
+
+The schema has no field for:
+
+- API keys;
+- webhook signing secrets;
+- private keys;
+- seed phrases;
+- raw provider references;
+- authentication tokens;
+- raw evidence bodies;
+- idempotency secrets.
+
+Concrete secret-shaped strings also fail validation.
+
+## Capsule output boundary
+
+```json
+{
+  "source_payload_body_included": false,
+  "provider_credentials_included": false,
+  "import_execution_state": "HOLD",
+  "provider_write": false,
+  "money_movement": false,
+  "rights_granted": false
+}
+```
+
+The capsule digest commits to the entire normalized capsule.
+
+## Provider remap plan
+
+A verified capsule can produce a remap plan from one governed adapter reference to another. The current plan supports only `controlled_test` and `staging_candidate` targets and always returns:
+
+```text
+REMAP_PLAN_HOLD
+```
+
+The plan preserves the stable wallet ID and event chain, copies no credentials and performs no provider write.
+
+## Fixed vector
+
+The controlled vector contains three chained wallet events, one provider alias and one held entitlement commitment. Its capsule digest is:
+
+```text
+9159d489d7dad6b6e1c7a93875e14ac51f0e6f7fa1d9adfb0d696efc9b6f5258
+```
+
+The vector also binds the exact remap-plan output for a synthetic alternate fiat adapter.
+
+## What portability does not prove
+
+A valid capsule does not prove that:
+
+- the destination provider supports equivalent features;
+- a provider account is authorized;
+- customer consent has been obtained;
+- legal/data-residency requirements are satisfied;
+- balances or funds were transferred;
+- external provider objects were recreated;
+- rights remain effective after migration;
+- the destination chain/account code is trustworthy.
+
+These remain separate governed import and certification gates.
+
+## Promotion gates
+
+A real provider exit requires dual-read comparison, export completeness, destination adapter certification, customer/tenant authorization, credential re-provisioning through secure channels, replay testing, reconciliation of in-flight events, rollback evidence and a final independent disposition. The portable capsule is the continuity substrate for that process, not the process's automatic approval.
