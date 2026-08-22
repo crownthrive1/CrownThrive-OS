@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/commercial-release-package.v1.json",
+  "title": "CrownThrive Commercial Release Package v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sku",
+    "title",
+    "product_type",
+    "asset_version",
+    "asset_sha256",
+    "platform",
+    "platform_id",
+    "surface_id",
+    "provider_url",
+    "credit_only",
+    "checkout_mode",
+    "checkout_state",
+    "stripe_objects_created",
+    "governed_acceptance_state",
+    "required_dimensions",
+    "workflow",
+    "gates",
+    "package_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "sku": {"type": "string", "pattern": "^CT-(LAUNCH|READY|PROCURE)-[A-Z0-9-]+$"},
+    "title": {"type": "string", "minLength": 1},
+    "product_type": {"type": "string", "minLength": 1},
+    "asset_version": {"type": "string", "minLength": 1},
+    "asset_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "asset_byte_size": {"type": "integer", "minimum": 1},
+    "platform": {"enum": ["launch", "ready", "procure"]},
+    "platform_id": {"type": "string", "minLength": 1},
+    "surface_id": {"type": "string", "minLength": 1},
+    "provider_url": {"type": "string", "format": "uri"},
+    "preferred_custom_domain": {"type": ["string", "null"]},
+    "credit_only": {"const": true},
+    "checkout_mode": {"const": "credits_only"},
+    "checkout_state": {"const": "closed"},
+    "stripe_objects_created": {"const": false},
+    "governed_acceptance_state": {"const": "waiting_for_all_certifications_then_sovereign_vote"},
+    "required_dimensions": {"type": "array", "minItems": 9, "uniqueItems": true, "items": {"type": "string"}},
+    "workflow": {
+      "type": "object",
+      "required": ["originating_agent", "independent_certifier", "autopublish_policy", "publisher_adapter", "direct_sites_provider_write", "read_after_write_required", "rollback_required"],
+      "properties": {
+        "direct_sites_provider_write": {"const": false},
+        "read_after_write_required": {"const": true},
+        "rollback_required": {"const": true}
+      },
+      "additionalProperties": true
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 9,
+      "items": {
+        "type": "object",
+        "required": ["dimension_key", "sequence", "state", "reason_codes", "independent"],
+        "properties": {
+          "dimension_key": {"type": "string"},
+          "sequence": {"type": "integer", "minimum": 1},
+          "state": {"enum": ["pending", "pass", "hold", "fail", "not_applicable"]},
+          "reason_codes": {"type": "array", "items": {"type": "string"}},
+          "independent": {"type": "boolean"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "package_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
