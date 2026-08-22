@@ -1,7 +1,7 @@
 ---
 title: "CHLOM Wallet Phase B Evidence"
 sidebarTitle: "Wallet Phase B"
-description: "Controlled-test evidence for CHLOM Wallet Stripe webhook verification, entitlement separation, Unified Value Receipt integrity, passkey/smart-account intents and provider-independent identity."
+description: "Controlled-test evidence for CHLOM Wallet Stripe webhook verification, entitlement separation, Unified Value Receipt integrity, passkey/smart-account intents, provider exit and commercial canaries."
 icon: "flask"
 ---
 
@@ -49,6 +49,42 @@ result: PASS_ENTITLEMENT_UVR_CANARY
 
 This is the intended CHLOM invariant: **provider evidence can participate in an entitlement decision, but it cannot be the entitlement decision by itself**.
 
+## Provider-exit drill
+
+A synthetic PAER drill tested provider portability without contacting or changing an external provider:
+
+```yaml
+result: PASS_PROVIDER_EXIT_DRILL
+paer_score: 99.25
+paer_disposition: EXIT_READY_TEST
+wallet_stable_id_preserved: true
+event_replay_preserved: true
+inflight_state: HOLD
+external_provider_calls: 0
+provider_write_performed: false
+```
+
+The drill demonstrates the intended identity model: the CrownThrive wallet ID and append-only lineage survive an adapter-change simulation while in-flight work remains held. It does not certify a real Stripe migration or alternate provider.
+
+## Controlled commercial canary
+
+A full synthetic offer-to-receipt path now runs against an internal `price_review` offer candidate without creating a Stripe Product, Price, Checkout Session or live payment:
+
+```yaml
+result: PASS_COMMERCIAL_CANARY
+provider_event_state: RECORDED_TEST
+payment_without_rights: HOLD
+payment_with_rights: ALLOW_TEST
+unified_value_receipt_created: true
+synthetic_entitlement_final_state: revoked
+stripe_object_created: false
+live_provider_event: false
+live_checkout: false
+money_movement: false
+```
+
+This test proves the controlled integration order across candidate offer, signed provider evidence, CHLOM event, independent rights decision and UVR. It does not authorize the candidate price or live commerce.
+
 ## Runtime controls
 
 The restricted runtime currently carries explicit controls:
@@ -75,6 +111,12 @@ Phase B adds deterministic reference code for:
 - ERC-4337/ERC-7579 smart-account registration intents with deploy/broadcast disabled;
 - Unified Value Receipt presentation invariants.
 
+A separate Solidity compile workflow pins compiler package version `0.8.36` and compiles the four no-value reference contracts. Passing compilation will prove syntax/toolchain compatibility only; it is not an audit or deployment approval.
+
+## Pricing research
+
+Public 2026 wallet-infrastructure benchmarks reinforce that wallet creation itself is becoming inexpensive. The internal CHLOM Wallet pricing candidates are therefore in `price_review`, with premium positioning tied to rights, policy, proof, impact and provider portability rather than wallet creation alone. The independent CrownThrive Price Certifier remains pending before any candidate becomes an effective offer.
+
 ## Provider continuity finding
 
 The live CrownThrive Stripe account currently contains multiple enabled and retired webhook endpoints for other CrownThrive properties. The previous Supabase institutional observer endpoint is disabled/retired. No new CHLOM Wallet live Stripe endpoint has been registered by this packet.
@@ -85,15 +127,15 @@ The restricted credential-continuity registry also keeps the generic Stripe serv
 
 - live Stripe webhook endpoint registration and live signing-secret continuity;
 - complete out-of-order/refund/dispute/subscription-change canaries;
-- customer-facing Wallet/UVR application shell;
+- customer-facing Wallet/UVR application shell beyond the current UI-agnostic presentation model;
 - production passkey enrollment/recovery;
 - smart-account implementation selection and audit;
-- pinned Solidity compiler and reproducible build evidence;
+- successful exact-head Solidity compile readback and reproducible build packaging;
 - fuzz/invariant testing beyond source-level guards;
 - testnet deployment/anchor receipt with approved signer path;
-- provider-exit drill with dual-read/replay evidence;
+- real provider-exit dual-read/replay canary;
 - independent pricing certification;
 - tax/legal/security/rights review for the final commercial transaction model;
-- governed commercial canary and eventual checkout activation.
+- live governed checkout canary and eventual commerce activation.
 
 No item above is considered complete merely because its interface or documentation now exists.
