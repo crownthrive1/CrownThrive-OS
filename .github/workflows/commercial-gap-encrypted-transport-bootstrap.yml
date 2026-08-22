@@ -8,7 +8,7 @@ on:
       - ".github/workflows/commercial-gap-encrypted-transport-bootstrap.yml"
 
 env:
-  TRANSPORT_BOOTSTRAP_VERSION: "3"
+  TRANSPORT_BOOTSTRAP_VERSION: "4"
 
 permissions:
   contents: write
@@ -37,7 +37,7 @@ jobs:
           echo "token=${ID_TOKEN}" >> "${GITHUB_OUTPUT}"
           echo "::add-mask::${ID_TOKEN}"
 
-      - name: Create one-time server-held payload key
+      - name: Create stateless wrapped payload key
         env:
           ID_TOKEN: ${{ steps.oidc.outputs.token }}
         shell: bash
@@ -47,6 +47,7 @@ jobs:
           import json
           from pathlib import Path
           source=json.loads(Path('developers/reference/commercial-release/private-fulfillment-client-public-jwk.json').read_text())
+          assert source.get('private_key_committed') is False
           Path('/tmp/bootstrap-request.json').write_text(json.dumps({
               'public_key_jwk': source['public_key_jwk'],
               'public_key_jwk_sha256': source['public_key_jwk_sha256'],
@@ -73,16 +74,18 @@ jobs:
           assert data.get('payload_key_returned_plaintext') is False, data
           assert data.get('payload_key_publicly_stored') is False, data
           assert data.get('public_url_created') is False, data
-          assert data.get('vault_locator_returned') is False, data
           assert data.get('plaintext_returned') is False, data
-          assert data.get('algorithm') == 'RSA-OAEP-3072-SHA256 + AES-256-GCM', data
+          assert data.get('server_state_persisted') is False, data
+          assert data.get('algorithm') == 'RSA-OAEP-3072-SHA256 + HKDF-SHA256 + AES-256-GCM', data
           assert isinstance(data.get('transport_id'), str) and len(data['transport_id']) == 36, data
           assert data.get('client_public_jwk_sha256') == source['public_key_jwk_sha256'], data
           wrapped=data.get('wrapped_payload_key_b64url')
+          commitment=data.get('payload_key_commitment_sha256')
           assert isinstance(wrapped,str) and len(wrapped) > 100, data
+          assert isinstance(commitment,str) and len(commitment) == 64, data
           receipt={
-            'schema_version':'1.0.0',
-            'receipt_id':'ct.receipt.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v3',
+            'schema_version':'1.1.0',
+            'receipt_id':'ct.receipt.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v4',
             'source_commit':os.environ['GITHUB_SHA'],
             'transport_bootstrap_version':os.environ['TRANSPORT_BOOTSTRAP_VERSION'],
             'transport_id':data['transport_id'],
@@ -90,10 +93,11 @@ jobs:
             'algorithm':data['algorithm'],
             'client_public_jwk_sha256':data['client_public_jwk_sha256'],
             'wrapped_payload_key_b64url':wrapped,
+            'payload_key_commitment_sha256':commitment,
             'payload_key_returned_plaintext':False,
             'payload_key_publicly_stored':False,
+            'server_state_persisted':False,
             'public_url_created':False,
-            'vault_locator_returned':False,
             'plaintext_returned':False,
           }
           Path('changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
@@ -107,5 +111,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json
-          git commit -m "Record encrypted private fulfillment transport bootstrap v3"
+          git commit -m "Record encrypted private fulfillment transport bootstrap v4"
           git push origin "HEAD:${GITHUB_REF_NAME}"
