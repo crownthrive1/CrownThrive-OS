@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 concurrency:
@@ -19,12 +19,13 @@ concurrency:
 jobs:
   private-fulfillment:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [launch, ready, procure]
+    timeout-minutes: 15
     steps:
+      - name: Checkout exact operations branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+
       - name: Request scoped GitHub OIDC token
         id: oidc
         shell: bash
@@ -38,44 +39,119 @@ jobs:
           echo "token=${ID_TOKEN}" >> "${GITHUB_OUTPUT}"
           echo "::add-mask::${ID_TOKEN}"
 
-      - name: Execute exact-content private fulfillment canary
+      - name: Execute three exact-content private fulfillment canaries
         env:
           ID_TOKEN: ${{ steps.oidc.outputs.token }}
-          PLATFORM: ${{ matrix.platform }}
         shell: bash
         run: |
           set -euo pipefail
-          BODY="$(curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "Authorization: Bearer ${ID_TOKEN}" \
-            "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-private-fulfillment-oidc?platform=${PLATFORM}")"
-          python3 - "${PLATFORM}" <<'PY' <<<"${BODY}"
-          import json, sys
-          expected = sys.argv[1]
-          data = json.load(sys.stdin)
-          assert data.get("platform") == expected, data
-          assert data.get("products") == 10, data
-          assert data.get("passed") == 10, data
-          assert data.get("failed") == 0, data
-          assert data.get("customer_effect") is False, data
-          assert data.get("money_movement") is False, data
-          assert data.get("checkout_activation") is False, data
-          assert data.get("entitlement_activation") is False, data
-          assert data.get("rights_grant") is False, data
-          assert data.get("public_url_created") is False, data
-          for item in data.get("results", []):
-              assert item.get("status") == "pass", item
-              assert item.get("grant_consumed") is True, item
-              assert item.get("private_fulfillment_technical_pass") is True, item
+          mkdir -p build/private-fulfillment
+          for PLATFORM in launch ready procure; do
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer ${ID_TOKEN}" \
+              "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-private-fulfillment-oidc?platform=${PLATFORM}" \
+              > "build/private-fulfillment/${PLATFORM}.json"
+          done
+
+      - name: Validate and sanitize receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          root = Path("build/private-fulfillment")
+          platforms = {}
+          total_products = 0
+          total_passed = 0
+
+          for platform in ("launch", "ready", "procure"):
+              data = json.loads((root / f"{platform}.json").read_text())
+              assert data.get("platform") == platform, data
+              assert data.get("products") == 10, data
+              assert data.get("passed") == 10, data
+              assert data.get("failed") == 0, data
+              for field in (
+                  "customer_effect", "money_movement", "checkout_activation",
+                  "entitlement_activation", "rights_grant", "public_url_created",
+              ):
+                  assert data.get(field) is False, (field, data)
+              safe_results = []
+              for item in data.get("results", []):
+                  assert item.get("status") == "pass", item
+                  assert item.get("grant_consumed") is True, item
+                  assert item.get("private_fulfillment_technical_pass") is True, item
+                  safe_results.append({
+                      "sku": item["sku"],
+                      "status": "pass",
+                      "sha256": item["sha256"],
+                      "byte_size": item["byte_size"],
+                      "grant_consumed": True,
+                      "private_fulfillment_technical_pass": True,
+                  })
+              assert len(safe_results) == 10, safe_results
+              platforms[platform] = {
+                  "archive_sha256": data["archive_sha256"],
+                  "products": 10,
+                  "passed": 10,
+                  "failed": 0,
+                  "customer_effect": False,
+                  "money_movement": False,
+                  "checkout_activation": False,
+                  "entitlement_activation": False,
+                  "rights_grant": False,
+                  "public_url_created": False,
+                  "results": safe_results,
+              }
+              total_products += 10
+              total_passed += 10
+
+          receipt = {
+              "schema_version": "1.0.0",
+              "receipt_id": "ct.receipt.commercial-gap-private-fulfillment-oidc.2026-08-22.v1",
+              "source_commit": os.environ["GITHUB_SHA"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "workflow_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "cohort_id": "ct-commercial-gap-sites-v1",
+              "candidate_version": "1.0.0-candidate.4",
+              "products": total_products,
+              "passed": total_passed,
+              "failed": 0,
+              "technical_gate": "private_fulfillment",
+              "technical_gate_state": "pass_independent_review_pending",
+              "customer_effect": False,
+              "money_movement": False,
+              "checkout_activation": False,
+              "entitlement_activation": False,
+              "rights_grant": False,
+              "public_url_created": False,
+              "signed_url_persisted": False,
+              "independent_review_pending": True,
+              "platforms": platforms,
+          }
+          out = Path("changelog/commercial-gap-private-fulfillment-oidc-receipt.json")
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
           print(json.dumps({
-              "platform": expected,
-              "products": data["products"],
-              "passed": data["passed"],
-              "customer_effect": data["customer_effect"],
-              "money_movement": data["money_movement"],
-              "checkout_activation": data["checkout_activation"],
-              "entitlement_activation": data["entitlement_activation"],
-              "rights_grant": data["rights_grant"],
-              "public_url_created": data["public_url_created"],
+              "products": receipt["products"],
+              "passed": receipt["passed"],
+              "technical_gate_state": receipt["technical_gate_state"],
+              "customer_effect": False,
+              "money_movement": False,
           }, sort_keys=True))
           PY
+
+      - name: Commit sanitized receipt only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add changelog/commercial-gap-private-fulfillment-oidc-receipt.json
+          if git diff --cached --quiet; then
+            echo "Receipt already current; no commit required."
+            exit 0
+          fi
+          git commit -m "Record commercial gap private fulfillment OIDC canary"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
