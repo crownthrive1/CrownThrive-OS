@@ -26,8 +26,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Pull-request checkout uses a synthetic merge commit. Depth 2 retains
-          # both exact parents so the trusted base/head diff can be derived
-          # without granting network/API authority to the decision engine.
+          # the current exact parents; the explicit fetch below also restores an
+          # older original base SHA when a long-lived PR has outlived the shallow window.
           fetch-depth: 2
 
       - name: Set up Python
@@ -56,6 +56,29 @@ jobs:
 
       - name: Validate GitHub Actions runtime and supply-chain policy
         run: python scripts/validate_github_actions_runtime_policy.py
+
+      - name: Fetch trusted exact PR base and head objects
+        if: github.event_name == 'pull_request'
+        env:
+          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CT_GIT_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+            git fetch --no-tags --unshallow origin \
+              "+refs/heads/main:refs/remotes/origin/ct-trusted-main"
+          else
+            git fetch --no-tags origin \
+              "+refs/heads/main:refs/remotes/origin/ct-trusted-main"
+          fi
+          git fetch --no-tags origin \
+            "+refs/heads/${CT_GIT_HEAD_REF}:refs/remotes/origin/ct-trusted-pr-head"
+          git cat-file -e "${CT_GIT_BASE_SHA}^{commit}"
+          git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}"
+          test "$(git rev-parse refs/remotes/origin/ct-trusted-pr-head)" = "${CT_GIT_HEAD_SHA}"
+          echo "Trusted PR base/head objects are locally available."
 
       - name: Bind governed changed files to trusted Git diff
         if: github.event_name == 'pull_request'
