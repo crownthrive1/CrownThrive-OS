@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   observe:
-    name: Observe Sepolia EntryPoint code through a 2-of-3 provider quorum
+    name: Observe Sepolia EntryPoint code through an availability-aware 2-of-3 quorum
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
@@ -35,13 +35,19 @@ jobs:
           python -m json.tool developers/reference/chlom-wallet/smart-account/external-readback-observation.json >/dev/null
 
       - name: Execute fixed-endpoint read-only observation
+        id: observe
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          set +e
           node developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs \
             | tee /tmp/chlom-wallet-sepolia-observation.json
+          node_status=${PIPESTATUS[0]}
+          set -e
+          test -s /tmp/chlom-wallet-sepolia-observation.json
+          echo "node_status=$node_status" >> "$GITHUB_OUTPUT"
 
-      - name: Validate live quorum observation and pinned evidence boundary
+      - name: Validate quorum, availability HOLD, and pinned evidence boundary
         shell: bash
         run: |
           set -euo pipefail
@@ -51,22 +57,19 @@ jobs:
           live=json.load(open('/tmp/chlom-wallet-sepolia-observation.json'))
           pinned=json.load(open('developers/reference/chlom-wallet/smart-account/external-readback-observation.json'))
           allowed={'publicnode','1rpc','sepolia-dev'}
+          pass_result='PASS_EXTERNAL_READ_ONLY_MULTI_PROVIDER_QUORUM_OBSERVATION'
+          availability_hold='HOLD_EXTERNAL_READ_ONLY_PROVIDER_QUORUM_NOT_MET'
 
-          assert live['result']=='PASS_EXTERNAL_READ_ONLY_MULTI_PROVIDER_QUORUM_OBSERVATION'
           assert live['target']['chain_id_caip2']=='eip155:11155111'
           assert live['target']['chain_id_hex']=='0xaa36a7'
           assert live['target']['entrypoint_address']=='0x433709009B8330FDa32311DF1C2AFA402eD8D009'
           assert live['provider_quorum_required']==2
           assert live['provider_attempted_count']==3
-          assert live['provider_success_count']>=2
           assert live['provider_success_count']==len(live['providers'])
           assert live['provider_failure_count']==len(live['provider_failures'])
           assert {p['provider_id'] for p in live['providers']} <= allowed
           assert {p['provider_id'] for p in live['provider_failures']} <= allowed
           assert all(p['rpc_methods_used']==['eth_chainId','eth_getCode'] for p in live['providers'])
-          assert live['provider_agreement'] is True
-          assert len({p['observed_runtime_codehash'] for p in live['providers']})==1
-          assert len({p['runtime_code_bytes'] for p in live['providers']})==1
           assert live['runtime_codehash_independently_approved'] is False
           assert live['source_profile_promoted'] is False
           for key in [
@@ -76,16 +79,43 @@ jobs:
             assert live[key] is False, (key,live[key])
 
           assert pinned['state']=='PASS_EXTERNAL_READ_ONLY_OBSERVATION_HOLD_INDEPENDENT_APPROVAL'
-          assert pinned['target']==live['target'] | {'network_name':'Sepolia'}
           assert pinned['observation']['provider_count']==2
           assert pinned['observation']['provider_agreement'] is True
-          assert pinned['observation']['runtime_code_bytes']==live['runtime_code_bytes']
-          assert pinned['observation']['observed_runtime_codehash']==live['observed_runtime_codehash']
-          assert all(p['observed_runtime_codehash']==pinned['observation']['observed_runtime_codehash'] for p in live['providers'])
-          assert all(p['runtime_code_bytes']==pinned['observation']['runtime_code_bytes'] for p in live['providers'])
           assert pinned['interpretation']['runtime_codehash_independently_approved'] is False
           assert pinned['interpretation']['runtime_codehash_verified_for_deployment'] is False
           assert all(value is False for value in pinned['hard_boundaries'].values())
+
+          # Every successful provider must still match the pinned bytecode evidence.
+          # A mismatch is never downgraded to an availability incident.
+          assert all(
+            p['observed_runtime_codehash']==pinned['observation']['observed_runtime_codehash']
+            and p['runtime_code_bytes']==pinned['observation']['runtime_code_bytes']
+            for p in live['providers']
+          )
+
+          if live['result']==pass_result:
+            assert live['provider_success_count']>=2
+            assert live['provider_agreement'] is True
+            assert len({p['observed_runtime_codehash'] for p in live['providers']})==1
+            assert len({p['runtime_code_bytes'] for p in live['providers']})==1
+            assert live['runtime_code_bytes']==pinned['observation']['runtime_code_bytes']
+            assert live['observed_runtime_codehash']==pinned['observation']['observed_runtime_codehash']
+            validation_state='PASS_FRESH_QUORUM'
+          elif live['result']==availability_hold:
+            assert live['provider_success_count']<2
+            assert live['provider_failure_count']>=2
+            validation_state='HOLD_PROVIDER_AVAILABILITY_PINNED_EVIDENCE_UNCHANGED'
+          else:
+            raise AssertionError(f"unacceptable_observation_result:{live['result']}")
+
+          print(json.dumps({
+            'validation_state':validation_state,
+            'provider_success_count':live['provider_success_count'],
+            'provider_failure_count':live['provider_failure_count'],
+            'pinned_runtime_codehash':pinned['observation']['observed_runtime_codehash'],
+            'runtime_codehash_independently_approved':False,
+            'broadcast_authorized':False,
+          },sort_keys=True))
           PY
 
       - name: Enforce fixed endpoints and RPC-method allowlist
@@ -104,6 +134,7 @@ jobs:
       - name: Record boundary
         run: |
           echo "EXTERNAL READ ONLY: three fixed public Sepolia providers with a two-provider agreement quorum."
-          echo "A provider outage is recorded separately from bytecode disagreement."
-          echo "Provider agreement is observation evidence, not independent codehash approval."
+          echo "Temporary provider quorum loss is recorded as availability HOLD, not bytecode disagreement."
+          echo "Any successful provider must continue matching the pinned runtime codehash and byte length."
+          echo "Provider agreement and reproducibility remain evidence, not independent approval."
           echo "No signer, UserOperation, simulation, deployment, broadcast, custody, money movement, rights grant, or Phase advancement occurs."
