@@ -1,0 +1,80 @@
+name: CIE Interoperability Governance
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/cie-interoperability.v1.json"
+      - "developers/manifests/cie-convergent-handoff.v1.json"
+      - "developers/manifests/cie-chlom-pallet-interface.v1.json"
+      - "developers/manifests/cie-commercialization-candidates.v1.json"
+      - "scripts/validate_cie_interoperability.py"
+      - "doctrine/cultural-imprint-engine.mdx"
+      - "doctrine/convergent-ecosystem.mdx"
+      - "changelog/phase-2-99-cie-interoperability-precert.mdx"
+      - ".github/workflows/cie-interoperability-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cie-interoperability-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate fail-closed CIE interoperability packet
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out proposal
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile validator
+        run: python -m py_compile scripts/validate_cie_interoperability.py
+
+      - name: Parse machine contracts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          paths = (
+              "developers/manifests/cie-interoperability.v1.json",
+              "developers/manifests/cie-convergent-handoff.v1.json",
+              "developers/manifests/cie-chlom-pallet-interface.v1.json",
+              "developers/manifests/cie-commercialization-candidates.v1.json",
+          )
+          for path in paths:
+              value = json.loads(Path(path).read_text(encoding="utf-8"))
+              if not isinstance(value, dict):
+                  raise SystemExit(f"object required: {path}")
+          PY
+
+      - name: Run parent packet validator and negative controls
+        run: python scripts/validate_cie_interoperability.py
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- .; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+      - name: Confirm no OIDC or mutation authority
+        run: |
+          if grep -q "id-token: write" .github/workflows/cie-interoperability-governance.yml; then
+            echo "CIE proposal validation must not receive OIDC authority."
+            exit 1
+          fi
+          if grep -Eq "(contents|pull-requests|actions|packages): write" .github/workflows/cie-interoperability-governance.yml; then
+            echo "CIE proposal workflow contains mutation authority."
+            exit 1
+          fi
