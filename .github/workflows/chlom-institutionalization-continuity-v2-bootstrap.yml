@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: chlom-institutionalization-continuity-v2-${{ github.workflow }}-${{ github.ref }}
@@ -123,44 +122,27 @@ jobs:
           },sort_keys=True))
           PY
 
-      - name: Post deterministic manifest to this PR for source-control handoff
-        if: github.event_name == 'pull_request'
+      - name: Stage deterministic manifest artifact
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          python - <<'PY' >/tmp/chlom-continuity-v2-comment.json
-          import json,os
-          manifest=open('/tmp/chlom-wallet-phase-c-institutionalization.v2.a.json',encoding='utf-8').read()
-          body=(
-            '<!-- chlom-continuity-v2-bootstrap-manifest -->\n'
-            '### CHLOM Institutionalization Continuity v2 deterministic manifest\n\n'
-            'Bootstrap run: `'+os.environ['GITHUB_RUN_ID']+'`  \n'
-            'Frozen source: `d6187bd9a9a5af12cf1121d761d325943cc63daa`  \n'
-            'Package digest: `c3433c0cc3f97003a8fbe75a5308edf68bf3b2bd19882d90dfeefe2bd2e15248`\n\n'
-            '```json\n'+manifest+'```\n'
-          )
-          print(json.dumps({'body':body}))
-          PY
-          curl --fail --silent --show-error \
-            --request POST \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header 'Accept: application/vnd.github+json' \
-            --header 'X-GitHub-Api-Version: 2022-11-28' \
-            --header 'Content-Type: application/json' \
-            --data-binary @/tmp/chlom-continuity-v2-comment.json \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" >/tmp/chlom-continuity-v2-comment-response.json
-          python - <<'PY'
-          import json
-          response=json.load(open('/tmp/chlom-continuity-v2-comment-response.json'))
-          assert isinstance(response.get('id'),int)
-          assert response.get('body','').startswith('<!-- chlom-continuity-v2-bootstrap-manifest -->')
-          print(json.dumps({'result':'POSTED_CONTINUITY_V2_MANIFEST_HANDOFF','comment_id':response['id']}))
-          PY
+          mkdir -p /tmp/chlom-continuity-v2-artifact
+          cp /tmp/chlom-wallet-phase-c-institutionalization.v2.a.json \
+            /tmp/chlom-continuity-v2-artifact/chlom-wallet-phase-c-institutionalization.v2.json
+          printf '%s\n' 'c3433c0cc3f97003a8fbe75a5308edf68bf3b2bd19882d90dfeefe2bd2e15248  chlom-wallet-phase-c-institutionalization.v2.json' \
+            >/tmp/chlom-continuity-v2-artifact/SHA256SUMS
+
+      - name: Upload deterministic manifest artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: chlom-continuity-v2-manifest
+          path: /tmp/chlom-continuity-v2-artifact
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
+          overwrite: true
 
       - name: Record boundary
         run: |
-          echo 'BOOTSTRAP_ONLY: compiles an exact frozen source snapshot and posts a deterministic PR evidence comment for source-control handoff.'
-          echo 'No source write, THIVEBASE write, reviewer heartbeat, review receipt, provider write, credential access, Stripe object, checkout, signing, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement, or merge authority occurs.'
+          echo 'BOOTSTRAP_ONLY: compiles an exact frozen source snapshot and uploads a deterministic manifest artifact for source-control handoff.'
+          echo 'No source write, PR comment write, THIVEBASE write, reviewer heartbeat, review receipt, provider write, credential access, Stripe object, checkout, signing, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement, or merge authority occurs.'
