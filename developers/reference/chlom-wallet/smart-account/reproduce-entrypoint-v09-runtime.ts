@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs'
 import hre, { ethers } from 'hardhat'
 
 const EXPECTED_RELEASE_COMMIT = 'b36a1ed52ae00da6f8a4c8d50181e2877e4fa410'
+const EXPECTED_CHAIN_ID = 11155111
 const EXPECTED_ENTRYPOINT_ADDRESS = '0x433709009b8330fda32311df1c2afa402ed8d009'
 const EXPECTED_RUNTIME_CODEHASH = '0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
 const EXPECTED_RUNTIME_CODE_BYTES = 22425
@@ -11,6 +12,8 @@ async function main (): Promise<void> {
   const provider = ethers.provider
   const from = await provider.getSigner().getAddress()
   const network = await provider.getNetwork()
+
+  assert.equal(network.chainId, EXPECTED_CHAIN_ID, 'reproduction_chain_id_mismatch')
 
   const deployment = await hre.deployments.deploy('EntryPoint', {
     from,
@@ -36,7 +39,8 @@ async function main (): Promise<void> {
     upstream_release_commit: EXPECTED_RELEASE_COMMIT,
     local_network: {
       name: network.name,
-      chain_id: network.chainId
+      chain_id: network.chainId,
+      target_semantics: 'sepolia_chain_id_on_ephemeral_hardhat'
     },
     deterministic_deployment: {
       entrypoint_address: address,
