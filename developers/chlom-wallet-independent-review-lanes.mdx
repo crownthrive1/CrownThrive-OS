@@ -1,0 +1,110 @@
+---
+title: "CHLOM Wallet Independent Review Lanes"
+sidebarTitle: "Wallet Review Lanes"
+description: "Reviewer-specific questions, outputs, dispositions and activation prerequisites for the frozen CHLOM Wallet ERC-4337 evidence snapshot."
+icon: "list-check"
+---
+
+# CHLOM Wallet independent review lanes
+
+**State:** `ASSIGNED_WAITING_FOR_REVIEWER_HEARTBEATS`  
+**Frozen head:** `df67672b99839e58d7873dabe49e06de58007820`  
+**Evidence digest:** `a11e9c03cfd0ec05d9e4f1171b1d99e124cf2f7fffd697881bb3718f13e4b9fb`  
+**Review receipts:** 0 of 5  
+**Originator self-review:** prohibited
+
+Each reviewer receives a bounded lane rather than a generic request to “approve the wallet.” The purpose is to make the review reproducible, role-specific and machine-verifiable while preserving the difference between evidence construction, independent review, Phase Gate and eventual testnet deployment authority.
+
+## Shared evidence
+
+All lanes review the same exact snapshot:
+
+```yaml
+chain_id_caip2: eip155:11155111
+entrypoint_address: '0x433709009B8330FDa32311DF1C2AFA402eD8D009'
+runtime_code_bytes: 22425
+runtime_codehash: '0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
+```
+
+Shared source-controlled evidence includes the runtime-codehash review request, audit profile, source profile, multi-provider observation, Sepolia readiness manifest, predeployment gates, reproducible-runtime harness and receipt schema.
+
+## Protocol lane
+
+**Reviewer:** `ct.chlom.agent.blockchain-crypto`
+
+The protocol lane determines whether the exact v0.9 release source and configuration reproducibly identify the observed Sepolia EntryPoint runtime. It must examine chain-bound immutable behavior, deterministic deployment, source lineage and the preserved historical deployment-artifact divergence.
+
+A positive result is limited to **further testnet predeployment review**. It cannot select an account, factory, validator, signer, bundler, paymaster or transaction.
+
+## Security lane
+
+**Reviewer:** `ct.chlom.agent.security`
+
+The security lane evaluates audit scope, the preserved report findings, source-lineage continuity, supply-chain pinning and whether the current packet introduces any signer, validator, module, paymaster, custody or transaction authority.
+
+The pinned Cantina artifact is evidence. It does not replace an independent CHLOM security disposition for the CrownThrive-specific wallet architecture.
+
+## Quorum lane
+
+**Reviewer:** `ct.relay.agent-d`
+
+The quorum lane confirms originator exclusion, distinct reviewer identities, exact snapshot binding, stale-heartbeat handling and separation between a review receipt and sovereign release authority.
+
+Agent D's pre-existing institutional voting eligibility is not modified. The wallet receipt itself has `vote_effect: none`.
+
+## Recovery lane
+
+**Reviewer:** `ct.chlom.agent.recovery`
+
+The recovery lane checks rollback, independent readback, stale-evidence handling, provider-outage behavior and incident recovery without private-key export, custody, chain writes or automatic resume.
+
+A positive readback result still cannot activate credentials, sign transactions or deploy contracts.
+
+## Release-synthesis lane
+
+**Reviewer:** `ct.chlom.agent.release-certifier`
+
+Release synthesis can begin only after the protocol, security, quorum and recovery receipts exist for the same head and evidence digest. Any HOLD or DENY condition remains visible.
+
+The most positive permitted result is:
+
+```text
+PASS_INDEPENDENT_REVIEW_RECEIPTS_READY_FOR_PHASE_GATE
+```
+
+That result forwards evidence to Phase Gate. It does not promote the profile or authorize deployment.
+
+## Activation prerequisite
+
+Every reviewer must act from its own current identity and heartbeat context. The Wallet Agent may not refresh a reviewer heartbeat, impersonate a reviewer or submit a receipt on the reviewer's behalf.
+
+```yaml
+current_reviewers_fresh: 0
+current_reviewers_stale: 5
+current_receipts: 0
+queue_items_waiting: 5
+```
+
+## Machine packet
+
+The canonical review packet is:
+
+```text
+developers/reference/chlom-wallet/smart-account/independent-review-lane-packets.v1.json
+```
+
+Receipt submission is governed by:
+
+```text
+chlom_wallet.record_independent_review_receipt_v1(...)
+```
+
+Public status is available through:
+
+```text
+public.chlom_wallet_independent_review_status_v1()
+```
+
+## Hard boundary
+
+The lane packets create no reviewer decision, heartbeat, vote, certification authority, profile promotion, implementation selection, signer, UserOperation, simulation, deployment, broadcast, custody, money movement, rights grant, phase advancement or merge authority.
