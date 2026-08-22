@@ -1,0 +1,106 @@
+---
+title: "ShopMelaninMagic Squarespace Control Plane"
+sidebarTitle: "ShopMelaninMagic / Squarespace"
+description: "Public-safe provider contract for ShopMelaninMagic Squarespace Commerce integration, CHLOM credential custody, bounded read verification and gated write remediation."
+icon: "store"
+---
+
+# ShopMelaninMagic Squarespace Control Plane
+
+**Surface:** `https://shopmelaninmagic.com`  
+**Provider:** Squarespace Commerce  
+**State:** provider read verified / bounded writes HOLD  
+**CHLOM service subject:** `ct.service.squarespace-shopmelaninmagic`  
+**Provisional internal DID:** `did:chlom:service:squarespace-shopmelaninmagic`
+
+The Commerce credential itself is not part of this public contract. It is held in restricted CHLOM/Supabase Vault custody with versioned recovery and capability-leasing controls.
+
+## Verified provider facts
+
+Squarespace Commerce API authentication uses a website-scoped API key or OAuth token in the HTTP `Authorization: Bearer` header. A key can access only its owning website. The general Commerce API rate limit is 300 requests per minute (approximately five requests/second). API-key-authenticated Create Order requests have a separate limit of 100 requests/hour/site.
+
+Current first-party documentation:
+
+- https://developers.squarespace.com/commerce-apis/overview
+- https://developers.squarespace.com/commerce-apis/authentication-and-permissions
+- https://developers.squarespace.com/commerce-apis/making-requests
+- https://developers.squarespace.com/commerce-apis/rate-limits
+
+CrownThrive's local monthly request ceiling is `-1` for this service. That means no CrownThrive-imposed monthly ceiling; Squarespace provider throttles and any provider billing/plan constraints remain authoritative.
+
+## Current credential scope
+
+The founder-supplied website credential is recorded with the following provider permissions:
+
+- Contacts — Read and Write
+- Discounts — Read and Write
+- Forms — Read Only
+- Inventory — Read and Write
+- Orders — Read and Write
+- Products — Read and Write
+- Profiles — Read Only
+- Transactions — Read Only
+
+Possession of those provider permissions does not automatically authorize every operation inside CrownThrive. CHLOM applies a narrower capability layer.
+
+## CHLOM capability boundary
+
+Controlled-test reads currently include:
+
+- `squarespace.shopmelaninmagic.site.read`
+- `squarespace.shopmelaninmagic.products.audit`
+
+The first authenticated site read returned HTTP 200 for Melanin Magic at the expected custom domain. A first-page Products API read also returned HTTP 200 and observed 50 products, 318 product-image records and 4 blank product-image alt-text values, with provider pagination indicating additional products.
+
+This does not invalidate the separate Ahrefs baseline of 109 URLs with missing alt text. It demonstrates that the Ahrefs issue is broader than the first Squarespace Products page and requires full inventory/crawl correlation before mutation.
+
+## Alt-text remediation lane
+
+Squarespace's Products API provides a specific update-product-image endpoint that currently supports updating product-image alt text. CrownThrive has implemented the server-side adapter contract, but its capability remains **HOLD**.
+
+Promotion requires:
+
+1. complete bounded product/image inventory;
+2. correlation against the dated Ahrefs missing-alt baseline;
+3. decorative-vs-informative classification;
+4. context-aware candidate alt text;
+5. independent verifier review;
+6. one exact canary;
+7. post-write readback;
+8. recrawl/regression evidence;
+9. rollback/reopen evidence.
+
+No bulk alt-text mutation is authorized from the existence of the provider key alone.
+
+## Write policy
+
+Current write families for contacts, discounts, inventory, orders and products remain separately gated. Generic unrestricted provider writes are not exposed through the CHLOM MCP surface. Product deletion is explicitly prohibited by CrownThrive's no-silent-delete policy even though the provider API offers a delete endpoint.
+
+Webhook Subscriptions are not authorized by this API-key path; Squarespace documents the Webhook Subscriptions API as OAuth-only.
+
+## Wholesale continuity
+
+ShopMelaninMagic's present wholesale lane is recorded as:
+
+- **Candid Wholesale** — current wholesale provider lane
+- **Candid Pay** — current wholesale payment lane
+- **Future CrownThrive proprietary wholesale layer** — `TBD / FUTURE / NOT SUPERSEDED`
+
+The current Candid use does not waive or replace the planned proprietary wholesale architecture. Provider/API/payment details for Candid remain a separate evidence and credential packet.
+
+## Analytics
+
+The site currently has Google Analytics measurement ID `G-4SNNTRTZDQ` configured as a public analytics identifier. It is not treated as a secret credential.
+
+## Security and identity
+
+- raw Squarespace credential: restricted Vault only;
+- redundant recovery copy: restricted Vault only;
+- immutable CHLOM credential version: opaque internal handle;
+- public contract: contains no credential value or Vault locator;
+- direct anon/authenticated database execution of Squarespace read/write adapters: denied;
+- write adapters: server-side only and individually capability-gated;
+- founder binding: typed-name institutional attestation, not cryptographic nonrepudiation;
+- provisional `did:chlom` binding: portability/test reference, not a public-chain DID proof.
+
+This provider integration does not advance Phase 3, create new sovereign voters, authorize customer data export, activate money movement, or create legal/tax/compliance conclusions.
