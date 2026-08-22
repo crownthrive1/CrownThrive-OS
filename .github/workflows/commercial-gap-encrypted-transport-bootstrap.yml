@@ -7,6 +7,9 @@ on:
     paths:
       - ".github/workflows/commercial-gap-encrypted-transport-bootstrap.yml"
 
+env:
+  TRANSPORT_BOOTSTRAP_VERSION: "2"
+
 permissions:
   contents: write
   id-token: write
@@ -34,7 +37,7 @@ jobs:
           echo "token=${ID_TOKEN}" >> "${GITHUB_OUTPUT}"
           echo "::add-mask::${ID_TOKEN}"
 
-      - name: Create one-time Vault-held transport key
+      - name: Create one-time server-held transport key
         env:
           ID_TOKEN: ${{ steps.oidc.outputs.token }}
         shell: bash
@@ -56,6 +59,8 @@ jobs:
           data=json.loads(Path('/tmp/bootstrap.json').read_text())
           assert data.get('state') == 'created', data
           assert data.get('private_key_returned') is False, data
+          assert data.get('private_key_publicly_stored') is False, data
+          assert data.get('public_url_created') is False, data
           assert data.get('vault_locator_returned') is False, data
           assert data.get('plaintext_returned') is False, data
           assert data.get('algorithm') == 'RSA-OAEP-3072-SHA256 + AES-256-GCM', data
@@ -64,14 +69,17 @@ jobs:
           assert data['public_key_jwk'].get('kty') == 'RSA', data
           receipt={
             'schema_version':'1.0.0',
-            'receipt_id':'ct.receipt.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v1',
+            'receipt_id':'ct.receipt.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v2',
             'source_commit':os.environ['GITHUB_SHA'],
+            'transport_bootstrap_version':os.environ['TRANSPORT_BOOTSTRAP_VERSION'],
             'transport_id':data['transport_id'],
             'expires_at':data['expires_at'],
             'algorithm':data['algorithm'],
             'public_key_jwk':data['public_key_jwk'],
             'public_key_jwk_sha256':data['public_key_jwk_sha256'],
             'private_key_returned':False,
+            'private_key_publicly_stored':False,
+            'public_url_created':False,
             'vault_locator_returned':False,
             'plaintext_returned':False,
           }
@@ -86,5 +94,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json
-          git commit -m "Record encrypted private fulfillment transport bootstrap"
+          git commit -m "Record encrypted private fulfillment transport bootstrap v2"
           git push origin "HEAD:${GITHUB_REF_NAME}"
