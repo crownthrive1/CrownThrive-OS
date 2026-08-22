@@ -1,0 +1,91 @@
+---
+title: "CHLOM Institutionalization OIDC Runtime Threat Model"
+sidebarTitle: "Institutionalization OIDC Security"
+description: "Threats and fail-closed controls for GitHub OIDC-bound institutional package ingestion into THIVEBASE."
+icon: "shield"
+---
+
+# CHLOM Institutionalization OIDC runtime threat model
+
+**State:** `CONTROLLED_TEST`  
+**Trust root:** GitHub OIDC RS256 signature plus exact repository/workflow claims  
+**Production authority:** none
+
+## Protected assets
+
+- deterministic package and artifact digests;
+- algorithm/invariant records;
+- source ancestry and manifest provenance;
+- OIDC identity and workflow evidence;
+- append-only package and ingest receipts;
+- documentation, rights, recovery, pricing, and security state;
+- Wallet Agent continuity and independent-review boundaries.
+
+## Threats and controls
+
+| Threat | Failure mode | Control |
+| --- | --- | --- |
+| Forged OIDC token | attacker submits an unsigned or tampered JWT | RS256 verification against GitHub JWKS; `alg`, `kid`, issuer, audience, and time gates |
+| Repository-name reuse | repository renamed/transferred but name-only policy still passes | immutable owner/repository IDs accepted and checked; name and numeric IDs must agree |
+| Subject broadening | prefix-only subject accepts wrong branch/repository | exact event-specific old and immutable subject allowlists |
+| Workflow substitution | different workflow receives ID-token permission | exact workflow name/path/ref and GitHub-hosted runner checks |
+| Actor substitution | unapproved actor dispatches ingest | actor login and numeric actor ID pinned for this controlled packet |
+| Fork PR injection | untrusted fork supplies manifest | PR head repository must be the canonical CrownThrive repository |
+| Stale source replay | old manifest submitted against later unrelated code | frozen source must be current-head ancestor with exact merge base and zero behind count |
+| Manifest substitution | request body differs from committed manifest | GitHub contents readback and canonical equality |
+| Digest confusion | package digest does not describe manifest | canonical digest recomputation excluding digest field |
+| OIDC replay | same JTI used twice | idempotent duplicate receipt; changed request under same JTI rejected |
+| Token leakage | bearer token appears in DB or logs | persist token fingerprint only; sanitize errors; no token echo |
+| Artifact leakage | raw code/evidence bodies copied into DB | metadata and hashes only; raw artifact body persistence false |
+| Middleware conflict | Supabase JWT middleware rejects GitHub JWT or bypasses internal verifier | `verify_jwt=false`; mandatory internal GitHub OIDC bearer verification |
+| JWKS outage | signature verification unavailable | fail closed; no cached-unbounded trust or automatic resume |
+| GitHub API outage | PR, ancestry, or manifest cannot be reread | fail closed; retain prior evidence; retry only through a fresh workflow run |
+| Authority escalation | manifest/claims attempt provider write, money, rights, chain, or release state | explicit false-boundary validation in function and database |
+| AI authority drift | advisor output becomes an automatic remediation/release | deterministic advisory-only engine; no write/decision authority; independent review required |
+| Supply-chain drift | deployed Edge source differs from repository | source-controlled runtime, function ID/version/build digest, exact-head CI, liveness and canary evidence |
+| Public documentation leak | private credentials or references appear in Mintlify/GitHub | secret-shape and forbidden-field scans; public/restricted classifications |
+
+## OIDC subject transition
+
+The runtime accepts only four exact subject classes:
+
+```text
+repo:crownthrive1/CrownThrive-Support:pull_request
+repo:crownthrive1@315660018/CrownThrive-Support@1336348391:pull_request
+repo:crownthrive1/CrownThrive-Support:ref:refs/heads/chlom-wallet/phase-c-proof-portability-20260822
+repo:crownthrive1@315660018/CrownThrive-Support@1336348391:ref:refs/heads/chlom-wallet/phase-c-proof-portability-20260822
+```
+
+No wildcard repository, owner, branch, environment, tag, or pull-request subject is accepted.
+
+## Failure response
+
+1. Return a bounded error code without token or claims bodies.
+2. Record no package on signature, claim, ancestry, manifest, or authority failure.
+3. Preserve prior append-only receipts.
+4. Keep provider, checkout, money, rights, chain, phase, and merge states false.
+5. Route recovery to Operations/SRE, Security, Evidence Provenance, and Phase Gate.
+6. Require fresh canaries and independent review before resume.
+
+## Residual risk
+
+- GitHub issuer/JWKS and API availability remain external dependencies.
+- The current controlled packet pins a single actor; future multi-actor operations require a governed actor/role policy rather than broadening the current allowlist.
+- The Edge build digest is deployment evidence, not a formal reproducible-build proof.
+- OIDC attests workflow identity and source context; it does not independently prove business, legal, pricing, rights, or release approval.
+- A recorded package is institutional evidence, not production activation.
+
+## Hard boundary
+
+```yaml
+raw_token_persisted: false
+raw_artifact_body_persisted: false
+provider_write: false
+credential_access: false
+money_movement: false
+production_rights_grant: false
+chain_broadcast: false
+automatic_release: false
+phase_advancement: false
+merge_authorized: false
+```

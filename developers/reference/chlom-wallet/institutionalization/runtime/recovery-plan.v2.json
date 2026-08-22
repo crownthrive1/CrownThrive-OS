@@ -1,0 +1,55 @@
+{
+  "plan_id": "ct.recovery.chlom-institutionalization-runtime-v2",
+  "semantic_version": "1.0.0",
+  "state": "CONTROLLED_TEST",
+  "service_id": "ct.service.chlom-wallet-institutionalize-v2",
+  "failure_classes": [
+    "OIDC_JWKS_UNAVAILABLE",
+    "OIDC_SIGNATURE_OR_CLAIM_FAILURE",
+    "GITHUB_READBACK_UNAVAILABLE",
+    "SOURCE_ANCESTRY_MISMATCH",
+    "COMMITTED_MANIFEST_MISMATCH",
+    "DATABASE_VALIDATION_FAILURE",
+    "DUPLICATE_JTI_DIFFERENT_REQUEST",
+    "EDGE_FUNCTION_INACTIVE"
+  ],
+  "immediate_controls": [
+    "fail request closed",
+    "return a sanitized error code",
+    "do not persist the raw OIDC token",
+    "do not persist raw artifact bodies",
+    "do not register or mutate the package on failed verification",
+    "preserve prior append-only receipts",
+    "leave merge, phase, commerce, custody and chain paths closed"
+  ],
+  "rollback_sequence": [
+    "mark the v2 ingest workflow HOLD",
+    "disable or redeploy the Edge Function from the last known-good source snapshot",
+    "verify function ID, version and build digest",
+    "rerun package, ingest and immutable-subject canaries",
+    "rerun wrong-signature, wrong-audience, wrong-repository and manifest-drift tests",
+    "rerun the GitHub OIDC workflow on the exact current head",
+    "record a new append-only correction or replacement receipt",
+    "require independent security and evidence review before resume"
+  ],
+  "resume_policy": {
+    "automatic_resume": false,
+    "reviewer_impersonation": false,
+    "historical_receipt_mutation": false,
+    "exact_head_required": true,
+    "fresh_oidc_token_required": true,
+    "fresh_canary_receipts_required": true,
+    "independent_review_required": true
+  },
+  "hard_boundaries": {
+    "provider_write": false,
+    "credential_access": false,
+    "custody": false,
+    "token_issuance": false,
+    "money_movement": false,
+    "production_rights_grant": false,
+    "chain_broadcast": false,
+    "phase_advancement": false,
+    "merge_authorized": false
+  }
+}

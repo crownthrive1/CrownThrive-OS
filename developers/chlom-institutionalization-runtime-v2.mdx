@@ -1,0 +1,159 @@
+---
+title: "CHLOM Institutionalization Runtime v2"
+sidebarTitle: "Institutionalization Runtime"
+description: "GitHub OIDC-bound, append-only ingestion and evidence continuity for deterministic CHLOM institutional packages."
+icon: "shield-halved"
+---
+
+# CHLOM Institutionalization Runtime v2
+
+**State:** `ACTIVE_PENDING_REAL_OIDC_INGEST`  
+**Phase:** 2.99  
+**Service:** `ct.service.chlom-wallet-institutionalize-v2`  
+**Originating specialist:** `ct.agent.chlom-wallet-settlement`  
+**Release authority:** none
+
+The Institutionalization Runtime closes the gap between source-controlled engineering evidence and THIVEBASE institutional memory. It accepts only a deterministic package that is bound to the CrownThrive Support repository, the expected workflow, the frozen source snapshot, the committed manifest, and a GitHub-signed OIDC identity.
+
+## Trust path
+
+```text
+GitHub-hosted workflow
+  -> short-lived GitHub OIDC JWT
+  -> RS256/JWKS signature verification
+  -> issuer, audience, repository, repository-ID and owner-ID checks
+  -> exact workflow, actor, branch and PR checks
+  -> current PR/branch readback from GitHub
+  -> frozen-source ancestry proof
+  -> committed-manifest readback
+  -> canonical manifest and package-digest verification
+  -> append-only THIVEBASE package and ingest receipts
+```
+
+The function does not accept a Supabase user JWT as its trust root. `verify_jwt` is disabled at the platform middleware so the function can apply its own exact GitHub OIDC verification. A missing or invalid GitHub bearer token fails closed.
+
+## Runtime implementation
+
+```yaml
+function_id: a9fa1f5d-908d-4807-9d35-20c95d161507
+slug: chlom-wallet-institutionalize-v2
+version: 2
+status: ACTIVE
+verify_jwt: false
+authentication_mode: INTERNAL_GITHUB_OIDC_RS256_JWKS_VERIFICATION
+ezbr_sha256: f3238ab6f53cc5333ac47b495706d346d6f178c0a9f618f0a0b6dedc6c17ebe6
+```
+
+Source-controlled runtime:
+
+- `developers/reference/chlom-wallet/institutionalization/runtime/index.ts`
+- `developers/reference/chlom-wallet/institutionalization/runtime/github-oidc-contract-v2.mjs`
+- `developers/reference/chlom-wallet/institutionalization/runtime/oidc-runtime-utils-v2.mjs`
+- `developers/reference/chlom-wallet/institutionalization/runtime/oidc-jwt-verifier-v2.mjs`
+- `developers/reference/chlom-wallet/institutionalization/runtime/github-repository-binding-v2.mjs`
+- `developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs`
+- `developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json`
+- `developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json`
+
+## Immutable GitHub subject support
+
+The runtime supports both the earlier repository subject format and GitHub's immutable repository/owner-ID subject format. Both remain pinned to:
+
+```yaml
+repository: crownthrive1/CrownThrive-Support
+repository_id: '1336348391'
+repository_owner: crownthrive1
+repository_owner_id: '315660018'
+source_branch: chlom-wallet/phase-c-proof-portability-20260822
+target_branch: chlom-wallet/phase-b-webhook-passkey-contracts-20260822
+pull_request_number: 233
+```
+
+Wrong owner IDs, repository IDs, branches, audiences, workflow identity, actors, signatures, and expired tokens are rejected.
+
+## Package binding
+
+The current controlled package is frozen at:
+
+```yaml
+package_id: ct.package.chlom-wallet.phase-c.institutionalization.v1
+semantic_version: 1.0.0
+frozen_source_head: 64118e61c7671a78b43999ac5f17f9eddd1226b1
+package_digest_sha256: 7b3be50d5541fff14127bfdd24724eb9b8b9f9ffd4b165a380dee02f2a1ef957
+manifest_path: developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json
+```
+
+A later branch head may contain documentation, workflows, or runtime repairs, but the frozen source must remain an ancestor and the committed package manifest must remain byte-equivalent after canonicalization. A submitted manifest cannot replace the committed manifest.
+
+## THIVEBASE data plane
+
+The runtime records:
+
+- package identity and digest;
+- artifact hashes, classifications, owners, sizes, and public-projection state;
+- algorithm IDs, source paths, invariants, dependencies, and authority boundaries;
+- documentation impact;
+- deterministic gap analysis;
+- GitHub repository, branch, workflow, run, actor, and OIDC claim digests;
+- token fingerprint rather than the token value;
+- request and claims digests;
+- exact source ancestry and manifest readback evidence.
+
+It does not persist raw OIDC tokens or raw artifact bodies.
+
+## Deterministic runtime advisor
+
+`ct.algorithm.chlom.institutionalization-runtime-advisor.v1` evaluates edge-function state, package/ingest canaries, OIDC subject compatibility, CI state, package registration, review readiness, and commercialization boundaries. It emits P0-P3 advisory records with bounded agent handoffs.
+
+It has no network access, credentials, write authority, decision authority, or automatic release authority. A future model-based extension requires a prompt/model/version receipt and independent review.
+
+## Recovery contract
+
+Failures remain fail closed. Recovery requires:
+
+1. classify the failure without logging tokens;
+2. preserve append-only evidence;
+3. redeploy only known-good source;
+4. rerun package, ingest, OIDC-subject, unit, and liveness canaries;
+5. verify the exact committed manifest and source ancestry;
+6. obtain independent security and release review before resuming.
+
+Automatic resume is prohibited.
+
+## Commercialization boundary
+
+The future commercial family is **CHLOM Institutionalization Compiler and Governed Evidence Runtime**. Candidate delivery models include readiness assessments, compiler licensing, managed evidence ingestion, enterprise governance packages, and private deployments.
+
+No model is currently an effective offer. Public pricing, Stripe Product/Price objects, checkout, customer fulfillment, tenant access, and production support commitments remain separately gated.
+
+## Current canaries
+
+```yaml
+package: PASS_CHLOM_INSTITUTIONALIZATION_PACKAGE_V2_CANARY
+ingest: PASS_CHLOM_INSTITUTIONALIZATION_INGEST_V2_CANARY
+oidc_subject: PASS_CHLOM_INSTITUTIONALIZATION_OIDC_SUBJECT_V2_CANARY
+oidc_unit_contract: PASS_CHLOM_WALLET_INSTITUTIONALIZATION_OIDC_V2_UNIT_CONTRACT
+runtime_advisor: PASS_CHLOM_INSTITUTIONALIZATION_RUNTIME_ADVISOR_V1
+```
+
+The canaries prove their tested contracts. The real package ingest remains a separate GitHub OIDC workflow gate until an exact-head receipt is recorded.
+
+## Hard boundaries
+
+```yaml
+token_value_persisted: false
+raw_artifact_body_persisted: false
+provider_write: false
+credential_access: false
+effective_offer: false
+stripe_objects_created: false
+checkout_enabled: false
+custody: false
+token_issuance: false
+money_movement: false
+production_rights_grant: false
+chain_broadcast: false
+automatic_profile_promotion: false
+phase_advancement: false
+merge_authorized: false
+```

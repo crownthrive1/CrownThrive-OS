@@ -1,0 +1,148 @@
+name: CHLOM Institutionalization Runtime v2
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/institutionalization/runtime/**"
+      - "developers/reference/chlom-wallet/institutionalization/sql/**"
+      - "automation/chlom-institutionalization-runtime-*.mjs"
+      - "automation/chlom-institutionalization-runtime-handoffs.v2.json"
+      - "developers/chlom-institutionalization-runtime-v2.mdx"
+      - "security/chlom-institutionalization-oidc-runtime-threat-model.mdx"
+      - ".github/workflows/chlom-wallet-institutionalization-runtime-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-institutionalization-runtime-v2-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-contract:
+    name: Validate OIDC runtime source, algorithms, liveness, and boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify source and machine syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          node --check developers/reference/chlom-wallet/institutionalization/runtime/github-oidc-contract-v2.mjs
+          node --check developers/reference/chlom-wallet/institutionalization/runtime/oidc-runtime-utils-v2.mjs
+          node --check developers/reference/chlom-wallet/institutionalization/runtime/oidc-jwt-verifier-v2.mjs
+          node --check developers/reference/chlom-wallet/institutionalization/runtime/github-repository-binding-v2.mjs
+          node --check developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs
+          node --check automation/chlom-institutionalization-runtime-advisor.mjs
+          node --check automation/test-chlom-institutionalization-runtime-advisor.mjs
+          python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/recovery-plan.v2.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/commercialization-boundary.v2.json >/dev/null
+          python -m json.tool automation/chlom-institutionalization-runtime-handoffs.v2.json >/dev/null
+          grep -F 'create or replace function chlom_wallet.run_institutionalization_oidc_subject_canary_v2()' developers/reference/chlom-wallet/institutionalization/sql/chlom-wallet-institutionalization-oidc-v2.sql >/dev/null
+
+      - name: Run GitHub OIDC unit contract
+        run: node developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs
+
+      - name: Run deterministic runtime advisor
+        run: node automation/test-chlom-institutionalization-runtime-advisor.mjs
+
+      - name: Validate deployed runtime contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          runtime=json.load(open('developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json'))
+          assert runtime['contract_id']=='ct.runtime.chlom-institutionalization-v2'
+          assert runtime['state'] in ('ACTIVE_PENDING_REAL_OIDC_INGEST','ACTIVE_REAL_PACKAGE_INGESTED')
+          edge=runtime['edge_function']
+          assert edge['service_id']=='ct.service.chlom-wallet-institutionalize-v2'
+          assert edge['function_id']=='a9fa1f5d-908d-4807-9d35-20c95d161507'
+          assert edge['slug']=='chlom-wallet-institutionalize-v2'
+          assert edge['version']==2
+          assert edge['status']=='ACTIVE'
+          assert edge['verify_jwt'] is False
+          assert edge['authentication_mode']=='INTERNAL_GITHUB_OIDC_RS256_JWKS_VERIFICATION'
+          assert edge['ezbr_sha256']=='f3238ab6f53cc5333ac47b495706d346d6f178c0a9f618f0a0b6dedc6c17ebe6'
+          oidc=runtime['github_oidc']
+          assert oidc['repository_id']=='1336348391'
+          assert oidc['repository_owner_id']=='315660018'
+          assert oidc['legacy_subject_supported'] is True
+          assert oidc['immutable_subject_supported'] is True
+          assert oidc['actor_pinned'] is True
+          assert oidc['github_hosted_runner_required'] is True
+          binding=runtime['package_binding']
+          assert binding['frozen_source_head']=='64118e61c7671a78b43999ac5f17f9eddd1226b1'
+          assert binding['package_digest_sha256']=='7b3be50d5541fff14127bfdd24724eb9b8b9f9ffd4b165a380dee02f2a1ef957'
+          assert binding['frozen_source_ancestor_required'] is True
+          assert binding['committed_manifest_readback_required'] is True
+          assert binding['submitted_manifest_must_equal_committed_manifest'] is True
+          assert runtime['database']['raw_oidc_token_persisted'] is False
+          assert runtime['database']['raw_artifact_body_persisted'] is False
+          assert runtime['ai_governance']['advisory_only'] is True
+          assert runtime['ai_governance']['decision_authority'] is False
+          assert runtime['ai_governance']['write_authority'] is False
+          assert runtime['ai_governance']['automatic_release'] is False
+          assert all(value is False for value in runtime['hard_boundaries'].values())
+          PY
+
+      - name: Verify unauthenticated requests fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=$(mktemp)
+          status=$(curl --silent --show-error --location --max-time 30 \
+            --output "$body" --write-out '%{http_code}' \
+            --request POST --header 'content-type: application/json' --data '{}' \
+            'https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-wallet-institutionalize-v2')
+          test "$status" = '401'
+          python - "$body" <<'PY'
+          import json,sys
+          value=json.load(open(sys.argv[1]))
+          assert value=={'ok':False,'error':'github_oidc_bearer_required'}
+          PY
+          rm -f "$body"
+
+      - name: Enforce no-secret and no-authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            developers/reference/chlom-wallet/institutionalization/runtime/index.ts
+            developers/reference/chlom-wallet/institutionalization/runtime/github-oidc-contract-v2.mjs
+            developers/reference/chlom-wallet/institutionalization/runtime/oidc-runtime-utils-v2.mjs
+            developers/reference/chlom-wallet/institutionalization/runtime/oidc-jwt-verifier-v2.mjs
+            developers/reference/chlom-wallet/institutionalization/runtime/github-repository-binding-v2.mjs
+            developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs
+            developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json
+            developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json
+            developers/reference/chlom-wallet/institutionalization/runtime/recovery-plan.v2.json
+            developers/reference/chlom-wallet/institutionalization/runtime/commercialization-boundary.v2.json
+            developers/reference/chlom-wallet/institutionalization/sql/chlom-wallet-institutionalization-oidc-v2.sql
+            automation/chlom-institutionalization-runtime-advisor.mjs
+            automation/test-chlom-institutionalization-runtime-advisor.mjs
+            automation/chlom-institutionalization-runtime-handoffs.v2.json
+            developers/chlom-institutionalization-runtime-v2.mdx
+            security/chlom-institutionalization-oidc-runtime-threat-model.mdx
+          )
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sb_secret_[A-Za-z0-9._-]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' "${files[@]}"; then
+            echo 'Potential live secret-shaped material detected in institutionalization runtime source.'
+            exit 1
+          fi
+          if grep -nE -- '"(provider_write|credential_access|effective_offer|stripe_objects_created|checkout_enabled|custody|token_issuance|money_movement|production_rights_grant|chain_broadcast|automatic_profile_promotion|phase_advancement|merge_authorized)"[[:space:]]*:[[:space:]]*true' "${files[@]}"; then
+            echo 'Institutionalization runtime source crossed a live or authority boundary.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo 'CONTROLLED_TEST: source, OIDC verifier, advisor, schema, SQL patch, recovery, pricing and documentation contracts validated.'
+          echo 'Unauthenticated Edge requests fail closed. The real package ingest remains a separate GitHub OIDC workflow gate.'
+          echo 'No token value, raw artifact body, provider write, credential access, Stripe object, checkout, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement or merge authority is created.'
