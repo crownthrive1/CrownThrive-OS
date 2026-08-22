@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CrownThrive Interoperability Fabric</title>
+  <style>
+    :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; padding: 1rem; background: Canvas; color: CanvasText; }
+    main { max-width: 72rem; margin: 0 auto; }
+    header { display: grid; gap: .4rem; margin-bottom: 1rem; }
+    h1 { margin: 0; font-size: clamp(1.35rem, 3vw, 2rem); }
+    p { margin: 0; line-height: 1.5; }
+    .notice { border: 1px solid color-mix(in srgb, CanvasText 22%, transparent); border-radius: .75rem; padding: .8rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; margin: 1rem 0; }
+    .card { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: .8rem; padding: .9rem; min-height: 5rem; }
+    .label { font-size: .78rem; opacity: .72; text-transform: uppercase; letter-spacing: .05em; }
+    .value { margin-top: .35rem; font-size: 1.45rem; font-weight: 700; overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; margin-top: .75rem; }
+    th, td { text-align: left; padding: .65rem; border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent); vertical-align: top; }
+    th { font-size: .8rem; }
+    .scroll { overflow-x: auto; }
+    .muted { opacity: .72; }
+    .badge { display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: .15rem .45rem; font-size: .75rem; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>CrownThrive Interoperability Fabric</h1>
+    <p>Controlled-test view of registered systems, contracts, routes and plugin state.</p>
+  </header>
+  <section class="notice" aria-label="Governance notice">
+    <strong>Evidence boundary:</strong> a planned route or compatibility score is not proof of deployment, certification, provider authority or legal compliance. Protected implementation, credentials and private identities are not displayed.
+  </section>
+  <section class="grid" id="metrics" aria-label="Interoperability metrics"></section>
+  <section>
+    <h2>Route state</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Route</th><th>Mode</th><th>Lifecycle</th><th>Certification</th></tr></thead>
+        <tbody id="routes"><tr><td colspan="4" class="muted">No route data supplied.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+  <p class="muted" id="status" role="status" aria-live="polite">Waiting for tool output.</p>
+</main>
+<script>
+(() => {
+  const safeObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const safeArray = (value) => Array.isArray(value) ? value : [];
+  const escapeText = (value) => String(value ?? "");
+  const output = safeObject(window.openai?.toolOutput || window.openai?.structuredContent || {});
+  const status = safeObject(output.status || output);
+  const routes = safeArray(output.routes || status.routes_detail);
+  const metrics = [
+    ["Systems", status.systems],
+    ["Contracts", status.contracts],
+    ["Mappings", status.mappings],
+    ["Routes", status.routes],
+    ["Certifications", status.certifications],
+    ["Plugins", status.plugins]
+  ];
+  document.getElementById("metrics").replaceChildren(...metrics.map(([label, value]) => {
+    const card = document.createElement("article");
+    card.className = "card";
+    const l = document.createElement("div"); l.className = "label"; l.textContent = label;
+    const v = document.createElement("div"); v.className = "value"; v.textContent = value ?? "—";
+    card.append(l, v); return card;
+  }));
+  if (routes.length) {
+    document.getElementById("routes").replaceChildren(...routes.slice(0, 50).map((route) => {
+      const row = document.createElement("tr");
+      [route.route_id, route.route_mode, route.route_state, route.certification_state].forEach((value, index) => {
+        const cell = document.createElement("td");
+        if (index > 1) { const badge = document.createElement("span"); badge.className = "badge"; badge.textContent = escapeText(value); cell.append(badge); }
+        else cell.textContent = escapeText(value);
+        row.append(cell);
+      });
+      return row;
+    }));
+  }
+  document.getElementById("status").textContent = window.openai ? "Tool output rendered. Protected fields remain unavailable to the widget." : "Standalone candidate preview. Connect through the governed MCP runtime for current data.";
+})();
+</script>
+</body>
+</html>
