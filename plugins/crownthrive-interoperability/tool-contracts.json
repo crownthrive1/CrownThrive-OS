@@ -1,0 +1,202 @@
+{
+  "schema_version": "1.0.0",
+  "server_id": "ct.mcp.crownthrive-interoperability",
+  "server_version": "1.0.0",
+  "tools": [
+    {
+      "name": "search",
+      "title": "Search CrownThrive interoperability resources",
+      "description": "Use this when locating CrownThrive plugins, contracts, routes, and services by topic.",
+      "risk_class": "D0",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "input_schema": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {"type": "string", "minLength": 1},
+          "resource_types": {
+            "type": "array",
+            "items": {"type": "string", "enum": ["plugin", "contract", "route", "service"]}
+          },
+          "limit": {"type": "integer", "minimum": 1, "maximum": 100}
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "fetch",
+      "title": "Fetch one interoperability resource",
+      "description": "Use this when retrieving one CrownThrive plugin, contract, route, binding, capability, or service by its exact stable ID.",
+      "risk_class": "D0",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "input_schema": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {"id": {"type": "string", "minLength": 1}},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "interop.status",
+      "title": "Check interoperability fabric status",
+      "description": "Use this when checking the sanitized state of the interoperability fabric, packages, contracts, routes, agents, tests, and commercialization gates.",
+      "risk_class": "D0",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "input_schema": {"type": "object", "additionalProperties": false}
+    },
+    {
+      "name": "interop.compatibility.check",
+      "title": "Check plugin compatibility",
+      "description": "Use this when determining whether two CrownThrive plugin packages can exchange one canonical contract without activating a route.",
+      "risk_class": "D1",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "input_schema": {
+        "type": "object",
+        "required": ["source_plugin_id", "destination_plugin_id", "contract_id"],
+        "properties": {
+          "source_plugin_id": {"type": "string"},
+          "destination_plugin_id": {"type": "string"},
+          "contract_id": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "interop.route.plan",
+      "title": "Plan an interoperability route",
+      "description": "Use this when producing a bounded, non-executing route plan with blockers, authority, data minimization, rollback, and reliability scoring.",
+      "risk_class": "D1",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "input_schema": {
+        "type": "object",
+        "required": ["source_plugin_id", "destination_plugin_id", "contract_id"],
+        "properties": {
+          "source_plugin_id": {"type": "string"},
+          "destination_plugin_id": {"type": "string"},
+          "contract_id": {"type": "string"},
+          "route_kind": {
+            "type": "string",
+            "enum": ["request_response", "event", "command", "sync", "async"]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plugins.list",
+      "title": "List CrownThrive plugins",
+      "description": "Use this when listing CrownThrive plugin packages and their truthful lifecycle, public, and monetization states.",
+      "risk_class": "D0",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "state": {"type": "string"},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 500}
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plugins.get",
+      "title": "Get one CrownThrive plugin",
+      "description": "Use this when retrieving one plugin manifest with sanitized capabilities, bindings, pricing candidates, and current gates.",
+      "risk_class": "D0",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "input_schema": {
+        "type": "object",
+        "required": ["plugin_id"],
+        "properties": {"plugin_id": {"type": "string"}},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plugins.install.plan",
+      "title": "Plan a plugin installation",
+      "description": "Use this when preparing a non-executing plugin installation plan. It never installs, creates credentials, grants authority, or activates commerce.",
+      "risk_class": "D1",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "input_schema": {
+        "type": "object",
+        "required": ["plugin_id", "target_type", "target_id"],
+        "properties": {
+          "plugin_id": {"type": "string"},
+          "target_type": {
+            "type": "string",
+            "enum": ["platform", "service", "website", "repository", "agent", "mcp_server", "contract"]
+          },
+          "target_id": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "plugins.package.validate",
+      "title": "Validate a plugin package",
+      "description": "Use this when checking package identity, capabilities, bindings, tests, owner-verifier separation, commerce gates, and public-private boundaries.",
+      "risk_class": "D1",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "input_schema": {
+        "type": "object",
+        "required": ["plugin_id"],
+        "properties": {"plugin_id": {"type": "string"}},
+        "additionalProperties": false
+      }
+    }
+  ],
+  "global_invariants": {
+    "provider_write_enabled": false,
+    "checkout_enabled": false,
+    "D3_auto": false,
+    "sovereign_vote_effect": false,
+    "credentials_returned": false,
+    "protected_weights_returned": false,
+    "private_identity_returned": false,
+    "history_policy": "append_or_supersede_never_silent_delete"
+  }
+}
