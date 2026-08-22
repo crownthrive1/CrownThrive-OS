@@ -1,0 +1,64 @@
+name: CrownThrive Institutional IP Diligence
+
+on:
+  pull_request:
+    paths:
+      - "institutional-ip/**"
+      - "standards/institutional-ip-diligence-and-commercial-proof.mdx"
+      - "scripts/validate_institutional_ip_diligence.py"
+      - "supabase/migrations/20260822213000_institutional_ip_registry_candidate.sql"
+      - "supabase/rollback/20260822213000_institutional_ip_registry_candidate.rollback.sql"
+      - "developers/manifests/institutional-ip-navigation-patch.v1.json"
+      - ".github/workflows/institutional-ip-diligence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: institutional-ip-diligence-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile public tools
+        run: python -m compileall -q institutional-ip scripts
+      - name: Validate public packet
+        run: python scripts/validate_institutional_ip_diligence.py
+      - name: Run public tests
+        run: python -m unittest -v institutional-ip/test_master_ip_diligence.py
+      - name: OSV dependency vulnerability scan
+        uses: google/osv-scanner-action/osv-scanner-action@06b2ab4348248b456ee06c9e953637f55e03504f # v2.5.0 exact action commit
+        with:
+          scan-args: |-
+            --recursive
+            ./institutional-ip
+          upload-sarif: false
+          fail-on-vuln: true
+      - name: Verify no OIDC or write authority
+        run: |
+          if grep -nE '^[[:space:]]+id-token:[[:space:]]+write([[:space:]]|$)|^[[:space:]]+(contents|pull-requests|packages|actions|security-events):[[:space:]]+write([[:space:]]|$)' .github/workflows/institutional-ip-diligence.yml; then
+            echo "Write or OIDC authority detected in PR validation workflow"
+            exit 1
+          fi
+      - name: Check whitespace and merge markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge marker detected"
+            exit 1
+          fi
+
+# Trusted release attestations are intentionally absent. A separate accepted release
+# workflow must bind the exact accepted head and may use OIDC only in that trusted job.
