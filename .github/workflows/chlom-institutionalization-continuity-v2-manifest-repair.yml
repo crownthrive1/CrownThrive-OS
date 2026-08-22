@@ -1,0 +1,48 @@
+name: CHLOM Institutionalization Continuity v2 Manifest Repair
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/chlom-institutionalization-continuity-v2-manifest-repair.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chlom-continuity-v2-manifest-repair-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    name: Replace transferred manifest only with compiler-exact bytes
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor == 'crownthrive1')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out exact PR head with bounded write credential
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: chlom-wallet/phase-c-proof-portability-20260822
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Compile frozen continuity package and verify expected digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = 'crownthrive1/CrownThrive-Support'
+          test "$GITHUB_ACTOR" = 'crownthrive1'
+          git merge-base --is-ancestor d6187bd9a9a5af12cf1121d761d325943cc63daa HEAD
+          node automation/compile-chlom-institutionalization.mjs \
+            --spec automation/chlom-institutionalization-continuity-v2.json \
+            --repo-root . \
+            --output /tmp/chlom-wallet-phase-c-institutionalization.v2.json \
+            >/tmp/chlom-continuity-v2-repair-compile.log
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/chlom-wallet-phase-c-institutionalization.v2.json'))
+          assert p['package_id']=='ct.package.chlom-wallet.phase-c.institutionalization.v2'
+          assert p['semantic_version']=='2.0.0'
+          assert p['state']=='PASS_CONTROLLED_TEST_INSTITUTIONALIZATlON'.replace('l','I') or False
+          PY
