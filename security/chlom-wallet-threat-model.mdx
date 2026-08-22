@@ -1,0 +1,116 @@
+---
+title: "CHLOM Wallet Threat Model"
+sidebarTitle: "CHLOM Wallet Security"
+description: "Public-safe threat model and release controls for CHLOM Wallet OS, Stripe translation, smart-account adapters, chain anchoring, recovery and ThriveFund obligations."
+icon: "shield-check"
+---
+
+# CHLOM Wallet threat model
+
+**State:** `CONTROLLED_TEST`  
+**Production authorization:** none  
+**Security principle:** minimize custody, minimize public disclosure, make every consequential state transition replay-safe and independently auditable.
+
+## Protected assets
+
+- payment and settlement evidence;
+- rights and entitlement state;
+- economic schedules;
+- ThriveFund obligations;
+- wallet/account bindings;
+- signing-key references and recovery metadata;
+- provider webhook authenticity;
+- event-chain integrity;
+- smart-contract admin/operator authority;
+- proof/anchor integrity;
+- user privacy and account-recovery channels.
+
+## Primary threat families
+
+| Threat | Example | Required control |
+| --- | --- | --- |
+| Replay | duplicate Stripe/provider event | provider-event uniqueness + idempotency key |
+| Event forgery | unsigned webhook or fake chain receipt | provider signature / chain verification before translation |
+| Ledger tampering | editing prior wallet event | append-only controls + hash chaining + correction event |
+| Amount drift | provider amount differs from offer/schedule | mismatch HOLD; no entitlement issuance |
+| Rights confusion | payment treated as license | independent CHLOM entitlement decision |
+| Privilege escalation | read token calls mutation | least-privilege scopes + deny-by-default + independent review |
+| Key compromise | exposed signer/recovery secret | no secret in source/logs; Vault/HSM/hardware/multisig path where approved |
+| Recovery takeover | weak reset channel | passkey/recovery policy, delay/step-up for material changes |
+| Smart-account module abuse | malicious delegated module | module allowlist/review, explicit user consent, reversible test deployment |
+| Contract admin capture | one compromised operator | pause, role separation, multisig/timelock candidates for production |
+| Chain reorg | anchor observed before finality | finality policy + reorg correction state |
+| Provider outage | Stripe/chain unavailable | durable CHLOM record, queue/retry, degraded mode, provider exit path |
+| Privacy leak | raw agreement/evidence on-chain | hash/root only; private evidence remains off-chain |
+| Economic rule drift | old split schedule reused | exact version/effective-period binding |
+| False impact claim | obligation presented as disbursed | calculated/approved/settled/evidence states remain separate |
+| Supply-chain compromise | malicious package/action | pinned dependencies, SBOM/provenance, independent code review |
+
+## Key and custody boundary
+
+The default wallet posture is **non-custodial**. The system stores references to approved secret-management locations, never public private-key material.
+
+Any later CrownThrive-controlled custody or treasury signing requires a separate legal/security architecture that answers:
+
+- who is the controller/custodian;
+- how keys are generated;
+- where keys live;
+- signer threshold and separation;
+- recovery and inheritance/succession process;
+- emergency pause;
+- compromise response;
+- transaction policy limits;
+- sanctions/KYC/legal obligations if applicable;
+- insurance/accounting implications;
+- independent audit.
+
+No historical token/multisig proposal satisfies this production gate by itself.
+
+## Passkey and smart-account boundary
+
+Passkeys are preferred as a user-experience direction because they can remove seed-phrase ceremony while retaining explicit user authorization. Smart-account functionality should use reviewed modular/account-abstraction patterns rather than custom cryptography.
+
+Delegated modules are high-risk code. A wallet must not ask a user to authorize arbitrary delegation without showing what code/module is being authorized, what it can execute, how it is revoked and how recovery works.
+
+## Stripe security boundary
+
+A production webhook receiver must verify Stripe signatures using a secret held outside source control. The received payload should be reduced into the minimum required private receipt plus a digest, then translated into CHLOM state exactly once.
+
+Customer-facing fulfillment remains a separate idempotent operation. A forged, duplicated or delayed provider event must not create duplicate entitlements or deliveries.
+
+## Smart-contract security boundary
+
+The initial public reference contracts deliberately avoid custody and transfers. Before any value-moving or mainnet contract is deployed, require:
+
+- compiler/toolchain pinning;
+- reproducible build artifact;
+- static analysis;
+- unit/fuzz/invariant tests;
+- privilege and pause-path tests;
+- storage/upgrade policy review;
+- external or independent audit appropriate to value at risk;
+- testnet canary;
+- admin/multisig/timelock proof;
+- deployment digest and verified source;
+- rollback/incident plan.
+
+Current reference Solidity sources are construction candidates, not audited production code.
+
+## Required invariants
+
+1. `sum(allocation legs) == gross amount`.
+2. One provider event cannot create two accepted provider receipts.
+3. One wallet idempotency key cannot create two wallet events.
+4. Prior wallet events cannot be updated or deleted through the normal application path.
+5. Every wallet event after genesis references the prior chain hash.
+6. Payment success cannot independently grant a right.
+7. ThriveFund calculated obligation cannot be represented as externally settled without settlement evidence.
+8. Public-chain proof never contains the protected evidence body.
+9. Provider and chain adapters cannot silently change economic schedules.
+10. An originating agent cannot be the independent final verifier of its material wallet release.
+
+## Foundation stress evidence
+
+The first controlled-test database canary passed `1,000` allocation cases, `500` chained events and `500` exact replays. The executable public-safe kernel separately passed `10,000` allocation cases and `2,000` chained events with unique chain hashes.
+
+These tests prove the tested invariants only. They do not certify production custody, payment acceptance, smart contracts, passkey recovery or mainnet operation.
