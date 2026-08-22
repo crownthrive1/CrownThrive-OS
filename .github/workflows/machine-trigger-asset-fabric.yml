@@ -1,0 +1,81 @@
+name: Machine Trigger Asset Fabric
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "developers/manifests/machine-trigger-asset-fabric.v1.json"
+      - "scripts/machine_trigger_asset_fabric.py"
+      - "automation/machine-trigger-asset-fabric.mdx"
+      - ".github/workflows/machine-trigger-asset-fabric.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "developers/manifests/machine-trigger-asset-fabric.v1.json"
+      - "scripts/machine_trigger_asset_fabric.py"
+      - "automation/machine-trigger-asset-fabric.mdx"
+      - ".github/workflows/machine-trigger-asset-fabric.yml"
+  schedule:
+    - cron: "11 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: machine-trigger-asset-fabric-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controlled-test:
+    name: Validate machine-trigger asset fabric
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile trigger fabric
+        run: python -m py_compile scripts/machine_trigger_asset_fabric.py
+
+      - name: Validate authority, plugin and Vault boundaries
+        run: python scripts/machine_trigger_asset_fabric.py --validate-only
+
+      - name: Materialize current trigger, plugin and Vault packages
+        run: python scripts/machine_trigger_asset_fabric.py --output build/machine-trigger-assets
+
+      - name: Assert bounded perpetual factory intake
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.loads(Path("build/machine-trigger-assets/summary.json").read_text())
+          assert s["trigger_bundles"] == 32
+          assert s["derivative_candidates"] == 128
+          assert s["plugins"] == 5
+          assert s["vault_bindings"] == 32
+          assert s["authoritative_delta"] == 0
+          assert s["state"] == {"candidate_hold": 32}
+          PY
+
+      - name: Assert scheduled execution cannot manufacture authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          t=Path(".github/workflows/machine-trigger-asset-fabric.yml").read_text().lower()
+          forbidden=["contents: write","packages: write","deploy_edge_function","stripe product create","checkout session create","supabase migration apply"]
+          for token in forbidden:
+              assert token not in t, f"forbidden scheduled mutation surface: {token}"
+          PY
+
+      - name: Re-run documentation governance
+        run: python scripts/validate_docs.py
