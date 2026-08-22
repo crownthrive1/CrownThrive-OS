@@ -1,0 +1,128 @@
+---
+title: "CHLOM EASOR Settlement Plan Compiler"
+sidebarTitle: "EASOR Settlement Plans"
+description: "Developer contract for deterministic minor-unit allocation and reversal obligation plans that preserve Money, Rights, Rewards and Impact as separate governed states."
+icon: "scale-balanced"
+---
+
+# CHLOM EASOR settlement plan compiler
+
+**Algorithm:** `EASOR v1`  
+**Schema:** `1.0.0`  
+**Output state:** `PREVIEW_HOLD`  
+**Provider writes:** none
+
+EASOR—Economic Allocation Schedule & Obligation Resolver—compiles an approved-candidate economic schedule into exact minor-unit obligations. It does not execute settlement.
+
+## Schedule contract
+
+Each rule contains:
+
+```json
+{
+  "leg_code": "creator",
+  "bps": 6500,
+  "beneficiary_ref": "ct.party.creator",
+  "leg_class": "creator",
+  "settlement_mode": "external_settlement_candidate",
+  "program_ref": null
+}
+```
+
+Supported leg classes are:
+
+```text
+platform
+creator
+tax_reserve
+impact_obligation
+affiliate
+service
+other
+```
+
+Supported settlement modes are:
+
+```text
+external_settlement_candidate
+internal_obligation
+hold_only
+```
+
+Rules are sorted by `leg_code`, duplicate leg codes are rejected and total basis points must equal exactly `10,000`.
+
+## Largest-remainder allocation
+
+For each leg:
+
+```text
+numerator = gross_minor × bps
+base allocation = floor(numerator ÷ 10,000)
+remainder = numerator mod 10,000
+```
+
+Any remaining minor units are assigned by:
+
+1. larger remainder first;
+2. lexicographically smaller `leg_code` when remainders tie.
+
+This creates a deterministic, order-independent result while preserving:
+
+```text
+sum(allocation legs) = gross_minor
+```
+
+## Semantic separation
+
+EASOR compiles five related but distinct outputs:
+
+- **Money legs** — calculated obligations only;
+- **Rights obligations** — `HOLD_INDEPENDENT_RIGHTS_REQUIRED`;
+- **Reward obligations** — `non_cash_candidate` with no cash-equivalence inference;
+- **Impact obligations** — `calculated_not_settled` with no disbursement claim;
+- **Plan proof** — deterministic plan digest.
+
+A successful payment can be an input to a later governed decision, but EASOR does not turn payment evidence into a license or entitlement.
+
+## Reversal compiler
+
+A reversal plan:
+
+- verifies the original plan digest before use;
+- rejects reversal value greater than the original gross;
+- allocates proportionally against original leg amounts;
+- uses deterministic remainder ordering;
+- never exceeds any original leg cap;
+- conserves the exact reversal amount;
+- remains `PREVIEW_HOLD`.
+
+This supports refund, dispute, correction and cancellation planning without mutating the original plan or performing a provider write.
+
+## Fixed vector
+
+The controlled vector uses `12,345` USD minor units with a `65% / 20% / 10% / 5%` schedule. Its plan digest is:
+
+```text
+857adfd266bc915bc3b26727d8e24678784d9e99e7f605c2c3b668b9147a8107
+```
+
+The same vector includes a `3,333`-minor-unit reversal and exact expected leg outputs.
+
+## Explicit non-authority
+
+An EASOR plan is not:
+
+- a tax determination;
+- a payout instruction;
+- a bank/Stripe transfer;
+- an invoice;
+- a rights grant;
+- a ThriveFund disbursement;
+- an accounting close;
+- a legal approval.
+
+Those transitions require their own evidence, authority and provider receipts.
+
+## Promotion gates
+
+Before an economic schedule becomes effective, require schedule ownership, effective period, jurisdiction/currency, tax treatment, beneficiary identity, contractual authority, refund/dispute behavior, provider capability, accounting reconciliation, reserve policy and independent Finance/Tax/Treasury review. The plan compiler remains useful while every execution path stays disabled.
