@@ -10,7 +10,6 @@ on:
 
 # Bounded exact-content execution trigger. Product bytes remain in private Drive
 # and private Supabase Storage; only sanitized digests/receipts may enter Git.
-# Retry after canonical grant-issuer and grant-ordering repair in fulfillment v2.
 permissions:
   contents: write
   id-token: write
@@ -48,14 +47,63 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/private-fulfillment
+          mkdir -p build/private-fulfillment changelog
+          FAILED=0
+          FAILED_PLATFORM=""
+          FAILED_HTTP=""
           for PLATFORM in launch ready procure; do
-            curl --fail-with-body --silent --show-error \
+            HTTP_CODE="$(curl --silent --show-error \
+              -o "build/private-fulfillment/${PLATFORM}.json" \
+              -w "%{http_code}" \
               -X POST \
               -H "Authorization: Bearer ${ID_TOKEN}" \
-              "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-private-fulfillment-oidc?platform=${PLATFORM}" \
-              > "build/private-fulfillment/${PLATFORM}.json"
+              "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-private-fulfillment-oidc?platform=${PLATFORM}")"
+            if [[ ! "${HTTP_CODE}" =~ ^2 ]]; then
+              FAILED=1
+              FAILED_PLATFORM="${PLATFORM}"
+              FAILED_HTTP="${HTTP_CODE}"
+              break
+            fi
           done
+          if [[ "${FAILED}" == "1" ]]; then
+            export FAILED_PLATFORM FAILED_HTTP
+            python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          platform = os.environ["FAILED_PLATFORM"]
+          raw = json.loads(Path(f"build/private-fulfillment/{platform}.json").read_text())
+          detail = str(raw.get("detail", "unspecified_failure"))
+          detail = re.sub(r"https?://\\S+", "[redacted-url]", detail)
+          detail = re.sub(r"storage://\\S+", "[redacted-ref]", detail)
+          detail = re.sub(r"\\b(?:sk|rk|pk|whsec|sb|ghp|github_pat)_[A-Za-z0-9_-]+\\b", "[redacted-secret]", detail)
+          detail = re.sub(r"[A-Za-z0-9_-]{32,}", "[redacted-token]", detail)[:240]
+          receipt = {
+              "schema_version": "1.0.0",
+              "receipt_id": "ct.receipt.commercial-gap-private-fulfillment-oidc.failure.2026-08-22.v1",
+              "source_commit": os.environ["GITHUB_SHA"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "cohort_id": "ct-commercial-gap-sites-v1",
+              "candidate_version": "1.0.0-candidate.4",
+              "platform": platform,
+              "http_status": int(os.environ["FAILED_HTTP"]),
+              "error": str(raw.get("error", "private_fulfillment_failed"))[:80],
+              "detail": detail,
+              "customer_effect": False,
+              "money_movement": False,
+              "checkout_activation": False,
+              "entitlement_activation": False,
+              "rights_grant": False,
+              "public_url_created": False,
+          }
+          Path("changelog/commercial-gap-private-fulfillment-oidc-failure.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          PY
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add changelog/commercial-gap-private-fulfillment-oidc-failure.json
+            git commit -m "Record sanitized private fulfillment failure" || true
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+            exit 1
+          fi
 
       - name: Validate and sanitize receipt
         shell: bash
