@@ -1,0 +1,55 @@
+---
+title: "CrownLytics JSON Ingest Foundry"
+sidebarTitle: "CrownLytics Ingest"
+description: "Public-safe contract for restricted JSON staging, schema fingerprinting, privacy/secret quarantine and future CrownLytics mapping."
+icon: "database"
+---
+
+# CrownLytics JSON Ingest Foundry
+
+**State:** CONTROLLED TEST.  
+**Provider dispatch:** DISABLED / FAIL-CLOSED.
+
+The CrownLytics JSON Ingest Foundry lets CrownThrive accept heterogeneous JSON exports without manually normalizing each file before governance begins. It is an intake and evidence plane, not automatic production ingestion.
+
+## Intake lifecycle
+
+`received -> SHA-256 -> schema fingerprint -> duplicate check -> secret/privacy scan -> validated | quarantined -> mapping candidate -> independent verification -> provider-ready candidate`
+
+Provider dispatch is a later state and remains disabled until the exact CrownLytics credential, endpoint contract, transformation and privacy requirements are certified.
+
+## Controls
+
+Each staged payload receives:
+
+- payload SHA-256;
+- deterministic schema fingerprint;
+- byte/object counts;
+- duplicate linkage rather than duplicate rewrite;
+- secret-shaped-field detection;
+- high-risk personal-data signal detection;
+- analytics-identifier signal detection;
+- immutable intake receipt;
+- DAIL lineage;
+- restricted raw-payload custody.
+
+A single staged JSON payload is currently limited to 10 MiB. Larger exports should be split into deterministic batches rather than bypassing the limit.
+
+## Quarantine
+
+Secret-shaped inputs fail closed to secret review. High-risk personal-data signals fail closed to privacy review. Analytics identifiers are tracked separately because privacy-preserving analytics may legitimately contain pseudonymous identifiers while still requiring minimization and retention controls.
+
+No raw JSON is public by default.
+
+## Gen-7 composition
+
+Agent V — CrownLytics Ingest Steward — is a non-voting D2 maximum subroute under the API/MCP specialist lane. It reuses existing Gen-7 Evidence Quality and Data Protection scoring instead of creating redundant scoring families.
+
+Scores are evidence aids. They cannot convert a quarantined payload into provider-ready state or waive privacy, credential, retention or provider certification.
+
+## MCP contracts
+
+- `crownlytics.ingest.status` — sanitized counts/state only;
+- `crownlytics.ingest.stage_json` — restricted staging and fingerprint/quarantine path.
+
+These contracts do not expose raw staged payloads.
