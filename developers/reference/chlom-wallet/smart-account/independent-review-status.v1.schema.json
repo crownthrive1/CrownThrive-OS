@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.crownthrive.com/chlom/independent-review-status.v1.schema.json",
+  "title": "CHLOM Wallet Independent Review Public Status v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "state",
+    "phase",
+    "originator_agent_id",
+    "originator_is_final_approver",
+    "technical_snapshot",
+    "counts",
+    "review_lanes",
+    "latest_synthesis",
+    "scheduler_policy",
+    "hard_boundaries",
+    "source_ref"
+  ],
+  "properties": {
+    "contract": { "const": "ct.wallet.independent-review-status.v1" },
+    "state": {
+      "enum": [
+        "HOLD_REVIEWER_HEARTBEATS_AND_RECEIPTS",
+        "HOLD_MISSING_INDEPENDENT_RECEIPTS",
+        "HOLD_REVIEW_CONDITIONS",
+        "DENY_INDEPENDENT_REVIEW",
+        "READY_FOR_PHASE_GATE_REVIEW",
+        "HOLD_INDEPENDENT_REVIEW_INCOMPLETE"
+      ]
+    },
+    "phase": { "const": "2.99" },
+    "originator_agent_id": { "const": "ct.agent.chlom-wallet-settlement" },
+    "originator_is_final_approver": { "const": false },
+    "technical_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exact_head_sha", "evidence_digest_sha256", "chain_id_caip2", "entrypoint_address", "runtime_code_bytes", "runtime_codehash"],
+      "properties": {
+        "exact_head_sha": { "const": "df67672b99839e58d7873dabe49e06de58007820" },
+        "evidence_digest_sha256": { "const": "a11e9c03cfd0ec05d9e4f1171b1d99e124cf2f7fffd697881bb3718f13e4b9fb" },
+        "chain_id_caip2": { "const": "eip155:11155111" },
+        "entrypoint_address": { "const": "0x433709009B8330FDa32311DF1C2AFA402eD8D009" },
+        "runtime_code_bytes": { "const": 22425 },
+        "runtime_codehash": { "const": "0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0" }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_reviewers", "ready_reviewers", "stale_or_unready_reviewers", "receipts_recorded", "pass_receipts", "hold_receipts", "deny_receipts"],
+      "properties": {
+        "required_reviewers": { "const": 5 },
+        "ready_reviewers": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "stale_or_unready_reviewers": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "receipts_recorded": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "pass_receipts": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "hold_receipts": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "deny_receipts": { "type": "integer", "minimum": 0, "maximum": 5 }
+      }
+    },
+    "review_lanes": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "work_id", "review_role", "reviewer_agent_id", "reviewer_did_uri",
+          "reviewer_public_identity_digest_sha256", "binding_state", "authority_ceiling",
+          "vote_eligible", "heartbeat_at", "heartbeat_ttl_seconds", "heartbeat_fresh",
+          "reviewer_ready", "work_state", "blocker_reason", "receipt_state",
+          "receipt_digest_sha256", "receipt_created_at"
+        ],
+        "properties": {
+          "work_id": { "type": "string", "pattern": "^ct[.]work[.]chlom-wallet[.]erc4337-[a-z0-9.-]+[.]v1$" },
+          "review_role": { "enum": ["protocol", "security", "quorum", "recovery", "release"] },
+          "reviewer_agent_id": { "type": "string", "pattern": "^ct[.](chlom[.]agent|relay)[.][a-z0-9.-]+$" },
+          "reviewer_did_uri": { "type": ["string", "null"], "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$" },
+          "reviewer_public_identity_digest_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+          "binding_state": { "type": ["string", "null"] },
+          "authority_ceiling": { "type": ["string", "null"], "enum": ["D0", "D1", "D2", null] },
+          "vote_eligible": { "type": "boolean" },
+          "heartbeat_at": { "type": ["string", "null"] },
+          "heartbeat_ttl_seconds": { "type": ["integer", "null"], "minimum": 300, "maximum": 86400 },
+          "heartbeat_fresh": { "type": "boolean" },
+          "reviewer_ready": { "type": "boolean" },
+          "work_state": { "enum": ["waiting", "ready", "active", "blocked", "done", "archived"] },
+          "blocker_reason": { "type": ["string", "null"] },
+          "receipt_state": { "enum": ["MISSING", "PASS_REVIEW", "HOLD", "DENY"] },
+          "receipt_digest_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+          "receipt_created_at": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "latest_synthesis": { "type": ["object", "null"] },
+    "scheduler_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dependency_refresh_job", "fresh_reviewer_heartbeat_required", "scheduler_executes_reviewers", "reviewer_impersonation_allowed"],
+      "properties": {
+        "dependency_refresh_job": { "const": "chlom-construction-queue-quarter-hourly" },
+        "fresh_reviewer_heartbeat_required": { "const": true },
+        "scheduler_executes_reviewers": { "const": false },
+        "reviewer_impersonation_allowed": { "const": false }
+      }
+    },
+    "hard_boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "private_fingerprint_exposed", "credential_value_exposed", "fabricated_reviewer_heartbeat",
+        "fabricated_review_receipt", "originator_self_approval", "automatic_profile_promotion",
+        "deployment_authorized", "broadcast_authorized", "custody", "money_movement",
+        "production_rights_grant", "phase_advancement", "merge_authorized"
+      ],
+      "properties": {
+        "private_fingerprint_exposed": { "const": false },
+        "credential_value_exposed": { "const": false },
+        "fabricated_reviewer_heartbeat": { "const": false },
+        "fabricated_review_receipt": { "const": false },
+        "originator_self_approval": { "const": false },
+        "automatic_profile_promotion": { "const": false },
+        "deployment_authorized": { "const": false },
+        "broadcast_authorized": { "const": false },
+        "custody": { "const": false },
+        "money_movement": { "const": false },
+        "production_rights_grant": { "const": false },
+        "phase_advancement": { "const": false },
+        "merge_authorized": { "const": false }
+      }
+    },
+    "source_ref": { "const": "github:crownthrive1/CrownThrive-Support:pull/230" }
+  },
+  "not": {
+    "anyOf": [
+      { "required": ["private_fingerprint"] },
+      { "required": ["private_fingerprint_sha256"] },
+      { "required": ["private_key"] },
+      { "required": ["seed_phrase"] },
+      { "required": ["mnemonic"] },
+      { "required": ["credential_value"] },
+      { "required": ["secret_manager_ref"] }
+    ]
+  }
+}

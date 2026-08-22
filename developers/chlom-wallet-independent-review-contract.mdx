@@ -1,0 +1,157 @@
+---
+title: "CHLOM Wallet Independent Review Contract"
+sidebarTitle: "Wallet Review Contract"
+description: "Exact-head, DID-bound and heartbeat-gated independent review receipts for the CHLOM Wallet ERC-4337 evidence packet."
+icon: "user-shield"
+---
+
+# CHLOM Wallet independent review contract
+
+**State:** `HOLD_REVIEWER_HEARTBEATS_AND_RECEIPTS`  
+**Phase:** 2.99  
+**Originator:** `ct.agent.chlom-wallet-settlement`  
+**Originator final approval:** prohibited  
+**Deployment and broadcast authority:** none
+
+CHLOM Wallet separates evidence construction from independent review. The Wallet Agent may build and freeze the technical packet, but it cannot refresh reviewers on their behalf, impersonate them, submit their decisions, approve its own runtime codehash, promote the EntryPoint profile, or authorize deployment.
+
+## Frozen technical snapshot
+
+```yaml
+exact_head_sha: df67672b99839e58d7873dabe49e06de58007820
+evidence_digest_sha256: a11e9c03cfd0ec05d9e4f1171b1d99e124cf2f7fffd697881bb3718f13e4b9fb
+chain_id_caip2: eip155:11155111
+entrypoint_address: '0x433709009B8330FDa32311DF1C2AFA402eD8D009'
+runtime_code_bytes: 22425
+runtime_codehash: '0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
+```
+
+The snapshot includes the official upstream source and audit evidence, multi-provider read-only observation, deterministic Sepolia-chain-ID runtime reproduction, WebAuthn controls, and the no-deployment boundary.
+
+## Required review lanes
+
+| Lane | Work ID | Reviewer | Current state |
+| --- | --- | --- | --- |
+| Protocol and bytecode identity | `ct.work.chlom-wallet.erc4337-runtime-codehash-review.v1` | `ct.chlom.agent.blockchain-crypto` | binding active; heartbeat stale; receipt missing |
+| Independent security | `ct.work.chlom-wallet.erc4337-security-review.v1` | `ct.chlom.agent.security` | binding active; heartbeat stale; receipt missing |
+| Quorum and separation of duties | `ct.work.chlom-wallet.erc4337-quorum-review.v1` | `ct.relay.agent-d` | binding active; heartbeat stale; receipt missing |
+| Recovery and readback | `ct.work.chlom-wallet.erc4337-recovery-readback.v1` | `ct.chlom.agent.recovery` | binding active; heartbeat stale; receipt missing |
+| Release synthesis | `ct.work.chlom-wallet.erc4337-release-synthesis.v1` | `ct.chlom.agent.release-certifier` | binding active; heartbeat stale; receipt missing |
+
+Agent D retains its pre-existing institutional voting status. A wallet review receipt from Agent D has `vote_effect: none`; it does not independently authorize release or phase advancement.
+
+## Receipt acceptance rules
+
+A review receipt is accepted only when:
+
+1. the work ID maps to the exact canonical reviewer and role;
+2. the reviewer is not the Wallet Agent or work owner;
+3. the agent template exists and prohibits self-approval;
+4. the repository binding is active;
+5. the DID and public identity digest resolve;
+6. the reviewer heartbeat is fresh at recording time;
+7. the queue scope matches the registered review lane;
+8. the receipt binds to the frozen head and evidence digest;
+9. the decision is `PASS_REVIEW`, `HOLD`, or `DENY`;
+10. every no-live and no-authority boundary remains false.
+
+The private write contract is:
+
+```text
+chlom_wallet.record_independent_review_receipt_v1(...)
+```
+
+Receipts are append-only, RLS-protected, and service-role mediated.
+
+## Public-safe status
+
+Current status is available through:
+
+```text
+public.chlom_wallet_independent_review_status_v1()
+```
+
+It exposes public DIDs, public identity digests, heartbeat readiness, work state, receipt state, synthesis state, and hard boundaries. It does not expose private fingerprint commitments, private keys, credential values, provider credentials, or secret-manager references.
+
+Current counts:
+
+```yaml
+required_reviewers: 5
+ready_reviewers: 0
+stale_or_unready_reviewers: 5
+receipts_recorded: 0
+pass_receipts: 0
+hold_receipts: 0
+deny_receipts: 0
+state: HOLD_REVIEWER_HEARTBEATS_AND_RECEIPTS
+```
+
+## Scheduler hardening
+
+The quarter-hourly construction scheduler evaluates dependencies but does not execute reviewers.
+
+```yaml
+job: chlom-construction-queue-quarter-hourly
+schedule: '7,22,37,52 * * * *'
+fresh_reviewer_heartbeat_required: true
+stale_reviewer_forces_waiting: true
+scheduler_executes_reviewers: false
+reviewer_impersonation_allowed: false
+```
+
+This prevents a dependency refresh from moving an independent-review item to `ready` while its designated reviewer is stale.
+
+## Fail-closed evidence
+
+```yaml
+enforcement_canary: PASS_INDEPENDENT_REVIEW_CONTRACT_FAIL_CLOSED_CANARY
+public_status_canary: PASS_INDEPENDENT_REVIEW_PUBLIC_STATUS_CANARY
+wrong_reviewer_rejected: true
+originator_rejected: true
+stale_reviewer_rejected: true
+missing_receipts_hold: true
+current_synthesis: HOLD_MISSING_INDEPENDENT_RECEIPTS
+```
+
+The PASS applies to the enforcement mechanism. The underlying protocol, security, quorum, recovery, and release reviews remain incomplete.
+
+## Synthesis boundary
+
+The synthesis function can return only:
+
+```text
+HOLD_MISSING_INDEPENDENT_RECEIPTS
+HOLD_REVIEWER_IDENTITY_OR_HEARTBEAT
+HOLD_REVIEW_CONDITIONS
+DENY_INDEPENDENT_REVIEW
+PASS_INDEPENDENT_REVIEW_RECEIPTS_READY_FOR_PHASE_GATE
+```
+
+Even five PASS receipts produce only `PASS_INDEPENDENT_REVIEW_RECEIPTS_READY_FOR_PHASE_GATE`. They do not promote the EntryPoint profile, choose an account implementation or factory, authorize a signer, deploy a contract, broadcast a UserOperation, move funds, grant rights, merge the PR, or enter Phase 3.
+
+## Machine contracts
+
+- `developers/manifests/chlom-wallet-independent-review-contract.v1.json`
+- `developers/reference/chlom-wallet/smart-account/independent-review-receipt.v1.schema.json`
+- `developers/reference/chlom-wallet/smart-account/independent-review-status.v1.schema.json`
+- `developers/reference/chlom-wallet/smart-account/test-independent-review-receipt-contract.mjs`
+- `.github/workflows/chlom-wallet-independent-review-contract.yml`
+
+## Hard boundaries
+
+```yaml
+originator_self_approval: false
+fabricated_reviewer_heartbeat: false
+fabricated_review_receipt: false
+automatic_profile_promotion: false
+deployment_authorized: false
+broadcast_authorized: false
+custody: false
+token_issuance: false
+money_movement: false
+production_rights_grant: false
+effective_price_publication: false
+checkout_activation: false
+phase_advancement: false
+merge_authorized: false
+```

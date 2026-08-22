@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.crownthrive.com/chlom/independent-review-receipt.v1.schema.json",
+  "title": "CHLOM Wallet Independent Review Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "work_id",
+    "review_role",
+    "reviewer_agent_id",
+    "reviewer_did_uri",
+    "reviewer_public_identity_digest_sha256",
+    "reviewer_head_sha",
+    "reviewer_heartbeat_at",
+    "reviewer_heartbeat_ttl_seconds",
+    "heartbeat_fresh_at_recording",
+    "exact_head_sha",
+    "evidence_digest_sha256",
+    "decision",
+    "findings",
+    "conditions",
+    "receipt_nonce",
+    "receipt_digest_sha256",
+    "source_ref",
+    "hard_boundaries"
+  ],
+  "properties": {
+    "contract": { "const": "ct.wallet.independent-review-receipt.v1" },
+    "work_id": {
+      "enum": [
+        "ct.work.chlom-wallet.erc4337-runtime-codehash-review.v1",
+        "ct.work.chlom-wallet.erc4337-security-review.v1",
+        "ct.work.chlom-wallet.erc4337-quorum-review.v1",
+        "ct.work.chlom-wallet.erc4337-recovery-readback.v1",
+        "ct.work.chlom-wallet.erc4337-release-synthesis.v1"
+      ]
+    },
+    "review_role": { "enum": ["protocol", "security", "quorum", "recovery", "release"] },
+    "reviewer_agent_id": {
+      "enum": [
+        "ct.chlom.agent.blockchain-crypto",
+        "ct.chlom.agent.security",
+        "ct.relay.agent-d",
+        "ct.chlom.agent.recovery",
+        "ct.chlom.agent.release-certifier"
+      ],
+      "not": { "const": "ct.agent.chlom-wallet-settlement" }
+    },
+    "reviewer_did_uri": { "type": "string", "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$" },
+    "reviewer_public_identity_digest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "reviewer_head_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "reviewer_heartbeat_at": { "type": "string", "format": "date-time" },
+    "reviewer_heartbeat_ttl_seconds": { "type": "integer", "minimum": 300, "maximum": 86400 },
+    "heartbeat_fresh_at_recording": { "const": true },
+    "exact_head_sha": { "const": "df67672b99839e58d7873dabe49e06de58007820" },
+    "evidence_digest_sha256": { "const": "a11e9c03cfd0ec05d9e4f1171b1d99e124cf2f7fffd697881bb3718f13e4b9fb" },
+    "decision": { "enum": ["PASS_REVIEW", "HOLD", "DENY"] },
+    "findings": { "type": "array", "maxItems": 100 },
+    "conditions": { "type": "array", "maxItems": 100 },
+    "receipt_nonce": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{8,160}$" },
+    "receipt_digest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_ref": { "type": "string", "minLength": 8, "maxLength": 500 },
+    "hard_boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "originator_self_approval",
+        "profile_promoted",
+        "deployment_authorized",
+        "broadcast_authorized",
+        "custody",
+        "money_movement",
+        "production_rights_grant",
+        "phase_advancement",
+        "merge_authorized"
+      ],
+      "properties": {
+        "originator_self_approval": { "const": false },
+        "profile_promoted": { "const": false },
+        "deployment_authorized": { "const": false },
+        "broadcast_authorized": { "const": false },
+        "custody": { "const": false },
+        "money_movement": { "const": false },
+        "production_rights_grant": { "const": false },
+        "phase_advancement": { "const": false },
+        "merge_authorized": { "const": false }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "work_id": { "const": "ct.work.chlom-wallet.erc4337-runtime-codehash-review.v1" } }, "required": ["work_id"] },
+      "then": { "properties": { "review_role": { "const": "protocol" }, "reviewer_agent_id": { "const": "ct.chlom.agent.blockchain-crypto" } } }
+    },
+    {
+      "if": { "properties": { "work_id": { "const": "ct.work.chlom-wallet.erc4337-security-review.v1" } }, "required": ["work_id"] },
+      "then": { "properties": { "review_role": { "const": "security" }, "reviewer_agent_id": { "const": "ct.chlom.agent.security" } } }
+    },
+    {
+      "if": { "properties": { "work_id": { "const": "ct.work.chlom-wallet.erc4337-quorum-review.v1" } }, "required": ["work_id"] },
+      "then": { "properties": { "review_role": { "const": "quorum" }, "reviewer_agent_id": { "const": "ct.relay.agent-d" } } }
+    },
+    {
+      "if": { "properties": { "work_id": { "const": "ct.work.chlom-wallet.erc4337-recovery-readback.v1" } }, "required": ["work_id"] },
+      "then": { "properties": { "review_role": { "const": "recovery" }, "reviewer_agent_id": { "const": "ct.chlom.agent.recovery" } } }
+    },
+    {
+      "if": { "properties": { "work_id": { "const": "ct.work.chlom-wallet.erc4337-release-synthesis.v1" } }, "required": ["work_id"] },
+      "then": { "properties": { "review_role": { "const": "release" }, "reviewer_agent_id": { "const": "ct.chlom.agent.release-certifier" } } }
+    }
+  ],
+  "not": {
+    "anyOf": [
+      { "required": ["private_fingerprint"] },
+      { "required": ["private_fingerprint_sha256"] },
+      { "required": ["private_key"] },
+      { "required": ["seed_phrase"] },
+      { "required": ["mnemonic"] },
+      { "required": ["credential_value"] },
+      { "required": ["secret_manager_ref"] }
+    ]
+  }
+}
