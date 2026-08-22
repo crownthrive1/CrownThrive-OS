@@ -163,22 +163,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          response=$(curl --fail --silent --show-error \
+          status=$(curl --silent --show-error \
+            -o /tmp/chlom-bridge-response.json \
+            -w '%{http_code}' \
             -X POST \
             -H "Authorization: Bearer ${ID_TOKEN}" \
             -H "Content-Type: application/json" \
             --data-binary @/tmp/chlom-payload.json \
             "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-github-executor-bridge")
-          printf '%s\n' "${response}" | python -c '
-          import json,sys
-          value=json.load(sys.stdin)
+          python - <<'PY'
+          import json
+          import pathlib
+          import sys
+          value=json.loads(pathlib.Path('/tmp/chlom-bridge-response.json').read_text(encoding='utf-8'))
+          print(json.dumps(value, indent=2))
+          PY
+          if [ "${status}" != "200" ]; then
+            echo "CHLOM bridge returned HTTP ${status}" >&2
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          import pathlib
+          value=json.loads(pathlib.Path('/tmp/chlom-bridge-response.json').read_text(encoding='utf-8'))
           assert value.get("ok") is True, value
           result=value.get("result") or {}
           assert result.get("accepted") is True, value
           assert result.get("sovereign_vote_effect") is False, value
           assert result.get("secret_exposed") is False, value
-          print(json.dumps(value, indent=2))
-          '
+          PY
 
       - name: Publish public-safe execution summary
         run: |
