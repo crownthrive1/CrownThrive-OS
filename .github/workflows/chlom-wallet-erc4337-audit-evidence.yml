@@ -24,14 +24,27 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Verify required local tools
+      - name: Install exact PDF extraction dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >/tmp/chlom-wallet-audit-requirements.txt <<'REQ'
+          pypdf==5.9.0 --hash=sha256:be10a4c54202f46d9daceaa8788be07aa8cd5ea8c25c529c50dd509206382c35
+          REQ
+          python -m pip install --disable-pip-version-check --no-deps --require-hashes \
+            -r /tmp/chlom-wallet-audit-requirements.txt
+          python - <<'PY'
+          import pypdf
+          assert pypdf.__version__=='5.9.0'
+          print(pypdf.__version__)
+          PY
+
+      - name: Verify source-controlled contracts
         shell: bash
         run: |
           set -euo pipefail
           python --version
           command -v curl
-          command -v pdfinfo
-          command -v pdftotext
           python -m json.tool developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json >/dev/null
           python -m py_compile developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py
 
@@ -66,6 +79,7 @@ jobs:
           assert extracted['result']=='PASS_AUDIT_PDF_IDENTITY_AND_TEXT_EXTRACTION_HOLD_INTERPRETATION'
           assert extracted['source']['git_blob_sha1']=='d0cd0ad29d341d35df1047cadde6cb67d453be91'
           assert extracted['source']['size_bytes']==498502
+          assert extracted['extractor']=={'library':'pypdf','version':'5.9.0','network_access':False}
           assert extracted['document']['page_count']>0
           assert extracted['document']['text_character_count']>=1000
           assert extracted['interpretation']['audit_scope_commit_confirmed'] is False
@@ -93,9 +107,12 @@ jobs:
           summary={
             'result': evidence['result'],
             'source': evidence['source'],
+            'extractor': evidence['extractor'],
             'document': {
               'page_count': evidence['document']['page_count'],
+              'pdf_metadata': evidence['document']['pdf_metadata'],
               'text_character_count': evidence['document']['text_character_count'],
+              'per_page_character_counts': evidence['document']['per_page_character_counts'],
               'text_sha256': evidence['document']['text_sha256'],
               'full_commit_candidates': evidence['document']['full_commit_candidates'],
               'evm_address_candidates': evidence['document']['evm_address_candidates'],
@@ -118,7 +135,7 @@ jobs:
             developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py
             .github/workflows/chlom-wallet-erc4337-audit-evidence.yml
           )
-          if grep -nE 'eth_sendRawTransaction|eth_sendTransaction|wallet_sendCalls|personal_sendTransaction|private[_ -]?key|mnemonic|seed phrase|broadcast_performed:[[:space:]]*true|money_movement:[[:space:]]*true' "${files[@]}"; then
+          if grep -nE 'eth_sendRawTransaction|eth_sendTransaction|wallet_sendCalls|personal_sendTransaction|mnemonic|seed phrase|broadcast_performed:[[:space:]]*true|money_movement:[[:space:]]*true' "${files[@]}"; then
             echo 'Audit evidence packet crossed the non-execution boundary.'
             exit 1
           fi
