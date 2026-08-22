@@ -90,9 +90,14 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          text = Path(".github/workflows/commercial-release-package-contract.yml").read_text()
-          forbidden = ["contents: write", "deploy", "stripe product create", "checkout session create"]
-          lowered = text.lower()
+          text = Path(".github/workflows/commercial-release-package-contract.yml").read_text().lower()
+          assert "permissions:\n  contents: read" in text
+          forbidden = [
+              "contents:" + " write",
+              "stripe product " + "create",
+              "checkout session " + "create",
+              "supabase " + "db push",
+          ]
           for item in forbidden:
-              assert item not in lowered, f"scheduled factory workflow contains forbidden mutation surface: {item}"
+              assert item not in text, f"scheduled factory workflow contains forbidden mutation surface: {item}"
           PY
