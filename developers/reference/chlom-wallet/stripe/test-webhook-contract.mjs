@@ -59,6 +59,27 @@ assert.equal(translated.fulfillment, 'HOLD');
 assert.equal(translated.entitlement_inferred, false);
 assert.equal(translated.rights_granted, false);
 
+const lifecycleCases = [
+  ['invoice.paid', 'provider_invoice_paid'],
+  ['invoice.payment_failed', 'provider_invoice_payment_failed'],
+  ['customer.subscription.created', 'provider_subscription_created'],
+  ['customer.subscription.updated', 'provider_subscription_updated'],
+  ['customer.subscription.deleted', 'provider_subscription_deleted'],
+  ['charge.dispute.created', 'provider_dispute_observed'],
+  ['charge.refunded', 'provider_refund_observed'],
+  ['checkout.session.async_payment_succeeded', 'provider_checkout_async_succeeded'],
+  ['checkout.session.async_payment_failed', 'provider_checkout_async_failed'],
+];
+for (const [type, normalized] of lifecycleCases) {
+  const translatedLifecycle = translateStripeEventForWallet({ ...event, id: `evt_${type}`, type });
+  assert.equal(translatedLifecycle.ok, true, `${type} must remain allowlisted`);
+  assert.equal(translatedLifecycle.value_class, 'Money');
+  assert.equal(translatedLifecycle.normalized_event, normalized);
+  assert.equal(translatedLifecycle.fulfillment, 'HOLD');
+  assert.equal(translatedLifecycle.entitlement_inferred, false);
+  assert.equal(translatedLifecycle.rights_granted, false);
+}
+
 const liveTranslated = translateStripeEventForWallet({ ...event, livemode: true });
 assert.equal(liveTranslated.fulfillment, 'HOLD');
 assert.equal(liveTranslated.reason, 'live_event_not_armed');
@@ -69,5 +90,6 @@ console.log(JSON.stringify({
   stale_timestamp_rejected: true,
   tamper_rejected: true,
   live_event_gate: true,
+  lifecycle_event_contracts: lifecycleCases.length,
   payment_to_entitlement_inference: false,
 }));
