@@ -1,0 +1,82 @@
+name: CIE Parent Custody Export
+
+on:
+  push:
+    branches:
+      - "agent-c/cie-custody-export-d08e68b"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cie-parent-custody-export-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    name: Build exact-head custody archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify candidate ancestry and build custody staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_head="d08e68b627f4cffd9c94e60da9598695121b374a"
+          git merge-base --is-ancestor "$candidate_head" HEAD
+          mkdir -p custody
+          cp .github/workflows/cie-interoperability-parent-governance.yml custody/CrownThrive_CIE_Workflow_Parent-Interoperability-Governance_2026-08-22_v3.yml
+          cp automation/cie-framework-agent.mdx custody/CrownThrive_CIE_Agent-Contract_Framework-Agent_2026-08-22_v3.mdx
+          cp changelog/phase-2-99-cie-interoperability-continuity-2026-08-22.mdx custody/CrownThrive_CIE_Changelog_Interoperability-Continuity_2026-08-22_v3.mdx
+          cp chlom/cie-cultural-governance-pallet.mdx custody/CrownThrive_CHLOM_Pallet_CIE-Cultural-Governance_2026-08-22_v3.mdx
+          cp developers/evals/cie-parent-interoperability-evals.v1.json custody/CrownThrive_CIE_Evals_Parent-Interoperability_2026-08-22_v3.json
+          cp developers/manifests/cie-commercialization-candidates.v1.json custody/CrownThrive_CIE_Commercial-Manifest_Candidate-Packages_2026-08-22_v3.json
+          cp developers/manifests/cie-interoperability-parent.v1.json custody/CrownThrive_CIE_Contract_Parent-Interoperability-Continuity_2026-08-22_v3.json
+          cp developers/templates/framework-child-interoperability-backlink.v1.json custody/CrownThrive_Framework-Factory_Template_Child-Interoperability-Backlink_2026-08-22_v3.json
+          cp doctrine/cultural-imprint-engine.mdx custody/CrownThrive_CIE_Doctrine_Cultural-Imprint-Engine_2026-08-22_v3.mdx
+          cp scripts/validate_cie_interoperability_parent.py custody/CrownThrive_CIE_Validator_Parent-Interoperability_2026-08-22_v3.py
+          cp .github/workflows/cie-custody-export.yml custody/CrownThrive_CIE_Workflow_Custody-Export-Parent_2026-08-22_v1.yml
+          (
+            cd custody
+            sha256sum * | sort -k2 > CrownThrive_CIE_Custody-Ledger_Parent-Interoperability_2026-08-22_v3.sha256
+            wc -c * | sort -k2 > CrownThrive_CIE_Custody-Byte-Ledger_Parent-Interoperability_2026-08-22_v3.tsv
+          )
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, subprocess
+          root = Path('custody')
+          entries = []
+          for p in sorted(root.iterdir()):
+              if p.is_file():
+                  b = p.read_bytes()
+                  entries.append({'name': p.name, 'bytes': len(b), 'sha256': hashlib.sha256(b).hexdigest()})
+          manifest = {
+              'manifest_version': '1.0.0',
+              'workstream': 'CIE_parent_interoperability_continuity_custody',
+              'candidate_head': 'd08e68b627f4cffd9c94e60da9598695121b374a',
+              'candidate_pr': 244,
+              'candidate_contract_digest': 'fa47e35f56d02e1fd6ddf39007624450047359e940f63040ebea43bc87f37b7e',
+              'child_candidate_head': 'c8133b1d774edb7f386b5864b160bb7f2ec66589',
+              'child_contract_digest': '1723291e5e1f6e76a771290fece4cc8cb6f23bdf73d3bea8c8e20439354a092f',
+              'export_commit': subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(),
+              'publication_state': 'PUBLIC_STANDARD_CANDIDATE',
+              'operationally_enabled': False,
+              'vote_eligible': False,
+              'artifacts': entries,
+          }
+          (root / 'CrownThrive_CIE_Custody-Manifest_Parent-Interoperability_2026-08-22_v3.json').write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          PY
+          tar -czf cie-parent-custody-v3.tar.gz -C custody .
+      - name: Upload custody archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cie-parent-custody-v3
+          path: cie-parent-custody-v3.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
