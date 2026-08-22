@@ -8,7 +8,7 @@ on:
       - ".github/workflows/commercial-gap-encrypted-transport-bootstrap.yml"
 
 env:
-  TRANSPORT_BOOTSTRAP_VERSION: "2"
+  TRANSPORT_BOOTSTRAP_VERSION: "3"
 
 permissions:
   contents: write
@@ -37,15 +37,26 @@ jobs:
           echo "token=${ID_TOKEN}" >> "${GITHUB_OUTPUT}"
           echo "::add-mask::${ID_TOKEN}"
 
-      - name: Create one-time server-held transport key
+      - name: Create one-time server-held payload key
         env:
           ID_TOKEN: ${{ steps.oidc.outputs.token }}
         shell: bash
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          source=json.loads(Path('developers/reference/commercial-release/private-fulfillment-client-public-jwk.json').read_text())
+          Path('/tmp/bootstrap-request.json').write_text(json.dumps({
+              'public_key_jwk': source['public_key_jwk'],
+              'public_key_jwk_sha256': source['public_key_jwk_sha256'],
+          }, separators=(',',':')))
+          PY
           curl --fail-with-body --silent --show-error \
             -X POST \
             -H "Authorization: Bearer ${ID_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/bootstrap-request.json \
             "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-encrypted-transport-bootstrap-oidc" \
             > /tmp/bootstrap.json
 
@@ -56,35 +67,37 @@ jobs:
           python3 - <<'PY'
           import json, os
           from pathlib import Path
+          source=json.loads(Path('developers/reference/commercial-release/private-fulfillment-client-public-jwk.json').read_text())
           data=json.loads(Path('/tmp/bootstrap.json').read_text())
           assert data.get('state') == 'created', data
-          assert data.get('private_key_returned') is False, data
-          assert data.get('private_key_publicly_stored') is False, data
+          assert data.get('payload_key_returned_plaintext') is False, data
+          assert data.get('payload_key_publicly_stored') is False, data
           assert data.get('public_url_created') is False, data
           assert data.get('vault_locator_returned') is False, data
           assert data.get('plaintext_returned') is False, data
           assert data.get('algorithm') == 'RSA-OAEP-3072-SHA256 + AES-256-GCM', data
           assert isinstance(data.get('transport_id'), str) and len(data['transport_id']) == 36, data
-          assert isinstance(data.get('public_key_jwk'), dict), data
-          assert data['public_key_jwk'].get('kty') == 'RSA', data
+          assert data.get('client_public_jwk_sha256') == source['public_key_jwk_sha256'], data
+          wrapped=data.get('wrapped_payload_key_b64url')
+          assert isinstance(wrapped,str) and len(wrapped) > 100, data
           receipt={
             'schema_version':'1.0.0',
-            'receipt_id':'ct.receipt.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v2',
+            'receipt_id':'ct.receipt.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v3',
             'source_commit':os.environ['GITHUB_SHA'],
             'transport_bootstrap_version':os.environ['TRANSPORT_BOOTSTRAP_VERSION'],
             'transport_id':data['transport_id'],
             'expires_at':data['expires_at'],
             'algorithm':data['algorithm'],
-            'public_key_jwk':data['public_key_jwk'],
-            'public_key_jwk_sha256':data['public_key_jwk_sha256'],
-            'private_key_returned':False,
-            'private_key_publicly_stored':False,
+            'client_public_jwk_sha256':data['client_public_jwk_sha256'],
+            'wrapped_payload_key_b64url':wrapped,
+            'payload_key_returned_plaintext':False,
+            'payload_key_publicly_stored':False,
             'public_url_created':False,
             'vault_locator_returned':False,
             'plaintext_returned':False,
           }
           Path('changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
-          print(json.dumps({'transport_id':receipt['transport_id'],'expires_at':receipt['expires_at'],'public_key_jwk_sha256':receipt['public_key_jwk_sha256']},sort_keys=True))
+          print(json.dumps({'transport_id':receipt['transport_id'],'expires_at':receipt['expires_at'],'client_public_jwk_sha256':receipt['client_public_jwk_sha256']},sort_keys=True))
           PY
 
       - name: Commit public bootstrap receipt
@@ -94,5 +107,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json
-          git commit -m "Record encrypted private fulfillment transport bootstrap v2"
+          git commit -m "Record encrypted private fulfillment transport bootstrap v3"
           git push origin "HEAD:${GITHUB_REF_NAME}"
