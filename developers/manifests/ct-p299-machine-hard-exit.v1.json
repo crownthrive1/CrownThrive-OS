@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.0.1",
   "contract_id": "ct.contract.phase-gate.p299-hard-exit.v1",
   "name": "CT-P299 Machine Hard Exit and Phase 3 Bootstrap Contract",
   "effective_date": "2026-08-22",
@@ -35,6 +35,7 @@
   "canonical_sources": [
     "developers/manifests/institutional-phase-namespace.v2.json",
     "developers/manifests/phase-2-99-hard-exit-ledger.v1.json",
+    "developers/manifests/machine-trigger-asset-fabric.v1.json",
     "standards/ten-phase-institutional-program-charter.mdx",
     "technology/phase-3-readiness-gate.mdx",
     "technology/phase-3-institutional-core.mdx",
@@ -45,27 +46,14 @@
   ],
   "hard_exit_gate_policy": {
     "registry_source": "developers/manifests/phase-2-99-hard-exit-ledger.v1.json",
-    "required_gate_ids": [
-      "CT-P299-GATE-001",
-      "CT-P299-GATE-002",
-      "CT-P299-GATE-003",
-      "CT-P299-GATE-004",
-      "CT-P299-GATE-005",
-      "CT-P299-GATE-006",
-      "CT-P299-GATE-007",
-      "CT-P299-GATE-008"
-    ],
+    "required_gate_ids": ["CT-P299-GATE-001","CT-P299-GATE-002","CT-P299-GATE-003","CT-P299-GATE-004","CT-P299-GATE-005","CT-P299-GATE-006","CT-P299-GATE-007","CT-P299-GATE-008"],
     "default_exit_states": ["pass"],
     "governed_deferral_states": ["deferred_accepted"],
     "deferral_requires_explicit_gate_authority": true,
     "live_overrides": {
       "CT-P299-GATE-004": {
         "source": "GitHub branches/main",
-        "requirements": {
-          "protected": true,
-          "protection_enabled": true,
-          "required_status_enforcement": ["non_admins", "everyone"]
-        },
+        "requirements": {"protected": true,"protection_enabled": true,"required_status_enforcement": ["non_admins","everyone"]},
         "static_ledger_cannot_override_live_failure": true
       }
     }
@@ -73,23 +61,14 @@
   "thivebase_snapshot": {
     "edge_function": "ct-phase3-hard-exit-snapshot",
     "github_oidc_audience": "ct-phase3-hard-exit",
-    "required_rpc_snapshots": [
-      "chlom_gen6_test_snapshot",
-      "commercial_release_factory_status_v2"
-    ],
+    "required_rpc_snapshots": ["chlom_gen6_test_snapshot","commercial_release_factory_status_v2"],
     "mutation_allowed": false,
     "secret_exposure_allowed": false
   },
   "authority_receipt": {
     "path": "governance/phase3-entry-authority-receipt.v1.json",
-    "required_participants": [
-      "ct.relay.agent-a",
-      "independent_audit",
-      "security",
-      "ct.relay.agent-d",
-      "sovereign_governance"
-    ],
-    "sovereign_voters": ["A", "B", "C", "D", "S"],
+    "required_participants": ["ct.relay.agent-a","independent_audit","security","ct.relay.agent-d","sovereign_governance"],
+    "sovereign_voters": ["A","B","C","D","S"],
     "minimum_approvals": 4,
     "agent_d_mandatory": true,
     "deny_or_block_stops_go": true,
@@ -97,13 +76,7 @@
   },
   "recovery_receipt": {
     "path": "governance/phase3-entry-recovery-receipt.v1.json",
-    "requires": [
-      "backup_verified",
-      "restore_tested",
-      "rollback_tested",
-      "off_provider_copy_verified",
-      "exact_readback_verified"
-    ]
+    "requires": ["backup_verified","restore_tested","rollback_tested","off_provider_copy_verified","exact_readback_verified"]
   },
   "verdicts": {
     "NO_GO": "one_or_more_absolute_no_go_conditions_true",
@@ -112,17 +85,24 @@
   },
   "bootstrap": {
     "bootstrap_id": "CT-PHASE3-BOOTSTRAP-v1",
-    "activation_sequence": [
-      "emit_dail_event",
-      "persist_thivebase_baseline",
-      "create_git_tag_and_release",
-      "publish_mintlify_changelog",
-      "bind_rollback_snapshot",
-      "read_back_all_bootstrap_effects"
-    ],
+    "activation_sequence": ["emit_dail_event","persist_thivebase_baseline","create_git_tag_and_release","publish_mintlify_changelog","bind_rollback_snapshot","read_back_all_bootstrap_effects"],
     "phase3_active_only_after_all_readbacks": true,
     "automatic_direct_main_write": false,
     "automatic_merge": false
+  },
+  "trigger_asset_fabric": {
+    "fabric_id": "ct.fabric.machine-trigger-assets.v1",
+    "manifest_path": "developers/manifests/machine-trigger-asset-fabric.v1.json",
+    "workflow_path": ".github/workflows/machine-trigger-asset-fabric.yml",
+    "trigger_bundle_count": 32,
+    "derivative_candidate_asset_count": 128,
+    "plugin_count": 5,
+    "vault_binding_candidate_count": 32,
+    "authoritative_generation_asset_count_delta": 0,
+    "factory_intake_state": "candidate_hold",
+    "live_vault_binding_state": "PENDING_RUNTIME_BINDING",
+    "required_before_trigger_fabric_runtime_promotion": ["canonical_merge","exact_head_validation","independent_review","vault_binding_readback","factory_lifecycle_acceptance"],
+    "machine_trigger_assets_may_not_manufacture_authority": true
   },
   "commerce_factory": {
     "factory_id": "ct.agent-suite.commercial-release-factory.v1",
@@ -131,12 +111,14 @@
     "every_new_or_changed_product_reenters_all_applicable_gates": true,
     "prior_version_pass_inheritance": false,
     "ecac_required_before_economic_activation": true,
+    "machine_trigger_plugin": "ct.plugin.commerce-factory",
     "automatic_publication_default": false,
     "pause_quarantine_decommission_supported": true,
     "perpetual_does_not_expand_authority": true
   },
   "automation": {
     "workflow": ".github/workflows/ct-p299-machine-hard-exit.yml",
+    "trigger_asset_workflow": ".github/workflows/machine-trigger-asset-fabric.yml",
     "cadence": "hourly_plus_event_driven",
     "bootstrap_attempt": "explicit_workflow_dispatch_after_GO",
     "scheduled_run_may_not_manufacture_authority": true
