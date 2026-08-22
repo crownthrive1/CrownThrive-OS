@@ -1,0 +1,158 @@
+name: CHLOM Wallet ERC-4337 v0.9 Audit Evidence
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json"
+      - "developers/reference/chlom-wallet/smart-account/runtime-codehash-independent-review-request.json"
+      - "developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json"
+      - "developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json"
+      - "developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json"
+      - "developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py"
+      - "developers/chlom-wallet-entrypoint-audit-review.mdx"
+      - ".github/workflows/chlom-wallet-erc4337-audit-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-erc4337-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extract:
+    name: Pin, extract and validate v0.9 audit review packet
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install exact PDF extraction dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >/tmp/chlom-wallet-audit-requirements.txt <<'REQ'
+          pypdf==5.9.0 --hash=sha256:be10a4c54202f46d9daceaa8788be07aa8cd5ea8c25c529c50dd509206382c35
+          REQ
+          python -m pip install --disable-pip-version-check --no-deps --require-hashes -r /tmp/chlom-wallet-audit-requirements.txt
+          python - <<'PY'
+          import pypdf
+          assert pypdf.__version__=='5.9.0'
+          PY
+
+      - name: Verify source-controlled contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/runtime-codehash-independent-review-request.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json >/dev/null
+          python -m py_compile developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py
+
+      - name: Download exact upstream audit artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://raw.githubusercontent.com/eth-infinitism/account-abstraction/1c6b669d0eea734e09a87e095ba15e076151718a/audits/ERC-4337%20Account%20Abstraction%20v0.9%20Security%20Review%20-%20Cantina.pdf'
+          curl --fail --location --proto '=https' --tlsv1.2 --retry 3 --retry-all-errors --silent --show-error "$url" -o /tmp/erc4337-v09-cantina.pdf
+          test "$(stat -c %s /tmp/erc4337-v09-cantina.pdf)" = '498502'
+
+      - name: Extract bounded audit evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py /tmp/erc4337-v09-cantina.pdf --output /tmp/erc4337-v09-audit-extraction.json | tee /tmp/erc4337-v09-audit-extraction.log
+          python -m json.tool /tmp/erc4337-v09-audit-extraction.json >/dev/null
+
+      - name: Validate exact evidence packet and HOLD boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          extracted=json.load(open('/tmp/erc4337-v09-audit-extraction.json'))
+          profile=json.load(open('developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json'))
+          source=json.load(open('developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json'))
+          request=json.load(open('developers/reference/chlom-wallet/smart-account/runtime-codehash-independent-review-request.json'))
+          gates=json.load(open('developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json'))
+          readiness=json.load(open('developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json'))
+          codehash='0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
+
+          assert extracted['source']['pdf_sha256']==profile['extraction']['pdf_sha256']
+          assert extracted['document']['text_sha256']==profile['extraction']['text_sha256']
+          assert extracted['document']['page_count']==profile['extraction']['page_count']==10
+          assert extracted['document']['text_character_count']==profile['extraction']['text_character_count']==16650
+          assert profile['state']=='AUDIT_ARTIFACT_EXTRACTED_RUNTIME_REPRODUCED_HOLD_INDEPENDENT_APPROVAL'
+          assert profile['extraction']['state']=='PASS_BOUNDED_EXTRACTION'
+          assert profile['audit_scope']['initial_review_commit_sha']=='86fcd84c0bcc1bfd2730b0d9823929b6ba896de7'
+          assert profile['audit_scope']['holistic_followup_commit_sha']=='f54584edd4c627e084d04c315dcabda48a6b9ea9'
+          assert profile['audit_scope']['entrypoint_source_unchanged_between_holistic_followup_and_release'] is True
+          assert profile['finding_summary']['critical']['found']==0
+          assert profile['finding_summary']['high']['found']==0
+          assert profile['finding_summary']['medium']['found']==0
+          assert profile['finding_summary']['low']=={'found':2,'addressed':2,'remaining':0}
+          assert profile['finding_summary']['informational']=={'found':8,'addressed':7,'remaining_or_acknowledged':1}
+          assert profile['reproducible_runtime']['workflow_run_id']==32569154292
+          assert profile['reproducible_runtime']['runtime_codehash']==codehash
+          assert profile['reproducible_runtime']['matches_observed_sepolia_runtime'] is True
+          assert profile['review_request']['runtime_codehash_independently_approved'] is False
+          assert all(value is False for value in profile['hard_boundaries'].values())
+
+          assert source['verification']['release_runtime_reproduced_on_ephemeral_sepolia_chain_id'] is True
+          assert source['verification']['reproduced_runtime_matches_observed_runtime'] is True
+          assert source['verification']['runtime_codehash_independently_approved'] is False
+          assert source['verification']['observed_runtime_codehash']==codehash
+          assert all(value is False for value in source['hard_boundaries'].values())
+
+          assert request['state']=='PENDING_INDEPENDENT_REVIEW'
+          assert request['requester_is_final_approver'] is False
+          assert request['scope']['candidate_runtime_codehash']==codehash
+          assert [r['agent_id'] for r in request['required_reviewers']]==['ct.chlom.agent.blockchain-crypto','ct.chlom.agent.security','ct.relay.agent-d']
+          assert all(r['decision'] is None for r in request['required_reviewers'])
+          assert request['current_disposition']=='HOLD_PENDING_INDEPENDENT_REVIEW'
+          assert request['runtime_codehash_independently_approved'] is False
+          assert all(value is False for value in request['hard_boundaries'].values())
+
+          gate_states={g['code']:g['state'] for g in gates['gates']}
+          for code in ['OFFICIAL_V09_AUDIT_ARTIFACT_PINNED','OFFICIAL_V09_AUDIT_BOUNDED_EXTRACTION','AUDITED_ENTRYPOINT_SOURCE_LINEAGE_TO_RELEASE','REPRODUCIBLE_RELEASE_RUNTIME_MATCH']:
+            assert gate_states[code]=='PASS_EVIDENCE'
+          assert gate_states['ENTRYPOINT_RUNTIME_CODEHASH_INDEPENDENTLY_APPROVED']=='PENDING_INDEPENDENT_REVIEW'
+          assert gates['state']=='HOLD_PREDEPLOYMENT'
+          assert gates['hard_boundaries']['broadcast_enabled'] is False
+          assert gates['hard_boundaries']['deploy_enabled'] is False
+          assert gates['hard_boundaries']['money_movement_enabled'] is False
+
+          assert readiness['state']=='HOLD_PREDEPLOYMENT'
+          assert readiness['account_abstraction']['reproduced_runtime_matches_observed_sepolia_runtime'] is True
+          assert readiness['chain']['runtime_codehash_independently_approved'] is False
+          assert readiness['chain']['runtime_code_hash_verified'] is False
+          assert readiness['deployment']['simulation_completed'] is False
+          assert readiness['deployment']['broadcast_enabled'] is False
+          assert readiness['deployment']['money_movement'] is False
+          PY
+
+      - name: Enforce non-execution boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json
+            developers/reference/chlom-wallet/smart-account/runtime-codehash-independent-review-request.json
+            developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py
+            developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json
+            developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json
+          )
+          if grep -nE 'eth_sendRawTransaction|eth_sendTransaction|wallet_sendCalls|personal_sendTransaction|mnemonic|seed phrase|broadcast_performed:[[:space:]]*true|money_movement:[[:space:]]*true' "${files[@]}"; then
+            echo 'Audit review packet crossed the non-execution boundary.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "CONTROLLED_TEST: audit identity, bounded extraction, source lineage, reproducible runtime, and independent review request."
+          echo "The Wallet Agent remains the originator and cannot approve its own code-identity conclusion."
+          echo "No signer, UserOperation, simulation, deployment, broadcast, custody, money movement, rights grant, merge authorization, or Phase advancement occurs."

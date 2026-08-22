@@ -1,0 +1,196 @@
+name: CHLOM Wallet Smart Account Preflight Contract
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/smart-account/**"
+      - "developers/chlom-wallet-smart-account-testnet-readiness.mdx"
+      - "developers/chlom-wallet-entrypoint-audit-review.mdx"
+      - ".github/workflows/chlom-wallet-smart-account-preflight-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-smart-account-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate source, audit, runtime evidence and predeployment HOLD
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify runtime
+        run: node --version
+
+      - name: Validate source-controlled JSON
+        run: |
+          python -m json.tool developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/external-readback-observation.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/runtime-codehash-independent-review-request.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json >/dev/null
+
+      - name: Syntax check
+        run: |
+          node --check developers/reference/chlom-wallet/smart-account/entrypoint-profile-verifier.mjs
+          node --check developers/reference/chlom-wallet/smart-account/test-entrypoint-profile-verifier.mjs
+          node --check developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs
+          node --check developers/reference/chlom-wallet/smart-account/test-read-only-chain-code-preflight.mjs
+          node --check developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs
+
+      - name: Verify official source, audit and runtime evidence profile
+        run: node developers/reference/chlom-wallet/smart-account/test-entrypoint-profile-verifier.mjs
+
+      - name: Verify read-only chain-code contract against local mock RPC
+        run: node developers/reference/chlom-wallet/smart-account/test-read-only-chain-code-preflight.mjs
+
+      - name: Enforce evidence consistency and predeployment HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          profile=json.load(open('developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json'))
+          observation=json.load(open('developers/reference/chlom-wallet/smart-account/external-readback-observation.json'))
+          audit=json.load(open('developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json'))
+          review=json.load(open('developers/reference/chlom-wallet/smart-account/runtime-codehash-independent-review-request.json'))
+          gates=json.load(open('developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json'))
+          readiness=json.load(open('developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json'))
+
+          expected_hash='0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
+          expected_address='0x433709009B8330FDa32311DF1C2AFA402eD8D009'
+
+          assert profile['schema_version']=='1.2.0'
+          assert profile['state']=='SOURCE_RELEASE_AND_TAG_ARTIFACT_DIVERGENCE_REGISTERED_CHAIN_CODE_UNVERIFIED'
+          verification=profile['verification']
+          assert verification['release_and_artifact_addresses_match'] is False
+          assert verification['external_read_only_chain_readback_completed'] is True
+          assert verification['external_read_only_provider_count']==2
+          assert verification['external_read_only_provider_agreement'] is True
+          assert verification['runtime_code_present'] is True
+          assert verification['runtime_code_bytes']==22425
+          assert verification['observed_runtime_codehash']==expected_hash
+          assert verification['audit_artifact_pinned'] is True
+          assert verification['audit_bounded_extraction_completed'] is True
+          assert verification['audited_entrypoint_source_blob_matches_release'] is True
+          assert verification['release_runtime_reproduced_on_ephemeral_sepolia_chain_id'] is True
+          assert verification['reproduced_runtime_matches_observed_runtime'] is True
+          assert verification['approved_runtime_codehash'] is None
+          assert verification['runtime_codehash_independently_approved'] is False
+          assert verification['runtime_codehash_verified'] is False
+          assert verification['disposition']=='HOLD_INDEPENDENT_CODE_IDENTITY_REVIEW_REQUIRED'
+          assert all(value is False for value in profile['hard_boundaries'].values())
+
+          assert observation['state']=='PASS_EXTERNAL_READ_ONLY_OBSERVATION_HOLD_INDEPENDENT_APPROVAL'
+          assert observation['target']['entrypoint_address']==expected_address
+          assert observation['observation']['result']=='PASS_EXTERNAL_READ_ONLY_MULTI_PROVIDER_OBSERVATION'
+          assert observation['observation']['provider_count']==2
+          assert observation['observation']['provider_agreement'] is True
+          assert observation['observation']['runtime_code_bytes']==22425
+          assert observation['observation']['observed_runtime_codehash']==expected_hash
+          assert {p['provider_id'] for p in observation['providers']}=={'publicnode','1rpc'}
+          assert len({p['observed_runtime_codehash'] for p in observation['providers']})==1
+          assert all(p['rpc_methods_used']==['eth_chainId','eth_getCode'] for p in observation['providers'])
+          assert observation['interpretation']['runtime_codehash_independently_approved'] is False
+          assert observation['interpretation']['runtime_codehash_verified_for_deployment'] is False
+          assert all(value is False for value in observation['hard_boundaries'].values())
+
+          assert audit['state']=='AUDIT_ARTIFACT_EXTRACTED_RUNTIME_REPRODUCED_HOLD_INDEPENDENT_APPROVAL'
+          assert audit['extraction']['state']=='PASS_BOUNDED_EXTRACTION'
+          assert audit['audit_scope']['entrypoint_source_unchanged_between_holistic_followup_and_release'] is True
+          assert audit['reproducible_runtime']['matches_observed_sepolia_runtime'] is True
+          assert audit['reproducible_runtime']['runtime_codehash']==expected_hash
+          assert audit['review_request']['runtime_codehash_independently_approved'] is False
+          assert audit['review_request']['runtime_codehash_verified_for_deployment'] is False
+          assert all(value is False for value in audit['hard_boundaries'].values())
+
+          assert review['state']=='PENDING_INDEPENDENT_REVIEW'
+          assert review['requester_is_final_approver'] is False
+          assert review['scope']['entrypoint_address']==expected_address
+          assert review['scope']['candidate_runtime_codehash']==expected_hash
+          assert [r['agent_id'] for r in review['required_reviewers']]==[
+            'ct.chlom.agent.blockchain-crypto','ct.chlom.agent.security','ct.relay.agent-d'
+          ]
+          assert all(r['decision'] is None for r in review['required_reviewers'])
+          assert review['current_disposition']=='HOLD_PENDING_INDEPENDENT_REVIEW'
+          assert review['runtime_codehash_independently_approved'] is False
+          assert review['runtime_codehash_verified_for_deployment'] is False
+          assert all(value is False for value in review['hard_boundaries'].values())
+
+          assert gates['state']=='HOLD_PREDEPLOYMENT'
+          evidence=gates['code_identity_evidence']
+          assert evidence['external_read_only_chain_readback_completed'] is True
+          assert evidence['provider_count']==2
+          assert evidence['provider_agreement'] is True
+          assert evidence['observed_runtime_codehash']==expected_hash
+          assert evidence['audit_artifact_pinned'] is True
+          assert evidence['audit_extraction_completed'] is True
+          assert evidence['release_source_reproduced'] is True
+          assert evidence['reproduced_runtime_matches_observed_runtime'] is True
+          assert evidence['runtime_codehash_independently_approved'] is False
+          gate_states={g['code']:g['state'] for g in gates['gates']}
+          for code in [
+            'EXTERNAL_READ_ONLY_CHAIN_ID_READBACK','ENTRYPOINT_RUNTIME_CODE_PRESENT',
+            'MULTI_PROVIDER_RUNTIME_CODE_AGREEMENT','OFFICIAL_V09_AUDIT_ARTIFACT_PINNED',
+            'OFFICIAL_V09_AUDIT_BOUNDED_EXTRACTION','AUDITED_ENTRYPOINT_SOURCE_LINEAGE_TO_RELEASE',
+            'REPRODUCIBLE_RELEASE_RUNTIME_MATCH'
+          ]:
+            assert gate_states[code]=='PASS_EVIDENCE', (code,gate_states[code])
+          assert gate_states['ENTRYPOINT_RUNTIME_CODEHASH_INDEPENDENTLY_APPROVED']=='PENDING_INDEPENDENT_REVIEW'
+          assert gate_states['TESTNET_BROADCAST_AUTHORIZATION']=='PENDING'
+          assert gates['construction_gate_mapping']=={
+            'CG-049':'PENDING_QUORUM_AND_SEPARATION_OF_DUTIES',
+            'CG-056':'PENDING_INDEPENDENT_CODEHASH_REVIEW_AND_RECOVERY_READBACK'
+          }
+          assert gates['hard_boundaries']['rpc_write_methods_allowed']==[]
+          assert gates['hard_boundaries']['account_implementation_selected'] is False
+          assert gates['hard_boundaries']['factory_selected'] is False
+          assert gates['hard_boundaries']['funded_signer_allowed'] is False
+          assert gates['hard_boundaries']['simulation_completed'] is False
+          assert gates['hard_boundaries']['broadcast_enabled'] is False
+          assert gates['hard_boundaries']['deploy_enabled'] is False
+          assert gates['hard_boundaries']['custody_enabled'] is False
+          assert gates['hard_boundaries']['money_movement_enabled'] is False
+
+          assert readiness['state']=='HOLD_PREDEPLOYMENT'
+          assert readiness['chain']['external_read_only_readback_completed'] is True
+          assert readiness['chain']['external_read_only_provider_count']==2
+          assert readiness['chain']['external_read_only_provider_agreement'] is True
+          assert readiness['chain']['observed_runtime_codehash']==expected_hash
+          assert readiness['chain']['approved_runtime_codehash'] is None
+          assert readiness['chain']['runtime_codehash_independently_approved'] is False
+          assert readiness['chain']['runtime_code_hash_verified'] is False
+          assert readiness['account_abstraction']['reproduced_runtime_matches_observed_sepolia_runtime'] is True
+          assert readiness['account_abstraction']['runtime_codehash_disposition']=='HOLD_INDEPENDENT_CODE_IDENTITY_REVIEW_REQUIRED'
+          assert readiness['construction_review']['state']=='PENDING_ASSIGNMENT_AND_INDEPENDENT_REVIEW'
+          assert readiness['construction_review']['requester_is_final_approver'] is False
+          assert readiness['deployment']['user_operation_state']=='DETERMINISTIC_UNSIGNED_INTENT_ONLY'
+          assert readiness['deployment']['simulation_completed'] is False
+          assert readiness['deployment']['broadcast_enabled'] is False
+          assert readiness['deployment']['custody'] is False
+          assert readiness['deployment']['money_movement'] is False
+          assert readiness['deployment']['transaction_hash'] is None
+          PY
+
+      - name: Scan smart-account projection for secret-shaped material
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find developers/reference/chlom-wallet/smart-account -type f -print)
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${files[@]}"; then
+            echo "Potential live secret-shaped material detected in smart-account projection."
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "CONTROLLED_TEST: exact source, audit, observed bytecode, and reproducible runtime evidence are pinned."
+          echo "The runtime codehash remains pending independent protocol, security, quorum, and recovery review."
+          echo "No signer, UserOperation submission, simulation, account/factory selection, deployment, broadcast, paymaster, custody, rights grant, money movement, merge authorization, or Phase advancement is authorized."

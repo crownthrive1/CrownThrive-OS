@@ -1,0 +1,158 @@
+---
+title: "CHLOM Wallet EntryPoint Audit & Code-Identity Review"
+sidebarTitle: "EntryPoint Audit Review"
+description: "Exact-source audit, runtime reproducibility, multi-provider Sepolia observation, and independent approval request for the CHLOM Wallet ERC-4337 v0.9 EntryPoint candidate."
+icon: "shield-halved"
+---
+
+# CHLOM Wallet EntryPoint audit and code-identity review
+
+**State:** `HOLD_INDEPENDENT_CODE_IDENTITY_REVIEW_REQUIRED`  
+**Target:** Sepolia / `eip155:11155111`  
+**EntryPoint candidate:** `0x433709009B8330FDa32311DF1C2AFA402eD8D009`  
+**Observed and reproduced runtime codehash:** `0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0`  
+**Deployment and broadcast:** disabled
+
+This packet narrows the EntryPoint question from “which upstream address should CHLOM trust?” to a precise independent-review question: **does the exact v0.9 release source/configuration, the Cantina audit lineage, the locally reproduced runtime, and the two-provider Sepolia bytecode observation establish sufficient code identity to continue non-broadcast testnet predeployment work?**
+
+## Exact upstream audit
+
+The official upstream audit was added through pull request `#612` and is pinned by artifact identity:
+
+```yaml
+repository: eth-infinitism/account-abstraction
+audit_pr: 612
+audit_merge_commit: 1c6b669d0eea734e09a87e095ba15e076151718a
+audit_path: audits/ERC-4337 Account Abstraction v0.9 Security Review - Cantina.pdf
+audit_git_blob_sha1: d0cd0ad29d341d35df1047cadde6cb67d453be91
+audit_size_bytes: 498502
+audit_pdf_sha256: 853a12e5a7b925a34a60c2d54cb21a0d51752aa4634ed1cb750a901dd9850449
+page_count: 10
+extracted_text_sha256: ce583f8d1e284303e60eb1eec8c4f6dfa2b2b1af134a38a5b8f8a5f9fc0b230b
+```
+
+The bounded extraction used exact `pypdf@5.9.0` and performed no chain access.
+
+## Audit scope and findings
+
+The report identifies an initial review at short commit `86fcd84c`, resolved to:
+
+```text
+86fcd84c0bcc1bfd2730b0d9823929b6ba896de7
+```
+
+It identifies a holistic follow-up at short commit `f54584ed`, resolved to:
+
+```text
+f54584edd4c627e084d04c315dcabda48a6b9ea9
+```
+
+The report states that the follow-up found all findings addressed and no new vulnerabilities. Its summary table records:
+
+| Severity | Found | Addressed | Remaining / acknowledged |
+| --- | ---: | ---: | ---: |
+| Critical | 0 | 0 | 0 |
+| High | 0 | 0 | 0 |
+| Medium | 0 | 0 | 0 |
+| Low | 2 | 2 | 0 |
+| Informational | 8 | 7 | 1 |
+
+Because the table and holistic statement use different summary semantics, CHLOM preserves both and requires an independent reviewer to interpret the residual informational entry. The Wallet Agent does not convert that evidence into its own security approval.
+
+## Audited source to release lineage
+
+The holistic follow-up commit and the release commit use the same `EntryPoint.sol` Git blob:
+
+```yaml
+holistic_followup_commit: f54584edd4c627e084d04c315dcabda48a6b9ea9
+release_commit: b36a1ed52ae00da6f8a4c8d50181e2877e4fa410
+entrypoint_source_blob_sha1: 3b4feb6ec0ed1cf41310b24858c81f5012572af9
+source_unchanged: true
+```
+
+The release commit fixes the deterministic deployment configuration and is pinned with:
+
+```yaml
+release_tree_sha: f75688b14e23ebddb9b81011b036bab15de89089
+hardhat_config_blob_sha1: fd05e9beaaa509e1ace2d9821b9ebaa4f32e1d8d
+deploy_script_blob_sha1: f714da04df562bd896bb22b932b16bc9a41ec664
+deployment_salt: 0x7702864008ddeab30aa67b7adc3d2653bc8d162714b1fe8fe4582df814f3bf61
+compiler: 0.8.28
+evm_version: cancun
+optimizer_runs: 1000000
+via_ir: true
+```
+
+The audit PDF itself does not print a deployment address or runtime codehash. Source/audit lineage therefore has to be combined with reproducible compilation and independent chain observation.
+
+## Reproducible runtime match
+
+The exact release commit was checked out and built with its locked dependency tree. CHLOM overlaid only an ephemeral Hardhat chain ID of `11155111` so chain-bound immutable data matched Sepolia semantics. The exact release source was then deterministically deployed on the isolated local chain.
+
+```yaml
+result: PASS_ERC4337_V09_REPRODUCIBLE_RUNTIME_MATCH_HOLD_INDEPENDENT_APPROVAL
+workflow_run_id: 32569154292
+job_id: 97022033197
+ephemeral_chain_id: 11155111
+entrypoint_address: 0x433709009b8330fda32311df1c2afa402ed8d009
+runtime_code_bytes: 22425
+runtime_codehash: 0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0
+matches_observed_sepolia_runtime: true
+native_value_held_wei: '0'
+external_rpc_used: false
+```
+
+A first reproduction on the default Hardhat chain ID produced a different runtime hash, exposing an important chain-bound immutable distinction. The governed reproduction was corrected to use Sepolia chain ID before any code-identity conclusion was accepted.
+
+## External chain observation
+
+Two independent public Sepolia RPC providers previously agreed on the same address, byte length, and runtime codehash using only `eth_chainId` and `eth_getCode`:
+
+```yaml
+providers: [publicnode, 1rpc]
+provider_agreement: true
+runtime_code_bytes: 22425
+runtime_codehash: 0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0
+evidence_digest_sha256: 171b0e7e15039f28954fa41df75fbd2f044c6a15c3a204630bfd43ddf78b7624
+```
+
+Later provider availability loss is recorded separately from bytecode disagreement. Any successful refresh provider must still match the pinned bytecode evidence.
+
+## Independent review request
+
+Machine request:
+
+`developers/reference/chlom-wallet/smart-account/runtime-codehash-independent-review-request.json`
+
+Required review route:
+
+```yaml
+protocol_verifier: ct.chlom.agent.blockchain-crypto
+security_verifier: ct.chlom.agent.security
+quorum_gatekeeper: ct.relay.agent-d
+recovery_authority: ct.chlom.agent.recovery
+construction_gates: [CG-049, CG-056]
+```
+
+The requested decision is limited to approving or rejecting the candidate runtime code identity for **further testnet predeployment work**. Even a positive code-identity decision would not select a smart-account implementation, validator, factory, signer, bundler, paymaster, recovery module, or transaction payload.
+
+## Hard boundary
+
+```yaml
+runtime_codehash_independently_approved: false
+account_implementation_selected: false
+factory_selected: false
+passkey_validator_selected: false
+funded_signer_authorized: false
+user_operation_created: false
+simulation_completed: false
+deployment_authorized: false
+broadcast_authorized: false
+custody: false
+money_movement: false
+production_rights_grant: false
+phase_advancement: false
+merge_authorized: false
+```
+
+This page is an evidence packet, not an audit opinion or production release.

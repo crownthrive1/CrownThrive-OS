@@ -1,0 +1,177 @@
+name: CHLOM Wallet Independent Review Contract
+
+on:
+  pull_request:
+    paths:
+      - "developers/chlom-wallet-independent-review-contract.mdx"
+      - "developers/chlom-wallet-independent-review-lanes.mdx"
+      - "developers/manifests/chlom-wallet-independent-review-contract.v1.json"
+      - "developers/reference/chlom-wallet/smart-account/independent-review-lane-packets.v1.json"
+      - "developers/reference/chlom-wallet/smart-account/independent-review-receipt.v1.schema.json"
+      - "developers/reference/chlom-wallet/smart-account/independent-review-status.v1.schema.json"
+      - "developers/reference/chlom-wallet/smart-account/test-independent-review-receipt-contract.mjs"
+      - ".github/workflows/chlom-wallet-independent-review-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-independent-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate exact-head reviewer receipts, status and lane packets
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install exact schema validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-save --no-package-lock \
+            ajv@8.17.1 \
+            ajv-formats@3.0.1
+          node - <<'NODE'
+          const expected={ajv:'8.17.1','ajv-formats':'3.0.1'};
+          for (const [name,version] of Object.entries(expected)) {
+            const actual=require(`./node_modules/${name}/package.json`).version;
+            if (actual!==version) throw new Error(`${name}:${actual}`);
+            console.log(`${name}@${actual}`);
+          }
+          NODE
+
+      - name: Validate JSON and JavaScript syntax
+        run: |
+          python -m json.tool developers/manifests/chlom-wallet-independent-review-contract.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/independent-review-lane-packets.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/independent-review-receipt.v1.schema.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/independent-review-status.v1.schema.json >/dev/null
+          node --check developers/reference/chlom-wallet/smart-account/test-independent-review-receipt-contract.mjs
+
+      - name: Run reviewer receipt and public-status schema tests
+        run: node developers/reference/chlom-wallet/smart-account/test-independent-review-receipt-contract.mjs
+
+      - name: Validate current HOLD manifest and lane packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,re
+          manifest=json.load(open('developers/manifests/chlom-wallet-independent-review-contract.v1.json'))
+          packet=json.load(open('developers/reference/chlom-wallet/smart-account/independent-review-lane-packets.v1.json'))
+
+          expected_head='df67672b99839e58d7873dabe49e06de58007820'
+          expected_digest='a11e9c03cfd0ec05d9e4f1171b1d99e124cf2f7fffd697881bb3718f13e4b9fb'
+          expected_hash='0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
+          expected={
+            'protocol':('ct.work.chlom-wallet.erc4337-runtime-codehash-review.v1','ct.chlom.agent.blockchain-crypto'),
+            'security':('ct.work.chlom-wallet.erc4337-security-review.v1','ct.chlom.agent.security'),
+            'quorum':('ct.work.chlom-wallet.erc4337-quorum-review.v1','ct.relay.agent-d'),
+            'recovery':('ct.work.chlom-wallet.erc4337-recovery-readback.v1','ct.chlom.agent.recovery'),
+            'release':('ct.work.chlom-wallet.erc4337-release-synthesis.v1','ct.chlom.agent.release-certifier'),
+          }
+
+          assert manifest['manifest_id']=='ct.manifest.chlom-wallet-independent-review-contract.v1'
+          assert manifest['state']=='HOLD_REVIEWER_HEARTBEATS_AND_RECEIPTS'
+          assert manifest['phase']=='2.99'
+          assert manifest['originator_agent_id']=='ct.agent.chlom-wallet-settlement'
+          assert manifest['originator_is_final_approver'] is False
+          snapshot=manifest['technical_snapshot']
+          assert snapshot['exact_head_sha']==expected_head
+          assert snapshot['evidence_digest_sha256']==expected_digest
+          assert snapshot['runtime_codehash']==expected_hash
+          assert snapshot['runtime_code_bytes']==22425
+          assert manifest['runtime_contract']['rls_deny_all'] is True
+          assert manifest['runtime_contract']['append_only_receipts'] is True
+          assert manifest['runtime_contract']['service_role_only_writes'] is True
+          assert manifest['runtime_contract']['public_status_read_only'] is True
+
+          lanes=manifest['review_lanes']
+          assert len(lanes)==5
+          assert {lane['review_role'] for lane in lanes}==set(expected)
+          for lane in lanes:
+            assert (lane['work_id'],lane['reviewer_agent_id'])==expected[lane['review_role']]
+            assert re.fullmatch(r'did:[a-z0-9]+:[A-Za-z0-9._:%-]+',lane['reviewer_did_uri'])
+            assert re.fullmatch(r'[0-9a-f]{64}',lane['reviewer_public_identity_digest_sha256'])
+            assert lane['binding_state']=='active'
+            assert lane['heartbeat_state']=='STALE'
+            assert lane['receipt_state']=='MISSING'
+          quorum=next(lane for lane in lanes if lane['review_role']=='quorum')
+          assert quorum['existing_vote_eligibility'] is True
+          assert quorum['receipt_vote_effect']=='none'
+          assert manifest['current_counts']=={
+            'required_reviewers':5,'ready_reviewers':0,'stale_or_unready_reviewers':5,
+            'receipts_recorded':0,'pass_receipts':0,'hold_receipts':0,'deny_receipts':0
+          }
+          assert manifest['canaries']['enforcement_contract']=='PASS_INDEPENDENT_REVIEW_CONTRACT_FAIL_CLOSED_CANARY'
+          assert manifest['canaries']['public_status']=='PASS_INDEPENDENT_REVIEW_PUBLIC_STATUS_CANARY'
+          assert manifest['current_synthesis']['result']=='HOLD_MISSING_INDEPENDENT_RECEIPTS'
+          assert manifest['current_synthesis']['phase_gate_required'] is True
+          assert manifest['current_synthesis']['automatic_profile_promotion'] is False
+          assert manifest['scheduler_policy']['fresh_reviewer_heartbeat_required'] is True
+          assert manifest['scheduler_policy']['stale_reviewer_forces_waiting'] is True
+          assert manifest['scheduler_policy']['scheduler_executes_reviewers'] is False
+          assert manifest['scheduler_policy']['reviewer_impersonation_allowed'] is False
+          assert all(value is False for value in manifest['hard_boundaries'].values())
+
+          assert packet['packet_id']=='ct.wallet.erc4337.independent-review-lanes.v1'
+          assert packet['state']=='ASSIGNED_WAITING_FOR_REVIEWER_HEARTBEATS'
+          assert packet['originator_agent_id']=='ct.agent.chlom-wallet-settlement'
+          assert packet['originator_may_submit_review_receipts'] is False
+          assert packet['technical_snapshot']['exact_head_sha']==expected_head
+          assert packet['technical_snapshot']['evidence_digest_sha256']==expected_digest
+          assert packet['technical_snapshot']['runtime_codehash']==expected_hash
+          assert packet['receipt_contract']['fresh_reviewer_heartbeat_required'] is True
+          assert packet['receipt_contract']['exact_head_required'] is True
+          assert packet['receipt_contract']['evidence_digest_required'] is True
+          assert packet['receipt_contract']['append_only'] is True
+          assert packet['receipt_contract']['service_role_only'] is True
+          assert len(packet['shared_sources'])>=8
+          assert len(packet['lanes'])==5
+          assert {lane['review_role'] for lane in packet['lanes']}==set(expected)
+          for lane in packet['lanes']:
+            assert (lane['work_id'],lane['reviewer_agent_id'])==expected[lane['review_role']]
+            assert lane['activation_prerequisite']
+            assert len(lane['required_questions'])>=4
+            assert len(lane['required_outputs'])>=4
+            assert lane['allowed_scope_dispositions']
+            assert lane['receipt_state']=='MISSING'
+          assert packet['current_state']=={
+            'reviewers_fresh':0,'reviewers_stale':5,'receipts_recorded':0,
+            'queue_items_waiting':5,'synthesis':'HOLD_MISSING_INDEPENDENT_RECEIPTS'
+          }
+          assert all(value is False for value in packet['hard_boundaries'].values())
+          PY
+
+      - name: Enforce public/private and no-live boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            developers/chlom-wallet-independent-review-contract.mdx
+            developers/chlom-wallet-independent-review-lanes.mdx
+            developers/manifests/chlom-wallet-independent-review-contract.v1.json
+            developers/reference/chlom-wallet/smart-account/independent-review-lane-packets.v1.json
+            developers/reference/chlom-wallet/smart-account/independent-review-receipt.v1.schema.json
+            developers/reference/chlom-wallet/smart-account/independent-review-status.v1.schema.json
+            developers/reference/chlom-wallet/smart-account/test-independent-review-receipt-contract.mjs
+          )
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${files[@]}"; then
+            echo 'Potential live secret-shaped material detected in independent-review projection.'
+            exit 1
+          fi
+          if grep -nE -- '"(profile_promoted|deployment_authorized|broadcast_authorized|custody|money_movement|production_rights_grant|phase_advancement|merge_authorized)"[[:space:]]*:[[:space:]]*true' "${files[@]}"; then
+            echo 'Independent-review contract crossed a no-live or no-authority boundary.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo 'CONTROLLED_TEST: reviewer-specific packets are complete while all five substantive reviews remain missing.'
+          echo 'The scheduler does not execute or impersonate reviewers.'
+          echo 'No heartbeat, receipt, profile promotion, implementation selection, signer, simulation, deployment, broadcast, custody, money movement, rights grant, phase advancement, or merge authority is fabricated.'

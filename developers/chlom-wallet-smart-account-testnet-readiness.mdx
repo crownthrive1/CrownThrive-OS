@@ -1,140 +1,134 @@
 ---
 title: "CHLOM Wallet Smart-Account Testnet Readiness"
 sidebarTitle: "Smart-Account Readiness"
-description: "Controlled-test readiness contract for the CHLOM Wallet Sepolia ERC-4337/ERC-7579 lane, current EntryPoint research, WebAuthn gates and non-broadcast deployment preparation."
+description: "Controlled-test readiness contract for CHLOM Wallet ERC-4337 v0.9 audit lineage, reproducible runtime identity, multi-provider Sepolia bytecode observation, WebAuthn gates and non-broadcast deployment preparation."
 icon: "diagram-project"
 ---
 
 # CHLOM Wallet smart-account testnet readiness
 
-**State:** `SPECIFIED_NOT_DEPLOYED`  
+**State:** `HOLD_PREDEPLOYMENT`  
 **Target chain:** Sepolia / `eip155:11155111`  
-**Broadcast:** disabled  
-**Production signer:** none  
-**Money movement:** none
+**External bytecode observation:** complete through two providers  
+**Exact release runtime reproduction:** complete  
+**Official audit extraction:** complete  
+**Runtime codehash independent approval:** pending  
+**Simulation and broadcast:** disabled
 
-The next CHLOM Wallet blockchain step is not “launch a token.” It is to prove that a governed CrownThrive wallet identity can safely bind to a modular smart account on a public test network while preserving passkey security, provider portability, rights separation and rollback evidence.
+The next CHLOM Wallet blockchain step remains evidence and review—not token issuance, account deployment, custody, or a transaction.
 
-## Current account-abstraction baseline
+## Evidence now complete
 
-Upstream `eth-infinitism/account-abstraction` now identifies **v0.9.0** as its latest ERC-4337 release. The release states a v0.9 EntryPoint candidate at:
+### Official release and source identity
 
-```text
-0x433709009B8330FDa32311DF1C2AFA402eD8D009
+```yaml
+repository: eth-infinitism/account-abstraction
+release_tag: v0.9.0
+release_commit_sha: b36a1ed52ae00da6f8a4c8d50181e2877e4fa410
+release_tree_sha: f75688b14e23ebddb9b81011b036bab15de89089
+entrypoint_source_blob_sha1: 3b4feb6ec0ed1cf41310b24858c81f5012572af9
+release_entrypoint: 0x433709009B8330FDa32311DF1C2AFA402eD8D009
 ```
 
-Current Sepolia explorer evidence shows contract activity at that address. This makes v0.9 the appropriate **research baseline** for new CHLOM testnet work rather than silently freezing the older v0.8 planning record.
+The stale tagged deployment artifact still records the earlier v0.8 address. That historical source divergence remains documented rather than deleted.
 
-## Important source discrepancy
+### Official Cantina audit
 
-During this pass, the upstream `v0.9.0` tag path:
+The exact 498,502-byte audit PDF is pinned by Git blob and SHA-256. Bounded extraction resolves the initial and holistic review commits and preserves the report's finding summary. The holistic follow-up `EntryPoint.sol` blob is identical to the release `EntryPoint.sol` blob.
 
-```text
-/deployments/ethereum/EntryPoint.json
+See [EntryPoint Audit & Code-Identity Review](/developers/chlom-wallet-entrypoint-audit-review).
+
+### Reproducible release runtime
+
+The exact release commit, locked dependency tree, compiler `0.8.28`, Cancun EVM target, optimizer runs `1,000,000`, `viaIR`, and release salt were used to deterministically deploy EntryPoint on an ephemeral Hardhat chain configured with Sepolia chain ID.
+
+```yaml
+result: PASS_ERC4337_V09_REPRODUCIBLE_RUNTIME_MATCH_HOLD_INDEPENDENT_APPROVAL
+workflow_run_id: 32569154292
+entrypoint_address: 0x433709009b8330fda32311df1c2afa402ed8d009
+runtime_code_bytes: 22425
+runtime_codehash: 0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0
+matches_observed_sepolia_runtime: true
+external_rpc_used: false
 ```
 
-returned the earlier address:
+### Multi-provider Sepolia observation
 
-```text
-0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108
+Two public providers independently returned the same chain ID, address, byte length, and runtime codehash using only `eth_chainId` and `eth_getCode`.
+
+```yaml
+provider_count: 2
+provider_agreement: true
+runtime_code_bytes: 22425
+runtime_codehash: 0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0
 ```
 
-while the v0.9 release page and current Sepolia chain observation support `0x433709...`.
+Provider availability loss is treated as an availability HOLD, not bytecode disagreement. Any successful refresh provider must match the pinned evidence.
 
-CHLOM does **not** hide that discrepancy. The testnet manifest records it as `OPEN_SOURCE_ARTIFACT_MISMATCH` and blocks broadcast until the selected EntryPoint is independently code-hash verified or the upstream artifact discrepancy is otherwise resolved.
+## What remains unresolved
 
-That is a feature of the evidence model: a plausible or even likely address is not enough for a privileged singleton that validates smart-account operations.
+The evidence now demonstrates:
 
-## Candidate stack
+1. exact upstream release source identity;
+2. exact audit artifact identity and bounded extraction;
+3. audited-source lineage to the release EntryPoint source;
+4. deterministic release address reproduction;
+5. deterministic release runtime reproduction under Sepolia chain semantics;
+6. equality between reproduced runtime and observed Sepolia runtime;
+7. prior two-provider external bytecode agreement.
 
-```text
-CHLOM stable wallet ID
-        ↓
-WebAuthn / passkey credential policy
-        ↓
-Smart-account implementation — NOT YET SELECTED
-        ↓
-ERC-7579 modular interface candidate
-        ↓
-ERC-4337 v0.9 EntryPoint research candidate
-        ↓
-Sepolia
+The Wallet Agent is still the originator and cannot independently approve its own code-identity conclusion. The runtime codehash therefore remains:
+
+```yaml
+runtime_codehash_independently_approved: false
+runtime_codehash_verified_for_deployment: false
+disposition: HOLD_INDEPENDENT_CODE_IDENTITY_REVIEW_REQUIRED
 ```
 
-The account implementation and factory remain deliberately unselected. Selecting them before completing the security/recovery criteria would create artificial momentum instead of evidence.
+## Assigned review path
 
-## WebAuthn registration gate
+```yaml
+request_id: ct.wallet.review.entrypoint-runtime-codehash.sepolia.v1
+work_id: ct.work.chlom-wallet.erc4337-runtime-codehash-review.v1
+protocol_verifier: ct.chlom.agent.blockchain-crypto
+security_verifier: ct.chlom.agent.security
+quorum_gatekeeper: ct.relay.agent-d
+recovery_authority: ct.chlom.agent.recovery
+construction_gates: [CG-049, CG-056]
+```
 
-The source-controlled registration verifier now supports a narrow controlled-test profile:
+The requested approval is limited to continuing testnet predeployment. It cannot authorize account deployment or broadcast.
 
-- `webauthn.create` client-data validation;
-- expected challenge binding;
-- HTTPS origin and RP-ID binding;
-- CBOR attestation-object parsing;
-- RP-ID hash validation;
-- user-presence and user-verification flags;
-- attested credential data extraction;
-- ES256 / P-256 COSE public-key validation;
-- deterministic credential commitment;
-- `none` attestation profile only.
+## Remaining hard gates
 
-The `none` attestation profile intentionally makes **no authenticator trust/attestation claim**. Production attestation policy remains a separate security/privacy/product decision.
+1. Independent runtime-codehash approval.
+2. Smart-account implementation selection and review.
+3. Factory/deterministic deployment selection and review.
+4. Passkey-validator selection and review.
+5. Authenticated browser WebAuthn canary.
+6. Production recovery and attestation policy.
+7. Reviewed account call data and init code.
+8. Bundler compatibility and UserOperation simulation.
+9. Independent wallet/account security review.
+10. Testnet signer and recovery-authority receipt.
+11. Rollback and recovery drill.
+12. Separate governed testnet broadcast authorization.
 
-The existing assertion verifier separately performs ES256/P-256 signature validation. Registration and assertion therefore now have independent controlled-test contracts rather than one vague “passkey supported” claim.
-
-## Why factory/account selection is still open
-
-Before CHLOM picks an account implementation or factory, the candidate must support the actual CrownThrive requirements:
-
-- WebAuthn/passkey validation without exporting signing secrets;
-- recoverable credential rotation;
-- explicit module allowlisting and removal;
-- deterministic deployment or equally strong identity binding;
-- ERC-1271-compatible signature validation where required;
-- compatible ERC-4337 version/EntryPoint;
-- no hidden paymaster dependency;
-- no mandatory vendor-hosted custody;
-- exportable state and provider exit;
-- independent audit evidence appropriate to the implementation;
-- clear failure and recovery behavior.
-
-ERC-7579 interface compatibility alone is insufficient evidence that a module or account implementation is safe.
-
-## Non-broadcast manifest
-
-The machine-readable readiness manifest explicitly contains:
+## Non-execution boundary
 
 ```yaml
 account_implementation_selected: false
 factory_selected: false
-user_operation_built: false
+passkey_validator_selected: false
+funded_signer_authorized: false
+user_operation_created: false
 simulation_completed: false
-broadcast_enabled: false
-transaction_hash: null
+deployment_authorized: false
+broadcast_authorized: false
+custody: false
 money_movement: false
+production_rights_grant: false
+phase_advancement: false
 ```
 
-This keeps construction moving while making it impossible to confuse research with a deployed wallet.
-
-## Next smart-account gates
-
-1. Reconcile the EntryPoint v0.9 source-artifact mismatch with direct runtime-code evidence.
-2. Select a minimal account implementation candidate and record exact source/version/license/audit evidence.
-3. Select a factory or deterministic deployment pattern.
-4. Bind the selected account to the WebAuthn registration/assertion/recovery profile.
-5. Generate a complete unsigned UserOperation candidate.
-6. Simulate it against Sepolia without broadcasting.
-7. Run recovery/module-abuse/adversarial tests.
-8. Obtain independent security disposition.
-9. Create a separate signer/testnet-broadcast authority receipt.
-10. Only then submit the first governed testnet transaction.
-
 No public testnet or mainnet transaction is authorized by this page.
-
-## Research references
-
-- ERC-4337 upstream repository and releases: `https://github.com/eth-infinitism/account-abstraction`
-- ERC-4337 v0.9 release: `https://github.com/eth-infinitism/account-abstraction/releases/tag/v0.9.0`
-- Sepolia explorer candidate: `https://sepolia.etherscan.io/address/0x433709009b8330fda32311df1c2afa402ed8d009`
-- ERC-7579: `https://eips.ethereum.org/EIPS/eip-7579`
-- WebAuthn Level 3: `https://www.w3.org/TR/webauthn-3/`

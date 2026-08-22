@@ -1,0 +1,191 @@
+name: CHLOM Wallet Agent Skill & Pallet Contract
+
+on:
+  pull_request:
+    paths:
+      - "automation/chlom-wallet-agent-skills-v2.json"
+      - "automation/chlom-wallet-agent-skills-v2.mdx"
+      - "automation/chlom-wallet-agent-handoff-crosswalk.v1.json"
+      - "chlom/chlom-wallet-component-pallets.v1.json"
+      - "chlom/chlom-wallet-component-pallets.mdx"
+      - "developers/manifests/chlom-wallet-agent-skill-pallet-registry.v1.json"
+      - ".github/workflows/chlom-wallet-agent-skill-pallet-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-skill-pallet-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate wallet skills, handoffs, pallets, and commercial HOLD
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate JSON syntax
+        run: |
+          python -m json.tool automation/chlom-wallet-agent-skills-v2.json >/dev/null
+          python -m json.tool automation/chlom-wallet-agent-handoff-crosswalk.v1.json >/dev/null
+          python -m json.tool chlom/chlom-wallet-component-pallets.v1.json >/dev/null
+          python -m json.tool developers/manifests/chlom-wallet-agent-skill-pallet-registry.v1.json >/dev/null
+
+      - name: Validate skill-suite authority and identity contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          suite=json.load(open('automation/chlom-wallet-agent-skills-v2.json'))
+          cross=json.load(open('automation/chlom-wallet-agent-handoff-crosswalk.v1.json'))
+          manifest=json.load(open('developers/manifests/chlom-wallet-agent-skill-pallet-registry.v1.json'))
+
+          assert suite['suite_id']=='ct.skill-suite.chlom-wallet.v2'
+          assert suite['semantic_version']=='2.0.0'
+          assert suite['state']=='CONTROLLED_TEST'
+          assert suite['canonical_agent_id']=='ct.agent.chlom-wallet-settlement'
+          authority=suite['authority']
+          assert authority['autonomy_ceiling']=='A2'
+          assert authority['decision_ceiling']=='D2'
+          for key in [
+            'vote_eligible','self_approval','certification_authority','sync_agents_authority',
+            'live_money_movement','custody','token_issuance','production_rights_grant',
+            'testnet_or_mainnet_broadcast','effective_price_publication'
+          ]:
+            assert authority[key] is False, (key,authority[key])
+
+          skills=suite['skills']
+          assert len(skills)==20
+          ids=[skill['skill_id'] for skill in skills]
+          assert len(ids)==len(set(ids))
+          assert all(value.startswith('ct.skill.chlom-wallet.') for value in ids)
+          for skill in skills:
+            assert skill['name'] and skill['purpose'] and skill['primary_handoffs']
+          defaults=suite['skill_defaults']
+          assert defaults['state']=='CONTROLLED_TEST'
+          assert defaults['authority_ceiling']=='D2'
+          assert defaults['vote_effect']=='none'
+          assert all(defaults[key] is False for key in ['provider_write','credential_access','money_movement','rights_grant','chain_broadcast'])
+          scheduler=suite['scheduler_policy']
+          assert scheduler=={
+            'new_external_scheduler_slot':False,'reuse_institutional_relay':True,
+            'heartbeat_required':True,'exact_head_required':True,'stale_evidence_holds':True
+          }
+          monetization=suite['monetization_policy']
+          assert monetization['candidate_only'] is True
+          assert monetization['effective_offer'] is False
+          assert monetization['stripe_objects_created'] is False
+          assert monetization['checkout_enabled'] is False
+          assert monetization['independent_price_certification_required'] is True
+          assert monetization['rights_and_security_release_required'] is True
+
+          assert cross['crosswalk_id']=='ct.crosswalk.chlom-wallet-agent-handoffs.v1'
+          assert cross['canonical_wallet_agent_id']=='ct.agent.chlom-wallet-settlement'
+          verified=cross['verified_handoffs']
+          pending=cross['pending_role_aliases']
+          assert len(verified)==19
+          assert len(pending)==2
+          verified_ids=[item['stable_agent_id'] for item in verified]
+          assert len(verified_ids)==len(set(verified_ids))
+          assert all(item['identity_state'].startswith('VERIFIED_') for item in verified)
+          assert all(item['vote_effect']=='none' for item in verified)
+          assert all(item['authority_ceiling'] in ('D1','D2') for item in verified)
+          for item in pending:
+            assert item['stable_agent_id'] is None
+            assert item['identity_state']=='ROLE_ALIAS_PENDING_STABLE_ID_CROSSWALK'
+            assert item['allowed_use']=='non_executing_handoff_label_only'
+            for key in ['authority_granted','capability_grant_created','heartbeat_binding_created','credential_access','provider_write','money_movement','rights_grant','chain_broadcast']:
+              assert item[key] is False, (item['legacy_alias'],key,item[key])
+          assert {item['legacy_alias'] for item in pending}=={'ct.agent.api-mcp','ct.agent.webhook-delivery'}
+          assert all(value is False for value in cross['hard_boundaries'].values())
+
+          assert manifest['private_canary']['result']=='PASS_CHLOM_WALLET_AGENT_SKILL_PALLET_REGISTRY_CANARY'
+          assert manifest['private_canary']['skill_count']==20
+          assert manifest['private_canary']['verified_handoff_count']==19
+          assert manifest['private_canary']['pending_alias_count']==2
+          assert manifest['private_canary']['pallet_count']==12
+          assert manifest['private_canary']['bundle_count']==4
+          assert manifest['private_canary']['invalid_authority_or_live_boundaries']==0
+          assert manifest['private_canary']['invalid_bundle_references']==0
+          assert all(value is False for value in manifest['hard_boundaries'].values())
+          PY
+
+      - name: Validate WalletKit pallet and bundle contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          catalog=json.load(open('chlom/chlom-wallet-component-pallets.v1.json'))
+          assert catalog['catalog_id']=='ct.catalog.chlom-wallet-component-pallets.v1'
+          assert catalog['semantic_version']=='1.0.0'
+          assert catalog['state']=='RESEARCH_CANDIDATE'
+          assert catalog['commercial_family']=='CHLOM WalletKit'
+          assert catalog['effective_offer'] is False
+          assert catalog['public_price_authorized'] is False
+          assert catalog['stripe_objects_created'] is False
+          assert catalog['checkout_enabled'] is False
+
+          pallets=catalog['pallets']
+          bundles=catalog['bundle_candidates']
+          assert len(pallets)==12
+          assert len(bundles)==4
+          pallet_ids=[item['pallet_id'] for item in pallets]
+          bundle_ids=[item['bundle_id'] for item in bundles]
+          assert len(pallet_ids)==len(set(pallet_ids))
+          assert len(bundle_ids)==len(set(bundle_ids))
+          assert all(item['name'] and item['strategic_role'] and item['current_state'] for item in pallets)
+          assert all(item['delivery_candidates'] and item['dependencies'] and item['required_gates'] for item in pallets)
+          known=set(pallet_ids)
+          for bundle in bundles:
+            assert bundle['state']=='PRICE_REVIEW'
+            assert bundle['included_pallets']
+            assert set(bundle['included_pallets']) <= known
+          defaults=catalog['pallet_defaults']
+          assert all(value is False for value in defaults.values())
+          bundle_defaults=catalog['bundle_defaults']
+          assert bundle_defaults['independent_price_review_request']=='ct.price-review.chlom-wallet.phase-b.v1'
+          assert all(bundle_defaults[key] is False for key in ['effective_offer','public_price_authorized','stripe_objects_created','checkout_enabled'])
+          pricing=catalog['pricing']
+          assert pricing['candidate_prices_public'] is False
+          assert pricing['effective_prices'] is False
+          assert pricing['stripe_product_creation_authorized'] is False
+          assert pricing['stripe_price_creation_authorized'] is False
+          assert pricing['checkout_creation_authorized'] is False
+          rights=catalog['rights']
+          assert rights['crownthrive_proprietary_layer'] is True
+          assert rights['third_party_standards_are_dependencies_not_crownthrive_ip'] is True
+          assert rights['source_license_review_required_before_distribution'] is True
+          assert rights['public_reference_is_not_commercial_license'] is True
+          PY
+
+      - name: Enforce alias quarantine and no-live projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            automation/chlom-wallet-agent-skills-v2.json
+            automation/chlom-wallet-agent-skills-v2.mdx
+            automation/chlom-wallet-agent-handoff-crosswalk.v1.json
+            chlom/chlom-wallet-component-pallets.v1.json
+            chlom/chlom-wallet-component-pallets.mdx
+            developers/manifests/chlom-wallet-agent-skill-pallet-registry.v1.json
+          )
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${files[@]}"; then
+            echo 'Potential live secret-shaped material detected in skill/pallet projection.'
+            exit 1
+          fi
+          if grep -nE -- '"(effective_offer|public_price_authorized|stripe_objects_created|stripe_product_created|stripe_price_created|checkout_enabled|provider_write|custody|token_issuance|money_movement|production_rights_grant|chain_broadcast|phase_advancement|merge_authorized)"[[:space:]]*:[[:space:]]*true' "${files[@]}"; then
+            echo 'Wallet skill/pallet packet crossed a commercial, value, authority, or release boundary.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo 'CONTROLLED_TEST: 20 skills, 19 verified handoffs, 2 quarantined aliases, 12 pallets, and 4 PRICE_REVIEW bundles validated.'
+          echo 'No new sovereign vote, certification authority, credential grant, provider write, Stripe object, checkout, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement, or merge authority is created.'

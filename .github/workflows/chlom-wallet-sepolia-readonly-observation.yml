@@ -1,0 +1,140 @@
+name: CHLOM Wallet Sepolia Read-Only Observation
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs"
+      - "developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs"
+      - "developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs"
+      - "developers/reference/chlom-wallet/smart-account/external-readback-observation.json"
+      - ".github/workflows/chlom-wallet-sepolia-readonly-observation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-sepolia-readonly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  observe:
+    name: Observe Sepolia EntryPoint code through an availability-aware 2-of-3 quorum
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify runtime, syntax and pinned evidence JSON
+        run: |
+          node --version
+          node --check developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs
+          node --check developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs
+          node --check developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs
+          python -m json.tool developers/reference/chlom-wallet/smart-account/external-readback-observation.json >/dev/null
+
+      - name: Execute fixed-endpoint read-only observation
+        id: observe
+        shell: bash
+        run: |
+          set -uo pipefail
+          set +e
+          node developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs \
+            | tee /tmp/chlom-wallet-sepolia-observation.json
+          node_status=${PIPESTATUS[0]}
+          set -e
+          test -s /tmp/chlom-wallet-sepolia-observation.json
+          echo "node_status=$node_status" >> "$GITHUB_OUTPUT"
+
+      - name: Validate quorum, availability HOLD, and pinned evidence boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool /tmp/chlom-wallet-sepolia-observation.json >/dev/null
+          python - <<'PY'
+          import json
+          live=json.load(open('/tmp/chlom-wallet-sepolia-observation.json'))
+          pinned=json.load(open('developers/reference/chlom-wallet/smart-account/external-readback-observation.json'))
+          allowed={'publicnode','1rpc','sepolia-dev'}
+          pass_result='PASS_EXTERNAL_READ_ONLY_MULTI_PROVIDER_QUORUM_OBSERVATION'
+          availability_hold='HOLD_EXTERNAL_READ_ONLY_PROVIDER_QUORUM_NOT_MET'
+
+          assert live['target']['chain_id_caip2']=='eip155:11155111'
+          assert live['target']['chain_id_hex']=='0xaa36a7'
+          assert live['target']['entrypoint_address']=='0x433709009B8330FDa32311DF1C2AFA402eD8D009'
+          assert live['provider_quorum_required']==2
+          assert live['provider_attempted_count']==3
+          assert live['provider_success_count']==len(live['providers'])
+          assert live['provider_failure_count']==len(live['provider_failures'])
+          assert {p['provider_id'] for p in live['providers']} <= allowed
+          assert {p['provider_id'] for p in live['provider_failures']} <= allowed
+          assert all(p['rpc_methods_used']==['eth_chainId','eth_getCode'] for p in live['providers'])
+          assert live['runtime_codehash_independently_approved'] is False
+          assert live['source_profile_promoted'] is False
+          for key in [
+            'account_implementation_selected','factory_selected','signer_used','user_operation_created',
+            'simulation_completed','broadcast_performed','deployment_performed','custody','money_movement','phase_advancement'
+          ]:
+            assert live[key] is False, (key,live[key])
+
+          assert pinned['state']=='PASS_EXTERNAL_READ_ONLY_OBSERVATION_HOLD_INDEPENDENT_APPROVAL'
+          assert pinned['observation']['provider_count']==2
+          assert pinned['observation']['provider_agreement'] is True
+          assert pinned['interpretation']['runtime_codehash_independently_approved'] is False
+          assert pinned['interpretation']['runtime_codehash_verified_for_deployment'] is False
+          assert all(value is False for value in pinned['hard_boundaries'].values())
+
+          # Every successful provider must still match the pinned bytecode evidence.
+          # A mismatch is never downgraded to an availability incident.
+          assert all(
+            p['observed_runtime_codehash']==pinned['observation']['observed_runtime_codehash']
+            and p['runtime_code_bytes']==pinned['observation']['runtime_code_bytes']
+            for p in live['providers']
+          )
+
+          if live['result']==pass_result:
+            assert live['provider_success_count']>=2
+            assert live['provider_agreement'] is True
+            assert len({p['observed_runtime_codehash'] for p in live['providers']})==1
+            assert len({p['runtime_code_bytes'] for p in live['providers']})==1
+            assert live['runtime_code_bytes']==pinned['observation']['runtime_code_bytes']
+            assert live['observed_runtime_codehash']==pinned['observation']['observed_runtime_codehash']
+            validation_state='PASS_FRESH_QUORUM'
+          elif live['result']==availability_hold:
+            assert live['provider_success_count']<2
+            assert live['provider_failure_count']>=2
+            validation_state='HOLD_PROVIDER_AVAILABILITY_PINNED_EVIDENCE_UNCHANGED'
+          else:
+            raise AssertionError(f"unacceptable_observation_result:{live['result']}")
+
+          print(json.dumps({
+            'validation_state':validation_state,
+            'provider_success_count':live['provider_success_count'],
+            'provider_failure_count':live['provider_failure_count'],
+            'pinned_runtime_codehash':pinned['observation']['observed_runtime_codehash'],
+            'runtime_codehash_independently_approved':False,
+            'broadcast_authorized':False,
+          },sort_keys=True))
+          PY
+
+      - name: Enforce fixed endpoints and RPC-method allowlist
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=developers/reference/chlom-wallet/smart-account/observe-sepolia-entrypoint.mjs
+          grep -F "https://ethereum-sepolia-rpc.publicnode.com" "$file" >/dev/null
+          grep -F "https://public.1rpc.io/sepolia" "$file" >/dev/null
+          grep -F "https://rpc.sepolia.dev" "$file" >/dev/null
+          if grep -nE 'eth_sendRawTransaction|eth_sendTransaction|wallet_sendCalls|personal_sendTransaction|private[_ -]?key|mnemonic|seed phrase' "$file"; then
+            echo "Transaction or secret-bearing path appeared in the read-only observation."
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "EXTERNAL READ ONLY: three fixed public Sepolia providers with a two-provider agreement quorum."
+          echo "Temporary provider quorum loss is recorded as availability HOLD, not bytecode disagreement."
+          echo "Any successful provider must continue matching the pinned runtime codehash and byte length."
+          echo "Provider agreement and reproducibility remain evidence, not independent approval."
+          echo "No signer, UserOperation, simulation, deployment, broadcast, custody, money movement, rights grant, or Phase advancement occurs."

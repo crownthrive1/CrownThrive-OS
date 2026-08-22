@@ -1,0 +1,191 @@
+{
+  "packet_id": "ct.wallet.erc4337.independent-review-lanes.v1",
+  "semantic_version": "1.0.0",
+  "state": "ASSIGNED_WAITING_FOR_REVIEWER_HEARTBEATS",
+  "phase": "2.99",
+  "originator_agent_id": "ct.agent.chlom-wallet-settlement",
+  "originator_may_submit_review_receipts": false,
+  "technical_snapshot": {
+    "exact_head_sha": "df67672b99839e58d7873dabe49e06de58007820",
+    "evidence_digest_sha256": "a11e9c03cfd0ec05d9e4f1171b1d99e124cf2f7fffd697881bb3718f13e4b9fb",
+    "entrypoint_address": "0x433709009B8330FDa32311DF1C2AFA402eD8D009",
+    "chain_id_caip2": "eip155:11155111",
+    "runtime_code_bytes": 22425,
+    "runtime_codehash": "0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0"
+  },
+  "shared_sources": [
+    "developers/reference/chlom-wallet/smart-account/runtime-codehash-independent-review-request.json",
+    "developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json",
+    "developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json",
+    "developers/reference/chlom-wallet/smart-account/external-readback-observation.json",
+    "developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json",
+    "developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json",
+    "developers/reference/chlom-wallet/smart-account/reproduce-entrypoint-v09-runtime.ts",
+    "developers/reference/chlom-wallet/smart-account/independent-review-receipt.v1.schema.json"
+  ],
+  "receipt_contract": {
+    "function": "chlom_wallet.record_independent_review_receipt_v1",
+    "schema": "developers/reference/chlom-wallet/smart-account/independent-review-receipt.v1.schema.json",
+    "fresh_reviewer_heartbeat_required": true,
+    "exact_head_required": true,
+    "evidence_digest_required": true,
+    "append_only": true,
+    "service_role_only": true
+  },
+  "lanes": [
+    {
+      "work_id": "ct.work.chlom-wallet.erc4337-runtime-codehash-review.v1",
+      "review_role": "protocol",
+      "reviewer_agent_id": "ct.chlom.agent.blockchain-crypto",
+      "activation_prerequisite": "REVIEWER_OWN_FRESH_HEARTBEAT",
+      "required_questions": [
+        "Does the exact v0.9 release source and configuration reproducibly identify the observed Sepolia EntryPoint runtime?",
+        "Does the reproduced runtime match the pinned two-provider observation in address, byte length and codehash?",
+        "Does chain-bound immutable behavior explain the rejected default-chain reproduction without weakening the Sepolia result?",
+        "Is the source and deployment-artifact divergence preserved without using the stale artifact as runtime truth?"
+      ],
+      "required_outputs": [
+        "protocol code-identity disposition",
+        "source and configuration lineage findings",
+        "runtime reproduction findings",
+        "conditions for any further testnet predeployment work"
+      ],
+      "allowed_scope_dispositions": [
+        "APPROVE_CODE_IDENTITY_FOR_FURTHER_TESTNET_PREDEPLOYMENT",
+        "HOLD_ADDITIONAL_AUDIT_OR_SOURCE_EVIDENCE_REQUIRED",
+        "HOLD_RUNTIME_CODE_MISMATCH",
+        "DENY_CODE_IDENTITY"
+      ],
+      "receipt_state": "MISSING"
+    },
+    {
+      "work_id": "ct.work.chlom-wallet.erc4337-security-review.v1",
+      "review_role": "security",
+      "reviewer_agent_id": "ct.chlom.agent.security",
+      "activation_prerequisite": "REVIEWER_OWN_FRESH_HEARTBEAT",
+      "required_questions": [
+        "Does the pinned Cantina audit scope cover the EntryPoint source lineage used by the release?",
+        "Are the report table, holistic follow-up statement and remaining acknowledged informational item represented without overclaim?",
+        "Do current wallet controls avoid introducing signer, paymaster, validator, module, custody or transaction authority?",
+        "Are source, audit, runtime observation and reproduction dependencies sufficiently pinned and reproducible?"
+      ],
+      "required_outputs": [
+        "security scope disposition",
+        "audit interpretation findings",
+        "supply-chain and reproducibility findings",
+        "conditions for account, validator and simulation review"
+      ],
+      "allowed_scope_dispositions": [
+        "APPROVE_CODE_IDENTITY_FOR_FURTHER_TESTNET_PREDEPLOYMENT",
+        "HOLD_ADDITIONAL_AUDIT_OR_SOURCE_EVIDENCE_REQUIRED",
+        "HOLD_RUNTIME_CODE_MISMATCH",
+        "DENY_CODE_IDENTITY"
+      ],
+      "receipt_state": "MISSING"
+    },
+    {
+      "work_id": "ct.work.chlom-wallet.erc4337-quorum-review.v1",
+      "review_role": "quorum",
+      "reviewer_agent_id": "ct.relay.agent-d",
+      "activation_prerequisite": "REVIEWER_OWN_FRESH_HEARTBEAT",
+      "required_questions": [
+        "Is the Wallet Agent excluded from final review and receipt submission?",
+        "Are five exact reviewer identities bound to distinct review roles and the frozen snapshot?",
+        "Do stale identities remain waiting rather than becoming ready through dependency refresh?",
+        "Does any existing Agent D vote eligibility remain separate from this receipt's vote_effect none?"
+      ],
+      "required_outputs": [
+        "originator-exclusion disposition",
+        "snapshot-binding disposition",
+        "reviewer independence and quorum findings",
+        "CG-049 readiness conditions"
+      ],
+      "allowed_scope_dispositions": [
+        "PASS_QUORUM_AND_SEPARATION_READY_FOR_RELEASE_SYNTHESIS",
+        "HOLD_QUORUM_OR_SEPARATION_OF_DUTIES_INCOMPLETE",
+        "DENY_QUORUM_INTEGRITY"
+      ],
+      "receipt_state": "MISSING",
+      "receipt_vote_effect": "none"
+    },
+    {
+      "work_id": "ct.work.chlom-wallet.erc4337-recovery-readback.v1",
+      "review_role": "recovery",
+      "reviewer_agent_id": "ct.chlom.agent.recovery",
+      "activation_prerequisite": "REVIEWER_OWN_FRESH_HEARTBEAT",
+      "required_questions": [
+        "Can the frozen evidence and source lineage be independently reread after interruption?",
+        "Are rollback, stale-evidence HOLD and provider-readback failure states explicit?",
+        "Are recovery operations separated from credentials, custody, signer use and chain writes?",
+        "Does resume require a new governed decision rather than automatic continuation?"
+      ],
+      "required_outputs": [
+        "rollback and recovery disposition",
+        "readback evidence result",
+        "stale-evidence handling findings",
+        "resume and incident conditions"
+      ],
+      "allowed_scope_dispositions": [
+        "PASS_RECOVERY_AND_READBACK_FOR_RELEASE_SYNTHESIS",
+        "HOLD_RECOVERY_OR_READBACK_INCOMPLETE",
+        "DENY_RECOVERY_INTEGRITY"
+      ],
+      "receipt_state": "MISSING"
+    },
+    {
+      "work_id": "ct.work.chlom-wallet.erc4337-release-synthesis.v1",
+      "review_role": "release",
+      "reviewer_agent_id": "ct.chlom.agent.release-certifier",
+      "activation_prerequisite": "FOUR_PREREQUISITE_RECEIPTS_AND_REVIEWER_OWN_FRESH_HEARTBEAT",
+      "required_questions": [
+        "Are protocol, security, quorum and recovery receipts present for the exact snapshot?",
+        "Do any HOLD or DENY conditions prevent positive synthesis?",
+        "Is any positive result strictly limited to further testnet predeployment and Phase Gate review?",
+        "Are profile promotion, implementation selection, signer, simulation, deployment and broadcast still separately gated?"
+      ],
+      "required_outputs": [
+        "independent receipt synthesis",
+        "open conditions and unresolved risks",
+        "Phase Gate handoff packet",
+        "explicit no-deployment and no-broadcast statement"
+      ],
+      "allowed_scope_dispositions": [
+        "PASS_INDEPENDENT_REVIEW_RECEIPTS_READY_FOR_PHASE_GATE",
+        "HOLD_MISSING_INDEPENDENT_RECEIPTS",
+        "HOLD_REVIEWER_IDENTITY_OR_HEARTBEAT",
+        "HOLD_REVIEW_CONDITIONS",
+        "DENY_INDEPENDENT_REVIEW"
+      ],
+      "receipt_state": "MISSING"
+    }
+  ],
+  "current_state": {
+    "reviewers_fresh": 0,
+    "reviewers_stale": 5,
+    "receipts_recorded": 0,
+    "queue_items_waiting": 5,
+    "synthesis": "HOLD_MISSING_INDEPENDENT_RECEIPTS"
+  },
+  "hard_boundaries": {
+    "reviewer_impersonation": false,
+    "fabricated_heartbeat": false,
+    "fabricated_receipt": false,
+    "originator_self_approval": false,
+    "automatic_profile_promotion": false,
+    "account_implementation_selected": false,
+    "factory_selected": false,
+    "passkey_validator_selected": false,
+    "signer_authorized": false,
+    "user_operation_created": false,
+    "simulation_completed": false,
+    "deployment_authorized": false,
+    "broadcast_authorized": false,
+    "custody": false,
+    "money_movement": false,
+    "production_rights_grant": false,
+    "phase_advancement": false,
+    "merge_authorized": false
+  },
+  "source_ref": "github:crownthrive1/CrownThrive-Support:pull/230",
+  "observed_on": "2026-08-22"
+}

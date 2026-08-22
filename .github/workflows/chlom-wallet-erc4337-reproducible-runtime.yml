@@ -1,0 +1,136 @@
+name: CHLOM Wallet ERC-4337 v0.9 Reproducible Runtime
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/smart-account/reproduce-entrypoint-v09-runtime.ts"
+      - "developers/reference/chlom-wallet/smart-account/reproduce-entrypoint-v09-hardhat.config.ts"
+      - "developers/reference/chlom-wallet/smart-account/external-readback-observation.json"
+      - ".github/workflows/chlom-wallet-erc4337-reproducible-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-erc4337-runtime-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reproduce:
+    name: Reproduce exact v0.9 EntryPoint runtime on isolated Sepolia-ID Hardhat
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out CrownThrive evidence repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: crownthrive-wallet-evidence
+          persist-credentials: false
+
+      - name: Check out exact upstream ERC-4337 release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: eth-infinitism/account-abstraction
+          ref: b36a1ed52ae00da6f8a4c8d50181e2877e4fa410
+          path: upstream-account-abstraction
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact upstream source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C upstream-account-abstraction rev-parse HEAD)" = 'b36a1ed52ae00da6f8a4c8d50181e2877e4fa410'
+          test "$(git -C upstream-account-abstraction rev-parse HEAD^{tree})" = 'f75688b14e23ebddb9b81011b036bab15de89089'
+          test "$(git -C upstream-account-abstraction hash-object contracts/core/EntryPoint.sol)" = '3b4feb6ec0ed1cf41310b24858c81f5012572af9'
+          test "$(git -C upstream-account-abstraction hash-object hardhat.config.ts)" = 'fd05e9beaaa509e1ace2d9821b9ebaa4f32e1d8d'
+          test "$(git -C upstream-account-abstraction hash-object deploy/1_deploy_entrypoint.ts)" = 'f714da04df562bd896bb22b932b16bc9a41ec664'
+          grep -F "const SALT = '0x7702864008ddeab30aa67b7adc3d2653bc8d162714b1fe8fe4582df814f3bf61'" upstream-account-abstraction/hardhat.config.ts >/dev/null
+          grep -F "version: '0.8.28'" upstream-account-abstraction/hardhat.config.ts >/dev/null
+          grep -F "evmVersion: 'cancun'" upstream-account-abstraction/hardhat.config.ts >/dev/null
+          grep -F "optimizer: { enabled: true, runs: 1000000 }" upstream-account-abstraction/hardhat.config.ts >/dev/null
+          grep -F 'viaIR: true' upstream-account-abstraction/hardhat.config.ts >/dev/null
+
+      - name: Install exact Yarn client and locked upstream dependencies
+        working-directory: upstream-account-abstraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          npm install --global --ignore-scripts yarn@1.22.22
+          test "$(yarn --version)" = '1.22.22'
+          yarn install --frozen-lockfile --non-interactive --ignore-scripts
+
+      - name: Install controlled reproduction harness and chain-ID overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp \
+            crownthrive-wallet-evidence/developers/reference/chlom-wallet/smart-account/reproduce-entrypoint-v09-runtime.ts \
+            upstream-account-abstraction/scripts/chlom-reproduce-entrypoint-v09-runtime.ts
+          cp \
+            crownthrive-wallet-evidence/developers/reference/chlom-wallet/smart-account/reproduce-entrypoint-v09-hardhat.config.ts \
+            upstream-account-abstraction/chlom-reproduce-entrypoint-v09-hardhat.config.ts
+          git -C upstream-account-abstraction status --short | grep -F '?? scripts/chlom-reproduce-entrypoint-v09-runtime.ts' >/dev/null
+          git -C upstream-account-abstraction status --short | grep -F '?? chlom-reproduce-entrypoint-v09-hardhat.config.ts' >/dev/null
+
+      - name: Compile and deterministically deploy on isolated Sepolia-ID Hardhat
+        working-directory: upstream-account-abstraction
+        shell: bash
+        env:
+          CHLOM_OUTPUT_PATH: /tmp/chlom-wallet-erc4337-v09-runtime.json
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/hardhat \
+            --config chlom-reproduce-entrypoint-v09-hardhat.config.ts \
+            run --network hardhat scripts/chlom-reproduce-entrypoint-v09-runtime.ts \
+            | tee /tmp/chlom-wallet-erc4337-v09-runtime.log
+          python -m json.tool /tmp/chlom-wallet-erc4337-v09-runtime.json >/dev/null
+
+      - name: Validate reproduced runtime and HOLD boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          result=json.load(open('/tmp/chlom-wallet-erc4337-v09-runtime.json'))
+          observed=json.load(open('crownthrive-wallet-evidence/developers/reference/chlom-wallet/smart-account/external-readback-observation.json'))
+
+          assert result['result']=='PASS_ERC4337_V09_REPRODUCIBLE_RUNTIME_MATCH_HOLD_INDEPENDENT_APPROVAL'
+          assert result['upstream_release_commit']=='b36a1ed52ae00da6f8a4c8d50181e2877e4fa410'
+          assert result['local_network']['chain_id']==11155111
+          assert result['local_network']['target_semantics']=='sepolia_chain_id_on_ephemeral_hardhat'
+          deployment=result['deterministic_deployment']
+          assert deployment['entrypoint_address']=='0x433709009b8330fda32311df1c2afa402ed8d009'
+          assert deployment['runtime_code_bytes']==22425
+          assert deployment['runtime_codehash']=='0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0'
+          assert deployment['native_value_held_wei']=='0'
+          assert deployment['runtime_codehash']==observed['observation']['observed_runtime_codehash']
+          assert deployment['runtime_code_bytes']==observed['observation']['runtime_code_bytes']
+          assert result['interpretation']['local_runtime_matches_observed_sepolia_runtime'] is True
+          assert result['interpretation']['runtime_codehash_independently_approved'] is False
+          assert result['interpretation']['deployment_authorized'] is False
+          assert result['interpretation']['broadcast_authorized'] is False
+          assert all(value is False for value in result['hard_boundaries'].values())
+          PY
+
+      - name: Enforce isolated non-execution boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            crownthrive-wallet-evidence/developers/reference/chlom-wallet/smart-account/reproduce-entrypoint-v09-runtime.ts
+            crownthrive-wallet-evidence/developers/reference/chlom-wallet/smart-account/reproduce-entrypoint-v09-hardhat.config.ts
+          )
+          if grep -nE 'https?://|wss?://|eth_sendRawTransaction|wallet_sendCalls|personal_sendTransaction|mnemonic|seed phrase' "${files[@]}"; then
+            echo 'External network, transaction, or secret-bearing path appeared in the reproduction harness.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "CONTROLLED_TEST: exact upstream commit compiled and deployed only on an ephemeral Hardhat chain configured with Sepolia chain ID."
+          echo "A runtime match is reproducibility evidence, not independent security/codehash approval."
+          echo "No external RPC, production signer, UserOperation, public-testnet deployment, broadcast, custody, money movement, rights grant, or Phase advancement occurs."
