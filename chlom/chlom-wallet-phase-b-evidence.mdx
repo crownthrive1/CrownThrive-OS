@@ -1,7 +1,7 @@
 ---
 title: "CHLOM Wallet Phase B Evidence"
 sidebarTitle: "Wallet Phase B"
-description: "Controlled-test evidence for CHLOM Wallet Stripe webhook verification, entitlement separation, Unified Value Receipt integrity, passkey/smart-account intents, provider exit and commercial canaries."
+description: "Controlled-test evidence for CHLOM Wallet Stripe webhook verification, lifecycle reconciliation, entitlement separation, Unified Value Receipt integrity, passkey/smart-account intents, provider exit and commercial canaries."
 icon: "flask"
 ---
 
@@ -31,6 +31,31 @@ rights_grant: false
 ```
 
 The test signing secret is synthetic and restricted. It is not a Stripe live endpoint secret.
+
+## Provider lifecycle and out-of-order canary
+
+The same controlled-test adapter now covers the initial subscription/refund/dispute lifecycle instead of testing payment success alone. A deliberately out-of-order five-event sequence was delivered through the deployed webhook receiver:
+
+```yaml
+unique_provider_receipts: 5
+unique_wallet_events: 5
+delivery_states:
+  - RECORDED_TEST
+  - RECORDED_TEST
+  - RECORDED_TEST
+  - RECORDED_TEST
+  - RECORDED_TEST
+exact_replay_state: DUPLICATE
+out_of_order_occurred_time_preserved: true
+all_fulfillment_states: HOLD
+money_movement: false
+rights_grant: false
+result: PASS_PROVIDER_LIFECYCLE_CANARY
+```
+
+The synthetic sequence covers `invoice.paid`, `customer.subscription.created`, `customer.subscription.updated`, `charge.dispute.created`, and `charge.refunded`. The invoice was delivered before an earlier-occurring subscription event to prove CHLOM preserves provider occurrence time separately from append order instead of rewriting history to make events appear ordered.
+
+The controlled VCTR mapping now also distinguishes asynchronous Checkout success/failure, invoice payment failure, and subscription create/update/delete events. None of these provider states independently creates entitlement.
 
 ## Entitlement and Unified Value Receipt canary
 
@@ -105,13 +130,13 @@ Phase B adds deterministic reference code for:
 - stale timestamp rejection;
 - raw-body tamper rejection;
 - controlled event allowlisting;
-- Money-class provider translation with fulfillment HOLD;
+- payment, invoice, subscription, refund, dispute and asynchronous Checkout translation with fulfillment HOLD;
 - CAIP-2 and CAIP-10 identity normalization;
 - WebAuthn credential commitments and origin/RP binding;
 - ERC-4337/ERC-7579 smart-account registration intents with deploy/broadcast disabled;
 - Unified Value Receipt presentation invariants.
 
-A separate Solidity compile workflow pins compiler package version `0.8.36` and compiles the four no-value reference contracts. Passing compilation will prove syntax/toolchain compatibility only; it is not an audit or deployment approval.
+A separate Solidity compile workflow pins compiler package version `0.8.36` and compiles the four no-value reference contracts. Exact-head compilation has passed; this proves syntax/toolchain compatibility only, not an audit or deployment approval.
 
 ## Pricing research
 
@@ -126,11 +151,10 @@ The restricted credential-continuity registry also keeps the generic Stripe serv
 ## Phase B gates still open
 
 - live Stripe webhook endpoint registration and live signing-secret continuity;
-- complete out-of-order/refund/dispute/subscription-change canaries;
 - customer-facing Wallet/UVR application shell beyond the current UI-agnostic presentation model;
 - production passkey enrollment/recovery;
 - smart-account implementation selection and audit;
-- successful exact-head Solidity compile readback and reproducible build packaging;
+- reproducible Solidity build artifact packaging and deeper contract verification;
 - fuzz/invariant testing beyond source-level guards;
 - testnet deployment/anchor receipt with approved signer path;
 - real provider-exit dual-read/replay canary;
