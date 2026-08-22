@@ -1,0 +1,190 @@
+---
+title: "CHLOM Wallet Phase C — Proof, Settlement Planning & Portability"
+sidebarTitle: "Wallet Phase C"
+description: "Controlled-test Phase C architecture and evidence for HARP proof capsules, EASOR allocation/reversal plans, provider-neutral portable wallet capsules and their commercial module mappings."
+icon: "boxes-stacked"
+---
+
+# CHLOM Wallet Phase C — proof, settlement planning and portability
+
+**State:** `CONTROLLED_TEST`  
+**Institutional phase:** Phase 2.99  
+**Production activation:** false  
+**Live money movement:** false  
+**Public-chain broadcast:** false
+
+Phase C turns three proprietary CHLOM algorithm families into executable, testable and machine-addressable wallet primitives:
+
+1. **HARP v1** packages sanitized commitments into deterministic proof capsules.
+2. **EASOR v1** compiles allocation and reversal obligation plans without settling them.
+3. **Portable Wallet Capsule v1** preserves wallet identity and event-chain commitments above replaceable providers.
+
+These primitives extend the existing CHLOM Wallet lanes—Money, Rights, Rewards, Impact and Proof—without collapsing their legal or economic meanings.
+
+## Why these primitives exist
+
+A closed CrownThrive wallet experience must feel simple without becoming technically or institutionally opaque. Phase C therefore separates three concerns that ordinary wallets commonly blur:
+
+- **proof**: what can be verified without exposing the underlying protected evidence;
+- **economic planning**: what amounts and obligations a governed schedule produces before any provider action;
+- **continuity**: what remains CrownThrive-owned when a payment, chain or wallet provider changes.
+
+The resulting lock-in is the quality of the CHLOM policy/evidence experience, not dependence on a single provider, token or blockchain.
+
+## HARP v1 — Hash Anchor Root Packager
+
+HARP consumes only stable identifiers, record classes, payload digests, optional policy digests, occurrence metadata and sanitized public metadata. It produces:
+
+- domain-separated leaf commitments;
+- a deterministic Merkle root;
+- a deterministic manifest digest;
+- record-level inclusion proofs;
+- a candidate anchor packet with broadcast disabled.
+
+HARP explicitly excludes raw evidence bodies, provider credentials, signing material and private records.
+
+Current stress evidence:
+
+```yaml
+result: PASS_HARP_PROOF_CAPSULE
+leaf_count: 4097
+inclusion_proofs_verified: 518
+reorder_deterministic: true
+odd_leaf_count_supported: true
+duplicate_record_rejected: true
+raw_evidence_field_rejected: true
+metadata_secret_key_rejected: true
+tamper_rejected: true
+public_chain_broadcast: false
+money_movement: false
+```
+
+## EASOR v1 — Economic Allocation Schedule & Obligation Resolver
+
+EASOR compiles a versioned basis-point schedule into exact minor-unit obligations using a deterministic largest-remainder algorithm. The compiler:
+
+- requires the schedule to total exactly `10,000` basis points;
+- sorts rules by stable leg code;
+- uses remainder-descending, leg-code-ascending tie breaking;
+- conserves the exact gross amount;
+- compiles proportional reversal previews capped by the original leg amounts;
+- keeps rights, rewards and ThriveFund/Impact obligations separate from Money.
+
+EASOR outputs `PREVIEW_HOLD`. It does not call Stripe, a bank, a chain or another provider.
+
+Current stress evidence:
+
+```yaml
+result: PASS_EASOR_SETTLEMENT_COMPILER
+plan_cases: 20000
+reversal_cases: 5000
+largest_remainder_order_independent: true
+allocation_conservation: true
+reversal_cap_enforced: true
+rights_independence_preserved: true
+rewards_cash_equivalence_inferred: false
+impact_disbursed: false
+provider_write: false
+money_movement: false
+```
+
+## Portable Wallet Capsule v1
+
+The portable capsule exports CrownThrive-owned continuity above external infrastructure. It preserves:
+
+- the stable CHLOM wallet ID;
+- issuer DID reference;
+- append-only event sequence and chain head;
+- provider-neutral adapter aliases;
+- entitlement commitments;
+- proof-capsule references.
+
+It excludes raw provider references, API credentials, webhook payload bodies, idempotency secrets and signing material. Import/remap output is always `HOLD` until separately reviewed.
+
+Current stress evidence:
+
+```yaml
+result: PASS_PORTABLE_WALLET_CAPSULE
+event_count: 2000
+chain_head_preserved: true
+input_order_independent: true
+stable_wallet_id_preserved: true
+provider_alias_remap_planned: true
+raw_provider_reference_exposed: false
+provider_credentials_included: false
+source_payload_body_included: false
+tamper_rejected: true
+provider_write: false
+rights_mutation: false
+money_movement: false
+```
+
+## Shared deterministic vectors
+
+Phase C includes one machine-readable cross-runtime vector set:
+
+```text
+ct.test-vectors.chlom-wallet.phase-c.v1
+```
+
+The vector set binds fixed HARP, EASOR and Portable Wallet inputs to expected roots, plan digests, capsule digests, inclusion proofs, allocation legs and remap outputs. The CI suite rebuilds every result and rejects drift.
+
+The current fixed-vector digests are:
+
+```yaml
+harp_root_digest: 8e70e71d117f3fe8c419465c35437581ed3533cc005005d5b9211ccb2ecc1db0
+easor_plan_digest: 857adfd266bc915bc3b26727d8e24678784d9e99e7f605c2c3b668b9147a8107
+portable_capsule_digest: 9159d489d7dad6b6e1c7a93875e14ac51f0e6f7fa1d9adfb0d696efc9b6f5258
+```
+
+These are controlled-test vectors, not live customer records or chain receipts.
+
+## Agent skill package
+
+The existing specialist remains canonical:
+
+```yaml
+agent_id: ct.agent.chlom-wallet-settlement
+name: CHLOM Wallet, Settlement & Treasury Agent
+vote_eligible: false
+authority_ceiling: D2
+autonomy_ceiling: A2
+self_approval: false
+```
+
+Phase C adds three bounded skills:
+
+- `ct.skill.chlom.harp-proof-capsule.v1`
+- `ct.skill.chlom.easor-settlement-plan.v1`
+- `ct.skill.chlom.portable-wallet-capsule.v1`
+
+The skills hand off independent review to Rights Governance, Finance/Tax/Treasury, Evidence Provenance, Recovery/Rollback and Articleization. They do not create new voting authority.
+
+## Commercial module mapping
+
+The executable primitives are mapped into the governed CHLOM catalog as reusable modules:
+
+| Module | Product family | Candidate value |
+| --- | --- | --- |
+| HARP Proof Capsule | CHLOM Proof Receipt API | verifiable commitments and inclusion proofs |
+| EASOR Settlement Plan | CHLOM Split & Settlement Ledger | exact allocation and reversal planning |
+| Portable Wallet Capsule | CHLOM Wallet OS Enterprise | provider-neutral continuity and exit readiness |
+
+No price, Stripe Product, Price, Checkout Session, live webhook, commercial entitlement or customer fulfillment is authorized by this packet.
+
+## Promotion gates
+
+Phase C cannot advance to production merely because its tests pass. Required downstream gates include:
+
+- independent evidence/provenance review of the proof format;
+- privacy and disclosure classification for public proof metadata;
+- Finance/Tax/Treasury review of every effective schedule class;
+- rights/legal review of entitlement and reversal semantics;
+- cross-language digest parity where an implementation is promoted beyond the reference kernel;
+- controlled provider dual-read/import drill;
+- operational rollback and correction workflow;
+- authenticated customer projection with least-privilege access;
+- testnet/mainnet authority, signer and code-identity evidence for any future broadcast;
+- separate pricing and live-commerce authorization.
+
+Phase C is therefore an executable institutional substrate, not a production settlement or blockchain launch.
