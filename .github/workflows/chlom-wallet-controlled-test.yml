@@ -22,7 +22,7 @@ jobs:
   kernel:
     name: Validate public-safe wallet kernel
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 7
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,6 +40,9 @@ jobs:
           node --check developers/reference/chlom-wallet/passkey/test-passkey-smart-account.mjs
           node --check developers/reference/chlom-wallet/ui/unified-value-receipt.mjs
           node --check developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
+          node --check developers/reference/chlom-wallet/ui/wallet-shell.mjs
+          node --check developers/reference/chlom-wallet/ui/test-wallet-shell.mjs
+          node --check developers/reference/chlom-wallet/contracts/contract-model-fuzz.mjs
 
       - name: Run deterministic wallet stress suite
         run: node developers/reference/chlom-wallet/test-kernel.mjs
@@ -52,6 +55,12 @@ jobs:
 
       - name: Run Unified Value Receipt presentation tests
         run: node developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
+
+      - name: Run accessible wallet-shell tests
+        run: node developers/reference/chlom-wallet/ui/test-wallet-shell.mjs
+
+      - name: Run deterministic contract state-model fuzz
+        run: node developers/reference/chlom-wallet/contracts/contract-model-fuzz.mjs
 
       - name: Validate agent and commerce JSON
         run: |
@@ -81,9 +90,18 @@ jobs:
             exit 1
           fi
 
+      - name: Enforce wallet-shell public projection boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE 'provider_ref_visible:[[:space:]]*true|private_evidence_exposed:[[:space:]]*true|cash_equivalent_inferred:[[:space:]]*true|disbursement_inferred:[[:space:]]*true' developers/reference/chlom-wallet/ui/*.mjs; then
+            echo "Wallet shell crossed a governed public-projection boundary."
+            exit 1
+          fi
+
       - name: Record boundary
         run: |
           echo "CONTROLLED_TEST: webhook tests use synthetic signing material and do not register a live Stripe endpoint."
           echo "CONTROLLED_TEST: passkey/smart-account code builds registration intents only; it does not deploy or broadcast."
-          echo "CONTROLLED_TEST: no Solidity compile/audit/mainnet deployment is certified by this workflow."
-          echo "The Solidity source candidates require a separately pinned compiler/audit pipeline before deployment."
+          echo "CONTROLLED_TEST: contract-model fuzz is source-aligned state-model testing, not EVM execution or an audit."
+          echo "CONTROLLED_TEST: no mainnet deployment, custody, money movement, or entitlement inference is certified by this workflow."
