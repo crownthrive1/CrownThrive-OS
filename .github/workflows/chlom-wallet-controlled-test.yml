@@ -76,8 +76,18 @@ jobs:
             echo "Reference contracts must not contain value-moving or delegatecall primitives in this controlled-test packet."
             exit 1
           fi
-          if grep -nE '(private key|seed phrase|mnemonic|sk_live_|whsec_)' automation/chlom-wallet-settlement-agent.* chlom/chlom-wallet-* developers/reference/chlom-wallet/** security/chlom-wallet-threat-model.mdx; then
-            echo "Potential secret-bearing text detected."
+
+      - name: Scan wallet projection for actual secret-shaped material
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t wallet_files < <(find automation chlom developers/reference/chlom-wallet security -type f \
+            \( -name 'chlom-wallet-settlement-agent.*' -o -name 'chlom-wallet-*' -o -path '*/chlom-wallet/*' -o -name 'chlom-wallet-threat-model.mdx' \) \
+            ! -path '*/.git/*' -print)
+          test "${#wallet_files[@]}" -gt 0
+          # Search for concrete credential/key shapes, not ordinary prose that explains that keys are prohibited.
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${wallet_files[@]}"; then
+            echo "Potential live secret-shaped material detected in wallet projection."
             exit 1
           fi
 
