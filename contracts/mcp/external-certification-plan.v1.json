@@ -1,92 +1,90 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.2.0",
   "certification_id": "CT-MCP-EXTCERT-001",
-  "title": "CrownThrive External MCP Certification Exit Plan",
-  "state": "prepared_awaiting_founder_signature",
+  "title": "CrownThrive External MCP Certification Public-Safe Contract",
+  "state": "security_hold_replacement_required",
   "canonical_roadmap": "CT-ADR-ROADMAP-010 / ten_phase_v1",
-  "phase_3_entry": "blocked_pending_phase_2_99_hard_exit",
-  "server": {
-    "production_url": "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-api-control",
-    "protocol_version": "2026-07-28",
-    "current_logical_contract_version": "4.0.0",
-    "post_signature_candidate_version": "4.1.0",
+  "phase_3_entry": "blocked_pending_phase_2_99_hard_exit_and_full_documentation_gate",
+  "authority": {
+    "execution_enabled": false,
+    "provider_reads_enabled": false,
     "provider_writes_enabled": false,
-    "sovereign_vote_authority": false,
-    "expected_central_enabled_tool_count": 20,
-    "dispatchable_services": ["crownthrive_io", "thrivetools_seo"]
+    "oidc_minting_enabled": false,
+    "non_d0_tool_enablement": false,
+    "sovereign_vote_authority": false
   },
-  "source_authority": {
-    "protocol": "Model Context Protocol specification 2026-07-28",
-    "official_conformance": "@modelcontextprotocol/conformance@0.1.16",
-    "official_conformance_release_commit": "21a9a2f",
-    "caveat": "The official conformance framework has a documented open issue in which the final 2026-07-28 release can still be treated as draft for tier arithmetic. Official-suite output is necessary evidence but not sufficient by itself; CrownThrive overlay tests remain mandatory."
-  },
-  "pre_signature_boundary": {
-    "allowed": [
-      "static contract validation",
-      "non-secret CI validation",
-      "candidate-only code and workflow preparation",
-      "control-plane evidence reconciliation",
-      "zero-provider-request negative/static testing"
-    ],
-    "prohibited": [
-      "production auth-surface expansion",
-      "production contract 4.1.0 activation",
-      "external live MCP certification call",
-      "provider mutation",
-      "D1/D2/D3 tool enablement",
-      "external_client_conformance_test PASS",
-      "Phase 3 advancement"
+  "public_contract": {
+    "protocol_version": "2026-07-28",
+    "candidate_contract_version": "4.1.0",
+    "resource_limits": {
+      "request_bytes_max": 262144,
+      "response_bytes_max": 1048576,
+      "upstream_timeout_ms_max": 15000
+    },
+    "required_controls": [
+      "closed input and output schemas",
+      "bounded request and response streaming",
+      "explicit upstream timeout and downstream cancellation",
+      "provider-free conformance mode",
+      "zero provider writes",
+      "D0-only certification authority",
+      "hash-only public evidence"
     ]
   },
-  "post_signature_execution": {
-    "required_sequence": [
-      "bind the certification run to the exact canonical main SHA, signed payload digest, workflow SHA and active Edge deployment digest",
-      "activate only the pre-reviewed v4.1.0 GitHub OIDC certifier lane; its authority is MCP-only, D0-only, non-sovereign, protected-main/workflow/repository-bound and provider-dispatch-disabled by default",
-      "tighten the nine permissive central input schemas to documented allowlists",
-      "perform one bounded schema-capture pass across the 20 enabled central D0 tools: 12 CrownThrive IO reads plus 8 ThriveTools SEO reads",
-      "derive and independently review bounded per-operation output schemas and least-data projections from the sanitized captures plus provider contracts",
-      "preserve privacy-safe capture evidence as request-audit response hashes, capture-file SHA-256, derived bounded schemas and generated migration; do not print or publish provider response bodies",
-      "apply the reviewed bounded schemas/projections and rerun runtime output validation",
-      "run the CrownThrive external overlay negative/positive suite; only its final live-proof step may make one additional D0 read per dispatchable provider",
-      "run pinned @modelcontextprotocol/conformance@0.1.16 for MCP 2026-07-28 through provider-free certification mode and preserve complete conformance output in the governed workflow log",
-      "verify provider writes remain disabled and no non-D0 central tool is exposed",
-      "verify request audit records every bounded live provider read",
-      "independently review Security/Privacy and Operations/SRE evidence",
-      "move external_client_conformance_test to PASS only if every mandatory acceptance predicate is proven",
-      "keep Phase 3 blocked unless the separate Phase 2.99 hard exit and full-documentation gate also pass"
+  "restricted_boundary": {
+    "projection_state": "removed_from_current_public_projection_pending_private_governed_custody",
+    "classes": [
+      "production identity material",
+      "credential and authorization architecture",
+      "provider operation topology",
+      "runtime and control locators",
+      "derived schemas and migrations",
+      "private evidence bodies"
     ],
-    "provider_read_budget": {
-      "crownthrive_io": 13,
-      "thrivetools_seo": 9,
-      "other_providers": 0,
-      "provider_writes": 0,
-      "derivation": "12 IO + 8 SEO schema-capture reads, then 1 IO + 1 SEO final live-proof reads; official conformance mode is provider-dispatch-disabled"
-    }
+    "publicly_allowed": [
+      "interfaces",
+      "aggregate limits",
+      "acceptance predicate identifiers",
+      "artifact digests",
+      "fail-closed lifecycle state"
+    ]
   },
-  "mandatory_acceptance": [
-    {"id":"EXT-001","claim":"server/discover succeeds under protocol 2026-07-28 and returns tools capability plus private cache metadata","proof":"external_client"},
-    {"id":"EXT-002","claim":"tools/list is deterministic, bounded to the governed central dispatch surface, and advertises valid JSON Schema 2020-12 input/output schemas","proof":"external_client"},
-    {"id":"EXT-003","claim":"malformed MCP JSON returns JSON-RPC ParseError -32700 with null id","proof":"external_negative"},
-    {"id":"EXT-004","claim":"non-application/json MCP POST is rejected with HTTP 415 before body parsing","proof":"external_negative"},
-    {"id":"EXT-005","claim":"required MCP routing headers are checked against the JSON-RPC body and mismatch returns -32020","proof":"external_negative"},
-    {"id":"EXT-006","claim":"unsupported protocol version returns -32022 with the supported protocol list","proof":"external_negative"},
-    {"id":"EXT-007","claim":"unknown method returns in-band JSON-RPC -32601 using final 2026-07-28 transport semantics","proof":"external_negative"},
-    {"id":"EXT-008","claim":"all enabled central input schemas reject undeclared properties and preserve only documented bounded parameters","proof":"registry_and_external"},
-    {"id":"EXT-009","claim":"all enabled central output schemas are bounded operation-specific contracts and successful structuredContent validates against them","proof":"registry_and_external"},
-    {"id":"EXT-010","claim":"runtime endpoint catalog revocation is fail-closed at dispatch time","proof":"runtime_negative"},
-    {"id":"EXT-011","claim":"inbound and provider response bytes are bounded before full buffering and provider requests have explicit cancellation deadlines","proof":"static_and_runtime"},
-    {"id":"EXT-012","claim":"provider success requires successful JSON parsing and least-data projection; malformed provider JSON cannot be surfaced as a successful tool result","proof":"runtime_negative"},
-    {"id":"EXT-013","claim":"at least one real D0 tool call per dispatchable provider succeeds through the external MCP client and creates durable request evidence","proof":"external_live"},
-    {"id":"EXT-014","claim":"zero provider mutation tools and zero non-D0 central tools are exposed during certification","proof":"registry_and_external"},
-    {"id":"EXT-015","claim":"pinned official MCP conformance output, CrownThrive overlay output, privacy-safe schema-capture hashes and derived bounded-schema evidence are bound to the exact runtime/head/signed-payload evidence envelope","proof":"governed_workflow_logs_and_request_audit"}
+  "acceptance_predicates": [
+    "EXT-001",
+    "EXT-002",
+    "EXT-003",
+    "EXT-004",
+    "EXT-005",
+    "EXT-006",
+    "EXT-007",
+    "EXT-008",
+    "EXT-009",
+    "EXT-010",
+    "EXT-011",
+    "EXT-012",
+    "EXT-013",
+    "EXT-014",
+    "EXT-015"
   ],
-  "founder_signature": {
-    "required": true,
-    "state": "awaiting_signature",
-    "signer_role": "Founding Member",
-    "signer_name": "Kavonte Jones Sr.",
-    "effect": "Authorizes only the final certification implementation and bounded external live execution described in the exact signed payload. It does not authorize provider writes, non-D0 tool enablement, commercial acceptance, constitutional changes, or Phase 3 advancement.",
-    "signature_text_template": "I, Kavonte Jones Sr., approve CT-MCP-EXTCERT-001 at the exact authorized payload SHA-256 presented by Agent E. I authorize the bounded final external MCP certification implementation and live execution described there, with provider writes remaining closed and the stated D0 read budget enforced."
+  "signature": {
+    "required_for_any_replacement_execution": true,
+    "state": "invalidated_by_material_security_remediation",
+    "prior_payload_digest": "e7ebaf18b08affe2bc2fcc89c808e3cceb4302de7693627e26756be4070593ba",
+    "replacement_payload_digest": null,
+    "rule": "A replacement digest may be produced only after private-custody restoration, exact-artifact rights review, negative tests and independent specialist review.",
+    "superseded_correction_payload_digest": "e0f403326e9dab954a323d032686f7044393b5f85fa5053b73afa36a1dec07cf",
+    "superseded_correction_payload_state": "historical_non_reusable"
+  },
+  "commercial_state": "not_applicable_no_offer_no_checkout_no_entitlement",
+  "rollback": "Revert only this remediation branch before merge. After merge, preserve the security hold until an independently accepted replacement packet supersedes it.",
+  "current_main_reconciliation": {
+    "canonical_main_sha": "0ccc6fac3d7b7028f4bd48b095c6cb4c30fe263d",
+    "physical_main_incident_pr": 200,
+    "prior_repair_head": "41064a8ddca70f940353264a3ff4250b41e5ff6d",
+    "branch_policy": "current_main_merge_parent_with_public_safe_security_hold_overlay",
+    "merged_correction_contracts_state": "removed_from_current_public_candidate",
+    "merged_correction_payload_sha256": "e0f403326e9dab954a323d032686f7044393b5f85fa5053b73afa36a1dec07cf",
+    "merged_correction_payload_state": "historical_exact_correction_only_not_reusable_after_material_security_remediation",
+    "replacement_execution_or_signature_authorized": false
   }
 }
