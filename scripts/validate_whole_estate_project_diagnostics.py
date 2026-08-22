@@ -20,10 +20,29 @@ assert manifest["d3_human_reserved"] is True
 assert manifest["no_silent_delete"] is True
 assert manifest["external_scheduler_slots_added"] == 0
 
-run = manifest["diagnostic_run"]
-assert run["projects_scanned"] == sum(manifest["project_types"].values())
-assert run["issues_created"] == run["resolved_at_checkpoint"] + run["running_at_checkpoint"] + run["assigned_at_checkpoint"]
-assert run["handoffs_created"] == run["issues_created"] - 1
+initial = manifest["initial_diagnostic_run"]
+assert initial["projects_scanned"] == sum(manifest["project_types"].values())
+assert initial["handoffs_created"] == initial["issues_created"] - 1
+
+deltas = manifest["post_scan_deltas"]
+assert len(deltas) == 1
+factory = deltas[0]
+assert factory["scope"] == "concurrent_proprietary_factory_expansion"
+assert factory["new_agent_created"] is False
+assert factory["new_external_scheduler_slot"] is False
+assert factory["owner_agent_id"] != factory["verifier_agent_id"]
+observed = factory["observed"]
+assert observed["factory_algorithms"] == observed["distinct_algorithm_ids"]
+assert observed["duplicate_public_contract_digests"] == 0
+assert observed["algorithms_runtime_enabled"] == 0
+assert observed["public_implementation_reachable"] == 0
+assert observed["explicit_algorithm_custody_rows"] <= observed["factory_algorithms"]
+
+current = manifest["current_totals"]
+assert current["issues"] == current["resolved"] + current["running"] + current["assigned"]
+assert current["handoffs"] == current["issues"] - current["resolved"] + 20
+assert current["issues"] == initial["issues_created"] + sum(d["issues_created"] for d in deltas)
+assert current["handoffs"] == initial["handoffs_created"] + sum(d["handoffs_created"] for d in deltas)
 
 agents = manifest["project_agents"]
 assert [a["agent_id"] for a in agents] == [
@@ -36,6 +55,8 @@ for agent in agents:
     assert agent["authority_ceiling"] == "D2"
     assert agent["vote_eligible"] is False
     assert agent["scheduler_slot"] is False
+    assert agent["did_uri"].startswith("did:chlom:agent:")
+    assert agent["private_mapping"] is True
 assert agents[1]["merge_authority"] is False
 assert agents[2]["live_schedule_mutation"] is False
 assert agents[3]["self_approval"] is False
@@ -61,6 +82,7 @@ assert budget["minus_one"] == "unlimited_local_ceiling"
 assert budget["zero"] == "disabled"
 assert budget["null"] == "unresolved_fail_closed"
 assert budget["provider_throttles_and_billing_separate"] is True
+assert budget["resolved_issue_count"] == 20
 
 api = manifest["api_mcp"]
 assert api["verify_jwt"] is True
