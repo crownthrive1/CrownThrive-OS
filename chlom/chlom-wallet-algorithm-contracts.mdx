@@ -1,0 +1,190 @@
+---
+title: "CHLOM Wallet Algorithm Contracts"
+sidebarTitle: "Wallet Algorithms"
+description: "Public-safe contracts for CHLOM Wallet's proprietary value translation, allocation, rights gating, reconciliation, proof batching, ThriveFund routing and provider portability algorithms."
+icon: "microchip"
+---
+
+# CHLOM Wallet algorithm contracts
+
+CHLOM Wallet OS uses a set of CrownThrive/CHLOM algorithm contracts to keep the end-user wallet simple while preserving rigorous boundaries between money, rights, rewards, impact, provider evidence, settlement and cryptographic proof.
+
+**Current state:** `CONTROLLED_TEST / SPECIFIED`  
+**Implementation classification:** `PUBLIC_CONTRACT_RESTRICTED_IMPLEMENTATION`  
+**Production authority:** none from this page
+
+Public documentation exposes purpose, inputs, outputs and invariants. Restricted calibration, risk weights and decision logic remain in governed private storage.
+
+## VCTR — Value-Class Translation Resolver
+
+**ID:** `ct.alg.wallet.vctr`
+
+VCTR normalizes an authenticated provider/network event into one of CHLOM Wallet's governed value classes without silently turning one class into another.
+
+```text
+external event + adapter + policy version + subject binding
+        ↓
+VCTR
+        ↓
+Money | Rights | Rewards | Impact | HOLD
+```
+
+### Invariants
+
+- Provider payment success is not a rights grant.
+- A rewards event is not cash by inference.
+- A ThriveFund obligation is not proof of disbursement.
+- Unknown or unmapped event types fail closed.
+- CrownThrive correlation IDs survive provider replacement.
+
+## EASOR — Economic Allocation Schedule & Obligation Resolver
+
+**ID:** `ct.alg.wallet.easor`
+
+EASOR resolves an approved versioned economic schedule into obligations while preserving the gross amount down to the minor unit.
+
+### Inputs
+
+- gross amount in minor units;
+- asset/currency code;
+- exact schedule/version;
+- effective event timestamp;
+- approved allocation legs.
+
+### Invariants
+
+- basis points must total exactly `10,000`;
+- allocation legs must conserve the gross amount;
+- schedule effectiveness is evaluated at the relevant event time;
+- rounding is deterministic;
+- calculated obligation is not the same state as settled value.
+
+A controlled-test implementation is backed by `chlom_wallet.calculate_allocations`.
+
+## RISE — Rights-Informed Settlement Eligibility
+
+**ID:** `ct.alg.wallet.rise`
+
+RISE determines whether a payment/provider event has sufficient independent rights and entitlement evidence for fulfillment to proceed.
+
+```text
+provider evidence
++ rights record
++ asset/version
++ license terms digest
++ subject eligibility
++ policy state
+        ↓
+ALLOW | DENY | HOLD | REQUIRE_REVIEW
+```
+
+### Invariants
+
+- Payment is evidence, not entitlement.
+- Revoked or expired rights cannot produce an active entitlement.
+- Asset and license versions must match the governing record.
+- Chain-of-title ambiguity cannot be hidden by payment success.
+- Rights/economic decisions remain separately auditable.
+
+## PERL — Provider Event Reconciliation Loop
+
+**ID:** `ct.alg.wallet.perl`
+
+PERL reconciles duplicate, delayed, reordered, refunded, disputed and reversed provider events into one append-only CHLOM event lineage.
+
+### Invariants
+
+- a provider event ID is processed once per provider;
+- a wallet idempotency key cannot create two accepted wallet events;
+- corrections and reversals append new records rather than mutating history;
+- original occurrence time is preserved separately from record time;
+- unverifiable provider authenticity fails closed.
+
+The current controlled-test wallet ledger implements the idempotency and append-only portions of this contract.
+
+## HARP — Hash Anchor Root Packager
+
+**ID:** `ct.alg.wallet.harp`
+
+HARP prepares disclosure-minimized proof batches from private institutional records.
+
+```text
+private evidence records
+        ↓
+canonical ordering + policy partition
+        ↓
+digests / root
+        ↓
+optional approved chain anchor
+```
+
+### Invariants
+
+- raw private evidence is never the anchor payload;
+- records with incompatible disclosure/policy states are not silently mixed;
+- root construction is deterministic;
+- an on-chain confirmation is evidence of an anchor, not a substitute for CHLOM rights/legal authority;
+- chain finality and CHLOM record authority remain separate states.
+
+A controlled-test candidate builder exists in `chlom_wallet.build_anchor_candidate`.
+
+## TFOER — ThriveFund Obligation Evidence Router
+
+**ID:** `ct.alg.wallet.tfoer`
+
+TFOER keeps impact accounting truthful by preserving the difference between a calculated obligation, approval, external settlement evidence and a public impact claim.
+
+```text
+qualified trigger
+→ calculated obligation
+→ approved / held
+→ externally settled
+→ evidence verified
+→ public-claim candidate
+```
+
+### Invariants
+
+- `calculated` is not `approved`;
+- `approved` is not `settled`;
+- settlement requires evidence;
+- public impact claims require a separately governed disclosure decision;
+- no nonprofit, investment, yield or guaranteed-return meaning is inferred.
+
+## PAER — Provider Adapter Exit Resolver
+
+**ID:** `ct.alg.wallet.paer`
+
+PAER measures and governs whether CHLOM Wallet can replace a payment, chain, smart-account or infrastructure provider without breaking institutional identity or evidence lineage.
+
+### Evaluation dimensions
+
+- exportability;
+- replayability;
+- identifier portability;
+- contract/interface portability;
+- reconciliation completeness;
+- rollback readiness.
+
+### Invariants
+
+- provider-native identifiers are aliases, not CrownThrive's sole identity keys;
+- institutional wallet and entitlement IDs survive migration;
+- in-flight events enter a reconciliation state during cutover;
+- provider retirement requires a dual-read or equivalent canary;
+- no third party becomes the sole copy of critical CHLOM wallet truth.
+
+## Why these algorithms matter
+
+The walled-garden advantage is not dependence on a proprietary coin or one vendor. It is the ability to make a complicated rights/payment/impact stack feel like a coherent CrownThrive product while retaining the evidence required to change providers, correct errors, prove entitlements and preserve institutional continuity.
+
+That creates a layered moat:
+
+1. **experience moat** — one understandable wallet surface;
+2. **policy moat** — CHLOM-specific rights/economic/impact translation;
+3. **data moat** — normalized cross-corridor event and entitlement history;
+4. **integration moat** — provider/chain adapters behind stable CrownThrive contracts;
+5. **evidence moat** — append-only lineage and disclosure-minimized proof;
+6. **portability moat** — CrownThrive controls its institutional identifiers and can replace infrastructure providers.
+
+The contracts are designed to be monetizable through WalletKit, Rights Wallet API, Proof Receipt API, Split & Settlement Ledger, ThriveFund Router and enterprise licensing without exposing the restricted calibration that differentiates the implementation.
