@@ -5,16 +5,18 @@ on:
     branches:
       - main
     paths:
-      - "developers/manifests/machine-trigger-asset-fabric.v1.json"
+      - "developers/manifests/machine-trigger-*.v1.json"
       - "scripts/machine_trigger_asset_fabric.py"
+      - "scripts/validate_machine_trigger_bindings.py"
       - "automation/machine-trigger-asset-fabric.mdx"
       - ".github/workflows/machine-trigger-asset-fabric.yml"
   push:
     branches:
       - main
     paths:
-      - "developers/manifests/machine-trigger-asset-fabric.v1.json"
+      - "developers/manifests/machine-trigger-*.v1.json"
       - "scripts/machine_trigger_asset_fabric.py"
+      - "scripts/validate_machine_trigger_bindings.py"
       - "automation/machine-trigger-asset-fabric.mdx"
       - ".github/workflows/machine-trigger-asset-fabric.yml"
   schedule:
@@ -44,11 +46,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile trigger fabric
-        run: python -m py_compile scripts/machine_trigger_asset_fabric.py
+      - name: Compile trigger fabric and binding validators
+        run: |
+          python -m py_compile scripts/machine_trigger_asset_fabric.py
+          python -m py_compile scripts/validate_machine_trigger_bindings.py
 
       - name: Validate authority, plugin and Vault boundaries
-        run: python scripts/machine_trigger_asset_fabric.py --validate-only
+        run: |
+          python scripts/machine_trigger_asset_fabric.py --validate-only
+          python scripts/validate_machine_trigger_bindings.py
 
       - name: Materialize current trigger, plugin and Vault packages
         run: python scripts/machine_trigger_asset_fabric.py --output build/machine-trigger-assets
@@ -65,6 +71,9 @@ jobs:
           assert s["vault_bindings"] == 32
           assert s["authoritative_delta"] == 0
           assert s["state"] == {"candidate_hold": 32}
+          intake=json.loads(Path("developers/manifests/machine-trigger-factory-intake.v1.json").read_text())
+          assert intake["authoritative_generation_asset_count_before"] == 100800
+          assert intake["authoritative_generation_asset_count_delta"] == 0
           PY
 
       - name: Assert scheduled execution cannot manufacture authority
