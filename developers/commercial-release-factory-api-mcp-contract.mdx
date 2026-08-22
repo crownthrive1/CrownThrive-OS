@@ -1,0 +1,156 @@
+---
+title: "Commercial Release Factory API and MCP Contract"
+description: "Public-safe API/MCP boundary for product release package compilation, gate status, governed publication and evidence readback."
+sidebarTitle: "Release Factory API/MCP"
+icon: "code"
+keywords: ["API", "MCP", "release", "Sites", "entitlement", "Crown Credits", "CHLOM"]
+---
+
+# Commercial Release Factory API and MCP Contract
+
+The Commercial Release Factory is modeled as provider-neutral operations over stable product, gate, release and publication records. This page documents the **public-safe interface contract only**. Private runtime locators, secret aliases, protected algorithms, reviewer evidence bodies and credential material are not part of the public interface.
+
+## Stable resources
+
+```text
+ProductAssetVersion
+ProductReleasePackage
+ReleaseGate
+GovernedRelease
+SiteCatalogProjection
+SitePublishJob
+SiteReadbackReceipt
+RollbackReceipt
+```
+
+The exact storage engine or provider may change without changing these resource semantics.
+
+## Candidate operations
+
+| Operation | Decision class | Mutation | Initial state |
+| --- | --- | --- | --- |
+| `release_factory.health` | D0 | no | controlled-test candidate |
+| `release_factory.list_candidates` | D0 | no | controlled-test candidate |
+| `release_factory.get_package` | D0 | no | controlled-test candidate |
+| `release_factory.compile_package` | D1 | internal package records only | controlled-test candidate |
+| `release_factory.get_gate_status` | D0 | no | controlled-test candidate |
+| `release_factory.refresh_deterministic_evidence` | D1 | evidence candidate only | controlled-test candidate |
+| `release_factory.prepare_review_handoff` | D1 | review-request metadata only | controlled-test candidate |
+| `release_factory.prepare_governed_release` | D2 | governed release candidate only | controlled-test candidate |
+| `release_factory.project_public_feed` | D2 | sanitized projection only | disabled pending destination certification |
+| `release_factory.readback_publication` | D0 | evidence receipt only | controlled-test candidate |
+| `release_factory.prepare_rollback` | D2 | rollback plan only | controlled-test candidate |
+
+No public MCP operation is authorized to create a sovereign vote, approve the originator's own work, authorize a price, grant final rights, sign a contract, change credentials, move money/credits, mutate DNS, create Stripe product objects, or bypass an independent gate.
+
+## Package schema
+
+A public-safe package summary may expose:
+
+```json
+{
+  "sku": "CT-LAUNCH-SOP-001",
+  "exact_version_ref": "1.0.0-candidate.4",
+  "content_sha256": "<sha256>",
+  "platform_id": "ct.platform.crownthrive-launch",
+  "surface_id": "ct.surface.crownthrive-launch.production",
+  "credit_only": true,
+  "checkout_mode": "crown_credits_only",
+  "package_state": "HOLD",
+  "gate_summary": {
+    "rights_provenance": "HOLD",
+    "pricing_tax": "HOLD",
+    "private_fulfillment": "HOLD",
+    "credit_checkout_webhook": "HOLD",
+    "entitlement_license": "HOLD",
+    "refund_dispute_rollback": "HOLD",
+    "accessibility_device": "HOLD",
+    "dns_tls_route": "HOLD",
+    "governed_acceptance_publication": "HOLD"
+  }
+}
+```
+
+An interface must not expose raw chain-of-title evidence, private reviewer notes, customer identity, object-store private paths, provider credentials, exact secret aliases, pricing negotiation records or protected algorithm parameters.
+
+## Compile semantics
+
+`compile_package` is deterministic with respect to the exact source records it consumes. It may create or refresh package and gate **candidates**, but it may not convert missing evidence into PASS.
+
+Required behavior:
+
+1. bind exact asset version and artifact hash;
+2. bind one target platform/surface;
+3. emit the nine required gate rows;
+4. default missing evidence to HOLD;
+5. reject originator self-review;
+6. reject mismatched product/version evidence;
+7. reject stale or superseded evidence;
+8. preserve public/private disclosure classification;
+9. produce an exact package digest;
+10. emit a sanitized evidence receipt candidate.
+
+## Governed release semantics
+
+A governed release candidate may be prepared only when all hard gates have current evidence. The release policy, not the originator, decides whether the candidate can progress.
+
+Automatic publication is permitted only when the **accepted release policy itself** enables auto-publication and all of the following are true:
+
+- exact version hash is present;
+- required independent votes/certifications pass;
+- no negative vote or blocking certification exists;
+- the destination adapter and route are certified;
+- read-after-write is supported;
+- rollback is supported and has an exact reference;
+- the public payload passes disclosure validation.
+
+## Sites feed contract
+
+The default provider integration for Launch, Ready and Procure is a public-safe catalog projection consumed by the registered Sites surface.
+
+A projection contains only fields needed to render the approved product surface, such as:
+
+- SKU and exact version;
+- title/summary approved for public display;
+- Crown Credits price after pricing authorization;
+- license class/version identifier;
+- public product state;
+- public preview/media references;
+- customer-facing entitlement/fulfillment terms;
+- support route;
+- public-safe release digest.
+
+The feed contains no secret, customer-specific entitlement, private fulfillment object path or provider administration data.
+
+## Readback contract
+
+Publication is not complete when a provider acknowledges a write. The independent readback must verify the public destination and expected content identity.
+
+At minimum record:
+
+```text
+surface_id
+release_id
+provider version before/after when available
+public URL
+HTTP/result state
+response/content digest
+expected content digest or invariant set
+checked_at
+rollback reference
+success/failure reason
+```
+
+A provider success without readback is incomplete evidence.
+
+## Credential contract
+
+Every provider adapter uses a stable credential alias or secret reference. APIs, MCPs, logs, DAIL receipts and public documentation must never return the secret value.
+
+A replicated agent may receive capability to call an adapter, but it does not inherit permission to retrieve the underlying credential.
+
+## MCP publication gate
+
+The reusable skill contracts are currently registered as **MCP-disabled candidates**. MCP exposure requires separate input/output schema validation, authentication and authorization review, negative tests, privacy/disclosure review, request/response bounds, audit receipt behavior, external client conformance and governed acceptance on the exact implementation.
+
+Until then, the machine-readable manifest is an institutional contract, not an advertised production MCP.
