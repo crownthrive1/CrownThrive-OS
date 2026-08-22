@@ -1,0 +1,86 @@
+name: Commercial Gap Stateless Transport Bootstrap v4
+
+on:
+  push:
+    branches:
+      - ops/commercial-gap-private-fulfillment-20260822
+    paths:
+      - ".github/workflows/commercial-gap-bootstrap-v4.yml"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout operations branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+
+      - name: Get scoped OIDC token
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          R="$(curl --fail-with-body --silent --show-error -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=crownthrive-commercial-gap-encrypted-transport")"
+          T="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<<"${R}")"
+          echo "token=${T}" >> "${GITHUB_OUTPUT}"
+          echo "::add-mask::${T}"
+
+      - name: Bootstrap stateless payload key
+        id: call
+        env:
+          ID_TOKEN: ${{ steps.oidc.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.loads(Path('developers/reference/commercial-release/private-fulfillment-client-public-jwk.json').read_text())
+          Path('/tmp/request.json').write_text(json.dumps({'public_key_jwk':s['public_key_jwk'],'public_key_jwk_sha256':s['public_key_jwk_sha256']},separators=(',',':')))
+          PY
+          CODE="$(curl --silent --show-error -o /tmp/response.json -w '%{http_code}' -X POST -H "Authorization: Bearer ${ID_TOKEN}" -H 'Content-Type: application/json' --data-binary @/tmp/request.json 'https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-encrypted-transport-bootstrap-oidc')"
+          echo "http_code=${CODE}" >> "${GITHUB_OUTPUT}"
+          test -s /tmp/response.json
+
+      - name: Write safe receipt or diagnostic
+        env:
+          HTTP_CODE: ${{ steps.call.outputs.http_code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.loads(Path('/tmp/response.json').read_text()); c=int(os.environ['HTTP_CODE'])
+          r=Path('changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json'); x=Path('changelog/commercial-gap-encrypted-transport-bootstrap-diagnostic.json')
+          r.unlink(missing_ok=True); x.unlink(missing_ok=True)
+          if c==200 and d.get('state')=='created':
+            assert d.get('server_state_persisted') is False
+            assert d.get('payload_key_returned_plaintext') is False
+            assert d.get('payload_key_publicly_stored') is False
+            assert d.get('public_url_created') is False
+            assert d.get('plaintext_returned') is False
+            w=d.get('wrapped_payload_key_b64url'); assert isinstance(w,str) and len(w)>100
+            o={'schema_version':'1.0.0','state':'created','http_status':c,'source_commit':os.environ['GITHUB_SHA'],'transport_id':d['transport_id'],'expires_at':d['expires_at'],'algorithm':d['algorithm'],'client_public_jwk_sha256':d['client_public_jwk_sha256'],'wrapped_payload_key_b64url':w,'payload_key_commitment_sha256':d['payload_key_commitment_sha256'],'server_state_persisted':False,'payload_key_returned_plaintext':False,'payload_key_publicly_stored':False,'public_url_created':False,'plaintext_returned':False}
+            r.write_text(json.dumps(o,indent=2,sort_keys=True)+'\n')
+          else:
+            o={'schema_version':'1.0.0','state':'failed','http_status':c,'source_commit':os.environ['GITHUB_SHA'],'error':d.get('error'),'detail':d.get('detail'),'oidc_token_recorded':False,'product_bytes_recorded':False,'payload_key_returned_plaintext':False,'plaintext_returned':False}
+            x.write_text(json.dumps(o,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(o,sort_keys=True))
+          PY
+
+      - name: Commit sanitized result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A changelog/
+          git commit -m 'Record stateless encrypted transport bootstrap v4'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
