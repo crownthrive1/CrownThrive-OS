@@ -1,0 +1,79 @@
+name: Interoperability Hardening Governance
+
+on:
+  pull_request:
+    paths:
+      - developers/manifests/crownthrive-interoperability-fabric.v1.1.json
+      - changelog/crownthrive-interoperability-hardening-2026-08-22.mdx
+      - scripts/validate_crownthrive_interoperability_hardening.py
+      - .github/workflows/interoperability-hardening-governance.yml
+  push:
+    branches:
+      - main
+    paths:
+      - developers/manifests/crownthrive-interoperability-fabric.v1.1.json
+      - changelog/crownthrive-interoperability-hardening-2026-08-22.mdx
+      - scripts/validate_crownthrive_interoperability_hardening.py
+      - .github/workflows/interoperability-hardening-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interoperability-hardening-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate interoperability hardening checkpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate Python syntax
+        run: python -m py_compile scripts/validate_crownthrive_interoperability_hardening.py
+
+      - name: Validate hardening invariants
+        run: python scripts/validate_crownthrive_interoperability_hardening.py
+
+      - name: Validate checkpoint JSON
+        run: python -m json.tool developers/manifests/crownthrive-interoperability-fabric.v1.1.json >/dev/null
+
+      - name: Check whitespace and merge-conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- \
+            developers/manifests/crownthrive-interoperability-fabric.v1.1.json \
+            changelog/crownthrive-interoperability-hardening-2026-08-22.mdx \
+            scripts/validate_crownthrive_interoperability_hardening.py; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+      - name: Publish public-safe summary
+        run: |
+          {
+            echo "## CrownThrive Interoperability hardening"
+            echo ""
+            echo "- Adapter SDK: verified"
+            echo "- Contract drift detector: verified"
+            echo "- Route observability: verified"
+            echo "- Independent test receipts: 12"
+            echo "- Database subagent runtime: controlled test"
+            echo "- First cron-fired receipt: pending"
+            echo "- Public submission: not submitted"
+            echo "- Provider writes and checkout: disabled"
+            echo "- D3 and sovereign-vote effect: none"
+          } >> "${GITHUB_STEP_SUMMARY}"
