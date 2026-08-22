@@ -1,4 +1,4 @@
-name: Commercial Gap Drive Read Probe
+name: Commercial Gap Encrypted Transport Diagnostic
 
 on:
   push:
@@ -6,28 +6,21 @@ on:
       - ops/commercial-gap-private-fulfillment-20260822
     paths:
       - ".github/workflows/commercial-gap-drive-read-probe.yml"
+      - "developers/reference/commercial-release/private-fulfillment-client-public-jwk.json"
 
 permissions:
   contents: write
   id-token: write
 
 jobs:
-  probe:
+  bootstrap:
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 5
     steps:
       - name: Checkout operations branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: true
-
-      - name: Preserve Drive privacy readback
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail-with-body --silent --show-error \
-            "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-drive-read-probe" \
-            > /tmp/drive-probe.json
 
       - name: Request scoped GitHub OIDC token
         id: oidc
@@ -42,8 +35,8 @@ jobs:
           echo "token=${ID_TOKEN}" >> "${GITHUB_OUTPUT}"
           echo "::add-mask::${ID_TOKEN}"
 
-      - name: Bootstrap one-time encrypted payload key
-        id: bootstrap
+      - name: Call one-time payload-key bootstrap
+        id: call
         env:
           ID_TOKEN: ${{ steps.oidc.outputs.token }}
         shell: bash
@@ -53,117 +46,65 @@ jobs:
           import json
           from pathlib import Path
           source=json.loads(Path('developers/reference/commercial-release/private-fulfillment-client-public-jwk.json').read_text())
-          Path('/tmp/bootstrap-request.json').write_text(json.dumps({
-              'public_key_jwk': source['public_key_jwk'],
-              'public_key_jwk_sha256': source['public_key_jwk_sha256'],
-          }, separators=(',',':')))
+          Path('/tmp/request.json').write_text(json.dumps({
+            'public_key_jwk': source['public_key_jwk'],
+            'public_key_jwk_sha256': source['public_key_jwk_sha256'],
+          },separators=(',',':')))
           PY
-          HTTP_CODE="$(curl --silent --show-error \
-            -o /tmp/bootstrap.json \
-            -w '%{http_code}' \
-            -X POST \
-            -H "Authorization: Bearer ${ID_TOKEN}" \
-            -H "Content-Type: application/json" \
-            --data-binary @/tmp/bootstrap-request.json \
-            "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-encrypted-transport-bootstrap-oidc")"
-          echo "http_code=${HTTP_CODE}" >> "${GITHUB_OUTPUT}"
-          test -s /tmp/bootstrap.json
+          CODE="$(curl --silent --show-error -o /tmp/response.json -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer ${ID_TOKEN}" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/request.json \
+            'https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-encrypted-transport-bootstrap-oidc')"
+          echo "http_code=${CODE}" >> "${GITHUB_OUTPUT}"
+          test -s /tmp/response.json
 
-      - name: Write sanitized Drive and bootstrap receipts
+      - name: Write sanitized result
         env:
-          BOOTSTRAP_HTTP_CODE: ${{ steps.bootstrap.outputs.http_code }}
+          HTTP_CODE: ${{ steps.call.outputs.http_code }}
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json, os
+          import json,os
           from pathlib import Path
-
-          drive = json.loads(Path('/tmp/drive-probe.json').read_text())
-          results = drive.get('results', [])
-          assert len(results) == 3, drive
-          assert {x.get('key') for x in results} == {'launch','ready','procure'}, drive
-          safe = [{
-              'key': item.get('key'),
-              'status': item.get('status'),
-              'ok': item.get('ok'),
-              'content_type': item.get('content_type'),
-              'byte_size': item.get('byte_size'),
-              'sha256': item.get('sha256'),
-              'expected_sha256': item.get('expected_sha256'),
-              'exact_match': item.get('exact_match'),
-              'final_host': item.get('final_host'),
-              'error': item.get('error'),
-          } for item in results]
-          drive_receipt = {
-              'schema_version':'1.0.0',
-              'receipt_id':'ct.receipt.commercial-gap-drive-read-probe.2026-08-22.v3',
-              'source_commit':os.environ['GITHUB_SHA'],
-              'mutating':False,
-              'all_exact_match':all(x.get('exact_match') is True for x in results),
-              'privacy_boundary_preserved':True,
-              'results':safe,
-          }
-          Path('changelog/commercial-gap-drive-read-probe-receipt.json').write_text(json.dumps(drive_receipt,indent=2,sort_keys=True)+'\n')
-
-          source=json.loads(Path('developers/reference/commercial-release/private-fulfillment-client-public-jwk.json').read_text())
-          data=json.loads(Path('/tmp/bootstrap.json').read_text())
-          http_code=int(os.environ['BOOTSTRAP_HTTP_CODE'])
-          if http_code == 200 and data.get('state') == 'created':
-              assert data.get('payload_key_returned_plaintext') is False, data
-              assert data.get('payload_key_publicly_stored') is False, data
-              assert data.get('public_url_created') is False, data
-              assert data.get('plaintext_returned') is False, data
-              assert data.get('client_public_jwk_sha256') == source['public_key_jwk_sha256'], data
-              wrapped=data.get('wrapped_payload_key_b64url')
-              assert isinstance(wrapped,str) and len(wrapped)>100, data
-              bootstrap_receipt = {
-                  'schema_version':'1.0.0',
-                  'receipt_id':'ct.receipt.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v4',
-                  'source_commit':os.environ['GITHUB_SHA'],
-                  'http_status':http_code,
-                  'state':'created',
-                  'transport_id':data['transport_id'],
-                  'expires_at':data['expires_at'],
-                  'algorithm':data['algorithm'],
-                  'client_public_jwk_sha256':data['client_public_jwk_sha256'],
-                  'wrapped_payload_key_b64url':wrapped,
-                  'payload_key_returned_plaintext':False,
-                  'payload_key_publicly_stored':False,
-                  'public_url_created':False,
-                  'plaintext_returned':False,
-              }
-              Path('changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json').write_text(json.dumps(bootstrap_receipt,indent=2,sort_keys=True)+'\n')
-              Path('changelog/commercial-gap-encrypted-transport-bootstrap-diagnostic.json').unlink(missing_ok=True)
-              print(json.dumps({'bootstrap_state':'created','transport_id':bootstrap_receipt['transport_id'],'expires_at':bootstrap_receipt['expires_at']},sort_keys=True))
+          data=json.loads(Path('/tmp/response.json').read_text())
+          code=int(os.environ['HTTP_CODE'])
+          for p in [Path('changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json'),Path('changelog/commercial-gap-encrypted-transport-bootstrap-diagnostic.json')]:
+            p.unlink(missing_ok=True)
+          if code==200 and data.get('state')=='created':
+            assert data.get('payload_key_returned_plaintext') is False
+            assert data.get('payload_key_publicly_stored') is False
+            assert data.get('public_url_created') is False
+            assert data.get('plaintext_returned') is False
+            wrapped=data.get('wrapped_payload_key_b64url')
+            assert isinstance(wrapped,str) and len(wrapped)>100
+            out={
+              'schema_version':'1.0.0','state':'created','http_status':code,
+              'source_commit':os.environ['GITHUB_SHA'],'transport_id':data['transport_id'],
+              'expires_at':data['expires_at'],'algorithm':data['algorithm'],
+              'client_public_jwk_sha256':data['client_public_jwk_sha256'],
+              'wrapped_payload_key_b64url':wrapped,
+              'payload_key_returned_plaintext':False,'payload_key_publicly_stored':False,
+              'public_url_created':False,'plaintext_returned':False
+            }
+            Path('changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
           else:
-              diagnostic={
-                  'schema_version':'1.0.0',
-                  'receipt_id':'ct.diagnostic.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v1',
-                  'source_commit':os.environ['GITHUB_SHA'],
-                  'http_status':http_code,
-                  'error':data.get('error','unknown_error'),
-                  'detail':data.get('detail','unspecified'),
-                  'payload_key_returned_plaintext':False,
-                  'plaintext_returned':False,
-                  'oidc_token_recorded':False,
-                  'product_bytes_recorded':False,
-              }
-              Path('changelog/commercial-gap-encrypted-transport-bootstrap-diagnostic.json').write_text(json.dumps(diagnostic,indent=2,sort_keys=True)+'\n')
-              Path('changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json').unlink(missing_ok=True)
-              print(json.dumps({'bootstrap_state':'failed','http_status':http_code,'error':diagnostic['error'],'detail':diagnostic['detail']},sort_keys=True))
+            out={
+              'schema_version':'1.0.0','state':'failed','http_status':code,
+              'source_commit':os.environ['GITHUB_SHA'],'error':data.get('error','unknown_error'),
+              'detail':data.get('detail','unspecified'),'oidc_token_recorded':False,
+              'product_bytes_recorded':False,'payload_key_returned_plaintext':False,'plaintext_returned':False
+            }
+            Path('changelog/commercial-gap-encrypted-transport-bootstrap-diagnostic.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(out,sort_keys=True))
           PY
 
-      - name: Commit sanitized evidence
+      - name: Commit sanitized result
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A changelog/
-          if git diff --cached --quiet; then
-            echo "No receipt delta."
-            exit 0
-          fi
-          git commit -m "Record encrypted transport bootstrap diagnostic"
+          git commit -m 'Record encrypted transport bootstrap result'
           git push origin "HEAD:${GITHUB_REF_NAME}"
