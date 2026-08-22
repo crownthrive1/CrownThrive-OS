@@ -1,0 +1,62 @@
+name: CHLOM Wallet Solidity Compile
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/contracts/**"
+      - ".github/workflows/chlom-wallet-solidity-compile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-solidity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Compile no-value reference contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install exact Solidity compiler package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-save --no-package-lock solc@0.8.36
+          ./node_modules/.bin/solcjs --version | tee /tmp/solc-version.txt
+          grep -E '^0\.8\.36\+' /tmp/solc-version.txt
+
+      - name: Compile reference contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/chlom-wallet-solidity
+          ./node_modules/.bin/solcjs \
+            --bin --abi \
+            --output-dir /tmp/chlom-wallet-solidity \
+            developers/reference/chlom-wallet/contracts/*.sol
+          test "$(find /tmp/chlom-wallet-solidity -type f -name '*.bin' | wc -l)" -eq 4
+          test "$(find /tmp/chlom-wallet-solidity -type f -name '*.abi' | wc -l)" -eq 4
+          if find /tmp/chlom-wallet-solidity -type f -name '*.bin' -empty | grep -q .; then
+            echo "Empty compiled bytecode detected."
+            exit 1
+          fi
+
+      - name: Re-enforce no-value-movement source boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE '\.transfer\(|\.send\(|call\{[[:space:]]*value|selfdestruct|delegatecall' developers/reference/chlom-wallet/contracts/*.sol; then
+            echo "Reference contract exceeded controlled-test no-value-movement boundary."
+            exit 1
+          fi
+
+      - name: Record compiler boundary
+        run: |
+          echo "Compiler: Solidity 0.8.36 exact npm package version."
+          echo "PASS means source compiles under this toolchain; it is not an audit, deployment approval, testnet receipt, or mainnet certification."
