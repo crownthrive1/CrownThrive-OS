@@ -5,7 +5,7 @@ on:
     paths:
       - "automation/chlom-wallet-settlement-agent.*"
       - "chlom/chlom-wallet-*"
-      - "developers/chlom-walletkit-contract.mdx"
+      - "developers/chlom-wallet*.mdx"
       - "developers/reference/chlom-wallet/**"
       - "security/chlom-wallet-threat-model.mdx"
       - ".github/workflows/chlom-wallet-controlled-test.yml"
@@ -34,9 +34,24 @@ jobs:
         run: |
           node --check developers/reference/chlom-wallet/chlom-wallet-kernel.mjs
           node --check developers/reference/chlom-wallet/test-kernel.mjs
+          node --check developers/reference/chlom-wallet/stripe/webhook-contract.mjs
+          node --check developers/reference/chlom-wallet/stripe/test-webhook-contract.mjs
+          node --check developers/reference/chlom-wallet/passkey/passkey-smart-account.mjs
+          node --check developers/reference/chlom-wallet/passkey/test-passkey-smart-account.mjs
+          node --check developers/reference/chlom-wallet/ui/unified-value-receipt.mjs
+          node --check developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
 
-      - name: Run deterministic stress suite
+      - name: Run deterministic wallet stress suite
         run: node developers/reference/chlom-wallet/test-kernel.mjs
+
+      - name: Run Stripe webhook contract tests
+        run: node developers/reference/chlom-wallet/stripe/test-webhook-contract.mjs
+
+      - name: Run passkey and smart-account intent tests
+        run: node developers/reference/chlom-wallet/passkey/test-passkey-smart-account.mjs
+
+      - name: Run Unified Value Receipt presentation tests
+        run: node developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
 
       - name: Validate agent and commerce JSON
         run: |
@@ -57,7 +72,18 @@ jobs:
             exit 1
           fi
 
+      - name: Enforce smart-account nondeployment boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE 'broadcast:[[:space:]]*true|deploy:[[:space:]]*true|money_movement:[[:space:]]*true' developers/reference/chlom-wallet/passkey/*.mjs; then
+            echo "Controlled-test passkey reference must remain non-deploying and non-broadcasting."
+            exit 1
+          fi
+
       - name: Record boundary
         run: |
+          echo "CONTROLLED_TEST: webhook tests use synthetic signing material and do not register a live Stripe endpoint."
+          echo "CONTROLLED_TEST: passkey/smart-account code builds registration intents only; it does not deploy or broadcast."
           echo "CONTROLLED_TEST: no Solidity compile/audit/mainnet deployment is certified by this workflow."
           echo "The Solidity source candidates require a separately pinned compiler/audit pipeline before deployment."
