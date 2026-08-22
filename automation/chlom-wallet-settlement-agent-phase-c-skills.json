@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0.0",
+  "package_id": "ct.skill-package.chlom-wallet.phase-c.v1",
+  "agent_id": "ct.agent.chlom-wallet-settlement",
+  "canonical_name": "CHLOM Wallet, Settlement & Treasury Agent",
+  "state": "CONTROLLED_TEST",
+  "vote_eligible": false,
+  "authority_ceiling": "D2",
+  "autonomy_ceiling": "A2",
+  "self_approval": false,
+  "production_activation": false,
+  "live_money_movement": false,
+  "public_chain_broadcast": false,
+  "skills": [
+    {
+      "skill_id": "ct.skill.chlom.harp-proof-capsule.v1",
+      "name": "HARP Proof Capsule Builder",
+      "algorithm_family": "HARP",
+      "purpose": "Build deterministic, domain-separated Merkle proof capsules from sanitized evidence commitments and verify inclusion proofs.",
+      "inputs": ["stable record IDs", "record classes", "payload digests", "policy digests", "sanitized metadata"],
+      "outputs": ["root digest", "manifest digest", "leaf commitments", "inclusion proofs", "candidate anchor packet"],
+      "prohibited": ["raw evidence bodies", "provider credentials", "private keys", "automatic chain broadcast"],
+      "commercial_mapping": "ct.product.chlom-proof-receipt-api",
+      "test_result": "PASS_HARP_PROOF_CAPSULE"
+    },
+    {
+      "skill_id": "ct.skill.chlom.easor-settlement-plan.v1",
+      "name": "EASOR Settlement Plan Compiler",
+      "algorithm_family": "EASOR",
+      "purpose": "Compile order-independent allocation and reversal obligation previews while keeping Money, Rights, Rewards and Impact semantics separate.",
+      "inputs": ["gross minor units", "versioned basis-point rules", "rights candidates", "reward candidates", "policy version"],
+      "outputs": ["allocation legs", "impact obligations", "rights holds", "reward candidates", "reversal preview", "plan digest"],
+      "prohibited": ["provider writes", "fund transfer", "rights grant", "impact disbursement", "tax determination"],
+      "commercial_mapping": "ct.product.chlom-split-settlement-ledger",
+      "test_result": "PASS_EASOR_SETTLEMENT_COMPILER"
+    },
+    {
+      "skill_id": "ct.skill.chlom.portable-wallet-capsule.v1",
+      "name": "Portable Wallet Capsule Builder",
+      "algorithm_family": "PAER",
+      "purpose": "Create provider-neutral wallet continuity capsules and HOLD-only provider-remap plans while preserving stable wallet identity and event-chain commitments.",
+      "inputs": ["stable wallet ID", "issuer DID", "provider aliases", "event commitments", "entitlement commitments", "proof-capsule reference"],
+      "outputs": ["portable capsule", "capsule digest", "chain-head verification", "provider-remap plan"],
+      "prohibited": ["raw provider references", "API credentials", "raw payload bodies", "automatic import", "provider mutation", "money movement"],
+      "commercial_mapping": "ct.product.chlom-wallet-os-enterprise",
+      "test_result": "PASS_PORTABLE_WALLET_CAPSULE"
+    }
+  ],
+  "handoffs": [
+    {
+      "agent_id": "ct.agent.articleization",
+      "scope": "public-safe documentation and audience-specific explanation",
+      "authority_effect": "none"
+    },
+    {
+      "agent_id": "ct.agent.rights-governance",
+      "scope": "independent entitlement and license review",
+      "authority_effect": "no automatic approval"
+    },
+    {
+      "agent_id": "ct.subagent.finance-tax-treasury",
+      "scope": "independent economic, tax and treasury review before effective settlement",
+      "authority_effect": "no automatic approval"
+    },
+    {
+      "agent_id": "ct.subagent.evidence-provenance",
+      "scope": "proof-capsule provenance and digest review",
+      "authority_effect": "no automatic approval"
+    },
+    {
+      "agent_id": "ct.subagent.recovery-rollback",
+      "scope": "portability import, rollback and provider-exit review",
+      "authority_effect": "no automatic approval"
+    }
+  ],
+  "commercialization": {
+    "pricing_authorized": false,
+    "stripe_objects_authorized": false,
+    "checkout_authorized": false,
+    "candidate_modules": [
+      "CHLOM Proof Capsule API",
+      "CHLOM Settlement Plan Compiler",
+      "CHLOM Portable Wallet Capsule"
+    ]
+  },
+  "source_branch": "chlom-wallet/phase-c-proof-portability-20260822"
+}
