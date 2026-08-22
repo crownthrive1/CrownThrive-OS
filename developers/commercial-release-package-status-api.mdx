@@ -1,36 +1,36 @@
 ---
-title: "Commercial Release Package Status API"
-sidebarTitle: "Release Status API"
-description: "JWT-protected aggregate status contract for the Launch, Ready, and Procure release-package factory."
+title: "Commercial Release Factory Status API"
+sidebarTitle: "Release Factory API"
+description: "JWT-protected aggregate and exact-SKU status contract for the Launch, Ready, and Procure release factory."
 icon: "chart-network"
 tag: "Controlled Test"
 ---
 
-# Commercial Release Package Status API
+# Commercial Release Factory Status API
 
-The `commercial-release-package-status` service exposes a sanitized aggregate read of the governed release-package estate. It is intended for authenticated operational dashboards, governed agents, and evidence reconciliation. It is not a customer checkout, product-delivery, credential, or sovereign-voting API.
+The canonical `commercial-release-factory-status` service exposes sanitized aggregate or exact-SKU state for the governed commercial release-package estate. The former `commercial-release-package-status` slug remains a compatibility alias to the same v2 RPC contract.
 
 ## Contract
 
-- method: `GET`
-- authentication: valid Supabase JWT required
-- mutation authority: none
-- customer records: excluded
-- credentials and Vault data: excluded
-- private storage paths: excluded
-- protected algorithm bodies: excluded
-- cache policy: `no-store`
+- method: `GET` only;
+- authentication: gateway-verified JWT plus an authenticated-user subject or service-role claim;
+- anonymous-role JWT: rejected;
+- optional input: exact `CT-LAUNCH-*`, `CT-READY-*`, or `CT-PROCURE-*` SKU;
+- mutation authority: none;
+- customer records, credentials, Vault bodies, private storage paths, and protected scoring bodies: excluded;
+- cache policy: `no-store`.
 
-The response contains package and gate totals, per-platform totals, aggregate release states, and the latest sanitized execution receipt. It also repeats the hard controls `credit_only=true`, `checkout_enabled=false`, and `direct_provider_write=false`.
+The aggregate response reports the 30-package estate, current gate totals, retained alias continuity, exact-binding mismatch counts, route state, nonsovereign agent count, and credit-only controls. The per-SKU response reports the exact asset/package binding, current gate states, governed-release state, and feed-consumer state.
 
 ## Fail-closed behavior
 
+- missing JWT returns `401` at the gateway;
+- a valid anonymous-role token returns `403` in the function;
 - non-GET methods return `405`;
-- unavailable server configuration returns `503`;
-- database/readback failure returns a generic `502` without internal error bodies;
-- the service-role credential remains runtime-only and is never returned;
-- API success does not certify any product or authorize publication.
+- invalid SKU shape returns `400`;
+- unavailable runtime configuration or readback returns `503` without protected details;
+- API success never certifies a product, manufactures a vote, enables checkout, or authorizes publication.
 
-## Current deployment
+## Current state
 
-The first deployment is ACTIVE with JWT verification enabled. The exact source is versioned with the Commercial Release Factory branch and the deployed runtime is fingerprinted independently by the provider.
+Both service slugs are ACTIVE with JWT verification enabled. The canonical source system is `commercial_sites_candidate_4`; the former source key is a compatibility alias. Runtime status remains 30 held packages, 30 current PASS gates, 280 current HOLD gates, zero accepted/published products, and zero exact-binding mismatches.
