@@ -1,12 +1,14 @@
-name: Commercial Release Factory
+name: Commercial Release Factory v2
 
 on:
   pull_request:
     paths:
       - "automation/commercial-release-package-agent.mdx"
       - "automation/commercial-release-factory-workflow.mdx"
-      - "developers/manifests/commercial-release-factory.v1.json"
-      - "developers/contracts/commercial-release-package.schema.json"
+      - "changelog/commercial-release-factory-2026-08-22.mdx"
+      - "developers/manifests/commercial-release-factory.v2.json"
+      - "developers/contracts/commercial-release-package.v2.schema.json"
+      - "developers/contracts/commercial-release-factory-api-mcp.v2.json"
       - "developers/reference/commercial-release-factory/**"
       - ".github/workflows/commercial-release-factory.yml"
   workflow_dispatch:
@@ -15,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: commercial-release-factory-${{ github.event.pull_request.number || github.ref }}
+  group: commercial-release-factory-v2-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,20 +29,24 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Parse public manifests
+      - name: Parse public contracts
         run: |
           python3 -m json.tool developers/manifests/commercial-release-factory.v1.json >/dev/null
+          python3 -m json.tool developers/manifests/commercial-release-factory.v2.json >/dev/null
           python3 -m json.tool developers/contracts/commercial-release-package.schema.json >/dev/null
-      - name: Run deterministic release-factory tests
-        run: python3 developers/reference/commercial-release-factory/tests/test_release_factory.py
-      - name: Enforce public-boundary and authority invariants
+          python3 -m json.tool developers/contracts/commercial-release-package.v2.schema.json >/dev/null
+          python3 -m json.tool developers/contracts/commercial-release-factory-api-mcp.v2.json >/dev/null
+          python3 -m json.tool developers/reference/commercial-release-factory/edge-functions/status/deno.json >/dev/null
+      - name: Run deterministic and adversarial tests
+        run: python3 developers/reference/commercial-release-factory/commercial_release_factory.py --self-test
+      - name: Enforce authority and disclosure invariants
         run: |
           ! grep -RniE '(BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY|sk_(live|test)_[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})' \
-            automation/commercial-release-package-agent.mdx \
-            automation/commercial-release-factory-workflow.mdx \
-            developers/manifests/commercial-release-factory.v1.json \
-            developers/contracts/commercial-release-package.schema.json \
+            automation/commercial-release-package-agent.mdx automation/commercial-release-factory-workflow.mdx \
+            changelog/commercial-release-factory-2026-08-22.mdx developers/manifests/commercial-release-factory.v2.json \
+            developers/contracts/commercial-release-package.v2.schema.json developers/contracts/commercial-release-factory-api-mcp.v2.json \
             developers/reference/commercial-release-factory
-          grep -q '"direct_sites_provider_write": false' developers/manifests/commercial-release-factory.v1.json
-          grep -q '"checkout_enabled": false' developers/manifests/commercial-release-factory.v1.json
-          grep -q '"sovereign_votes_created": false' developers/manifests/commercial-release-factory.v1.json
+          grep -q '"direct_sites_provider_write": false' developers/manifests/commercial-release-factory.v2.json
+          grep -q '"checkout_enabled": false' developers/manifests/commercial-release-factory.v2.json
+          grep -q '"sovereign_votes_created": false' developers/manifests/commercial-release-factory.v2.json
+          grep -q '"package_release_binding_mismatches": 0' developers/manifests/commercial-release-factory.v2.json

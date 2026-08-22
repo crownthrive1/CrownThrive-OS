@@ -1,0 +1,68 @@
+{
+  "schema_version": "2.0.0",
+  "contract_id": "ct.contract.commercial-release-factory-api-mcp.v2",
+  "service_id": "ct.service.commercial-release-factory-status",
+  "authentication": {
+    "mode": "jwt_required",
+    "anonymous_access": false,
+    "service_role_execution": "server_side_only",
+    "credential_values_in_response": false
+  },
+  "http": {
+    "endpoint_slug": "commercial-release-factory-status",
+    "methods": ["GET"],
+    "mutating_methods": [],
+    "response_class": "sanitized_aggregate_or_exact_sku_status",
+    "compatibility_aliases": ["commercial-release-package-status"],
+    "accepted_principals": ["authenticated user JWT with subject", "service-role JWT"],
+    "anonymous_role_jwt_allowed": false
+  },
+  "mcp_tools": [
+    {
+      "tool_id": "ct.mcp.commercial-release-factory.get-status.v2",
+      "name": "get_commercial_release_factory_status",
+      "decision_class": "D0",
+      "enabled_state": "controlled_test_candidate",
+      "read_only": true
+    },
+    {
+      "tool_id": "ct.mcp.commercial-release-factory.get-package-status.v2",
+      "name": "get_commercial_release_package_status",
+      "decision_class": "D0",
+      "enabled_state": "controlled_test_candidate",
+      "read_only": true,
+      "input": {"sku": "required exact SKU"}
+    },
+    {
+      "tool_id": "ct.mcp.commercial-release-factory.materialize.v2",
+      "name": "materialize_commercial_release_packages",
+      "decision_class": "D2",
+      "enabled_state": "private_runtime_only",
+      "read_only": false,
+      "external_mcp_publication_authorized": false,
+      "creates_votes": false,
+      "creates_offers": false,
+      "publishes_sites": false
+    },
+    {
+      "tool_id": "ct.mcp.commercial-release-factory.publish.v2",
+      "name": "publish_accepted_commercial_release",
+      "decision_class": "D2",
+      "enabled_state": "disabled_until_governed_acceptance_and_destination_certification",
+      "read_only": false,
+      "direct_provider_write": false,
+      "adapter": "ct.adapter.dynamic-feed.v1",
+      "read_after_write_required": true,
+      "rollback_required": true
+    }
+  ],
+  "forbidden_response_fields": [
+    "vault_secret",
+    "credential_value",
+    "service_role_key",
+    "private_storage_object_path",
+    "customer_record",
+    "protected_policy_body",
+    "private_scoring_weight"
+  ]
+}

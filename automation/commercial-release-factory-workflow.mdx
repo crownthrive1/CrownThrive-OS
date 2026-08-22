@@ -1,36 +1,53 @@
 ---
 title: "Commercial Release Factory Workflow"
 sidebarTitle: "Release Factory Workflow"
-description: "Per-product evidence, certification, publication, readback, and rollback workflow for Launch, Ready, and Procure."
+description: "Exact-version evidence, certification, credit-only publication, readback, and rollback workflow for Launch, Ready, and Procure."
 icon: "diagram-project"
 tag: "Fail Closed"
 ---
 
 # Commercial Release Factory Workflow
 
-## Trigger and materialization
+## Hourly materialization
 
-An hourly THIVEBASE condition watch reads the latest exact asset version for each product in `commercial-gap-sites-2026-08-21-v1`. It deterministically generates or refreshes one release package per SKU. Repeated execution is idempotent for the same SKU, asset version, surface, and content hash.
+An hourly THIVEBASE condition watch at minute 27 resolves the current 30-product cohort from `commercial_sites_candidate_4`. The prior source key remains an accepted input alias. The job deterministically generates or refreshes one v2 package per exact SKU and asset version.
 
-The generator cannot create a sovereign vote, offer, entitlement, public price, Stripe object, fulfillment path, or provider write. Missing evidence is recorded as a typed HOLD with reason codes rather than converted into a synthetic PASS.
+Repeated execution is idempotent. The materializer cannot create a sovereign vote, offer, entitlement, public price, Stripe object, fulfillment path, or direct provider write. Missing or contradictory evidence is recorded as a typed HOLD rather than converted into a synthetic PASS.
 
-## Gate contract
-
-Every product requires:
+## Current required gates
 
 1. package integrity;
-2. rights and licensing;
-3. credit pricing and tax;
-4. fulfillment;
+2. rights provenance;
+3. Crown Credits pricing and tax;
+4. private fulfillment;
 5. credit checkout and webhook;
 6. entitlement and license issuance;
-7. accessibility;
-8. DNS and TLS; and
-9. destination readiness.
+7. refund, dispute, remedy, and rollback;
+8. accessibility and device review;
+9. DNS, TLS, canonical route, and application readback; and
+10. governed acceptance and publication.
 
-CrownThrive Ready adds a tenth gate for qualified-professional scope review. Its preparation products may organize evidence and readiness work, but cannot issue legal, security, privacy, tax, accessibility, or regulatory conclusions.
+CrownThrive Ready adds an eleventh qualified-professional review gate. Its products may organize readiness evidence but cannot issue legal, security, privacy, tax, accessibility, or regulatory conclusions.
 
-## Site routes
+## Current controlled-test proof
+
+The first exact v2 run produced:
+
+- 30 products and 30 packages;
+- 310 current required gate rows;
+- 30 exact package-integrity PASS rows;
+- 280 current HOLD rows;
+- 210 retained historical alias rows;
+- 520 total retained evidence rows;
+- zero package/release hash mismatches;
+- zero current gate binding mismatches;
+- zero current certification binding mismatches;
+- zero accepted or published products;
+- zero offers, enabled checkouts, direct provider writes, or manufactured sovereign votes.
+
+The manual proof run is `039ed072-4795-4052-a4bd-24c08919a120`; the scheduled repeat run is `3d17e7ac-f067-458b-937b-1624921172bb`. Both produced input digest `0c2ff76d62daa19d4b0c0f8f9de1ec179ce6768cb6484e472dc1922a38858a45` and output digest `9c836037646c8aa153ee673e5bfcb8a45fd03d6e14bb9e6ad8dd002ccba50a52`.
+
+## ChatGPT Sites routes
 
 | Platform | Provider surface | Preferred route | Automated route state |
 | --- | --- | --- | --- |
@@ -38,19 +55,15 @@ CrownThrive Ready adds a tenth gate for qualified-professional scope review. Its
 | CrownThrive Ready | `crownthrive-ready.crownthrive.chatgpt.site` | `ready.crownthrive.com` | HOLD pending governed-feed consumer proof |
 | CrownThrive Procure | `crownthrive-procure.crownthrive.chatgpt.site` | `procure.crownthrive.com` | HOLD pending governed-feed consumer proof |
 
-The route uses the certified dynamic-feed adapter. Publication is queued automatically only after the existing `ct.site.autopublish.v1` policy accepts the exact product release. A non-PASS transition after publication triggers quarantine and rollback handling.
+Publication is queued automatically only after the accepted policy approves the exact package and the destination is certified. A later non-PASS transition quarantines the release and invokes rollback handling.
 
 ## Evidence states
 
-- **PASS** means exact-version evidence exists and the asserted reviewer is authorized for that gate.
-- **HOLD** means evidence is missing, stale, contradictory, outside authority, or requires a qualified professional or founder.
-- **FAIL** means an exact negative test or contradiction was proven.
-- **NOT APPLICABLE** requires evidence; it is not a shortcut.
+- **PASS** requires exact-version evidence and an authorized, independent reviewer where applicable.
+- **HOLD** records missing, stale, contradictory, outside-authority, or professional/founder-dependent evidence.
+- **FAIL** records a proven exact negative result.
+- **NOT APPLICABLE** requires positive evidence and cannot be used as a shortcut.
 
-## Current controlled-test proof target
+## Drift and rollback
 
-The first deterministic test vector contains 30 products, 30 packages, and 280 gates. Existing package-integrity receipts account for 30 initial PASS gates. The remaining 250 gates stay HOLD. Therefore accepted products, published products, created offers, enabled checkouts, and manufactured sovereign votes must all equal zero.
-
-## Rollback and drift
-
-Every release is bound to an exact version and SHA-256. Changes to source bytes, rights, price evidence, tax profile, fulfillment object, webhook contract, entitlement rules, accessibility evidence, domain state, destination consumer, or reviewer authority create a new review boundary. Previously accepted evidence cannot silently float to the changed artifact.
+Changes to source bytes, asset hash, package hash, rights, price evidence, tax profile, fulfillment object, webhook contract, entitlement rule, remedy sequence, accessibility evidence, domain state, destination consumer, or reviewer authority create a new review boundary. Earlier acceptance cannot silently float to the changed artifact.

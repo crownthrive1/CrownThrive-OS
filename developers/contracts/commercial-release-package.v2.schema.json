@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/commercial-release-package.v2.json",
+  "title": "CrownThrive Commercial Release Package v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "manifest", "package_sha256", "exact_version_ref", "asset_sha256", "governed_release_binding", "canonical_gates", "legacy_alias_gates", "acceptance_state", "publication_state"],
+  "properties": {
+    "schema_version": {"const": "2.0.0"},
+    "manifest": {
+      "type": "object",
+      "required": ["factory_id", "factory_manifest_version", "source_system", "asset_identity", "required_dimensions", "commerce_contract", "publication_contract", "governance_contract", "private_boundary"],
+      "properties": {
+        "factory_id": {"const": "ct.release-factory.commercial-sites.v2"},
+        "factory_manifest_version": {"const": "2.0.0"},
+        "source_system": {"const": "commercial_sites_candidate_4"},
+        "asset_identity": {
+          "type": "object",
+          "required": ["sku", "version", "asset_sha256", "byte_size", "platform", "platform_id", "surface_id"],
+          "properties": {
+            "sku": {"type": "string", "pattern": "^CT-(LAUNCH|READY|PROCURE)-[A-Z0-9-]+$"},
+            "version": {"type": "string", "minLength": 1},
+            "asset_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "byte_size": {"type": "integer", "minimum": 1},
+            "platform": {"enum": ["launch", "ready", "procure"]},
+            "platform_id": {"type": "string", "minLength": 1},
+            "surface_id": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": true
+        },
+        "required_dimensions": {"type": "array", "minItems": 10, "maxItems": 11, "uniqueItems": true, "items": {"type": "string"}},
+        "commerce_contract": {
+          "type": "object",
+          "required": ["product_checkout_mode", "stripe_per_product_objects", "checkout_state"],
+          "properties": {
+            "product_checkout_mode": {"const": "crown_credits_only"},
+            "stripe_per_product_objects": {"const": false},
+            "checkout_state": {"const": "closed"}
+          },
+          "additionalProperties": true
+        },
+        "publication_contract": {
+          "type": "object",
+          "required": ["route_mode", "adapter_id", "direct_provider_write", "require_read_after_write", "require_rollback_ref"],
+          "properties": {
+            "route_mode": {"const": "governed_dynamic_feed"},
+            "adapter_id": {"const": "ct.adapter.dynamic-feed.v1"},
+            "direct_provider_write": {"const": false},
+            "require_read_after_write": {"const": true},
+            "require_rollback_ref": {"const": true}
+          },
+          "additionalProperties": true
+        },
+        "governance_contract": {
+          "type": "object",
+          "required": ["originating_agent", "originator_self_approval", "independent_certifier", "policy_id", "d3_human_reserved", "sovereign_vote_creation"],
+          "properties": {
+            "originator_self_approval": {"const": false},
+            "d3_human_reserved": {"const": true},
+            "sovereign_vote_creation": {"const": false}
+          },
+          "additionalProperties": true
+        },
+        "private_boundary": {
+          "type": "object",
+          "required": ["protected_policy_body_exposed", "credential_values_exposed", "customer_records_exposed", "storage_object_path_exposed"],
+          "properties": {
+            "protected_policy_body_exposed": {"const": false},
+            "credential_values_exposed": {"const": false},
+            "customer_records_exposed": {"const": false},
+            "storage_object_path_exposed": {"const": false}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    },
+    "package_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "exact_version_ref": {"type": "string", "minLength": 1},
+    "asset_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "governed_release_binding": {
+      "type": "object",
+      "required": ["exact_version_ref", "content_sha256", "required_certification_dimensions", "certification_state", "vote_state", "release_state"],
+      "properties": {
+        "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "certification_state": {"const": "hold"},
+        "vote_state": {"const": "pending"},
+        "release_state": {"const": "quarantined"}
+      },
+      "additionalProperties": true
+    },
+    "canonical_gates": {
+      "type": "array", "minItems": 10, "maxItems": 11,
+      "items": {"type": "object", "required": ["dimension_key", "sequence", "state", "worker_agent_id", "independent", "reason_codes", "exact_version_ref", "content_sha256", "required_for_acceptance"], "properties": {"state": {"enum": ["pass", "hold", "fail", "not_applicable"]}, "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "required_for_acceptance": {"const": true}}, "additionalProperties": true}
+    },
+    "legacy_alias_gates": {
+      "type": "array", "minItems": 7, "maxItems": 7,
+      "items": {"type": "object", "required": ["dimension_key", "superseded_by", "state", "required_for_acceptance", "legacy_alias", "exact_version_ref", "content_sha256"], "properties": {"required_for_acceptance": {"const": false}, "legacy_alias": {"const": true}}, "additionalProperties": true}
+    },
+    "acceptance_state": {"const": "hold"},
+    "publication_state": {"const": "hold_feed_consumer_unverified"}
+  }
+}
