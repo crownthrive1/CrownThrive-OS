@@ -1,7 +1,7 @@
 ---
 title: "CHLOM WalletKit API & MCP Contract"
 sidebarTitle: "CHLOM WalletKit"
-description: "Public-safe contract for CHLOM WalletKit integrations, provider translation, idempotency, entitlement, allocation, proof and controlled developer access."
+description: "Public-safe contract for CHLOM WalletKit integrations, provider translation, idempotency, entitlement, allocation, unified value receipts, proof and controlled developer access."
 icon: "brackets-curly"
 ---
 
@@ -32,9 +32,11 @@ CHLOM WalletKit is the developer-facing capability family for integrating CrownT
 /wallets/{wallet_id}/events
 /wallets/{wallet_id}/entitlements
 /wallets/{wallet_id}/obligations
+/wallets/{wallet_id}/value-receipts
 /economic-schedules
 /provider-receipts
 /reconciliations
+/value-receipts/{value_receipt_id}
 /proofs
 /anchors
 /policy-decisions
@@ -138,6 +140,27 @@ An entitlement response should make the distinction between payment and rights e
 
 A `payment.succeeded` provider event can be one input. It is never the entire decision.
 
+## Unified Value Receipt
+
+The CHLOM Unified Value Receipt is the human/machine explanation object that lets one wallet view show Money, Rights, Rewards and Impact while keeping the underlying records separate.
+
+```json
+{
+  "value_receipt_id": "ct.uvr.example",
+  "wallet_id": "ct-wallet-id",
+  "source_event_ref": "ct-event-id",
+  "money": {"asset": "USD", "amount_minor": 4900, "state": "reconciled"},
+  "rights": {"entitlement_ref": "ct.entitlement.example", "state": "active"},
+  "rewards": {"reward_ref": "ct.reward.example", "state": "earned"},
+  "impact": {"obligation_ref": "ct.impact.example", "state": "calculated"},
+  "policy_version": "ct.policy.uvr.v1",
+  "receipt_digest": "64-hex",
+  "anchor_state": "not_anchored"
+}
+```
+
+A Unified Value Receipt is not a substitute for the Stripe/provider financial receipt, governing license, reward ledger or ThriveFund settlement evidence. Corrections append lineage rather than rewriting a prior receipt.
+
 ## Proof receipt
 
 ```json
@@ -164,8 +187,12 @@ Candidate MCP tools are intentionally narrow:
 | --- | --- | --- |
 | `wallet.get_summary` | D0 | read-only |
 | `wallet.get_entitlements` | D0 | read-only |
+| `wallet.get_value_receipt` | D0 | read-only |
 | `wallet.verify_proof` | D0 | read-only |
 | `wallet.preview_allocation` | D0 | pure calculation |
+| `wallet.preview_value_class` | D0 | pure calculation |
+| `wallet.preview_rights_eligibility` | D1 | controlled-test decision aid |
+| `wallet.preview_provider_exit` | D1 | controlled-test decision aid |
 | `wallet.reconcile_provider_event` | D2 | disabled / controlled test |
 | `wallet.record_entitlement` | D2 | disabled / controlled test |
 | `wallet.create_anchor_candidate` | D1 | disabled / controlled test |
@@ -234,6 +261,7 @@ Before a mutation-capable WalletKit release, the integration suite must prove at
 - refund/dispute reversal lineage;
 - payment succeeded but rights missing HOLD;
 - entitlement issuance and fulfillment replay safety;
+- Unified Value Receipt correction/reversal lineage;
 - economic schedule version mismatch HOLD;
 - 10,000-bps conservation;
 - provider outage/degraded mode;
