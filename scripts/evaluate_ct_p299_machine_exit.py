@@ -81,7 +81,14 @@ def thivebase(path: Path | None) -> tuple[bool,dict[str,Any],list[str]]:
     if d.get("ok") is not True: why.append("thivebase_snapshot_not_ok")
     digest=str(d.get("snapshot_sha256") or "").lower()
     if len(digest)!=64 or any(c not in "0123456789abcdef" for c in digest): why.append("thivebase_snapshot_digest_invalid")
-    side=d.get("snapshot",{}).get("side_effects",{})
+    snap=d.get("snapshot",{})
+    thive=snap.get("thivebase",{})
+    if thive.get("required_reads_complete") is not True:
+        why.append("thivebase_required_reads_incomplete")
+    for rail in ("chlom_gen6","commercial_release_factory"):
+        if thive.get(rail,{}).get("ok") is not True:
+            why.append(f"thivebase_{rail}_read_not_ok")
+    side=snap.get("side_effects",{})
     for k in ("database_mutation","commerce_activation","money_movement","phase_transition","sovereign_vote_effect"):
         if side.get(k) is not False: why.append(f"thivebase_snapshot_{k}_must_be_false")
     return not why,d,why
