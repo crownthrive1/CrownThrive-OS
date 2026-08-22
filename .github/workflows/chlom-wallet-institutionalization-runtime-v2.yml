@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   runtime-contract:
-    name: Validate OIDC runtime source, module linkage, liveness, real ingest, and boundaries
+    name: Validate OIDC runtime, lineage fence, real ingest, and boundaries
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -39,6 +39,8 @@ jobs:
           node --check developers/reference/chlom-wallet/institutionalization/runtime/github-repository-binding-v2.mjs
           node --check developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs
           node --check developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs
+          node --check developers/reference/chlom-wallet/institutionalization/runtime/runtime-deployment-lineage-fence-v1.mjs
+          node --check developers/reference/chlom-wallet/institutionalization/runtime/test-runtime-deployment-lineage-fence-v1.mjs
           node --check automation/chlom-institutionalization-runtime-advisor.mjs
           node --check automation/test-chlom-institutionalization-runtime-advisor.mjs
           python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json >/dev/null
@@ -47,6 +49,7 @@ jobs:
           python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/commercialization-boundary.v2.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/real-oidc-ingest-evidence.v2.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/runtime-deployment-lineage-fence.v1.json >/dev/null
           python -m json.tool automation/chlom-institutionalization-runtime-handoffs.v2.json >/dev/null
           grep -F 'export const encoder = new TextEncoder();' developers/reference/chlom-wallet/institutionalization/runtime/oidc-runtime-utils-v2.mjs >/dev/null
           grep -F 'export const decoder = new TextDecoder();' developers/reference/chlom-wallet/institutionalization/runtime/oidc-runtime-utils-v2.mjs >/dev/null
@@ -55,13 +58,16 @@ jobs:
       - name: Run module-linkage regression contract
         run: node developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs
 
+      - name: Run deployment-lineage fence tests
+        run: node developers/reference/chlom-wallet/institutionalization/runtime/test-runtime-deployment-lineage-fence-v1.mjs
+
       - name: Run GitHub OIDC unit contract
         run: node developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs
 
       - name: Run deterministic runtime advisor
         run: node automation/test-chlom-institutionalization-runtime-advisor.mjs
 
-      - name: Validate deployed runtime and real ingest contract
+      - name: Validate deployed runtime, real ingest, and lineage fence contract
         shell: bash
         run: |
           set -euo pipefail
@@ -70,6 +76,7 @@ jobs:
           runtime=json.load(open('developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json'))
           reconciliation=json.load(open('developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json'))
           ingest=json.load(open('developers/reference/chlom-wallet/institutionalization/runtime/real-oidc-ingest-evidence.v2.json'))
+          fence=json.load(open('developers/reference/chlom-wallet/institutionalization/runtime/runtime-deployment-lineage-fence.v1.json'))
 
           assert runtime['contract_id']=='ct.runtime.chlom-institutionalization-v2'
           assert runtime['state']=='ACTIVE_REAL_PACKAGE_INGESTED'
@@ -149,6 +156,27 @@ jobs:
           assert ingest['public_status']['real_package_recorded'] is True
           assert ingest['public_status']['real_oidc_ingest_receipt_recorded'] is True
           assert all(value is False for value in ingest['hard_boundaries'].values())
+
+          assert fence['algorithm_id']=='ct.algorithm.chlom.runtime-deployment-lineage-fence.v1'
+          assert fence['short_name']=='RDLF'
+          assert fence['semantic_version']=='1.0.0'
+          assert fence['state']=='CONTROLLED_TEST'
+          assert fence['implementation']['export']=='evaluateRuntimeDeploymentLineageV1'
+          assert fence['current_evidence']['failed_deployment_version']==3
+          assert fence['current_evidence']['failed_disposition']=='HOLD_CHLOM_RUNTIME_DEPLOYMENT_LINEAGE_FENCE_V1'
+          assert fence['current_evidence']['corrected_deployment_version']==4
+          assert fence['current_evidence']['corrected_disposition']=='PASS_CHLOM_RUNTIME_DEPLOYMENT_LINEAGE_FENCE_V1'
+          assert fence['current_evidence']['canary_result']=='PASS_CHLOM_RUNTIME_DEPLOYMENT_LINEAGE_FENCE_V1_CANARY'
+          assert fence['current_evidence']['canary_evidence_digest_sha256']=='bed42aee9428ef6e6d5ec6984cc17dc1d939d8c47fb20681d80fb58234c42d6c'
+          assert len(fence['negative_cases'])>=19
+          assert fence['commercialization_candidate']['candidate_only'] is True
+          assert fence['commercialization_candidate']['effective_offer'] is False
+          assert fence['commercialization_candidate']['stripe_objects_created'] is False
+          assert fence['commercialization_candidate']['checkout_enabled'] is False
+          assert fence['ai_governance']['decision_authority'] is False
+          assert fence['ai_governance']['write_authority'] is False
+          assert fence['ai_governance']['automatic_release'] is False
+          assert all(value is False for value in fence['hard_boundaries'].values())
           PY
 
       - name: Verify unauthenticated requests fail closed
@@ -180,6 +208,9 @@ jobs:
             developers/reference/chlom-wallet/institutionalization/runtime/github-repository-binding-v2.mjs
             developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs
             developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs
+            developers/reference/chlom-wallet/institutionalization/runtime/runtime-deployment-lineage-fence-v1.mjs
+            developers/reference/chlom-wallet/institutionalization/runtime/test-runtime-deployment-lineage-fence-v1.mjs
+            developers/reference/chlom-wallet/institutionalization/runtime/runtime-deployment-lineage-fence.v1.json
             developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json
             developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json
             developers/reference/chlom-wallet/institutionalization/runtime/recovery-plan.v2.json
@@ -204,6 +235,6 @@ jobs:
 
       - name: Record boundary
         run: |
-          echo 'CONTROLLED_TEST: source, module linkage, OIDC verifier, real package ingest evidence, advisor, schema, recovery, pricing and documentation contracts validated.'
-          echo 'Unauthenticated Edge requests fail closed. The real package and GitHub OIDC receipt are recorded as append-only evidence.'
+          echo 'CONTROLLED_TEST: source, OIDC verifier, module linkage, RDLF deployment-lineage fence, real package ingest evidence, advisor, recovery, pricing and documentation contracts validated.'
+          echo 'Unauthenticated Edge requests fail closed. Historical version-3 BOOT_ERROR evidence is preserved while version 4 passes the lineage fence.'
           echo 'No token value, raw artifact body, provider write, credential access, Stripe object, checkout, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement or merge authority is created.'
