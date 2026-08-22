@@ -8,6 +8,7 @@ contract ChlomEntitlementRegistry {
     error Paused();
     error Exists(bytes32 entitlementId);
     error Missing(bytes32 entitlementId);
+    error InvalidState(bytes32 entitlementId);
     error ZeroValue();
 
     enum State { None, Active, Revoked }
@@ -75,6 +76,8 @@ contract ChlomEntitlementRegistry {
     function revoke(bytes32 entitlementId, bytes32 reasonDigest) external onlyOperator {
         Entitlement storage e = _entitlements[entitlementId];
         if (e.state == State.None) revert Missing(entitlementId);
+        if (e.state != State.Active) revert InvalidState(entitlementId);
+        if (reasonDigest == bytes32(0)) revert ZeroValue();
         e.state = State.Revoked;
         emit EntitlementRevoked(entitlementId, reasonDigest);
     }
