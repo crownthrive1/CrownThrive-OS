@@ -1,7 +1,7 @@
 ---
 title: "CHLOM Wallet Phase B Evidence"
 sidebarTitle: "Wallet Phase B"
-description: "Controlled-test evidence for CHLOM Wallet Stripe verification, lifecycle reconciliation, entitlement separation, Unified Value Receipts, wallet UX, passkey challenge control, smart-account intents, contract hardening, provider exit and commercial canaries."
+description: "Controlled-test evidence for CHLOM Wallet Stripe verification, lifecycle reconciliation, entitlement separation, Unified Value Receipts, wallet UX, WebAuthn/passkey controls, local EVM contract execution, provider exit and commercial canaries."
 icon: "flask"
 ---
 
@@ -89,13 +89,37 @@ money_movement: false
 result: PASS_PASSKEY_CHALLENGE_CANARY
 ```
 
-This validates challenge/origin/replay control only. It deliberately does **not** claim complete WebAuthn cryptographic assertion verification, production credential enrollment, smart-account deployment or account recovery readiness.
+This runtime canary validates challenge/origin/replay control only. It does not claim that the restricted runtime has activated a production credential, deployed a smart account or completed account recovery.
+
+## Cryptographic WebAuthn assertion test
+
+A separate source-controlled assertion verifier now executes real ES256/P-256 signature verification against ephemeral synthetic credentials. The verifier binds the assertion to the expected challenge, HTTPS origin, RP ID hash, user-presence flag, user-verification flag and signature counter policy.
+
+The exact CI test passed:
+
+```yaml
+result: PASS_WEBAUTHN_ASSERTION_CRYPTO
+es256_p256_signature_verified: true
+challenge_bound: true
+origin_bound: true
+rp_id_hash_bound: true
+user_presence_required: true
+user_verification_required: true
+counter_rollback_rejected: true
+tamper_rejected: true
+private_jwk_rejected: true
+zero_counter_supported_without_false_claim: true
+production_credential_activation: false
+smart_account_deployment: false
+```
+
+Negative cases cover challenge mismatch, origin mismatch, RP-ID-hash mismatch, missing user verification, counter rollback, signature tamper and attempted private-JWK input. This closes the public-reference assertion-cryptography gap, but production registration/attestation policy, credential persistence, recovery and private-runtime integration remain separate gates.
 
 A candidate smart-account profile remains `specified_not_deployed` with an explicit CAIP-2 testnet target, WebAuthn/passkey commitment profile, modular ERC-4337/ERC-7579 direction, disabled paymaster/modules, `broadcast=false`, and `money_movement=false`.
 
 ## Wallet experience and public projection
 
-The source-controlled wallet shell now models one consumer-facing surface with five separate lanes: **Money, Rights, Rewards, Impact and Proof**. Its reference tests passed with:
+The source-controlled wallet shell models one consumer-facing surface with five separate lanes: **Money, Rights, Rewards, Impact and Proof**. Its reference tests passed with:
 
 ```yaml
 unified_shell_sections: 5
@@ -121,7 +145,7 @@ The four no-value Solidity reference contracts compile under the exact `solc@0.8
 - Anchor Registry keeps duplicate/zero/pause/authority guards;
 - no controlled-test contract exposes transfer/send/value-call/delegatecall/selfdestruct primitives.
 
-A deterministic source-aligned state-model fuzz suite also passed:
+A deterministic source-aligned state-model fuzz suite passed:
 
 ```yaml
 result: PASS_CONTRACT_MODEL_FUZZ
@@ -136,7 +160,28 @@ evm_execution: false
 audit_claimed: false
 ```
 
-This is meaningful invariant testing, but it is still not EVM bytecode execution, an external audit, a testnet deployment or mainnet approval.
+### Local EVM execution
+
+The same four contracts now also compile, deploy and execute on an isolated in-memory EVM. The local suite uses exact Solidity `0.8.36`, an in-process chain ID `1337`, no external RPC and no production signer.
+
+```yaml
+result: PASS_LOCAL_EVM_EXECUTION
+chain_id: 1337
+compiler_version: 0.8.36+commit.8a079791.Emscripten.clang
+contracts_deployed: 4
+expected_reverts: 15
+native_value_held_wei: 0
+external_rpc_used: false
+production_signer_used: false
+audit_claimed: false
+mainnet_deployment: false
+```
+
+The executed negative cases include duplicate anchors, unauthorized and paused writes, zero IDs, invalid entitlement revocation, duplicate entitlement creation, invalid split basis points, self/missing split-policy replacement, zero ThriveFund obligations, missing settlement evidence and duplicate settlement/reversal transitions.
+
+The first local-EVM run surfaced a **test-harness defect**, not a contract PASS: the revert helper awaited transaction submission but not the mined receipt, so a reverted state-changing transaction could be mistaken for a non-revert. The helper was corrected to await the receipt, the suite was rerun, and the 15 expected reverts then passed. The failed run remains part of CI history rather than being hidden.
+
+Local EVM execution materially strengthens the controlled-test evidence. It is still not an independent audit, public testnet receipt, signer authorization or mainnet approval.
 
 ## Provider-exit drill
 
@@ -176,7 +221,7 @@ This test proves the controlled integration order across candidate offer, signed
 
 ## Pricing-certification handoff
 
-The internal WalletKit offer cohort remains in `price_review`. A restricted independent-review request now exists:
+The internal WalletKit offer cohort remains in `price_review`. A restricted independent-review request exists:
 
 ```yaml
 request_code: ct.price-review.chlom-wallet.phase-b.v1
@@ -212,13 +257,15 @@ Phase B includes deterministic reference code for:
 - controlled event allowlisting;
 - payment, invoice, subscription, refund, dispute and asynchronous Checkout translation with fulfillment HOLD;
 - CAIP-2 and CAIP-10 identity normalization;
-- WebAuthn credential commitments and origin/RP binding;
+- passkey challenge and RP/origin controls;
+- real ES256/P-256 WebAuthn assertion verification against synthetic credentials;
 - ERC-4337/ERC-7579 smart-account registration intents with deployment/broadcast disabled;
 - Unified Value Receipt presentation invariants;
 - accessible wallet-shell public-projection invariants;
-- source-aligned deterministic contract-state fuzz testing.
+- source-aligned deterministic contract-state fuzz testing;
+- isolated local-EVM contract execution.
 
-The dedicated controlled-test CI also now scans the wallet projection for concrete live-secret-shaped material rather than relying on ordinary words such as “private key” or “seed phrase,” which legitimately appear in security prohibitions. This keeps the check fail-closed without treating defensive documentation as a secret.
+The dedicated controlled-test CI also scans the wallet projection for concrete live-secret-shaped material rather than relying on ordinary words such as “private key” or “seed phrase,” which legitimately appear in security prohibitions. This keeps the check fail-closed without treating defensive documentation as a secret.
 
 ## Provider continuity finding
 
@@ -229,10 +276,10 @@ The restricted credential-continuity registry also keeps generic Stripe server c
 ## Phase B gates still open
 
 - live Stripe webhook endpoint registration and live signing-secret continuity;
-- complete production WebAuthn registration/assertion verification and recovery;
+- production WebAuthn registration/attestation policy, credential persistence, recovery and private-runtime assertion-verifier integration;
 - customer-facing Wallet/UVR application deployment;
-- smart-account implementation selection, EVM execution tests and independent audit appropriate to risk;
-- reproducible Solidity artifact packaging and testnet deployment/anchor receipt with approved signer path;
+- smart-account implementation selection and independent security audit appropriate to risk;
+- reproducible Solidity artifact packaging and approved public testnet deployment/anchor receipt with signer/recovery evidence;
 - real provider-exit dual-read/replay canary;
 - independent price-certifier decision;
 - tax/legal/security/rights review for the final commercial transaction model;
