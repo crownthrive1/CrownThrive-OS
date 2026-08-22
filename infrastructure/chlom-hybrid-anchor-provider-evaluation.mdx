@@ -1,0 +1,79 @@
+---
+title: "CHLOM Hybrid Anchor Provider Evaluation"
+sidebarTitle: "CHLOM Anchor Providers"
+description: "Public-safe current-state evaluation of Cloudflare, DigitalOcean and managed Polkadot/Substrate infrastructure for CHLOM anchoring."
+icon: "link"
+---
+
+# CHLOM Hybrid Anchor Provider Evaluation
+
+**State:** RESEARCH CANDIDATE / NO PURCHASE / NO DEPLOYMENT.  
+**Phase effect:** none. Phase 3 is not advanced.
+
+CHLOM should not treat any infrastructure vendor as the canonical authority for identity, licensing, protected implementation or evidence truth. THIVEBASE/DAIL remains the current governed operational ledger and Supabase Vault remains the current restricted-secret authority until a separately certified custody architecture supersedes it.
+
+## Candidate architecture
+
+The portable anchor envelope should contain only public-safe commitments such as:
+
+- Merkle/checkpoint root;
+- DAIL checkpoint digest;
+- artifact/version digest;
+- public DID/fingerprint commitment;
+- sequence/timestamp;
+- policy/version identifier.
+
+Never anchor raw credentials, trade secrets, private subject IDs, customer records, raw DAIL events, unpublished IP or restricted vulnerability details.
+
+## Cloudflare
+
+Current Cloudflare Web3 provides IPFS and Ethereum gateways. The Ethereum gateway supports JSON-RPC reads and writes without CrownThrive operating its own Ethereum node. Cloudflare Workers/R2 can also provide a global edge control plane and strongly consistent object storage for public proof packages.
+
+**CHLOM fit:** edge notarization, public proof distribution, anti-abuse/perimeter logic and an optional EVM/Ethereum anchor adapter.
+
+**Boundary:** Cloudflare's Web3 write path is EVM-oriented; it is not a managed Polkadot/Substrate node layer. Therefore Cloudflare should not become the sole CHLOM chain infrastructure if the Polkadot SDK/Substrate direction remains canonical.
+
+## DigitalOcean
+
+DigitalOcean Kubernetes provides a managed control plane, high availability and autoscaling, while Droplets/VPC/Volumes/Managed Databases/Spaces provide conventional infrastructure primitives.
+
+**CHLOM fit:** future self-operated CHLOM node/validator/archive infrastructure, private services, indexers and portable Kubernetes workloads.
+
+**Boundary:** this is infrastructure hosting rather than a purpose-built managed Polkadot/Substrate node service. It gives CrownThrive more operational control but also more node lifecycle/security/upgrade responsibility.
+
+## Managed Polkadot/Substrate providers
+
+OnFinality provides dedicated Substrate nodes with RPC, P2P and metrics endpoints and supports Polkadot-family networks, including archive/full/collator options on supported networks. Blockdaemon provides dedicated Polkadot nodes, Polkadot APIs and institutional staking/validator infrastructure.
+
+**CHLOM fit:** managed test/production RPC and node infrastructure while CrownThrive develops the chain/anchor protocol without immediately taking on every node-operations burden.
+
+## Current candidate topology
+
+The current research candidate is deliberately multi-provider and replaceable:
+
+1. **THIVEBASE/DAIL:** governed private operational lineage and current source ledger.
+2. **Supabase Vault:** private secrets/keys/implementation custody.
+3. **CHLOM Anchor Batcher:** deterministic, idempotent creation of public-safe checkpoint envelopes.
+4. **Polkadot/Substrate managed adapter candidate:** OnFinality as an initial managed-node/RPC path; Blockdaemon as institutional redundancy/validator candidate.
+5. **Cloudflare:** edge/proof distribution, R2 public-proof storage, optional Ethereum fallback anchor.
+6. **DigitalOcean:** future self-hosted node/validator/indexer infrastructure when CrownThrive accepts the operational burden.
+
+No provider-specific node ID, account ID or endpoint is canonical. The same checkpoint envelope must be independently verifiable after provider replacement.
+
+## Promotion gates
+
+Before any chain/anchor service is declared production, require:
+
+- exact chain architecture and threat model;
+- key custody/signing design;
+- deterministic anchor envelope and schema versioning;
+- replay/idempotency rules;
+- failure/reorg/finality handling;
+- provider failover and portability test;
+- cost/capacity model;
+- independent security review;
+- public readback verification;
+- rollback/recovery evidence;
+- explicit governance approval for production authority.
+
+This evaluation does not create a token, public blockchain, production DID method or live validator.
