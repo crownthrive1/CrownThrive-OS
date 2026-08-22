@@ -90,7 +90,8 @@ assert.throws(() => compileInstitutionalizationPackage({ ...spec, ai_governance:
 
 const secretRepo = makeRepo();
 const secretArtifact = secretRepo.artifacts[0];
-writeFileSync(join(secretRepo.root, secretArtifact.path), 'forbidden shape sk_live_1234567890abcdef\n', 'utf8');
+const syntheticSecret = ['sk', 'live', '1234567890abcdef'].join('_');
+writeFileSync(join(secretRepo.root, secretArtifact.path), `forbidden shape ${syntheticSecret}\n`, 'utf8');
 assert.throws(() => compileInstitutionalizationPackage(baseSpec(secretRepo.artifacts), secretRepo.root), /secret_shape_detected/);
 
 const restrictedRepo = makeRepo();
