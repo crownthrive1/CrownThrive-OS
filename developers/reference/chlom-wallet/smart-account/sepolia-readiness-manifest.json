@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "manifest_id": "ct.wallet.smart-account.sepolia-readiness.v1",
   "state": "SPECIFIED_NOT_DEPLOYED",
   "phase": "2.99",
@@ -9,30 +9,33 @@
     "name": "Sepolia",
     "chain_id": 11155111,
     "environment": "public_testnet_target",
-    "external_rpc_selected": false
+    "external_rpc_selected": false,
+    "runtime_code_hash_verified": false
   },
   "account_abstraction": {
     "standard": "ERC-4337",
     "reference_release": "v0.9.0",
     "entrypoint_candidate": "0x433709009B8330FDa32311DF1C2AFA402eD8D009",
-    "entrypoint_selection_state": "CONTROLLED_TEST_CANDIDATE_RECONCILED_FROM_RELEASE_AND_CHAIN_OBSERVATION",
+    "entrypoint_selection_state": "CONTROLLED_TEST_CANDIDATE_FROM_UPSTREAM_RELEASE",
     "entrypoint_sources": [
       {
         "type": "upstream_release",
         "url": "https://github.com/eth-infinitism/account-abstraction/releases/tag/v0.9.0",
-        "statement": "v0.9 release identifies EntryPoint 0x433709009B8330FDa32311DF1C2AFA402eD8D009"
+        "statement": "The upstream v0.9 release identifies EntryPoint 0x433709009B8330FDa32311DF1C2AFA402eD8D009."
       },
       {
-        "type": "sepolia_chain_explorer_observation",
-        "url": "https://sepolia.etherscan.io/address/0x433709009b8330fda32311df1c2afa402ed8d009",
-        "statement": "Sepolia currently exposes contract activity at the v0.9 candidate address"
+        "type": "upstream_source",
+        "url": "https://github.com/eth-infinitism/account-abstraction/blob/v0.9.0/contracts/core/EntryPoint.sol",
+        "statement": "The tagged source identifies the v0.9 EIP-712 domain as ERC4337 version 1 and hashes PackedUserOperation through getUserOpHash."
       }
     ],
     "source_discrepancy": {
-      "state": "OPEN_SOURCE_ARTIFACT_MISMATCH",
-      "source": "https://raw.githubusercontent.com/eth-infinitism/account-abstraction/v0.9.0/deployments/ethereum/EntryPoint.json",
-      "observed_address": "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108",
-      "interpretation": "The tag deployment artifact observed during this pass reports the earlier v0.8-style address while the v0.9 release and Sepolia chain observation support the v0.9 candidate. The manifest therefore remains non-deploying and requires direct code-hash verification before any broadcast."
+      "state": "RELEASE_AND_TAG_DEPLOYMENT_ARTIFACT_DIVERGE_RUNTIME_CODEHASH_UNVERIFIED",
+      "tag_deployment_artifact": "https://raw.githubusercontent.com/eth-infinitism/account-abstraction/v0.9.0/deployments/ethereum/EntryPoint.json",
+      "artifact_observed_address": "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108",
+      "release_observed_address": "0x433709009B8330FDa32311DF1C2AFA402eD8D009",
+      "disposition": "HOLD",
+      "interpretation": "The upstream release and tagged deployment artifact do not identify the same address. CHLOM therefore preserves the release address as a non-deploying candidate only and requires direct target-chain runtime-code-hash verification before simulation or broadcast."
     }
   },
   "modularity": {
@@ -44,19 +47,38 @@
     "paymaster_enabled": false
   },
   "webauthn": {
+    "runtime_contract": "developers/reference/chlom-wallet/passkey/runtime-contract.json",
+    "runtime_state": "CONTROLLED_TEST_ACTIVE",
     "registration_profile": "controlled_none_attestation_es256_p256",
     "assertion_profile": "controlled_es256_p256",
+    "verification_library": "@simplewebauthn/server@13.3.2",
+    "database_canary": "PASS_WEBAUTHN_RUNTIME_DB_CANARY",
+    "recovery_state_machine_canary": "PASS_PASSKEY_RECOVERY_CANARY",
+    "authenticated_browser_ceremony_state": "NOT_YET_EXECUTED",
     "production_attestation_policy_selected": false,
     "credential_activation_enabled": false,
-    "recovery_state_machine_required": true
+    "smart_account_binding_enabled": false
   },
   "deployment": {
     "account_implementation_selected": false,
     "factory_selected": false,
     "factory_address": null,
     "account_address": null,
-    "user_operation_built": false,
+    "user_operation_built": true,
+    "user_operation_state": "DETERMINISTIC_UNSIGNED_INTENT_ONLY",
+    "user_operation_reference": "developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs",
+    "user_operation_test_reference": "developers/reference/chlom-wallet/smart-account/test-user-operation-intent.mjs",
+    "solidity_crosscheck_reference": "developers/reference/chlom-wallet/smart-account/user-operation-hash-crosscheck.mjs",
+    "test_vector": {
+      "user_operation_hash": "0xbe377d88646d9fe4b6543d66d3142e76272eaedd63ba5790daf8170c50e0f812",
+      "intent_sha256": "0x63080334e0097834b7d3532e12c69fc8fbfe18230f3b465086b8f212a2a8c8ef",
+      "signature_state": "UNSIGNED",
+      "factory_state": "UNSELECTED",
+      "eip7702_state": "NOT_SUPPORTED",
+      "paymaster_state": "DISABLED"
+    },
     "simulation_completed": false,
+    "simulation_state": "NOT_RUN",
     "broadcast_enabled": false,
     "transaction_hash": null,
     "deployment_receipt": null,
@@ -64,13 +86,15 @@
     "money_movement": false
   },
   "promotion_gates": [
-    "resolve_entrypoint_source_artifact_mismatch_or_verify_runtime_code_hash",
+    "verify_candidate_entrypoint_runtime_code_hash_on_target_chain",
     "select_and_review_account_implementation",
     "select_and_review_factory",
-    "complete_production_webauthn_registration_and_recovery_model",
-    "simulate_user_operation",
-    "independent_security_review",
-    "testnet_signer_and_recovery_authority_receipt",
-    "governed_testnet_broadcast_authorization"
+    "execute_authenticated_browser_webauthn_canary",
+    "complete production_attestation_and_recovery_policy",
+    "build reviewed account_calldata_and_factory_initcode",
+    "complete local_and_public_testnet_user_operation_simulation",
+    "complete independent_security_review",
+    "obtain testnet_signer_and_recovery_authority_receipt",
+    "obtain governed_testnet_broadcast_authorization"
   ]
 }

@@ -22,7 +22,7 @@ jobs:
   kernel:
     name: Validate public-safe wallet kernel
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,6 +49,9 @@ jobs:
           node --check developers/reference/chlom-wallet/passkey/test-webauthn-assertion-verifier.mjs
           node --check developers/reference/chlom-wallet/passkey/webauthn-registration-verifier.mjs
           node --check developers/reference/chlom-wallet/passkey/test-webauthn-registration-verifier.mjs
+          node --check developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs
+          node --check developers/reference/chlom-wallet/smart-account/test-user-operation-intent.mjs
+          node --check developers/reference/chlom-wallet/smart-account/user-operation-hash-crosscheck.mjs
           node --check developers/reference/chlom-wallet/ui/unified-value-receipt.mjs
           node --check developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
           node --check developers/reference/chlom-wallet/ui/wallet-shell.mjs
@@ -70,6 +73,9 @@ jobs:
       - name: Run controlled WebAuthn registration tests
         run: node developers/reference/chlom-wallet/passkey/test-webauthn-registration-verifier.mjs
 
+      - name: Run deterministic ERC-4337 v0.9 unsigned-intent tests
+        run: node developers/reference/chlom-wallet/smart-account/test-user-operation-intent.mjs
+
       - name: Run Unified Value Receipt presentation tests
         run: node developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
 
@@ -79,10 +85,11 @@ jobs:
       - name: Run deterministic contract state-model fuzz
         run: node developers/reference/chlom-wallet/contracts/contract-model-fuzz.mjs
 
-      - name: Validate agent, commerce and readiness JSON
+      - name: Validate agent, commerce, runtime and readiness JSON
         run: |
           python -m json.tool automation/chlom-wallet-settlement-agent.json >/dev/null
           python -m json.tool chlom/chlom-wallet-commercial-catalog.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/passkey/runtime-contract.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json >/dev/null
 
       - name: Enforce reference-contract no-value-movement boundary
@@ -108,22 +115,33 @@ jobs:
             exit 1
           fi
 
-      - name: Enforce smart-account nondeployment boundary
+      - name: Enforce passkey and smart-account nondeployment boundary
         shell: bash
         run: |
           set -euo pipefail
-          if grep -nE 'broadcast:[[:space:]]*true|deploy:[[:space:]]*true|money_movement:[[:space:]]*true' developers/reference/chlom-wallet/passkey/*.mjs; then
-            echo "Controlled-test passkey reference must remain non-deploying and non-broadcasting."
+          if grep -nE 'broadcast:[[:space:]]*true|deploy:[[:space:]]*true|money_movement:[[:space:]]*true' \
+            developers/reference/chlom-wallet/passkey/*.mjs \
+            developers/reference/chlom-wallet/smart-account/*.mjs; then
+            echo "Controlled-test wallet reference crossed its nondeployment boundary."
             exit 1
           fi
           python - <<'PY'
           import json
-          p='developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json'
-          d=json.load(open(p))
-          assert d['state']=='SPECIFIED_NOT_DEPLOYED'
-          assert d['deployment']['broadcast_enabled'] is False
-          assert d['deployment']['money_movement'] is False
-          assert d['deployment']['transaction_hash'] is None
+          runtime=json.load(open('developers/reference/chlom-wallet/passkey/runtime-contract.json'))
+          assert runtime['state']=='CONTROLLED_TEST_ACTIVE'
+          assert runtime['edge_function']['verify_jwt'] is True
+          assert runtime['edge_function']['authenticated_browser_ceremony_state']=='NOT_YET_EXECUTED'
+          assert all(value is False for value in runtime['hard_boundaries'].values())
+
+          readiness=json.load(open('developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json'))
+          assert readiness['state']=='SPECIFIED_NOT_DEPLOYED'
+          assert readiness['chain']['runtime_code_hash_verified'] is False
+          assert readiness['deployment']['user_operation_state']=='DETERMINISTIC_UNSIGNED_INTENT_ONLY'
+          assert readiness['deployment']['simulation_completed'] is False
+          assert readiness['deployment']['broadcast_enabled'] is False
+          assert readiness['deployment']['money_movement'] is False
+          assert readiness['deployment']['transaction_hash'] is None
+          assert readiness['account_abstraction']['source_discrepancy']['disposition']=='HOLD'
           PY
 
       - name: Enforce wallet-shell public projection boundary
@@ -138,7 +156,7 @@ jobs:
       - name: Record boundary
         run: |
           echo "CONTROLLED_TEST: webhook tests use synthetic signing material and do not register a live Stripe endpoint."
-          echo "CONTROLLED_TEST: WebAuthn tests use synthetic P-256 credentials; registration accepts only the none-attestation profile and makes no authenticator trust claim."
-          echo "CONTROLLED_TEST: passkey/smart-account code remains non-deploying and non-broadcasting."
+          echo "CONTROLLED_TEST: WebAuthn source tests use synthetic P-256 credentials; deployed runtime activation remains disabled."
+          echo "CONTROLLED_TEST: ERC-4337 v0.9 output is an unsigned deterministic intent; simulation and broadcast remain disabled."
           echo "CONTROLLED_TEST: contract-model fuzz is source-aligned state-model testing, not an audit."
-          echo "CONTROLLED_TEST: no mainnet deployment, custody, money movement, or entitlement inference is certified by this workflow."
+          echo "CONTROLLED_TEST: no testnet/mainnet deployment, custody, money movement, or entitlement inference is certified by this workflow."

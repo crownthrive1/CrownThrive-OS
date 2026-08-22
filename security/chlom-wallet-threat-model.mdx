@@ -1,7 +1,7 @@
 ---
 title: "CHLOM Wallet Threat Model"
 sidebarTitle: "CHLOM Wallet Security"
-description: "Public-safe threat model and release controls for CHLOM Wallet OS, Stripe translation, WebAuthn/passkeys, smart-account adapters, chain anchoring, recovery and ThriveFund obligations."
+description: "Public-safe threat model and release controls for CHLOM Wallet OS, Stripe translation, WebAuthn runtime, smart-account intents, chain anchoring, recovery and ThriveFund obligations."
 icon: "shield-check"
 ---
 
@@ -18,12 +18,12 @@ icon: "shield-check"
 - economic schedules;
 - ThriveFund obligations;
 - wallet/account bindings;
-- WebAuthn credential public-key bindings and recovery metadata;
-- signing-key references;
+- WebAuthn challenge, credential and recovery metadata;
+- signing-key references and recovery authority;
 - provider webhook authenticity;
 - event-chain integrity;
 - smart-contract admin/operator authority;
-- EntryPoint/factory/module identity;
+- unsigned and signed UserOperation snapshots;
 - proof/anchor integrity;
 - user privacy and account-recovery channels.
 
@@ -31,32 +31,55 @@ icon: "shield-check"
 
 | Threat | Example | Required control |
 | --- | --- | --- |
-| Replay | duplicate Stripe/provider event | provider-event uniqueness + idempotency key |
+| Replay | duplicate provider event or reused passkey challenge | uniqueness, idempotency and atomic one-time consumption |
 | Event forgery | unsigned webhook or fake chain receipt | provider signature / chain verification before translation |
+| Credential forgery | fabricated WebAuthn response | challenge, origin, RP hash, UP/UV, public-key signature and counter verification |
+| Credential lookup disclosure | raw credential ID leaked across systems | nonreversible RP-bound lookup and commitment digests |
+| Counter rollback | cloned authenticator reuses an older counter | monotonic counter enforcement when the authenticator supports counters |
+| Recovery takeover | weak reset channel replaces a credential | identity review, cooldown, step-up, independent approval and append-only receipts |
 | Ledger tampering | editing prior wallet event | append-only controls + hash chaining + correction event |
 | Amount drift | provider amount differs from offer/schedule | mismatch HOLD; no entitlement issuance |
 | Rights confusion | payment treated as license | independent CHLOM entitlement decision |
 | Privilege escalation | read token calls mutation | least-privilege scopes + deny-by-default + independent review |
 | Key compromise | exposed signer/recovery secret | no secret in source/logs; Vault/HSM/hardware/multisig path where approved |
-| Challenge replay | reused passkey challenge | one-time challenge digest + expiry + RP/origin binding |
-| RP/origin confusion | credential used for wrong origin | exact HTTPS origin + RP ID + RP-ID-hash validation |
-| WebAuthn downgrade | unexpected attestation/algorithm accepted | explicit attestation/COSE allowlists; unsupported profile HOLD |
-| Counter false certainty | zero counter treated as clone proof or absence | policy distinguishes zero/not-supported from monotonic counter evidence |
-| Recovery takeover | weak reset channel | identity review + cooldown + independent approval + step-up + append-only case |
-| Smart-account module abuse | malicious delegated module | module allowlist/review, explicit user consent, reversible test deployment |
-| EntryPoint confusion | wrong version/address/code selected | versioned singleton record + release evidence + chain code-hash verification before broadcast |
-| Source artifact conflict | upstream release and deployment file disagree | explicit contradiction record; no silent source selection; broadcast HOLD |
+| Smart-account module abuse | malicious delegated module | module allowlist/review, explicit scope, revocation and simulation |
+| UserOperation substitution | signed fields differ from reviewed intent | immutable exact-snapshot digest and signer-visible policy confirmation |
+| EntryPoint spoofing | wrong contract at a familiar address | chain ID + address + runtime code-hash verification |
+| Bundler simulation drift | bundler accepts a different state/operation | exact UserOperation hash, multi-provider simulation and bounded validity window |
+| Paymaster abuse | sponsorship policy changes signed economics | paymaster disabled by default; separate policy and signature validation |
 | Contract admin capture | one compromised operator | pause, role separation, multisig/timelock candidates for production |
 | Chain reorg | anchor observed before finality | finality policy + reorg correction state |
 | Provider outage | Stripe/chain unavailable | durable CHLOM record, queue/retry, degraded mode, provider exit path |
-| Privacy leak | raw agreement/evidence on-chain | hash/root only; private evidence remains off-chain |
+| Privacy leak | raw agreement/evidence on-chain | hash/root only; protected evidence remains off-chain |
 | Economic rule drift | old split schedule reused | exact version/effective-period binding |
 | False impact claim | obligation presented as disbursed | calculated/approved/settled/evidence states remain separate |
-| Supply-chain compromise | malicious package/action | pinned dependencies, reproducible manifests, provenance, independent code review |
+| Supply-chain compromise | malicious package/action | pinned dependencies, provenance, SBOM and independent code review |
+
+## WebAuthn runtime boundary
+
+The controlled runtime uses a JWT-protected service with exact origin and RP ID binding. Its private data plane stores challenge digests, public credential material and append-only receipts—not private keys.
+
+Required controls include:
+
+- random, purpose-bound, expiring challenges;
+- SHA-256 challenge digest persistence rather than raw challenge persistence;
+- subject and stable-wallet binding;
+- exact `https://wallet.crownthrive.com` origin and `crownthrive.com` RP ID;
+- registration restricted to controlled `none` attestation and ES256/P-256;
+- user presence and user verification;
+- nonreversible credential lookup and commitment digests;
+- public COSE key persistence only;
+- counter rollback detection where counters are supported;
+- append-only verification receipts;
+- bounded failure attempts and challenge cancellation;
+- separate recovery state machine;
+- production credential activation disabled until independent review.
+
+The `none` attestation profile does not establish authenticator provenance. A later production policy must explicitly choose whether and where stronger attestation trust is required.
 
 ## Key and custody boundary
 
-The default wallet posture is **non-custodial**. The system stores references to approved secret-management locations, never public signing-key material.
+The default wallet posture is **non-custodial**. The system stores references to approved secret-management locations, never public private-key material.
 
 Any later CrownThrive-controlled custody or treasury signing requires a separate legal/security architecture that answers:
 
@@ -72,88 +95,81 @@ Any later CrownThrive-controlled custody or treasury signing requires a separate
 - insurance/accounting implications;
 - independent audit.
 
-No historical token/multisig proposal satisfies this production gate by itself.
+No historical token or multisig proposal satisfies this production gate by itself.
 
-## Passkey and WebAuthn boundary
+## UserOperation and EntryPoint boundary
 
-Passkeys are preferred as a user-experience direction because they can remove seed-phrase ceremony while retaining explicit user authorization. Smart-account functionality should use reviewed account-abstraction patterns rather than custom cryptography.
+The ERC-4337 v0.9 reference builder currently emits an unsigned intent only. It rejects nonempty factory init code, paymaster data and signatures, and it marks opaque call data HOLD.
 
-The controlled-test WebAuthn profile now separates **registration**, **assertion**, **recovery**, and **smart-account binding** instead of collapsing them into a generic “passkey supported” claim.
+Before any signature or simulation, require:
 
-Registration currently permits only the controlled `none` attestation profile with ES256/P-256 credential keys. `none` attestation verifies the registration structure and credential key binding but deliberately makes no authenticator-manufacturer/trust claim. A future production attestation policy must be separately selected.
+- exact chain ID and EntryPoint address;
+- independently verified EntryPoint runtime code hash;
+- reviewed account implementation and factory;
+- reviewed call-data semantics;
+- exact nonce, gas and fee bounds;
+- immutable intent and policy digests;
+- signer-visible scope;
+- simulation against the exact chain snapshot;
+- expiry/validity window;
+- replay and replacement policy;
+- recovery authority state;
+- bundler/provider diversity where material.
 
-Assertion verification binds challenge, client-data type, HTTPS origin, RP-ID hash, user-presence/user-verification flags, signature, credential public key and counter policy. Zero/non-incrementing authenticator counters require careful interpretation; zero is not automatically evidence of compromise and is not presented as proof that cloning is impossible.
-
-Recovery is a separate state machine. A replacement credential must not become active merely because an email, support case or device claims the prior passkey was lost.
-
-## Smart-account / EntryPoint boundary
-
-The current research baseline is ERC-4337 v0.9.0 with a Sepolia EntryPoint candidate recorded in the non-broadcast manifest. The pass found an upstream-source discrepancy: the v0.9 release identifies one address while a v0.9-tag deployment artifact observed during the same pass reports the earlier v0.8-style address.
-
-The conflict remains visible. Before any UserOperation simulation/broadcast, CHLOM requires direct chain/runtime-code identity verification for the selected EntryPoint plus exact version/source binding. Explorer presence alone is useful evidence but does not remove the code-identity gate.
-
-Account implementation, factory, recovery modules, session modules, paymaster and spending modules remain unselected/disabled. ERC-7579 interface compatibility alone does not make a module safe.
-
-Delegated modules are high-risk code. A wallet must not ask a user to authorize arbitrary delegation without showing what code/module is being authorized, what it can execute, how it is revoked and how recovery works.
+The upstream v0.9 release and tagged deployment artifact currently identify different EntryPoint addresses. CHLOM remains HOLD until runtime code identity is independently reconciled.
 
 ## Stripe security boundary
 
 A production webhook receiver must verify Stripe signatures using a secret held outside source control. The received payload should be reduced into the minimum required private receipt plus a digest, then translated into CHLOM state exactly once.
 
-Customer-facing fulfillment remains a separate idempotent operation. A forged, duplicated, delayed or out-of-order provider event must not create duplicate entitlements or deliveries.
-
-The current controlled adapter has demonstrated exact replay rejection and preservation of provider occurrence time across a deliberately out-of-order subscription/refund/dispute sequence. Live provider registration remains disabled.
+Customer-facing fulfillment remains a separate idempotent operation. A forged, duplicated or delayed provider event must not create duplicate entitlements or deliveries.
 
 ## Smart-contract security boundary
 
-The initial public reference contracts deliberately avoid custody and transfers. Before any value-moving or public testnet/mainnet contract is authorized, require:
+The initial public reference contracts deliberately avoid custody and transfers. Before any value-moving or mainnet contract is deployed, require:
 
 - compiler/toolchain pinning;
-- reproducible artifact manifest;
+- reproducible build artifact;
 - static analysis;
 - unit/fuzz/invariant tests;
 - privilege and pause-path tests;
 - storage/upgrade policy review;
 - external or independent audit appropriate to value at risk;
-- governed public-testnet canary;
-- admin/multisig/timelock proof where applicable;
-- deployment/runtime code digest and verified source;
+- testnet canary;
+- admin/multisig/timelock proof;
+- deployment digest and verified source;
 - rollback/incident plan.
 
-Current reference Solidity has passed exact compiler, deterministic state-model fuzz and isolated local-EVM execution. Those are meaningful engineering gates, not an audit or public-chain authorization.
+Current reference Solidity sources are construction candidates, not audited production code.
 
 ## Required invariants
 
 1. `sum(allocation legs) == gross amount`.
 2. One provider event cannot create two accepted provider receipts.
 3. One wallet idempotency key cannot create two wallet events.
-4. Prior wallet events cannot be updated or deleted through the normal application path.
+4. Prior wallet events and WebAuthn verification receipts cannot be updated or deleted through the normal application path.
 5. Every wallet event after genesis references the prior chain hash.
 6. Payment success cannot independently grant a right.
 7. ThriveFund calculated obligation cannot be represented as externally settled without settlement evidence.
 8. Public-chain proof never contains the protected evidence body.
 9. Provider and chain adapters cannot silently change economic schedules.
 10. An originating agent cannot be the independent final verifier of its material wallet release.
-11. A WebAuthn challenge is single-use, time-bounded and RP/origin-bound.
-12. A replacement passkey cannot skip the governed recovery path.
-13. Smart-account broadcast stays disabled until EntryPoint/account/factory/runtime-code identities and signer authority are resolved.
-14. A reproducible compile or local-EVM PASS cannot be promoted to “audited” or “deployed.”
+11. A passkey challenge is usable once and only by its bound subject, purpose, RP ID and origin.
+12. A verified credential binding contains public verification material but no private key.
+13. A supported signature counter cannot decrease or repeat.
+14. Recovery cannot skip identity-review, cooldown and approval states.
+15. A UserOperation intent cannot become signed, simulated or broadcast without a new governed state transition.
+16. EntryPoint address alone is insufficient; runtime code identity must match the approved version.
 
-## Current controlled-test evidence
+## Controlled-test evidence
 
-Current evidence includes:
+- database wallet foundation: `1,000` allocation cases, `500` chained events and `500` exact replays;
+- public-safe wallet kernel: `10,000` allocation cases and `2,000` unique chained events;
+- contract state-model fuzz: `25,000` operations;
+- local no-value registry EVM suite: four deployed contracts and `15` expected reverts;
+- WebAuthn source tests: controlled registration and cryptographic assertion verification;
+- WebAuthn private database canary: registration, assertion, counter advancement and duplicate replay;
+- recovery canary: governed state path with illegal skip rejection;
+- ERC-4337 intent: deterministic v0.9 unsigned hash envelope and Solidity cross-check.
 
-- `10,000` allocation conservation cases and `2,000` chained public-kernel events;
-- Stripe-format raw-body signature/timestamp/tamper tests;
-- exact provider replay and out-of-order lifecycle canaries;
-- independent payment-versus-rights and Unified Value Receipt canary;
-- one-time passkey challenge replay/origin canary;
-- ES256/P-256 WebAuthn assertion cryptographic tests;
-- controlled WebAuthn registration CBOR/COSE tests once the current branch validator passes;
-- passkey recovery-state canary;
-- `25,000` source-aligned contract state-model operations;
-- four no-value contracts executed on an isolated local EVM with expected revert paths;
-- synthetic provider-exit drill with zero provider writes;
-- controlled commercial canary with zero Stripe commerce objects and zero money movement.
-
-These tests prove the tested invariants only. They do not certify production custody, live payment acceptance, authenticator attestation trust, smart-account deployment, public-chain operation or legal/regulatory sufficiency.
+These tests prove only their tested invariants. They do not certify production custody, payment acceptance, public-testnet operation, authenticator provenance, wallet recovery readiness, smart-account security, EntryPoint code identity or mainnet operation.
