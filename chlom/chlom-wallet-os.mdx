@@ -1,0 +1,283 @@
+---
+title: "CHLOM Wallet OS"
+sidebarTitle: "CHLOM Wallet OS"
+description: "Public-safe architecture, operating boundaries, provider model, value classes, ThriveFund integration, monetization and release gates for CHLOM Wallet OS."
+icon: "wallet"
+---
+
+# CHLOM Wallet OS
+
+CHLOM Wallet OS is the proposed wallet and value-translation surface for the CrownThrive ecosystem. The product goal is a **simple user experience over a governed multi-rail backend**.
+
+The current implementation state is `CONTROLLED_TEST`. This page is not a claim of custody, live cryptocurrency support, token issuance, mainnet deployment, production settlement or Phase 3 entry.
+
+## Product thesis
+
+The wallet should feel like one coherent product even when the institution uses multiple providers, databases, networks and rights systems underneath it.
+
+```text
+                     CHLOM WALLET
+
+              Money   Rights   Rewards   Impact
+                │       │        │        │
+                └───────┴────────┴────────┘
+                         │
+                  CHLOM policy layer
+                         │
+      ┌──────────────────┼──────────────────┐
+      │                  │                  │
+ Fiat/payment rail   Rights/value rail   Proof/chain rail
+      │                  │                  │
+ Stripe adapter      DLA/entitlements    Optional anchors
+ Banks/providers     Rewards/splits      Smart contracts
+      │                  │                  │
+      └────────────── DAIL / Records ───────┘
+                         │
+                   Reconciliation
+```
+
+The user should not need to understand which provider produced a payment receipt, which chain holds a proof, which license record controls a right or which internal service calculated an allocation. CHLOM resolves those systems into one governed view without pretending they are the same thing.
+
+## Four user-facing value classes
+
+### Money
+
+Fiat payment and settlement state. Stripe is the initial CrownThrive fiat/payment adapter, not the permanent institutional ledger and not the ownership authority.
+
+Money states must distinguish at least:
+
+`initiated → provider_pending → provider_succeeded → reconciled → allocated → externally_settled`
+
+Refund, dispute, reversal, hold and correction branches remain explicit.
+
+### Rights
+
+Rights, licenses, entitlements, permitted uses, expirations and revocations. A Rights entry points to authoritative CHLOM rights/DLA/entitlement records. It is not created merely because a payment succeeded.
+
+### Rewards
+
+CrownRewards and other approved loyalty/incentive value classes. Rewards remain separately classified from cash, equity, securities, ownership and transferable crypto unless a later governed record explicitly changes that classification.
+
+### Impact
+
+Approved ThriveFund/CII obligations, evidence and settlement state. Impact is represented as a governed allocation/obligation class, not an investment account or charitable/nonprofit claim by inference.
+
+## Hybrid Stripe + CHLOM model
+
+The first commercialization path uses Stripe to charge CrownThrive's own customers for CHLOM software/capability access. The accepted integration direction is:
+
+- web-first;
+- embedded checkout experience where practical;
+- simple flat-rate subscription products initially;
+- pay up front;
+- Stripe Customer Portal for subscription lifecycle;
+- Stripe revenue-recovery controls;
+- webhook-driven reconciliation into CHLOM;
+- no Connect marketplace/payout assumption in the first release.
+
+A future Connect, creator/seller payout or cross-border flow is a separate architecture and liability gate.
+
+The governing translation is:
+
+```text
+Stripe provider event
+        ↓
+signature + provider-state verification
+        ↓
+idempotent provider receipt
+        ↓
+CHLOM policy evaluation
+        ↓
+append-only CHLOM value event
+        ↓
+rights / entitlement / allocation evaluation
+        ↓
+fulfillment or HOLD
+        ↓
+reconciliation evidence
+```
+
+No provider event bypasses CHLOM policy or entitlement checks.
+
+## Wallet identity and account model
+
+CHLOM Wallet OS treats a wallet as an institutional container that may bind several account types:
+
+- internal CHLOM ledger identity;
+- fiat/payment provider customer/account reference;
+- externally controlled blockchain address;
+- smart-account address;
+- institutional multisig candidate;
+- service account where strictly necessary.
+
+Network and account references should use chain-agnostic identifiers where adopted. Private keys and seed phrases are never stored in public documentation. Secret-manager references are distinct from secret values.
+
+## Passkey and smart-account direction
+
+The intended consumer UX is passwordless/passkey-friendly and hides blockchain ceremony where safely possible. Smart-account support should be modular rather than hard-bound to one vendor. The design target is compatible with modern account-abstraction and modular-account patterns while preserving independent security review and explicit recovery behavior.
+
+This is a target architecture. No production passkey-controlled smart account is claimed by this page.
+
+## Append-only wallet record
+
+The controlled-test runtime uses append-only wallet events with:
+
+- stable wallet ID;
+- monotonic per-wallet sequence;
+- event type;
+- optional asset and amount;
+- provider reference;
+- schedule/entitlement references;
+- correlation ID;
+- idempotency key;
+- occurrence and record timestamps;
+- payload digest;
+- previous chain hash;
+- current chain hash.
+
+The purpose is evidence, reconciliation and correction lineage. It is not a substitute for a bank ledger, blockchain consensus or qualified accounting system.
+
+## Economic schedules and allocation engine
+
+Economic meaning is versioned independently from payment execution.
+
+A schedule can define approved legs such as:
+
+- CrownThrive operating share;
+- creator/rightsholder obligation;
+- affiliate/ambassador obligation;
+- partner obligation;
+- platform/service fee;
+- reserve;
+- ThriveFund/CII obligation;
+- tax/other governed hold.
+
+The controlled-test allocation function requires basis points to total exactly `10,000` and preserves the gross amount down to the minor currency unit by deterministically assigning rounding remainder to the final leg. It calculates obligations; it does not move money.
+
+Historical split percentages are not revived by this architecture. Current percentages require their own approved economic schedule.
+
+## ThriveFund mechanism
+
+The initial ThriveFund mechanism is an **obligation router**, not an autonomous treasury.
+
+```text
+qualified economic trigger
+        ↓
+approved schedule version
+        ↓
+calculate ThriveFund obligation
+        ↓
+record source + amount + program + authority
+        ↓
+HOLD / approval / external settlement
+        ↓
+receipt + impact evidence
+        ↓
+public-safe claim, if separately approved
+```
+
+This preserves a later pathway to more advanced smart-treasury automation without letting research-stage treasury, yield, DAO or token ideas become production claims.
+
+## Cryptographic proof and optional chain layer
+
+CHLOM can cryptographically anchor evidence without publishing private evidence.
+
+The target proof pattern is:
+
+```text
+private institutional records
+        ↓
+deterministic digests
+        ↓
+batch/root digest
+        ↓
+optional approved network anchor
+        ↓
+transaction reference stored in CHLOM
+```
+
+Public chains should receive proofs/digests, not private agreement bodies, credentials, payment secrets or personal evidence.
+
+Blockchain remains an adapter, not a mandatory dependency. If an approved chain is unavailable, the authoritative CHLOM record must remain recoverable and auditable.
+
+## Smart-contract families
+
+The controlled-test contract roadmap is intentionally narrower than historic token proposals:
+
+1. **Proof Anchor Registry** — anchors approved batch/root digests.
+2. **Entitlement Attestation Registry** — records/revokes entitlement digests without replacing the governing agreement.
+3. **Split Policy Registry** — commits versioned economic-policy fingerprints without executing payout.
+4. **ThriveFund Obligation Registry** — records approved obligation proofs without claiming custody.
+5. **Smart Account Adapter** — later modular wallet/account-abstraction adapter after security review.
+6. **Settlement Adapter** — later provider/chain settlement translation; no unilateral money movement.
+
+Token issuance is not required for any of these capabilities.
+
+## Proprietary differentiation
+
+The moat is not a custom coin. The moat is the **translation layer** that can make rights, money, rewards, impact, entitlement, provenance, policy, evidence and optional blockchain proofs behave as one understandable product.
+
+Candidate protected mechanisms include:
+
+- value-class translation and normalization;
+- rights-aware payment fulfillment;
+- economic-schedule resolver;
+- obligation-versus-settlement state machine;
+- provider/chain reconciliation scoring;
+- proof batching and disclosure minimization;
+- policy-aware wallet routing;
+- cross-corridor entitlement projection;
+- ThriveFund evidence routing;
+- recovery and provider-exit mapping.
+
+Public documentation states capabilities and invariants. Protected calibration, risk weights, anti-fraud heuristics, private policy logic and security topology remain restricted.
+
+## Commercial product family
+
+The architecture supports a staged commercial family:
+
+| Product | Customer | Model | Current state |
+| --- | --- | --- | --- |
+| CHLOM Wallet | CrownThrive users/members | included or plan-entitled | controlled-test |
+| CHLOM WalletKit | developers/partners | recurring SaaS | candidate |
+| Rights Wallet API | media/creators/institutions | SaaS + usage | candidate |
+| Proof Receipt API | developers/compliance workflows | usage/metered later | candidate |
+| Split & Settlement Ledger | platforms/marketplaces | SaaS + usage | candidate |
+| ThriveFund Router | approved ecosystem programs | institutional | candidate |
+| White-label Wallet OS | enterprise/licensees | negotiated license + service | candidate |
+
+No exact live price is authorized by this document. Stripe Product/Price/Checkout activation remains separate from product definition.
+
+## Foundation test evidence
+
+The restricted controlled-test foundation passed:
+
+- `1,000` deterministic allocation conservation cases;
+- `500` sequential append-only wallet events;
+- `500` exact idempotent replay attempts;
+- zero chain-link breaks in the canary;
+- fail-closed rejection of an invalid allocation schedule;
+- fail-closed rejection of direct ledger tampering.
+
+Synthetic stress data was rolled back. A durable controlled-test system record preserves the foundation evidence without storing customer funds or credentials.
+
+## Release gates
+
+Before any production wallet or mainnet release, require at minimum:
+
+- Phase authority and exact artifact acceptance;
+- security threat model and independent adversarial review;
+- key/recovery design and compromise drills;
+- privacy/data classification review;
+- economic schedule authority;
+- payment/refund/dispute reconciliation tests;
+- rights/entitlement/fulfillment canary;
+- tax/legal/regulatory review for the actual transaction model;
+- smart-contract test/audit evidence where applicable;
+- chain/provider exit and degraded-mode test;
+- incident pause/kill switch;
+- backup/restore proof;
+- accessibility and customer-support readiness;
+- no-secret/public-disclosure scan.
+
+Until those gates are met, CHLOM Wallet OS remains a controlled-test institutional capability.
