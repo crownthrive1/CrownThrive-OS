@@ -17,7 +17,7 @@ api_base: https://crownlytics.com/api
 auth_scheme: bearer_api_key
 timezone: UTC
 credential_continuity: verified_dual_reference
-runtime_authentication: open_pending_bounded_read
+runtime_authentication: read_verified_user_and_websites
 provider_writes: closed
 local_monthly_ceiling: 0
 local_budget_meaning: unlimited CrownThrive local ceiling
@@ -40,9 +40,9 @@ No credential value, private fingerprint, Vault mapping or immutable archive map
 
 ## Runtime boundary
 
-The JWT/admin-protected CrownLytics control adapter remains fail-closed for provider dispatch until one bounded authenticated read passes. The read must prove the expected account/tenant context, exact endpoint, response schema, timeout behavior and least-data projection.
+The JWT/admin-protected CrownLytics control adapter completed bounded authenticated `GET /user` and `GET /websites` certification using the Vault-held credential. Both calls returned HTTP 200 application/json. Only status, media/schema shape, bounded byte counts and response digests were retained; the credential and raw provider bodies were not returned.
 
-Credential custody is not runtime authentication. Runtime authentication is not provider-write authority.
+Credential custody and runtime read authentication are now separately verified. Runtime authentication is still not provider-write authority.
 
 ## Sensitive analytics data
 
@@ -67,4 +67,4 @@ A successful bounded write canary applies only to that operation and does not cr
 
 ## Next certification action
 
-Run one bounded authenticated read through the governed adapter. Preserve the provider credential as a persistent server-side credential unless the founder authorizes a change or the provider invalidates it.
+Expand exact read contracts only through bounded least-data certification. General provider writes remain closed until a separately authorized operation-specific canary proves idempotency, rollback, read-after-write and audit behavior. Preserve the provider credential as a persistent server-side credential unless the founder authorizes a change or the provider invalidates it.
