@@ -1,0 +1,74 @@
+---
+title: "Phase 2.99 — cPanel/WHM Hosting Control Integration"
+sidebarTitle: "2.99 cPanel / WHM"
+description: "Phase 2.99 implementation record for CrownThrive's WHM API 1 connection, Vault credential custody, THIVEBASE capacity evidence, read-only adapter and hosting-account reconciliation gates."
+icon: "server"
+keywords: ["Phase 2.99", "cPanel", "WHM", "WHM API 1", "Supabase Vault", "THIVEBASE", "hosting", "credentials"]
+---
+
+# Phase 2.99 — cPanel/WHM Hosting Control Integration
+
+## Run result
+
+```yaml
+phase: 2.99
+workstream: infrastructure_provider_reconciliation
+service_id: ct.service.hosting.whm
+credential_id: ct.credential.cpanel-whm.thrivebase
+adapter_id: ct.adapter.cpanel-whm.api1.v1
+source_refs:
+  - S111
+  - S112
+vault_binding: pass
+credential_recovery_reference: pass
+credential_version_custody: pass
+authenticated_account_inventory_read: pass
+authenticated_system_load_read: pass
+authenticated_hostname_read: pass
+adapter_deployment: pass
+provider_write_gate: closed
+phase_2_99_hard_exit: not_met
+phase_3_entry: blocked_pending_phase_2_99_hard_exit
+```
+
+## What changed
+
+Founder-supplied WHM administrator evidence and a newly created provider token were converted into a governed infrastructure integration instead of remaining chat-only credential material.
+
+The credential is now stored only as restricted Vault material with a CHLOM-managed recovery reference and version-custody record. An authenticated WHM API 1 read confirmed **44 cPanel accounts**, including **8 suspended** at the certification snapshot. Independent read calls also verified current system-load telemetry and resolved the provider hostname. The raw credential is not reproduced in documentation, source control, logs or evidence summaries.
+
+A JWT-protected `cpanel-whm-api-control` Edge Function was deployed as the institutional adapter. It exposes an allowlisted D0 read surface and keeps provider mutations disabled.
+
+## THIVEBASE and evidence state
+
+THIVEBASE now treats cPanel/WHM as an active infrastructure provider. Capacity records include the current account-count/suspension-count observations and current load samples. The hosting-control data model also adds private snapshot/observation structures and evidence hashes so later agents can reconcile hosting state without copying security-sensitive provider payloads into public knowledge.
+
+The current suspension count is a **WATCH/reconciliation signal**, not an automatic remediation order. Several suspended accounts may correspond to intentional reserve/sunset assets. Asset lifecycle evidence controls whether a suspension is expected, stale or an incident.
+
+## Explicit boundaries
+
+- provider token existence does not grant blanket CrownThrive mutation authority;
+- provider-native ACL/privilege detail remains unverified;
+- cPanel account presence does not prove registrar custody, DNS/TLS, application health or canonical deployment;
+- current load averages are not classified as overload until CPU/core and resource capacity are verified;
+- exact account rows, contact information, IP assignments, raw provider responses and credentials remain restricted;
+- no account/package/DNS/service/token/server mutation was performed in this run.
+
+## Remaining gates
+
+1. verify provider-native token ACL/expiry/revocation state without disclosing the token;
+2. certify bounded disk-usage read and establish CPU/core, memory and storage capacity baselines;
+3. reconcile the eight suspended accounts against canonical asset lifecycle state;
+4. certify backup/restore/export/provider-exit procedures;
+5. map hosting evidence to domain/DNS/TLS/mail/application deployments as separate authorities;
+6. define monitoring cadence, thresholds, alert routing and rollback before any autonomous remediation;
+7. preserve the provider-write gate until an explicit governed action class authorizes a specific mutation.
+
+## Downstream propagation
+
+- **Phase 3:** WHM becomes an executable infrastructure-provider seed with credential/reference/endpoint/account-observation records.
+- **Phase 4:** platform deployment certification can consume WHM account evidence but must independently prove DNS/TLS and application/runtime health.
+- **Phase 8:** portfolio infrastructure and capacity management gains provider-backed account/dependency evidence without inflating platform counts.
+- **Phase 10:** continuity inherits credential rotation/revocation, backup/export, DNS/mail dependencies and provider-exit requirements.
+
+No downstream gate is widened.

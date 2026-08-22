@@ -177,6 +177,43 @@ Endpoint evidence:
 
 No documentation or source record authorizes enabling the closed write routes. Public docs omit raw credentials, fingerprints, secret paths and restricted failure evidence.
 
+## cPanel / WHM hosting control plane
+
+```yaml
+service_id: ct.service.hosting.whm
+api_id: ct.api.cpanel-whm.api1
+adapter_id: ct.adapter.cpanel-whm.api1.v1
+provider: cPanel_and_WHM
+runtime_base_url: restricted_operator_configuration
+auth_scheme: whm_api_token_header
+credential_ref: restricted_vault_reference
+credential_state: verified_dual_reference
+adapter_state: deployed_read_only
+provider_writes_enabled: false
+source_refs:
+  - S111
+  - S112
+state:
+  accounts_list: auth_verified
+  system_load: auth_verified
+  server_hostname: auth_verified
+  disk_usage: docs_verified_bounded_read_pending
+  provider_native_token_acl: unverified
+```
+
+The WHM API 1 connection is now authenticated from server-side Vault custody. The current certification snapshot returned **44 cPanel accounts**, including **8 suspended**, and separately verified system-load and hostname reads. Exact account rows, management endpoints, provider-host details, contact data and credentials remain restricted rather than being projected into public documentation.
+
+| Method | Provider operation | Institutional state | Mutation |
+| --- | --- | --- | --- |
+| `GET` | account inventory | authenticated read verified | no |
+| `GET` | system load | authenticated read verified | no |
+| `GET` | server hostname | authenticated read verified | no |
+| `GET` | disk usage | provider contract documented; bounded certification pending | no |
+
+The deployed adapter is JWT-protected and allowlisted. Provider-native token permissions may be broader than the adapter; that fact does not authorize any account, package, DNS, service, server or token mutation. Hosting-account evidence remains separate from registrar, DNS/TLS, application-health and source/deployment authority.
+
+See [cPanel / WHM Hosting Control Plane](/technology/cpanel-whm-hosting-control-plane).
+
 ## Virality Music
 
 ```yaml
