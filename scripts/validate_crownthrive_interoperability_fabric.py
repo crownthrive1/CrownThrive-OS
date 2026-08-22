@@ -221,14 +221,24 @@ def validate_tools(tools: dict[str, Any]) -> None:
 
 def validate_text_files() -> None:
     paths = [README_PATH, DOC_PATH, AGENTS_PATH, CHANGELOG_PATH]
+    combined: list[str] = []
     for path in paths:
         if not path.exists():
             raise AssertionError(f"Missing public-safe text artifact: {path.relative_to(ROOT)}")
         text = path.read_text(encoding="utf-8")
+        combined.append(text)
         assert "CONTROLLED TEST" in text.upper() or "controlled test" in text.lower()
-        assert "not submitted" in text.lower()
-        assert "provider write" in text.lower()
         assert "D3" in text
+        assert "vote" in text.lower()
+        assert "credential" in text.lower()
+        assert "history" in text.lower() or "delete" in text.lower()
+
+    corpus = "\n".join(combined).lower()
+    assert "not submitted" in corpus
+    assert "provider write" in corpus
+    assert "checkout" in corpus
+    assert "authenticated external" in corpus
+    assert "no new external scheduler slot" in corpus or "zero new external" in corpus
 
 
 def validate_no_secret_patterns() -> None:
