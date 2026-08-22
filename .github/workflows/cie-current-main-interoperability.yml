@@ -5,9 +5,11 @@ on:
     paths:
       - "developers/contracts/cie-*.json"
       - "developers/manifests/cie-current-main-interoperability.v1.json"
+      - "developers/manifests/cie-agent-machine-commercialization.v1.json"
       - "doctrine/cultural-imprint-engine.mdx"
       - "changelog/phase-2-99-cie-current-main-interoperability.mdx"
       - "scripts/validate_cie_current_main_interoperability.py"
+      - "scripts/validate_cie_agent_machine_public.py"
   workflow_dispatch:
 
 permissions:
@@ -25,6 +27,8 @@ jobs:
           python-version: "3.13"
       - name: Validate bounded CIE packet
         run: python3 scripts/validate_cie_current_main_interoperability.py
+      - name: Validate public-safe CIE agent machine
+        run: python3 scripts/validate_cie_agent_machine_public.py
       - name: Fail closed if canonical main moved
         shell: bash
         run: |
@@ -32,5 +36,7 @@ jobs:
           expected=$(python3 -c 'import json; print(json.load(open("developers/manifests/cie-current-main-interoperability.v1.json"))["canonical_main_observed"])')
           observed=$(git rev-parse origin/main)
           test "$observed" = "$expected" || { echo "ERROR: current main moved: $observed != $expected"; exit 1; }
-      - name: Compile validator
-        run: python3 -m py_compile scripts/validate_cie_current_main_interoperability.py
+      - name: Compile validators
+        run: |
+          python3 -m py_compile scripts/validate_cie_current_main_interoperability.py
+          python3 -m py_compile scripts/validate_cie_agent_machine_public.py
