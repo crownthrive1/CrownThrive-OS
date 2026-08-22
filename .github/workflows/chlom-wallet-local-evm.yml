@@ -1,0 +1,57 @@
+name: CHLOM Wallet Local EVM
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/contracts/**"
+      - ".github/workflows/chlom-wallet-local-evm.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-local-evm-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  execute:
+    name: Execute wallet registries on isolated local EVM
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install exact local-EVM test packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-save --no-package-lock \
+            solc@0.8.36 \
+            ethers@6.15.0 \
+            ganache@7.9.2
+          node -e "console.log(require('solc').version())" | tee /tmp/solc-version.txt
+          grep -E '^0\.8\.36\+' /tmp/solc-version.txt
+
+      - name: Execute local EVM invariant suite
+        run: node developers/reference/chlom-wallet/contracts/local-evm-test.mjs
+
+      - name: Enforce isolated execution boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE 'https?://|wss?://' developers/reference/chlom-wallet/contracts/local-evm-test.mjs; then
+            echo "Local EVM test must not contain an external RPC URL."
+            exit 1
+          fi
+          if grep -nE 'sk_live_|whsec_|PRIVATE KEY|mnemonic|seed phrase' developers/reference/chlom-wallet/contracts/local-evm-test.mjs; then
+            echo "Local EVM test must not contain production credential material."
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "CONTROLLED_TEST: execution occurs only on an in-memory Ganache chain (chain ID 1337)."
+          echo "No external RPC, funded production signer, testnet transaction, mainnet transaction, custody, or value movement is authorized."
+          echo "Passing local EVM execution is not a security audit."
