@@ -1,0 +1,96 @@
+---
+title: "ThriveBase Hosting Access & FTPS Control"
+sidebarTitle: "ThriveBase FTPS Control"
+description: "Public-safe institutional record for the ThriveBase hosting access surface, secure credential custody, explicit FTPS verification, fail-closed certificate handling and deployment-readiness gates."
+icon: "server"
+keywords: ["ThriveBase", "THIVEBASE", "FTPS", "hosting", "cPanel", "credential custody", "deployment access", "security"]
+---
+
+# ThriveBase Hosting Access & FTPS Control
+
+## Purpose
+
+This record governs the dedicated hosting-access path being prepared for ThriveBase site work. It separates **credential custody**, **transport security**, **provider authentication**, **file-read capability** and **write authority** so one successful layer is never misrepresented as full deployment access.
+
+## Current state — August 21, 2026
+
+```yaml
+surface: ThriveBase hosting access
+provider_family: cPanel / Pure-FTPd
+transport_target: explicit FTPS on port 21
+credential_custody: verified_restricted_dual_reference
+requested_public_alias: ftp.crownthrive.io
+requested_alias_tls_state: hostname_validation_failed
+provider_server_tls_state: certificate_validation_passed_restricted_host
+provider_authentication: failed_530
+file_read_capability: not_reached
+provider_write_capability: closed
+state: HOLD_AUTH
+```
+
+The dedicated credential is stored only through the restricted CHLOM/THIVEBASE credential-control path with primary and recovery custody. The raw username/password, fingerprint, recovery aliases and provider-internal server hostname are **not public documentation**.
+
+## Transport finding
+
+The configured public FTP alias currently reaches a TLS-capable Pure-FTPd service, but strict certificate hostname validation fails for that alias. The institutional rule is fail closed:
+
+- do not transmit credentials through a hostname whose certificate identity does not validate;
+- do not disable certificate verification to force a connection;
+- do not fall back to plaintext FTP;
+- do not treat a successful TCP connection or `AUTH TLS` response as authenticated access.
+
+First-party cPanel evidence identifies the provider's canonical server hostname in the restricted control plane. A strict explicit-FTPS probe against that provider hostname passed certificate validation and reached provider authentication, but the supplied credential was rejected with FTP `530 Login authentication failed` using both the full-account and local-part username forms.
+
+## Credential state versus authentication state
+
+Credential custody and credential correctness are different controls.
+
+```text
+Vault custody PASS
+      ↓
+TLS server identity PASS on restricted provider hostname
+      ↓
+FTP authentication FAIL / HOLD
+      ↓
+Directory listing NOT CERTIFIED
+      ↓
+File read NOT CERTIFIED
+      ↓
+File write / deployment CLOSED
+```
+
+The current credential record can therefore remain `verified_dual_reference` for **custody** while the FTPS adapter remains `read_capability_state = fail` for **provider authentication**.
+
+## Safe file-access certification
+
+The next certification run must remain read-only:
+
+1. verify or reset the FTP-account password at the provider;
+2. confirm the exact FTP-account login identity and home-directory scope;
+3. connect with explicit FTPS and strict certificate validation;
+4. list the account root without mutation;
+5. select a clearly non-secret public file such as `robots.txt`, `index.html`, `index.php` or an approved README;
+6. read the file only to compute size/hash evidence without publishing its contents by default;
+7. disconnect and record the receipt;
+8. keep upload/delete/rename/chmod/deployment writes closed until a separate rollback-capable write canary is authorized.
+
+Files such as `.env`, private keys, credential files, database dumps, backup archives and configuration secrets are excluded from read-canary selection.
+
+## Deployment authority
+
+Successful FTPS authentication will establish a provider-access capability, not unrestricted site authority. Before automated site changes begin, the deployment adapter still requires:
+
+- canonical site/domain mapping;
+- current source/repository or provider-source authority;
+- backup and rollback target;
+- bounded writable path;
+- read-before-write and read-after-write verification;
+- change receipt and DAIL event;
+- secret redaction in logs and documentation;
+- separation between hosting access and CHLOM/THIVEBASE data authority.
+
+## Current conclusion
+
+The ThriveBase credential is institutionally vaulted and the hosting path has been probed without provider mutation. Secure transport is available on the provider's restricted canonical hostname, but authentication is currently blocked. No file was read because the authentication gate correctly failed first, and no provider-side write occurred.
+
+The immediate remediation is provider-side credential/account verification followed by the same read-only FTPS certification sequence. Public alias certificate routing should also be corrected before `ftp.crownthrive.io` is used as the normal credential-bearing endpoint.
