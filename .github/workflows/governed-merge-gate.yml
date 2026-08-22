@@ -50,7 +50,10 @@ jobs:
           fi
           git cat-file -e "${CT_GIT_BASE_SHA}^{commit}"
           git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}"
-          test "$(git rev-parse refs/remotes/origin/ct-governed-base)" = "$CT_GIT_BASE_SHA"
+          # The base branch can advance while a run is queued. Accept that only
+          # when the event base remains an ancestor of the fetched branch tip;
+          # a rewrite/force-push that drops the event base still fails closed.
+          git merge-base --is-ancestor "$CT_GIT_BASE_SHA" refs/remotes/origin/ct-governed-base
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
