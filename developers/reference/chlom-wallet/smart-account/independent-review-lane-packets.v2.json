@@ -1,0 +1,50 @@
+{
+  "packet_id": "ct.wallet.erc4337.independent-review-lanes.v2",
+  "semantic_version": "2.0.0",
+  "state": "ASSIGNED_WAITING_FOR_REVIEWER_HEARTBEATS",
+  "originator_agent_id": "ct.agent.chlom-wallet-settlement",
+  "originator_may_submit_review_receipts": false,
+  "technical_snapshot": {
+    "evidence_anchor_head_sha": "df67672b99839e58d7873dabe49e06de58007820",
+    "evidence_digest_sha256": "a11e9c03cfd0ec05d9e4f1171b1d99e124cf2f7fffd697881bb3718f13e4b9fb",
+    "runtime_codehash": "0x280d5c7c0de94b512401eb9c4b0ef0436275ff03627aad0ce1f93ab1627187a0"
+  },
+  "review_target_contract": {
+    "mode": "pull_request_head_at_review_time",
+    "source": "github.event.pull_request.head.sha",
+    "exact_head_required": true,
+    "runtime_target_equality_required": true,
+    "static_review_target_sha": null,
+    "evidence_anchor_is_review_target": false
+  },
+  "receipt_contract": {
+    "schema": "developers/reference/chlom-wallet/smart-account/independent-review-receipt.v2.schema.json",
+    "fresh_reviewer_heartbeat_required": true,
+    "evidence_anchor_required": true,
+    "review_target_head_required": true,
+    "evidence_digest_required": true,
+    "append_only": true,
+    "service_role_only": true,
+    "originator_rejected": true,
+    "reviewer_impersonation_allowed": false
+  },
+  "shared_sources": [
+    "developers/reference/chlom-wallet/smart-account/erc4337-provider-support.v1.json",
+    "developers/reference/chlom-wallet/smart-account/erc4337-sepolia-observation.v1.json",
+    "developers/reference/chlom-wallet/smart-account/erc4337-runtime-reproduction.v1.json",
+    "developers/reference/chlom-wallet/smart-account/erc4337-upstream-audit-evidence.v1.json",
+    "developers/reference/chlom-wallet/smart-account/erc4337-governance-readiness.v1.json",
+    "developers/reference/chlom-wallet/smart-account/erc4337-userop-calldata-canary.v1.json",
+    "developers/reference/chlom-wallet/smart-account/erc4337-runtime-reproduction.candidate.json",
+    "developers/reference/chlom-wallet/smart-account/research-source-register.v1.json"
+  ],
+  "lanes": [
+    {"work_id":"ct.work.chlom-wallet.erc4337-runtime-codehash-review.v1","review_role":"protocol","reviewer_agent_id":"ct.chlom.agent.blockchain-crypto","activation_prerequisite":"fresh reviewer heartbeat plus runtime exact-head binding","required_questions":["Does the evidence anchor reproduce the expected EntryPoint runtime?","Does the current PR head preserve the reviewed technical invariant?","Are provider-support claims evidence-bounded?","Is any deployment claim overstated?"],"required_outputs":["decision","findings","conditions","exact review-target head receipt"],"allowed_scope_dispositions":["PASS_REVIEW","HOLD","DENY"],"receipt_state":"MISSING"},
+    {"work_id":"ct.work.chlom-wallet.erc4337-security-review.v1","review_role":"security","reviewer_agent_id":"ct.chlom.agent.security","activation_prerequisite":"fresh reviewer heartbeat plus runtime exact-head binding","required_questions":["Are signer and passkey boundaries fail-closed?","Are replay/idempotency controls sufficient?","Are secrets absent from public artifacts?","Does the current PR head introduce new attack surface?"],"required_outputs":["decision","findings","conditions","exact review-target head receipt"],"allowed_scope_dispositions":["PASS_REVIEW","HOLD","DENY"],"receipt_state":"MISSING"},
+    {"work_id":"ct.work.chlom-wallet.erc4337-quorum-review.v1","review_role":"quorum","reviewer_agent_id":"ct.relay.agent-d","activation_prerequisite":"fresh reviewer heartbeat plus runtime exact-head binding","required_questions":["Is separation of duties preserved?","Is originator self-approval impossible?","Are quorum effects absent from reviewer receipts?","Is phase advancement still blocked?"],"required_outputs":["decision","findings","conditions","exact review-target head receipt"],"allowed_scope_dispositions":["PASS_REVIEW","HOLD","DENY"],"receipt_state":"MISSING","receipt_vote_effect":"none"},
+    {"work_id":"ct.work.chlom-wallet.erc4337-recovery-readback.v1","review_role":"recovery","reviewer_agent_id":"ct.chlom.agent.recovery","activation_prerequisite":"fresh reviewer heartbeat plus runtime exact-head binding","required_questions":["Are rollback/readback paths exact?","Can evidence be reconstructed after drift?","Are recovery materials private?","Does current head preserve deterministic recovery?"],"required_outputs":["decision","findings","conditions","exact review-target head receipt"],"allowed_scope_dispositions":["PASS_REVIEW","HOLD","DENY"],"receipt_state":"MISSING"},
+    {"work_id":"ct.work.chlom-wallet.erc4337-release-synthesis.v1","review_role":"release","reviewer_agent_id":"ct.chlom.agent.release-certifier","activation_prerequisite":"fresh reviewer heartbeat plus all prerequisite lane receipts","required_questions":["Are all four prerequisite reviews independently attributable?","Do all receipts bind the same runtime review-target head?","Are unresolved conditions release-blocking?","Is merge/phase advancement still independently governed?"],"required_outputs":["decision","findings","conditions","exact review-target head synthesis receipt"],"allowed_scope_dispositions":["PASS_REVIEW","HOLD","DENY"],"receipt_state":"MISSING"}
+  ],
+  "current_state": {"reviewers_fresh":0,"reviewers_stale":5,"receipts_recorded":0,"queue_items_waiting":5,"synthesis":"HOLD_MISSING_INDEPENDENT_RECEIPTS"},
+  "hard_boundaries": {"fabricated_heartbeat":false,"fabricated_receipt":false,"originator_self_approval":false,"profile_promotion":false,"deployment_authorized":false,"broadcast_authorized":false,"custody":false,"money_movement":false,"rights_grant":false,"phase_advancement":false,"merge_authorized":false}
+}

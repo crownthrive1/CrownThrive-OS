@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
+
+const HERE=dirname(fileURLToPath(import.meta.url));
+const TARGET=(process.env.REVIEW_TARGET_HEAD_SHA||'').trim();
+assert.match(TARGET,/^[0-9a-f]{40}$/,'runtime PR head is required');
+const schema=JSON.parse(readFileSync(join(HERE,'independent-review-receipt.v2.schema.json'),'utf8'));
+const ajv=new Ajv2020({allErrors:true,strict:true,strictRequired:false}); addFormats(ajv);
+const validate=ajv.compile(schema);
+const boundaries={originator_self_approval:false,profile_promoted:false,deployment_authorized:false,broadcast_authorized:false,custody:false,money_movement:false,production_rights_grant:false,phase_advancement:false,merge_authorized:false};
+const receipt={contract:'ct.wallet.independent-review-receipt.v2',work_id:'ct.work.chlom-wallet.erc4337-runtime-codehash-review.v1',review_role:'protocol',reviewer_agent_id:'ct.chlom.agent.blockchain-crypto',reviewer_did_uri:'did:chlom:70f6e3c9e8d143299a9d69350093fca4',reviewer_public_identity_digest_sha256:'1'.repeat(64),reviewer_head_sha:'2'.repeat(40),reviewer_heartbeat_at:'2026-08-22T12:00:00.000Z',reviewer_heartbeat_ttl_seconds:3900,heartbeat_fresh_at_recording:true,evidence_anchor_head_sha:'df67672b99839e58d7873dabe49e06de58007820',review_target_head_sha:TARGET,evidence_digest_sha256:'a11e9c03cfd0ec05d9e4f1171b1d99e124cf2f7fffd697881bb3718f13e4b9fb',decision:'PASS_REVIEW',findings:[],conditions:[],receipt_nonce:'ct.review.protocol.v2.001',receipt_digest_sha256:'3'.repeat(64),source_ref:'github:crownthrive1/CrownThrive-Support:pull/230',hard_boundaries:boundaries};
+const validForTarget=(value)=>validate(value)&&value.review_target_head_sha===TARGET;
+assert.equal(validForTarget(receipt),true,JSON.stringify(validate.errors));
+const wrongTarget={...receipt,review_target_head_sha:'4'.repeat(40)}; assert.equal(validForTarget(wrongTarget),false);
+const wrongAnchor={...receipt,evidence_anchor_head_sha:'5'.repeat(40)}; assert.equal(validForTarget(wrongAnchor),false);
+const stale={...receipt,heartbeat_fresh_at_recording:false}; assert.equal(validForTarget(stale),false);
+const wrongReviewer={...receipt,reviewer_agent_id:'ct.chlom.agent.security'}; assert.equal(validForTarget(wrongReviewer),false);
+const originator={...receipt,reviewer_agent_id:'ct.agent.chlom-wallet-settlement'}; assert.equal(validForTarget(originator),false);
+const deployment=structuredClone(receipt); deployment.hard_boundaries.deployment_authorized=true; assert.equal(validForTarget(deployment),false);
+const secretLeak={...receipt,credential_value:'forbidden'}; assert.equal(validForTarget(secretLeak),false);
+console.log(JSON.stringify({result:'PASS_CHLOM_WALLET_DYNAMIC_REVIEW_TARGET_CONTRACT_V2',review_target_head_sha:TARGET,evidence_anchor_head_sha:receipt.evidence_anchor_head_sha,wrong_target_rejected:true,wrong_anchor_rejected:true,stale_heartbeat_rejected:true,wrong_reviewer_rejected:true,originator_rejected:true,authority_escalation_rejected:true,secret_shape_rejected:true,receipt_created:false,heartbeat_created:false,vote_effect:'none',phase_effect:'none'}));
