@@ -13,6 +13,13 @@ on:
       - developers/manifests/scheduled-agent-architecture.v1.json
       - skills/sales-email-ops-v2/locticians-claim-outreach/SKILL.md
       - workflows/locticians-claim-offer-conversion.mdx
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
   workflow_dispatch:
 
 permissions:
@@ -20,7 +27,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: gen7-pr220-owner-${{ github.ref }}
+  group: gen7-pr220-owner-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -29,10 +36,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout exact branch head
+      - name: Checkout exact PR or branch head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Fetch current canonical main
         run: git fetch --no-tags origin main
@@ -52,6 +60,7 @@ jobs:
 
           path = pathlib.Path("evidence/pr220-owner-closure.v1.json")
           data = json.loads(path.read_text(encoding="utf-8"))
+          event = json.loads(pathlib.Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
           expected_files = {
               "automation/scheduled-task-agent-architecture.mdx",
               "changelog/locticians-claimmonth50-and-scheduled-agent-architecture-2026-08-21.mdx",
@@ -61,6 +70,7 @@ jobs:
               "workflows/locticians-claim-offer-conversion.mdx",
           }
           assert data["packet_id"] == "ct.packet.gen6.pr220-public-projection-containment"
+          assert data["pr_number"] == 220
           assert data["owner_agent_id"] == "ct.relay.agent-c"
           assert data["independent_verifier_agent_id"] == "ct.relay.agent-s"
           assert set(data["classification"]) == expected_files
@@ -71,8 +81,18 @@ jobs:
           assert data["rollback"]["provider_or_database_rollback_required"] is False
           assert data["authority"]["phase_3_effect"] is False
 
+          pr = event.get("pull_request") or {}
+          pr_number = int(pr.get("number") or event.get("number") or 0)
+          pr_head_sha = str((pr.get("head") or {}).get("sha") or "").lower()
+          head_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip().lower()
+          if os.environ.get("GITHUB_EVENT_NAME") == "pull_request":
+              assert pr_number == 220
+              assert pr_head_sha == head_sha
+          else:
+              pr_number = 220
+              pr_head_sha = head_sha
+
           main_sha = subprocess.check_output(["git", "rev-parse", "origin/main"], text=True).strip()
-          head_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           merge_base = subprocess.check_output(["git", "merge-base", "origin/main", "HEAD"], text=True).strip()
           ahead = int(subprocess.check_output(["git", "rev-list", "--count", "origin/main..HEAD"], text=True).strip())
           behind = int(subprocess.check_output(["git", "rev-list", "--count", "HEAD..origin/main"], text=True).strip())
@@ -81,14 +101,16 @@ jobs:
           payload = {
               "payload": {
                   "packet_id": data["packet_id"],
+                  "pr_number": pr_number,
+                  "pr_head_sha": pr_head_sha,
                   "action": "continue_and_handoff",
                   "step_key": "pr220-owner-closure-v1",
-                  "head_sha": head_sha,
+                  "head_sha": pr_head_sha,
                   "progress_percent": 70,
                   "work_units": 4,
                   "blocker_codes": ["independent_review", "sovereign_quorum"],
                   "evidence_refs": [
-                      f"github:commit:{head_sha}",
+                      f"github:pr220@{pr_head_sha}",
                       "github:file:evidence/pr220-owner-closure.v1.json",
                       f"github:workflow-run:{os.environ['GITHUB_RUN_ID']}",
                       f"github:main:{main_sha}",
@@ -106,6 +128,7 @@ jobs:
                       "ahead_by": ahead,
                       "behind_by": behind,
                       "evidence_sha256": evidence_sha,
+                      "github_event_name": os.environ.get("GITHUB_EVENT_NAME"),
                       "direct_main_write": False,
                       "provider_write": False,
                       "credential_exposure": False,
@@ -115,7 +138,7 @@ jobs:
           }
           pathlib.Path("/tmp/chlom-payload.json").write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
-              out.write(f"head_sha={head_sha}\n")
+              out.write(f"head_sha={pr_head_sha}\n")
               out.write(f"main_sha={main_sha}\n")
               out.write(f"merge_base={merge_base}\n")
               out.write(f"ahead={ahead}\n")
@@ -162,7 +185,7 @@ jobs:
           {
             echo "## PR #220 Gen-7 owner execution"
             echo ""
-            echo "- Exact head: \`${{ steps.validate.outputs.head_sha }}\`"
+            echo "- Exact PR head: \`${{ steps.validate.outputs.head_sha }}\`"
             echo "- Current main: \`${{ steps.validate.outputs.main_sha }}\`"
             echo "- Merge base: \`${{ steps.validate.outputs.merge_base }}\`"
             echo "- Ahead / behind: ${{ steps.validate.outputs.ahead }} / ${{ steps.validate.outputs.behind }}"
