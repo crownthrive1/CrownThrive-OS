@@ -1,0 +1,90 @@
+name: Interoperability Fabric Governance
+
+on:
+  pull_request:
+    paths:
+      - developers/crownthrive-interoperability-fabric.mdx
+      - developers/manifests/crownthrive-interoperability-fabric.v1.json
+      - automation/crownthrive-interoperability-agents.mdx
+      - changelog/crownthrive-interoperability-fabric-2026-08-22.mdx
+      - plugins/crownthrive-interoperability/**
+      - scripts/validate_crownthrive_interoperability_fabric.py
+      - .github/workflows/interoperability-fabric-governance.yml
+  push:
+    branches:
+      - main
+    paths:
+      - developers/crownthrive-interoperability-fabric.mdx
+      - developers/manifests/crownthrive-interoperability-fabric.v1.json
+      - automation/crownthrive-interoperability-agents.mdx
+      - changelog/crownthrive-interoperability-fabric-2026-08-22.mdx
+      - plugins/crownthrive-interoperability/**
+      - scripts/validate_crownthrive_interoperability_fabric.py
+      - .github/workflows/interoperability-fabric-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interoperability-fabric-governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate interoperability plugin and contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate Python syntax
+        run: python -m py_compile scripts/validate_crownthrive_interoperability_fabric.py
+
+      - name: Validate interoperability fabric invariants
+        run: python scripts/validate_crownthrive_interoperability_fabric.py
+
+      - name: Validate JSON syntax
+        run: |
+          python -m json.tool developers/manifests/crownthrive-interoperability-fabric.v1.json >/dev/null
+          python -m json.tool plugins/crownthrive-interoperability/plugin.manifest.json >/dev/null
+          python -m json.tool plugins/crownthrive-interoperability/tool-contracts.json >/dev/null
+
+      - name: Validate repository whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- \
+            developers/crownthrive-interoperability-fabric.mdx \
+            developers/manifests/crownthrive-interoperability-fabric.v1.json \
+            automation/crownthrive-interoperability-agents.mdx \
+            changelog/crownthrive-interoperability-fabric-2026-08-22.mdx \
+            plugins/crownthrive-interoperability \
+            scripts/validate_crownthrive_interoperability_fabric.py; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+      - name: Publish public-safe summary
+        run: |
+          {
+            echo "## CrownThrive Interoperability Fabric"
+            echo ""
+            echo "- Package: controlled test / governed HOLD"
+            echo "- Archetype: tool-only"
+            echo "- Root tools: 9 read-only"
+            echo "- Packages / capabilities / contracts / bindings / routes: 21 / 39 / 13 / 42 / 15"
+            echo "- Internal tests: 9 PASS / 0 FAIL"
+            echo "- Public submission: not submitted"
+            echo "- Provider writes: disabled"
+            echo "- Checkout and entitlements: disabled"
+            echo "- D3 automation and sovereign-vote effect: none"
+          } >> "${GITHUB_STEP_SUMMARY}"
