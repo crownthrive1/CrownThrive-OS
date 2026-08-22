@@ -29,16 +29,9 @@ def package_id(sku: str) -> str:
 
 def gate_state(code: str) -> tuple[str, dict[str, Any]]:
     if code == "G10_REPRODUCIBILITY":
-        return "EVIDENCE_PRESENT_REVIEW_PENDING", {
-            "evidence_class": "packaged_asset_digest",
-            "technical_claim_only": True,
-        }
+        return "EVIDENCE_PRESENT_REVIEW_PENDING", {"evidence_class": "packaged_asset_digest", "technical_claim_only": True}
     if code == "G18_SITE_PUBLICATION":
-        return "HOLD", {
-            "historical_provider_preview": "deployment_succeeded",
-            "current_external_probe": "HOLD_UNREADABLE_FROM_CURRENT_PROBE",
-            "custom_domain_readback": False,
-        }
+        return "HOLD", {"historical_provider_preview": "deployment_succeeded", "current_external_probe": "HOLD_UNREADABLE_FROM_CURRENT_PROBE", "custom_domain_readback": False}
     return "HOLD", {"evidence_required": True}
 
 def build_package(product: dict[str, Any], platform: dict[str, Any], policy: dict[str, Any], inventory: dict[str, Any]) -> dict[str, Any]:
@@ -48,133 +41,25 @@ def build_package(product: dict[str, Any], platform: dict[str, Any], policy: dic
     for gate in policy["gates"]:
         state, evidence = gate_state(gate["code"])
         if gate["code"] == "G10_REPRODUCIBILITY":
-            evidence = {
-                **evidence,
-                "asset_version_count": product["asset_version_count"],
-                "asset_set_sha256": product["asset_set_sha256"],
-                "candidate_version": product["candidate_version"],
-            }
-        gates.append({
-            "code": gate["code"],
-            "label": gate["label"],
-            "reviewer_class": gate["reviewer_class"],
-            "human_required": gate["human_required"],
-            "state": state,
-            "producer_agent_id": "ct.agent.commercial-release-package-builder",
-            "independent_reviewer_id": None,
-            "evidence": evidence,
-        })
+            evidence = {**evidence, "asset_version_count": product["asset_version_count"], "asset_set_sha256": product["asset_set_sha256"], "candidate_version": product["candidate_version"]}
+        gates.append({"code": gate["code"], "label": gate["label"], "reviewer_class": gate["reviewer_class"], "human_required": gate["human_required"], "state": state, "producer_agent_id": "ct.agent.commercial-release-package-builder", "independent_reviewer_id": None, "evidence": evidence})
 
     payload: dict[str, Any] = {
         "schema_version": "1.0.0",
         "package_id": package_id(product["sku"]),
         "sku": product["sku"],
-        "platform": {
-            "platform_id": platform["platform_id"],
-            "name": platform["name"],
-            "provider_system": "ChatGPT Sites",
-            "provider_preview": platform["provider_preview"],
-            "target_hostname": platform["target_hostname"],
-            "source_build_commit": platform["source_build_commit"],
-            "aggregate_sha256": platform["aggregate_sha256"],
-            "operating_agent_id": platform["agent_id"],
-            "boundary": platform["boundary"],
-        },
-        "product": {
-            "slug": product["slug"],
-            "title": product["title"],
-            "product_type": product["product_type"],
-            "candidate_version": product["candidate_version"],
-            "lifecycle_state": product["lifecycle_state"],
-            "license_version": product["license_version"],
-            "asset_version_count": product["asset_version_count"],
-            "asset_set_sha256": product["asset_set_sha256"],
-            "support_boundary": product["support_boundary"],
-        },
-        "pricing": {
-            "pricing_policy_version": pricing["version"],
-            "candidate_credit_price": pricing["target_credits"],
-            "authorized_credit_price": None,
-            "minimum_credits": pricing["minimum_credits"],
-            "maximum_credits": pricing["maximum_credits"],
-            "minimum_comparables": pricing["minimum_comparables"],
-            "minimum_sources": pricing["minimum_sources"],
-            "comparables_recorded": 0,
-            "sources_recorded": 0,
-            "state": "HOLD_COMPARABLES_AND_INDEPENDENT_PRICE_CERTIFICATION",
-        },
-        "tax": {
-            "tax_profile_code": tax["code"],
-            "provider_tax_code": tax["stripe_tax_code"],
-            "provider_code_state": tax["provider_code_state"],
-            "legal_taxability_state": tax["legal_taxability_state"],
-            "state": "HOLD_JURISDICTION_REVIEW",
-        },
-        "commerce": {
-            "denomination": "Crown Credits",
-            "credit_only": True,
-            "cash_checkout_enabled": False,
-            "credit_checkout_enabled": False,
-            "stripe_product_created": False,
-            "stripe_price_created": False,
-            "webhook_endpoint_active": False,
-            "atomic_redemption_proven": False,
-            "exact_replay_idempotency_proven": False,
-            "out_of_order_handling_proven": False,
-            "entitlement_issue_reversal_proven": False,
-            "state": "HOLD",
-        },
-        "domain": {
-            "provider_preview_state": platform["provider_preview_state"],
-            "target_hostname": platform["target_hostname"],
-            "dns_authority_state": "UNVERIFIED",
-            "tls_state": "UNVERIFIED",
-            "https_readback": False,
-            "canonical_redirect_readback": False,
-            "current_cpanel_inventory_match": False,
-            "state": "HOLD_DNS_TLS_AND_ROUTE_READBACK",
-        },
-        "publication": {
-            "provider_system": "ChatGPT Sites",
-            "provider_preview": platform["provider_preview"],
-            "historical_deployment_state": "succeeded",
-            "current_external_probe_state": platform["external_probe_2026_08_22"],
-            "source_build_commit": platform["source_build_commit"],
-            "publish_candidate_created": False,
-            "provider_write_authorized": False,
-            "rollback_version_bound": False,
-            "readback_proven": False,
-            "automatic_publication_eligible": False,
-            "state": "HOLD",
-        },
-        "credential_contract": {
-            "credential_source": "Supabase Vault alias through CHLOM Vault broker",
-            "raw_secret_return": False,
-            "primary_and_recovery_alias_required": True,
-            "runtime_binding_state": "HOLD_UNTIL_PROVIDER_OPERATION_REQUIRES_CREDENTIAL",
-        },
-        "governance": {
-            "producer_agent_id": "ct.agent.commercial-release-package-builder",
-            "self_approval": False,
-            "sovereign_voters": policy["sovereign_rule"]["voters"],
-            "minimum_approvals": policy["sovereign_rule"]["minimum_approvals"],
-            "agent_d_required": policy["sovereign_rule"]["agent_d_required"],
-            "any_block_holds": policy["sovereign_rule"]["any_block_holds"],
-            "recorded_approvals": 0,
-            "agent_d_approval_recorded": False,
-            "accepted_exact_digest": None,
-        },
+        "platform": {"platform_id": platform["platform_id"], "name": platform["name"], "provider_system": "ChatGPT Sites", "provider_preview": platform["provider_preview"], "target_hostname": platform["target_hostname"], "source_build_commit": platform["source_build_commit"], "aggregate_sha256": platform["aggregate_sha256"], "operating_agent_id": platform["agent_id"], "boundary": platform["boundary"]},
+        "product": {"slug": product["slug"], "title": product["title"], "product_type": product["product_type"], "candidate_version": product["candidate_version"], "lifecycle_state": product["lifecycle_state"], "license_version": product["license_version"], "asset_version_count": product["asset_version_count"], "asset_set_sha256": product["asset_set_sha256"], "support_boundary": product["support_boundary"]},
+        "pricing": {"pricing_policy_version": pricing["version"], "candidate_credit_price": pricing["target_credits"], "authorized_credit_price": None, "minimum_credits": pricing["minimum_credits"], "maximum_credits": pricing["maximum_credits"], "minimum_comparables": pricing["minimum_comparables"], "minimum_sources": pricing["minimum_sources"], "comparables_recorded": 0, "sources_recorded": 0, "state": "HOLD_COMPARABLES_AND_INDEPENDENT_PRICE_CERTIFICATION"},
+        "tax": {"tax_profile_code": tax["code"], "provider_tax_code": tax["stripe_tax_code"], "provider_code_state": tax["provider_code_state"], "legal_taxability_state": tax["legal_taxability_state"], "state": "HOLD_JURISDICTION_REVIEW"},
+        "commerce": {"denomination": "Crown Credits", "credit_only": True, "cash_checkout_enabled": False, "credit_checkout_enabled": False, "stripe_product_created": False, "stripe_price_created": False, "webhook_endpoint_active": False, "atomic_redemption_proven": False, "exact_replay_idempotency_proven": False, "out_of_order_handling_proven": False, "entitlement_issue_reversal_proven": False, "state": "HOLD"},
+        "domain": {"provider_preview_state": platform["provider_preview_state"], "target_hostname": platform["target_hostname"], "dns_authority_state": "UNVERIFIED", "tls_state": "UNVERIFIED", "https_readback": False, "canonical_redirect_readback": False, "current_cpanel_inventory_match": False, "state": "HOLD_DNS_TLS_AND_ROUTE_READBACK"},
+        "publication": {"provider_system": "ChatGPT Sites", "provider_preview": platform["provider_preview"], "historical_deployment_state": "succeeded", "current_external_probe_state": platform["external_probe_2026_08_22"], "source_build_commit": platform["source_build_commit"], "publish_candidate_created": False, "provider_write_authorized": False, "rollback_version_bound": False, "readback_proven": False, "automatic_publication_eligible": False, "state": "HOLD"},
+        "credential_contract": {"credential_source": "Supabase Vault alias through CHLOM Vault broker", "raw_secret_return": False, "primary_and_recovery_alias_required": True, "runtime_binding_state": "HOLD_UNTIL_PROVIDER_OPERATION_REQUIRES_CREDENTIAL"},
+        "governance": {"producer_agent_id": "ct.agent.commercial-release-package-builder", "self_approval": False, "sovereign_voters": policy["sovereign_rule"]["voters"], "minimum_approvals": policy["sovereign_rule"]["minimum_approvals"], "agent_d_required": policy["sovereign_rule"]["agent_d_required"], "any_block_holds": policy["sovereign_rule"]["any_block_holds"], "recorded_approvals": 0, "agent_d_approval_recorded": False, "accepted_exact_digest": None},
         "gates": gates,
         "overall_state": "HOLD",
-        "next_actions": [
-            "collect rights and customer-license evidence",
-            "collect pricing comparables and independent price certification",
-            "record jurisdiction-specific tax decision",
-            "prove protected fulfillment, credit redemption, webhook idempotency, entitlement and reversal",
-            "complete accessibility and security review",
-            "complete DNS, TLS, ChatGPT Sites publish/readback/rollback/reapply proof",
-            "obtain exact-digest independent governance acceptance",
-        ],
+        "next_actions": ["collect rights and customer-license evidence", "collect pricing comparables and independent price certification", "record jurisdiction-specific tax decision", "prove protected fulfillment, credit redemption, webhook idempotency, entitlement and reversal", "complete accessibility and security review", "complete DNS, TLS, ChatGPT Sites publish/readback/rollback/reapply proof", "obtain exact-digest independent governance acceptance"]
     }
     payload["package_sha256"] = sha256_hex(payload)
     return payload
@@ -226,8 +111,12 @@ def build_all(inventory_path: Path, policy_path: Path, output_dir: Path) -> dict
     platform_by_key = {p["platform_key"]: p for p in inventory["platforms"]}
     output_dir.mkdir(parents=True, exist_ok=True)
     packages = []
-    for product in sorted(inventory["products"], key=lambda item: item["sku"]):
-        package = build_package(product, platform_by_key[product["platform_key"]], policy, inventory)
+    common_defaults = inventory["product_defaults"]["common"]
+    platform_defaults = inventory["product_defaults"]["by_platform"]
+    for compact_product in sorted(inventory["products"], key=lambda item: item["sku"]):
+        platform = platform_by_key[compact_product["platform_key"]]
+        product = {**common_defaults, **platform_defaults[compact_product["platform_key"]], **compact_product, "platform_id": platform["platform_id"]}
+        package = build_package(product, platform, policy, inventory)
         errors = validate_package(package, policy)
         if errors:
             raise ValueError(f"{product['sku']}: {'; '.join(errors)}")
@@ -238,16 +127,13 @@ def build_all(inventory_path: Path, policy_path: Path, output_dir: Path) -> dict
         "schema_version": "1.0.0",
         "run_id": "ct.release-package-run.commercial-gap-sites.v1",
         "product_count": len(packages),
-        "platform_counts": {
-            key: sum(1 for p in packages if p["platform"]["platform_id"] == platform["platform_id"])
-            for key, platform in sorted(platforms_from_inventory(inventory).items())
-        },
+        "platform_counts": {key: sum(1 for p in packages if p["platform"]["platform_id"] == platform["platform_id"]) for key, platform in sorted(platforms_from_inventory(inventory).items())},
         "accepted_count": sum(1 for p in packages if p["overall_state"] == "ACCEPTED"),
         "hold_count": sum(1 for p in packages if p["overall_state"] == "HOLD"),
         "cash_checkout_enabled_count": sum(1 for p in packages if p["commerce"]["cash_checkout_enabled"]),
         "credit_checkout_enabled_count": sum(1 for p in packages if p["commerce"]["credit_checkout_enabled"]),
         "automatic_publication_eligible_count": sum(1 for p in packages if p["publication"]["automatic_publication_eligible"]),
-        "package_digests": {p["sku"]: p["package_sha256"] for p in packages},
+        "package_digests": {p["sku"]: p["package_sha256"] for p in packages}
     }
     summary["summary_sha256"] = sha256_hex(summary)
     (output_dir / "summary.json").write_bytes(canonical_bytes(summary))
