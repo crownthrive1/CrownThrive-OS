@@ -139,6 +139,54 @@ portable_capsule_digest: 9159d489d7dad6b6e1c7a93875e14ac51f0e6f7fa1d9adfb0d696ef
 
 These are controlled-test vectors, not live customer records or chain receipts.
 
+## Private controlled-test runtime evidence
+
+The restricted CHLOM Wallet data plane now has append-only, service-role-only records for proof capsules, proof items, settlement-plan previews, settlement legs, portable-wallet capsules, provider aliases, event commitments, entitlement commitments and Phase C canary runs.
+
+```yaml
+migration: chlom_wallet_phase_c_proof_settlement_portability_v1
+private_canary: PASS_PHASE_C_PRIVATE_CANARY
+fixed_vector_parity: true
+stored_proof_capsules: 1
+stored_proof_items: 3
+stored_settlement_plans: 1
+stored_settlement_legs: 4
+stored_portable_capsules: 1
+stored_portable_events: 3
+stored_canary_runs: 1
+append_only_mutation_rejected: true
+rls_enabled: true
+anon_authenticated_access: denied
+```
+
+The private runtime independently reproduced the public fixed-vector HARP root, EASOR plan/reversal digests and portable-capsule digest. Replaying the same canary is idempotent and returns the same evidence record instead of creating duplicate institutional state.
+
+The JWT-protected `chlom-wallet-lab` Edge Function is at controlled-test version `6` with source digest:
+
+```text
+55ed7e03f592a746c990760604ad1a03accdc0077b374d1902fb3d511d51d635
+```
+
+Exact controlled calls passed for:
+
+- HARP inclusion-proof verification against the fixed root;
+- EASOR fixed-vector compilation with `gross_minor == sum(legs)`;
+- portable-wallet capsule verification with the fixed capsule digest and chain head.
+
+The active runtime boundary remains:
+
+```yaml
+production_activation: false
+provider_write: false
+public_chain_broadcast: false
+money_movement: false
+rights_granted: false
+impact_disbursed: false
+live_checkout: false
+```
+
+No credential, JWT, private key, webhook signing secret or raw provider payload is present in this public projection. Current security-advisor output contains no new Phase C `chlom_wallet` finding; remaining advisor notices are pre-existing or outside this packet's scope.
+
 ## Agent skill package
 
 The existing specialist remains canonical:
@@ -157,6 +205,12 @@ Phase C adds three bounded skills:
 - `ct.skill.chlom.harp-proof-capsule.v1`
 - `ct.skill.chlom.easor-settlement-plan.v1`
 - `ct.skill.chlom.portable-wallet-capsule.v1`
+
+The restricted skill package is version `0.2.0`, remains `mcp_state: test` / `commercial_state: hold`, and is bound to manifest digest:
+
+```text
+dcb29722fa87e3cd135eac13b3f7aa08383afc810b7235d47a66757392d83a50
+```
 
 The skills hand off independent review to Rights Governance, Finance/Tax/Treasury, Evidence Provenance, Recovery/Rollback and Articleization. They do not create new voting authority.
 
