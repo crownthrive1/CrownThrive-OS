@@ -1,0 +1,41 @@
+name: Whole-Estate Project Diagnostics Governance
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/whole-estate-project-diagnostics.yml
+      - automation/whole-estate-project-diagnostics.mdx
+      - developers/whole-estate-project-diagnostics.mdx
+      - developers/manifests/whole-estate-project-diagnostics.v1.json
+      - scripts/validate_whole_estate_project_diagnostics.py
+      - changelog/phase-2-99-whole-estate-project-audit-2026-08-22.mdx
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: whole-estate-project-diagnostics-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate whole-estate project-control invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate project-control manifest
+        run: python scripts/validate_whole_estate_project_diagnostics.py
+
+      - name: Validate institutional documentation
+        run: python scripts/validate_docs.py
