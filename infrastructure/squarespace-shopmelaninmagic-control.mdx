@@ -9,15 +9,19 @@ icon: "store"
 
 **Surface:** `https://shopmelaninmagic.com`  
 **Provider:** Squarespace Commerce  
-**State:** provider read verified / bounded writes HOLD  
+**State:** provider read verified / sanitized read adapter active / bounded writes HOLD  
 **CHLOM service subject:** `ct.service.squarespace-shopmelaninmagic`  
 **Provisional internal DID:** `did:chlom:service:squarespace-shopmelaninmagic`
 
 The Commerce credential itself is not part of this public contract. It is held in restricted CHLOM/Supabase Vault custody with versioned recovery and capability-leasing controls.
 
+## Duplicate reconciliation
+
+A later founder-supplied one-time key display was reconciled against the already-bound CHLOM credential and matched the existing credential fingerprint exactly. CrownThrive therefore created **no duplicate Vault secret, no duplicate credential version, no duplicate service, no duplicate website surface and no duplicate DID**. The existing credential/version lineage remains authoritative and received a separate founder reaffirmation receipt.
+
 ## Verified provider facts
 
-Squarespace Commerce API authentication uses a website-scoped API key or OAuth token in the HTTP `Authorization: Bearer` header. A key can access only its owning website. The general Commerce API rate limit is 300 requests per minute (approximately five requests/second). API-key-authenticated Create Order requests have a separate limit of 100 requests/hour/site.
+Squarespace Commerce API authentication uses a website-scoped API key or OAuth token in the HTTP `Authorization: Bearer` header. A key can access only its owning website. API keys remain valid while the merchant site remains active. The general Commerce API rate limit is 300 requests per minute, approximately five requests per second. API-key-authenticated Create Order requests have a separate limit of 100 requests/hour/site.
 
 Current first-party documentation:
 
@@ -25,6 +29,7 @@ Current first-party documentation:
 - https://developers.squarespace.com/commerce-apis/authentication-and-permissions
 - https://developers.squarespace.com/commerce-apis/making-requests
 - https://developers.squarespace.com/commerce-apis/rate-limits
+- https://developers.squarespace.com/commerce-apis/products
 
 CrownThrive's local monthly request ceiling is `-1` for this service. That means no CrownThrive-imposed monthly ceiling; Squarespace provider throttles and any provider billing/plan constraints remain authoritative.
 
@@ -43,20 +48,35 @@ The founder-supplied website credential is recorded with the following provider 
 
 Possession of those provider permissions does not automatically authorize every operation inside CrownThrive. CHLOM applies a narrower capability layer.
 
+Squarespace documents the Profiles API as maintenance-mode and recommends Contacts for new integrations. CrownThrive therefore prefers Contacts and does not build new dependencies on Profiles. The Forms permission is recorded but not activated as a general custom-application capability. Webhook Subscriptions remain OAuth-only and are not inferred from this API key.
+
 ## CHLOM capability boundary
 
-Controlled-test reads currently include:
+Existing provider verification includes:
 
 - `squarespace.shopmelaninmagic.site.read`
 - `squarespace.shopmelaninmagic.products.audit`
 
 The first authenticated site read returned HTTP 200 for Melanin Magic at the expected custom domain. A first-page Products API read also returned HTTP 200 and observed 50 products, 318 product-image records and 4 blank product-image alt-text values, with provider pagination indicating additional products.
 
-This does not invalidate the separate Ahrefs baseline of 109 URLs with missing alt text. It demonstrates that the Ahrefs issue is broader than the first Squarespace Products page and requires full inventory/crawl correlation before mutation.
+Generation 7 adds a dedicated non-voting `ShopMelaninMagic Squarespace Commerce API Agent` under Agent E and the reusable skill `crownthrive-shopmelaninmagic-squarespace-commerce`. No new external scheduler slot is created.
+
+The JWT/admin-only server adapter `squarespace-shopmelaninmagic-control` performs one bounded provider read per invocation and returns sanitized summaries only. Its controlled-test read contracts include:
+
+- `squarespace.shopmelaninmagic.contacts.summary`
+- `squarespace.shopmelaninmagic.discounts.audit`
+- `squarespace.shopmelaninmagic.inventory.audit`
+- `squarespace.shopmelaninmagic.orders.summary`
+- `squarespace.shopmelaninmagic.transactions.summary`
+- the existing site and Products reads above.
+
+Raw contact names, addresses, customer email addresses, transaction gateway identifiers and the provider credential are excluded from default agent output.
 
 ## Alt-text remediation lane
 
-Squarespace's Products API provides a specific update-product-image endpoint that currently supports updating product-image alt text. CrownThrive has implemented the server-side adapter contract, but its capability remains **HOLD**.
+Squarespace Products API v2 provides a specific update-product-image endpoint that currently supports updating product-image alt text. CrownThrive has implemented the server-side capability contract, but its write capability remains **HOLD**.
+
+The separate Ahrefs baseline remains 109 URLs with missing alt text. The first-page Squarespace Products read found only 4 blank product-image alt-text values among 318 image records. These are different evidence universes and must be reconciled across the full product/image inventory and crawl surface before any bulk write.
 
 Promotion requires:
 
@@ -74,9 +94,17 @@ No bulk alt-text mutation is authorized from the existence of the provider key a
 
 ## Write policy
 
-Current write families for contacts, discounts, inventory, orders and products remain separately gated. Generic unrestricted provider writes are not exposed through the CHLOM MCP surface. Product deletion is explicitly prohibited by CrownThrive's no-silent-delete policy even though the provider API offers a delete endpoint.
+The following write families are defined but disabled pending operation-specific evidence:
 
-Webhook Subscriptions are not authorized by this API-key path; Squarespace documents the Webhook Subscriptions API as OAuth-only.
+- contacts write;
+- discounts create/update;
+- inventory adjustment;
+- order fulfillment update;
+- third-party order import;
+- product update;
+- product-image alt-text update.
+
+Inventory adjustments and API-key Create Order operations require provider idempotency controls. Customer-facing, financial or consent-sensitive changes remain separately gated. Generic unrestricted provider writes are not exposed through the CHLOM MCP surface. Product deletion is explicitly prohibited by CrownThrive's no-silent-delete policy even though the provider API offers deletion capabilities.
 
 ## Wholesale continuity
 
@@ -90,7 +118,7 @@ The current Candid use does not waive or replace the planned proprietary wholesa
 
 ## Analytics
 
-The site currently has Google Analytics measurement ID `G-4SNNTRTZDQ` configured as a public analytics identifier. It is not treated as a secret credential.
+The site currently has Google Analytics measurement ID `G-4SNNTRTZDQ` configured as a public analytics identifier. It is not treated as a secret credential. The Amazon Associates field observed in the provider UI remains a placeholder/unconfigured state and is not represented as an active affiliate relationship.
 
 ## Security and identity
 
@@ -98,7 +126,8 @@ The site currently has Google Analytics measurement ID `G-4SNNTRTZDQ` configured
 - redundant recovery copy: restricted Vault only;
 - immutable CHLOM credential version: opaque internal handle;
 - public contract: contains no credential value or Vault locator;
-- direct anon/authenticated database execution of Squarespace read/write adapters: denied;
+- direct anon/authenticated database execution of Squarespace secret resolvers: denied;
+- read adapter: JWT/admin-only and sanitized by default;
 - write adapters: server-side only and individually capability-gated;
 - founder binding: typed-name institutional attestation, not cryptographic nonrepudiation;
 - provisional `did:chlom` binding: portability/test reference, not a public-chain DID proof.
