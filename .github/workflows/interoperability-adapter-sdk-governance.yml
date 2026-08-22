@@ -1,0 +1,77 @@
+name: Interoperability Adapter SDK Governance
+
+on:
+  pull_request:
+    paths:
+      - plugins/crownthrive-interoperability/sdk/**
+      - scripts/validate_interop_adapter_sdk.py
+      - .github/workflows/interoperability-adapter-sdk-governance.yml
+  push:
+    branches:
+      - main
+    paths:
+      - plugins/crownthrive-interoperability/sdk/**
+      - scripts/validate_interop_adapter_sdk.py
+      - .github/workflows/interoperability-adapter-sdk-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interoperability-adapter-sdk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate governed adapter SDK templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate Python syntax
+        run: python -m py_compile scripts/validate_interop_adapter_sdk.py
+
+      - name: Validate adapter SDK invariants
+        run: python scripts/validate_interop_adapter_sdk.py
+
+      - name: Validate JSON templates
+        run: |
+          python -m json.tool plugins/crownthrive-interoperability/sdk/adapter-package.template.json >/dev/null
+          python -m json.tool plugins/crownthrive-interoperability/sdk/route.template.json >/dev/null
+
+      - name: Check whitespace and merge-conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- \
+            plugins/crownthrive-interoperability/sdk \
+            scripts/validate_interop_adapter_sdk.py; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+      - name: Publish public-safe summary
+        run: |
+          {
+            echo "## CrownThrive Interoperability Adapter SDK"
+            echo ""
+            echo "- State: controlled test / public-safe scaffold"
+            echo "- Templates: adapter package and route"
+            echo "- Raw credentials in package: prohibited"
+            echo "- Exact-version contracts: required"
+            echo "- Negative/security/privacy/idempotency tests: required"
+            echo "- Write rollback/readback: required"
+            echo "- Provider writes: disabled by default"
+            echo "- D3 and sovereign-vote effect: none"
+          } >> "${GITHUB_STEP_SUMMARY}"
