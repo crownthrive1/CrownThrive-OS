@@ -1,0 +1,145 @@
+name: CHLOM Institutionalization Package v2
+
+on:
+  pull_request:
+    paths:
+      - "automation/chlom-institutionalization-compiler.v1.json"
+      - "automation/compile-chlom-institutionalization.mjs"
+      - "automation/chlom-institutionalization-gap-resolver.mjs"
+      - "automation/chlom-institutionalization-ai-advisor.mjs"
+      - "developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json"
+      - "developers/reference/chlom-wallet/institutionalization/**"
+      - ".github/workflows/chlom-wallet-institutionalization-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: chlom-wallet-institutionalization-v2-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ingest:
+    name: Verify and ingest committed institutional package
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify branch and frozen-source ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REPOSITORY}" = 'crownthrive1/CrownThrive-Support'
+          if [ "${GITHUB_EVENT_NAME}" = 'pull_request' ]; then
+            test "${{ github.event.pull_request.head.ref }}" = 'chlom-wallet/phase-c-proof-portability-20260822'
+            test "${{ github.event.pull_request.base.ref }}" = 'chlom-wallet/phase-b-webhook-passkey-contracts-20260822'
+            test "$(git rev-parse HEAD)" = '${{ github.event.pull_request.head.sha }}'
+          else
+            test "${GITHUB_REF_NAME}" = 'chlom-wallet/phase-c-proof-portability-20260822'
+          fi
+          git merge-base --is-ancestor 64118e61c7671a78b43999ac5f17f9eddd1226b1 HEAD
+
+      - name: Rebuild and compare institutional package
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json'
+          test -f "$target"
+          node automation/compile-chlom-institutionalization.mjs \
+            --spec automation/chlom-institutionalization-compiler.v1.json \
+            --repo-root . \
+            --output /tmp/chlom-wallet-institutionalization-v2.json \
+            | tee /tmp/chlom-wallet-institutionalization-v2-compile.log
+          cmp "$target" /tmp/chlom-wallet-institutionalization-v2.json
+          python -m json.tool "$target" >/dev/null
+          python - <<'PY'
+          import json
+          value=json.load(open('developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json'))
+          assert value['schema_version']=='1.0.0'
+          assert value['package_id']=='ct.package.chlom-wallet.phase-c.institutionalization.v1'
+          assert value['state']=='PASS_CONTROLLED_TEST_INSTITUTIONALIZATION'
+          assert value['source_snapshot']['repository']=='crownthrive1/CrownThrive-Support'
+          assert value['source_snapshot']['branch']=='chlom-wallet/phase-c-proof-portability-20260822'
+          assert value['source_snapshot']['head_sha']=='64118e61c7671a78b43999ac5f17f9eddd1226b1'
+          assert value['gap_analysis']['gap_count']==0
+          assert value['gap_analysis']['completeness_score']==100
+          assert all(flag is False for flag in value['hard_boundaries'].values())
+          assert value['ai_governance']['advisory_only'] is True
+          assert value['ai_governance']['decision_authority'] is False
+          assert value['ai_governance']['write_authority'] is False
+          assert value['ai_governance']['automatic_release'] is False
+          PY
+
+      - name: Request bounded GitHub OIDC token
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}"
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
+          response="$(curl --fail --silent --show-error \
+            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=chlom-wallet-institutionalization-v2")"
+          token="$(python -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<<"$response")"
+          test -n "$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+          echo "::add-mask::$token"
+
+      - name: Submit committed manifest to CHLOM v2 ingest
+        id: submit
+        shell: bash
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY' >/tmp/chlom-wallet-institutionalization-v2-request.json
+          import json
+          manifest=json.load(open('developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json'))
+          print(json.dumps({'manifest':manifest},separators=(',',':')))
+          PY
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${OIDC_TOKEN}" \
+            --header 'Content-Type: application/json' \
+            --data-binary @/tmp/chlom-wallet-institutionalization-v2-request.json \
+            'https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-wallet-institutionalize-v2' \
+            | tee /tmp/chlom-wallet-institutionalization-v2-response.json
+
+      - name: Validate controlled-test ingest response
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool /tmp/chlom-wallet-institutionalization-v2-response.json >/dev/null
+          python - <<'PY'
+          import json
+          response=json.load(open('/tmp/chlom-wallet-institutionalization-v2-response.json'))
+          assert response['ok'] is True
+          assert response['service_id']=='ct.service.chlom-wallet-institutionalize-v2'
+          assert response['state']=='RECORDED_CONTROLLED_TEST_EVIDENCE'
+          assert response['result']['result'] in (
+            'RECORDED_INSTITUTIONALIZATION_PACKAGE_INGEST_V2',
+            'DUPLICATE_OIDC_INGEST_RECEIPT'
+          )
+          for key in [
+            'token_value_persisted','raw_artifact_body_persisted','provider_write',
+            'credential_access','effective_offer','stripe_objects_created','checkout_enabled',
+            'custody','token_issuance','money_movement','production_rights_grant',
+            'chain_broadcast','phase_advancement','merge_authorized'
+          ]:
+            assert response[key] is False, (key,response[key])
+          PY
+
+      - name: Record boundary
+        run: |
+          echo 'CONTROLLED_TEST: GitHub OIDC authenticates a read-only, committed-manifest evidence ingest.'
+          echo 'The raw OIDC token and raw artifact bodies are not persisted.'
+          echo 'No provider write, credential grant, price, Stripe object, checkout, signing, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement or merge authority is created.'
