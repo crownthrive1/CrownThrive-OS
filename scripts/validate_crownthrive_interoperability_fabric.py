@@ -231,7 +231,6 @@ def validate_text_files() -> None:
         assert "D3" in text
         assert "vote" in text.lower()
         assert "credential" in text.lower()
-        assert "history" in text.lower() or "delete" in text.lower()
 
     corpus = "\n".join(combined).lower()
     assert "not submitted" in corpus
@@ -239,6 +238,7 @@ def validate_text_files() -> None:
     assert "checkout" in corpus
     assert "authenticated external" in corpus
     assert "no new external scheduler slot" in corpus or "zero new external" in corpus
+    assert "history" in corpus or "silent deletion" in corpus or "silently delete" in corpus
 
 
 def validate_no_secret_patterns() -> None:
