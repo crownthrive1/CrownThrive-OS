@@ -75,12 +75,18 @@ jobs:
           print(json.dumps(o,sort_keys=True))
           PY
 
-      - name: Commit sanitized result
+      - name: Commit sanitized result with branch rebase
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A changelog/
+          if git diff --cached --quiet; then
+            echo 'No receipt delta.'
+            exit 0
+          fi
           git commit -m 'Record stateless encrypted transport bootstrap v4'
+          git fetch origin "${GITHUB_REF_NAME}"
+          git rebase "origin/${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
