@@ -31,7 +31,10 @@ begin
       public_contract_digest = '7ea12daf4b4ed96824aab51e7391309951e40e9abd94ccaa6b3685e79153316e',
       metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
         'candidate_packet_id', 'ct.packet.cie-interoperability-continuity.2026-08-22.v1',
-        'parent_anchor_sha', 'PENDING_COMMIT_SHA',
+        'parent_anchor_sha', '39713b4da545da6e293045ce2a0df19bd3b63585',
+        'child_proposal_head_sha', '45dad3ff917d39812a7adcf99f593b728ff7376f',
+        'parent_draft_pr', 245,
+        'child_draft_pr', 8,
         'child_repository_id', 1341314455,
         'child_federation_state', 'PROVISIONED_UNLINKED',
         'runtime_integration_allowed', false,
