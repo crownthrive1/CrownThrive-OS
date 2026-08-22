@@ -1,0 +1,56 @@
+---
+title: "Commercial Release Factory Workflow"
+sidebarTitle: "Release Factory Workflow"
+description: "Per-product evidence, certification, publication, readback, and rollback workflow for Launch, Ready, and Procure."
+icon: "diagram-project"
+tag: "Fail Closed"
+---
+
+# Commercial Release Factory Workflow
+
+## Trigger and materialization
+
+An hourly THIVEBASE condition watch reads the latest exact asset version for each product in `commercial-gap-sites-2026-08-21-v1`. It deterministically generates or refreshes one release package per SKU. Repeated execution is idempotent for the same SKU, asset version, surface, and content hash.
+
+The generator cannot create a sovereign vote, offer, entitlement, public price, Stripe object, fulfillment path, or provider write. Missing evidence is recorded as a typed HOLD with reason codes rather than converted into a synthetic PASS.
+
+## Gate contract
+
+Every product requires:
+
+1. package integrity;
+2. rights and licensing;
+3. credit pricing and tax;
+4. fulfillment;
+5. credit checkout and webhook;
+6. entitlement and license issuance;
+7. accessibility;
+8. DNS and TLS; and
+9. destination readiness.
+
+CrownThrive Ready adds a tenth gate for qualified-professional scope review. Its preparation products may organize evidence and readiness work, but cannot issue legal, security, privacy, tax, accessibility, or regulatory conclusions.
+
+## Site routes
+
+| Platform | Provider surface | Preferred route | Automated route state |
+| --- | --- | --- | --- |
+| CrownThrive Launch | `crownthrive-launch.crownthrive.chatgpt.site` | `launch.crownthrive.com` | HOLD pending governed-feed consumer proof |
+| CrownThrive Ready | `crownthrive-ready.crownthrive.chatgpt.site` | `ready.crownthrive.com` | HOLD pending governed-feed consumer proof |
+| CrownThrive Procure | `crownthrive-procure.crownthrive.chatgpt.site` | `procure.crownthrive.com` | HOLD pending governed-feed consumer proof |
+
+The route uses the certified dynamic-feed adapter. Publication is queued automatically only after the existing `ct.site.autopublish.v1` policy accepts the exact product release. A non-PASS transition after publication triggers quarantine and rollback handling.
+
+## Evidence states
+
+- **PASS** means exact-version evidence exists and the asserted reviewer is authorized for that gate.
+- **HOLD** means evidence is missing, stale, contradictory, outside authority, or requires a qualified professional or founder.
+- **FAIL** means an exact negative test or contradiction was proven.
+- **NOT APPLICABLE** requires evidence; it is not a shortcut.
+
+## Current controlled-test proof target
+
+The first deterministic test vector contains 30 products, 30 packages, and 280 gates. Existing package-integrity receipts account for 30 initial PASS gates. The remaining 250 gates stay HOLD. Therefore accepted products, published products, created offers, enabled checkouts, and manufactured sovereign votes must all equal zero.
+
+## Rollback and drift
+
+Every release is bound to an exact version and SHA-256. Changes to source bytes, rights, price evidence, tax profile, fulfillment object, webhook contract, entitlement rules, accessibility evidence, domain state, destination consumer, or reviewer authority create a new review boundary. Previously accepted evidence cannot silently float to the changed artifact.
