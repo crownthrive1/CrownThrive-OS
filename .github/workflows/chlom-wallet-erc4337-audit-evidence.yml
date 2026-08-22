@@ -1,0 +1,130 @@
+name: CHLOM Wallet ERC-4337 v0.9 Audit Evidence
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json"
+      - "developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py"
+      - ".github/workflows/chlom-wallet-erc4337-audit-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-erc4337-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extract:
+    name: Pin and extract official v0.9 audit evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify required local tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          python --version
+          command -v curl
+          command -v pdfinfo
+          command -v pdftotext
+          python -m json.tool developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json >/dev/null
+          python -m py_compile developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py
+
+      - name: Download exact upstream audit artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://raw.githubusercontent.com/eth-infinitism/account-abstraction/1c6b669d0eea734e09a87e095ba15e076151718a/audits/ERC-4337%20Account%20Abstraction%20v0.9%20Security%20Review%20-%20Cantina.pdf'
+          curl --fail --location --proto '=https' --tlsv1.2 --retry 3 --retry-all-errors \
+            --silent --show-error "$url" -o /tmp/erc4337-v09-cantina.pdf
+          test "$(stat -c %s /tmp/erc4337-v09-cantina.pdf)" = '498502'
+
+      - name: Extract bounded audit evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py \
+            /tmp/erc4337-v09-cantina.pdf \
+            --output /tmp/erc4337-v09-audit-extraction.json \
+            | tee /tmp/erc4337-v09-audit-extraction.log
+          python -m json.tool /tmp/erc4337-v09-audit-extraction.json >/dev/null
+
+      - name: Validate extraction and HOLD boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          extracted=json.load(open('/tmp/erc4337-v09-audit-extraction.json'))
+          profile=json.load(open('developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json'))
+
+          assert extracted['result']=='PASS_AUDIT_PDF_IDENTITY_AND_TEXT_EXTRACTION_HOLD_INTERPRETATION'
+          assert extracted['source']['git_blob_sha1']=='d0cd0ad29d341d35df1047cadde6cb67d453be91'
+          assert extracted['source']['size_bytes']==498502
+          assert extracted['document']['page_count']>0
+          assert extracted['document']['text_character_count']>=1000
+          assert extracted['interpretation']['audit_scope_commit_confirmed'] is False
+          assert extracted['interpretation']['runtime_codehash_independently_approved'] is False
+          assert extracted['interpretation']['runtime_codehash_verified_for_deployment'] is False
+          assert all(value is False for value in extracted['hard_boundaries'].values())
+
+          assert profile['state']=='AUDIT_ARTIFACT_PINNED_EXTRACTION_PENDING'
+          assert profile['upstream']['audit_git_blob_sha1']==extracted['source']['git_blob_sha1']
+          assert profile['upstream']['audit_size_bytes']==extracted['source']['size_bytes']
+          assert profile['extraction']['state']=='PENDING'
+          assert profile['review_request']['requester_is_final_approver'] is False
+          assert profile['review_request']['runtime_codehash_independently_approved'] is False
+          assert profile['review_request']['runtime_codehash_verified_for_deployment'] is False
+          assert all(value is False for value in profile['hard_boundaries'].values())
+          PY
+
+      - name: Print bounded extraction summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          evidence=json.load(open('/tmp/erc4337-v09-audit-extraction.json'))
+          summary={
+            'result': evidence['result'],
+            'source': evidence['source'],
+            'document': {
+              'page_count': evidence['document']['page_count'],
+              'text_character_count': evidence['document']['text_character_count'],
+              'text_sha256': evidence['document']['text_sha256'],
+              'full_commit_candidates': evidence['document']['full_commit_candidates'],
+              'evm_address_candidates': evidence['document']['evm_address_candidates'],
+              'bytes32_candidates': evidence['document']['bytes32_candidates'],
+              'severity_word_mentions': evidence['document']['severity_word_mentions'],
+              'bounded_evidence_markers': evidence['document']['bounded_evidence_markers'],
+            },
+            'interpretation': evidence['interpretation'],
+            'hard_boundaries': evidence['hard_boundaries'],
+          }
+          print(json.dumps(summary,sort_keys=True))
+          PY
+
+      - name: Enforce non-execution boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            developers/reference/chlom-wallet/smart-account/erc4337-v09-audit-source-profile.json
+            developers/reference/chlom-wallet/smart-account/extract-erc4337-v09-audit.py
+            .github/workflows/chlom-wallet-erc4337-audit-evidence.yml
+          )
+          if grep -nE 'eth_sendRawTransaction|eth_sendTransaction|wallet_sendCalls|personal_sendTransaction|private[_ -]?key|mnemonic|seed phrase|broadcast_performed:[[:space:]]*true|money_movement:[[:space:]]*true' "${files[@]}"; then
+            echo 'Audit evidence packet crossed the non-execution boundary.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "CONTROLLED_TEST: exact public audit artifact identity and bounded text extraction only."
+          echo "The Wallet Agent does not interpret itself into codehash approval."
+          echo "No RPC, signer, UserOperation, simulation, deployment, broadcast, custody, money movement, rights grant, or Phase advancement occurs."
