@@ -10,13 +10,16 @@ import argparse
 import hashlib
 import json
 import re
-import subprocess
 from pathlib import Path
 from typing import Any
+
+import pypdf
+from pypdf import PdfReader
 
 EXPECTED_SIZE = 498_502
 EXPECTED_GIT_BLOB_SHA1 = "d0cd0ad29d341d35df1047cadde6cb67d453be91"
 EXPECTED_PATH = "audits/ERC-4337 Account Abstraction v0.9 Security Review - Cantina.pdf"
+EXPECTED_PYPDF_VERSION = "5.9.0"
 KEYWORDS = (
     "audit", "review", "scope", "commit", "entrypoint", "code hash", "codehash",
     "deployment", "address", "critical", "high", "medium", "low", "informational",
@@ -31,21 +34,6 @@ def sha256_hex(data: bytes) -> str:
 def git_blob_sha1(data: bytes) -> str:
     header = f"blob {len(data)}\0".encode("ascii")
     return hashlib.sha1(header + data).hexdigest()  # noqa: S324 - Git identity, not security use.
-
-
-def run_text(command: list[str]) -> str:
-    result = subprocess.run(command, check=True, capture_output=True, text=True)
-    return result.stdout
-
-
-def parse_pdfinfo(text: str) -> dict[str, str]:
-    result: dict[str, str] = {}
-    for line in text.splitlines():
-        if ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        result[key.strip()] = value.strip()
-    return result
 
 
 def clean_line(line: str) -> str:
@@ -79,11 +67,21 @@ def bounded_markers(text: str, limit: int = 80, width: int = 240) -> list[dict[s
     return markers
 
 
+def metadata_value(metadata: Any, key: str) -> str | None:
+    if metadata is None:
+        return None
+    value = metadata.get(key)
+    return str(value) if value is not None else None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("pdf", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+
+    if pypdf.__version__ != EXPECTED_PYPDF_VERSION:
+        raise SystemExit(f"pypdf_version_mismatch:{pypdf.__version__}")
 
     data = args.pdf.read_bytes()
     if len(data) != EXPECTED_SIZE:
@@ -92,13 +90,19 @@ def main() -> int:
     if observed_blob != EXPECTED_GIT_BLOB_SHA1:
         raise SystemExit(f"audit_git_blob_sha1_mismatch:{observed_blob}")
 
-    info_text = run_text(["pdfinfo", str(args.pdf)])
-    pdfinfo = parse_pdfinfo(info_text)
-    page_count = int(pdfinfo.get("Pages", "0"))
+    reader = PdfReader(str(args.pdf), strict=True)
+    page_count = len(reader.pages)
     if page_count < 1:
         raise SystemExit("audit_page_count_invalid")
 
-    extracted = run_text(["pdftotext", "-layout", str(args.pdf), "-"])
+    page_text: list[str] = []
+    per_page_character_counts: list[int] = []
+    for page in reader.pages:
+        text = page.extract_text(extraction_mode="layout") or ""
+        page_text.append(text)
+        per_page_character_counts.append(len(text))
+
+    extracted = "\n".join(page_text)
     normalized = "\n".join(clean_line(line) for line in extracted.splitlines() if clean_line(line))
     if len(normalized) < 1_000:
         raise SystemExit(f"audit_text_extraction_insufficient:{len(normalized)}")
@@ -112,9 +116,22 @@ def main() -> int:
         severity: len(re.findall(rf"\b{severity}\b", normalized, flags=re.IGNORECASE))
         for severity in ("critical", "high", "medium", "low", "informational")
     }
+    metadata = reader.metadata
+    pdf_metadata = {
+        key: value
+        for key, value in {
+            "title": metadata_value(metadata, "/Title"),
+            "author": metadata_value(metadata, "/Author"),
+            "creator": metadata_value(metadata, "/Creator"),
+            "producer": metadata_value(metadata, "/Producer"),
+            "creation_date": metadata_value(metadata, "/CreationDate"),
+            "modification_date": metadata_value(metadata, "/ModDate"),
+        }.items()
+        if value
+    }
 
     body = {
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "evidence_contract": "ct.wallet.erc4337.v0.9.audit-extraction.v1",
         "result": "PASS_AUDIT_PDF_IDENTITY_AND_TEXT_EXTRACTION_HOLD_INTERPRETATION",
         "source": {
@@ -124,14 +141,16 @@ def main() -> int:
             "size_bytes": len(data),
             "pdf_sha256": sha256_hex(data),
         },
+        "extractor": {
+            "library": "pypdf",
+            "version": pypdf.__version__,
+            "network_access": False,
+        },
         "document": {
             "page_count": page_count,
-            "pdfinfo": {
-                key: pdfinfo.get(key)
-                for key in ("Title", "Author", "Creator", "Producer", "CreationDate", "ModDate", "Pages")
-                if pdfinfo.get(key)
-            },
+            "pdf_metadata": pdf_metadata,
             "text_character_count": len(normalized),
+            "per_page_character_counts": per_page_character_counts,
             "text_sha256": sha256_hex(normalized.encode("utf-8")),
             "full_commit_candidates": full_commits,
             "evm_address_candidates": evm_addresses,
