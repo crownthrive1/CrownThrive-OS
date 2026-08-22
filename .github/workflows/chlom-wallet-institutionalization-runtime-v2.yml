@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   runtime-contract:
-    name: Validate OIDC runtime source, algorithms, liveness, and boundaries
+    name: Validate OIDC runtime source, module linkage, liveness, and boundaries
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -38,14 +38,21 @@ jobs:
           node --check developers/reference/chlom-wallet/institutionalization/runtime/oidc-jwt-verifier-v2.mjs
           node --check developers/reference/chlom-wallet/institutionalization/runtime/github-repository-binding-v2.mjs
           node --check developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs
+          node --check developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs
           node --check automation/chlom-institutionalization-runtime-advisor.mjs
           node --check automation/test-chlom-institutionalization-runtime-advisor.mjs
           python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/recovery-plan.v2.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/commercialization-boundary.v2.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json >/dev/null
           python -m json.tool automation/chlom-institutionalization-runtime-handoffs.v2.json >/dev/null
+          grep -F 'export const encoder = new TextEncoder();' developers/reference/chlom-wallet/institutionalization/runtime/oidc-runtime-utils-v2.mjs >/dev/null
+          grep -F 'export const decoder = new TextDecoder();' developers/reference/chlom-wallet/institutionalization/runtime/oidc-runtime-utils-v2.mjs >/dev/null
           grep -F 'create or replace function chlom_wallet.run_institutionalization_oidc_subject_canary_v2()' developers/reference/chlom-wallet/institutionalization/sql/chlom-wallet-institutionalization-oidc-v2.sql >/dev/null
+
+      - name: Run module-linkage regression contract
+        run: node developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs
 
       - name: Run GitHub OIDC unit contract
         run: node developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs
@@ -60,17 +67,20 @@ jobs:
           python - <<'PY'
           import json
           runtime=json.load(open('developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json'))
+          reconciliation=json.load(open('developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json'))
           assert runtime['contract_id']=='ct.runtime.chlom-institutionalization-v2'
           assert runtime['state'] in ('ACTIVE_PENDING_REAL_OIDC_INGEST','ACTIVE_REAL_PACKAGE_INGESTED')
           edge=runtime['edge_function']
           assert edge['service_id']=='ct.service.chlom-wallet-institutionalize-v2'
           assert edge['function_id']=='a9fa1f5d-908d-4807-9d35-20c95d161507'
           assert edge['slug']=='chlom-wallet-institutionalize-v2'
-          assert edge['version']==2
+          assert edge['version']==4
           assert edge['status']=='ACTIVE'
           assert edge['verify_jwt'] is False
           assert edge['authentication_mode']=='INTERNAL_GITHUB_OIDC_RS256_JWKS_VERIFICATION'
-          assert edge['ezbr_sha256']=='f3238ab6f53cc5333ac47b495706d346d6f178c0a9f618f0a0b6dedc6c17ebe6'
+          assert edge['ezbr_sha256']=='9dfec88ed84103fb43e332a11b1877d87f01fb3eae2b280b1125434b4a711b4f'
+          assert edge['module_linkage_regression_test'].endswith('test-module-linkage-v2.mjs')
+          assert edge['deployment_reconciliation'].endswith('deployment-reconciliation.v2.json')
           oidc=runtime['github_oidc']
           assert oidc['repository_id']=='1336348391'
           assert oidc['repository_owner_id']=='315660018'
@@ -86,11 +96,30 @@ jobs:
           assert binding['submitted_manifest_must_equal_committed_manifest'] is True
           assert runtime['database']['raw_oidc_token_persisted'] is False
           assert runtime['database']['raw_artifact_body_persisted'] is False
+          assert runtime['canaries']['runtime_module_linkage']=='PASS_CHLOM_INSTITUTIONALIZATION_RUNTIME_MODULE_LINKAGE_V2'
+          assert runtime['deployment_reconciliation']['prior_failed_version']==3
+          assert runtime['deployment_reconciliation']['prior_failure']=='BOOT_ERROR'
+          assert runtime['deployment_reconciliation']['root_cause']=='DEPLOYED_MODULE_EXPORT_DRIFT'
+          assert runtime['deployment_reconciliation']['corrected_version']==4
+          assert runtime['deployment_reconciliation']['corrected_ezbr_sha256']==edge['ezbr_sha256']
           assert runtime['ai_governance']['advisory_only'] is True
           assert runtime['ai_governance']['decision_authority'] is False
           assert runtime['ai_governance']['write_authority'] is False
           assert runtime['ai_governance']['automatic_release'] is False
           assert all(value is False for value in runtime['hard_boundaries'].values())
+
+          assert reconciliation['state']=='REDEPLOYED_PENDING_REAL_OIDC_INGEST'
+          assert reconciliation['failure_observation']['observed_http_status']==503
+          assert reconciliation['failure_observation']['observed_error_code']=='BOOT_ERROR'
+          assert reconciliation['failure_observation']['real_package_recorded'] is False
+          assert reconciliation['root_cause']['classification']=='DEPLOYED_MODULE_EXPORT_DRIFT'
+          assert reconciliation['root_cause']['deployed_bad_version']==3
+          assert reconciliation['root_cause']['source_control_state']=='CORRECT_EXPORTS_PRESENT'
+          assert reconciliation['corrective_action']['redeployed_version']==4
+          assert reconciliation['corrective_action']['redeployed_ezbr_sha256']==edge['ezbr_sha256']
+          assert reconciliation['verification_state']['real_package_recorded'] is False
+          assert reconciliation['verification_state']['real_oidc_ingest_receipt_recorded'] is False
+          assert all(value is False for value in reconciliation['hard_boundaries'].values())
           PY
 
       - name: Verify unauthenticated requests fail closed
@@ -121,10 +150,12 @@ jobs:
             developers/reference/chlom-wallet/institutionalization/runtime/oidc-jwt-verifier-v2.mjs
             developers/reference/chlom-wallet/institutionalization/runtime/github-repository-binding-v2.mjs
             developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs
+            developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs
             developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json
             developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json
             developers/reference/chlom-wallet/institutionalization/runtime/recovery-plan.v2.json
             developers/reference/chlom-wallet/institutionalization/runtime/commercialization-boundary.v2.json
+            developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json
             developers/reference/chlom-wallet/institutionalization/sql/chlom-wallet-institutionalization-oidc-v2.sql
             automation/chlom-institutionalization-runtime-advisor.mjs
             automation/test-chlom-institutionalization-runtime-advisor.mjs
@@ -143,6 +174,6 @@ jobs:
 
       - name: Record boundary
         run: |
-          echo 'CONTROLLED_TEST: source, OIDC verifier, advisor, schema, SQL patch, recovery, pricing and documentation contracts validated.'
+          echo 'CONTROLLED_TEST: source, module linkage, OIDC verifier, advisor, schema, SQL patch, recovery, pricing and documentation contracts validated.'
           echo 'Unauthenticated Edge requests fail closed. The real package ingest remains a separate GitHub OIDC workflow gate.'
           echo 'No token value, raw artifact body, provider write, credential access, Stripe object, checkout, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement or merge authority is created.'
