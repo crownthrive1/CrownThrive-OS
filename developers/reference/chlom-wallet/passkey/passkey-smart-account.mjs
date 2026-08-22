@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 // CONTROLLED-TEST INTENT BUILDER.
-// This module does not create credentials, private keys, UserOperations, signatures,
+// This module does not create credentials, signing material, UserOperations, signatures,
 // smart accounts, or blockchain transactions. It normalizes public registration intent only.
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
