@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.crownthrive.com/chlom/institutionalization-package.v1.schema.json",
+  "title": "CHLOM Institutionalization Package v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "package_id",
+    "semantic_version",
+    "state",
+    "source_snapshot",
+    "compiler",
+    "artifact_inventory",
+    "artifact_counts",
+    "algorithm_registry",
+    "docs_impact",
+    "security",
+    "privacy",
+    "rights",
+    "commercialization",
+    "rollback",
+    "scheduler",
+    "provenance",
+    "third_party_dependencies",
+    "ai_governance",
+    "gap_analysis",
+    "output_contract",
+    "hard_boundaries",
+    "package_digest_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "package_id": { "type": "string", "pattern": "^ct[.]package[.][A-Za-z0-9._-]+$" },
+    "semantic_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$" },
+    "state": { "enum": ["PASS_CONTROLLED_TEST_INSTITUTIONALIZATION", "HOLD_INSTITUTIONALIZATION_GAPS"] },
+    "source_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "branch", "head_sha", "observed_on"],
+      "properties": {
+        "repository": { "const": "crownthrive1/CrownThrive-Support" },
+        "branch": { "const": "chlom-wallet/phase-c-proof-portability-20260822" },
+        "head_sha": { "const": "64118e61c7671a78b43999ac5f17f9eddd1226b1" },
+        "observed_on": { "const": "2026-08-22" }
+      }
+    },
+    "compiler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_id", "algorithm_id", "semantic_version", "deterministic", "canonicalization", "hash", "network_access", "signing", "provider_write", "chain_broadcast", "money_movement"],
+      "properties": {
+        "tool_id": { "const": "ct.tool.chlom-institutionalization-compiler" },
+        "algorithm_id": { "const": "ct.algorithm.chlom.institutionalization-compiler.v1" },
+        "semantic_version": { "const": "1.0.0" },
+        "deterministic": { "const": true },
+        "canonicalization": { "type": "string" },
+        "hash": { "const": "SHA-256" },
+        "network_access": { "const": false },
+        "signing": { "const": false },
+        "provider_write": { "const": false },
+        "chain_broadcast": { "const": false },
+        "money_movement": { "const": false }
+      }
+    },
+    "artifact_inventory": {
+      "type": "array",
+      "minItems": 11,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_id", "path", "kind", "classification", "owner_agent_id", "status", "public_projection", "sha256", "size_bytes", "secret_shape_detected", "source_ref"],
+        "properties": {
+          "artifact_id": { "type": "string", "pattern": "^ct[.]artifact[.][A-Za-z0-9._-]+$" },
+          "path": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "kind": { "enum": ["algorithm", "source_code", "test", "documentation", "machine_manifest", "schema", "threat_model", "recovery", "pricing", "agent_handoff", "ci_workflow"] },
+          "classification": { "enum": ["public", "internal", "restricted"] },
+          "owner_agent_id": { "type": "string", "pattern": "^ct[.][A-Za-z0-9._-]+$" },
+          "status": { "enum": ["CONTROLLED_TEST", "HOLD", "REFERENCE", "CANDIDATE", "VERIFIED_TEST"] },
+          "public_projection": { "type": "boolean" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "size_bytes": { "type": "integer", "minimum": 1 },
+          "secret_shape_detected": { "const": false },
+          "source_ref": { "type": "string", "minLength": 8 }
+        }
+      }
+    },
+    "artifact_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "public", "internal", "restricted", "public_projection"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 11 },
+        "public": { "type": "integer", "minimum": 0 },
+        "internal": { "type": "integer", "minimum": 0 },
+        "restricted": { "type": "integer", "minimum": 0 },
+        "public_projection": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "algorithm_registry": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["algorithm_id", "semantic_version", "classification", "source_paths", "invariants", "proprietary_scope", "external_dependencies", "authority_effect", "provider_write", "money_movement", "rights_grant", "chain_broadcast"],
+        "properties": {
+          "algorithm_id": { "type": "string", "pattern": "^ct[.]algorithm[.][A-Za-z0-9._-]+$" },
+          "semantic_version": { "type": "string" },
+          "classification": { "type": "string" },
+          "source_paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "invariants": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "proprietary_scope": { "type": "string" },
+          "external_dependencies": { "type": "array" },
+          "authority_effect": { "const": "none" },
+          "provider_write": { "const": false },
+          "money_movement": { "const": false },
+          "rights_grant": { "const": false },
+          "chain_broadcast": { "const": false }
+        }
+      }
+    },
+    "docs_impact": { "type": "object", "minProperties": 1 },
+    "security": { "type": "object", "minProperties": 1 },
+    "privacy": { "type": "object", "minProperties": 1 },
+    "rights": { "type": "object", "minProperties": 1 },
+    "commercialization": { "type": "object", "minProperties": 1 },
+    "rollback": { "type": "object", "minProperties": 1 },
+    "scheduler": { "type": "object", "minProperties": 1 },
+    "provenance": { "type": "object", "minProperties": 1 },
+    "third_party_dependencies": { "type": "array", "minItems": 1 },
+    "ai_governance": {
+      "type": "object",
+      "required": ["advisory_only", "decision_authority", "write_authority", "output_requires_independent_review", "automatic_release"],
+      "properties": {
+        "advisory_only": { "const": true },
+        "decision_authority": { "const": false },
+        "write_authority": { "const": false },
+        "output_requires_independent_review": { "const": true },
+        "automatic_release": { "const": false }
+      }
+    },
+    "gap_analysis": {
+      "type": "object",
+      "required": ["algorithm_id", "algorithm_version", "mode", "ai_extension_mode", "gap_count", "blocking_gap_count", "completeness_score", "disposition", "gaps", "required_handoffs", "authority_effect", "automatic_remediation", "automatic_release"],
+      "properties": {
+        "algorithm_id": { "const": "ct.algorithm.chlom.institutionalization-gap-resolver.v1" },
+        "algorithm_version": { "const": "1.0.0" },
+        "mode": { "const": "deterministic_policy_engine" },
+        "ai_extension_mode": { "const": "advisory_only_no_authority" },
+        "gap_count": { "type": "integer", "minimum": 0 },
+        "blocking_gap_count": { "type": "integer", "minimum": 0 },
+        "completeness_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "disposition": { "enum": ["PASS_CONTROLLED_TEST_INSTITUTIONALIZATION", "HOLD_INSTITUTIONALIZATION_GAPS"] },
+        "gaps": { "type": "array" },
+        "required_handoffs": { "type": "array" },
+        "authority_effect": { "const": "none" },
+        "automatic_remediation": { "const": false },
+        "automatic_release": { "const": false }
+      }
+    },
+    "output_contract": { "type": "object", "minProperties": 1 },
+    "hard_boundaries": { "type": "object", "additionalProperties": { "const": false }, "minProperties": 10 },
+    "package_digest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "not": {
+    "anyOf": [
+      { "required": ["private_key"] },
+      { "required": ["seed_phrase"] },
+      { "required": ["mnemonic"] },
+      { "required": ["credential_value"] },
+      { "required": ["secret_manager_ref"] },
+      { "required": ["provider_credential"] }
+    ]
+  }
+}
