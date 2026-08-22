@@ -1,0 +1,107 @@
+---
+title: "Whole-Estate Project Control API"
+sidebarTitle: "Project Control API"
+description: "Developer-facing public-safe contract for project inventory, issue routing, handoffs and independent verification."
+icon: "code-branch"
+---
+
+# Whole-Estate Project Control API
+
+The CHLOM project-control plane is an internal controlled-test service for converting current CrownThrive evidence into bounded, measurable work.
+
+## Server
+
+```text
+ct.mcp.chlom-project-control
+```
+
+The server is JWT/admin protected. Service-role operations occur behind the server boundary. It does not expose credentials, private subject identifiers, protected PIRS weights, protected evidence bodies or provider secrets.
+
+## Read tools
+
+### `projects.status`
+
+Returns sanitized counts by project type, issue state, severity and latest diagnostic run.
+
+### `projects.issues.list`
+
+Optional filters:
+
+```json
+{
+  "limit": 100,
+  "state": "assigned",
+  "owner_agent_id": "ct.project.agent.pr-convergence"
+}
+```
+
+The response includes issue identity, project identity, public issue class, severity, score/band, lifecycle state, owner/verifier, blocker/unlock summary and timing. It omits private evidence bodies and protected scoring internals.
+
+### `projects.handoffs.list`
+
+Returns append-only handoff metadata for a specified owner or verifier.
+
+## Mutation tools
+
+### `projects.issue.accept`
+
+Only the bound owner may accept an `assigned`, `open` or `deferred` issue. Acceptance moves the issue to `running`; it does not create progress.
+
+### `projects.issue.progress`
+
+Requires:
+
+- bound owner;
+- `running` state;
+- strictly increased progress below 100;
+- positive work units;
+- at least one evidence reference.
+
+The call cannot resolve an issue.
+
+### `projects.issue.handoff`
+
+Only the bound owner may move a `running` issue to `verifying`. Evidence is required.
+
+### `projects.issue.verify`
+
+Only the bound verifier may select one disposition:
+
+- `resolve`
+- `return`
+- `block`
+
+The verifier cannot be the owner. Resolution sets progress to 100. Blocking requires an exact blocker reason. None of these operations creates a sovereign vote.
+
+## Storage contracts
+
+| Table | Purpose |
+| --- | --- |
+| `chlom_runtime.project_portfolio_projects` | canonical project inventory |
+| `chlom_runtime.project_diagnostic_runs` | immutable diagnostic-run summaries |
+| `chlom_runtime.project_issue_inventory` | deduplicated issues and lifecycle state |
+| `chlom_runtime.project_handoffs` | append-only owner/verifier handoffs |
+| `chlom_runtime.project_issue_events` | append-only lifecycle/progress receipts |
+| `chlom_runtime.agent_authority_corrections` | append-only authority-drift corrections |
+
+All are RLS + FORCE RLS and unavailable to normal `anon` or `authenticated` database roles.
+
+## PIRS public contract
+
+`ct.alg.gen7.pirs` routes issues using six bounded feature classes. Exact weights and thresholds are encrypted in Supabase Vault. Its current public contract digest is recorded in the CHLOM algorithm registry. The implementation is controlled test and cannot score people, create D3 authority or replace independent verification.
+
+## Failure behavior
+
+The runtime fails closed for:
+
+- unknown issue;
+- wrong owner or verifier;
+- owner/verifier collision;
+- absent evidence;
+- zero work units on a progress claim;
+- non-increasing progress;
+- completion by an owner;
+- verification outside `verifying` state;
+- unsupported verifier disposition.
+
+History is append-only. Corrective work produces a new event or supersession record rather than deleting predecessor evidence.
