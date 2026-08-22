@@ -22,15 +22,16 @@ concurrency:
 
 jobs:
   controlled-test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Parse public contracts
         run: |
+          set -euo pipefail
           python3 -m json.tool developers/manifests/commercial-release-factory.v1.json >/dev/null
           python3 -m json.tool developers/manifests/commercial-release-factory.v2.json >/dev/null
           python3 -m json.tool developers/contracts/commercial-release-package.schema.json >/dev/null
@@ -38,9 +39,12 @@ jobs:
           python3 -m json.tool developers/contracts/commercial-release-factory-api-mcp.v2.json >/dev/null
           python3 -m json.tool developers/reference/commercial-release-factory/edge-functions/status/deno.json >/dev/null
       - name: Run deterministic and adversarial tests
-        run: python3 developers/reference/commercial-release-factory/commercial_release_factory.py --self-test
+        run: |
+          set -euo pipefail
+          python3 developers/reference/commercial-release-factory/commercial_release_factory.py --self-test
       - name: Enforce authority and disclosure invariants
         run: |
+          set -euo pipefail
           ! grep -RniE '(BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY|sk_(live|test)_[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})' \
             automation/commercial-release-package-agent.mdx automation/commercial-release-factory-workflow.mdx \
             changelog/commercial-release-factory-2026-08-22.mdx developers/manifests/commercial-release-factory.v2.json \
