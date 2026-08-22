@@ -1,0 +1,46 @@
+name: Commercial Release Factory
+
+on:
+  pull_request:
+    paths:
+      - "automation/commercial-release-package-agent.mdx"
+      - "automation/commercial-release-factory-workflow.mdx"
+      - "developers/manifests/commercial-release-factory.v1.json"
+      - "developers/contracts/commercial-release-package.schema.json"
+      - "developers/reference/commercial-release-factory/**"
+      - ".github/workflows/commercial-release-factory.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commercial-release-factory-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controlled-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Parse public manifests
+        run: |
+          python3 -m json.tool developers/manifests/commercial-release-factory.v1.json >/dev/null
+          python3 -m json.tool developers/contracts/commercial-release-package.schema.json >/dev/null
+      - name: Run deterministic release-factory tests
+        run: python3 developers/reference/commercial-release-factory/tests/test_release_factory.py
+      - name: Enforce public-boundary and authority invariants
+        run: |
+          ! grep -RniE '(BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY|sk_(live|test)_[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})' \
+            automation/commercial-release-package-agent.mdx \
+            automation/commercial-release-factory-workflow.mdx \
+            developers/manifests/commercial-release-factory.v1.json \
+            developers/contracts/commercial-release-package.schema.json \
+            developers/reference/commercial-release-factory
+          grep -q '"direct_sites_provider_write": false' developers/manifests/commercial-release-factory.v1.json
+          grep -q '"checkout_enabled": false' developers/manifests/commercial-release-factory.v1.json
+          grep -q '"sovereign_votes_created": false' developers/manifests/commercial-release-factory.v1.json
