@@ -1,0 +1,59 @@
+name: CHLOM Wallet Sepolia Read-Only Codehash
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_runtime_codehash:
+        description: "Governed expected keccak256 runtime codehash (0x + 64 hex)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-sepolia-readonly-codehash
+  cancel-in-progress: false
+
+jobs:
+  readback:
+    name: Read chain ID and EntryPoint code only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: chlom-wallet-readonly-testnet
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate governed input and read-only RPC secret presence
+        env:
+          EXPECTED_HASH: ${{ inputs.expected_runtime_codehash }}
+          RPC_URL: ${{ secrets.CHLOM_SEPOLIA_RPC_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HASH" =~ ^0x[0-9a-fA-F]{64}$ ]]
+          test -n "$RPC_URL"
+
+      - name: Execute read-only preflight
+        env:
+          CHLOM_READONLY_RPC_URL: ${{ secrets.CHLOM_SEPOLIA_RPC_URL }}
+          CHLOM_EXPECTED_CHAIN_ID_HEX: "0xaa36a7"
+          CHLOM_ENTRYPOINT_ADDRESS: "0x433709009B8330FDa32311DF1C2AFA402eD8D009"
+          CHLOM_EXPECTED_RUNTIME_CODEHASH: ${{ inputs.expected_runtime_codehash }}
+        run: node developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs
+
+      - name: Enforce no transaction path
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE 'eth_sendRawTransaction|eth_sendTransaction|personal_sendTransaction|wallet_sendCalls' developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs; then
+            echo "A transaction-capable RPC method appeared in the read-only preflight implementation."
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "READ_ONLY: eth_chainId and eth_getCode only."
+          echo "No signer, private key, UserOperation submission, deployment, broadcast, custody, or money movement is used."
+          echo "A PASS is code-readback evidence only and does not authorize testnet deployment."

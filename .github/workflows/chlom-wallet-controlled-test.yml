@@ -52,6 +52,10 @@ jobs:
           node --check developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs
           node --check developers/reference/chlom-wallet/smart-account/test-user-operation-intent.mjs
           node --check developers/reference/chlom-wallet/smart-account/user-operation-hash-crosscheck.mjs
+          node --check developers/reference/chlom-wallet/smart-account/entrypoint-profile-verifier.mjs
+          node --check developers/reference/chlom-wallet/smart-account/test-entrypoint-profile-verifier.mjs
+          node --check developers/reference/chlom-wallet/smart-account/read-only-chain-code-preflight.mjs
+          node --check developers/reference/chlom-wallet/smart-account/test-read-only-chain-code-preflight.mjs
           node --check developers/reference/chlom-wallet/ui/unified-value-receipt.mjs
           node --check developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
           node --check developers/reference/chlom-wallet/ui/wallet-shell.mjs
@@ -76,6 +80,12 @@ jobs:
       - name: Run deterministic ERC-4337 v0.9 unsigned-intent tests
         run: node developers/reference/chlom-wallet/smart-account/test-user-operation-intent.mjs
 
+      - name: Run ERC-4337 source-profile tests
+        run: node developers/reference/chlom-wallet/smart-account/test-entrypoint-profile-verifier.mjs
+
+      - name: Run read-only chain-code preflight contract tests
+        run: node developers/reference/chlom-wallet/smart-account/test-read-only-chain-code-preflight.mjs
+
       - name: Run Unified Value Receipt presentation tests
         run: node developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
 
@@ -90,6 +100,8 @@ jobs:
           python -m json.tool automation/chlom-wallet-settlement-agent.json >/dev/null
           python -m json.tool chlom/chlom-wallet-commercial-catalog.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/passkey/runtime-contract.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json >/dev/null
 
       - name: Enforce reference-contract no-value-movement boundary
@@ -133,15 +145,33 @@ jobs:
           assert runtime['edge_function']['authenticated_browser_ceremony_state']=='NOT_YET_EXECUTED'
           assert all(value is False for value in runtime['hard_boundaries'].values())
 
+          profile=json.load(open('developers/reference/chlom-wallet/smart-account/erc4337-entrypoint-v0.9.0-profile.json'))
+          assert profile['state']=='SOURCE_RELEASE_AND_TAG_ARTIFACT_DIVERGENCE_REGISTERED_CHAIN_CODE_UNVERIFIED'
+          assert profile['verification']['release_and_artifact_addresses_match'] is False
+          assert profile['verification']['external_read_only_chain_readback_completed'] is False
+          assert profile['verification']['runtime_codehash_verified'] is False
+          assert all(value is False for value in profile['hard_boundaries'].values())
+
+          gates=json.load(open('developers/reference/chlom-wallet/smart-account/testnet-predeployment-gates.v1.json'))
+          assert gates['state']=='HOLD_PREDEPLOYMENT'
+          assert gates['hard_boundaries']['rpc_write_methods_allowed']==[]
+          assert gates['hard_boundaries']['external_rpc_readback_completed'] is False
+          assert gates['hard_boundaries']['approved_runtime_codehash_present'] is False
+          assert gates['hard_boundaries']['simulation_completed'] is False
+          assert gates['hard_boundaries']['broadcast_enabled'] is False
+          assert gates['hard_boundaries']['deploy_enabled'] is False
+          assert gates['hard_boundaries']['money_movement_enabled'] is False
+
           readiness=json.load(open('developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json'))
-          assert readiness['state']=='SPECIFIED_NOT_DEPLOYED'
+          assert readiness['state']=='HOLD_PREDEPLOYMENT'
+          assert readiness['chain']['external_read_only_readback_completed'] is False
           assert readiness['chain']['runtime_code_hash_verified'] is False
           assert readiness['deployment']['user_operation_state']=='DETERMINISTIC_UNSIGNED_INTENT_ONLY'
           assert readiness['deployment']['simulation_completed'] is False
           assert readiness['deployment']['broadcast_enabled'] is False
           assert readiness['deployment']['money_movement'] is False
           assert readiness['deployment']['transaction_hash'] is None
-          assert readiness['account_abstraction']['source_discrepancy']['disposition']=='HOLD'
+          assert readiness['account_abstraction']['source_discrepancy_disposition']=='HOLD'
           PY
 
       - name: Enforce wallet-shell public projection boundary
@@ -158,5 +188,6 @@ jobs:
           echo "CONTROLLED_TEST: webhook tests use synthetic signing material and do not register a live Stripe endpoint."
           echo "CONTROLLED_TEST: WebAuthn source tests use synthetic P-256 credentials; deployed runtime activation remains disabled."
           echo "CONTROLLED_TEST: ERC-4337 v0.9 output is an unsigned deterministic intent; simulation and broadcast remain disabled."
+          echo "CONTROLLED_TEST: source release/artifact divergence is registered and chain runtime code remains externally unverified."
           echo "CONTROLLED_TEST: contract-model fuzz is source-aligned state-model testing, not an audit."
           echo "CONTROLLED_TEST: no testnet/mainnet deployment, custody, money movement, or entitlement inference is certified by this workflow."
