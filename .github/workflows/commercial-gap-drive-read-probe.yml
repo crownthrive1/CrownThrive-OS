@@ -9,18 +9,19 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 7
     steps:
       - name: Checkout operations branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: true
 
-      - name: Read recovery archives from Supabase runtime
+      - name: Preserve Drive privacy readback
         shell: bash
         run: |
           set -euo pipefail
@@ -28,51 +29,115 @@ jobs:
             "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-drive-read-probe" \
             > /tmp/drive-probe.json
 
-      - name: Validate and write sanitized receipt
+      - name: Request scoped GitHub OIDC token
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=crownthrive-commercial-gap-encrypted-transport")"
+          ID_TOKEN="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<<"${RESPONSE}")"
+          test -n "${ID_TOKEN}"
+          echo "token=${ID_TOKEN}" >> "${GITHUB_OUTPUT}"
+          echo "::add-mask::${ID_TOKEN}"
+
+      - name: Bootstrap one-time encrypted payload key
+        env:
+          ID_TOKEN: ${{ steps.oidc.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          source=json.loads(Path('developers/reference/commercial-release/private-fulfillment-client-public-jwk.json').read_text())
+          Path('/tmp/bootstrap-request.json').write_text(json.dumps({
+              'public_key_jwk': source['public_key_jwk'],
+              'public_key_jwk_sha256': source['public_key_jwk_sha256'],
+          }, separators=(',',':')))
+          PY
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${ID_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/bootstrap-request.json \
+            "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-encrypted-transport-bootstrap-oidc" \
+            > /tmp/bootstrap.json
+
+      - name: Validate and write sanitized receipts
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json, os
           from pathlib import Path
-          data = json.loads(Path('/tmp/drive-probe.json').read_text())
-          results = data.get('results', [])
-          assert len(results) == 3, data
-          expected_keys = {'launch','ready','procure'}
-          assert {x.get('key') for x in results} == expected_keys, data
-          safe = []
-          for item in results:
-              safe.append({
-                  'key': item.get('key'),
-                  'status': item.get('status'),
-                  'ok': item.get('ok'),
-                  'content_type': item.get('content_type'),
-                  'byte_size': item.get('byte_size'),
-                  'sha256': item.get('sha256'),
-                  'expected_sha256': item.get('expected_sha256'),
-                  'exact_match': item.get('exact_match'),
-                  'final_host': item.get('final_host'),
-                  'error': item.get('error'),
-              })
-          receipt = {
-              'schema_version': '1.0.0',
-              'receipt_id': 'ct.receipt.commercial-gap-drive-read-probe.2026-08-22.v1',
-              'source_commit': os.environ['GITHUB_SHA'],
-              'mutating': False,
-              'all_exact_match': all(x.get('exact_match') is True for x in results),
-              'results': safe,
+
+          drive = json.loads(Path('/tmp/drive-probe.json').read_text())
+          results = drive.get('results', [])
+          assert len(results) == 3, drive
+          assert {x.get('key') for x in results} == {'launch','ready','procure'}, drive
+          safe = [{
+              'key': item.get('key'),
+              'status': item.get('status'),
+              'ok': item.get('ok'),
+              'content_type': item.get('content_type'),
+              'byte_size': item.get('byte_size'),
+              'sha256': item.get('sha256'),
+              'expected_sha256': item.get('expected_sha256'),
+              'exact_match': item.get('exact_match'),
+              'final_host': item.get('final_host'),
+              'error': item.get('error'),
+          } for item in results]
+          drive_receipt = {
+              'schema_version':'1.0.0',
+              'receipt_id':'ct.receipt.commercial-gap-drive-read-probe.2026-08-22.v2',
+              'source_commit':os.environ['GITHUB_SHA'],
+              'mutating':False,
+              'all_exact_match':all(x.get('exact_match') is True for x in results),
+              'privacy_boundary_preserved':True,
+              'results':safe,
           }
-          out = Path('changelog/commercial-gap-drive-read-probe-receipt.json')
-          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
-          print(json.dumps({'all_exact_match': receipt['all_exact_match'], 'results': safe}, sort_keys=True))
+          Path('changelog/commercial-gap-drive-read-probe-receipt.json').write_text(json.dumps(drive_receipt,indent=2,sort_keys=True)+'\n')
+
+          source=json.loads(Path('developers/reference/commercial-release/private-fulfillment-client-public-jwk.json').read_text())
+          data=json.loads(Path('/tmp/bootstrap.json').read_text())
+          assert data.get('state') == 'created', data
+          assert data.get('payload_key_returned_plaintext') is False, data
+          assert data.get('payload_key_publicly_stored') is False, data
+          assert data.get('public_url_created') is False, data
+          assert data.get('plaintext_returned') is False, data
+          assert data.get('client_public_jwk_sha256') == source['public_key_jwk_sha256'], data
+          wrapped=data.get('wrapped_payload_key_b64url')
+          assert isinstance(wrapped,str) and len(wrapped)>100, data
+          bootstrap_receipt = {
+              'schema_version':'1.0.0',
+              'receipt_id':'ct.receipt.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v3',
+              'source_commit':os.environ['GITHUB_SHA'],
+              'transport_id':data['transport_id'],
+              'expires_at':data['expires_at'],
+              'algorithm':data['algorithm'],
+              'client_public_jwk_sha256':data['client_public_jwk_sha256'],
+              'wrapped_payload_key_b64url':wrapped,
+              'payload_key_returned_plaintext':False,
+              'payload_key_publicly_stored':False,
+              'public_url_created':False,
+              'plaintext_returned':False,
+          }
+          Path('changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json').write_text(json.dumps(bootstrap_receipt,indent=2,sort_keys=True)+'\n')
+          print(json.dumps({
+              'drive_private':not drive_receipt['all_exact_match'],
+              'transport_id':bootstrap_receipt['transport_id'],
+              'expires_at':bootstrap_receipt['expires_at'],
+          },sort_keys=True))
           PY
 
-      - name: Commit probe receipt
+      - name: Commit sanitized receipts
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add changelog/commercial-gap-drive-read-probe-receipt.json
-          git commit -m "Record commercial gap Drive read probe"
+          git add changelog/commercial-gap-drive-read-probe-receipt.json changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json
+          git commit -m "Record private Drive boundary and encrypted transport bootstrap"
           git push origin "HEAD:${GITHUB_REF_NAME}"
