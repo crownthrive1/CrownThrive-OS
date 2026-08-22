@@ -1,0 +1,143 @@
+---
+title: "CHLOM Wallet Experience Contract"
+sidebarTitle: "Wallet Experience"
+description: "The end-user experience contract for a simple, closed-loop CHLOM Wallet surface over governed Money, Rights, Rewards, Impact and Proof rails."
+icon: "mobile-screen-button"
+---
+
+# CHLOM Wallet experience contract
+
+CHLOM Wallet should make a complicated institutional system feel simple without hiding the meaning users actually need.
+
+The experience target is **one CrownThrive wallet, five understandable answers**:
+
+1. **Money —** what happened financially?
+2. **Rights —** what am I actually allowed to access or use?
+3. **Rewards —** what did I earn inside approved CrownThrive programs?
+4. **Impact —** what impact obligation exists and what state is it in?
+5. **Proof —** what evidence fingerprint can verify this exact state?
+
+This is a closed-loop CrownThrive experience architecture, not a requirement that every value class become a token or transferable asset.
+
+## Experience principle: hide infrastructure, not truth
+
+The customer should not have to understand:
+
+- Stripe PaymentIntents or webhook event IDs;
+- CHLOM internal table names;
+- chain RPC providers;
+- ERC EntryPoints or bundlers;
+- rights-ledger implementation details;
+- economic-schedule JSON;
+- evidence-storage topology.
+
+The customer **does** need to understand:
+
+- whether money is pending, completed, refunded, disputed or held;
+- whether a right or entitlement is active, held, expired or revoked;
+- whether a reward was earned, redeemed, reversed or expired;
+- whether an impact amount is calculated, approved, settled or only awaiting proof;
+- whether a proof is merely created, anchored in test, or confirmed in an approved production system.
+
+## One shell, separate value lanes
+
+CHLOM Wallet intentionally avoids a misleading universal balance.
+
+```text
+┌─────────────────────────────────────────────┐
+│ CHLOM Wallet                                │
+│                                             │
+│ Money        Rights       Rewards    Impact │
+│ $49.99       Active       Earned     Calc.  │
+│ Reconciled   License A    Program B  Hold   │
+│                                             │
+│ Proof                                       │
+│ Receipt fingerprint · Not anchored          │
+│                                             │
+│ Recent Value Receipts                       │
+└─────────────────────────────────────────────┘
+```
+
+A unified visual shell does not mean that `$49.99`, a license, 200 reward points and a ThriveFund obligation can be mathematically added into one number.
+
+## Primary customer actions
+
+The first product should expose only high-value actions:
+
+- **View** a wallet summary.
+- **Open** a Unified Value Receipt.
+- **Verify** a receipt fingerprint.
+- **Review** current rights and expiration/revocation state.
+- **Review** reward history.
+- **Review** impact state and evidence status.
+- **Manage** payment/subscription through the approved Stripe surface when enabled.
+- **Export** an approved personal receipt/audit packet.
+- **Get help** with a payment, entitlement or receipt discrepancy.
+
+Advanced provider or blockchain administration remains outside the consumer surface.
+
+## Progressive disclosure
+
+The default receipt uses plain language. Advanced evidence opens only when requested and authorized.
+
+```text
+Level 1 — Simple status
+Paid · License active · Rewards earned · Impact calculated
+
+Level 2 — Receipt details
+Amounts · dates · license reference · policy version · fingerprint
+
+Level 3 — Verification
+Digest · anchor state · public-safe evidence references
+
+Level 4 — Restricted operations
+Provider diagnostics · private rights evidence · security · finance reconciliation
+```
+
+This prevents the user experience from becoming a database console while preserving auditability for authorized operators.
+
+## Provider abstraction
+
+Provider names should appear only where they add customer value, such as a payment-method detail or a support explanation. Provider-native identifiers do not become the primary CrownThrive identity.
+
+A customer sees the same CHLOM wallet and receipt model if CrownThrive later changes a payment processor, chain RPC service, wallet infrastructure vendor or proof network—subject to the provider-exit and reconciliation gates.
+
+## Accessibility contract
+
+The reference shell uses:
+
+- semantic landmarks and headings;
+- text status in addition to visual styling;
+- readable state words rather than icon-only meaning;
+- keyboard-compatible document structure;
+- `aria-live` for status changes where an application implementation needs it;
+- no color-only distinction between approved/held/revoked states;
+- plain-language explanations before technical identifiers.
+
+Production UI still requires device, keyboard, screen-reader and contrast testing.
+
+## Safety and trust UX
+
+The shell must never show:
+
+- `Paid` as `Licensed` when the rights decision is still HOLD;
+- `Impact settled` when only a calculation exists;
+- rewards as cash/crypto unless the approved program actually defines them that way;
+- a test anchor as production proof;
+- a chain transaction as proof of legal ownership by itself;
+- a provider error as a disappearance of the user's institutional record.
+
+When states disagree, the user gets a visible `Needs review` or `Held` state rather than a falsely clean success message.
+
+## Current reference implementation
+
+The source-controlled `wallet-shell.mjs` reference now renders a five-section wallet view from public-safe Unified Value Receipt projections. Its tests enforce:
+
+- provider implementation details do not leak into the customer shell;
+- private evidence fields do not render;
+- active rights require an entitlement reference;
+- externally settled impact requires evidence;
+- Money, Rights, Rewards and Impact remain semantically separate;
+- semantic headings and live-status structure are present.
+
+The reference renderer is not yet a deployed customer application. It defines the experience contract the production CrownThrive surface must meet.
