@@ -72,14 +72,19 @@ jobs:
           from pathlib import Path
           platform = os.environ["FAILED_PLATFORM"]
           raw = json.loads(Path(f"build/private-fulfillment/{platform}.json").read_text())
-          detail = str(raw.get("detail", "unspecified_failure"))
-          detail = re.sub(r"https?://\\S+", "[redacted-url]", detail)
-          detail = re.sub(r"storage://\\S+", "[redacted-ref]", detail)
-          detail = re.sub(r"\\b(?:sk|rk|pk|whsec|sb|ghp|github_pat)_[A-Za-z0-9_-]+\\b", "[redacted-secret]", detail)
-          detail = re.sub(r"[A-Za-z0-9_-]{32,}", "[redacted-token]", detail)[:240]
+          raw_detail = str(raw.get("detail", "unspecified_failure"))
+          failure_code = raw_detail.split(":", 1)[0][:96]
+          if not re.fullmatch(r"[A-Za-z0-9_.-]+", failure_code):
+              failure_code = "unclassified_failure"
+          detail = raw_detail
+          detail = re.sub(r"https?://\S+", "[redacted-url]", detail)
+          detail = re.sub(r"storage://\S+", "[redacted-ref]", detail)
+          detail = re.sub(r"\b(?:sk|rk|pk|whsec|sb|ghp|github_pat)_[A-Za-z0-9_-]+\b", "[redacted-secret]", detail)
+          detail = re.sub(r"\b[0-9a-fA-F]{64}\b", "[redacted-sha256]", detail)
+          detail = re.sub(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,}\b", "[redacted-uuid]", detail)[:240]
           receipt = {
-              "schema_version": "1.0.0",
-              "receipt_id": "ct.receipt.commercial-gap-private-fulfillment-oidc.failure.2026-08-22.v1",
+              "schema_version": "1.0.1",
+              "receipt_id": "ct.receipt.commercial-gap-private-fulfillment-oidc.failure.2026-08-22.v2",
               "source_commit": os.environ["GITHUB_SHA"],
               "workflow_run_id": os.environ["GITHUB_RUN_ID"],
               "cohort_id": "ct-commercial-gap-sites-v1",
@@ -87,6 +92,7 @@ jobs:
               "platform": platform,
               "http_status": int(os.environ["FAILED_HTTP"]),
               "error": str(raw.get("error", "private_fulfillment_failed"))[:80],
+              "failure_code": failure_code,
               "detail": detail,
               "customer_effect": False,
               "money_movement": False,
