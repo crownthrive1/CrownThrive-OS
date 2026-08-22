@@ -22,13 +22,20 @@ jobs:
   kernel:
     name: Validate public-safe wallet kernel
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 9
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Verify runtime
         run: node --version
+
+      - name: Install exact CBOR dependency for registration tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-save --no-package-lock cbor-x@1.6.4
+          node -e "const p=require('./node_modules/cbor-x/package.json'); if(p.version!=='1.6.4') process.exit(1); console.log(p.version)"
 
       - name: Syntax check
         run: |
@@ -40,6 +47,8 @@ jobs:
           node --check developers/reference/chlom-wallet/passkey/test-passkey-smart-account.mjs
           node --check developers/reference/chlom-wallet/passkey/webauthn-assertion-verifier.mjs
           node --check developers/reference/chlom-wallet/passkey/test-webauthn-assertion-verifier.mjs
+          node --check developers/reference/chlom-wallet/passkey/webauthn-registration-verifier.mjs
+          node --check developers/reference/chlom-wallet/passkey/test-webauthn-registration-verifier.mjs
           node --check developers/reference/chlom-wallet/ui/unified-value-receipt.mjs
           node --check developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
           node --check developers/reference/chlom-wallet/ui/wallet-shell.mjs
@@ -58,6 +67,9 @@ jobs:
       - name: Run cryptographic WebAuthn assertion tests
         run: node developers/reference/chlom-wallet/passkey/test-webauthn-assertion-verifier.mjs
 
+      - name: Run controlled WebAuthn registration tests
+        run: node developers/reference/chlom-wallet/passkey/test-webauthn-registration-verifier.mjs
+
       - name: Run Unified Value Receipt presentation tests
         run: node developers/reference/chlom-wallet/ui/test-unified-value-receipt.mjs
 
@@ -67,10 +79,11 @@ jobs:
       - name: Run deterministic contract state-model fuzz
         run: node developers/reference/chlom-wallet/contracts/contract-model-fuzz.mjs
 
-      - name: Validate agent and commerce JSON
+      - name: Validate agent, commerce and readiness JSON
         run: |
           python -m json.tool automation/chlom-wallet-settlement-agent.json >/dev/null
           python -m json.tool chlom/chlom-wallet-commercial-catalog.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json >/dev/null
 
       - name: Enforce reference-contract no-value-movement boundary
         shell: bash
@@ -90,7 +103,6 @@ jobs:
             \( -name 'chlom-wallet-settlement-agent.*' -o -name 'chlom-wallet-*' -o -path '*/chlom-wallet/*' -o -name 'chlom-wallet-threat-model.mdx' \) \
             ! -path '*/.git/*' -print)
           test "${#wallet_files[@]}" -gt 0
-          # Search for concrete credential/key shapes, not ordinary prose that explains that keys are prohibited.
           if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${wallet_files[@]}"; then
             echo "Potential live secret-shaped material detected in wallet projection."
             exit 1
@@ -104,6 +116,15 @@ jobs:
             echo "Controlled-test passkey reference must remain non-deploying and non-broadcasting."
             exit 1
           fi
+          python - <<'PY'
+          import json
+          p='developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json'
+          d=json.load(open(p))
+          assert d['state']=='SPECIFIED_NOT_DEPLOYED'
+          assert d['deployment']['broadcast_enabled'] is False
+          assert d['deployment']['money_movement'] is False
+          assert d['deployment']['transaction_hash'] is None
+          PY
 
       - name: Enforce wallet-shell public projection boundary
         shell: bash
@@ -117,7 +138,7 @@ jobs:
       - name: Record boundary
         run: |
           echo "CONTROLLED_TEST: webhook tests use synthetic signing material and do not register a live Stripe endpoint."
-          echo "CONTROLLED_TEST: WebAuthn assertion tests use ephemeral synthetic P-256 credentials and do not activate a production credential."
-          echo "CONTROLLED_TEST: passkey/smart-account code builds registration intents only; it does not deploy or broadcast."
-          echo "CONTROLLED_TEST: contract-model fuzz is source-aligned state-model testing, not EVM execution or an audit."
+          echo "CONTROLLED_TEST: WebAuthn tests use synthetic P-256 credentials; registration accepts only the none-attestation profile and makes no authenticator trust claim."
+          echo "CONTROLLED_TEST: passkey/smart-account code remains non-deploying and non-broadcasting."
+          echo "CONTROLLED_TEST: contract-model fuzz is source-aligned state-model testing, not an audit."
           echo "CONTROLLED_TEST: no mainnet deployment, custody, money movement, or entitlement inference is certified by this workflow."
