@@ -106,6 +106,151 @@ The July 2026 data/API/security specification defines representative contracts:
 
 All remain `source_defined` until implemented and tested. Phase 3 may refine paths while preserving semantic IDs and migration history.
 
+## ThriveTools family
+
+### Parent family
+
+```yaml
+platform_id: ct.platform.thrivetools
+host: https://thrivetools.io
+source_portfolio_row: S100-PORT-017
+source_engine_row: S100-ENG-006
+source_domain_row: S100-DOM-057
+interface_state: uninspected
+child_capabilities:
+  - ct.capability.thrivetools.seo
+  - ct.capability.thrivetools.opt
+counting_rule: child_capabilities_do_not_increment_top_level_platform_count
+```
+
+The parent does not inherit a child API, version, provider, entitlement or deployment state.
+
+### ThriveTools SEO
+
+```yaml
+capability_id: ct.capability.thrivetools.seo
+parent_id: ct.platform.thrivetools
+host: https://seo.thrivetools.io
+host_source: S108
+source_portfolio_row: S100-PORT-018
+source_engine_row: S100-ENG-083
+api_base_url: unverified
+public_api_docs: not_discovered
+runtime_provider_version_deployment: verification_open
+```
+
+The child identity and host relationship are source-backed. No API base, current provider entitlement or live runtime is inferred from the domain manifest or the historical `66audit` engine row.
+
+### ThriveTools OPT
+
+```yaml
+capability_id: ct.capability.thrivetools.opt
+parent_id: ct.platform.thrivetools
+host: https://optimize.thrivetools.io
+host_source: S108
+api_id: ct.api.thrivetools.opt.v4
+base_url: https://optimize.thrivetools.io/api
+version_evidence: 4.0.0
+auth_scheme: api_key_authorization_header
+source: S109
+state:
+  docs: docs_verified
+  credential_binding: auth_verified_server_side
+  check_status: auth_verified
+  remaining_d0_bounded_reads: open
+  request_body_bounding: open
+  recovery_continuity: open
+  mcp_adapter: open
+  provider_writes: closed
+```
+
+Endpoint evidence:
+
+| Method | Path | State |
+| --- | --- | --- |
+| `GET` | `/check-status` | authenticated read verified |
+| `GET` | `/get-images` | documented; runtime dispatch gated pending bounded certification |
+| `GET` | `/get-media` | documented; runtime dispatch gated pending bounded certification |
+| `POST` | `/get-single-image` | documented read-style request; runtime dispatch gated pending bounded certification |
+| `POST` | `/upload` | D2 write closed / disabled |
+| `POST` | `/delete` | D2 write closed / disabled |
+
+No documentation or source record authorizes enabling the closed write routes. Public docs omit raw credentials, fingerprints, secret paths and restricted failure evidence.
+
+## cPanel / WHM hosting control plane
+
+```yaml
+service_id: ct.service.hosting.whm
+api_id: ct.api.cpanel-whm.api1
+adapter_id: ct.adapter.cpanel-whm.api1.v1
+provider: cPanel_and_WHM
+runtime_base_url: restricted_operator_configuration
+auth_scheme: whm_api_token_header
+credential_ref: restricted_vault_reference
+credential_state: verified_dual_reference
+adapter_state: deployed_read_only
+provider_writes_enabled: false
+source_refs:
+  - S111
+  - S112
+  - S113
+  - S114
+state:
+  accounts_list: auth_verified
+  system_load: auth_verified
+  server_hostname: auth_verified
+  disk_usage: docs_verified_bounded_read_pending
+  provider_native_token_acl: broad_existing_token_observed_rotation_pending
+```
+
+The WHM API 1 connection is authenticated from server-side Vault custody. The certification snapshot returned **44 cPanel accounts**, including **8 suspended**, and separately verified system-load and hostname reads. Exact account rows, management endpoints, provider-host details, contact data and credentials remain restricted rather than being projected into public documentation.
+
+| Method | Provider operation | Institutional state | Mutation |
+| --- | --- | --- | --- |
+| `GET` | account inventory | authenticated read verified | no |
+| `GET` | system load | authenticated read verified | no |
+| `GET` | server hostname | authenticated read verified | no |
+| `GET` | disk usage | provider contract documented; bounded certification pending | no |
+
+### crownthrive.io cPanel UAPI
+
+```yaml
+service_id: ct.service.cpanel.crownthrive-io
+credential_id: ct.credential.cpanel.crownthrive-io.thrivebase-api
+adapter_id: ct.adapter.cpanel.crownthrive-io.uapi.v1
+provider_api: cPanel_UAPI
+credential_state: verified_dual_reference
+managed_token_expiry: 2026-11-20T03:49:00Z
+provider_token_scope: full_account_access
+institutional_adapter_scope: read_only
+adapter_state: deployed_read_only
+certified_operation: StatsBar/get_stats(diskusage)
+provider_writes_enabled: false
+```
+
+The managed cPanel token was created through the provider's token-management API, vaulted immediately, and verified through a direct authenticated UAPI disk-usage read. Two transient certification tokens were revoked after the managed credential passed. A separate pre-existing provider token named `THRIVEBASE` remains visible but is not the governed runtime credential; external-consumer review is required before revocation.
+
+### SSH key custody
+
+```yaml
+key_id: ct.sshkey.cpanel.crownthrive-io.thrivebase
+key_type: ssh-rsa
+key_bits: 4096
+public_fingerprint_sha256: SHA256:FAKVVWXR98wQylQpqEa1qeC8MoEzNCw356N0JJY1kXY
+private_key_state: encrypted_vault_primary_and_recovery
+private_key_cipher: aes256-ctr
+private_key_kdf: bcrypt
+passphrase_state: required_not_supplied
+provider_authorization_state: unverified
+live_ssh_test: not_run
+```
+
+The uploaded private key and supplied public key match at the OpenSSH envelope/fingerprint level. The private key is Vault-only and remains unusable for runtime SSH until the passphrase and provider-side authorization state are independently verified. No shell connection was attempted.
+
+The deployed WHM and cPanel adapters are JWT-protected and allowlisted. Provider-native permissions may be broader than the adapter; that fact does not authorize account, package, DNS, service, server, token or shell mutations. Hosting-account evidence remains separate from registrar, DNS/TLS, application-health and source/deployment authority.
+
+See [cPanel / WHM Hosting Control Plane](/technology/cpanel-whm-hosting-control-plane).
+
 ## Virality Music
 
 ```yaml
@@ -425,24 +570,29 @@ Documented families include User, Websites, Pageviews, Visitors, Goals, Goal con
 
 ## CrownPulse
 
-Phase 2.98 verified the public CrownPulse host and a current Bearer-key API example.
+Phase 2.98 verified the public CrownPulse host and Bearer-key API example. The founder-supplied administrator snapshot dated 2026-08-21 also verifies the current API documentation/account-API routes and restricted credential custody, without converting custody into endpoint certification.
 
 ```yaml
 api_id: ct.api.crownpulse.public
 host: https://crownpulse.com
+docs_url: https://crownpulse.com/api-documentation
+account_api_url: https://crownpulse.com/account-api
 known_path: /api/campaigns
 known_method: POST
 auth_scheme: bearer_api_key
 state:
   public_host: public_host_verified
+  docs_route: verified
   public_example: verified
-  full_docs_extraction: pending
-  auth: unverified
+  privileged_credential_custody: verified_restricted_dual_reference
+  exact_contract_extraction: pending
+  authenticated_request: not_run
   sandbox: unverified
   production_request: unverified
+  production_write: closed
 ```
 
-Current public API families include Campaigns, Campaign notifications, Notification handlers and Custom domains. Full API documentation, concrete schemas, delivery side effects, rate limits, consent/suppression behavior and provider integrations still require verification.
+Current account/documentation surfaces name API families for User, Statistics, Campaigns, Campaign notifications, Notification handlers, Custom domains, teams/team members, account payments and account logs. Do not infer method coverage, scopes, schemas, idempotency or side effects from family names. Current provider lineage is founder-attested as 66socialproof/AltumCode with installed `v57.0.0`, `v61.0.0` available and support expired; that dated version evidence is separate from repository/deployment custody. The privileged credential value, fingerprint and recovery material remain restricted and must never be copied into Mintlify/GitHub. Authorized read/canary testing, delivery side effects, rate limits, consent/suppression behavior and provider integrations remain open.
 
 ## CrownThrive IO and domains
 
@@ -489,7 +639,7 @@ The public-domain sweep verified visible Bearer-key REST documentation for four 
 
 ### CrownPulse
 
-`https://crownpulse.com/api/{endpoint}` · Bearer API key. Families include Statistics, Campaigns, Campaign notifications, handlers, domains, teams and account payments/logs. Observed example: `POST /api/campaigns`.
+`https://crownpulse.com/api/{endpoint}` · Bearer API key. Current documentation/account routes are `https://crownpulse.com/api-documentation` and `https://crownpulse.com/account-api`. Families visible in the current surface include User, Statistics, Campaigns, Campaign notifications, handlers, domains, teams/team members and account payments/logs. Observed example: `POST /api/campaigns`. Restricted credential custody is verified; authenticated endpoint behavior remains untested in this pass and provider writes remain closed.
 
 ### Locticians
 

@@ -1,0 +1,82 @@
+{
+  "manifest_id": "ct.manifest.cpanel-hosting-control.v1",
+  "manifest_version": "1.0.0",
+  "phase": "2.99",
+  "effective_date": "2026-08-22",
+  "classification": "public_safe_machine_projection",
+  "service_family": {
+    "whm_service_id": "ct.service.hosting.whm",
+    "cpanel_account_service_id": "ct.service.cpanel.crownthrive-io",
+    "provider_family": "cPanel_and_WHM",
+    "provider_writes_enabled": false,
+    "shell_execution_enabled": false
+  },
+  "credentials": {
+    "whm": {
+      "credential_id": "ct.credential.cpanel-whm.thrivebase",
+      "custody_state": "vaulted_dual_reference_verified",
+      "rotation_state": "required_broad_conversation_exposed_credential",
+      "raw_value_publication": "prohibited"
+    },
+    "cpanel_account": {
+      "credential_id": "ct.credential.cpanel.crownthrive-io.thrivebase-api",
+      "provider_token_label": "ThriveBase-Managed-API",
+      "custody_state": "vaulted_dual_reference_verified",
+      "provider_scope": "full_account_access",
+      "institutional_scope": "read_only_adapter",
+      "expires_at": "2026-11-20T03:49:00Z",
+      "raw_value_publication": "prohibited",
+      "unmanaged_provider_token_review": "THRIVEBASE"
+    }
+  },
+  "adapters": [
+    {
+      "adapter_id": "ct.adapter.cpanel-whm.api1.v1",
+      "runtime_slug": "cpanel-whm-api-control",
+      "authentication": "jwt_required",
+      "state": "read_verified",
+      "verified_operations": ["accounts.list", "system.load", "system.hostname"],
+      "mutations": "disabled"
+    },
+    {
+      "adapter_id": "ct.adapter.cpanel.crownthrive-io.uapi.v1",
+      "runtime_slug": "cpanel-account-api-control",
+      "authentication": "jwt_required",
+      "state": "read_verified",
+      "verified_operations": ["stats.diskusage"],
+      "mutations": "disabled"
+    }
+  ],
+  "hosting_snapshot": {
+    "account_count": 44,
+    "suspended_count": 8,
+    "interpretation": "reconciliation_signal_not_automatic_remediation",
+    "raw_account_rows_publication": "prohibited"
+  },
+  "ssh": {
+    "key_id": "ct.sshkey.cpanel.crownthrive-io.thrivebase",
+    "provider_label": "ThriveBase",
+    "algorithm": "ssh-rsa",
+    "bits": 4096,
+    "public_fingerprint_sha256": "SHA256:FAKVVWXR98wQylQpqEa1qeC8MoEzNCw356N0JJY1kXY",
+    "public_private_match": "verified",
+    "private_key_state": "encrypted_vault_primary_and_recovery",
+    "private_key_cipher": "aes256-ctr",
+    "private_key_kdf": "bcrypt",
+    "passphrase_state": "required_not_supplied",
+    "provider_authorization_state": "unverified",
+    "live_test_state": "not_run",
+    "shell_execution": "fail_closed"
+  },
+  "source_refs": ["S111", "S112", "S113", "S114"],
+  "hard_gates": [
+    "rotate_whm_to_least_privilege_managed_credential",
+    "review_unmanaged_cpanel_token_before_revoke",
+    "verify_ssh_passphrase_and_provider_authorization_before_live_use",
+    "certify_resource_capacity_before_load_thresholding",
+    "reconcile_suspended_accounts_against_asset_lifecycle",
+    "certify_backup_restore_export_and_provider_exit",
+    "keep_provider_writes_and_shell_execution_closed_until_separately_authorized"
+  ],
+  "phase_3_entry": "blocked_pending_phase_2_99_hard_exit"
+}
