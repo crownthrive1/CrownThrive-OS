@@ -1,0 +1,152 @@
+---
+title: "CHLOM Wallet ERC-4337 v0.9 Intent"
+sidebarTitle: "ERC-4337 v0.9 Intent"
+description: "Public-safe contract for deterministic unsigned ERC-4337 v0.9 PackedUserOperation hashing, Solidity cross-checks and fail-closed simulation/broadcast gates."
+icon: "code-branch"
+---
+
+# CHLOM Wallet ERC-4337 v0.9 intent
+
+**State:** `CONTROLLED_TEST / UNSIGNED_INTENT_ONLY`  
+**Target chain candidate:** `eip155:11155111`  
+**Simulation:** not run  
+**Broadcast:** disabled  
+**Money movement:** disabled
+
+CHLOM separates **transaction intent construction** from signing, simulation, sponsorship and broadcast. The current reference code constructs a deterministic ERC-4337 v0.9 hash envelope so policy, rights, recovery and security systems can review an exact candidate before any chain-facing authority exists.
+
+## Reference files
+
+- `developers/reference/chlom-wallet/smart-account/user-operation-intent.mjs`
+- `developers/reference/chlom-wallet/smart-account/test-user-operation-intent.mjs`
+- `developers/reference/chlom-wallet/smart-account/UserOpHashV09Harness.sol`
+- `developers/reference/chlom-wallet/smart-account/user-operation-hash-crosscheck.mjs`
+- `developers/reference/chlom-wallet/smart-account/sepolia-readiness-manifest.json`
+
+## Upstream v0.9 profile
+
+The builder follows the upstream v0.9 PackedUserOperation type:
+
+```text
+PackedUserOperation(
+  address sender,
+  uint256 nonce,
+  bytes initCode,
+  bytes callData,
+  bytes32 accountGasLimits,
+  uint256 preVerificationGas,
+  bytes32 gasFees,
+  bytes paymasterAndData
+)
+```
+
+It constructs the EIP-712 domain with:
+
+```yaml
+name: ERC4337
+version: '1'
+chain_id: 11155111
+verifying_contract: candidate EntryPoint address
+```
+
+The final hash is computed as the EIP-712 typed-data digest over the domain separator and PackedUserOperation struct hash.
+
+## Controlled restrictions
+
+The current builder fails closed unless:
+
+- `sender` and EntryPoint are nonzero 20-byte addresses;
+- chain ID is positive;
+- gas-limit and fee components fit unsigned 128-bit packing;
+- `initCode` is empty because no factory is selected;
+- `paymasterAndData` is empty because sponsorship is disabled;
+- `signature` is empty because the output is an unsigned intent;
+- any nonempty call data is marked `HOLD_OPAQUE_CALLDATA`.
+
+The v0.9 EIP-7702 init-code override path is not implemented by this controlled profile. Nonempty init code is therefore rejected rather than hashed incorrectly.
+
+## Test vector
+
+```yaml
+intent_id: ct.wallet.intent.test.001
+chain_id: 11155111
+entrypoint: '0x433709009B8330FDa32311DF1C2AFA402eD8D009'
+sender: '0x1111111111111111111111111111111111111111'
+nonce: 0
+init_code: '0x'
+call_data: '0x'
+verification_gas_limit: 150000
+call_gas_limit: 100000
+pre_verification_gas: 50000
+max_priority_fee_per_gas: 1000000000
+max_fee_per_gas: 2000000000
+paymaster_and_data: '0x'
+signature: '0x'
+```
+
+Expected output:
+
+```yaml
+result: PASS_ERC4337_V09_INTENT
+user_operation_hash: '0xbe377d88646d9fe4b6543d66d3142e76272eaedd63ba5790daf8170c50e0f812'
+intent_sha256: '0x63080334e0097834b7d3532e12c69fc8fbfe18230f3b465086b8f212a2a8c8ef'
+simulation_state: NOT_RUN
+signature_state: UNSIGNED
+factory_state: UNSELECTED
+eip7702_state: NOT_SUPPORTED
+paymaster_state: DISABLED
+broadcast: false
+deploy: false
+money_movement: false
+```
+
+## Independent Solidity cross-check
+
+The Solidity harness independently recomputes:
+
+- PackedUserOperation type hash;
+- struct hash;
+- EIP-712 domain separator;
+- final UserOperation hash.
+
+The Node cross-check deploys only this pure harness to an in-memory Ganache chain and compares its output to the JavaScript builder. The test uses no external RPC, production signer or native value.
+
+A PASS means the two independent implementations agree for the governed test vector. It does not prove target-chain EntryPoint code identity, account validation, factory behavior, gas adequacy, bundler acceptance or transaction success.
+
+## EntryPoint discrepancy and HOLD
+
+The upstream v0.9 release identifies candidate address:
+
+```text
+0x433709009B8330FDa32311DF1C2AFA402eD8D009
+```
+
+The tagged deployment artifact observed in the same release tag identifies:
+
+```text
+0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108
+```
+
+CHLOM records this divergence without silently selecting one artifact as runtime truth. The candidate release address may be used for offline hash construction only. Before simulation or broadcast, the target chain must provide independently verified runtime bytecode and code hash bound to the exact EntryPoint version.
+
+## Promotion sequence
+
+1. Verify target EntryPoint runtime code hash.
+2. Select and review the smart-account implementation.
+3. Select and review the factory.
+4. Define reviewed account call data and factory init code.
+5. Bind the active WebAuthn credential policy and recovery authority.
+6. Build an unsigned operation against the exact implementation snapshot.
+7. Run local EntryPoint validation simulation.
+8. Run governed public-testnet simulation.
+9. Obtain independent security review.
+10. Obtain signer, recovery and broadcast authority receipts.
+11. Only then consider a governed testnet broadcast.
+
+No step is implied by completion of the prior step.
+
+## Upstream references
+
+- v0.9 EntryPoint source: `https://github.com/eth-infinitism/account-abstraction/blob/v0.9.0/contracts/core/EntryPoint.sol`
+- v0.9 UserOperation library: `https://github.com/eth-infinitism/account-abstraction/blob/v0.9.0/contracts/core/UserOperationLib.sol`
+- v0.9 release: `https://github.com/eth-infinitism/account-abstraction/releases/tag/v0.9.0`

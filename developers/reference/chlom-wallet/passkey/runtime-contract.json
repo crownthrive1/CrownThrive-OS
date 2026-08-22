@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0.0",
+  "runtime_id": "ct.wallet.passkey-runtime.controlled.v1",
+  "state": "CONTROLLED_TEST_ACTIVE",
+  "phase": "2.99",
+  "agent_id": "ct.agent.chlom-wallet-settlement",
+  "edge_function": {
+    "function_id": "fbc1eff3-818e-4fb9-ad3b-9856c0cabbe0",
+    "slug": "chlom-wallet-passkey-control",
+    "version": 2,
+    "status": "ACTIVE",
+    "verify_jwt": true,
+    "ezbr_sha256": "81a164e2db79e3b07e9454970c190cea2fc5c9eaa3668ef69e6245e89a420442",
+    "allowed_origin": "https://wallet.crownthrive.com",
+    "rp_id": "crownthrive.com",
+    "verification_library": "@simplewebauthn/server@13.3.2",
+    "runtime_compile_state": "PASS_DEPLOYED_ACTIVE",
+    "authenticated_browser_ceremony_state": "NOT_YET_EXECUTED"
+  },
+  "capabilities": [
+    "registration-options",
+    "verify-registration",
+    "assertion-options",
+    "verify-assertion",
+    "recovery-step-up-options",
+    "verify-recovery-step-up"
+  ],
+  "registration_profile": {
+    "attestation": "none",
+    "cose_algorithm": -7,
+    "curve": "P-256",
+    "resident_key": "required",
+    "user_verification": "required",
+    "attestation_trust_claimed": false
+  },
+  "database": {
+    "schema": "chlom_wallet",
+    "migrations": [
+      "chlom_wallet_webauthn_runtime_v2",
+      "chlom_wallet_webauthn_wallet_ensure_fix_v1",
+      "chlom_wallet_webauthn_public_rpc_wrappers_v1",
+      "chlom_wallet_webauthn_cose_runtime_v3"
+    ],
+    "challenge_storage": "sha256_digest_only",
+    "credential_storage": "public_cose_key_only",
+    "verification_receipts": "append_only",
+    "rls": "forced_deny_client_access",
+    "service_rpc_access": "service_role_only",
+    "counter_policy": "monotonic_when_supported",
+    "failed_attempt_policy": "cancel_challenge_after_five_holds"
+  },
+  "controlled_test_evidence": {
+    "database_canary": "PASS_WEBAUTHN_RUNTIME_DB_CANARY",
+    "registration_state": "VERIFIED_REGISTRATION_CONTROLLED_TEST",
+    "assertion_state": "VERIFIED_ASSERTION_CONTROLLED_TEST",
+    "exact_replay_state": "DUPLICATE",
+    "recovery_state_machine_canary": "PASS_PASSKEY_RECOVERY_CANARY",
+    "source_registration_test": "PASS_WEBAUTHN_REGISTRATION_CONTROLLED_TEST",
+    "source_assertion_test": "PASS_WEBAUTHN_ASSERTION_CRYPTO"
+  },
+  "privacy_and_security": {
+    "raw_challenge_persisted": false,
+    "raw_credential_id_persisted": false,
+    "private_key_material_persisted": false,
+    "public_key_digest_required": true,
+    "credential_lookup_digest_required": true,
+    "origin_and_rp_binding_required": true,
+    "user_presence_required": true,
+    "user_verification_required": true
+  },
+  "hard_boundaries": {
+    "production_credential_activation": false,
+    "smart_account_binding": false,
+    "smart_account_deployment": false,
+    "chain_broadcast": false,
+    "custody": false,
+    "money_movement": false,
+    "production_rights_grant": false
+  },
+  "promotion_gates": [
+    "execute_authenticated_browser_registration_and_assertion_canary",
+    "complete independent security review of private runtime",
+    "complete production authenticator-attestation policy decision",
+    "complete recovery and credential-replacement drills against deployed runtime",
+    "select and review smart-account implementation and factory",
+    "verify target EntryPoint runtime code hash",
+    "complete governed testnet simulation before any broadcast"
+  ]
+}
