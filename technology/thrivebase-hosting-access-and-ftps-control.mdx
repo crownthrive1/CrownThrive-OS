@@ -22,81 +22,87 @@ credential_custody: verified_restricted_dual_reference
 requested_public_alias: ftp.crownthrive.io
 requested_alias_tls_state: hostname_validation_failed
 provider_server_tls_state: certificate_validation_passed_restricted_host
-provider_authentication: failed_530
-file_read_capability: not_reached
-provider_write_capability: closed
-state: HOLD_AUTH
+provider_authentication: pass
+username_form: full_account_address
+directory_listing: pass
+file_read_capability: pass_hash_only_canary
+provider_write_capability: closed_unverified
+state: READ_CERTIFIED_WRITE_CLOSED
 ```
 
 The dedicated credential is stored only through the restricted CHLOM/THIVEBASE credential-control path with primary and recovery custody. The raw username/password, fingerprint, recovery aliases and provider-internal server hostname are **not public documentation**.
 
+The founder clarified that the previously supplied leading `21` belonged to the explicit-FTPS port, not the password. The restricted Vault copies were corrected in place without exposing the credential. The corrected credential then authenticated successfully using the full FTP-account address.
+
 ## Transport finding
 
-The configured public FTP alias currently reaches a TLS-capable Pure-FTPd service, but strict certificate hostname validation fails for that alias. The institutional rule is fail closed:
+The configured public FTP alias currently reaches a TLS-capable Pure-FTPd service, but strict certificate hostname validation fails for that alias. The institutional rule remains fail closed:
 
 - do not transmit credentials through a hostname whose certificate identity does not validate;
 - do not disable certificate verification to force a connection;
 - do not fall back to plaintext FTP;
 - do not treat a successful TCP connection or `AUTH TLS` response as authenticated access.
 
-First-party cPanel evidence identifies the provider's canonical server hostname in the restricted control plane. A strict explicit-FTPS probe against that provider hostname passed certificate validation and reached provider authentication, but the supplied credential was rejected with FTP `530 Login authentication failed` using both the full-account and local-part username forms.
+First-party cPanel evidence identifies the provider's canonical server hostname in the restricted control plane. A strict explicit-FTPS probe against that provider hostname passed certificate validation, authenticated successfully and completed a read-only directory listing.
 
 ## Credential state versus authentication state
 
-Credential custody and credential correctness are different controls.
+Credential custody, provider authentication, file-read capability and deployment authority are separate controls.
 
 ```text
 Vault custody PASS
       ↓
 TLS server identity PASS on restricted provider hostname
       ↓
-FTP authentication FAIL / HOLD
+FTP authentication PASS
       ↓
-Directory listing NOT CERTIFIED
+Directory listing PASS
       ↓
-File read NOT CERTIFIED
+Hash-only file read PASS
       ↓
 File write / deployment CLOSED
 ```
 
-The current credential record can therefore remain `verified_dual_reference` for **custody** while the FTPS adapter remains `read_capability_state = fail` for **provider authentication**.
+The FTPS adapter now has `read_capability_state = pass`, while its write canary and read-after-write controls remain unverified. It therefore remains a governed candidate adapter rather than a fully certified write adapter.
 
 ## cPanel control-plane read probe
 
 A separate read-only test used the already-governed cPanel API credential to attempt account-information and FTP-account inventory reads. The provider returned HTTP `403 Access denied` from both the public cPanel host and the provider-canonical host. No mutation endpoint was called.
 
-This result is `HOLD_ACCESS_DENIED`, not evidence that the FTP account does not exist. It means the remote probe environment is not currently allowed to use that cPanel API path, so cPanel inventory cannot be used yet to resolve the FTP login failure.
+This result remains a separate `HOLD_ACCESS_DENIED` for remote cPanel API inventory. It does not invalidate the successful explicit-FTPS authentication and read canary.
 
 ## Safe file-access certification
 
-The next certification run must remain read-only:
+The corrected credential passed the read-only certification sequence:
 
-1. verify or reset the FTP-account password at the provider;
-2. confirm the exact FTP-account login identity and home-directory scope;
-3. connect with explicit FTPS and strict certificate validation;
-4. list the account root without mutation;
-5. select a clearly non-secret public file such as `robots.txt`, `index.html`, `index.php` or an approved README;
-6. read the file only to compute size/hash evidence without publishing its contents by default;
-7. disconnect and record the receipt;
-8. keep upload/delete/rename/chmod/deployment writes closed until a separate rollback-capable write canary is authorized.
+1. strict explicit FTPS with certificate validation on the provider-canonical hostname;
+2. authentication with the full FTP-account address;
+3. account-root directory listing;
+4. hash-only read of the provider quota metadata file as the available safe canary;
+5. content withheld from logs and documentation;
+6. zero upload, delete, rename, chmod, password, billing or deployment writes.
 
-Files such as `.env`, private keys, credential files, database dumps, backup archives and configuration secrets are excluded from read-canary selection.
+The account root currently contains only FTP filesystem metadata and no website payload. That is important operational evidence: **secure access is working, but the intended ThriveBase website document root/content has not yet been established in this FTP scope.**
+
+Files such as `.env`, private keys, credential files, database dumps, backup archives and configuration secrets remain excluded from read-canary selection.
 
 ## Deployment authority
 
-Successful FTPS authentication will establish a provider-access capability, not unrestricted site authority. Before automated site changes begin, the deployment adapter still requires:
+Successful FTPS authentication establishes a provider-access capability, not unrestricted site authority. Before automated site changes begin, the deployment adapter still requires:
 
-- canonical site/domain mapping;
+- intended website document-root mapping;
 - current source/repository or provider-source authority;
 - backup and rollback target;
 - bounded writable path;
-- read-before-write and read-after-write verification;
+- controlled write canary;
+- read-after-write verification;
+- rollback verification;
 - change receipt and DAIL event;
 - secret redaction in logs and documentation;
 - separation between hosting access and CHLOM/THIVEBASE data authority.
 
 ## Current conclusion
 
-The ThriveBase credential is institutionally vaulted and the hosting path has been probed without provider mutation. Secure transport is available on the provider's restricted canonical hostname, but authentication is currently blocked. No file was read because the authentication gate correctly failed first, and no provider-side write occurred.
+The ThriveBase credential is institutionally vaulted, explicit-FTPS authentication now passes, directory listing passes and a hash-only file-read canary passes without exposing file contents. No provider-side write occurred.
 
-The immediate remediation is provider-side credential/account verification followed by the same read-only FTPS certification sequence. Public alias certificate routing should also be corrected before `ftp.crownthrive.io` is used as the normal credential-bearing endpoint.
+The remaining transport issue is the certificate-name mismatch on `ftp.crownthrive.io`; the normal credential-bearing alias should not be used until that identity is corrected. The next implementation gate is to establish the intended ThriveBase website document root/content and then perform a separately governed write + read-after-write + rollback canary before production deployment writes are opened.
