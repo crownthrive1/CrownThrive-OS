@@ -1,0 +1,90 @@
+name: Commercial Gap Encrypted Transport Bootstrap
+
+on:
+  push:
+    branches:
+      - ops/commercial-gap-private-fulfillment-20260822
+    paths:
+      - ".github/workflows/commercial-gap-encrypted-transport-bootstrap.yml"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout operations branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+
+      - name: Request scoped GitHub OIDC token
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=crownthrive-commercial-gap-encrypted-transport")"
+          ID_TOKEN="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<<"${RESPONSE}")"
+          test -n "${ID_TOKEN}"
+          echo "token=${ID_TOKEN}" >> "${GITHUB_OUTPUT}"
+          echo "::add-mask::${ID_TOKEN}"
+
+      - name: Create one-time Vault-held transport key
+        env:
+          ID_TOKEN: ${{ steps.oidc.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${ID_TOKEN}" \
+            "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-encrypted-transport-bootstrap-oidc" \
+            > /tmp/bootstrap.json
+
+      - name: Validate public-only bootstrap receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          data=json.loads(Path('/tmp/bootstrap.json').read_text())
+          assert data.get('state') == 'created', data
+          assert data.get('private_key_returned') is False, data
+          assert data.get('vault_locator_returned') is False, data
+          assert data.get('plaintext_returned') is False, data
+          assert data.get('algorithm') == 'RSA-OAEP-3072-SHA256 + AES-256-GCM', data
+          assert isinstance(data.get('transport_id'), str) and len(data['transport_id']) == 36, data
+          assert isinstance(data.get('public_key_jwk'), dict), data
+          assert data['public_key_jwk'].get('kty') == 'RSA', data
+          receipt={
+            'schema_version':'1.0.0',
+            'receipt_id':'ct.receipt.commercial-gap-encrypted-transport-bootstrap.2026-08-22.v1',
+            'source_commit':os.environ['GITHUB_SHA'],
+            'transport_id':data['transport_id'],
+            'expires_at':data['expires_at'],
+            'algorithm':data['algorithm'],
+            'public_key_jwk':data['public_key_jwk'],
+            'public_key_jwk_sha256':data['public_key_jwk_sha256'],
+            'private_key_returned':False,
+            'vault_locator_returned':False,
+            'plaintext_returned':False,
+          }
+          Path('changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          print(json.dumps({'transport_id':receipt['transport_id'],'expires_at':receipt['expires_at'],'public_key_jwk_sha256':receipt['public_key_jwk_sha256']},sort_keys=True))
+          PY
+
+      - name: Commit public bootstrap receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add changelog/commercial-gap-encrypted-transport-bootstrap-receipt.json
+          git commit -m "Record encrypted private fulfillment transport bootstrap"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
