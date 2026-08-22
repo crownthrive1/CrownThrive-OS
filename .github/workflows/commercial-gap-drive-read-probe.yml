@@ -1,0 +1,78 @@
+name: Commercial Gap Drive Read Probe
+
+on:
+  push:
+    branches:
+      - ops/commercial-gap-private-fulfillment-20260822
+    paths:
+      - ".github/workflows/commercial-gap-drive-read-probe.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout operations branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+
+      - name: Read recovery archives from Supabase runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/commercial-gap-drive-read-probe" \
+            > /tmp/drive-probe.json
+
+      - name: Validate and write sanitized receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          data = json.loads(Path('/tmp/drive-probe.json').read_text())
+          results = data.get('results', [])
+          assert len(results) == 3, data
+          expected_keys = {'launch','ready','procure'}
+          assert {x.get('key') for x in results} == expected_keys, data
+          safe = []
+          for item in results:
+              safe.append({
+                  'key': item.get('key'),
+                  'status': item.get('status'),
+                  'ok': item.get('ok'),
+                  'content_type': item.get('content_type'),
+                  'byte_size': item.get('byte_size'),
+                  'sha256': item.get('sha256'),
+                  'expected_sha256': item.get('expected_sha256'),
+                  'exact_match': item.get('exact_match'),
+                  'final_host': item.get('final_host'),
+                  'error': item.get('error'),
+              })
+          receipt = {
+              'schema_version': '1.0.0',
+              'receipt_id': 'ct.receipt.commercial-gap-drive-read-probe.2026-08-22.v1',
+              'source_commit': os.environ['GITHUB_SHA'],
+              'mutating': False,
+              'all_exact_match': all(x.get('exact_match') is True for x in results),
+              'results': safe,
+          }
+          out = Path('changelog/commercial-gap-drive-read-probe-receipt.json')
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          print(json.dumps({'all_exact_match': receipt['all_exact_match'], 'results': safe}, sort_keys=True))
+          PY
+
+      - name: Commit probe receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add changelog/commercial-gap-drive-read-probe-receipt.json
+          git commit -m "Record commercial gap Drive read probe"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
