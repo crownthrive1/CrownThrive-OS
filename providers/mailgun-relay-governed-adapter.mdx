@@ -9,7 +9,7 @@ icon: "envelope"
 
 **Provider:** Mailgun / Sinch  
 **Domain:** `relay.crownthrive.com`  
-**State:** account API read verified; domain active; domain-sending key Vault-bound with controlled canary pending.
+**State:** account API read verified; domain active; domain sending verified for the internal allowlist.
 
 ## Credential separation
 
@@ -36,8 +36,10 @@ The unverified MX state does not block sending by itself. Receiving MX is requir
 
 The CrownThrive local monthly request limit is `-1`, meaning no local monthly ceiling. Provider rate limits, billing and abuse protections still apply.
 
-## Send boundary
+## Send verification and boundary
 
-The domain sending credential is not treated as general account authority. Outbound sending is promoted only through bounded sender/from-domain policy, recipient controls, suppression/opt-out requirements where applicable, delivery/readback evidence and rate/abuse safeguards.
+A controlled internal-recipient canary was accepted by the provider and independently observed in the destination Gmail inbox. This verifies the domain-limited sending path for the tested internal scope; it does not authorize unrestricted outbound email.
+
+The active adapter is JWT/admin protected, rate checked, uses an allowlisted set of internal recipients and sender local-parts, and records provider request evidence without returning the credential. General cold outreach, bulk sending and recipient expansion remain outside this certified scope and require their own suppression, opt-out, compliance and abuse-prevention controls.
 
 No secret value is exposed through the public contract.
