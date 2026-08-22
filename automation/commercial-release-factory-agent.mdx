@@ -1,0 +1,122 @@
+---
+title: "Commercial Release Factory Agent"
+description: "Governed non-voting agent that compiles per-product rights, pricing/tax, fulfillment, credit checkout, entitlement, accessibility, DNS/TLS and acceptance packages for CrownThrive commercial Sites."
+sidebarTitle: "Commercial Release Factory"
+icon: "conveyor-belt"
+keywords: ["release factory", "automation", "Crown Credits", "Sites", "CHLOM", "governed release"]
+---
+
+# Commercial Release Factory Agent
+
+The **CrownThrive Commercial Release Package Agent** (`ct.agent.commercial-release-packager`) is the bounded orchestrator for converting packaged products into exact, independently reviewable release packets.
+
+It currently serves **CrownThrive Launch**, **CrownThrive Ready**, and **CrownThrive Procure**. Each surface is a CrownThrive ChatGPT Sites deployment and each product remains **Crown Credits-only**. Stripe is not the per-product checkout rail for these three surfaces. Any Stripe use belongs to a separately governed Crown Credits funding path.
+
+<Warning>
+  The agent is A2/D2, non-voting, cannot self-approve, cannot authorize a live price, cannot move money or credits, cannot grant final rights, cannot expose credentials, cannot write directly to `main`, and cannot publish directly to a Sites project unless the destination route has independently passed its release controls.
+</Warning>
+
+## What the agent builds
+
+For every exact product version the agent compiles nine linked packages:
+
+1. **Rights and provenance** — ownership, contributors, source provenance, permitted license class, restrictions, unresolved third-party material and CHLOM subject/fingerprint binding.
+2. **Pricing and tax** — exact Crown Credits price candidate, comparable-price evidence, pricing-policy version, jurisdiction/tax classification state and escalation requirements. The agent may prepare evidence; it does not invent or authorize a price or tax conclusion.
+3. **Private fulfillment** — immutable artifact hash, private object/custody reference, delivery contract, expiry/download controls where applicable, missing-asset behavior and rollback target.
+4. **Credit checkout and event handling** — credit-balance check, atomic debit candidate, idempotency key, signed or authenticated event contract, duplicate/replay handling and closed-browser recovery. This package must preserve that a debit is payment/access evidence, not a license by itself.
+5. **Entitlement and license** — exact product/version, license class/version, acceptance evidence requirement, entitlement scope, grant/revoke/remedy state and fulfillment binding.
+6. **Refund, dispute and rollback** — append-only reversal/remedy model, entitlement consequence, fulfillment cutoff, duplicate reversal protection, support route and exact rollback reference.
+7. **Accessibility and device** — semantic structure, keyboard/focus behavior, labels, contrast, zoom/reflow, downloadable-file accessibility, reduced-motion behavior where relevant, mobile breakpoints and assistive-technology evidence. A deterministic check is not a formal conformance claim.
+8. **DNS, TLS and route** — current provider route, preferred custom hostname, DNS authority evidence, certificate/TLS readback, canonical redirect state and rollback path. No custom-domain claim is made from a configured target alone.
+9. **Governed acceptance and publication** — exact-version hash, independent reviewer receipts, vote/certification state, destination certification, read-after-write proof and rollback proof.
+
+A missing, stale, contradictory, expired or originator-only hard-gate receipt resolves to **HOLD**.
+
+## Release state machine
+
+```text
+packaged
+→ rights_cleared
+→ pricing_authorized
+→ fulfillment_certified
+→ checkout_staged
+→ governed_release_pass
+→ published
+→ readback_verified
+```
+
+Publication is not a separate authority bypass. The publish job exists only after the exact governed release is PASS and the selected route permits automatic publication.
+
+## Credit-only commerce contract
+
+The three surfaces reuse the same separation used across CrownThrive's governed commerce architecture:
+
+```text
+Crown Credits balance
+→ authenticated redemption request
+→ atomic/idempotent debit evidence
+→ license/entitlement policy decision
+→ entitlement record
+→ protected fulfillment
+→ append-only remedy/reversal when needed
+```
+
+Required invariants:
+
+- a credit debit is not a rights grant;
+- a provider event is not an entitlement;
+- an entitlement cannot point at a different artifact version;
+- fulfillment cannot precede entitlement;
+- replay cannot create a second debit or entitlement;
+- reversal cannot silently erase prior evidence;
+- per-SKU Stripe Product/Price objects are prohibited for Launch/Ready/Procure;
+- a separately governed funding rail cannot silently become product checkout.
+
+## Site publication contract
+
+The current Sites strategy is a **governed dynamic feed**, not unrestricted agent editing. The release factory writes a public-safe catalog projection only after governed acceptance. A certified Sites consumer may read that projection and render the product state.
+
+The publication adapter must prove:
+
+- exact release/version/hash binding;
+- destination and surface identity;
+- idempotent write or feed publication;
+- read-after-write parity;
+- rollback reference and rollback canary;
+- public/private field allowlist;
+- no secret-bearing payload;
+- no publication on HOLD/FAIL/UNKNOWN.
+
+If the Sites consumer cannot be independently read back, publication remains quarantined even when a product package is otherwise ready.
+
+## CHLOM, evidence and Vault boundary
+
+CHLOM supplies rights/evidence/entitlement semantics and exact version identity. THIVEBASE stores public-safe lifecycle state and restricted release evidence. Credential material is referenced by stable secret aliases and is never returned through a release packet.
+
+The public factory manifest exposes only stable identifiers and qualitative control contracts. Protected algorithm bodies, weights, thresholds, private prompts, credential locators, customer data, private reviewer evidence and raw chain-of-title material remain restricted.
+
+## Reusable capability suite
+
+The factory institutionalizes reusable skills for source normalization, rights, pricing/tax, private fulfillment, credit checkout/events, entitlement/license, remedies, accessibility, DNS/TLS, governed acceptance, Sites feed projection, readback, evidence hash-chaining, credential alias resolution, provider capability checks, drift reconciliation, rollback/replay and safe agent replication.
+
+All new MCP-facing skill candidates start **disabled**. Controlled-test success does not publish an MCP or create production authority.
+
+## Agent replication
+
+A replicated release worker must inherit the same immutable ceiling and must receive a unique stable identity. Replication may increase throughput; it cannot create votes or remove separation of duties.
+
+Every child worker is required to:
+
+- identify the parent factory and exact capability version;
+- remain non-voting;
+- refuse self-review;
+- use the same hard-gate order;
+- emit exact-version evidence;
+- stop on credential, rights, legal, tax, security or authority ambiguity;
+- preserve rollback and evidence lineage.
+
+The parent agent may shard products across workers only when write sets are disjoint or explicitly sequenced.
+
+## Initial scope
+
+The first governed cohort binds 30 exact `1.0.0-candidate.4` product packages: ten Launch, ten Ready and ten Procure products. Their package QA and independent integrity reviews are existing construction evidence; none of those signals independently clears the remaining commercial release gates.
