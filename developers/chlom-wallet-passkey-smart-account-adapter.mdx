@@ -1,0 +1,145 @@
+---
+title: "CHLOM Wallet Passkey & Smart-Account Adapter"
+sidebarTitle: "Passkey Smart Account"
+description: "Public-safe contract for WebAuthn/passkey credential commitments, CAIP chain/account identities and future ERC-4337/ERC-7579 smart-account adapters without hidden deployment or custody claims."
+icon: "fingerprint"
+---
+
+# CHLOM Wallet Passkey & Smart-Account Adapter
+
+**State:** `SPECIFIED / CONTROLLED_TEST_REFERENCE`  
+**Production passkey wallet:** not claimed  
+**Smart-account deployment:** not authorized  
+**Chain broadcast:** disabled
+
+The CHLOM Wallet user-experience target is passkey-friendly: normal customers should not need to learn seed phrases, bundlers, EntryPoints, chain IDs or module standards merely to use CrownThrive services. The backend still preserves explicit authority, recovery, replay protection and chain identity.
+
+## Standards profile
+
+The current design references stable/public standards rather than inventing custom cryptography:
+
+- **WebAuthn Level 3** for public-key credential ceremonies and relying-party/origin binding;
+- **CAIP-2** for chain identifiers;
+- **CAIP-10** for chain-qualified account identifiers;
+- **ERC-4337** as the primary Ethereum account-abstraction interoperability model;
+- **ERC-7579** as a modular smart-account interface candidate.
+
+The adapter treats these as interoperability contracts. Adoption of a standard does not itself authorize deployment on a chain.
+
+## Registration-intent model
+
+The public-safe reference implementation produces a non-executable registration intent:
+
+```json
+{
+  "wallet_stable_id": "ct.wallet.example",
+  "chain_id": "eip155:11155111",
+  "account_standard": "ERC-7579",
+  "credential_commitment": "sha256-hex",
+  "factory_ref": "candidate-reference",
+  "entrypoint_ref": "candidate-reference",
+  "paymaster_policy": "disabled_by_default",
+  "recovery_policy": "separate_governed_record_required",
+  "broadcast": false,
+  "deploy": false,
+  "money_movement": false
+}
+```
+
+The intent is a governance/evidence artifact, not a `UserOperation` and not a transaction.
+
+## WebAuthn boundary
+
+The adapter records only what is required to bind a controlled wallet-registration intent:
+
+- credential identifier commitment;
+- RP ID;
+- HTTPS origin;
+- COSE algorithm identifier;
+- resident-key/user-verification policy indicators;
+- declared transports;
+- exact policy/version references.
+
+The public reference code intentionally does not generate or export private key material. The raw credential identifier is committed to a deterministic digest before it is used as a CHLOM cross-system evidence key.
+
+Origin/RP mismatch fails closed. HTTP origins fail closed for this production-target profile.
+
+## Chain and account identity
+
+CAIP-2 identifies the chain independently of the provider. CAIP-10 composes that chain ID with an account address. CHLOM keeps its stable wallet ID above both:
+
+```text
+ct.wallet.*
+   ↓
+CAIP-2 chain ID
+   ↓
+CAIP-10 account ID
+```
+
+This lets a CrownThrive wallet survive chain/provider migration without making the blockchain address the sole institutional identity.
+
+Wildcard/multichain proposals are not assumed stable merely because draft standards exist. Current production-target records require an explicit chain ID.
+
+## ERC-4337 boundary
+
+ERC-4337 defines `UserOperation`, `EntryPoint`, bundler and account validation concepts. CHLOM Wallet does not currently create or submit a production `UserOperation`.
+
+A later adapter must bind, at minimum:
+
+- explicit chain ID;
+- supported EntryPoint version/address;
+- account factory version;
+- nonce/replay policy;
+- signer/passkey validation module;
+- paymaster policy if any;
+- gas/fee limits;
+- simulation result;
+- exact deployment/runtime code digest;
+- independent security review.
+
+## ERC-7579 boundary
+
+ERC-7579 is considered for modular account interoperability. A module cannot be silently enabled merely because it conforms to an interface. CHLOM still requires an allowlisted module record, code identity, authority scope, revocation path and security evidence.
+
+High-risk module examples include session keys, delegated execution, recovery modules and spending controls. Their convenience does not waive authorization.
+
+## Recovery model
+
+Recovery is a separate governed state machine. A future production design must define:
+
+- passkey loss/replacement;
+- additional credential enrollment;
+- device theft;
+- guardian/multisig recovery where used;
+- delay/step-up requirements for material changes;
+- account-module replacement;
+- founder/institutional succession for treasury wallets;
+- compromised-credential quarantine;
+- audit and correction evidence.
+
+No recovery secret is represented in public documentation.
+
+## Reference tests
+
+The controlled public reference suite currently proves:
+
+- CAIP-2 validation;
+- CAIP-10 composition;
+- HTTPS origin requirement;
+- RP/origin binding;
+- deterministic credential commitment;
+- duplicate-transport normalization;
+- smart-account intent remains `broadcast:false` and `deploy:false`;
+- external account binding remains `candidate_unverified` until deployment evidence exists.
+
+## Source references
+
+- WebAuthn Level 3: `https://www.w3.org/TR/webauthn-3/`
+- ERC-4337: `https://eips.ethereum.org/EIPS/eip-4337`
+- ERC-7579: `https://eips.ethereum.org/EIPS/eip-7579`
+- CAIP-2: `https://standards.chainagnostic.org/CAIPs/caip-2`
+- CAIP-10: `https://standards.chainagnostic.org/CAIPs/caip-10`
+
+## Promotion gates
+
+Production smart-account/passkey activation requires exact implementation evidence, independent security review, recovery drills, account/factory/module audits appropriate to risk, testnet deployment and rollback evidence, chain/provider exit proof, privacy review and a current Phase gate. Until then, this remains an interoperability construction contract.
