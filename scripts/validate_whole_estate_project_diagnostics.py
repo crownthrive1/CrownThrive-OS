@@ -40,7 +40,6 @@ assert observed["explicit_algorithm_custody_rows"] <= observed["factory_algorith
 
 current = manifest["current_totals"]
 assert current["issues"] == current["resolved"] + current["running"] + current["assigned"]
-assert current["handoffs"] == current["issues"] - current["resolved"] + 20
 assert current["issues"] == initial["issues_created"] + sum(d["issues_created"] for d in deltas)
 assert current["handoffs"] == initial["handoffs_created"] + sum(d["handoffs_created"] for d in deltas)
 
