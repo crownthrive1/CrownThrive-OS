@@ -8,6 +8,8 @@ contract ChlomSplitPolicyRegistry {
     error Paused();
     error InvalidBps();
     error Exists(bytes32 policyId);
+    error Missing(bytes32 policyId);
+    error SelfReplacement();
     error ZeroValue();
 
     struct Policy {
@@ -70,6 +72,9 @@ contract ChlomSplitPolicyRegistry {
 
     function supersede(bytes32 policyId, bytes32 replacementPolicyId) external onlyOperator {
         if (replacementPolicyId == bytes32(0)) revert ZeroValue();
+        if (replacementPolicyId == policyId) revert SelfReplacement();
+        if (_policies[policyId].createdAt == 0) revert Missing(policyId);
+        if (_policies[replacementPolicyId].createdAt == 0) revert Missing(replacementPolicyId);
         _policies[policyId].superseded = true;
         emit PolicySuperseded(policyId, replacementPolicyId);
     }
