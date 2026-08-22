@@ -1,0 +1,72 @@
+name: Commercial Release Package Contract
+
+on:
+  pull_request:
+    paths:
+      - "automation/commercial-release-package-agent*.mdx"
+      - "developers/manifests/commercial-release-package-agent.v1.json"
+      - "developers/reference/commercial-release/**"
+      - "developers/schemas/commercial-product-release-package.v1.schema.json"
+      - "scripts/build_commercial_release_packages.py"
+      - "scripts/validate_commercial_release_packages.py"
+      - ".github/workflows/commercial-release-package-contract.yml"
+      - "platforms/crownthrive-*-institutional-registry.mdx"
+      - "workflows/commercial-*.mdx"
+      - "runbooks/commercial-sites-publication-and-rollback.mdx"
+  push:
+    branches:
+      - main
+      - "feature/commercial-release-package-agent-*"
+    paths:
+      - "automation/commercial-release-package-agent*.mdx"
+      - "developers/manifests/commercial-release-package-agent.v1.json"
+      - "developers/reference/commercial-release/**"
+      - "developers/schemas/commercial-product-release-package.v1.schema.json"
+      - "scripts/build_commercial_release_packages.py"
+      - "scripts/validate_commercial_release_packages.py"
+      - ".github/workflows/commercial-release-package-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commercial-release-package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controlled-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile agent code
+        run: |
+          python -m py_compile scripts/build_commercial_release_packages.py
+          python -m py_compile scripts/validate_commercial_release_packages.py
+
+      - name: Run deterministic and negative controls
+        run: python scripts/validate_commercial_release_packages.py
+
+      - name: Rebuild all product packages
+        run: python scripts/build_commercial_release_packages.py --output build/commercial-release-packages
+
+      - name: Assert no provider or commerce mutation
+        run: |
+          test "$(find build/commercial-release-packages -maxdepth 1 -name '*.json' | wc -l)" -eq 31
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          summary = json.loads(Path("build/commercial-release-packages/summary.json").read_text())
+          assert summary["product_count"] == 30
+          assert summary["cash_checkout_enabled_count"] == 0
+          assert summary["automatic_publication_eligible_count"] == 0
+          assert summary["accepted_count"] == 0
+          PY
