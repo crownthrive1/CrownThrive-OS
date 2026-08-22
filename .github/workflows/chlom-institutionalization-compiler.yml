@@ -1,0 +1,172 @@
+name: CHLOM Institutionalization Compiler
+
+on:
+  pull_request:
+    paths:
+      - "automation/chlom-institutionalization-compiler.v1.json"
+      - "automation/compile-chlom-institutionalization.mjs"
+      - "automation/chlom-institutionalization-gap-resolver.mjs"
+      - "automation/test-chlom-institutionalization-compiler.mjs"
+      - "automation/test-chlom-institutionalization-gap-resolver.mjs"
+      - "developers/reference/chlom-wallet/institutionalization/**"
+      - "developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json"
+      - "developers/chlom-institutionalization-compiler.mdx"
+      - "security/chlom-institutionalization-compiler-threat-model.mdx"
+      - ".github/workflows/chlom-institutionalization-compiler.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-institutionalization-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Compile deterministic institutional package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify runtime and frozen source ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          python --version
+          git merge-base --is-ancestor 64118e61c7671a78b43999ac5f17f9eddd1226b1 HEAD
+          test "$(git rev-list --count 64118e61c7671a78b43999ac5f17f9eddd1226b1..HEAD)" -ge 1
+
+      - name: Install exact schema validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-save --no-package-lock \
+            ajv@8.17.1 \
+            ajv-formats@3.0.1
+          node - <<'NODE'
+          const expected={ajv:'8.17.1','ajv-formats':'3.0.1'};
+          for (const [name,version] of Object.entries(expected)) {
+            const actual=require(`./node_modules/${name}/package.json`).version;
+            if (actual!==version) throw new Error(`${name}:${actual}`);
+            console.log(`${name}@${actual}`);
+          }
+          NODE
+
+      - name: Validate source syntax
+        run: |
+          python -m json.tool automation/chlom-institutionalization-compiler.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/institutionalization/institutionalization-package.v1.schema.json >/dev/null
+          node --check automation/compile-chlom-institutionalization.mjs
+          node --check automation/chlom-institutionalization-gap-resolver.mjs
+          node --check automation/test-chlom-institutionalization-compiler.mjs
+          node --check automation/test-chlom-institutionalization-gap-resolver.mjs
+
+      - name: Run gap-resolver negative and positive tests
+        run: node automation/test-chlom-institutionalization-gap-resolver.mjs
+
+      - name: Run compiler determinism and security tests
+        run: node automation/test-chlom-institutionalization-compiler.mjs
+
+      - name: Compile twice and byte-compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          node automation/compile-chlom-institutionalization.mjs \
+            --spec automation/chlom-institutionalization-compiler.v1.json \
+            --repo-root . \
+            --output /tmp/chlom-institutionalization-a.json \
+            | tee /tmp/chlom-institutionalization-a.log
+          node automation/compile-chlom-institutionalization.mjs \
+            --spec automation/chlom-institutionalization-compiler.v1.json \
+            --repo-root . \
+            --output /tmp/chlom-institutionalization-b.json \
+            | tee /tmp/chlom-institutionalization-b.log
+          cmp /tmp/chlom-institutionalization-a.json /tmp/chlom-institutionalization-b.json
+          python -m json.tool /tmp/chlom-institutionalization-a.json >/dev/null
+
+      - name: Validate compiled package against machine schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import Ajv2020 from 'ajv/dist/2020.js';
+          import addFormats from 'ajv-formats';
+          const schema=JSON.parse(readFileSync('developers/reference/chlom-wallet/institutionalization/institutionalization-package.v1.schema.json','utf8'));
+          const value=JSON.parse(readFileSync('/tmp/chlom-institutionalization-a.json','utf8'));
+          const ajv=new Ajv2020({allErrors:true,strict:true,strictRequired:false});
+          addFormats(ajv);
+          const validate=ajv.compile(schema);
+          if (!validate(value)) throw new Error(JSON.stringify(validate.errors));
+          if (value.state!=='PASS_CONTROLLED_TEST_INSTITUTIONALIZATION') throw new Error(`institutionalization_state:${value.state}`);
+          if (value.gap_analysis.gap_count!==0) throw new Error('institutionalization_gaps_present');
+          if (value.gap_analysis.completeness_score!==100) throw new Error('institutionalization_score_not_100');
+          console.log(JSON.stringify({
+            result:'PASS_CHLOM_INSTITUTIONALIZATION_SCHEMA',
+            package_id:value.package_id,
+            package_digest_sha256:value.package_digest_sha256,
+            artifact_count:value.artifact_counts.total,
+            algorithm_count:value.algorithm_registry.length,
+            completeness_score:value.gap_analysis.completeness_score,
+          }));
+          NODE
+
+      - name: Emit generated manifest for governed reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'CHLOM_GENERATED_MANIFEST_BASE64_BEGIN'
+          base64 -w 0 /tmp/chlom-institutionalization-a.json
+          echo
+          echo 'CHLOM_GENERATED_MANIFEST_BASE64_END'
+
+      - name: Verify committed package matches deterministic rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json
+          cmp /tmp/chlom-institutionalization-a.json developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json
+
+      - name: Enforce public/restricted and no-live boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          public_files=(
+            automation/chlom-institutionalization-compiler.v1.json
+            developers/reference/chlom-wallet/institutionalization/institutionalization-package.v1.schema.json
+            developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json
+            developers/chlom-institutionalization-compiler.mdx
+            security/chlom-institutionalization-compiler-threat-model.mdx
+          )
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${public_files[@]}"; then
+            echo 'Potential live secret-shaped material detected in institutional package.'
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          spec=json.load(open('automation/chlom-institutionalization-compiler.v1.json'))
+          manifest=json.load(open('developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json'))
+          assert all(value is False for value in spec['hard_boundaries'].values())
+          assert all(value is False for value in manifest['hard_boundaries'].values())
+          assert manifest['compiler']['network_access'] is False
+          assert manifest['compiler']['signing'] is False
+          assert manifest['compiler']['provider_write'] is False
+          assert manifest['compiler']['chain_broadcast'] is False
+          assert manifest['compiler']['money_movement'] is False
+          assert manifest['ai_governance']['advisory_only'] is True
+          assert manifest['ai_governance']['decision_authority'] is False
+          assert manifest['ai_governance']['write_authority'] is False
+          assert manifest['ai_governance']['automatic_release'] is False
+          PY
+
+      - name: Record boundary
+        run: |
+          echo 'CONTROLLED_TEST: deterministic institutional packaging, completeness analysis, provenance and documentation impact only.'
+          echo 'No AI decision authority, reviewer impersonation, provider write, signing, custody, token issuance, money movement, rights grant, chain broadcast, price publication, checkout, phase advancement or merge authority is created.'
