@@ -8,6 +8,7 @@ contract ThriveFundObligationRegistry {
     error Paused();
     error Exists(bytes32 obligationId);
     error Missing(bytes32 obligationId);
+    error InvalidState(bytes32 obligationId);
     error ZeroValue();
 
     enum State { None, Recorded, SettledExternally, Reversed }
@@ -58,7 +59,7 @@ contract ThriveFundObligationRegistry {
 
     function record(bytes32 obligationId, bytes32 sourceDigest, bytes32 programDigest, bytes32 assetDigest, uint256 amountMinor) external onlyOperator {
         if (paused) revert Paused();
-        if (obligationId == bytes32(0) || sourceDigest == bytes32(0) || programDigest == bytes32(0) || assetDigest == bytes32(0)) revert ZeroValue();
+        if (obligationId == bytes32(0) || sourceDigest == bytes32(0) || programDigest == bytes32(0) || assetDigest == bytes32(0) || amountMinor == 0) revert ZeroValue();
         if (_obligations[obligationId].state != State.None) revert Exists(obligationId);
         _obligations[obligationId] = Obligation(sourceDigest, programDigest, assetDigest, amountMinor, State.Recorded, uint64(block.timestamp));
         emit ObligationRecorded(obligationId, sourceDigest, programDigest, assetDigest, amountMinor);
@@ -66,7 +67,9 @@ contract ThriveFundObligationRegistry {
 
     function markSettledExternally(bytes32 obligationId, bytes32 evidenceDigest) external onlyOperator {
         Obligation storage o = _obligations[obligationId];
-        if (o.state != State.Recorded) revert Missing(obligationId);
+        if (o.state == State.None) revert Missing(obligationId);
+        if (o.state != State.Recorded) revert InvalidState(obligationId);
+        if (evidenceDigest == bytes32(0)) revert ZeroValue();
         o.state = State.SettledExternally;
         emit ObligationStateChanged(obligationId, State.SettledExternally, evidenceDigest);
     }
@@ -74,6 +77,8 @@ contract ThriveFundObligationRegistry {
     function reverse(bytes32 obligationId, bytes32 evidenceDigest) external onlyOperator {
         Obligation storage o = _obligations[obligationId];
         if (o.state == State.None) revert Missing(obligationId);
+        if (o.state == State.Reversed) revert InvalidState(obligationId);
+        if (evidenceDigest == bytes32(0)) revert ZeroValue();
         o.state = State.Reversed;
         emit ObligationStateChanged(obligationId, State.Reversed, evidenceDigest);
     }
