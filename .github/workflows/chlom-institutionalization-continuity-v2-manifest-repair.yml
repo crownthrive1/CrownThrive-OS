@@ -20,14 +20,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Check out exact PR head with bounded write credential
+      - name: Check out exact same-repository branch with bounded write credential
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: chlom-wallet/phase-c-proof-portability-20260822
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Compile frozen continuity package and verify expected digest
+      - name: Compile frozen continuity package and verify exact expected manifest identity
         shell: bash
         run: |
           set -euo pipefail
@@ -42,7 +42,57 @@ jobs:
           python - <<'PY'
           import json
           p=json.load(open('/tmp/chlom-wallet-phase-c-institutionalization.v2.json'))
+          assert p['schema_version']=='1.0.0'
           assert p['package_id']=='ct.package.chlom-wallet.phase-c.institutionalization.v2'
           assert p['semantic_version']=='2.0.0'
-          assert p['state']=='PASS_CONTROLLED_TEST_INSTITUTIONALIZATlON'.replace('l','I') or False
+          assert p['state']=='PASS_CONTROLLED_TEST_INSTITUTIONALIZATION'
+          assert p['source_snapshot']['head_sha']=='d6187bd9a9a5af12cf1121d761d325943cc63daa'
+          assert p['artifact_counts']['total']==19
+          assert len(p['algorithm_registry'])==4
+          assert p['gap_analysis']['gap_count']==0
+          assert p['gap_analysis']['completeness_score']==100
+          assert p['package_digest_sha256']=='c3433c0cc3f97003a8fbe75a5308edf68bf3b2bd19882d90dfeefe2bd2e15248'
+          assert p['rights']['state']=='HOLD_INDEPENDENT_RIGHTS_REVIEW'
+          assert p['commercialization']['state']=='PRICE_REVIEW'
+          assert all(value is False for value in p['hard_boundaries'].values())
+          paths={item['path'] for item in p['artifact_inventory']}
+          assert 'developers/reference/chlom-wallet/institutionalization/runtime/runtime-deployment-lineage-fence-v1.mjs' in paths
+          assert not any('vuntime-deployment-lineage-fence' in path for path in paths)
           PY
+
+      - name: Replace only the manifest when transferred bytes differ
+        id: repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='developers/manifests/chlom-wallet-phase-c-institutionalization.v2.json'
+          if cmp --silent "$target" /tmp/chlom-wallet-phase-c-institutionalization.v2.json; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo 'Committed manifest already equals compiler output.'
+            exit 0
+          fi
+          cp /tmp/chlom-wallet-phase-c-institutionalization.v2.json "$target"
+          mapfile -t changed < <(git diff --name-only)
+          test "${#changed[@]}" = 1
+          test "${changed[0]}" = "$target"
+          python -m json.tool "$target" >/dev/null
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Commit compiler-exact manifest repair
+        if: steps.repair.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='developers/manifests/chlom-wallet-phase-c-institutionalization.v2.json'
+          git config user.name 'CrownThrive CHLOM Institutionalizer'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "$target"
+          test "$(git diff --cached --name-only | wc -l)" = '1'
+          test "$(git diff --cached --name-only)" = "$target"
+          git commit -m 'Repair compiler-exact CHLOM Phase C institutionalization v2 manifest'
+          git push origin HEAD:chlom-wallet/phase-c-proof-portability-20260822
+
+      - name: Record boundary
+        run: |
+          echo 'BOUNDED_REPAIR: compiler output may replace exactly one committed manifest file after frozen-snapshot and expected-digest verification.'
+          echo 'No other source path, THIVEBASE record, reviewer heartbeat, review receipt, provider object, credential, Stripe object, checkout, signing, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement, or merge authority may be changed by this workflow.'
