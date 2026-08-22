@@ -1,0 +1,110 @@
+name: CHLOM Wallet Phase C Controlled Test
+
+on:
+  pull_request:
+    paths:
+      - "automation/chlom-wallet-settlement-agent-phase-c-skills.json"
+      - "chlom/chlom-wallet-commercial-catalog.json"
+      - "chlom/chlom-wallet-phase-c-proof-portability.mdx"
+      - "developers/chlom-wallet-*.mdx"
+      - "developers/reference/chlom-wallet/common/**"
+      - "developers/reference/chlom-wallet/proof/**"
+      - "developers/reference/chlom-wallet/settlement/**"
+      - "developers/reference/chlom-wallet/portability/**"
+      - "developers/reference/chlom-wallet/vectors/**"
+      - "security/chlom-wallet*.mdx"
+      - ".github/workflows/chlom-wallet-phase-c-controlled-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-phase-c-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phase-c:
+    name: Validate proof, settlement and portability kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify runtime
+        run: node --version
+
+      - name: Syntax check
+        run: |
+          node --check developers/reference/chlom-wallet/common/canonical-json.mjs
+          node --check developers/reference/chlom-wallet/proof/harp-proof-capsule.mjs
+          node --check developers/reference/chlom-wallet/proof/test-harp-proof-capsule.mjs
+          node --check developers/reference/chlom-wallet/settlement/easor-settlement-plan.mjs
+          node --check developers/reference/chlom-wallet/settlement/test-easor-settlement-plan.mjs
+          node --check developers/reference/chlom-wallet/portability/portable-wallet-capsule.mjs
+          node --check developers/reference/chlom-wallet/portability/test-portable-wallet-capsule.mjs
+          node --check developers/reference/chlom-wallet/vectors/test-phase-c-vectors.mjs
+
+      - name: Run HARP proof-capsule stress suite
+        run: node developers/reference/chlom-wallet/proof/test-harp-proof-capsule.mjs
+
+      - name: Run EASOR settlement-plan stress suite
+        run: node developers/reference/chlom-wallet/settlement/test-easor-settlement-plan.mjs
+
+      - name: Run portable-wallet capsule suite
+        run: node developers/reference/chlom-wallet/portability/test-portable-wallet-capsule.mjs
+
+      - name: Run deterministic cross-runtime vectors
+        run: node developers/reference/chlom-wallet/vectors/test-phase-c-vectors.mjs
+
+      - name: Validate machine contracts
+        run: |
+          python -m json.tool automation/chlom-wallet-settlement-agent-phase-c-skills.json >/dev/null
+          python -m json.tool chlom/chlom-wallet-commercial-catalog.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/vectors/phase-c-test-vectors.json >/dev/null
+
+      - name: Enforce no-network and no-secret code boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            developers/reference/chlom-wallet/common/*.mjs
+            developers/reference/chlom-wallet/proof/*.mjs
+            developers/reference/chlom-wallet/settlement/*.mjs
+            developers/reference/chlom-wallet/portability/*.mjs
+            developers/reference/chlom-wallet/vectors/*.mjs
+          )
+          if grep -nE 'https?://|wss?://|fetch\(|WebSocket\(' "${files[@]}"; then
+            echo "Phase C reference kernel must remain deterministic and network-free."
+            exit 1
+          fi
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sb_secret_[A-Za-z0-9._-]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' \
+            automation/chlom-wallet-settlement-agent-phase-c-skills.json \
+            chlom/chlom-wallet-commercial-catalog.json \
+            "${files[@]}"; then
+            echo "Potential secret-shaped material detected in Phase C projection."
+            exit 1
+          fi
+
+      - name: Enforce controlled-test semantic boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            developers/reference/chlom-wallet/proof/*.mjs
+            developers/reference/chlom-wallet/settlement/*.mjs
+            developers/reference/chlom-wallet/portability/*.mjs
+            developers/reference/chlom-wallet/vectors/*.mjs
+          )
+          if grep -nE 'money_movement:[[:space:]]*true|provider_write:[[:space:]]*true|rights_granted:[[:space:]]*true|impact_disbursed:[[:space:]]*true|public_chain_broadcast:[[:space:]]*true' "${files[@]}"; then
+            echo "Phase C reference kernel crossed a controlled-test side-effect boundary."
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "CONTROLLED_TEST: HARP creates digest commitments and inclusion proofs only; no chain broadcast occurs."
+          echo "CONTROLLED_TEST: EASOR compiles allocation/reversal obligations only; no settlement, rights grant, or impact disbursement occurs."
+          echo "CONTROLLED_TEST: portable-wallet capsules contain no provider credentials or raw evidence and produce HOLD-only remap plans."
+          echo "Passing Phase C tests is technical evidence, not release, pricing, custody, testnet, mainnet, or money-movement authorization."
