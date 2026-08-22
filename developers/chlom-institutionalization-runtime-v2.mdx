@@ -37,11 +37,11 @@ The function does not accept a Supabase user JWT as its trust root. `verify_jwt`
 ```yaml
 function_id: a9fa1f5d-908d-4807-9d35-20c95d161507
 slug: chlom-wallet-institutionalize-v2
-version: 2
+version: 4
 status: ACTIVE
 verify_jwt: false
 authentication_mode: INTERNAL_GITHUB_OIDC_RS256_JWKS_VERIFICATION
-ezbr_sha256: f3238ab6f53cc5333ac47b495706d346d6f178c0a9f618f0a0b6dedc6c17ebe6
+ezbr_sha256: 9dfec88ed84103fb43e332a11b1877d87f01fb3eae2b280b1125434b4a711b4f
 ```
 
 Source-controlled runtime:
@@ -52,8 +52,52 @@ Source-controlled runtime:
 - `developers/reference/chlom-wallet/institutionalization/runtime/oidc-jwt-verifier-v2.mjs`
 - `developers/reference/chlom-wallet/institutionalization/runtime/github-repository-binding-v2.mjs`
 - `developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs`
+- `developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs`
 - `developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json`
 - `developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json`
+- `developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json`
+
+## Deployment-drift incident and correction
+
+A real GitHub OIDC ingest attempt exposed a deployment/source drift defect rather than an institutional-package defect.
+
+At Phase C head `79408520094ac5b3d51b75ce776fe97f0109c08d`:
+
+```yaml
+compiler: PASS
+manifest_rebuild_and_cmp: PASS
+github_oidc_token_request: PASS
+edge_ingest_http_status: 503
+edge_error: BOOT_ERROR
+real_package_recorded: false
+```
+
+The deployed version 3 bundle contained `encoder` and `decoder` as module-local constants while downstream modules imported them as named exports. The corresponding source-controlled file already contained the correct exports:
+
+```js
+export const encoder = new TextEncoder();
+export const decoder = new TextDecoder();
+```
+
+The source-controlled runtime-utils blob is:
+
+```text
+33a74f3c294947ab6df04a2a1710697e7563bfeb
+```
+
+The runtime was redeployed from those exact source-controlled modules as version 4. The correction is institutionalized in:
+
+```text
+developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json
+```
+
+A regression test now imports the complete OIDC runtime module graph and verifies the required named exports:
+
+```text
+developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs
+```
+
+The runtime CI also verifies the unauthenticated `401` response against the deployed service. The real OIDC package ingest remains a separate gate and is not inferred from successful redeployment.
 
 ## Immutable GitHub subject support
 
@@ -113,10 +157,12 @@ Failures remain fail closed. Recovery requires:
 
 1. classify the failure without logging tokens;
 2. preserve append-only evidence;
-3. redeploy only known-good source;
-4. rerun package, ingest, OIDC-subject, unit, and liveness canaries;
-5. verify the exact committed manifest and source ancestry;
-6. obtain independent security and release review before resuming.
+3. compare deployed module linkage against source-controlled exports;
+4. redeploy only exact known-good source;
+5. run the module-linkage regression contract;
+6. rerun package, ingest, OIDC-subject, unit, and deployed-liveness canaries;
+7. verify the exact committed manifest and source ancestry;
+8. obtain independent security and release review before resuming.
 
 Automatic resume is prohibited.
 
@@ -133,10 +179,11 @@ package: PASS_CHLOM_INSTITUTIONALIZATION_PACKAGE_V2_CANARY
 ingest: PASS_CHLOM_INSTITUTIONALIZATION_INGEST_V2_CANARY
 oidc_subject: PASS_CHLOM_INSTITUTIONALIZATION_OIDC_SUBJECT_V2_CANARY
 oidc_unit_contract: PASS_CHLOM_WALLET_INSTITUTIONALIZATION_OIDC_V2_UNIT_CONTRACT
+runtime_module_linkage: PASS_CHLOM_INSTITUTIONALIZATION_RUNTIME_MODULE_LINKAGE_V2
 runtime_advisor: PASS_CHLOM_INSTITUTIONALIZATION_RUNTIME_ADVISOR_V1
 ```
 
-The canaries prove their tested contracts. The real package ingest remains a separate GitHub OIDC workflow gate until an exact-head receipt is recorded.
+These canaries prove their tested contracts. The real package ingest remains a separate GitHub OIDC workflow gate until an exact-head non-canary receipt is recorded.
 
 ## Hard boundaries
 
