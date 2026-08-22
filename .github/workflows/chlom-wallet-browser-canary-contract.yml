@@ -1,0 +1,109 @@
+name: CHLOM Wallet Browser Canary Contract
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/passkey/browser-canary.mjs"
+      - "developers/reference/chlom-wallet/passkey/test-browser-canary.mjs"
+      - "developers/reference/chlom-wallet/passkey/runtime-contract.json"
+      - "developers/reference/chlom-wallet/passkey/runtime-readiness-audit.json"
+      - "developers/chlom-wallet-webauthn-browser-canary.mdx"
+      - ".github/workflows/chlom-wallet-browser-canary-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-browser-canary-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate browser canary handoff without executing a browser ceremony
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify runtime
+        run: node --version
+
+      - name: Validate JSON contracts
+        run: |
+          python -m json.tool developers/reference/chlom-wallet/passkey/runtime-contract.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/passkey/runtime-readiness-audit.json >/dev/null
+
+      - name: Syntax check browser canary source
+        run: |
+          node --check developers/reference/chlom-wallet/passkey/browser-canary.mjs
+          node --check developers/reference/chlom-wallet/passkey/test-browser-canary.mjs
+
+      - name: Run browser canary source contract test
+        run: node developers/reference/chlom-wallet/passkey/test-browser-canary.mjs
+
+      - name: Enforce runtime and browser HOLD boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          runtime=json.load(open('developers/reference/chlom-wallet/passkey/runtime-contract.json'))
+          audit=json.load(open('developers/reference/chlom-wallet/passkey/runtime-readiness-audit.json'))
+          assert runtime['state']=='CONTROLLED_TEST_ACTIVE'
+          assert runtime['edge_function']['version']==3
+          assert runtime['edge_function']['status']=='ACTIVE'
+          assert runtime['edge_function']['verify_jwt'] is True
+          assert runtime['edge_function']['ezbr_sha256']=='0975644a8c98dd8af11da14010b94f01488793e49b7178004bcad0e525b963ca'
+          assert runtime['edge_function']['authenticated_browser_ceremony_state']=='NOT_YET_EXECUTED'
+          assert runtime['controlled_test_evidence']['runtime_readiness_audit']=='PASS_WEBAUTHN_RUNTIME_READINESS_AUDIT'
+          assert runtime['controlled_test_evidence']['runtime_policy_digest_sha256']=='c71d9495dc50d53861cb8cc4eb2ff33cf33dc19fdc831b1d9e2ea6796e02f040'
+          assert runtime['browser_canary']['contract_test']=='PASS_WEBAUTHN_BROWSER_CANARY_CONTRACT'
+          assert runtime['browser_canary']['execution_state']=='NOT_YET_EXECUTED'
+          assert runtime['browser_canary']['authenticated_browser_receipt_ref'] is None
+          assert all(value is False for value in runtime['hard_boundaries'].values())
+
+          assert audit['state']=='PASS_CONTROLLED_TEST_RUNTIME_READINESS'
+          assert audit['runtime']['edge_function_version']==3
+          assert audit['private_runtime_audit']['result']=='PASS_WEBAUTHN_RUNTIME_READINESS_AUDIT'
+          assert audit['private_runtime_audit']['production_active_binding_count']==0
+          assert audit['private_runtime_audit']['smart_account_binding_count']==0
+          assert audit['browser_canary']['authenticated_browser_ceremony_state']=='NOT_YET_EXECUTED'
+          assert audit['browser_canary']['authenticated_browser_receipt_ref'] is None
+          assert all(value is False for value in audit['hard_boundaries'].values())
+          PY
+
+      - name: Scan browser canary projection for secret-shaped material
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            developers/reference/chlom-wallet/passkey/browser-canary.mjs
+            developers/reference/chlom-wallet/passkey/test-browser-canary.mjs
+            developers/reference/chlom-wallet/passkey/runtime-contract.json
+            developers/reference/chlom-wallet/passkey/runtime-readiness-audit.json
+            developers/chlom-wallet-webauthn-browser-canary.mdx
+          )
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${files[@]}"; then
+            echo "Potential live secret-shaped material detected in browser canary projection."
+            exit 1
+          fi
+
+      - name: Enforce no production or chain activation in browser canary source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE 'production_credential_activation:[[:space:]]*true|smart_account_binding:[[:space:]]*true|smart_account_deployment:[[:space:]]*true|chain_broadcast:[[:space:]]*true|custody:[[:space:]]*true|money_movement:[[:space:]]*true|production_rights_grant:[[:space:]]*true' \
+            developers/reference/chlom-wallet/passkey/browser-canary.mjs \
+            developers/reference/chlom-wallet/passkey/runtime-contract.json \
+            developers/reference/chlom-wallet/passkey/runtime-readiness-audit.json; then
+            echo "Browser canary crossed its controlled non-activation boundary."
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo "CONTROLLED_TEST: the browser source/serialization/action contract passed against mocks."
+          echo "No authenticator-driven browser ceremony is claimed by this workflow."
+          echo "No production credential activation, smart-account binding, chain broadcast, custody, rights grant, or money movement is authorized."

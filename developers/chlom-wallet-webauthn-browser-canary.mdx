@@ -1,0 +1,144 @@
+---
+title: "CHLOM Wallet WebAuthn Browser Canary"
+sidebarTitle: "WebAuthn Browser Canary"
+description: "Controlled browser handoff for validating CHLOM Wallet passkey registration, assertion and optional recovery step-up against the JWT-protected runtime without enabling production credentials or smart-account execution."
+icon: "fingerprint"
+---
+
+# CHLOM Wallet WebAuthn browser canary
+
+**Runtime state:** `CONTROLLED_TEST_ACTIVE`  
+**Runtime version:** `3`  
+**Browser ceremony:** `NOT_YET_EXECUTED`  
+**Production credential activation:** disabled  
+**Smart-account binding and deployment:** disabled  
+**Chain broadcast / money movement:** disabled
+
+The deployed CHLOM Wallet passkey runtime has passed its private policy, ACL, RLS and database-canary audit. The remaining browser gate requires an authenticated user gesture from the exact wallet origin. Source-controlled browser support now exists, but its presence is not represented as a completed WebAuthn ceremony.
+
+## Current deployed runtime
+
+```yaml
+runtime_id: ct.wallet.passkey-runtime.controlled.v1
+service_id: ct.service.chlom-wallet-passkey-control
+edge_function_id: fbc1eff3-818e-4fb9-ad3b-9856c0cabbe0
+edge_function_slug: chlom-wallet-passkey-control
+edge_function_version: 3
+status: ACTIVE
+verify_jwt: true
+edge_function_ezbr_sha256: 0975644a8c98dd8af11da14010b94f01488793e49b7178004bcad0e525b963ca
+verification_library: '@simplewebauthn/server@13.3.2'
+allowed_origin: https://wallet.crownthrive.com
+rp_id: crownthrive.com
+```
+
+The machine audit is:
+
+`developers/reference/chlom-wallet/passkey/runtime-readiness-audit.json`
+
+The private runtime audit passed:
+
+```yaml
+result: PASS_WEBAUTHN_RUNTIME_READINESS_AUDIT
+policy_digest_sha256: c71d9495dc50d53861cb8cc4eb2ff33cf33dc19fdc831b1d9e2ea6796e02f040
+database_canary_state: PASS_WEBAUTHN_RUNTIME_DB_CANARY
+rls_force_rls_verified: true
+deny_client_policies_verified: true
+client_table_access: false
+client_rpc_execution: false
+service_role_rpc_execution: true
+production_active_binding_count: 0
+smart_account_binding_count: 0
+```
+
+This establishes the controlled runtime’s current implementation and access boundary. It is not an authenticator-provenance, recovery-readiness or production-release certificate.
+
+## Browser source contract
+
+The browser handoff is:
+
+`developers/reference/chlom-wallet/passkey/browser-canary.mjs`
+
+It performs the following sequence only when invoked from a user interaction at `https://wallet.crownthrive.com`:
+
+1. Request controlled registration options.
+2. Call `navigator.credentials.create()`.
+3. Serialize and submit the registration result.
+4. Request controlled authentication options.
+5. Call `navigator.credentials.get()`.
+6. Serialize and submit the assertion result.
+7. Optionally repeat the assertion ceremony for recovery step-up.
+8. Return receipt digests and controlled-test states without returning or persisting the access token.
+
+The reference rejects:
+
+- an origin other than the exact wallet origin;
+- a non-secure context;
+- a missing WebAuthn Credential Management API;
+- a non-HTTPS function endpoint;
+- a function endpoint with URL credentials or a fragment;
+- a function endpoint whose path does not end in `chlom-wallet-passkey-control`;
+- missing authenticated access material;
+- registration/assertion results outside the controlled-test states.
+
+## Source contract test
+
+The Node contract test validates Base64URL conversion, option decoding, credential serialization, origin/HTTPS/slug enforcement, token non-return behavior and the exact mocked action sequence:
+
+```yaml
+result: PASS_WEBAUTHN_BROWSER_CANARY_CONTRACT
+base64url_roundtrip: true
+registration_options_decoded: true
+assertion_options_decoded: true
+registration_credential_serialized: true
+assertion_credential_serialized: true
+exact_wallet_origin_required: true
+secure_context_required: true
+endpoint_https_and_slug_bound: true
+mocked_action_sequence_verified: true
+authenticated_browser_ceremony_executed: false
+production_credential_activation: false
+smart_account_binding: false
+smart_account_deployment: false
+chain_broadcast: false
+custody: false
+money_movement: false
+```
+
+The mocked test validates the browser integration contract. It does not substitute for an authenticator-driven browser ceremony.
+
+## Execution prerequisites
+
+The live controlled canary requires:
+
+- a signed-in CrownThrive test subject with a valid JWT;
+- the exact `https://wallet.crownthrive.com` origin;
+- an HTTPS secure context;
+- a supported platform or roaming authenticator;
+- an explicit user gesture;
+- the version-3 runtime and current policy digest;
+- no production credential activation or smart-account binding;
+- capture of only public receipt digests and controlled states.
+
+A successful browser ceremony should return:
+
+```yaml
+result: PASS_AUTHENTICATED_BROWSER_WEBAUTHN_CANARY
+registration_state: VERIFIED_REGISTRATION_CONTROLLED_TEST
+assertion_state: VERIFIED_ASSERTION_CONTROLLED_TEST
+recovery_step_up_state: NOT_REQUESTED | VERIFIED_ASSERTION_CONTROLLED_TEST
+access_token_persisted: false
+access_token_logged: false
+production_credential_activation: false
+smart_account_binding: false
+smart_account_deployment: false
+chain_broadcast: false
+custody: false
+money_movement: false
+```
+
+## Evidence and promotion rule
+
+The browser gate closes only after an actual user-gesture ceremony produces exact controlled-test registration and assertion receipt digests against the current runtime version, hash, policy digest, repository head and authenticated test subject.
+
+The result must then be independently reviewed. It cannot activate a production credential, replace a credential, bind a smart account, deploy an account, create custody, move value or advance the institutional phase by itself.

@@ -1,0 +1,53 @@
+---
+title: "CHLOM Wallet Runtime Readiness — 2026-08-22"
+sidebarTitle: "Wallet Runtime Readiness"
+description: "Version-3 WebAuthn runtime reconciliation, private readiness audit, browser-canary handoff and exact separation from production credential or smart-account activation."
+icon: "shield-check"
+---
+
+# CHLOM Wallet runtime readiness — 2026-08-22
+
+The CHLOM Wallet passkey runtime record was reconciled to the actual active Edge Function rather than the prior version-2 documentation snapshot.
+
+```yaml
+edge_function_slug: chlom-wallet-passkey-control
+edge_function_version: 3
+edge_function_status: ACTIVE
+verify_jwt: true
+edge_function_ezbr_sha256: 0975644a8c98dd8af11da14010b94f01488793e49b7178004bcad0e525b963ca
+verification_library: '@simplewebauthn/server@13.3.2'
+```
+
+The private control-plane audit passed:
+
+```yaml
+result: PASS_WEBAUTHN_RUNTIME_READINESS_AUDIT
+policy_digest_sha256: c71d9495dc50d53861cb8cc4eb2ff33cf33dc19fdc831b1d9e2ea6796e02f040
+database_canary_state: PASS_WEBAUTHN_RUNTIME_DB_CANARY
+rls_force_rls_verified: true
+deny_client_policies_verified: true
+client_table_access: false
+client_rpc_execution: false
+service_role_rpc_execution: true
+production_active_binding_count: 0
+smart_account_binding_count: 0
+```
+
+A source-controlled browser handoff and mocked contract test were added. They validate option conversion, credential serialization, exact wallet-origin enforcement and the controlled registration/assertion action sequence.
+
+```yaml
+browser_contract_test: PASS_WEBAUTHN_BROWSER_CANARY_CONTRACT
+authenticated_browser_ceremony_state: NOT_YET_EXECUTED
+```
+
+No browser-authenticator ceremony is inferred from the source or mocked test. Production credential activation, smart-account binding/deployment, chain broadcast, custody, money movement, production rights grants and Phase advancement remain disabled.
+
+Canonical current machine records:
+
+- `developers/reference/chlom-wallet/passkey/runtime-contract.json`
+- `developers/reference/chlom-wallet/passkey/runtime-readiness-audit.json`
+- `developers/reference/chlom-wallet/passkey/browser-canary.mjs`
+- `developers/reference/chlom-wallet/passkey/test-browser-canary.mjs`
+- `developers/chlom-wallet-webauthn-browser-canary.mdx`
+
+Earlier version-2 statements remain recoverable in Git history but are superseded for current runtime identity by these version-3 records.
