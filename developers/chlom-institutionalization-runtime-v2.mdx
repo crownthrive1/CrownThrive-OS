@@ -7,7 +7,7 @@ icon: "shield-halved"
 
 # CHLOM Institutionalization Runtime v2
 
-**State:** `ACTIVE_PENDING_REAL_OIDC_INGEST`  
+**State:** `ACTIVE_REAL_PACKAGE_INGESTED`  
 **Phase:** 2.99  
 **Service:** `ct.service.chlom-wallet-institutionalize-v2`  
 **Originating specialist:** `ct.agent.chlom-wallet-settlement`  
@@ -56,6 +56,7 @@ Source-controlled runtime:
 - `developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json`
 - `developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json`
 - `developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json`
+- `developers/reference/chlom-wallet/institutionalization/runtime/real-oidc-ingest-evidence.v2.json`
 
 ## Deployment-drift incident and correction
 
@@ -85,19 +86,64 @@ The source-controlled runtime-utils blob is:
 33a74f3c294947ab6df04a2a1710697e7563bfeb
 ```
 
-The runtime was redeployed from those exact source-controlled modules as version 4. The correction is institutionalized in:
+The runtime was redeployed from those exact source-controlled modules as version 4. A regression test now imports the complete OIDC runtime module graph and verifies the required named exports. Runtime CI also verifies that an unauthenticated POST receives the exact fail-closed `401` response.
 
-```text
-developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json
+The reconciliation is now closed as:
+
+```yaml
+state: RESOLVED_REAL_OIDC_PACKAGE_INGESTED
+runtime_module_linkage: PASS_CHLOM_INSTITUTIONALIZATION_RUNTIME_MODULE_LINKAGE_V2
+unauthenticated_liveness: PASS_UNAUTHENTICATED_401_FAIL_CLOSED
+real_package_recorded: true
+real_oidc_ingest_receipt_recorded: true
 ```
 
-A regression test now imports the complete OIDC runtime module graph and verifies the required named exports:
+Machine records:
 
-```text
-developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs
+- `developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json`
+- `developers/reference/chlom-wallet/institutionalization/runtime/real-oidc-ingest-evidence.v2.json`
+
+## Real institutional package recording
+
+The actual non-canary Phase C package is now recorded in THIVEBASE:
+
+```yaml
+package_record_id: 7e5bbe59-b486-402c-b361-a390074546da
+package_id: ct.package.chlom-wallet.phase-c.institutionalization.v1
+semantic_version: 1.0.0
+package_state: PASS_CONTROLLED_TEST_INSTITUTIONALIZATION
+frozen_source_head: 64118e61c7671a78b43999ac5f17f9eddd1226b1
+package_digest_sha256: 7b3be50d5541fff14127bfdd24724eb9b8b9f9ffd4b165a380dee02f2a1ef957
+artifact_count: 17
+algorithm_count: 5
+gap_count: 0
+completeness_score: 100
+docs_state: DOCS_UPDATED
+security_state: CONTROLLED_TEST
+privacy_state: CONTROLLED_TEST
+rights_state: HOLD_INDEPENDENT_RIGHTS_REVIEW
+commercialization_state: PRICE_REVIEW
+scheduler_state: NO_NEW_EXTERNAL_SLOT
+provenance_state: SOURCE_CONTROLLED
 ```
 
-The runtime CI also verifies the unauthenticated `401` response against the deployed service. The real OIDC package ingest remains a separate gate and is not inferred from successful redeployment.
+The first successful GitHub OIDC ingest receipt is:
+
+```yaml
+receipt_id: 8183012f-ff77-4f67-91ee-eeb3931050cc
+github_run_id: '32598549723'
+record_result: RECORDED_INSTITUTIONALIZATION_PACKAGE_V2
+```
+
+A later exact-head OIDC verification recorded another append-only receipt:
+
+```yaml
+receipt_id: 433d7944-3e44-478e-89c7-1c5987f8fb76
+github_run_id: '32598629857'
+record_result: DUPLICATE_PACKAGE_DIGEST
+```
+
+`DUPLICATE_PACKAGE_DIGEST` is the intended idempotent state: the immutable package already exists, while the new GitHub OIDC event receives its own ingest receipt. The raw OIDC token is not persisted.
 
 ## Immutable GitHub subject support
 
@@ -117,7 +163,7 @@ Wrong owner IDs, repository IDs, branches, audiences, workflow identity, actors,
 
 ## Package binding
 
-The current controlled package is frozen at:
+The controlled package remains frozen at:
 
 ```yaml
 package_id: ct.package.chlom-wallet.phase-c.institutionalization.v1
@@ -162,7 +208,8 @@ Failures remain fail closed. Recovery requires:
 5. run the module-linkage regression contract;
 6. rerun package, ingest, OIDC-subject, unit, and deployed-liveness canaries;
 7. verify the exact committed manifest and source ancestry;
-8. obtain independent security and release review before resuming.
+8. confirm the non-canary package/receipt readback;
+9. obtain independent security and release review before production use.
 
 Automatic resume is prohibited.
 
@@ -172,7 +219,7 @@ The future commercial family is **CHLOM Institutionalization Compiler and Govern
 
 No model is currently an effective offer. Public pricing, Stripe Product/Price objects, checkout, customer fulfillment, tenant access, and production support commitments remain separately gated.
 
-## Current canaries
+## Current canaries and real evidence
 
 ```yaml
 package: PASS_CHLOM_INSTITUTIONALIZATION_PACKAGE_V2_CANARY
@@ -181,9 +228,11 @@ oidc_subject: PASS_CHLOM_INSTITUTIONALIZATION_OIDC_SUBJECT_V2_CANARY
 oidc_unit_contract: PASS_CHLOM_WALLET_INSTITUTIONALIZATION_OIDC_V2_UNIT_CONTRACT
 runtime_module_linkage: PASS_CHLOM_INSTITUTIONALIZATION_RUNTIME_MODULE_LINKAGE_V2
 runtime_advisor: PASS_CHLOM_INSTITUTIONALIZATION_RUNTIME_ADVISOR_V1
+real_package: PASS_CONTROLLED_TEST_INSTITUTIONALIZATION
+real_oidc_ingest: RECORDED_CONTROLLED_TEST_EVIDENCE
 ```
 
-These canaries prove their tested contracts. The real package ingest remains a separate GitHub OIDC workflow gate until an exact-head non-canary receipt is recorded.
+The package is institutionalized as controlled-test evidence. This does not satisfy independent Rights, Security, Pricing, Release, Phase Gate, or production activation requirements.
 
 ## Hard boundaries
 
