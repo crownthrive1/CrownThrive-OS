@@ -4,9 +4,11 @@ on:
   pull_request:
     paths:
       - "developers/manifests/cie-interoperability.v1.json"
+      - "developers/manifests/cie-interoperability-reanchor.v2.json"
       - "developers/manifests/cie-navigation-patch.v1.json"
       - "developers/templates/framework-child-interoperability-backlink.v1.json"
       - "scripts/validate_cie_interoperability.py"
+      - "scripts/validate_cie_interoperability_reanchor.py"
       - "automation/cie-interoperability-and-convergence-bridge.mdx"
       - "changelog/phase-2-99-cie-interoperability.mdx"
       - ".github/workflows/cie-interoperability-governance.yml"
@@ -35,11 +37,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile parent validator
-        run: python -m py_compile scripts/validate_cie_interoperability.py
+      - name: Compile parent validators
+        run: |
+          python -m py_compile scripts/validate_cie_interoperability.py
+          python -m py_compile scripts/validate_cie_interoperability_reanchor.py
 
       - name: Validate manifest and negative cases
         run: python scripts/validate_cie_interoperability.py --self-test --json
+
+      - name: Validate current child re-anchor
+        run: python scripts/validate_cie_interoperability_reanchor.py
 
       - name: Validate JSON contracts
         run: |
@@ -48,6 +55,7 @@ jobs:
           from pathlib import Path
           for path in (
               Path("developers/manifests/cie-interoperability.v1.json"),
+              Path("developers/manifests/cie-interoperability-reanchor.v2.json"),
               Path("developers/manifests/cie-navigation-patch.v1.json"),
               Path("developers/templates/framework-child-interoperability-backlink.v1.json"),
           ):
@@ -70,12 +78,14 @@ jobs:
         run: |
           if grep -RInE '"(vote_eligible|checkout_enabled|customer_entitlement_active|operationally_enabled)"[[:space:]]*:[[:space:]]*true' \
             developers/manifests/cie-interoperability.v1.json \
+            developers/manifests/cie-interoperability-reanchor.v2.json \
             developers/templates/framework-child-interoperability-backlink.v1.json; then
             echo "Fail-closed authority/commerce drift detected."
             exit 1
           fi
           if grep -RInE 'gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sb_secret_[A-Za-z0-9_-]{16,}|sk-[A-Za-z0-9]{20,}' \
             developers/manifests/cie-interoperability.v1.json \
+            developers/manifests/cie-interoperability-reanchor.v2.json \
             automation/cie-interoperability-and-convergence-bridge.mdx \
             changelog/phase-2-99-cie-interoperability.mdx; then
             echo "Credential-shaped value detected."
