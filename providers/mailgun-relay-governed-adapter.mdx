@@ -1,0 +1,43 @@
+---
+title: "Mailgun Relay — Governed Adapter"
+sidebarTitle: "Mailgun Relay"
+description: "Public-safe provider boundary for relay.crownthrive.com and THIVEBASE-controlled email delivery."
+icon: "envelope"
+---
+
+# Mailgun Relay — Governed Adapter
+
+**Provider:** Mailgun / Sinch  
+**Domain:** `relay.crownthrive.com`  
+**State:** account API read verified; domain active; domain-sending key Vault-bound with controlled canary pending.
+
+## Credential separation
+
+CrownThrive maintains two distinct provider authorities:
+
+1. an account API credential for account/domain management and reporting;
+2. a domain sending credential restricted to message sending for the relay domain.
+
+Raw values are Vault-only and are forbidden from GitHub, Mintlify, Drive plaintext, client code, logs and public artifacts.
+
+## Current domain evidence
+
+Current provider evidence shows the relay domain active with Automatic Sender Security enabled. Public-safe DNS state is:
+
+- SPF: verified;
+- DKIM: current rotating selectors active/verified; a legacy selector may be inactive;
+- tracking CNAME: verified;
+- DMARC: configured;
+- receiving MX: not verified.
+
+The unverified MX state does not block sending by itself. Receiving MX is required only when CrownThrive intends Mailgun to receive mail for the domain; it must not be changed merely to make a sending-only configuration look fully green.
+
+## API budget semantics
+
+The CrownThrive local monthly request limit is `-1`, meaning no local monthly ceiling. Provider rate limits, billing and abuse protections still apply.
+
+## Send boundary
+
+The domain sending credential is not treated as general account authority. Outbound sending is promoted only through bounded sender/from-domain policy, recipient controls, suppression/opt-out requirements where applicable, delivery/readback evidence and rate/abuse safeguards.
+
+No secret value is exposed through the public contract.
