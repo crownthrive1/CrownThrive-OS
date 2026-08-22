@@ -1,0 +1,171 @@
+---
+title: "CHLOM Wallet Phase B Continuation Evidence"
+sidebarTitle: "Wallet Phase B Continuation"
+description: "Continuation evidence for WebAuthn registration, recovery state, reproducible contract artifacts and the ERC-4337 v0.9 Sepolia readiness gate."
+icon: "shield-halved"
+---
+
+# CHLOM Wallet Phase B continuation evidence
+
+**State:** `CONTROLLED_TEST`  
+**Institutional phase:** Phase 2.99  
+**Production activation:** false
+
+This continuation closes several engineering gaps that remained after the first Phase B evidence packet. It does not authorize live checkout, production credentials, a smart-account deployment, public-chain broadcast, money movement, custody or Phase 3 entry.
+
+## WebAuthn registration verification
+
+The wallet now has separate controlled-test contracts for both WebAuthn registration and assertion.
+
+The registration verifier parses the `webauthn.create` client data and CBOR attestation object, validates the RP-ID hash and authenticator flags, extracts the attested credential ID and COSE public key, accepts only ES256/P-256 for the current profile, and creates a deterministic credential commitment.
+
+The current controlled registration policy permits only the `none` attestation format. That deliberately proves the registration/credential binding **without claiming authenticator manufacturer/trust attestation**.
+
+Exact test result:
+
+```yaml
+result: PASS_WEBAUTHN_REGISTRATION_CONTROLLED_TEST
+attestation_profile: none
+cbor_attestation_parsed: true
+rp_id_hash_bound: true
+challenge_bound: true
+origin_bound: true
+user_presence_required: true
+user_verification_required: true
+es256_p256_cose_key_required: true
+deterministic_credential_commitment: true
+attestation_trust_claimed: false
+production_credential_activation: false
+smart_account_deployment: false
+```
+
+Negative tests reject wrong challenge, origin, RP-ID hash, missing user verification, missing attested-credential data, non-allowlisted attestation format, non-empty `none` attestation statements and unsupported COSE algorithm profiles.
+
+The existing assertion verifier continues to pass real ES256/P-256 signature tests with challenge/origin/RP-ID/user-verification/counter binding.
+
+## Private passkey policy profile
+
+The restricted wallet runtime now contains:
+
+```yaml
+profile_id: ct.wallet.webauthn.controlled.v1
+rp_id: crownthrive.com
+allowed_origins:
+  - https://wallet.crownthrive.com
+registration_attestation_formats:
+  - none
+allowed_cose_algorithms:
+  - -7
+challenge_ttl_seconds: 300
+credential_activation_enabled: false
+smart_account_binding_enabled: false
+```
+
+This is a controlled policy seed, not an activated production credential system.
+
+## Recovery state machine
+
+Passkey recovery is now modeled separately from ordinary authentication. The controlled path is:
+
+```text
+opened
+→ identity_review
+→ cooldown
+→ approved_test
+→ replacement_candidate
+→ old_credential_suspended_test
+→ closed_test
+```
+
+An illegal skip from `opened` directly to `replacement_candidate` fails closed.
+
+Controlled canary:
+
+```yaml
+result: PASS_PASSKEY_RECOVERY_CANARY
+illegal_skip_rejected: true
+credential_mutation_performed: false
+smart_account_mutation_performed: false
+money_movement: false
+```
+
+The current canary proves state-machine discipline only. Production identity evidence, cooldown duration, approver policy, replacement-key activation and emergency recovery still require separate authority and tests.
+
+## ERC-4337 v0.9 readiness update
+
+Current upstream research identifies `eth-infinitism/account-abstraction` **v0.9.0** as the latest ERC-4337 release and identifies the v0.9 EntryPoint candidate:
+
+```text
+0x433709009B8330FDa32311DF1C2AFA402eD8D009
+```
+
+Current Sepolia explorer evidence shows activity at that address, so the smart-account readiness manifest now uses v0.9 as the new **research baseline**.
+
+However, the same pass found an important source discrepancy: the `v0.9.0` tag's `deployments/ethereum/EntryPoint.json` observed through the upstream repository still reported:
+
+```text
+0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108
+```
+
+The wallet does not silently choose between conflicting first-party artifacts. The readiness manifest therefore records `OPEN_SOURCE_ARTIFACT_MISMATCH` and requires direct runtime-code identity/code-hash verification before any UserOperation simulation or broadcast.
+
+Machine readiness remains:
+
+```yaml
+chain: eip155:11155111
+network: Sepolia
+account_implementation_selected: false
+factory_selected: false
+user_operation_built: false
+simulation_completed: false
+broadcast_enabled: false
+transaction_hash: null
+money_movement: false
+```
+
+## Reproducible Solidity artifact evidence
+
+The wallet compile pipeline now builds a deterministic contract artifact manifest twice from exact `solc@0.8.36` inputs and requires the two generated files to be byte-identical.
+
+Current successful build evidence:
+
+```yaml
+result: PASS_ARTIFACT_MANIFEST_BUILD
+compiler: 0.8.36+commit.8a079791.Emscripten.clang
+contract_count: 4
+embedded_manifest_sha256: 129a5ea40776ef0d3918d5eb04bf34893a6bd10d722d12783250277e20cbcfd9
+output_file_sha256: f9826732ada7e78606089089d8a7f6dd9806b068303c18ff0af60223b3a03425
+creation_bytecode_bytes: 4799
+runtime_bytecode_bytes: 3879
+reproducible_second_build_match: true
+```
+
+The manifest fingerprints every contract source, ABI, creation bytecode, runtime bytecode and compiler metadata. It contains no signer, no RPC endpoint, no deployment receipt and no value movement.
+
+This improves build custody and future testnet verification. It is not an audit or chain deployment proof.
+
+## Source and security discipline
+
+The smart-account and WebAuthn work continues to use public standards for interoperability rather than proprietary cryptography:
+
+- WebAuthn Level 3;
+- CAIP-2 / CAIP-10;
+- ERC-4337;
+- ERC-7579.
+
+The proprietary CrownThrive value is the CHLOM translation, policy, evidence, rights, recovery, provider-portability and customer-experience layer above those standards.
+
+## Still blocked
+
+The next gates remain explicit:
+
+- select and independently review a smart-account implementation and factory;
+- resolve/verify the ERC-4337 EntryPoint source mismatch with direct runtime-code evidence;
+- complete production WebAuthn registration/attestation policy and credential persistence;
+- bind the verified assertion/registration logic into the private runtime without enabling production accounts;
+- finalize recovery evidence/approver/cooldown policy;
+- generate an unsigned UserOperation and simulate it on Sepolia;
+- obtain independent security disposition before any testnet broadcast;
+- preserve `stripe_live_webhook_enabled=false` and `mainnet_anchor_enabled=false` until their independent gates pass.
+
+The continuation therefore advances engineering depth while retaining the same fail-closed production boundary.
