@@ -1,0 +1,59 @@
+name: Interoperability Runtime Governance
+
+on:
+  pull_request:
+    paths:
+      - developers/manifests/crownthrive-interoperability-runtime.v0.2.json
+      - apps/crownthrive-interoperability-plugin/chatgpt-app-submission.candidate.json
+      - apps/crownthrive-interoperability-plugin/mcp-resource-manifest.json
+      - scripts/validate_interoperability_runtime_v02.py
+      - .github/workflows/interoperability-runtime-governance.yml
+  push:
+    branches:
+      - agent/gen6-priority-delegation-control-plane-20260821
+    paths:
+      - developers/manifests/crownthrive-interoperability-runtime.v0.2.json
+      - apps/crownthrive-interoperability-plugin/chatgpt-app-submission.candidate.json
+      - apps/crownthrive-interoperability-plugin/mcp-resource-manifest.json
+      - scripts/validate_interoperability_runtime_v02.py
+      - .github/workflows/interoperability-runtime-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interoperability-runtime-governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  interoperability-runtime-governance:
+    name: Validate runtime and non-operative app submission
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact repository head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate runtime and submission boundaries
+        run: python scripts/validate_interoperability_runtime_v02.py
+
+      - name: Validate base interoperability package
+        run: python scripts/validate_interoperability_fabric.py
+
+      - name: Check whitespace and conflict markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
