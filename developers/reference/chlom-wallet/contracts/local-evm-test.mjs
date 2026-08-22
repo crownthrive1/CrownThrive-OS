@@ -63,7 +63,8 @@ async function send(txPromise) {
 let expectedReverts = 0;
 async function expectRevert(promiseFactory, label) {
   try {
-    await promiseFactory();
+    const maybeTx = await promiseFactory();
+    if (maybeTx && typeof maybeTx.wait === 'function') await maybeTx.wait();
     assert.fail(`expected_revert:${label}`);
   } catch (error) {
     if (String(error?.message ?? error).startsWith('expected_revert:')) throw error;
