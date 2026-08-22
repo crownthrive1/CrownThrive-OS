@@ -1,0 +1,134 @@
+---
+title: "CHLOM HARP Proof Capsule Contract"
+sidebarTitle: "HARP Proof Capsules"
+description: "Developer contract for deterministic, privacy-preserving CHLOM proof capsules and Merkle inclusion proofs without raw evidence disclosure or automatic chain broadcast."
+icon: "fingerprint"
+---
+
+# CHLOM HARP proof capsule contract
+
+**Algorithm:** `HARP v1`  
+**Schema:** `1.0.0`  
+**State:** `CONTROLLED_TEST`  
+**Broadcast:** disabled
+
+HARP—Hash Anchor Root Packager—turns a set of already-derived evidence commitments into a deterministic proof capsule. It is designed to answer “does this commitment belong to this governed batch?” without publishing the protected evidence body.
+
+## Input contract
+
+Each item accepts only:
+
+```json
+{
+  "record_id": "ct.record.*",
+  "record_type": "wallet_event",
+  "payload_digest": "64-lowercase-hex",
+  "policy_digest": "64-lowercase-hex-or-null",
+  "occurred_at": "ISO-8601-UTC-or-null",
+  "source_event_seq": 1,
+  "public_metadata": {}
+}
+```
+
+Unknown keys fail closed. `public_metadata` is canonicalized, size-bounded and scanned for prohibited key names and concrete credential shapes. Raw evidence, provider references, credentials and signing material are not accepted fields.
+
+## Canonicalization and domain separation
+
+The implementation uses:
+
+- recursively sorted JSON object keys;
+- finite JSON numbers only;
+- length-prefixed ASCII framing;
+- SHA-256 digests;
+- separate domains for leaves, internal nodes and manifests.
+
+```text
+CHLOM:HARP:LEAF:v1
+CHLOM:HARP:NODE:v1
+CHLOM:HARP:MANIFEST:v1
+```
+
+Domain separation prevents a digest valid in one layer from being silently reinterpreted as a digest in another.
+
+## Leaf commitment
+
+After validation, each record is sorted by `record_id`. The leaf preimage contains:
+
+```text
+leaf domain
+scope
+record ID
+record type
+payload digest
+policy digest or '-'
+occurred timestamp or '-'
+source event sequence or '-'
+public metadata digest
+```
+
+Every framed part is prefixed by its ASCII byte length before hashing.
+
+## Tree construction
+
+- Leaves are ordered by stable `record_id`.
+- Duplicate record IDs are rejected.
+- Pairs are hashed left-to-right.
+- An odd final leaf at a level is duplicated for that level.
+- The process repeats until one root remains.
+
+The order of caller-provided input therefore does not change the result.
+
+## Capsule output
+
+```json
+{
+  "schema_version": "1.0.0",
+  "capsule_id": "ct.harp.*",
+  "scope": "ct.wallet.*",
+  "policy_version": "harp-v1-controlled-test",
+  "created_at": "...Z",
+  "leaf_count": 3,
+  "root_digest": "...",
+  "commitments": [],
+  "anchor_state": "candidate_unbroadcast",
+  "raw_evidence_included": false,
+  "money_movement": false,
+  "public_chain_broadcast": false,
+  "manifest_digest": "..."
+}
+```
+
+The manifest digest commits to the complete capsule except the manifest digest itself.
+
+## Inclusion proof
+
+A proof contains the sibling digest and whether it belongs on the left or right at each level. Verification recomputes the leaf and walks to the root. Verification never requires the raw evidence body, only the already-derived item commitment fields.
+
+## Fixed vector
+
+The authoritative controlled-test vector set includes a three-record HARP capsule with root:
+
+```text
+8e70e71d117f3fe8c419465c35437581ed3533cc005005d5b9211ccb2ecc1db0
+```
+
+The vector includes a full proof for `ct.record.002` and is rebuilt in CI.
+
+## Security boundaries
+
+HARP does not:
+
+- decide whether the underlying evidence is legally sufficient;
+- attest that the originating system was honest;
+- reveal the evidence body;
+- sign the root;
+- submit a transaction;
+- select a blockchain;
+- establish finality;
+- move money or grant rights.
+
+A future chain adapter must independently bind network, contract code identity, signer authority, transaction receipt, confirmation/finality policy and correction/reorg handling.
+
+## Promotion checklist
+
+Production use requires privacy classification, independent provenance review, digest parity across every promoted implementation, public-metadata allowlists, durable correction semantics, signer/broadcast authority and an approved chain-finality policy. Until then, HARP outputs remain candidate proofs.
