@@ -1,0 +1,32 @@
+name: Commercial Release Factory
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/commercial-release-factory.v1.json"
+      - "scripts/validate_commercial_release_factory.py"
+      - "automation/commercial-release-factory-agent.mdx"
+      - "workflows/credit-only-product-release-factory.mdx"
+      - "developers/commercial-release-factory-api-mcp-contract.mdx"
+      - "changelog/commercial-release-factory-2026-08-22.mdx"
+      - ".github/workflows/commercial-release-factory.yml"
+      - "docs.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commercial-release-factory-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controlled-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate public documentation boundary
+        run: python3 scripts/validate_docs.py
+      - name: Validate Commercial Release Factory contract
+        run: python3 scripts/validate_commercial_release_factory.py
