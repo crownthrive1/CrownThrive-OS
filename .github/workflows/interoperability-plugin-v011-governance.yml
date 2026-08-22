@@ -1,0 +1,63 @@
+name: Interoperability Plugin 0.1.1 Governance
+
+on:
+  pull_request:
+    paths:
+      - developers/manifests/crownthrive-interoperability-plugin.v1.1.json
+      - developers/manifests/crownthrive-interoperability-runtime.v0.3.json
+      - apps/crownthrive-interoperability-plugin/chatgpt-app-submission.candidate.v0.3.json
+      - apps/crownthrive-interoperability-plugin/mcp-resource-manifest.v0.3.json
+      - scripts/validate_interoperability_plugin_v011.py
+      - .github/workflows/interoperability-plugin-v011-governance.yml
+  push:
+    branches:
+      - agent/gen6-priority-delegation-control-plane-20260821
+    paths:
+      - developers/manifests/crownthrive-interoperability-plugin.v1.1.json
+      - developers/manifests/crownthrive-interoperability-runtime.v0.3.json
+      - apps/crownthrive-interoperability-plugin/chatgpt-app-submission.candidate.v0.3.json
+      - apps/crownthrive-interoperability-plugin/mcp-resource-manifest.v0.3.json
+      - scripts/validate_interoperability_plugin_v011.py
+      - .github/workflows/interoperability-plugin-v011-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interoperability-plugin-v011-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  interoperability-plugin-v011:
+    name: Validate plugin 0.1.1, runtime 0.3 and submission packet 0.3
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact repository head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate plugin package
+        run: python scripts/validate_interoperability_plugin_v011.py
+
+      - name: Validate runtime and resource
+        run: |
+          python scripts/validate_interoperability_runtime_v03.py
+          python scripts/validate_interoperability_resource_v03.py
+
+      - name: Check whitespace and conflict markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
