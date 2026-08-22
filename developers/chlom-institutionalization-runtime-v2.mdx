@@ -53,6 +53,9 @@ Source-controlled runtime:
 - `developers/reference/chlom-wallet/institutionalization/runtime/github-repository-binding-v2.mjs`
 - `developers/reference/chlom-wallet/institutionalization/runtime/test-github-oidc-contract-v2.mjs`
 - `developers/reference/chlom-wallet/institutionalization/runtime/test-module-linkage-v2.mjs`
+- `developers/reference/chlom-wallet/institutionalization/runtime/runtime-deployment-lineage-fence-v1.mjs`
+- `developers/reference/chlom-wallet/institutionalization/runtime/test-runtime-deployment-lineage-fence-v1.mjs`
+- `developers/reference/chlom-wallet/institutionalization/runtime/runtime-deployment-lineage-fence.v1.json`
 - `developers/reference/chlom-wallet/institutionalization/runtime/oidc-claims.v2.schema.json`
 - `developers/reference/chlom-wallet/institutionalization/runtime/runtime-contract.v2.json`
 - `developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json`
@@ -88,7 +91,7 @@ The source-controlled runtime-utils blob is:
 
 The runtime was redeployed from those exact source-controlled modules as version 4. A regression test now imports the complete OIDC runtime module graph and verifies the required named exports. Runtime CI also verifies that an unauthenticated POST receives the exact fail-closed `401` response.
 
-The reconciliation is now closed as:
+The reconciliation is closed as:
 
 ```yaml
 state: RESOLVED_REAL_OIDC_PACKAGE_INGESTED
@@ -103,9 +106,49 @@ Machine records:
 - `developers/reference/chlom-wallet/institutionalization/runtime/deployment-reconciliation.v2.json`
 - `developers/reference/chlom-wallet/institutionalization/runtime/real-oidc-ingest-evidence.v2.json`
 
+## RDLF deployment-lineage fence
+
+The incident is now protected by a dedicated deterministic algorithm:
+
+```yaml
+algorithm_id: ct.algorithm.chlom.runtime-deployment-lineage-fence.v1
+short_name: RDLF
+semantic_version: 1.0.0
+state: CONTROLLED_TEST
+```
+
+RDLF binds five layers before a runtime can be represented as healthy:
+
+1. exact function/service identity and deployment version;
+2. exact deployed EZBR digest and custom OIDC authentication mode;
+3. exact source blob plus required module exports;
+4. deployed unauthenticated `401 github_oidc_bearer_required` liveness;
+5. real package and GitHub OIDC ingest continuity with every live/authority field false.
+
+The historical version-3 deployment is retained as a negative observation and must evaluate to HOLD. The corrected version-4 deployment must evaluate to PASS.
+
+```yaml
+failed_deployment: HOLD_CHLOM_RUNTIME_DEPLOYMENT_LINEAGE_FENCE_V1
+corrected_deployment: PASS_CHLOM_RUNTIME_DEPLOYMENT_LINEAGE_FENCE_V1
+canary: PASS_CHLOM_RUNTIME_DEPLOYMENT_LINEAGE_FENCE_V1_CANARY
+canary_evidence_digest_sha256: bed42aee9428ef6e6d5ec6984cc17dc1d939d8c47fb20681d80fb58234c42d6c
+automatic_resume: false
+```
+
+Private runtime records:
+
+```text
+chlom_wallet.institutionalization_runtime_deployments_v2
+chlom_wallet.institutionalization_runtime_lineage_canary_runs_v1
+chlom_wallet.evaluate_institutionalization_runtime_deployment_lineage_v1(...)
+chlom_wallet.run_institutionalization_runtime_lineage_canary_v1()
+```
+
+RDLF is also registered in the CHLOM institutionalization algorithm registry as a controlled-test commercialization candidate. That registration creates no pricing, checkout, provider-write, release, or production authority.
+
 ## Real institutional package recording
 
-The actual non-canary Phase C package is now recorded in THIVEBASE:
+The actual non-canary Phase C package is recorded in THIVEBASE:
 
 ```yaml
 package_record_id: 7e5bbe59-b486-402c-b361-a390074546da
@@ -173,7 +216,7 @@ package_digest_sha256: 7b3be50d5541fff14127bfdd24724eb9b8b9f9ffd4b165a380dee02f2
 manifest_path: developers/manifests/chlom-wallet-phase-c-institutionalization.v1.json
 ```
 
-A later branch head may contain documentation, workflows, or runtime repairs, but the frozen source must remain an ancestor and the committed package manifest must remain byte-equivalent after canonicalization. A submitted manifest cannot replace the committed manifest.
+A later branch head may contain documentation, workflows, runtime algorithms, or repairs, but the frozen source must remain an ancestor and the committed package manifest must remain byte-equivalent after canonicalization. A submitted manifest cannot replace the committed manifest.
 
 ## THIVEBASE data plane
 
@@ -187,13 +230,14 @@ The runtime records:
 - GitHub repository, branch, workflow, run, actor, and OIDC claim digests;
 - token fingerprint rather than the token value;
 - request and claims digests;
-- exact source ancestry and manifest readback evidence.
+- exact source ancestry and manifest readback evidence;
+- deployment lineage and failed/corrected runtime observations.
 
 It does not persist raw OIDC tokens or raw artifact bodies.
 
 ## Deterministic runtime advisor
 
-`ct.algorithm.chlom.institutionalization-runtime-advisor.v1` evaluates edge-function state, package/ingest canaries, OIDC subject compatibility, CI state, package registration, review readiness, and commercialization boundaries. It emits P0-P3 advisory records with bounded agent handoffs.
+`ct.algorithm.chlom.institutionalization-runtime-advisor.v1` evaluates edge-function state, package/ingest canaries, OIDC subject compatibility, CI state, package registration, review readiness, commercialization boundaries, and runtime-lineage evidence. It emits P0-P3 advisory records with bounded agent handoffs.
 
 It has no network access, credentials, write authority, decision authority, or automatic release authority. A future model-based extension requires a prompt/model/version receipt and independent review.
 
@@ -204,18 +248,19 @@ Failures remain fail closed. Recovery requires:
 1. classify the failure without logging tokens;
 2. preserve append-only evidence;
 3. compare deployed module linkage against source-controlled exports;
-4. redeploy only exact known-good source;
-5. run the module-linkage regression contract;
-6. rerun package, ingest, OIDC-subject, unit, and deployed-liveness canaries;
-7. verify the exact committed manifest and source ancestry;
-8. confirm the non-canary package/receipt readback;
-9. obtain independent security and release review before production use.
+4. evaluate RDLF and require a HOLD for the failed observation;
+5. redeploy only exact known-good source;
+6. run the module-linkage and RDLF regression contracts;
+7. rerun package, ingest, OIDC-subject, unit, and deployed-liveness canaries;
+8. verify the exact committed manifest and source ancestry;
+9. confirm the non-canary package/receipt readback;
+10. obtain independent security and release review before production use.
 
 Automatic resume is prohibited.
 
 ## Commercialization boundary
 
-The future commercial family is **CHLOM Institutionalization Compiler and Governed Evidence Runtime**. Candidate delivery models include readiness assessments, compiler licensing, managed evidence ingestion, enterprise governance packages, and private deployments.
+The future commercial family is **CHLOM Institutionalization Compiler and Governed Evidence Runtime**. Candidate delivery models include readiness assessments, compiler licensing, managed evidence ingestion, deployment-lineage fencing, enterprise governance packages, and private deployments.
 
 No model is currently an effective offer. Public pricing, Stripe Product/Price objects, checkout, customer fulfillment, tenant access, and production support commitments remain separately gated.
 
@@ -227,6 +272,7 @@ ingest: PASS_CHLOM_INSTITUTIONALIZATION_INGEST_V2_CANARY
 oidc_subject: PASS_CHLOM_INSTITUTIONALIZATION_OIDC_SUBJECT_V2_CANARY
 oidc_unit_contract: PASS_CHLOM_WALLET_INSTITUTIONALIZATION_OIDC_V2_UNIT_CONTRACT
 runtime_module_linkage: PASS_CHLOM_INSTITUTIONALIZATION_RUNTIME_MODULE_LINKAGE_V2
+runtime_lineage_fence: PASS_CHLOM_RUNTIME_DEPLOYMENT_LINEAGE_FENCE_V1_CANARY
 runtime_advisor: PASS_CHLOM_INSTITUTIONALIZATION_RUNTIME_ADVISOR_V1
 real_package: PASS_CONTROLLED_TEST_INSTITUTIONALIZATION
 real_oidc_ingest: RECORDED_CONTROLLED_TEST_EVIDENCE
