@@ -1,0 +1,137 @@
+name: CHLOM Institutionalization Continuity v2 Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - "automation/chlom-institutionalization-continuity-v2.json"
+      - ".github/workflows/chlom-institutionalization-continuity-v2-bootstrap.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-institutionalization-continuity-v2-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    name: Compile frozen continuity snapshot and emit bootstrap manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out full repository history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate continuity spec and frozen snapshot ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool automation/chlom-institutionalization-continuity-v2.json >/dev/null
+          node --check automation/compile-chlom-institutionalization.mjs
+          frozen='d6187bd9a9a5af12cf1121d761d325943cc63daa'
+          git cat-file -e "${frozen}^{commit}"
+          git merge-base --is-ancestor "$frozen" HEAD
+          python - <<'PY'
+          import json
+          spec=json.load(open('automation/chlom-institutionalization-continuity-v2.json'))
+          assert spec['package_id']=='ct.package.chlom-wallet.phase-c.institutionalization.v2'
+          assert spec['semantic_version']=='2.0.0'
+          assert spec['state']=='CONTROLLED_TEST'
+          assert spec['source_snapshot']['head_sha']=='d6187bd9a9a5af12cf1121d761d325943cc63daa'
+          assert spec['provenance']['base_package_id']=='ct.package.chlom-wallet.phase-c.institutionalization.v1'
+          assert spec['provenance']['base_package_digest_sha256']=='7b3be50d5541fff14127bfdd24724eb9b8b9f9ffd4b165a380dee02f2a1ef957'
+          assert len(spec['artifacts'])>=11
+          assert len(spec['algorithms'])>=4
+          assert all(value is False for value in spec['hard_boundaries'].values())
+          PY
+
+      - name: Prove frozen artifact bytes have not drifted
+        shell: bash
+        run: |
+          set -euo pipefail
+          frozen='d6187bd9a9a5af12cf1121d761d325943cc63daa'
+          mapfile -t paths < <(python - <<'PY'
+          import json
+          spec=json.load(open('automation/chlom-institutionalization-continuity-v2.json'))
+          for item in spec['artifacts']:
+              print(item['path'])
+          PY
+          )
+          test "${#paths[@]}" -ge 11
+          for path in "${paths[@]}"; do
+            git cat-file -e "${frozen}:${path}"
+          done
+          if ! git diff --quiet "$frozen" HEAD -- "${paths[@]}"; then
+            echo 'Frozen continuity artifact bytes drifted after the declared snapshot.'
+            git diff --name-only "$frozen" HEAD -- "${paths[@]}"
+            exit 1
+          fi
+
+      - name: Compile continuity package twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          node automation/compile-chlom-institutionalization.mjs \
+            --spec automation/chlom-institutionalization-continuity-v2.json \
+            --repo-root . \
+            --output /tmp/chlom-wallet-phase-c-institutionalization.v2.a.json \
+            | tee /tmp/chlom-continuity-v2-a.log
+          node automation/compile-chlom-institutionalization.mjs \
+            --spec automation/chlom-institutionalization-continuity-v2.json \
+            --repo-root . \
+            --output /tmp/chlom-wallet-phase-c-institutionalization.v2.b.json \
+            | tee /tmp/chlom-continuity-v2-b.log
+          cmp /tmp/chlom-wallet-phase-c-institutionalization.v2.a.json /tmp/chlom-wallet-phase-c-institutionalization.v2.b.json
+
+      - name: Validate compiled package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool /tmp/chlom-wallet-phase-c-institutionalization.v2.a.json >/dev/null
+          python - <<'PY'
+          import json,re
+          p=json.load(open('/tmp/chlom-wallet-phase-c-institutionalization.v2.a.json'))
+          assert p['schema_version']=='1.0.0'
+          assert p['package_id']=='ct.package.chlom-wallet.phase-c.institutionalization.v2'
+          assert p['semantic_version']=='2.0.0'
+          assert p['state']=='PASS_CONTROLLED_TEST_INSTITUTIONALIZATION'
+          assert p['source_snapshot']['head_sha']=='d6187bd9a9a5af12cf1121d761d325943cc63daa'
+          assert p['gap_analysis']['gap_count']==0
+          assert p['gap_analysis']['completeness_score']==100
+          assert p['artifact_counts']['total']>=11
+          assert len(p['algorithm_registry'])>=4
+          assert re.fullmatch(r'[0-9a-f]{64}',p['package_digest_sha256'])
+          assert p['rights']['state']=='HOLD_INDEPENDENT_RIGHTS_REVIEW'
+          assert p['commercialization']['state']=='PRICE_REVIEW'
+          assert p['ai_governance']['advisory_only'] is True
+          assert p['ai_governance']['decision_authority'] is False
+          assert p['ai_governance']['write_authority'] is False
+          assert all(value is False for value in p['hard_boundaries'].values())
+          print(json.dumps({
+            'result':p['state'],
+            'package_id':p['package_id'],
+            'package_digest_sha256':p['package_digest_sha256'],
+            'artifact_count':p['artifact_counts']['total'],
+            'algorithm_count':len(p['algorithm_registry']),
+            'gap_count':p['gap_analysis']['gap_count'],
+            'completeness_score':p['gap_analysis']['completeness_score'],
+          },sort_keys=True))
+          PY
+
+      - name: Emit bootstrap manifest for source-control handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'CHLOM_CONTINUITY_V2_MANIFEST_BASE64_BEGIN'
+          base64 -w0 /tmp/chlom-wallet-phase-c-institutionalization.v2.a.json
+          echo
+          echo 'CHLOM_CONTINUITY_V2_MANIFEST_BASE64_END'
+
+      - name: Record boundary
+        run: |
+          echo 'BOOTSTRAP_ONLY: compiles an exact frozen source snapshot and emits a deterministic manifest for source-control handoff.'
+          echo 'No GitHub write, THIVEBASE write, reviewer heartbeat, review receipt, provider write, credential access, Stripe object, checkout, signing, custody, token issuance, money movement, rights grant, chain broadcast, phase advancement, or merge authority occurs.'
