@@ -58,6 +58,9 @@ def main()->int:
     assert v["exact_asset_and_sha_binding_required"] is True and v["readback_required"] is True and v["restore_test_required"] is True
     assert "plugin-suite exact binding" in v["promotion_requires"]
     assert "factory-intake acceptance" in v["promotion_requires"]
+    assert v["runtime_boundary"]=={
+      "binding_candidate_generation":True,"database_write_performed_by_candidate_contract":False,
+      "vault_mutation_performed_by_scheduled_validation":False,"production_invocation_enabled":False}
 
     for row in triggers:
         tid,group,event,target,plugin,profile,independent,preconditions=row
