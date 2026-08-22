@@ -25,9 +25,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Pull-request checkout uses a synthetic merge commit. Depth 2 retains
-          # both exact parents so the trusted base/head diff can be derived
-          # without granting network/API authority to the decision engine.
+          # Pull-request checkout uses a synthetic merge commit. Depth 2 normally
+          # retains its two parents. The governed-diff step below additionally
+          # fetches the exact event base/head objects when a long-lived PR base
+          # is older than the shallow checkout. The decision engine itself still
+          # receives only local Git objects and no API/network authority.
           fetch-depth: 2
 
       - name: Set up Python
@@ -56,6 +58,23 @@ jobs:
 
       - name: Validate GitHub Actions runtime and supply-chain policy
         run: python scripts/validate_github_actions_runtime_policy.py
+
+      - name: Fetch exact trusted Git diff objects
+        if: github.event_name == 'pull_request'
+        env:
+          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git cat-file -e "${CT_GIT_BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_BASE_SHA}"
+          fi
+          if ! git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_HEAD_SHA}"
+          fi
+          git cat-file -e "${CT_GIT_BASE_SHA}^{commit}"
+          git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}"
 
       - name: Bind governed changed files to trusted Git diff
         if: github.event_name == 'pull_request'
