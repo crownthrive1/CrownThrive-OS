@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0.0",
+  "control_id": "ct.control.agent-authority-containment.v1",
+  "canonical_name": "Agent Exact-Scope Authority Lease & Emergency Containment Control",
+  "state": "CONTROLLED_TEST",
+  "constitutional_rules": [
+    "Standing registration does not confer execution authority.",
+    "Standing authorization does not confer execution authority.",
+    "Usable authority requires an exact-resource, unexpired Founder-issued lease.",
+    "An agent may self-contain but may never self-release or self-escalate.",
+    "Emergency containment revokes authority before adjudication continues.",
+    "Behavioral anomaly language is resolved to measurable policy deviation, not subjective agency attribution."
+  ],
+  "lease_model": {
+    "registry": "chlom_runtime.agent_authority_leases_v1",
+    "issuer_kind": "founder",
+    "minimum_ttl_seconds": 60,
+    "hard_global_max_ttl_seconds": 1200,
+    "exact_scope_required": true,
+    "scope_fields": ["principal_kind", "principal_id", "capability", "resource_type", "resource_id", "sensitivity_level", "plaintext_return"],
+    "key_material_return": false,
+    "expired_or_missing_lease_disposition": "DENY"
+  },
+  "ttl_policy": [
+    {"sensitivity":"S1","agent_max_seconds":900,"founder_max_seconds":1200},
+    {"sensitivity":"S2","agent_max_seconds":600,"founder_max_seconds":900},
+    {"sensitivity":"S3","agent_max_seconds":420,"founder_max_seconds":600},
+    {"sensitivity":"S4","agent_max_seconds":300,"founder_max_seconds":420},
+    {"sensitivity":"S5","agent_max_seconds":180,"founder_max_seconds":300}
+  ],
+  "automatic_containment": {
+    "incident_registry": "chlom_runtime.agent_behavior_incidents_v1",
+    "kill_registry": "chlom_runtime.agent_emergency_kill_state_v1",
+    "guardian_registry": "chlom_runtime.agent_guardian_bindings_v1",
+    "trigger_if_scope_deviation": true,
+    "trigger_if_autonomy_anomaly": true,
+    "trigger_at_or_above_severity": 4,
+    "reason_codes": [
+      "SCOPE_ESCAPE",
+      "AUTHORITY_ESCALATION",
+      "SECRET_EXPORT_ATTEMPT",
+      "KEY_EXPORT_ATTEMPT",
+      "SELF_AUTHORIZATION",
+      "POLICY_TAMPER",
+      "KILL_SWITCH_TAMPER"
+    ],
+    "kill_actions": [
+      "kill_active_exact_scope_leases",
+      "kill_active_agent_standing_authorizations",
+      "quarantine_agent_privilege_profile",
+      "append_restricted_DAIL_event"
+    ],
+    "self_detection_can_trigger_kill": true,
+    "self_release_allowed": false,
+    "automatic_authority_restoration": false
+  },
+  "guardians": [
+    {
+      "agent_id": "ct.agent.factory.security-red-team",
+      "state": "ACTIVE",
+      "authority": "Founder-granted emergency containment only",
+      "can_trigger_kill": true,
+      "can_release_quarantine": false
+    },
+    {
+      "agent_id": "ct.chlom.agent.security",
+      "state": "PENDING_UNATTESTED",
+      "authority": "Reserved higher-agent emergency containment binding",
+      "can_trigger_kill": false,
+      "activation_requires_identity_attestation": true,
+      "can_release_quarantine": false
+    }
+  ],
+  "release_model": {
+    "release_authority": "Founder only",
+    "entrypoint": "chlom_runtime.founder_release_agent_quarantine_v1",
+    "release_destination": "RELEASED_TO_RECERTIFICATION",
+    "restores_authority": false,
+    "new_standing_regrant_required": true,
+    "new_exact_scope_lease_required": true
+  },
+  "runtime": {
+    "ttl_policy_table": "chlom_runtime.founder_crypto_ttl_policy_v1",
+    "lease_table": "chlom_runtime.agent_authority_leases_v1",
+    "guardian_table": "chlom_runtime.agent_guardian_bindings_v1",
+    "kill_state_table": "chlom_runtime.agent_emergency_kill_state_v1",
+    "incident_table": "chlom_runtime.agent_behavior_incidents_v1",
+    "issue_lease_function": "chlom_runtime.issue_agent_authority_lease_v1",
+    "behavior_observation_function": "chlom_runtime.record_agent_behavior_observation_v1",
+    "emergency_kill_function": "chlom_runtime.emergency_kill_agent_v1",
+    "founder_release_function": "chlom_runtime.founder_release_agent_quarantine_v1",
+    "data_api_anon_access": false,
+    "data_api_authenticated_access": false,
+    "internal_assert_helpers_service_role_direct_execute": false
+  },
+  "verification": {
+    "scope_mismatch": "DENIED_AS_REQUIRED",
+    "expired_lease": "DENIED_AS_REQUIRED",
+    "combined_scope_ttl_canary": "PASS_SCOPE_AND_TTL_DENIAL",
+    "higher_agent_scope_escape": "KILLED_AND_QUARANTINED",
+    "self_detected_autonomy_anomaly": "KILLED_AND_QUARANTINED",
+    "kill_revoked_active_lease": true,
+    "founder_release_to_recertification": true,
+    "founder_release_restored_authority": false,
+    "DAIL_checked_events": 622,
+    "DAIL_failure_count": 0
+  },
+  "secret_boundary": {
+    "contains_secret_values": false,
+    "contains_raw_key_material": false,
+    "contains_provider_credentials": false
+  }
+}
