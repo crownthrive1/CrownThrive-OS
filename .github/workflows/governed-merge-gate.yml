@@ -26,10 +26,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Pull-request checkout uses a synthetic merge commit. Keep the
-          # bounded initial checkout, then hydrate only the exact event refs
-          # before trusted-diff evaluation so base movement cannot masquerade
-          # as a policy or governance denial.
+          # bounded initial checkout, then hydrate only immutable commit SHAs
+          # before trusted-diff evaluation so mutable PR refs cannot influence
+          # the privileged evidence path or masquerade as a policy decision.
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -66,23 +67,16 @@ jobs:
         env:
           CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          CT_GIT_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          CT_GIT_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f .git/shallow ]; then
-            git fetch --no-tags --no-recurse-submodules --unshallow origin \
-              "+refs/heads/${CT_GIT_BASE_REF}:refs/remotes/origin/${CT_GIT_BASE_REF}" \
-              "+refs/heads/${CT_GIT_HEAD_REF}:refs/remotes/origin/${CT_GIT_HEAD_REF}"
-          else
-            git fetch --no-tags --no-recurse-submodules origin \
-              "+refs/heads/${CT_GIT_BASE_REF}:refs/remotes/origin/${CT_GIT_BASE_REF}" \
-              "+refs/heads/${CT_GIT_HEAD_REF}:refs/remotes/origin/${CT_GIT_HEAD_REF}"
-          fi
+          # Fetch immutable commit identities only. Never interpolate the
+          # contributor-controlled head ref into a privileged Git command.
+          git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_BASE_SHA}"
+          git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_HEAD_SHA}"
           git cat-file -e "${CT_GIT_BASE_SHA}^{commit}"
           git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}"
-          echo "Exact base/head objects hydrated and verified."
+          echo "Exact immutable base/head objects hydrated and verified."
 
       - name: Bind governed changed files to trusted Git diff
         id: trusted_diff
