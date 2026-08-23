@@ -1,0 +1,330 @@
+---
+title: "CHLOM Evidence Vault — Historical Engine and Current Custody Mapping"
+sidebarTitle: "Evidence Vault"
+description: "Standalone comprehensive CHLOM Evidence Vault article covering source/evidence custody, classification, digests, chain of custody, DAIL references, public/private projections, recovery and the distinction between Vault concepts and actual secret storage."
+icon: "vault"
+keywords: ["CHLOM Evidence Vault", "evidence custody", "chain of custody", "DAIL", "source provenance", "private master"]
+---
+
+# CHLOM Evidence Vault — Historical Engine and Current Custody Mapping
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.evidence-vault
+canonical_name: Evidence Vault
+artifact_class: evidence_custody_engine
+source_lineage:
+  - recovered Help Center engine/component estate
+  - Genesis / Grand Prospectus evidence architecture
+  - current CHLOM recovery and institutional-memory workflows
+current_mapping:
+  - P-10 Operations & Institutional Memory
+  - DAIL evidence references
+  - governed private Drive/repository custody
+  - approved secret store for actual secrets
+status: historical_concept_with_current_operational_mapping
+```
+
+## Purpose
+
+The Evidence Vault is CHLOM's conceptual and operational layer for **preserving the source objects that justify institutional records and decisions**. It provides chain of custody, classification, content identity, source lineage, access boundaries, retention, legal/security holds, recovery and public-safe projection references.
+
+It must not be confused with a secrets manager.
+
+```text
+SOURCE FILE / RECEIPT / AGREEMENT / LOG / PROOF
+                   |
+                   v
+             CLASSIFICATION
+                   |
+                   v
+            EVIDENCE VAULT
+          +--------+---------+
+          |                  |
+     private custody      digest / reference
+          |                  |
+          +--------+---------+
+                   |
+                  DAIL
+                   |
+        public/internal projections
+```
+
+## Custody domains
+
+Current CrownThrive/CHLOM separates three protection domains:
+
+```text
+SECRET VALUES / PRIVATE KEYS
+   -> approved secret store / Supabase Vault
+
+RESTRICTED HUMAN-READABLE MASTERS / SOURCE EVIDENCE
+   -> governed private Drive / private repositories
+
+PUBLIC-SAFE DOCUMENTATION
+   -> GitHub + Mintlify
+```
+
+The Evidence Vault engine records references/classification across those domains; it does not justify copying a password/token into a document.
+
+## Evidence object
+
+```yaml
+evidence_id: stable ID
+evidence_type: document|image|receipt|provider_record|log|attestation|agreement|source_code|other
+source_origin_ref: required
+custody_ref: governed location reference
+content_digest: optional/required by evidence class
+digest_algorithm: versioned
+classification: public|internal|restricted|secret_reference
+captured_at: timestamp
+source_time: nullable
+collector_ref: actor/service
+status: active|held|superseded|invalidated|missing
+```
+
+## Content identity
+
+A digest can identify exact bytes/content:
+
+```text
+d = H(content)
+```
+
+The algorithm/version must be named. A digest proves content equality/integrity under its assumptions—not factual truth.
+
+```text
+hash matches != statement is true
+```
+
+## Chain of custody
+
+```text
+SOURCE ORIGIN
+   |
+CAPTURE
+   |
+CLASSIFY
+   |
+STORE / HASH
+   |
+ACCESS / REVIEW
+   |
+DERIVED RECORD / DECISION
+   |
+CORRECTION / SUPERSESSION / HOLD
+```
+
+Each material custody transition can receive DAIL evidence.
+
+## Source versus derived evidence
+
+```text
+SOURCE EVIDENCE
+  original/provider/source artifact
+
+DERIVED EVIDENCE
+  normalized row, summary, transcription, calculation, model output, screenshot derivative
+```
+
+Derived artifacts must retain references to their inputs and transformation/version.
+
+## Provider evidence
+
+Provider evidence includes API readback, dashboard export, receipt, transaction record or service status. It proves only the provider-side fact represented within that provider's scope.
+
+```text
+provider receipt
+     !=
+institution-wide canonical truth
+```
+
+Reconciliation occurs in the relevant domain service.
+
+## Classification
+
+Evidence classification can control:
+
+- who can access it;
+- whether content may be indexed;
+- whether it can appear in public docs;
+- retention/hold requirements;
+- whether a public digest/reference is permissible;
+- whether legal/professional review is required.
+
+## Public-safe projection
+
+```text
+RESTRICTED EVIDENCE E
+        |
+policy / minimization
+        |
+        v
+PUBLIC PROJECTION P(E)
+```
+
+`P(E)` can include a stable evidence ID, digest, type, date and current status without exposing the original artifact.
+
+## Evidence hold
+
+A hold prevents deletion/alteration under defined governance/legal/incident conditions.
+
+```yaml
+hold_id: stable ID
+evidence_refs: []
+reason_ref: required
+authority_ref: required
+opened_at: timestamp
+expires_or_review_at: nullable
+status: active|released|superseded
+```
+
+The exact legal effect of a litigation/legal hold requires appropriate legal authority; this engine provides the custody mechanism.
+
+## Recovery
+
+Recovery quality is measured by round-trip/readback, not merely by backup existence.
+
+```text
+backup exists
+   |
+restore candidate
+   |
+content digest / metadata / link checks
+   |
+consumer readback
+   |
+RECOVERY VERIFIED
+```
+
+## Missing evidence
+
+If a canonical record references evidence that cannot be located:
+
+```text
+evidence status = missing
+related high-risk claim/action -> HOLD/review as policy requires
+```
+
+The system does not invent replacement evidence.
+
+## DAIL relationship
+
+DAIL stores the event/evidence lineage and references; the Evidence Vault stores or points to the protected source content.
+
+```text
+DAIL RECORD
+  evidence_ref = EV-123
+       |
+       v
+EVIDENCE VAULT INDEX
+       |
+       v
+restricted source object
+```
+
+## Attestation relationship
+
+An attestation can summarize verified evidence. The underlying evidence can remain restricted.
+
+## Merkle/notarization relationship
+
+Multiple evidence digests can be batched into a Merkle root or external notarization anchor. That provides integrity/time anchoring, not factual validation.
+
+## Current event families
+
+```text
+ct.evidence.captured.v1
+ct.evidence.classified.v1
+ct.evidence.digest.recorded.v1
+ct.evidence.custody.changed.v1
+ct.evidence.hold.activated.v1
+ct.evidence.hold.released.v1
+ct.evidence.missing.detected.v1
+ct.evidence.restored.v1
+ct.evidence.superseded.v1
+```
+
+## API/service contract
+
+Potential current interfaces:
+
+- register evidence metadata;
+- attach custody reference;
+- calculate/verify digest;
+- classify evidence;
+- create/release hold;
+- list evidence for subject/case;
+- create public-safe projection;
+- verify recovery/readback.
+
+Implementation endpoints require separate evidence.
+
+## Failure modes
+
+### Source file renamed/moved in Drive
+
+Canonical evidence ID remains stable; update custody locator after verified lookup/readback.
+
+### Digest mismatch
+
+Mark evidence integrity problem/HOLD; preserve both expected and observed digests and investigate.
+
+### Public article links restricted file
+
+Contain/fix projection and review permissions; do not solve by making restricted file public.
+
+### Secret discovered in evidence doc
+
+Move/rotate/revoke under security workflow; secrets belong in secret store, not document custody.
+
+### Provider deletes historical dashboard record
+
+Preserve previously captured evidence/digest where law/policy permits and mark current provider source unavailable.
+
+## Security/privacy threats
+
+- overbroad Drive sharing;
+- secret leakage;
+- tampering;
+- malicious replacement with same filename;
+- stale public projection;
+- evidence deletion during dispute;
+- cross-tenant evidence exposure;
+- public indexing of restricted content.
+
+## Restricted companion
+
+The Evidence Vault by definition has a restricted operational estate. Public docs should document its contract, while private Drive/repository records hold source and indexes according to classification.
+
+## Metrics
+
+Potential definitions:
+
+- evidence objects by class/status;
+- missing evidence references;
+- digest coverage;
+- broken custody locators;
+- public/restricted projection violations;
+- recovery-readback pass rate;
+- active holds;
+- unresolved integrity mismatches;
+- source-to-capture latency.
+
+## Invariants
+
+```text
+Evidence Vault != secret store
+evidence exists != claim true
+hash match != legal/factual correctness
+provider receipt != canonical truth
+backup exists != recovery verified
+public digest != permission to expose source
+derived summary != source artifact
+missing evidence != permission to fabricate
+```
+
+## Status
+
+The Evidence Vault is preserved as a first-class CHLOM engine and is currently mapped to P-10 source custody, DAIL evidence references, governed private Drive/repositories and approved secret storage for actual secret values.

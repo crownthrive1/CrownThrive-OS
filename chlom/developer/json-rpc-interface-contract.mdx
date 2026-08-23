@@ -1,0 +1,202 @@
+---
+title: "JSON-RPC — CHLOM Procedure Interface Contract"
+sidebarTitle: "JSON-RPC"
+description: "Individual CHLOM developer article for procedure-oriented JSON-RPC interfaces with explicit method identity, typed parameters, versioning, scopes, idempotency, error semantics and authority separation."
+icon: "code"
+keywords: ["CHLOM JSON-RPC", "developer API", "RPC", "SDK API Gateway", "procedure interface"]
+---
+
+# JSON-RPC — CHLOM Procedure Interface Contract
+
+## Institutional identity
+
+```yaml
+interface_id: CT-CHLOM-JRPC-001
+name: JSON-RPC
+source_status: explicitly_recovered_interface_family
+source_lineage: recovered SDK & API Gateway module; historical developer/runtime architecture
+classification: source_grounded_current_interface_contract
+exact_production_methods: not_defined_by_this_article
+version: 1.0.0
+```
+
+## Source boundary
+
+The recovered CHLOM module catalog explicitly describes the **SDK & API Gateway** as a unified JSON-RPC, GraphQL, webhook and typed-SDK surface. JSON-RPC therefore has direct source support as a distinct interface family, even though an exact recovered method catalog has not been located.
+
+This article institutionalizes the interface contract without inventing historical method names or claiming a current production RPC endpoint.
+
+## Purpose
+
+JSON-RPC provides a compact procedure-oriented interface where clients invoke named CHLOM operations using typed parameters and receive a structured result or error. It can be appropriate for SDK/internal-service parity, deterministic capability calls and environments where resource-oriented REST semantics are less natural.
+
+## Method families
+
+Current engineering method namespaces can map to institutional capabilities such as:
+
+```text
+identity.*
+rights.*
+dla.*
+dail.*
+policy.*
+evidence.*
+lex.*
+economics.*
+cases.*
+proof.*
+audit.*
+interop.*
+```
+
+These are namespace patterns, not recovered or asserted production method names.
+
+## Request envelope
+
+A governed RPC request should preserve standard JSON-RPC identity plus CHLOM execution context:
+
+```yaml
+jsonrpc: "2.0"
+id: client_request_id
+method: registered_method
+params: object
+context:
+  tenant_id:
+  client_id:
+  actor_or_subject_ref:
+  correlation_id:
+  object_version_refs[]:
+  idempotency_ref:
+```
+
+The context can be transmitted through authenticated session/header metadata or explicit envelope fields according to the implementation. The institutional requirement is that it be resolvable and auditable.
+
+## Method registry
+
+Every RPC method should have a stable registry record:
+
+```yaml
+method_id:
+rpc_name:
+version:
+capability:
+input_schema_ref:
+output_schema_ref:
+side_effect_class: READ|ANALYSIS|WRITE_CANDIDATE|CONSEQUENTIAL_WRITE
+required_scopes[]:
+required_authority_classes[]:
+idempotency_required:
+timeout_or_sla_ref:
+DAIL_behavior:
+status:
+```
+
+A method being registered does not mean every authenticated client may call it.
+
+## Procedure versus authority
+
+```text
+RPC method exists
++ client scope permits request
+!= authority to execute institutional action
+```
+
+Consequential methods still resolve source rights, policy, evidence, approvals and authority for the exact action before side effects occur.
+
+## Candidate-action design
+
+Where possible, expose candidate/request methods separately from final execution. For example, a client can submit a DLA or LEX candidate and receive `PASS_CANDIDATE`, `HOLD` or `DENY` without the interface pretending every method call is an immediate state mutation.
+
+## Versioning
+
+Method names, parameter schemas and semantic meaning are versioned. Breaking parameter/result changes should use an explicit version/migration path rather than silently changing how an old SDK call behaves.
+
+## Idempotency
+
+Methods that can create or multiply rights, entitlements, money, messages or external provider actions require semantic idempotency. Retrying the same logical RPC request should return/recover the existing result rather than create a second effect.
+
+## Optimistic concurrency
+
+Consequential methods can require exact object version/hash parameters. If the object changed between client read and call, return a stale-version/conflict result and require the caller to re-read/re-evaluate.
+
+## Result envelope
+
+A CHLOM RPC result can expose:
+
+```yaml
+institutional_state: PASS_CANDIDATE|HOLD|DENY|COMPLETE|PENDING|OTHER
+resource_or_action_ref:
+object_version:
+data_or_projection:
+reason_codes[]:
+DAIL_or_evidence_ref:
+correlation_id:
+```
+
+The standard JSON-RPC success/error envelope and the institutional business state remain distinct.
+
+## Error model
+
+Transport/protocol errors include malformed request, unsupported method/version and invalid parameters. Institutional outcomes such as `HOLD`, `DENY`, stale evidence or insufficient authority should remain typed domain results or domain-specific errors according to the registered method contract.
+
+Do not leak protected evidence or internal implementation traces in error payloads.
+
+## Batch calls
+
+JSON-RPC can support batched requests where the implementation allows it, but batching must not weaken:
+
+- per-method authorization;
+- tenant/object scope;
+- ordering/dependency rules;
+- idempotency;
+- rate limits;
+- atomicity expectations.
+
+A batch of five actions is not automatically one atomic institutional transaction.
+
+## Notifications
+
+RPC notifications without an expected response should be limited to operations where loss of an immediate result is safe. Consequential state changes generally benefit from a stable request/result receipt rather than fire-and-forget semantics.
+
+## Authentication and scopes
+
+Authentication is handled by the gateway/session/transport. The RPC layer receives a trusted client identity/context and enforces method scopes. Underlying action authority is still resolved separately.
+
+## Rate limits and quotas
+
+Apply client, tenant and method-class budgets. Expensive proof, graph, simulation or export methods can have distinct limits from ordinary reads. `null` or unknown institutional request budget must fail closed under the CrownThrive-local budget convention.
+
+## Provider adapters
+
+RPC methods call provider-neutral CHLOM services. Provider IDs, response schemas and retries are normalized behind adapters rather than leaking into the public method contract unless an operation explicitly returns a provider alias.
+
+## Observability
+
+Record method ID/version, client/tenant, duration, result class, correlation ID, dependency failure and consequential DAIL/action references without logging secrets or raw protected evidence unnecessarily.
+
+## SDK relationship
+
+Typed SDKs can wrap the RPC method registry, generating strongly typed request/result functions. The SDK must preserve method version, result/disposition semantics and authority/error behavior rather than hiding HOLD/DENY states behind generic exceptions.
+
+## Conformance tests
+
+- supported read method;
+- unknown method;
+- invalid parameters;
+- cross-tenant object request;
+- candidate write with missing authority;
+- duplicate idempotent call;
+- stale object version;
+- batch with mixed scopes;
+- rate-limit state;
+- provider dependency failure;
+- restricted result projection;
+- SDK-generated request compatibility.
+
+## Current status
+
+JSON-RPC is explicitly part of recovered CHLOM SDK/API Gateway architecture. Exact production methods/endpoints require a registered machine manifest and implementation evidence.
+
+## Versioning
+
+Method registry, parameter/result schemas, gateway implementation and SDK bindings are independently versioned. Historical method versions retain migration/deprecation records.

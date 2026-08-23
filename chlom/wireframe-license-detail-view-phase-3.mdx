@@ -1,0 +1,368 @@
+---
+title: "Wireframe: License Detail View (Phase 3)"
+sidebarTitle: "License Detail Wireframe"
+description: "Recovered-title implementation article for the Phase 3 License Detail View, exposing exact DLA identity, source rights, scope, parties, policy, evidence, lifecycle, agreement, transferability, cases and DAIL history."
+icon: "file-lines"
+keywords: ["CHLOM License Detail", "DLA detail", "Phase 3", "rights scope", "agreement", "DAIL"]
+---
+
+# Wireframe: License Detail View (Phase 3)
+
+## Recovery status
+
+```yaml
+ui_asset_id: ct.chlom.ui.license-detail.phase3
+exact_recovered_title: "Wireframe: License Detail View (Phase 3)"
+recovery_status: exact_title_recovered_related_architecture_available
+original_visual_body: not_confirmed_recovered_for_this_article
+current_mapping: P-03 DLA/license canonical detail
+```
+
+## Purpose
+
+The License Detail View is the canonical human-readable page for one license/DLA version and its current lifecycle. It should let an authorized user answer:
+
+```text
+What is this license?
+What asset/right is it derived from?
+Who issued/holds it?
+What exact scope is permitted?
+Which version is current?
+What evidence/policy governs it?
+Can it be transferred/sublicensed/renewed?
+Is it held/disputed/revoked?
+What changed over time?
+```
+
+## ASCII wireframe
+
+```text
++--------------------------------------------------------------------------------+
+| < Licenses | DLA-00123 | Version 4 | ACTIVE              [Actions if allowed]  |
++--------------------------------------------------------------------------------+
+| Asset / public title          Holder / Licensee       Issuer / Steward          |
+| Effective / Expires          Verification            Case/HOLD                 |
++--------------------------------------------------------------------------------+
+| Tabs: Overview | Rights Scope | Evidence | Agreement | History | Cases | DAIL   |
++--------------------------------------------------------------------------------+
+| RIGHT-SCOPE SUMMARY                                                        |
+| Territory | Media/Channel | Field of Use | Duration | Exclusivity             |
+| Transfer: Conditional | Sublicense: No                                        |
++--------------------------------------------------------------------------------+
+| Source-right chain / parent-child graph                                        |
++--------------------------------------------------------------------------------+
+| Current decision/readback/status                                                |
++--------------------------------------------------------------------------------+
+```
+
+## Header identity
+
+Always show:
+
+- canonical DLA ID;
+- exact version;
+- current status;
+- asset/public title;
+- environment/tenant where relevant;
+- public/internal classification indicator;
+- current `as_of`/readback when status freshness matters.
+
+A provider license ID may appear as an alias, never as the only identity.
+
+## Overview tab
+
+Core fields:
+
+```text
+DLA ID
+version
+license type / purpose
+asset ID
+issuer / licensing steward
+holder / beneficiary
+status
+effective from
+expires at
+agreement reference
+policy/Compliance Pack refs
+verification/evidence status
+transferability
+sublicensing
+current case/HOLD
+provider projections
+```
+
+## Rights Scope tab
+
+Render structured scope in human-readable and, where allowed, machine-readable forms.
+
+```text
+Territory       United States
+Channels        web, streaming
+Field of use    defined commercial use
+Duration        2026-01-01 -> 2027-01-01
+Exclusivity     non-exclusive
+Transfer        conditional
+Sublicense      prohibited
+Quantity        if applicable
+Restrictions    public-safe summary
+```
+
+## Scope-set representation
+
+For technical/admin roles:
+
+```text
+R_dla = {territory, channels, field, duration, exclusivity, transfer, sublicense, ...}
+```
+
+Current invariant:
+
+```text
+R_dla subseteq R_parent/source
+```
+
+If containment cannot be verified, the detail page displays HOLD/conflict rather than falsely rendering a green rights state.
+
+## Source-right chain
+
+```text
+Source asset / right
+   |
+   +--> ownership / authority evidence
+        |
+        +--> parent agreement/license if any
+             |
+             +--> DLA-00123 v4
+```
+
+Each node links only to fields/evidence the actor may access.
+
+## Parties
+
+Separate:
+
+```text
+asset owner / rights holder
+licensor / issuer/steward
+licensee / DLA holder
+beneficiary
+agent/operator
+reviewer
+```
+
+Do not conflate operational issuer with underlying IP owner.
+
+## Evidence tab
+
+Metadata view:
+
+```text
+Evidence ID
+Type
+Source
+Captured/source time
+Integrity state
+Classification
+Current/superseded
+Used by which decision/version
+```
+
+Restricted evidence opens through protected role-authorized viewer.
+
+## Agreement tab
+
+Show safe agreement metadata:
+
+```text
+agreement ID/version
+parties
+effective period
+status
+signature/execution state
+public terms summary
+related offer/transaction
+```
+
+Do not expose confidential commercial terms to unauthorized roles.
+
+## Lifecycle History tab
+
+```text
+DRAFT
+  |
+PENDING_EVIDENCE
+  |
+APPROVED
+  |
+ACTIVE v1
+  |
+AMENDED v2
+  |
+ACTIVE v2
+  |
+SUSPENDED
+  |
+RESTORED
+  |
+RENEWED v3
+```
+
+Timeline rows include actor/authority, reason class, policy/version and DAIL receipt.
+
+## Cases / Holds tab
+
+Show:
+
+- open/closed case IDs;
+- safe dispute type;
+- hold scope;
+- current review state;
+- appeal/remedy status;
+- links to case page when authorized.
+
+A case being open does not mean wrongdoing was established.
+
+## DAIL tab
+
+DAIL projection includes material license events only, not unrestricted raw audit/evidence data.
+
+```text
+Event ID
+Type
+Time
+Actor
+Prior/new status
+Policy/decision ref
+Correction/supersession
+```
+
+## Action menu
+
+Role-gated actions may include:
+
+```text
+Request amendment
+Request renewal
+Suspend
+Restore
+Revoke
+Request transfer
+Request sublicense
+Open dispute
+Export safe record
+View public verification
+```
+
+The UI should not show `Delete license` as a normal lifecycle action.
+
+## High-impact action dialog
+
+Example revocation:
+
+```text
+Revoke DLA-00123 v4
+Current holder: ...
+Effect: blocks future governed use/transfer under current state
+Dependent systems: LEX / entitlement / commerce / provider projections
+Reason/evidence: required
+Authority: resolved
+[Cancel] [Continue to policy confirmation]
+```
+
+## Version navigation
+
+```text
+v1 | v2 | v3 | v4 current
+```
+
+Viewing an old version must clearly show `Historical version — not current state`.
+
+## Current versus historical evaluation
+
+For a past event, the page can show which DLA version governed the event. It should not apply today's terms retroactively without an explicit correction rule.
+
+## Provider projections
+
+```text
+Provider A: ACTIVE / last readback ...
+Provider B: stale / mismatch
+Canonical DLA: SUSPENDED
+```
+
+Canonical state is visually primary.
+
+## Loading/stale behavior
+
+Material action buttons remain disabled while:
+
+- canonical version is unresolved;
+- rights graph is stale;
+- policy resolver unavailable;
+- open security/guardian hold is unresolved.
+
+## Error states
+
+- DLA not found;
+- version conflict;
+- evidence unavailable;
+- agreement access denied;
+- provider mismatch;
+- policy service unavailable;
+- DAIL projection unavailable.
+
+## Public verification variant
+
+A public-safe detail route can show only approved fields:
+
+```text
+DLA public ID
+status
+issuer public identity
+holder alias if public
+scope summary
+validity
+public proof/attestation
+```
+
+No private agreement/evidence is implied public.
+
+## Data dependencies
+
+- P-03 DLA/right graph/agreement;
+- P-01 parties/roles;
+- P-02 policy/decisions;
+- Evidence Vault;
+- case/DREP;
+- LEX/commerce/provider projections;
+- DAIL.
+
+## Accessibility
+
+- tabs keyboard accessible;
+- status text plus icon;
+- rights graph has table/text alternative;
+- history timeline has linear list alternative;
+- high-impact action dialogs describe consequences;
+- historical/current version state announced clearly.
+
+## Restricted companion
+
+Contains private agreement terms, evidence viewer fields, issuer-review information, protected provider states, fraud/security flags and sensitive case detail.
+
+## Invariants
+
+```text
+DLA detail != proof of underlying IP ownership by itself
+current status != provider status automatically
+historical version != current version
+agreement != DLA
+case open != violation proven
+revocation != deletion
+public verification != public evidence corpus
+reconstructed layout != recovered original visual
+```
+
+## Known unknowns
+
+The recovered title is exact; the original visual layout has not been confirmed recovered. This page is the current implementation reconstruction.

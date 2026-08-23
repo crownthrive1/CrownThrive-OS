@@ -1,0 +1,114 @@
+---
+title: "ALG-018 — Policy Version Migration"
+sidebarTitle: "ALG-018 Policy Migration"
+description: "Standalone CHLOM procedure for validating, regression-testing, simulating, approving and scheduling new policy versions without self-adoption by AI or simulation."
+icon: "code-branch"
+keywords: ["CHLOM ALG-018", "policy migration", "policy version", "regression", "simulation", "governance approval"]
+---
+
+# ALG-018 — Policy Version Migration
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-018
+name: Policy Version Migration
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Compliance Pack versioning; Policy Engine; governance/change control
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-018 governs the transition from one approved CHLOM policy version to another. It exists to make policy evolution testable and reversible and to prevent a generated, simulated or merely edited rule from becoming institutional policy automatically.
+
+## Constitutional invariant
+
+```text
+simulation does not self-adopt
+AI-generated policy != adopted policy
+```
+
+## Inputs
+
+```yaml
+current_policy_ref:
+new_policy_candidate:
+source_authority_refs[]:
+regression_suite_ref:
+historical_fixture_set:
+approval_requirements:
+proposed_effective_time:
+rollback_plan:
+```
+
+## Procedure
+
+```text
+function adopt_policy(new_version):
+    validate_schema(new_version)
+    run_regression_suite(new_version)
+    simulate_against_historical_events(new_version)
+    compare_deltas(current_version, new_version)
+    require_governed_approval()
+    schedule_effective_time()
+    append_dail_event("POLICY_ADOPTED")
+```
+
+## Candidate validation
+
+Validate syntax, schema, referenced controls, dependencies, effective dates, allowed values and forbidden self-references. Unsupported references must fail before simulation.
+
+## Regression testing
+
+The suite should test explicit requirements and known edge cases. A policy version that makes tests pass by deleting a required control is not acceptable; test coverage is itself governed.
+
+## Historical replay and delta analysis
+
+Replay the candidate against representative historical events and compare outcomes to the current version:
+
+```yaml
+PASS_to_PASS:
+PASS_to_HOLD:
+PASS_to_DENY:
+HOLD_to_PASS:
+HOLD_to_DENY:
+DENY_to_PASS:
+```
+
+High-impact deltas require review and explanation. Replay is an analysis tool, not retroactive rewriting of historical decisions.
+
+## Approval
+
+Approval must be performed by the authority required for that policy class: founder/reserved authority, governance body, compliance/legal reviewer, platform owner or another explicitly delegated role. AI can prepare evidence but cannot satisfy a human approval requirement by asserting approval.
+
+## Effective-time scheduling
+
+A new version can be approved before it becomes effective. At activation, the system should revalidate that the approval remains valid, dependencies are available and no emergency HOLD blocks deployment.
+
+## Output
+
+```yaml
+migration_id:
+old_version:
+new_version:
+test_results_ref:
+simulation_ref:
+delta_summary:
+approval_refs[]:
+effective_at:
+rollback_ref:
+state: APPROVED_SCHEDULED|HOLD|REJECTED|ACTIVE
+```
+
+## DAIL evidence
+
+Append candidate registration, test result, simulation, approval, activation and rollback events separately. Do not collapse them into one mutable status row without event lineage.
+
+## Tests
+
+Test compatible change, breaking schema, missing dependency, unexpected PASS-to-DENY spike, absent approval, approval revoked before effective time, rollback, overlapping effective windows and concurrent candidate versions.
+
+## Versioning
+
+ALG-018 itself is versioned independently from the policies it migrates.

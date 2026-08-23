@@ -1,0 +1,653 @@
+---
+title: "P-03 Rights & Licensing Pallet"
+sidebarTitle: "P-03 Rights & Licensing"
+description: "Comprehensive current CHLOM capability-pallet contract for asset/evidence registry, rights graph, DLA, CHLOM LEX, agreements, entitlements, disputes and rights-before-revenue enforcement."
+icon: "file-signature"
+keywords: ["CHLOM P-03", "Rights and Licensing", "rights graph", "DLA", "LEX", "agreements", "entitlements", "disputes"]
+---
+
+# P-03 Rights & Licensing Pallet
+
+## Canonical record
+
+```yaml
+pallet_id: P-03
+canonical_name: Rights & Licensing
+namespace: current_capability_pallet
+source_priority: Foundation
+source_components:
+  - asset/evidence registry
+  - rights graph
+  - DLA
+  - CHLOM LEX
+  - agreements
+  - entitlements
+  - disputes
+current_status: reconstructed_source_grounded
+production_status: not_implied_by_documentation
+public_projection: public_safe
+restricted_companion_required: true
+```
+
+## Purpose
+
+P-03 is the current CHLOM capability container for answering a fundamental institutional question before commerce, distribution, access or transfer occurs:
+
+> **What rights exist, who can exercise them, under what evidence, scope, conditions, duration and remedies?**
+
+P-03 owns the rights-before-license and rights-before-revenue control plane. It registers source assets/evidence, models rights as a graph, issues/manages Dynamic Licensing Assets, governs LEX eligibility, binds agreements and entitlements, and routes disputes/remedies without manufacturing ownership from provider activity or payment.
+
+```text
+SOURCE ASSET / WORK / RIGHT
+          |
+          v
+EVIDENCE + CHAIN OF TITLE
+          |
+          v
+RIGHTS GRAPH
+          |
+          v
+LICENSABLE SCOPE
+          |
+          v
+DLA  = Dynamic Licensing Asset
+          |
+          +--------> agreement / entitlement
+          |
+          +--------> LEX candidate
+          |
+          v
+USAGE / TRANSFER / RENEWAL
+          |
+          v
+DAIL + RECONCILIATION + REMEDIES
+```
+
+## Six Functions mapping
+
+| Function | P-03 responsibility |
+| --- | --- |
+| Rights | Source rights, ownership claims, permissions, licenses, sublicenses, entitlements |
+| Rules | Scope, territory, media, field, duration, transfer and use restrictions |
+| Roles | Owner, licensor, issuer, licensee, sublicensee, reviewer, claimant |
+| Revenue | Rights basis for royalties, fees, commissions and economic activation |
+| Records | Chain of title, DLA versions, agreements, entitlements, usage evidence |
+| Remedies | Suspension, revocation, dispute, appeal, correction, restoration, termination |
+
+## Current DLA meaning
+
+Within current CHLOM:
+
+```text
+DLA = Dynamic Licensing Asset
+```
+
+Historical sources also use DLA as **Decentralized Licensing Authority**. That source-era authority design remains preserved but is not the current machine-readable DLA meaning. Current issuer/authority functions are described through Licensing Stewardship / Issuer Authority.
+
+```text
+historical:
+Decentralized Licensing Authority
+
+current decomposition:
+Licensing Stewardship / Issuer Authority
+                 +
+Dynamic Licensing Asset (DLA)
+```
+
+## Asset/evidence registry
+
+The asset/evidence registry identifies the subject of rights without claiming more than the evidence proves.
+
+Possible asset classes include:
+
+- copyrighted work;
+- trademark/brand asset;
+- media master;
+- publication;
+- software/code asset;
+- dataset;
+- license/permit record;
+- physical-space/right-of-use record;
+- franchise/operator rights;
+- curriculum;
+- image/likeness/publicity-right object;
+- commercial inventory;
+- contract-derived right;
+- other evidence-backed institutional asset.
+
+### Asset record
+
+```yaml
+asset_id: stable ID
+asset_type: controlled vocabulary
+title_or_label: string
+source_refs: []
+claimed_owner_refs: []
+verification_state: unverified|partially_verified|verified|disputed
+classification: public|internal|restricted
+created_at: timestamp
+version: integer
+```
+
+The registry can preserve conflicting claims without choosing an unsupported winner.
+
+## Evidence model
+
+Evidence can include:
+
+- source files;
+- signed agreements;
+- assignments;
+- licenses;
+- registrations;
+- invoices/receipts as supporting evidence;
+- provider records;
+- creator/owner attestations;
+- publication records;
+- corporate records;
+- adjudications;
+- verified third-party records.
+
+Provider evidence is not sovereign truth. A distributor, marketplace, payment provider or storage service cannot by itself determine CrownThrive's complete rights state.
+
+## Rights graph
+
+Rights are modeled as relationships, not one Boolean ownership field.
+
+```text
+                [SOURCE RIGHT]
+                      |
+        +-------------+-------------+
+        |                           |
+   [OWNER A]                    [OWNER B]
+        |
+     license
+        |
+   [LICENSEE]
+        |
+   sublicense if permitted
+        |
+   [SUBLICENSEE]
+```
+
+Each edge can carry:
+
+```text
+scope
+territory
+media/channel
+field of use
+duration
+exclusivity
+transferability
+sublicensing
+revocability
+payment/economic terms reference
+conditions
+source evidence
+```
+
+## Rights conservation invariant
+
+A downstream license cannot legitimately expand beyond its source authority.
+
+```text
+CHILD_RIGHTS <= PARENT_RIGHTS <= SOURCE_RIGHTS
+```
+
+For set-based modeling:
+
+```text
+R_child subseteq R_parent subseteq R_source
+```
+
+A transfer or sublicense that requires rights outside the parent set is invalid/held even if a provider technically accepts the transaction.
+
+## Chain of title
+
+Chain of title is a lineage graph of how current claimed authority derives from prior rights/evidence.
+
+```text
+SOURCE CREATION
+      |
+      v
+INITIAL OWNERSHIP / CLAIM
+      |
+      v
+ASSIGNMENT / LICENSE / SUCCESSION
+      |
+      v
+CURRENT LICENSOR AUTHORITY
+      |
+      v
+DLA / AGREEMENT / ENTITLEMENT
+```
+
+Missing links do not get inferred simply to make the chain complete.
+
+## Dynamic Licensing Asset
+
+A DLA is a machine-readable representation of a license/permission state. It is not the underlying intellectual property or automatically a transferable token.
+
+### DLA record
+
+```yaml
+dla_id: stable ID
+asset_id: source asset
+issuer_authority_ref: required
+holder_or_beneficiary_ref: subject
+rights_scope: structured rights set
+territory: structured
+channels_or_media: []
+field_of_use: []
+effective_from: timestamp
+expires_at: nullable
+transferability: prohibited|conditional|allowed
+sublicensing: prohibited|conditional|allowed
+status: draft|pending|active|suspended|expired|revoked|terminated|disputed
+agreement_ref: nullable
+policy_refs: []
+evidence_refs: []
+version: integer
+```
+
+## DLA lifecycle
+
+```text
+DRAFT
+  |
+EVIDENCE_PENDING
+  |
+RIGHTS_VERIFIED
+  |
+APPROVAL_PENDING
+  |
+ACTIVE
+  |
+  +--> AMENDED --> ACTIVE(new version)
+  +--> SUSPENDED --> RESTORED / REVOKED
+  +--> DISPUTED --> RESOLVED / MODIFIED / REVOKED
+  +--> EXPIRED --> RENEWED / CLOSED
+  +--> TERMINATED
+```
+
+State transitions require policy/authority/evidence and preserve prior versions.
+
+## Agreements
+
+An agreement is not the same object as a DLA.
+
+```text
+AGREEMENT
+ legal/commercial terms + signatures + obligations
+
+DLA
+ machine-readable current permission state
+
+ENTITLEMENT
+ operational access/use benefit resolved from agreement/license
+```
+
+One agreement can produce multiple DLAs or entitlements when the rights/evidence support that structure.
+
+## Entitlements
+
+An entitlement is a current operational permission such as access, download, use, seat, booking right, distribution permission or platform capability.
+
+Payment can be a precondition for an entitlement but is not the entitlement itself.
+
+```text
+PAYMENT SUCCESS
+     |
+     v
+AGREEMENT / OFFER / POLICY RECONCILIATION
+     |
+     v
+ENTITLEMENT CREATED / UPDATED
+```
+
+## LEX relationship
+
+LEX is a rights-gated exchange/service surface.
+
+```text
+ASSET
+  |
+RIGHTS VERIFIED
+  |
+DLA ACTIVE / LICENSABLE SCOPE
+  |
+LISTING CANDIDATE
+  |
+ELIGIBILITY / POLICY
+  |
+LEX LISTING
+  |
+AGREEMENT
+  |
+PAYMENT EVIDENCE
+  |
+ENTITLEMENT / TRANSFER
+  |
+SETTLEMENT / REMEDIES
+```
+
+LEX may never manufacture rights by listing an asset.
+
+## LEX eligibility
+
+A listing/transmission decision can require:
+
+- licensor authority;
+- current DLA state;
+- transfer/sublicense rights;
+- counterparty eligibility;
+- jurisdiction/sector rules;
+- pricing/economic schedule authority;
+- required agreement template/version;
+- dispute/escrow requirements;
+- provider capability/readiness.
+
+## Rights-before-revenue invariant
+
+```text
+NO VERIFIED RIGHTS
+      |
+      v
+NO LICENSE AUTHORITY
+      |
+      v
+NO CERTIFIED ECONOMIC ACTIVATION
+```
+
+Economic systems can reconcile payment and allocation; they cannot manufacture license scope.
+
+## ThriveEvergreen relationship
+
+Where a CHLOM asset becomes commercial, current CrownThrive economic activation can bind through ThriveEvergreen/ECAC.
+
+```text
+P-03 RIGHTS STATE
+       |
+       v
+DLA / AGREEMENT / ENTITLEMENT
+       |
+       v
+THRIVEEVERGREEN ECONOMIC ACTIVATION
+       |
+       v
+P-06 / P-11 execution + settlement
+```
+
+P-03 remains authoritative for rights/licensing semantics; ThriveEvergreen governs current commercial/economic activation within its authority.
+
+## Disputes
+
+A rights dispute is represented as a case, not by silently editing ownership.
+
+```text
+CLAIM / CONFLICT
+       |
+       v
+CASE OPEN
+       |
+EVIDENCE PRESERVED
+       |
+OPTIONAL HOLD / SUSPENSION
+       |
+REVIEW / ADJUDICATION
+       |
+OUTCOME
+       |
+CORRECTION / REMEDY / APPEAL
+```
+
+## Revocation
+
+Revocation terminates or invalidates a permission state under authorized conditions. It does not erase evidence that the license previously existed.
+
+### Revocation propagation
+
+Potential downstream effects may include:
+
+- stop new use;
+- suspend entitlement;
+- remove/hold LEX listing;
+- block sublicense creation;
+- trigger economic reconciliation;
+- preserve completed lawful historical uses;
+- notify dependent systems;
+- update public-safe status if appropriate.
+
+## Transfer and sublicensing
+
+A transfer must verify that the transferor can transfer the exact rights set.
+
+```text
+requested_rights
+      subseteq
+transferable_parent_rights
+      ?
+ yes -> continue eligibility
+ no  -> DENY
+```
+
+Sublicensing creates a child relationship and never destroys the parent source chain.
+
+## Versioning
+
+DLA versions preserve effective periods.
+
+```text
+DLA v1  2026-01-01 -> 2026-03-31
+DLA v2  2026-04-01 -> current
+```
+
+Historical usage is evaluated against the version that governed the event, not automatically against today's terms.
+
+## Core event families
+
+```text
+ct.asset.registered.v1
+ct.asset.claim.created.v1
+ct.rights.edge.created.v1
+ct.rights.edge.superseded.v1
+ct.rights.dispute.opened.v1
+ct.dla.created.v1
+ct.dla.activated.v1
+ct.dla.amended.v1
+ct.dla.suspended.v1
+ct.dla.revoked.v1
+ct.dla.expired.v1
+ct.agreement.executed.v1
+ct.entitlement.created.v1
+ct.entitlement.revoked.v1
+ct.lex.eligibility.evaluated.v1
+ct.license.transfer.completed.v1
+ct.license.sublicense.created.v1
+```
+
+Material events carry DAIL evidence and correlation IDs.
+
+## Interfaces
+
+P-03 can expose public-safe APIs for:
+
+- asset registration candidates;
+- rights claims/evidence submission;
+- rights status retrieval;
+- DLA creation/workflow;
+- DLA status;
+- entitlement lookup;
+- LEX candidate creation;
+- transfer/sublicense requests;
+- dispute/case submission;
+- public-safe verification endpoints.
+
+Write interfaces require explicit authority and readback.
+
+## Cross-pallet dependencies
+
+```text
+P-01 Identity ---------+
+                       |
+P-02 Governance -------+----> P-03 Rights & Licensing
+                       |              |
+P-10 Evidence ---------+              +--> P-04 Media/IP
+                                      +--> P-06 Commerce
+                                      +--> P-11 Settlement
+```
+
+## Historical runtime lineage
+
+Historical CHLOM describes:
+
+- Decentralized Licensing Authority pallet;
+- LEX runtime pallet;
+- license NFTs/SBTs;
+- Substrate `pallet_uniques` style implementation;
+- smart-contract/on-chain transfer;
+- token staking for issuer roles;
+- cross-chain licensing.
+
+Those remain source/research lineage. P-03's current institutional semantics do not require a public chain or token.
+
+## Operating procedures
+
+### Asset onboarding
+
+1. assign stable asset ID;
+2. preserve source evidence;
+3. record claims without overstatement;
+4. reconcile ownership/licensor authority;
+5. build rights graph;
+6. classify restrictions;
+7. mark unresolved conflicts;
+8. create licensable scope only when supported.
+
+### DLA issuance
+
+1. confirm source asset;
+2. confirm issuer authority;
+3. confirm rights scope;
+4. evaluate policy/eligibility;
+5. bind agreement where required;
+6. create DLA candidate;
+7. obtain approval;
+8. activate exact version;
+9. emit/read back DAIL evidence.
+
+### Transfer
+
+1. resolve active DLA;
+2. calculate allowed transfer scope;
+3. verify recipient eligibility;
+4. verify economic/escrow conditions;
+5. execute authorized state changes;
+6. read back provider/operational state;
+7. reconcile rights graph and entitlement;
+8. emit evidence.
+
+### Dispute
+
+1. freeze mutable evidence;
+2. create case;
+3. apply bounded hold if authorized;
+4. review evidence/authority;
+5. issue disposition/remedy;
+6. propagate correction;
+7. retain original lineage.
+
+## Failure modes
+
+### Provider says user owns asset
+
+**Response:** provider evidence is one source; do not convert to institutional ownership without supporting rights evidence.
+
+### Payment succeeded before entitlement
+
+**Response:** reconcile payment, rights, agreement and entitlement; compensate/refund/hold as policy requires.
+
+### Child license exceeds parent
+
+**Response:** DENY creation or transfer.
+
+### Missing chain-of-title link
+
+**Response:** HOLD high-risk rights activation; preserve unresolved claim.
+
+### Revoked DLA remains listed externally
+
+**Response:** hold listing/use, initiate provider reconciliation and record mismatch.
+
+### Expired agreement but active cached entitlement
+
+**Response:** fail closed where current entitlement requires current agreement; reconcile cache/provider.
+
+## Metrics
+
+Once definitions are adopted:
+
+- assets by verification state;
+- unresolved rights claims;
+- rights-chain completeness;
+- active/suspended/revoked DLAs;
+- DLA issuance cycle time;
+- expired-but-active mismatch count;
+- LEX eligibility PASS/HOLD/DENY;
+- dispute age;
+- entitlement reconciliation failures;
+- provider rights-state mismatches;
+- sublicense depth/distribution where relevant;
+- orphaned agreements/entitlements.
+
+## Restricted companion
+
+May contain:
+
+- confidential agreements;
+- unpublished rights evidence;
+- protected chain-of-title analyses;
+- unreleased licensing schedules;
+- private dispute evidence;
+- anti-fraud transfer controls;
+- private settlement conditions;
+- protected algorithm/calibration;
+- secret references without values.
+
+## Release gates
+
+```text
+[ ] stable asset/rights IDs
+[ ] rights graph invariant tests
+[ ] issuer authority enforced
+[ ] DLA lifecycle tests
+[ ] transfer/sublicense containment tests
+[ ] agreement/entitlement separation verified
+[ ] revocation propagation tested
+[ ] LEX rights gate verified
+[ ] economic handoff does not manufacture rights
+[ ] dispute/appeal path tested
+[ ] DAIL readback verified
+[ ] public/restricted projection reviewed
+```
+
+## Invariants
+
+```text
+asset exists != rights verified
+provider record != institutional ownership
+payment != entitlement
+listing != license authority
+DLA != underlying IP
+agreement != DLA
+DLA != entitlement
+child rights <= parent rights <= source rights
+revocation != historical erasure
+LEX != rights factory
+historical DLA authority != current DLA object
+```
+
+## Current implementation effect
+
+P-03 is a **Foundation** pallet in the July 2026 Technical Build Pack. It defines the required current rights/licensing container even though individual platform integrations, LEX functions and historical runtime implementations remain subject to their own evidence and maturity states.

@@ -1,0 +1,106 @@
+---
+title: "SCHEMA-001 — DAIL Event Envelope"
+sidebarTitle: "SCHEMA-001 DAIL Event"
+description: "Canonical public-safe machine contract for append-only CHLOM DAIL events, stable identity, actor/tenant scope, evidence, authority, timing, classification, corrections and idempotency."
+icon: "timeline"
+keywords: ["CHLOM schema", "DAIL event", "event envelope", "append only", "provenance"]
+---
+
+# SCHEMA-001 — DAIL Event Envelope
+
+## Schema identity
+
+```yaml
+schema_id: SCHEMA-001
+name: DAIL Event Envelope
+classification: reconstructed_machine_contract
+current_term: Decentralized Autonomous Information Ledger
+version: 1.0.0
+related_algorithm: ALG-014; ALG-015
+```
+
+## Purpose
+
+SCHEMA-001 defines the provider-neutral machine envelope for a CHLOM DAIL event. The schema records an observation, decision, action, correction, attestation or other governed institutional event without implying that every payload claim is factually true or institutionally authoritative.
+
+## Core envelope
+
+```yaml
+event_id: string
+schema_id: SCHEMA-001
+schema_version: string
+event_type: string
+tenant_id: string
+subject_refs: [stable_ref]
+actor:
+  actor_id: string
+  actor_type: human|agent|service|provider_adapter|system
+  role_refs: [stable_ref]
+authority_refs: [stable_ref]
+policy_refs: [stable_ref]
+evidence_refs: [stable_ref]
+occurred_at: timestamp|null
+observed_at: timestamp
+recorded_at: timestamp
+effective_at: timestamp|null
+classification: public|internal|restricted|trade_secret|secret_reference
+payload: object
+idempotency_ref: string|null
+supersedes_ref: string|null
+corrects_ref: string|null
+correlation_refs: [stable_ref]
+source_refs: [stable_ref]
+digest:
+  algorithm: string|null
+  value: string|null
+```
+
+The exact persistence implementation may add internal fields, but public contracts must not depend on undocumented provider/database primary keys.
+
+## Stable identity and tenancy
+
+`event_id` is globally/stably unique within the CHLOM institutional namespace. `tenant_id` is mandatory for multi-tenant isolation. A subject reference must not allow an event writer to escape its tenant or action scope.
+
+## Actor versus authority
+
+Actor identity records **who/what emitted the event**. `authority_refs` record the grants/approvals that make a consequential action institutionally valid. A service account can be the actor while a human/governance approval remains the authority.
+
+## Time semantics
+
+`occurred_at`, `observed_at`, `recorded_at` and `effective_at` are distinct. A source event can occur earlier than CHLOM observes it; a correction recorded today can be effective for a different time. Missing timestamps remain `null/unknown`, not fabricated.
+
+## Classification
+
+Sensitive payloads may be represented by restricted custody/evidence references and digests rather than embedded in a public-readable DAIL record. Secret values never belong in the event payload.
+
+## Correction model
+
+Corrections are new events. `corrects_ref` or `supersedes_ref` links the new event to its predecessor. Consumers derive current effective state through reducer/version rules; the original event remains immutable history.
+
+## Idempotency
+
+Consequential events bind to a semantic idempotency reference where applicable so retries cannot multiply rights, money, entitlements or state effects.
+
+## Validation rules
+
+- supported schema/version;
+- valid stable IDs;
+- actor and tenant resolved;
+- allowed classification/payload combination;
+- required evidence/authority refs present for the event type;
+- time values normalized;
+- correction references resolve;
+- no plaintext secret fields;
+- no cross-tenant subject leakage.
+
+## Public projection
+
+Public/indexer views are derived through projection policy. Projection can redact fields or payload content but cannot mutate canonical event history.
+
+## Tests
+
+Validate ordinary append, correction, restricted payload reference, missing actor, wrong tenant, unsupported event type/version, duplicate idempotency, future/ambiguous timestamps, digest mismatch and rebuild of effective state.
+
+## Versioning
+
+Additive optional fields can be backward-compatible. Changes to event identity, authority semantics, correction behavior or required fields require a new schema version and migration/replay analysis.

@@ -1,0 +1,523 @@
+---
+title: "CHLOM Formal Proof, Theorem and Mechanism-Design Register"
+sidebarTitle: "Formal Proof Register"
+description: "Public-safe theorem and mechanism-design register derived from the recovered Internal Gold Paper, covering value conservation, overrides, capacity, ZK compliance, liveness, deterrence, immutability, batching, revocation, rounding, collusion, oracle accountability and cross-chain safety."
+icon: "function"
+noindex: true
+keywords: ["CHLOM theorem", "formal proof", "mechanism design", "value conservation", "rounding bound", "BFT", "oracle accountability", "incentive compatibility", "TLA+"]
+---
+
+# CHLOM Formal Proof, Theorem and Mechanism-Design Register
+
+The recovered **CHLOM™ Internal Gold Paper — Master Technical Document v0.9-internal** contains a named proof corpus. Because that source is confidential/internal, this article records the **public-safe theorem statements, assumptions, equations and engineering implications** without reproducing protected proof details.
+
+## Proof-status warning
+
+```yaml
+source_theorem_corpus: recovered
+independent_peer_review: not_established_here
+machine_checked_proofs: not_established_here
+current_production_implementation: separate_evidence_required
+public_projection: theorem_statements_and_safe_math_only
+```
+
+A theorem appearing in a historical internal paper is evidence of formal-design intent. It is not automatically a current certification.
+
+## Historical assumption set
+
+The source assumes, at a high level:
+
+```text
+collision-resistant hash functions
+EUF-CMA secure digital signatures
+sound zero-knowledge proof system
+zero-knowledge privacy property
+Byzantine-fault-tolerant finality
+f < n/3 adversarial validators
+```
+
+The current cloud-first architecture does not require every decentralized-network assumption.
+
+## T1 — Value Conservation: Splitter
+
+### Historical statement class
+
+If a base amount `B` is distributed according to a normalized split vector whose weights sum to denominator `D`, allocation plus deterministic residual preserves total value.
+
+Let:
+
+```text
+Σ a_i = D
+p_i = floor(a_i * B / D)
+r = B - Σp_i
+```
+
+Then:
+
+```text
+Σp_i + r = B
+```
+
+### Current invariant
+
+```text
+gross = deductions + allocations + holds + residue
+```
+
+No unexplained economic value disappears.
+
+## T2 — Override Correctness: Tree
+
+Historical override-routing uses edge rates `r_e` along a path.
+
+Conceptually:
+
+```text
+ancestor_share = B * Π r_e
+```
+
+The source claims the modeled tree preserves value conservation.
+
+### Current correction
+
+A mathematically conserved split is still invalid if the underlying contract or rights state does not authorize the routing.
+
+```text
+mathematical conservation != economic authority
+```
+
+## T3 — Capacity Safety
+
+Historical license usage has capacity `cap` and consumed amount `used`.
+
+Invariant:
+
+```text
+0 <= used <= cap
+```
+
+Transition guard:
+
+```text
+used_next = used + delta
+allowed only if used + delta <= cap
+```
+
+A nonce/replay guard is used to prevent duplicate state advancement.
+
+### Modern mapping
+
+Applicable to:
+
+- seat limits;
+- license uses;
+- quota-limited permissions;
+- inventory capacities;
+- bounded entitlements.
+
+## T4 — Attribution Uniqueness: DID
+
+Historical theorem family relies on collision-resistant identity/key assumptions.
+
+Public-safe statement:
+
+```text
+valid stable identity references should not collide except with negligible cryptographic probability under assumed primitives
+```
+
+### Current correction
+
+Cryptographic uniqueness does not prove real-world identity uniqueness unless the identity proofing system establishes that separately.
+
+## T5 — ZK Compliance
+
+Historical form:
+
+```text
+Verify(proof) == TRUE
+    => accepted circuit predicate C(x) == TRUE
+```
+
+under the proof system's soundness assumptions.
+
+Privacy property prevents disclosure of protected witness data beyond the proven statement.
+
+### Current mapping
+
+```text
+proof cryptographically valid
+      != witness source current
+      != credential unrevoked
+      != policy version current
+      != action authorized
+```
+
+## T6 — Eventual Enforcement / Liveness
+
+Historical source maps BFT liveness/finality assumptions to eventual enforcement of accepted compliance/governance actions.
+
+A current service-oriented equivalent is operational rather than consensus-theoretic:
+
+```text
+accepted durable command
++ available dependencies
++ no valid hold
++ retry/queue guarantees
+-> bounded eventual processing target
+```
+
+Exact SLOs require current operational evidence.
+
+## T7 — Incentive Compatibility
+
+The Gold Paper provides the deterrence inequality:
+
+```text
+S >= G / (p * s)
+```
+
+Equivalent:
+
+```text
+p * s * S >= G
+```
+
+Where:
+
+- `S` = stake/bond;
+- `G` = potential gain from misconduct;
+- `p` = detection probability;
+- `s` = fraction of stake lost if detected/proven.
+
+### Interpretation
+
+Expected penalty:
+
+```text
+E[penalty] = p * s * S
+```
+
+To make misconduct unattractive in the simplified model:
+
+```text
+E[penalty] >= G
+```
+
+### Sensitivity
+
+Required stake:
+
+```text
+S_required = G / (p*s)
+```
+
+Therefore:
+
+```text
+∂S_required/∂G > 0
+∂S_required/∂p < 0
+∂S_required/∂s < 0
+```
+
+Higher possible gain demands more bond; stronger detection or stronger permitted penalty lowers the theoretical required bond.
+
+### Boundary
+
+This is mechanism-design research, not a current financial bonding requirement.
+
+## T8 — Audit Immutability
+
+Historical theorem family assumes finalized ledger events cannot be modified without violating the underlying cryptographic/consensus assumptions.
+
+### Current DAIL mapping
+
+Current architecture uses an append-only correction model:
+
+```text
+E0 original
+  |
+  v
+E1 correction references E0
+  |
+  v
+E2 supersession references E1
+```
+
+Immutability is not interpreted as an inability to correct institutional meaning.
+
+## T9 — Compositional Compliance
+
+If multiple independent required predicates are all proven/accepted:
+
+```text
+C1(x) = TRUE
+C2(x) = TRUE
+...
+Cn(x) = TRUE
+```
+
+then:
+
+```text
+AND_i C_i(x) = TRUE
+```
+
+provided the predicates apply to the same valid context/version.
+
+### Important limit
+
+Composition fails semantically if proofs use incompatible effective dates, subjects, scopes or policy versions.
+
+## T10 — Batch Invariance
+
+Historical allocation theorem states totals should remain invariant to order/partition under the specified payout model.
+
+Desired property:
+
+```text
+Allocate(B, batch_partition_A)
+    ==
+Allocate(B, batch_partition_B)
+```
+
+in aggregate, subject to a deterministic rounding rule.
+
+### Modern test use
+
+Property-based test:
+
+```text
+shuffle events / repartition batch
+-> aggregate recipient totals remain identical
+```
+
+unless event ordering is explicitly part of the adopted economic rule.
+
+## T11 — Subtree Revocation Conservation
+
+Historical tree model states that revoking a subtree stops future flow to that subtree while preserving total conservation through the remaining valid routing/residual logic.
+
+### Rights mapping
+
+```text
+revoked child
+  -> no future entitlement under that child
+  -> source/parent history remains
+  -> downstream economic obligations follow adopted correction policy
+```
+
+Revocation must not mutate historical payouts retroactively unless a separate remedy authorizes correction/reversal.
+
+## T12 — Rounding Bound
+
+For `m` recipients using floor allocation:
+
+```text
+p_i = floor(a_i * B / D)
+```
+
+The source states residual bound:
+
+```text
+0 <= r <= m - 1
+```
+
+when working in smallest indivisible integer units under the modeled normalized split.
+
+### Reasoning sketch
+
+Each floor operation loses less than one unit:
+
+```text
+0 <= exact_i - floor(exact_i) < 1
+```
+
+Summing `m` losses gives:
+
+```text
+0 <= residual < m
+```
+
+For integer residual:
+
+```text
+r <= m - 1
+```
+
+This public-safe derivation is consistent with the source theorem statement.
+
+## T13 — Collusion Thresholds
+
+Historical BFT model references approximate threshold classes:
+
+```text
+>= 1/3 adversarial power -> censorship/liveness risk class
+> 2/3 adversarial power  -> safety-break class under modeled consensus assumptions
+```
+
+The exact consensus protocol matters. Do not generalize these thresholds to cloud access control, corporate governance or current CHLOM decision authority.
+
+## T14 — Oracle Accountability
+
+Historical source applies incentive deterrence to false oracle reporting:
+
+```text
+p_det * s_V * S_V >= benefit_false
+```
+
+Where:
+
+- `p_det` = probability false reporting is detected/proven;
+- `s_V` = slash fraction;
+- `S_V` = oracle bond/stake;
+- `benefit_false` = potential benefit from lying.
+
+### Current generalized assurance model
+
+Without requiring a token:
+
+```text
+expected_cost_of_misconduct
+   >=
+expected_benefit_of_misconduct
+```
+
+Controls can include contractual deposits, insurance, access loss, reputation, legal remedies or provider termination.
+
+## T15 — Cross-Chain Settlement Safety
+
+Historical source relies on verified light-client/finality proofs before mirroring state/value across chains.
+
+Public-safe principle:
+
+```text
+remote claim
+  + authenticated source
+  + replay protection
+  + accepted finality evidence
+  + local policy
+  + local authority
+  -> local effect candidate
+```
+
+A remote proof does not create local institutional authority automatically.
+
+## Mechanism-design worksheet
+
+Historical Gold Paper says to enumerate role-specific potential gain `G`, detection probability `p`, penalty fraction `s`, then solve for `S`.
+
+Public-safe worksheet:
+
+| Role | Estimated gain from misconduct `G` | Detection probability `p` | Enforceable loss factor `s` | Calculated `S_required` | Adopted? |
+| --- | --: | --: | --: | --: | --- |
+| example only | 100 | 0.5 | 0.25 | 800 | no |
+
+because:
+
+```text
+S = 100 / (0.5 * 0.25)
+  = 100 / 0.125
+  = 800
+```
+
+This table is illustrative mechanism math only.
+
+## Detection-probability calibration
+
+The source historically discusses validator/AI co-training as a way to improve `p` over time.
+
+A derived monitoring view:
+
+```text
+p_estimated = detected_valid_incidents / total_incidents_estimated
+```
+
+In reality, total undiscovered incidents are unknown, so `p` needs careful statistical estimation rather than naive counting.
+
+## Proof composition graph
+
+```text
+IDENTITY PROOF ----+
+                   |
+LICENSE PROOF -----+----> COMPOSED POLICY
+                   |            |
+GEO PROOF ---------+            v
+                              ACCEPTED
+                                 |
+                                 v
+                          AUTHORITY GATE
+```
+
+Cryptographic composition and institutional authorization are separate stages.
+
+## Formal-model lineage
+
+The source includes a TLA\+ starter sketch around:
+
+```text
+Vars:
+  license.state
+  license.used
+  license.cap
+  license.nonce
+  split.weights
+  override_tree
+  ledger
+
+Transitions:
+  AdvanceUsage
+  Payout
+  RevokeSubtree
+  VerifyZK
+```
+
+and identifies invariant families around split conservation, capacity, nonces, authorization, audit linkage, ZK-policy relation, tree integrity, replay and finality.
+
+### Current next step
+
+A future formal-methods tranche can translate current cloud-first semantics—not historical token/chain mechanics blindly—into executable TLA\+/PlusCal or another model checker.
+
+## Proof-corpus status matrix
+
+| Proof family | Historical source | Current invariant useful? | Current implementation proof established? |
+| --- | --- | --- | --- |
+| value conservation | yes | yes | separate evidence needed |
+| capacity safety | yes | yes | separate evidence needed |
+| attribution uniqueness | yes | partially | separate evidence needed |
+| ZK compliance | yes | yes as target | implementation-specific |
+| eventual enforcement | yes | yes operationally | separate evidence needed |
+| incentive compatibility | yes | research/assurance | not adopted by this page |
+| audit immutability | yes | yes via DAIL continuity | implementation-specific |
+| compositionality | yes | yes | separate evidence needed |
+| batch invariance | yes | yes where applicable | test required |
+| subtree revocation | yes | yes | implementation-specific |
+| rounding bound | yes | yes | algorithm/test required |
+| collusion thresholds | yes | historical chain only | not current cloud invariant |
+| oracle accountability | yes | assurance concept | current mechanism TBD |
+| cross-chain safety | yes | future adapter | not current core proof |
+
+## Current formal-methods principle
+
+```text
+THEOREM STATEMENT
+      +
+EXPLICIT ASSUMPTIONS
+      +
+MODEL
+      +
+PROOF / MODEL CHECK
+      +
+IMPLEMENTATION CONFORMANCE
+      +
+RUNTIME MONITORING
+      =
+MEANINGFUL ASSURANCE
+```
+
+Leaving out implementation conformance creates a proof of the model, not proof that deployed code behaves like the model.
+
+## Founder adjudication
+
+`open_after_publication`
+
+The Founder may later designate individual theorem families as canonical requirements, historical-only research, protected IP, implementation gates or formal-verification targets. The original Gold Paper lineage remains preserved.

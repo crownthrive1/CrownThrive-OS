@@ -1,0 +1,61 @@
+---
+title: "FORM-021 — SLA Latency Percentiles"
+sidebarTitle: "FORM-021 Latency Percentiles"
+description: "Standalone CHLOM latency reference defining p95 and p99 percentile calculations, measurement scope and SLO authority boundaries."
+icon: "stopwatch"
+keywords: ["CHLOM FORM-021", "p95 latency", "p99 latency", "SLA", "performance"]
+---
+
+# FORM-021 — SLA Latency Percentiles
+
+## Formula identity
+
+```yaml
+formula_id: FORM-021
+classification: standard_engineering_model_adopted_for_reference
+origin: CHLOM SLA Metrics and observability lineage
+adopted_latency_target: false
+```
+
+## Expressions
+
+For latency sample set `L`:
+
+```text
+p95_latency = percentile(L, 95)
+p99_latency = percentile(L, 99)
+```
+
+The percentile implementation method must be explicit because interpolation conventions can differ across monitoring systems.
+
+## Purpose
+
+Percentiles describe tail experience better than averages for APIs, proof verification, policy checks, indexers, webhooks and other CHLOM services. A low mean can hide a small but important population of very slow requests.
+
+## Measurement scope
+
+Every report should state endpoint/service, region, tenant scope if relevant, request class, success/error inclusion, time window, warm/cold state, sample count and latency clock boundaries. Server processing time and end-to-end client latency are different metrics.
+
+## Small samples
+
+Percentiles are unstable or misleading with very small sample sizes. Monitoring policy should define minimum sample count or use alternative reporting for low-traffic services.
+
+## Errors and timeouts
+
+Policy must define whether timed-out/failed requests enter latency distributions, are tracked separately, or both. Excluding all failures can make latency appear healthy while availability is poor.
+
+## Authority boundary
+
+FORM-021 defines measurement, not a contractual target. A target like `p95 < X ms` requires an adopted SLO/SLA.
+
+## DAIL/evidence
+
+Consequential SLA reports should retain measurement configuration, source observability stream, sample count, percentile method/version and target policy.
+
+## Tests
+
+Test ordered/unordered samples, odd/even sizes, duplicate values, small sample, timeout handling, missing telemetry, extreme outlier and two percentile-library conventions.
+
+## Versioning
+
+Any change to percentile/interpolation or measurement boundaries requires metric-definition versioning so historical reports remain comparable.

@@ -1,0 +1,101 @@
+---
+title: "FORM-011 — DLA Validity Predicate"
+sidebarTitle: "FORM-011 DLA Validity"
+description: "Standalone CHLOM boolean predicate defining the conjunctive conditions required for a Dynamic Licensing Asset to be valid and usable."
+icon: "file-circle-check"
+keywords: ["CHLOM FORM-011", "DLA validity", "Dynamic Licensing Asset", "license predicate", "rights"]
+---
+
+# FORM-011 — DLA Validity Predicate
+
+## Formula identity
+
+```yaml
+formula_id: FORM-011
+classification: derived_formal_predicate
+origin: DLA lifecycle and activation requirements
+adopted_as_reconstruction_contract: yes
+```
+
+## Predicate
+
+A Dynamic Licensing Asset is valid for a given evaluation context only when all required conditions are true:
+
+```text
+VALID(DLA) =
+    rights_valid
+AND issuer_authorized
+AND licensee_eligible
+AND effective_time_valid
+AND not_revoked
+AND not_suspended
+AND required_credentials_current
+AND required_policy_passed
+AND required_economic_conditions_met
+```
+
+## Three-valued extension
+
+Real CHLOM state includes unresolved facts. Therefore production evaluation should use PASS/HOLD/DENY semantics rather than ordinary two-valued Boolean coercion. If any mandatory predicate is unknown because evidence is missing/stale, validity is **HOLD**, not true.
+
+## Predicate components
+
+### rights\_valid
+
+Source rights and parent chain support the requested scope under FORM-009/FORM-010.
+
+### issuer\_authorized
+
+The actor granting the DLA possesses current authority over the relevant rights.
+
+### licensee\_eligible
+
+Identity, credentials, jurisdiction and other eligibility requirements pass.
+
+### effective\_time\_valid
+
+Current/requested time falls within the license's effective term and any activation/timelock constraints.
+
+### not\_revoked / not\_suspended
+
+The lifecycle record contains no currently effective revocation or suspension.
+
+### required\_credentials\_current
+
+Credential attestations remain valid, unrevoked and fresh enough for policy.
+
+### required\_policy\_passed
+
+Applicable Compliance Packs resolve according to ALG-001/ALG-017.
+
+### required\_economic\_conditions\_met
+
+Only conditions that are actually contractual/policy prerequisites belong here. Payment provider success alone is not automatically sufficient; it must reconcile to the defined obligation.
+
+## Use-specific validity
+
+A DLA can be valid generally yet not authorize every requested use. The predicate should be evaluated with requested scope/context, not just as a global `active=true` flag.
+
+## Output schema
+
+```yaml
+dla_validity_assessment_id:
+dla_ref:
+context_ref:
+predicate_results:
+final_state: PASS|HOLD|DENY
+reason_codes[]:
+valid_until:
+```
+
+## Tests
+
+Individually falsify/unknown each predicate, test all true, revoked after prior PASS, stale credential, economic condition reversed, scope not covered and policy version change.
+
+## DAIL evidence
+
+Record the exact DLA version, source-rights snapshot, predicate evidence and result for consequential uses.
+
+## Versioning
+
+Adding/removing a mandatory predicate is a material contract change and requires a new formula/policy version.

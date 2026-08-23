@@ -1,0 +1,289 @@
+---
+title: "ZK Prover Cluster"
+sidebarTitle: "ZK Prover Cluster"
+description: "Standalone CHLOM service article for approved zero-knowledge circuit proving, witness handling, prover compatibility, job isolation, replay protection, proof receipts, capacity and privacy boundaries."
+icon: "shield-halved"
+keywords: ["CHLOM ZK Prover Cluster", "ZKP", "prover service", "circuits", "witness", "privacy", "proof"]
+---
+
+# ZK Prover Cluster
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.service.zk-prover-cluster
+canonical_name: ZK Prover Cluster
+artifact_class: privacy_preserving_proving_service
+source_lineage:
+  - recovered Help Center component catalog
+  - Technical Blueprint ZKP module
+  - ZK/ZKX historical architecture
+  - Developer/Metaprotocol ZK proof series
+recovery_state: reconstructed_source_grounded
+current_mapping:
+  - privacy-preserving proof generation
+  - ZK verifier registry
+  - credential/DLA/compliance proof workflows
+production_state: implementation_and_circuit_specific_evidence_required
+```
+
+## Source basis
+
+The recovered Help Center defines the **ZK Prover Cluster** as a scalable proving service for approved circuits with verifier compatibility, replay protection and attestations. Historical papers describe proof circuits for age, accreditation, solvency, credential validity and other compliance predicates.
+
+## Purpose
+
+The cluster converts private witness data into a proof for an approved predicate without exposing the underlying data to the verifier/public projection.
+
+```text
+PRIVATE WITNESS / CREDENTIAL / DATA
+              |
+              v
+        APPROVED CIRCUIT
+              |
+       PROVING JOB ISOLATION
+              |
+              v
+          ZK PROVER
+              |
+              v
+ PROOF + PUBLIC INPUTS + METADATA
+              |
+              v
+      ZK VERIFIER / ZKX
+              |
+       PASS / INVALID / HOLD
+```
+
+## Non-purpose
+
+The cluster does not:
+
+- establish the truth of witness data merely because a proof is valid;
+- decide policy/authorization;
+- make all proof schemes/circuits current CHLOM standards;
+- store raw private witnesses indefinitely by default;
+- expose proving keys/secrets or private credentials publicly;
+- imply production proving infrastructure exists for every historical circuit.
+
+## Proving job
+
+```yaml
+proof_job_id: stable ID
+circuit_ref: exact circuit/version
+proving_key_ref: protected versioned ref
+subject_ref: pseudonymous/stable reference where needed
+purpose: exact predicate/action
+witness_source_refs: restricted references
+public_inputs: typed minimum necessary values
+nonce_or_challenge: replay-safe
+requested_by: authorized actor/service
+environment: test|controlled_test|production
+status: queued|running|completed|held|failed|cancelled
+created_at: timestamp
+expires_at: optional
+```
+
+## Circuit registry dependency
+
+A prover must only run approved circuits/versions for governed workflows.
+
+```yaml
+circuit_id: stable ID
+version: exact
+predicate: human/machine readable
+input_schema_ref: required
+public_input_schema_ref: required
+verifying_key_ref: versioned
+proving_key_ref: restricted
+trusted_setup_ref: if applicable
+security_review_ref: required by profile
+status: candidate|approved|held|retired
+```
+
+Historical mentions of Groth16, PLONK, Circom, Noir or Arkworks are technology options, not current mandated implementations.
+
+## Witness handling
+
+Witness material is highly sensitive. Requirements include:
+
+- minimum necessary data;
+- explicit purpose;
+- memory/storage isolation;
+- encryption in transit/at rest where applicable;
+- retention/deletion profile;
+- access logs;
+- no public logs with raw witness;
+- provider/model/tool data-use review;
+- tenant isolation.
+
+## Proof output
+
+```yaml
+proof_id: stable ID
+proof_job_ref: required
+circuit_ref: exact
+proof_bytes_ref: artifact/digest
+public_inputs: typed
+challenge_or_nonce: required where replay relevant
+created_at: timestamp
+valid_until: optional
+subject_binding_ref: privacy-preserving
+prover_service_ref: version
+attestation_ref: optional
+```
+
+## Replay protection
+
+A proof valid for one challenge/action should not automatically authorize another.
+
+```text
+proof
++ action/subject binding
++ nonce/challenge
++ validity window
+```
+
+The exact replay contract belongs to the circuit/workflow profile.
+
+## Capacity model
+
+Proving can be computationally expensive. The cluster should expose:
+
+- queue depth;
+- estimated/observed latency;
+- job size/resource class;
+- worker/prover health;
+- failure/retry rate;
+- proof cost/resource metrics;
+- capacity limits and request budgets.
+
+Capacity limits are operational, not proof semantics.
+
+## Multi-prover architecture
+
+```text
+PROOF ROUTER
+  |
+  +--> Prover Worker A
+  +--> Prover Worker B
+  +--> Prover Worker C
+        |
+       isolated jobs
+```
+
+Worker/provider identities are replaceable. A proof remains tied to circuit/version and verification contract rather than one vendor brand.
+
+## Verification compatibility
+
+Before returning a proof as usable:
+
+- verifier supports circuit/version;
+- verifying key/version matches;
+- public-input schema matches;
+- proof scheme matches;
+- challenge/nonce binding valid;
+- proof not expired under workflow profile.
+
+## Credential proofs
+
+A proof may establish a predicate such as:
+
+```text
+credential is valid
+age >= threshold
+jurisdiction attribute satisfies allowed set
+credential issuer belongs to approved issuer set
+license status satisfies predicate
+```
+
+The verifier should learn only required public information.
+
+## Financial/solvency lineage
+
+Historical CHLOM contemplated solvency/compliance proofs. Any current financial use requires separately validated data, circuit correctness, audit/accounting basis and professional/legal authority. A cryptographic proof does not decide whether the predicate itself is the correct regulatory/accounting test.
+
+## DAIL events
+
+```text
+ct.zk.proof_job.created.v1
+ct.zk.proof_job.started.v1
+ct.zk.proof_job.completed.v1
+ct.zk.proof_job.failed.v1
+ct.zk.proof.created.v1
+ct.zk.proof.expired.v1
+ct.zk.prover.capacity.held.v1
+ct.zk.circuit.compatibility.failed.v1
+```
+
+DAIL/public projections should store safe proof/circuit references, not private witnesses.
+
+## Failure modes
+
+- circuit not approved -\> reject;
+- witness unavailable -\> HOLD/fail;
+- proving key mismatch -\> fail;
+- insufficient capacity -\> queue/HOLD;
+- proof generation fails -\> no proof;
+- verifier incompatibility -\> HOLD/reprove/migrate;
+- nonce replay -\> reject;
+- proof expired -\> regenerate/revalidate;
+- witness retention breach -\> security incident.
+
+## Threat model
+
+- witness exfiltration;
+- malicious circuit;
+- poisoned proving/verifying keys;
+- compromised prover worker;
+- replay;
+- cross-tenant witness mixing;
+- side-channel leakage;
+- denial of service/capacity exhaustion;
+- invalid proof accepted due verifier mismatch;
+- trusted-setup compromise where relevant.
+
+## Test vectors
+
+1. approved circuit \+ valid witness -\> proof verifies;
+2. wrong witness -\> proof generation/verification fails;
+3. proof for subject A replayed for B -\> reject;
+4. old circuit version after retirement -\> hold/reject according to migration profile;
+5. verifying key mismatch -\> invalid;
+6. cluster overloaded -\> queue/HOLD, not fake proof;
+7. witness not retained beyond configured period -\> retention test;
+8. public logs -\> no raw witness;
+9. proof valid but credential revoked after proof -\> downstream currentness policy prevents stale authorization;
+10. provider/worker changes -\> proof semantics remain circuit/version based.
+
+## Metrics
+
+- proof jobs by circuit/version;
+- success/failure rate;
+- proving latency percentiles;
+- queue depth;
+- resource/cost class;
+- replay rejections;
+- circuit compatibility failures;
+- privacy/security incidents;
+- verifier acceptance rate.
+
+## Restricted companion
+
+Contains proving keys, witness schemas and sensitive examples, private deployment topology, provider configuration, resource tuning, security tests, side-channel analysis, private circuits and unreleased proof predicates.
+
+## Invariants
+
+```text
+proof generation != proof verification
+proof valid != witness source truth automatically
+proof valid != action authority
+witness != public record
+provider worker != proof semantics
+circuit version must match verifier version
+replayable proof must not create duplicate authority
+```
+
+## Status
+
+`current_semantic_service_specification`; exact circuits, proving infrastructure and production readiness remain separately evidenced.

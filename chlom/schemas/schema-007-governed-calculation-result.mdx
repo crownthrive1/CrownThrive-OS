@@ -1,0 +1,109 @@
+---
+title: "SCHEMA-007 — Governed Calculation Result"
+sidebarTitle: "SCHEMA-007 Calculation Result"
+description: "Canonical CHLOM machine record binding a formula/model version to inputs, evidence, units, rounding, policy, authority, result, review and DAIL lineage."
+icon: "calculator"
+keywords: ["CHLOM schema", "calculation record", "formula", "rounding", "DAIL", "model governance"]
+---
+
+# SCHEMA-007 — Governed Calculation Result
+
+## Schema identity
+
+```yaml
+schema_id: SCHEMA-007
+name: Governed Calculation Result
+classification: reconstructed_machine_contract
+version: 1.0.0
+related_formula: FORM-030; FORM-034
+```
+
+## Purpose
+
+SCHEMA-007 is the machine form of CHLOM's governed-calculation rule. It prevents a number produced by code, a spreadsheet, an AI model or a provider from becoming institutional economic/risk/governance truth without preserving the exact formula/model, input evidence, units, policy and authority context.
+
+## Core record
+
+```yaml
+calculation_id: string
+tenant_id: string
+calculation_type: string
+formula_or_model_ref: stable_ref
+formula_or_model_version: string
+implementation_ref: stable_ref|null
+inputs:
+  - name: string
+    value: any
+    unit: string|null
+    evidence_refs: [stable_ref]
+    observed_at: timestamp|null
+output:
+  value: any
+  unit: string|null
+  precision: integer|null
+rounding_policy_ref: stable_ref|null
+intermediate_or_residue_refs: [stable_ref]
+policy_refs: [stable_ref]
+economic_schedule_ref: stable_ref|null
+authority_context_refs: [stable_ref]
+executed_by:
+  actor_id: string
+  actor_type: human|agent|service|system
+calculated_at: timestamp
+review_state: SIMULATION|UNREVIEWED|MACHINE_VERIFIED|HUMAN_REVIEWED|APPROVED_FOR_USE|SUPERSEDED
+review_refs: [stable_ref]
+source_calculation_ref: stable_ref|null
+supersedes: stable_ref|null
+DAIL_refs: [stable_ref]
+classification: public|internal|restricted|trade_secret
+```
+
+## Formula/model binding
+
+A human-readable equation copied into code is not sufficient. `formula_or_model_ref` and version identify the exact institutional model. Production code can reference an implementation commit/version so later audits can detect formula-code drift.
+
+## Inputs and evidence
+
+Consequential inputs must carry units and evidence references. Derived inputs can reference other governed calculations. Guessed or placeholder inputs can exist only when the calculation is explicitly labeled simulation/estimate and cannot silently become `APPROVED_FOR_USE`.
+
+## Unit discipline
+
+FORM-031 applies. Percent/basis points, currency units, gross/net basis, time units and token/fiat units must be explicit. The schema should reject incompatible unit combinations where the calculation contract can determine them.
+
+## Rounding and residue
+
+Economic/finite-precision calculations reference an approved rounding policy. Residue and intermediate records that affect conservation remain traceable rather than disappearing inside implementation code.
+
+## Policy and authority
+
+A mathematically correct calculation can still be inapplicable or unauthorized. Policy/economic schedule and authority context are separate references. `APPROVED_FOR_USE` requires the consuming domain's required review/authority conditions.
+
+## Review state
+
+`SIMULATION` and `UNREVIEWED` are allowed institutional states but must never render as final obligation/decision. A later approval does not mutate the original calculation without a DAIL/review transition reference.
+
+## Correction
+
+If inputs, formula/version or rounding were wrong, create a superseding calculation linked to the prior record. Economic reversals/adjustments may reference both the original and corrected calculations.
+
+## Protected models
+
+Trade-secret formulas/weights can remain private. The calculation record may expose only opaque model ID/version, public-safe inputs/outputs and vault binding according to classification.
+
+## Validation rules
+
+- stable calculation ID/tenant;
+- formula/model/version resolves;
+- all consequential numeric values have declared unit/scale;
+- required evidence refs resolve;
+- rounding policy required where applicable;
+- review state is consistent with review/authority refs;
+- secret/protected model internals are not embedded in public projection.
+
+## Tests
+
+Test valid economic allocation, unit mismatch, missing evidence, simulation, model version change, rounding residue, superseding correction, restricted model, cross-tenant input and implementation-version drift.
+
+## Versioning
+
+Calculation records are immutable snapshots. Schema evolution preserves the ability to replay older records under the formula/model versions originally used.

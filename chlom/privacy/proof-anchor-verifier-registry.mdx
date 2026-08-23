@@ -1,0 +1,167 @@
+---
+title: "Proof Anchoring & Verifier Registry — Component Contract"
+sidebarTitle: "Proof Anchor & Verifiers"
+description: "Individual CHLOM privacy/proof component contract for approved verifier identities, circuit/key registries, proof receipts, optional Merkle/notary anchoring, revocation and the boundary between integrity and factual truth."
+icon: "stamp"
+keywords: ["CHLOM verifier registry", "proof anchor", "ZK verifier", "Merkle anchor", "proof receipt", "registry"]
+---
+
+# Proof Anchoring & Verifier Registry — Component Contract
+
+## Institutional identity
+
+```yaml
+component_id: CT-CHLOM-PROOF-REG-001
+name: Proof Anchoring & Verifier Registry
+source_status: recovered_named_component_family
+source_lineage: component atlas; ZK Verifier Pallet; Merkle Anchor & Notarization; Attestation Mirror; ZKX
+classification: source_grounded_current_component_reconstruction
+version: 1.0.0
+```
+
+## Purpose
+
+This component governs **which proof verifiers/circuits/keys CHLOM accepts**, records verification receipts, and optionally anchors safe digests/roots to external integrity/notarization systems without confusing cryptographic integrity with factual or institutional truth.
+
+## Core invariants
+
+```text
+proof verifies != proof usable
+anchor exists != claim true
+verifier service online != verifier authorized
+historical anchor != current revocation state
+```
+
+## Verifier registry
+
+A verifier registry entry should identify:
+
+```yaml
+verifier_id:
+verifier_type: service|library|smart_contract|hardware|other
+operator_or_owner_ref:
+accepted_proof_types[]:
+accepted_circuit_refs[]:
+verification_key_refs[]:
+environment:
+status: DRAFT|TESTING|ACTIVE|SUSPENDED|REVOKED|RETIRED
+valid_from:
+valid_until:
+security_review_refs[]:
+implementation_refs[]:
+provider_aliases[]:
+DAIL_refs[]:
+```
+
+A generic API endpoint that returns `valid=true` is not accepted unless its registry record permits the proof/circuit/version.
+
+## Circuit registry relationship
+
+Circuits are separately identified/versioned with purpose, public-input schema, accepted witness/source class, verification key, activation/retirement and security review. The verifier registry declares compatibility; it does not redefine the circuit's predicate.
+
+## Verification key registry
+
+Key material can be public where the proof system requires public verification keys, but key identity/version/currentness must be explicit. Compromised, rotated or retired verification keys create new registry state rather than changing historical proof receipts.
+
+## Verification receipt
+
+A public-safe receipt can include:
+
+```yaml
+verification_receipt_id:
+proof_ref_or_digest:
+proof_type:
+circuit_ref:
+verification_key_ref:
+verifier_ref:
+public_input_digest_or_safe_projection:
+cryptographic_result:
+policy_usability_state:
+verified_at:
+reference_time:
+context_ref:
+DAIL_ref:
+```
+
+Private witnesses never belong in the receipt.
+
+## Proof usability separation
+
+Cryptographic verification can occur inside the verifier component, but policy usability is evaluated separately using circuit approval, witness/currentness/revocation, context and policy requirements. An `INVALID` proof can be rejected immediately; a cryptographically valid proof can still HOLD.
+
+## Optional proof anchoring
+
+Verification receipts, evidence digests or batches can be included in Merkle trees or other integrity structures and optionally notarized/anchored externally.
+
+```text
+proof/evidence receipt digests
+        |
+        v
+Merkle batch / root
+        |
+        v
+optional external anchor / notarization
+        |
+        v
+inclusion proof + anchor receipt
+```
+
+The canonical source remains CHLOM's governed evidence/DAIL records. External anchors are integrity/time evidence, not the source of rights or policy.
+
+## Anchor record
+
+```yaml
+anchor_id:
+root_digest:
+digest_algorithm:
+batch_manifest_ref:
+external_anchor_type:
+external_receipt_or_tx_alias:
+anchored_at:
+provider_or_network_ref:
+confirmation_or_finality_state:
+verification_method_ref:
+DAIL_refs[]:
+```
+
+Public blockchains/notaries/providers are replaceable adapters. Stable CHLOM `anchor_id` remains canonical.
+
+## Revocation and historical proofs
+
+Revoking a verifier/circuit/key affects **future/current usability** according to policy. It does not make historical cryptographic receipts disappear. The system records whether a proof was valid under the then-active registry and whether it remains usable for a current decision.
+
+## Public verification surfaces
+
+A public explorer/widget can expose safe verifier/circuit version, proof receipt, anchor/inclusion status and current validity/revocation indicators. It must not expose private witness, protected evidence, internal Fingerprint data or confidential agreement terms.
+
+## Multi-verifier / assurance
+
+High-consequence proof types can require multiple verifier implementations or independent verification runs according to policy. Multiple identical deployments using the same faulty library should not be falsely represented as independent cryptographic assurance.
+
+## Trust and provider boundary
+
+The registry makes trust assumptions explicit:
+
+- who operates the verifier;
+- which implementation/version;
+- which circuit/key;
+- security/audit status;
+- active period;
+- external dependencies;
+- whether the verifier is independent of the proof generator.
+
+## Failure states
+
+Unknown verifier, unsupported circuit, retired/revoked key, proof malformed, verifier outage, conflicting verification results, anchor provider outage, missing inclusion proof, wrong root, replay/context mismatch, stale currentness, public receipt privacy violation.
+
+## Tests
+
+Test active verifier, retired verifier, rotated verification key, same proof through two verifier implementations, malformed proof, valid proof unusable by policy, anchor inclusion success/failure, external provider replacement and historical receipt after registry revocation.
+
+## Security boundary
+
+Private proving keys/witnesses and secret service credentials remain in restricted secret custody. Public verifier keys and receipts are disclosed only where the proof system and classification permit.
+
+## Versioning
+
+Verifier, circuit, key, receipt and anchor schemas are independently versioned. Historical proof receipts retain the exact registry versions used at verification time.

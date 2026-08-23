@@ -1,0 +1,315 @@
+---
+title: "DAO & Council Governance Engine"
+sidebarTitle: "DAO & Council Governance Engine"
+description: "Standalone CHLOM governance engine article for proposals, voting/approval paths, council review, quorum, timelocks, emergency measures, enactment and current human-governed mapping without claiming a live DAO."
+icon: "landmark"
+keywords: ["CHLOM DAO Council Governance Engine", "governance", "proposals", "voting", "council", "timelock", "enactment"]
+---
+
+# DAO & Council Governance Engine
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.engine.dao-council-governance
+canonical_name: DAO & Council Governance Engine
+artifact_class: engine
+source_lineage:
+  - recovered Help Center component catalog
+  - Genesis governance hierarchy
+  - Technical Blueprint governance pallets
+  - Grand Prospectus governance templates
+recovery_state: reconstructed_source_grounded
+current_mapping:
+  - P-02 Governance & Compliance
+  - institutional proposal/approval workflow
+  - Council/Multisig + Technical Committee + reserved authority
+production_state: current_semantic_spec_historical_DAO_not_claimed_live
+```
+
+## Source basis
+
+The recovered Help Center names a **DAO & Council Governance Engine** distinct from the Governance (DAO) Pallet and Council/Multisig Pallet. The engine is the orchestration layer: proposal authoring, review, voting/approval, timelocks, emergency measures, enactment and auditability.
+
+## Historical purpose
+
+```text
+CHANGE / PROPOSAL
+      |
+      v
+CLASSIFY GOVERNANCE DOMAIN
+      |
+      +--> ordinary parameter
+      +--> technical/security
+      +--> treasury/economic
+      +--> rights/licensing
+      +--> constitutional/reserved
+      |
+      v
+ELIGIBLE GOVERNANCE PATH
+      |
+DISCUSSION / REVIEW / EVIDENCE
+      |
+VOTE / APPROVAL / QUORUM
+      |
+      v
+TIMelock / challenge window
+      |
+      v
+ENACTMENT GATE
+      |
+EXECUTION / READBACK
+      |
+      v
+DAIL
+```
+
+## Non-purpose
+
+The engine does not imply:
+
+- a current tokenholder DAO;
+- one-token-one-vote as current CrownThrive governance;
+- that a vote can override law, rights or contractual limits;
+- self-manufactured authority;
+- irreversible hidden emergency power;
+- automatic execution of every approved recommendation.
+
+## Governance domains
+
+A proposal must be classified because different domains require different authority.
+
+```text
+POLICY
+TECHNICAL
+SECURITY
+TREASURY/ECONOMIC
+RIGHTS/LICENSING
+MODEL/AI
+ORACLE/SOURCE
+PLATFORM/INTEGRATION
+CONSTITUTIONAL/RESERVED
+```
+
+## Proposal object
+
+```yaml
+proposal_id: stable ID
+title: concise
+description_ref: full governed body
+proposer_ref: actor/role
+domain: typed
+target_refs: exact objects/versions
+change_set_ref: structured diff/action
+policy_or_charter_ref: governing authority
+risk_class: typed
+required_governance_profile_ref: required
+opened_at: timestamp
+voting_or_review_window: explicit
+execution_timelock_ref: optional
+status: draft|review|held|open|approved|denied|queued|executed|cancelled|superseded
+```
+
+## Governance profile
+
+```yaml
+profile_id: stable ID
+eligible_roles_or_members: explicit
+quorum_rule: exact
+approval_rule: exact
+council_review: optional|required
+technical_review: optional|required
+professional_review: optional|required
+founder_reserved_gate: optional|required
+challenge_window: optional
+timelock: optional
+execution_authority_ref: required
+```
+
+No profile is inferred from historical tokenomics.
+
+## Proposal lifecycle
+
+```text
+DRAFT
+  |
+SOURCE/SCHEMA VALIDATION
+  |
+REVIEW
+  |
+  +-- conflict/missing evidence --> HOLD
+  |
+OPEN / DECISION WINDOW
+  |
+APPROVED or DENIED
+  |
+if approved:
+TIMelock / challenge
+  |
+EXECUTION-TIME REVALIDATION
+  |
+EXECUTE
+  |
+READBACK / CERTIFY
+```
+
+## Quorum/approval math
+
+The engine can support weighted or role-based rules. Let:
+
+```text
+E = eligible decision weight/count
+P = participating weight/count
+Y = approving weight/count
+```
+
+Then profiles may define:
+
+```text
+quorum = P / E
+approval = Y / P
+```
+
+Historical examples such as 15% quorum, simple majority or 2/3 supermajority remain historical examples unless adopted in a current governance profile.
+
+## Bicameral / dual-governance lineage
+
+Historical CHLOM includes a Dual DAO/bicameral concept combining broad stakeholder/token voting with curated council oversight. Current mapping can preserve the **two-lane governance principle** without tokenization:
+
+```text
+participatory/stakeholder lane
+          +
+qualified/reserved oversight lane
+          |
+     adopted decision rule
+```
+
+## Council review
+
+Council review can:
+
+- approve within bounded scope;
+- veto/hold where charter allows;
+- require additional evidence;
+- trigger emergency protection;
+- route constitutional/reserved questions upward.
+
+It cannot expand its own charter.
+
+## Technical Committee handoff
+
+Technical changes can require a separate technical review before governance decision or execution.
+
+```text
+governance authority
+   + technical safety evidence
+   + security/release evidence
+```
+
+## Emergency governance
+
+Emergency measures require pre-delegated scope, evidence, time bounds, minimum approvals, automatic review/sunset and restoration/compensation path.
+
+## Enactment
+
+Approval does not equal execution. The engine produces an execution envelope containing:
+
+- approved proposal/version;
+- exact target/change;
+- authority evidence;
+- effective time/timelock;
+- rollback/compensation reference;
+- idempotency/correlation ID.
+
+Execution adapters then apply and read back the change.
+
+## Configuration/model/oracle changes
+
+A governance decision may authorize changes to:
+
+- parameters;
+- policies;
+- provider/source allowlists;
+- model versions;
+- oracle profiles;
+- budgets;
+- technical releases.
+
+Each downstream domain still validates compatibility and scope.
+
+## Events
+
+```text
+ct.governance.proposal.created.v1
+ct.governance.proposal.held.v1
+ct.governance.proposal.opened.v1
+ct.governance.vote.recorded.v1
+ct.governance.proposal.approved.v1
+ct.governance.proposal.denied.v1
+ct.governance.proposal.queued.v1
+ct.governance.proposal.executed.v1
+ct.governance.proposal.cancelled.v1
+ct.governance.emergency.enacted.v1
+ct.governance.emergency.sunset.v1
+```
+
+## Failure modes
+
+- wrong governance profile -\> HOLD;
+- quorum unavailable -\> proposal remains unresolved;
+- authority expired during timelock -\> revalidate/HOLD;
+- target version changed -\> require compatibility/reapproval;
+- provider execution fails -\> governance decision remains but implementation not certified;
+- emergency measure expires -\> automatic sunset/review;
+- proposal self-expands decision authority -\> reserved/constitutional gate.
+
+## Threat model
+
+- governance capture;
+- Sybil or identity fraud;
+- vote replay;
+- quorum denominator manipulation;
+- conflicted council members;
+- hidden proposal mutation after approval;
+- emergency power abuse;
+- stale authority at execution;
+- provider-side change without governance receipt;
+- AI recommendation masquerading as decision.
+
+## Test vectors
+
+1. eligible proposal \+ correct profile \+ threshold met -\> approved;
+2. proposal changes after votes -\> prior approvals invalid for new version;
+3. quorum not met -\> not approved;
+4. emergency action without preauthorized scope -\> reject/hold;
+5. timelock executes after target changed -\> HOLD revalidation;
+6. technical change missing technical review -\> HOLD;
+7. economic change missing economic authority -\> HOLD;
+8. provider applies unapproved config -\> drift incident;
+9. historical token vote data -\> not current governance authority;
+10. approved action execution fails -\> not falsely marked implemented.
+
+## Current mapping
+
+Modern CHLOM is human-governed. This engine maps historical DAO/council ideas to institutional proposal, review, approval, timelock, execution and audit workflows. Token voting remains historical/target research unless separately adopted.
+
+## Restricted companion
+
+May contain private proposals, member/committee mappings, conflict disclosures, voting detail, unreleased security changes, private change sets, economic proposals and emergency incident data.
+
+## Invariants
+
+```text
+proposal != policy
+vote != authority outside governance profile
+approval != execution
+execution != certified readback
+majority != right to violate higher authority
+emergency != permanent
+AI recommendation != governance decision
+historical DAO != current DAO
+```
+
+## Status
+
+`current_semantic_engine_specification + historical_DAO_lineage_preserved`. No current token-governed DAO is claimed.

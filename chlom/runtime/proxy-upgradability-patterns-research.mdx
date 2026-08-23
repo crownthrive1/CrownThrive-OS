@@ -1,0 +1,192 @@
+---
+title: "Proxy & Upgradability Patterns — Historical Runtime Research & Governance Contract"
+sidebarTitle: "Proxy & Upgradability"
+description: "Individual CHLOM runtime-research article for proxy and upgradeability patterns, including version binding, upgrade authority, migration, timelock, rollback, storage compatibility and audit lineage without implying a live proxy deployment."
+icon: "code-branch"
+keywords: ["CHLOM proxy patterns", "upgradeability", "runtime upgrade", "smart contract proxy", "migration", "governance"]
+---
+
+# Proxy & Upgradability Patterns — Historical Runtime Research & Governance Contract
+
+## Institutional identity
+
+```yaml
+research_id: CT-CHLOM-UPGRADE-001
+name: Proxy & Upgradability Patterns
+source_status: recovered_named_research_component
+source_body_status: distinct_full_body_not_located
+source_lineage: component atlas; historical runtime/smart-contract research; governance/timelock/parameter controls
+classification: historical_research_plus_current_upgrade_governance_contract
+current_proxy_deployment_status: not_proven
+version: 1.0.0
+```
+
+## Source boundary
+
+The recovered CHLOM component atlas names **proxy/upgradability patterns** inside the smart-contract/runtime research family. CHLOM also preserves governance, timelock, parameter/config and smart-contract upgrade concerns, but a single exact historical proxy implementation body has not been recovered.
+
+This article therefore preserves the research lane and specifies current governance/safety requirements for any upgradeable implementation without claiming a live proxy architecture.
+
+## Purpose
+
+Upgradeability allows implementation logic or configuration to evolve while preserving selected stable identities/state. The risk is that a convenient upgrade path can become an undocumented superuser path that bypasses CHLOM governance, rights or evidence assumptions.
+
+The governing rule is:
+
+```text
+upgrade mechanism != unrestricted authority
+```
+
+## Upgradeable object types
+
+The pattern can apply differently to:
+
+- smart-contract instances;
+- runtime pallets/modules;
+- policy engines/DSLs;
+- provider adapters;
+- API/MCP schemas;
+- database projections/migrations;
+- model/circuit/verifier implementations;
+- other modular services.
+
+Each class needs its own compatibility and authority model.
+
+## Stable identity versus implementation version
+
+A stable institutional object can point to versioned implementation:
+
+```yaml
+object_id:
+implementation_ref:
+implementation_version:
+configuration_version:
+upgrade_policy_ref:
+upgrade_authority_ref:
+current_status:
+```
+
+Changing implementation must not silently change the institutional meaning of the object.
+
+## Proxy-style pattern
+
+A generic proxy arrangement separates stable address/identity from replaceable implementation logic:
+
+```text
+CALLER
+  |
+  v
+STABLE PROXY / ENTRY POINT
+  |
+  v
+CURRENT IMPLEMENTATION VERSION
+  |
+  v
+STATE / EVENTS / EXTERNAL CALLS
+```
+
+The exact runtime mechanism is implementation-specific and not prescribed by this article.
+
+## Upgrade proposal
+
+A governed upgrade record should contain:
+
+```yaml
+upgrade_id:
+target_object_ref:
+current_version:
+proposed_version:
+implementation_digest_or_commit_ref:
+compatibility_report_ref:
+migration_plan_ref:
+test_results_refs[]:
+security_review_refs[]:
+rollback_plan_ref:
+required_approvals[]:
+timelock_ref:
+not_before:
+status:
+DAIL_refs[]:
+```
+
+## Upgrade authority
+
+The ability to submit, approve and execute an upgrade can be separated. Admin key possession is not sufficient institutional authority unless the governing policy says it is.
+
+High-consequence upgrades can require multisig/council/founder/reserved approvals, exact implementation digest binding and timelock.
+
+## Timelock and revalidation
+
+At execution, re-check that approvals remain valid, the proposed implementation digest has not changed, test/security evidence is still applicable and no emergency HOLD or new vulnerability/incident blocks activation.
+
+## Storage/state compatibility
+
+Upgradeable systems must define how state survives implementation changes. Migration should validate schema/layout compatibility, default values, units/precision, enums/state-machine semantics and historical data readability.
+
+A version that interprets existing stored rights or balances differently is a material institutional migration, not merely a code upgrade.
+
+## Initialization
+
+Upgrade paths must avoid ambiguous initialization or reinitialization state. Required configuration should be explicit, one-time or versioned according to the implementation pattern and verified in tests before activation.
+
+## Access-control continuity
+
+Upgrades must preserve or intentionally migrate:
+
+- owner/governance identity;
+- role/authority rules;
+- emergency controls;
+- provider credentials references;
+- tenant isolation;
+- policy/version bindings;
+- event/DAIL correlation;
+- revocation/currentness state.
+
+Any change requires explicit governance and migration evidence.
+
+## Interface compatibility
+
+API/contract callers need a compatibility matrix. Breaking changes require a versioned interface, migration window or coordinated consumer upgrade rather than silently changing call semantics behind a stable proxy.
+
+## Event lineage
+
+Emit/record upgrade proposal, approval, scheduled activation, execution, rollback and supersession events. Historical DAIL/provenance records retain which implementation version executed each consequential action.
+
+## Rollback
+
+A rollback plan should state:
+
+- whether code can revert safely;
+- whether state migration is reversible;
+- how external side effects are compensated;
+- whether consumers/adapters need downgrade;
+- how data written under the new version is handled;
+- what evidence confirms restoration.
+
+Rollback is not assumed safe merely because the prior binary/code still exists.
+
+## Immutable alternatives
+
+Some high-assurance components may prefer immutable versioned deployments with migration to a new stable institutional object/adapter binding rather than in-place proxy upgrades. Immutability and upgradeability are architecture choices with different tradeoffs.
+
+## Defensive review
+
+Review should focus on least privilege, exact implementation/version binding, storage compatibility, initialization, access-control continuity, migration correctness, external-call behavior, rollback, event lineage and independent conformance testing.
+
+This article intentionally avoids offensive exploit instructions.
+
+## Tests
+
+Test authorized upgrade, unauthorized actor, proposal digest changed after approval, storage migration, old/new interface compatibility, role preservation, timelock expiry, emergency HOLD, rollback after partial state migration, provider adapter version mismatch and historical readback.
+
+## Current status
+
+```text
+recovered proxy/upgradability research
+!= live proxy deployment
+!= permission for silent runtime upgrades
+```
+
+## Versioning
+
+Upgrade governance, implementation, configuration and migration schemas are independently versioned. Every production action should be attributable to the implementation version active at that time.

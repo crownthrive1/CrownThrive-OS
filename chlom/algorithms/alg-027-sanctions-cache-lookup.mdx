@@ -1,0 +1,95 @@
+---
+title: "ALG-027 — Sanctions Cache Lookup"
+sidebarTitle: "ALG-027 Sanctions Lookup"
+description: "Standalone CHLOM lookup procedure that distinguishes stale or ambiguous sanctions evidence from confirmed matches and prevents fuzzy name similarity from becoming automatic denial."
+icon: "ban"
+keywords: ["CHLOM ALG-027", "sanctions cache", "fuzzy match", "HOLD refresh", "eligibility"]
+---
+
+# ALG-027 — Sanctions Cache Lookup
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-027
+name: Sanctions Cache Lookup
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Sanctions Cache pallet lineage; Oracle Lattice; eligibility controls
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-027 provides a bounded lookup against a registered sanctions/restricted-party evidence cache. It is intentionally conservative: a stale cache cannot approve, and a fuzzy name similarity is not automatically treated as a confirmed identity match.
+
+## Inputs
+
+```yaml
+subject_ref:
+subject_identifiers[]:
+cache_version:
+cache_observed_at:
+freshness_policy:
+matching_policy:
+source_registry_refs[]:
+```
+
+## Procedure
+
+```text
+function sanctions_check(subject):
+    entry = cache.lookup(subject.identifiers)
+
+    if entry.missing or entry.stale:
+        return HOLD_REFRESH
+
+    if entry.match_confirmed:
+        return DENY_OR_ESCALATE_PER_POLICY
+
+    return PASS
+```
+
+## Identifier hierarchy
+
+Where available, deterministic identifiers should be preferred over names alone. Names, aliases, transliteration, dates of birth, organization registration details and other attributes can support resolution according to adopted matching policy.
+
+## Fuzzy matching
+
+A fuzzy or phonetic name match can create a candidate for review, but should not become a confirmed match without the corroboration required by policy. False-positive handling is a core safety requirement.
+
+## Freshness
+
+Sanctions and restricted-party lists can change. The cache must record source version, observation/fetch time and freshness. If a required source is stale or the provider refresh failed, the result becomes HOLD rather than a silent PASS.
+
+## Source authority
+
+The cache is an indexed copy of external evidence. It must retain source references and not claim to be the legal source itself. Different jurisdictions/lists can have different applicability.
+
+## Output
+
+```yaml
+sanctions_check_id:
+subject_ref:
+cache_ref:
+match_state: NO_MATCH|POSSIBLE_MATCH|CONFIRMED_MATCH|UNKNOWN
+freshness_state:
+disposition: PASS|HOLD_REFRESH|HOLD_REVIEW|DENY_OR_ESCALATE
+matched_source_refs[]:
+reason_codes[]:
+```
+
+## Privacy
+
+Sanctions checks involve sensitive identity data. Public projections should not reveal unnecessary identifiers or candidate-match details.
+
+## DAIL evidence
+
+Record list/source version, cache freshness, matching mode, result and reviewer resolution where applicable. A later list update appends new evidence rather than altering the earlier check.
+
+## Tests
+
+Test exact identifier match, same name different person, alias/transliteration, stale cache, missing cache, source unavailable, removed/de-listed entry, multiple jurisdictions, cross-tenant subject alias and reviewer-confirmed false positive.
+
+## Versioning
+
+Changes to matching thresholds or source applicability require a new version and careful false-positive/false-negative evaluation.

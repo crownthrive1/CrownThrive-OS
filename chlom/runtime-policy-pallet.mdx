@@ -1,0 +1,243 @@
+---
+title: "Policy Pallet — Historical Runtime Record"
+sidebarTitle: "Policy Pallet"
+description: "Individual reconstruction of CHLOM's historical Policy Pallet for versioned machine-executable policy references and runtime checks, mapped to current Compliance Packs, Policy Engine and P-02 governance."
+icon: "scale-balanced"
+keywords: ["CHLOM Policy Pallet", "policy rules", "Compliance Pack", "runtime policy", "governance", "P-02"]
+---
+
+# Policy Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.policy-pallet
+namespace: historical_runtime_pallet
+recovered_title: Policy Pallet
+recovered_help_center_description: on-chain policy/rule storage and execution references for compliance pre-checks
+source_recovery: substantive_title_plus_core_architecture
+current_mapping:
+  - P-02 Governance & Compliance
+  - Compliance Pack Registry
+  - Policy Engine / Policy DSL Compiler
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Policy Pallet was designed to hold protocol-level policy state that other historical CHLOM pallets could consult before executing regulated or governed actions.
+
+```text
+GOVERNANCE / AUTHORIZED POLICY UPDATE
+                |
+                v
+          POLICY PALLET
+                |
+        versioned rule state
+                |
+        +-------+-------+
+        |               |
+      DLA              LEX
+        |               |
+        +-------+-------+
+                |
+         compliance pre-check
+```
+
+## Policy versus code
+
+A runtime policy representation is an implementation of an adopted rule—not the source of authority by itself.
+
+```text
+source authority
+     |
+adopted policy meaning
+     |
+machine representation
+     |
+runtime evaluation
+```
+
+A machine rule that diverges from the adopted source is defective even if the chain executes it consistently.
+
+## Reconstructed policy object
+
+```yaml
+policy_id: stable ID
+version: string
+source_authority_ref: required
+scope: global|module|asset|transaction|jurisdiction|other
+condition_refs: []
+action_or_decision_ref: structured
+effective_from: timestamp
+effective_until: nullable
+status: draft|active|superseded|retired
+```
+
+This is a current semantic reconstruction rather than literal historical Rust storage.
+
+## Policy versioning
+
+```text
+POLICY v1
+   |
+GOVERNED UPDATE
+   |
+POLICY v2
+```
+
+Historical transactions/decisions must retain a reference to the policy version that governed them.
+
+## Compliance pre-check relationship
+
+Historical CHLOM architecture describes in-runtime compliance hooks that could reject an operation before execution.
+
+```text
+PROPOSED EXTRINSIC
+      |
+POLICY LOOKUP
+      |
+IDENTITY / LICENSE / RISK INPUTS
+      |
+DECISION
+ALLOW | REJECT | HOLD-like off-chain review path
+```
+
+The original runtime design was more binary than current CHLOM's explicit PASS/HOLD/DENY model. Current mapping adds HOLD for unresolved/stale/conflicting state.
+
+## Governance relationship
+
+Policy updates historically flowed through governance mechanisms. Current CHLOM preserves that principle without assuming token voting.
+
+```text
+authorized governance decision
+       |
+       v
+new policy version
+       |
+       v
+current services + DAIL
+```
+
+## Current Compliance Pack mapping
+
+Current Compliance Packs package rules, evidence requirements, applicability and tests in a richer service model.
+
+```text
+Historical Policy Pallet
+       |
+       v
+Compliance Pack Registry
+       |
+       v
+Policy Engine / evaluator
+       |
+       v
+P-02 PASS/HOLD/DENY decision
+```
+
+## Policy precedence
+
+Current mapping requires explicit precedence between overlapping policies. The historical title inventory does not prove a particular on-chain precedence algorithm, so none is invented.
+
+## Policy compiler relationship
+
+A Policy DSL/compiler can transform approved policy into executable representations.
+
+```text
+human/adopted source
+    |
+compiler
+    |
+candidate machine policy
+    |
+validation/test
+    |
+authorized executable version
+```
+
+Compilation never self-authorizes changes.
+
+## Historical operation families
+
+Source-supported intentions:
+
+- register/update policy;
+- retire/supersede policy;
+- query policy state;
+- perform policy check;
+- reference policy in governed transaction.
+
+Exact extrinsic names are not recovered.
+
+## Current events
+
+```text
+ct.policy.registered.v1
+ct.policy.version.activated.v1
+ct.policy.superseded.v1
+ct.policy.evaluation.completed.v1
+ct.policy.conflict.detected.v1
+```
+
+## Failure cases
+
+### Unknown policy version
+
+Current result: HOLD for actions requiring a resolved current policy.
+
+### Source/machine divergence
+
+Current result: HOLD/disable affected rule; open correction review.
+
+### Stale policy cache
+
+Canonical policy version controls; provider/service cache mismatch is evidence.
+
+### Conflicting policies
+
+Use explicit precedence where adopted; otherwise HOLD rather than selecting a convenient result.
+
+## Security concerns
+
+- unauthorized policy mutation;
+- malicious policy broadening;
+- version rollback;
+- source/code divergence;
+- hidden defaults;
+- fail-open behavior;
+- stale caches;
+- rule injection/DSL parser abuse.
+
+## Public / restricted split
+
+Public-safe:
+
+- policy architecture;
+- public policy IDs/versions where appropriate;
+- evaluation semantics;
+- current mapping.
+
+Restricted:
+
+- anti-fraud rules;
+- sensitive thresholds;
+- confidential contract/jurisdiction mappings;
+- exploit-sensitive compiler/evaluator details;
+- private legal analyses.
+
+## Invariants
+
+```text
+machine policy != source authority
+policy active != action authorized by itself
+unknown policy != PASS
+compiler output != adopted policy
+historical binary allow/reject != current HOLD semantics automatically
+policy update != historical erasure
+runtime design != deployed runtime
+```
+
+## Status
+
+The Policy Pallet is preserved as historical runtime IP and mapped to the current Compliance Pack Registry, Policy Engine and P-02 governance/compliance decision plane.
