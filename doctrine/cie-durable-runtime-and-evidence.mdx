@@ -1,0 +1,229 @@
+---
+title: "CIE Durable Runtime & Evidence"
+sidebarTitle: "CIE Durable Runtime"
+description: "The controlled-test durable evidence, idempotency, replay-control, DAIL, security and observability substrate for Cultural Imprint Engine interoperability with CHLOM."
+icon: "database"
+keywords: ["Cultural Imprint Engine", "CIE", "CHLOM", "ThriveBase", "DAIL", "idempotency", "replay", "runtime"]
+---
+
+# CIE Durable Runtime & Evidence
+
+The **Cultural Imprint Engine (CIE)** now has a live **internal controlled-test durable interoperability substrate** with CHLOM in ThriveBase.
+
+This is not a public network endpoint and it is not production authority. It persists the evidence needed to prove what CIE sent, what CHLOM returned, whether a message is an exact replay or a conflicting replay, and whether the two independently governed states are composition-ready.
+
+```yaml
+runtime_id: ct.runtime.cie-chlom.durable.v1
+framework_id: ct.framework.cultural-imprint-engine
+canonical_engine_name: Cultural Imprint Engine
+cie_system_id: ct.system.cie.runtime
+chlom_system_id: ct.system.chlom.runtime
+public_contract: ct.contract.cie-chlom.interop.v1
+persistence_contract: ct.contract.cie-chlom.persistence.v1
+route_id: ct.route.cie-chlom.interop.v1
+runtime_state: controlled_test
+route_certification_state: candidate
+composition_ceiling: COMPOSED_READY_NON_EXECUTING
+```
+
+## What is live
+
+The runtime reuses CrownThrive's existing `chlom_runtime` interoperability registries and DAIL ledger. It does not create a competing control plane.
+
+Wave 3B materializes:
+
+- a logical Cultural Imprint Engine runtime identity;
+- a separate CHLOM runtime identity;
+- the public non-mutating CIE ↔ CHLOM interoperability contract;
+- a restricted persistence contract for append-only internal evidence;
+- a bidirectional controlled-test route;
+- an append-only correlation/receipt ledger;
+- service-role-only record, readback and health functions;
+- replay/idempotency enforcement;
+- restricted DAIL evidence for durable exchange events and fail-closed exceptions;
+- a supporting DAIL foreign-key index;
+- runtime health/readback without exposing restricted payload bodies.
+
+## What `write_effect=true` means
+
+The persistence contract `ct.contract.cie-chlom.persistence.v1` has `write_effect=true` because it writes **append-only internal institutional evidence** into ThriveBase.
+
+It does **not** mean:
+
+- provider/customer mutation authority;
+- permission to deploy production code;
+- license issuance;
+- commerce activation;
+- checkout, payout or entitlement authority;
+- protected CIE scoring authority;
+- D3 or sovereign authority.
+
+That distinction is mandatory anywhere the persistence contract is summarized.
+
+## Durable correlation model
+
+The canonical idempotency key is:
+
+```text
+(correlation_id, direction)
+```
+
+For each direction, exactly one canonical payload is retained.
+
+| Condition | Durable result |
+| --- | --- |
+| First valid payload | `RECORDED` |
+| Same key + same payload digest | `IDEMPOTENT_DUPLICATE` |
+| Same key + different payload digest | `HOLD_REPLAY_CONFLICT` |
+| CHLOM receipt without prior CIE request | `HOLD_ORPHAN_CHLOM_RECEIPT` |
+
+A replay conflict does not overwrite the canonical receipt. The conflict becomes restricted DAIL evidence and the route fails closed.
+
+## Composition is still non-executing
+
+Durability does not alter the Wave 2 composition model.
+
+A fully resolved CIE + CHLOM correlation may become:
+
+`COMPOSED_READY_NON_EXECUTING`
+
+That means the evaluated cultural state and rights/evidence state are sufficiently resolved to be handed to the next **separately authorized** layer. It does not itself authorize that next layer to act.
+
+The composed readback can still return:
+
+- `DENY_CULTURAL`;
+- `HOLD_CIE`;
+- `DENY_RIGHTS`;
+- `HOLD_CHLOM`;
+- `HOLD_CHLOM_RIGHTS`;
+- `HOLD_CHLOM_LICENSE`;
+- `HOLD_EVIDENCE`;
+- `COMPOSED_READY_NON_EXECUTING`.
+
+## Least-data and access boundary
+
+The durable receipt ledger is intentionally private and fail-closed.
+
+Live controls include:
+
+- RLS enabled and forced;
+- no `anon` or `authenticated` table read/write grants;
+- governed record/readback/health function execution denied to `anon` and `authenticated`;
+- service role permitted to use the governed writer;
+- direct service-role `INSERT`, `UPDATE` and `DELETE` denied;
+- a `BEFORE UPDATE OR DELETE` trigger rejects receipt-history mutation.
+
+The `public_safe` profile recursively rejects restricted evidence keys, raw evidence, credentials, secrets, protected-runtime receipts and private reasoning.
+
+The `internal_governed` profile may reference approved private evidence through opaque references, but raw evidence, credentials, secrets and private reasoning remain outside this transport.
+
+## Required-field hardening
+
+The live writer requires explicit material fields rather than trusting nullable JSON extraction.
+
+For example, an otherwise shaped CIE request with no `cie_state` fails before persistence. This closes PostgreSQL three-valued-logic edge cases that could otherwise allow an incomplete envelope through a negative comparison.
+
+The live hardening also requires:
+
+- canonical framework/name identity;
+- explicit usage profile;
+- object/use identity;
+- CIE state;
+- audience and canon state;
+- source refs and conditions arrays;
+- `authority_effect: none`;
+- `chlom_resolution_required: true`;
+- valid envelope/receipt digests;
+- complete CHLOM rights/license/permission/evidence state on the return leg.
+
+## DAIL evidence
+
+Every new canonical durable exchange receipt is bound to a restricted DAIL event and event hash. Replay conflicts and orphan CHLOM receipts also produce restricted DAIL evidence without creating or rewriting a canonical exchange receipt.
+
+Wave 3B direct read-only verification recomputed payload digests and validated previous-event links against the **full global DAIL sequence** before filtering to CIE/CHLOM events.
+
+The generic `verify_dail_chain()` function was not reported as passing because its invocation was blocked by the connected SQL safety layer. CrownThrive records that blocked verification exactly rather than converting it into a success claim.
+
+## Current controlled-test readback
+
+The Wave 3B certification readback on August 23, 2026 showed:
+
+```yaml
+runtime_live: true
+receipt_count: 2
+correlation_count: 1
+pending_correlation_count: 0
+forced_rls: true
+service_role_record_execute: true
+anon_record_execute: false
+authenticated_record_execute: false
+contract_state: controlled_test
+route_state: controlled_test
+route_certification_state: candidate
+```
+
+The controlled correlation proved:
+
+```text
+CIE request → RECORDED
+same request → IDEMPOTENT_DUPLICATE
+CHLOM response → RECORDED
+correlated composition → COMPOSED_READY_NON_EXECUTING
+conflicting replay → HOLD_REPLAY_CONFLICT
+orphan CHLOM response → HOLD_ORPHAN_CHLOM_RECEIPT
+```
+
+This is a synthetic governed validation correlation, not customer or public transaction evidence.
+
+## Performance hardening
+
+The receipt ledger's foreign key to DAIL is backed by the dedicated index:
+
+`cie_chlom_exchange_receipts_dail_event_id_idx`
+
+The Wave 3B tranche did not attempt to mass-edit unrelated pre-existing project advisor findings.
+
+## Advisor disposition
+
+Supabase may report `rls_enabled_no_policy` for this receipt table. In this design that is intentional least privilege, not a reason to create a permissive policy: the table is private, RLS is forced, anon/authenticated receive no grants, and writes occur only through the governed service-role function.
+
+If the access architecture changes, the advisory must be reconsidered rather than permanently ignored.
+
+## Source-controlled implementation
+
+The accepted CIE package is merged in `crownthrive1/CrownThrive-CIE` at merge commit:
+
+`2067572bd9674766b4121c904c2042a87e4d5bcb`
+
+The package contains:
+
+- `runtime/cie-chlom-durable-runtime.v1.json`;
+- three ordered SQL migrations;
+- `runtime/durable_interop_reference.py`;
+- deterministic tests and validator;
+- `docs/WAVE_3B_DURABLE_INTEROP.md`;
+- `docs/WAVE_3B_RUNTIME_RECEIPT.md`.
+
+## Parallel governed packets
+
+Wave 3B does not silently absorb or certify separate CIE work.
+
+- protected CIE score/runtime-readiness work remains a separate governed packet;
+- exact parent-link/certification evidence remains a separate governed packet;
+- their status must be read from current evidence rather than inferred from this durable runtime.
+
+## Reopen triggers
+
+Reopen Wave 3B review for:
+
+- contract/schema/version change;
+- route-state or certification-state change;
+- new network/API/MCP deployment;
+- provider or customer mutation;
+- direct table-write permission change;
+- RLS/policy/ACL change;
+- DAIL semantics change;
+- replay/idempotency rule change;
+- protected scoring activation;
+- economic/entitlement effect;
+- D3 or sovereign-authority change.
