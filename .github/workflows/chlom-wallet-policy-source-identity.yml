@@ -1,0 +1,125 @@
+name: CHLOM Wallet Policy Source Identity
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/chlom-wallet/policy/chlom-wallet-policy-assurance.mjs"
+      - "developers/reference/chlom-wallet/policy/source-identity-readback/**"
+      - "developers/manifests/chlom-wallet-policy-assurance-engine.v1.json"
+      - "developers/reference/chlom-wallet/policy/edge/runtime-deployment.v1.json"
+      - ".github/workflows/chlom-wallet-policy-source-identity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-policy-source-identity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify committed bytes against fixed-source runtime observation
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate source-controlled readback contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          node --check developers/reference/chlom-wallet/policy/source-identity-readback/test-source-identity-contract.mjs
+          python -m json.tool developers/reference/chlom-wallet/policy/source-identity-readback/runtime-contract.v1.json >/dev/null
+          node developers/reference/chlom-wallet/policy/source-identity-readback/test-source-identity-contract.mjs \
+            | tee /tmp/chlom-wallet-source-local.json
+          python -m json.tool /tmp/chlom-wallet-source-local.json >/dev/null
+
+      - name: Fetch fixed-source runtime observation
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --retry 3 --retry-all-errors \
+            'https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-wallet-source-identity-readback' \
+            -o /tmp/chlom-wallet-source-remote.json
+          python -m json.tool /tmp/chlom-wallet-source-remote.json >/dev/null
+
+      - name: Compare local bytes, remote observation, and persistence receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,re
+          local=json.load(open('/tmp/chlom-wallet-source-local.json'))
+          remote=json.load(open('/tmp/chlom-wallet-source-remote.json'))
+          contract=json.load(open('developers/reference/chlom-wallet/policy/source-identity-readback/runtime-contract.v1.json'))
+
+          assert local['result']=='PASS_CHLOM_WALLET_FIXED_SOURCE_IDENTITY_CONTRACT'
+          assert remote['ok'] is True
+          assert remote['result']=='PASS_CHLOM_WALLET_SOURCE_IDENTITY_READBACK'
+          assert remote['service']['service_id']=='ct.service.chlom-wallet-source-identity-readback'
+          assert remote['service']['slug']=='chlom-wallet-source-identity-readback'
+          assert remote['service']['version']==2
+          assert remote['source']['repository']==contract['fixed_source']['repository']
+          assert remote['source']['commit_sha']==contract['fixed_source']['commit_sha']
+          assert remote['source']['path']==contract['fixed_source']['path']
+          assert remote['source']['expected_git_blob_sha1']==contract['fixed_source']['expected_git_blob_sha1']
+          assert remote['source']['expected_size_bytes']==contract['fixed_source']['expected_size_bytes']
+          assert remote['observed']['size_bytes']==local['source_size_bytes']
+          assert remote['observed']['git_blob_sha1']==local['git_blob_sha1']
+          assert remote['observed']['sha256']==local['source_sha256']
+          assert re.fullmatch(r'[0-9a-f]{64}',remote['observed']['sha256'])
+
+          persistence=remote['persistence']
+          assert persistence['result']=='RECORDED_CHLOM_WALLET_SOURCE_IDENTITY_OBSERVATION'
+          assert persistence['source_sha256']==remote['observed']['sha256']
+          assert persistence['git_blob_sha1']==remote['observed']['git_blob_sha1']
+          assert persistence['source_size_bytes']==remote['observed']['size_bytes']
+          assert re.fullmatch(r'[0-9a-f]{64}',persistence['observation_digest_sha256'])
+
+          assert remote['controls']['fixed_source_only'] is True
+          assert remote['controls']['arbitrary_url_input'] is False
+          assert all(remote['controls'][key] is False for key in [
+            'credential_value_exposed','provider_write','production_activation','money_movement',
+            'chain_broadcast','phase_advancement','merge_authorized'
+          ])
+
+          print(json.dumps({
+            'result':'PASS_CHLOM_WALLET_POLICY_SOURCE_IDENTITY_CI',
+            'source_size_bytes':local['source_size_bytes'],
+            'git_blob_sha1':local['git_blob_sha1'],
+            'source_sha256':local['source_sha256'],
+            'observation_duplicate':persistence['duplicate'],
+            'fixed_source_only':True,
+            'provider_write':False,
+            'money_movement':False,
+            'chain_broadcast':False,
+          },sort_keys=True))
+          PY
+
+      - name: Enforce no arbitrary input, credentials, or live effects
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            developers/reference/chlom-wallet/policy/source-identity-readback/index.ts
+            developers/reference/chlom-wallet/policy/source-identity-readback/runtime-contract.v1.json
+            developers/reference/chlom-wallet/policy/source-identity-readback/test-source-identity-contract.mjs
+          )
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN .*PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${files[@]}"; then
+            echo 'Potential live secret-shaped material detected in source-identity packet.'
+            exit 1
+          fi
+          if grep -nE -- '"(provider_write|production_activation|custody|token_issuance|money_movement|production_rights_grant|chain_broadcast|effective_price_publication|checkout_activation|phase_advancement|merge_authorized)"[[:space:]]*:[[:space:]]*true' "${files[@]}"; then
+            echo 'Source-identity packet crossed a no-live or no-authority boundary.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo 'CONTROLLED_TEST: fixed public source only; no arbitrary URL input.'
+          echo 'The Edge observer recomputes SHA-256 and Git blob SHA-1 from exact committed bytes and stores an idempotent append-only observation.'
+          echo 'No credential value, provider write, production activation, custody, token issuance, money movement, rights grant, chain broadcast, pricing, checkout, phase advancement, or merge authority occurs.'
