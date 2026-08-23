@@ -9,6 +9,13 @@ keywords: ["cPanel", "DNS", "TLS", "ChatGPT Sites", "domains", "deployment", "ro
 
 # crownthrive.io Domain & Deployment Certification
 
+## Continuity map
+
+- [cPanel / WHM Hosting Control Plane](/technology/cpanel-whm-hosting-control-plane)
+- [ThriveBase Hosting Access & FTPS Control](/technology/thrivebase-hosting-access-and-ftps-control)
+- [Current-State Validation Queue](/knowledge/current-state-validation-queue)
+- [Phase 3 Readiness Gate](/technology/phase-3-readiness-gate)
+
 This packet reconciles the useful provider-presence evidence from stale PR #229 onto current `main` without treating cPanel presence as DNS, TLS or application certification.
 
 ## Current cPanel snapshot
@@ -37,14 +44,17 @@ The current hosting inventory contains one main domain, eight addon domains and 
 
 No provider DNS record type or target value is published because current provider-authoritative custom-domain target evidence has not been obtained. An invented CNAME or A record would be an unsafe mutation.
 
-## Provider-control boundary
+## Provider-control boundary — current reconciliation
 
-The existing provider-control surfaces remain read-oriented:
+The earlier statement that the cPanel API read was failing is superseded. Current ThriveBase/hosting-control evidence establishes:
 
-- `ct.adapter.thrivebase-cpanel-read`: current API read is failing; write canary and read-after-write are unverified; rollback unsupported.
-- `ct.adapter.thrivebase-ftps-read`: read evidence passes; write canary and read-after-write are unverified; rollback unsupported.
+- authenticated crownthrive.io cPanel UAPI read via the JWT-protected account adapter, with `StatsBar/get_stats(diskusage)` certified;
+- authenticated WHM allowlisted reads for account inventory, load and hostname;
+- explicit-FTPS authentication, directory listing and safe hash-only file-read canary passed; the one-shot FTPS probe was then disabled;
+- the current crownthrive.io cPanel domain inventory remains 12 rows;
+- provider writes, arbitrary filesystem mutation, DNS mutation and shell execution remain closed.
 
-Therefore this packet authorizes **no DNS mutation, Force HTTPS mutation, cPanel write, FTPS write, domain creation, redirect change or TLS mutation**.
+Read certification does **not** provide a tested write rollback. Therefore this packet still authorizes **no DNS mutation, Force HTTPS mutation, cPanel write, FTPS write, domain creation, redirect change or TLS mutation**. The open gap is no longer basic provider read access; it is exact DNS authority/target evidence plus bounded mutation/readback/rollback certification where a future write is actually authorized.
 
 ## Required certification sequence
 
