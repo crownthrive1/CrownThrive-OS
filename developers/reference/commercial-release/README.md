@@ -8,4 +8,4 @@ This directory is the public-safe machine source for the CrownThrive Launch, Rea
 - `chatgpt-sites-publication-contract.v1.json`: provider publication, readback, rollback, and reapply requirements.
 - `convergence-queue.v1.json`: Wallet B→C, commercial-site, and domain-chain priority order.
 
-Generated per-product packages are reproducible CI artifacts and restricted THIVEBASE run records. They are not committed as 30 redundant public snapshots.
+Generated per-product packages are reproducible CI artifacts and restricted ThriveBase run records. They are not committed as 30 redundant public snapshots.
