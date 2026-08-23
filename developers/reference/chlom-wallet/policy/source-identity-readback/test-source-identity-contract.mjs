@@ -1,13 +1,31 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, parse, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const contract = JSON.parse(readFileSync(join(HERE, 'runtime-contract.v1.json'), 'utf8'));
-const repoRoot = resolve(HERE, '../../../../../');
+
+function discoverRepoRoot(start) {
+  let candidate = resolve(start);
+  const filesystemRoot = parse(candidate).root;
+  while (candidate !== filesystemRoot) {
+    if (
+      existsSync(join(candidate, '.git'))
+      && existsSync(join(candidate, 'docs.json'))
+      && existsSync(join(candidate, 'developers'))
+    ) {
+      return candidate;
+    }
+    candidate = dirname(candidate);
+  }
+  throw new Error(`Unable to discover repository root from ${start}`);
+}
+
+const repoRoot = discoverRepoRoot(HERE);
 const sourcePath = resolve(repoRoot, contract.fixed_source.path);
+assert.equal(sourcePath.startsWith(`${repoRoot}/`), true);
 const sourceBytes = readFileSync(sourcePath);
 const gitHeader = Buffer.from(`blob ${sourceBytes.length}\0`, 'utf8');
 const gitBlobSha1 = createHash('sha1').update(gitHeader).update(sourceBytes).digest('hex');
@@ -45,6 +63,7 @@ assert.doesNotMatch(indexSource, /eth_send|wallet_sendCalls|private[_ -]?key|mne
 
 console.log(JSON.stringify({
   result: 'PASS_CHLOM_WALLET_FIXED_SOURCE_IDENTITY_CONTRACT',
+  repository_root_discovered: true,
   source_size_bytes: sourceBytes.length,
   git_blob_sha1: gitBlobSha1,
   source_sha256: sourceSha256,
