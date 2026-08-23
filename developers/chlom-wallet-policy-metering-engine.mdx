@@ -1,0 +1,274 @@
+---
+title: "CHLOM Wallet Policy, Metering & Assurance Engine"
+sidebarTitle: "Wallet Policy & Metering"
+description: "Deterministic CHLOM Wallet policy compilation, exact quota semantics, append-only usage evidence, scenario assurance, and suggestion-only algorithmic recommendations."
+icon: "gauge-high"
+---
+
+# CHLOM Wallet policy, metering and assurance engine
+
+**Subsystem:** `ct.subsystem.chlom-wallet.policy-metering-assurance.v1`  
+**Algorithm suite:** `ct.algorithm-suite.chlom-wallet-policy-metering.v1`  
+**State:** `CONTROLLED_TEST`  
+**Institutional phase:** 2.99  
+**Effective policy, billing, prices and checkout:** disabled
+
+The Policy, Metering & Assurance Engine converts CHLOM Wallet governance into deterministic, testable machine contracts. It is the control layer that allows WalletKit capabilities to be packaged, measured, simulated and independently reviewed without turning controlled-test evidence into a live product, charge, entitlement, credential, transaction or chain action.
+
+The engine is proprietary CrownThrive orchestration built above public standards and replaceable providers. It does not relabel WebAuthn, Stripe, ERC-4337, ERC-7579, CAIP or other third-party technology as CrownThrive intellectual property.
+
+## Five algorithm families
+
+### CWPX — CHLOM Wallet Policy Compiler & eXecutor
+
+CWPX normalizes policy packages, detects contradictory same-priority rules, produces deterministic compiled artifacts and returns explainable `ALLOW | HOLD | DENY` receipts.
+
+Core rules:
+
+- `DENY` outranks `HOLD`, which outranks `ALLOW`;
+- missing consequential inputs fail closed to `HOLD`;
+- policy source and compiled artifacts receive separate SHA-256 commitments;
+- compilation never activates a policy;
+- evaluation never writes to a provider, grants a production right, activates a credential, moves money or broadcasts to a chain.
+
+### MARC — Metered Activity Reconciliation Compiler
+
+MARC records append-only usage evidence and separates provider or application event time from append order.
+
+It enforces:
+
+- one tenant/idempotency key per semantic event;
+- exact duplicate replay returns `DUPLICATE`;
+- the same idempotency key with a different payload digest fails closed;
+- monthly UTC rollups sort by occurrence time and stable event ID;
+- rollups are evidence, not bills;
+- no price, charge or Stripe object is inferred from usage.
+
+### QERA — Quota Enforcement & Reconciliation Algorithm
+
+QERA implements the founder-overridden CrownThrive-local limit semantics exactly:
+
+```yaml
+-1: unlimited CrownThrive-local limit
+0: exactly zero permitted
+positive_integer: exact permitted quantity
+null: unresolved or unknown; HOLD fail-closed
+less_than_-1: invalid; DENY
+```
+
+Provider throttles, plan entitlements, billing limits, contractual limits and platform safety controls remain separately authoritative. `-1` does not mean an external provider has no limit.
+
+### SAGE — Scenario Assurance & Governance Evaluator
+
+SAGE executes deterministic policy matrices and produces:
+
+- decision distributions;
+- reason-code distributions;
+- per-rule true/false/unknown coverage;
+- unreachable-rule candidates;
+- deterministic simulation digests.
+
+A passing simulation proves only the tested policy behavior. It does not activate the policy or authorize a live action.
+
+### AURA — Algorithmic Usage & Risk Advisor
+
+AURA ranks suggestion-only proposals from simulation summaries, meter snapshots and bounded risk signals. The first version is deterministic and makes no external model call.
+
+Candidate recommendations include:
+
+- resolve missing policy inputs;
+- investigate usage that conflicts with a zero limit;
+- review a bounded limit above 80 percent utilization;
+- add an explicit deny or hold rule for an unmapped consequential action;
+- add scenario coverage for an untested rule path.
+
+AURA has no auto-apply path. It cannot change policy, pricing, rights, provider state, credentials, chain state or institutional phase.
+
+## Policy package contract
+
+The source schema is:
+
+```text
+developers/reference/chlom-wallet/policy/wallet-policy-package.v1.schema.json
+```
+
+A package declares:
+
+- stable policy and semantic-version IDs;
+- tenant and WalletKit pallet scope;
+- default and unknown-input dispositions;
+- ordered rules with conditions, effects and reason codes;
+- explicit no-live hard boundaries.
+
+The controlled fixture is:
+
+```text
+developers/reference/chlom-wallet/policy/fixtures/walletkit-controlled-policy.v1.json
+```
+
+It explicitly denies provider writes, money movement, production rights grants and chain broadcasts; holds unverified provider evidence, unsupported rights decisions and effective-offer changes; and permits only bounded controlled-test translations, rights evaluations and simulations.
+
+## Explainable decision receipts
+
+Every evaluation returns:
+
+```yaml
+contract: ct.wallet.policy-decision-receipt.v1
+policy_id: ct.policy.chlom-wallet.walletkit-controlled.v1
+policy_version: 1.0.0
+compiled_digest_sha256: <digest>
+input_digest_sha256: <digest>
+decision: ALLOW | HOLD | DENY
+reason_code: <stable reason>
+decisive_rule_ids: []
+rule_evaluations: []
+decision_digest_sha256: <digest>
+```
+
+The receipt is evidence of a policy evaluation. It is not a payment, license, credential, transaction, fulfillment event or release authorization.
+
+## Usage and license candidates
+
+Usage events follow:
+
+```text
+developers/reference/chlom-wallet/policy/wallet-usage-event.v1.schema.json
+```
+
+License-package candidates follow:
+
+```text
+developers/reference/chlom-wallet/policy/wallet-license-candidate.v1.schema.json
+```
+
+The synthetic fixture deliberately exercises every CrownThrive-local limit state:
+
+```yaml
+api_requests_monthly: 100
+chain_broadcast_monthly: 0
+proof_anchor_monthly: null
+internal_simulation_monthly: -1
+```
+
+This fixture is not an effective offer or production license.
+
+## Private runtime
+
+The restricted `chlom_wallet` data plane includes:
+
+```text
+policy_algorithm_suites_v1
+policy_algorithm_definitions_v1
+policy_packages_v1
+policy_compiled_artifacts_v1
+policy_simulation_runs_v1
+meter_definitions_v1
+license_package_candidates_v1
+usage_event_receipts_v1
+usage_rollup_snapshots_v1
+policy_advisor_proposals_v1
+policy_metering_canary_runs_v1
+```
+
+Private functions include:
+
+```text
+chlom_wallet.evaluate_usage_budget_v1(...)
+chlom_wallet.record_usage_event_v1(...)
+chlom_wallet.run_policy_metering_canary_v1()
+```
+
+Public-safe status is available through:
+
+```text
+public.chlom_wallet_policy_metering_status_v1()
+```
+
+Private tables use RLS deny-all policies, append-or-version controls and revoked public/anonymous/authenticated access. The public status exposes only counts, controlled-test state, limit semantics and no-live boundaries.
+
+## Controlled evidence
+
+The executable source suite covers:
+
+- deterministic compilation and replay;
+- rule-conflict rejection;
+- explainable provider, rights, pricing, money and chain decisions;
+- 50,000 deterministic policy scenarios;
+- exact `-1 / 0 / N / null` quota semantics;
+- exact duplicate usage replay;
+- idempotency collision rejection;
+- out-of-order monthly usage rollups;
+- deterministic license commitments;
+- suggestion-only AURA proposals;
+- JSON Schema positive and negative tests;
+- deterministic manifest reconstruction.
+
+The private runtime canary records:
+
+```yaml
+result: PASS_CHLOM_WALLET_POLICY_METERING_CANARY
+algorithms: 5
+meters: 4
+exact_limit_semantics_passed: true
+duplicate_replay_passed: true
+collision_rejected: true
+out_of_order_rollup_passed: true
+```
+
+The PASS applies to the controlled-test algorithm and storage invariants. It does not certify production billing, commerce, licensing or deployment.
+
+## Monetization path
+
+This subsystem supports future WalletKit monetization by making capability packages measurable and governable. Candidate commercial uses include:
+
+- metered managed APIs;
+- restricted builder licenses;
+- policy simulation and assurance reports;
+- usage and capacity dashboards;
+- enterprise policy packs;
+- portability and compliance evidence services;
+- private hosted control planes.
+
+Before any candidate becomes an effective offer, require independent price certification, rights and licensing review, security/privacy review, tax/accounting scope, support/fulfillment readiness, tenant isolation, provider continuity and a governed launch canary.
+
+The current independent pricing request remains:
+
+```text
+ct.price-review.chlom-wallet.phase-b.v1
+```
+
+It authorizes no price, Stripe Product, Stripe Price, Checkout Session or charge.
+
+## Source contracts
+
+```text
+developers/reference/chlom-wallet/policy/policy-engine.mjs
+developers/reference/chlom-wallet/policy/metering-engine.mjs
+developers/reference/chlom-wallet/policy/policy-advisor.mjs
+developers/reference/chlom-wallet/policy/test-policy-metering-engine.mjs
+developers/reference/chlom-wallet/policy/test-policy-schemas.mjs
+developers/reference/chlom-wallet/policy/build-policy-metering-manifest.mjs
+developers/reference/chlom-wallet/policy/supabase-policy-metering-v1.sql
+developers/manifests/chlom-wallet-policy-metering-engine.v1.json
+.github/workflows/chlom-wallet-policy-metering-engine.yml
+```
+
+## Hard boundaries
+
+```yaml
+external_model_authority: false
+auto_policy_activation: false
+effective_policy: false
+provider_write: false
+production_rights_grant: false
+credential_activation: false
+chain_broadcast: false
+custody: false
+token_issuance: false
+money_movement: false
+effective_price_publication: false
+stripe_objects_created: false
+checkout_activation: false
+phase_advancement: false
+merge_authorized: false
+```
