@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.crownthrive.com/chlom/wallet-policy-package.v1.schema.json",
+  "title": "CHLOM Wallet Policy Package v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "policy_id", "semantic_version", "state", "scope", "defaults", "rules", "metadata", "hard_boundaries"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "policy_id": { "type": "string", "pattern": "^ct[.]policy[.][a-z0-9._-]{3,180}$" },
+    "semantic_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "state": { "const": "CONTROLLED_TEST" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant_ref", "pallets"],
+      "properties": {
+        "tenant_ref": { "type": "string", "minLength": 3, "maxLength": 180 },
+        "pallets": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^ct[.]pallet[.][a-z0-9._-]+[.]v1$" } }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "unknown"],
+      "properties": {
+        "decision": { "enum": ["ALLOW", "HOLD", "DENY"] },
+        "unknown": { "const": "HOLD" }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule_id", "priority", "effect", "reason_code", "when"],
+        "properties": {
+          "rule_id": { "type": "string", "pattern": "^ct[.]rule[.][a-z0-9._-]{3,180}$" },
+          "priority": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+          "effect": { "enum": ["ALLOW", "HOLD", "DENY"] },
+          "reason_code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,120}$" },
+          "when": { "$ref": "#/$defs/condition" },
+          "metadata": { "type": "object" }
+        }
+      }
+    },
+    "metadata": { "type": "object" },
+    "hard_boundaries": { "$ref": "#/$defs/hardBoundaries" }
+  },
+  "$defs": {
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["field", "op"],
+          "properties": {
+            "field": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,159}$" },
+            "op": { "enum": ["eq", "neq", "in", "not_in", "gt", "gte", "lt", "lte", "exists", "prefix", "contains"] },
+            "value": {}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["all"],
+          "properties": { "all": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/condition" } } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["any"],
+          "properties": { "any": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/condition" } } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["not"],
+          "properties": { "not": { "$ref": "#/$defs/condition" } }
+        }
+      ]
+    },
+    "hardBoundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_write", "production_rights_grant", "credential_activation", "chain_broadcast", "custody", "money_movement", "effective_price_publication", "checkout_activation", "phase_advancement", "merge_authorized"],
+      "properties": {
+        "provider_write": { "const": false },
+        "production_rights_grant": { "const": false },
+        "credential_activation": { "const": false },
+        "chain_broadcast": { "const": false },
+        "custody": { "const": false },
+        "money_movement": { "const": false },
+        "effective_price_publication": { "const": false },
+        "checkout_activation": { "const": false },
+        "phase_advancement": { "const": false },
+        "merge_authorized": { "const": false }
+      }
+    }
+  },
+  "not": {
+    "anyOf": [
+      { "required": ["private_key"] },
+      { "required": ["seed_phrase"] },
+      { "required": ["mnemonic"] },
+      { "required": ["credential_value"] },
+      { "required": ["secret_manager_ref"] },
+      { "required": ["provider_credential"] }
+    ]
+  }
+}
