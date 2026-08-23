@@ -1,0 +1,84 @@
+---
+title: CHLOM Wallet Continuity Factory Threat Model
+description: Threat model for candidate-only continuity assets, automation, oracles, recovery, ML advisory scoring, APIs, MCPs and proprietary-factory integration.
+---
+
+# CHLOM Wallet Continuity Factory Threat Model
+
+## Protected assets
+
+The continuity layer protects institutional identity, source-head lineage, policy state, evidence freshness, recovery proofs, DAIL continuity, factory generation boundaries, agent DIDs/fingerprints, API/MCP contracts, module/plugin bindings and customer-facing truth claims.
+
+## Principal threats
+
+### Stale evidence replay
+
+An attacker or faulty agent may reuse a previously valid reviewer receipt, heartbeat, oracle observation or source-head binding after its freshness contract expires.
+
+**Control:** EEDP-style downgrade. Freshness is derived from timestamps and TTLs. Stale evidence becomes HOLD; the system never refreshes evidence by assertion.
+
+### Authority manufacture through continuity
+
+Recovery, automation, AI or factory code could attempt to treat operational continuity as permission to move money, issue Rights, write to providers, broadcast to a chain, publish pricing or merge code.
+
+**Control:** continuity artifacts are candidate-only; strictest-wins ECAC/HOLD/DENY composition; explicit no-authority/no-production flags; execution-envelope and Policy Assurance remain upstream authority inputs.
+
+### Factory generation inflation
+
+A continuity projection could be misrepresented as completion of a new proprietary-factory generation.
+
+**Control:** generation 48 is explicitly bound and `factory_generation_advanced=false`. The 600 continuity assets are projections, not generation-49 evidence.
+
+### Oracle poisoning
+
+A compromised provider or external source could submit stale, forged or low-confidence data.
+
+**Control:** oracles are read-only; payload SHA-256 is required; source confidence and freshness are evaluated; low confidence HOLDs; non-read-only configuration DENYs; provider evidence is never institutional truth by itself.
+
+### DID or fingerprint substitution
+
+A role alias or different agent could attempt to satisfy a continuity handoff.
+
+**Control:** exact stable agent ID + DID + fingerprint bindings. Role names alone have no execution authority.
+
+### ML/AI authority escalation
+
+A high-confidence model output could be treated as permission.
+
+**Control:** continuity ML is advisory-only and `final_authority=false`. AI cannot upgrade HOLD or DENY.
+
+### Secret leakage through public artifacts
+
+Factory assets, API/MCP docs or oracle definitions could contain tokens, private keys or credentials.
+
+**Control:** public artifacts contain vault aliases or sanitized endpoint references only. Raw credentials are prohibited from catalog, API, MCP, plugin and metaprotocol manifests.
+
+### Destructive recovery
+
+An automated recovery routine could delete or overwrite authoritative state.
+
+**Control:** recovery is plan-first, rollback-evidenced and non-destructive. Automatic destructive action is false. Evidence/history tables are append-only.
+
+### Scheduler privilege expansion
+
+A database cron worker could become a hidden privileged executor.
+
+**Control:** the scheduled job calls one private continuity tick. It may derive stale state and append evidence only. It cannot access provider credentials or live economic/rights/chain authority.
+
+## Fail-closed matrix
+
+| Condition | Disposition |
+| --- | --- |
+| Fresh exact-head evidence, valid identity, satisfied dependencies | ECAC for continuity evaluation only |
+| Stale heartbeat/reviewer/oracle/rollback evidence | HOLD |
+| Missing source-head or identity evidence | HOLD |
+| Low-confidence oracle | HOLD |
+| Non-read-only oracle | DENY |
+| Authority escalation | DENY |
+| Secret exposure | DENY |
+| Provider write / money movement / Rights grant / chain broadcast request | DENY |
+| Destructive recovery request | DENY |
+
+## Residual risk
+
+The continuity suite does not create independent reviewers, external provider availability, live Mintlify bindings, chain RPC availability or production credentials. Those remain external dependencies and must stay HOLD when evidence is absent.
