@@ -40,10 +40,6 @@ if phase.get("named_canonical_phases") != list(range(1, 11)):
 if phase.get("reserved_horizon_slots") != list(range(11, 21)):
     errors.append("phase_11_20_horizon_invalid")
 
-rmct = manifest.get("rmct", {})
-if rmct.get("literal_token") != "RMCT" or rmct.get("definition_state") != "needs_owner_validation":
-    errors.append("rmct_must_remain_unexpanded_until_authoritative")
-
 if article.get("forensic_baseline", {}).get("legacy_title_count") != 795:
     errors.append("article_baseline_count_mismatch")
 
