@@ -1,0 +1,91 @@
+{
+  "schema_version": "2.0.1",
+  "bridge_id": "ct.control.agent-a.execution-bridge.v2",
+  "agent_id": "ct.relay.agent-a",
+  "state": "CONTROLLED_TEST_ACTIVE_PRODUCTION_HOLD",
+  "authority_ceiling": "D2",
+  "target_wip": 4,
+  "hard_max_wip": 6,
+  "continuation_before_dispatch": true,
+  "runtime_function": "chlom_runtime.agent_a_emergency_portfolio_cycle_v2",
+  "stale_actuator_function": "chlom_runtime.gen7_actuate_stale_portfolio_v2",
+  "packet_metric_function": "chlom_runtime.gen6_finalize_cycle",
+  "stale_actuator": {
+    "threshold_seconds": 1800,
+    "running_retry_lt_2": "rebind_current_executor_preserve_progress_and_blockers",
+    "verifying": "rearm_current_independent_verifier_preserve_progress_and_blockers",
+    "running_retry_gte_2": "bounded_replan_escalation_no_progress_effect",
+    "action_ledger": "chlom_runtime.gen7_stale_packet_actions",
+    "cron_job": "gen7-stale-portfolio-actuator-10m",
+    "cron": "*/10 * * * *"
+  },
+  "l_p_telemetry": {
+    "enabled": true,
+    "agents": ["ct.gen6.agent-l", "ct.gen6.agent-m", "ct.gen6.agent-n", "ct.gen6.agent-o", "ct.gen6.agent-p"],
+    "internal_subroutes": true,
+    "packet_progress_effect": false,
+    "count_as_packets_closed": false
+  },
+  "measurement": {
+    "scope": "packet_only_for_throughput",
+    "control_plane_runs_excluded": true,
+    "original_pdis_targets": [209, 220, 169, 204, 216],
+    "metrics": [
+      "active_wip",
+      "packets_started",
+      "packets_verifying",
+      "packets_done",
+      "packets_blocked",
+      "packets_closed_per_hour",
+      "blocker_count_before",
+      "blocker_count_after",
+      "blocker_burndown",
+      "review_wait_seconds",
+      "verification_seconds",
+      "cycle_time_seconds",
+      "throughput_by_agent"
+    ]
+  },
+  "force_test_2026_08_23": {
+    "cycle_id": "ct.cycle.agent-a.emergency-v2.20260823T1718Z",
+    "preflight_state": "pass",
+    "active_wip": 4,
+    "available_slots": 0,
+    "new_dispatches": 0,
+    "l_p_telemetry_live": true,
+    "progress_fabricated": false,
+    "packet_metrics": {
+      "active_wip": 4,
+      "packets_done": 0,
+      "packets_closed_per_hour": 0,
+      "cumulative_original_five_blocker_count_before": 27,
+      "cumulative_original_five_blocker_count_after": 25,
+      "cumulative_blocker_burndown": 2,
+      "control_plane_runs_excluded": 7
+    },
+    "stale_actions": [
+      {"packet": 209, "first_action": "rebind_current_executor", "retry_after": 2, "subsequent_action": "replan_escalation"},
+      {"packet": 220, "action": "verifier_rearm", "progress_preserved": 70, "blockers_preserved": 2},
+      {"packet": 169, "first_action": "rebind_current_executor", "retry_after": 2, "subsequent_action": "replan_escalation"},
+      {"packet": 216, "first_action": "rebind_current_executor", "retry_after": 2, "subsequent_action": "replan_escalation"}
+    ],
+    "note": "The two-blocker reduction is cumulative from earlier PR #220 movement; the force test did not fabricate a new blocker reduction."
+  },
+  "invariants": {
+    "progress_requires_new_evidence": true,
+    "progress_requires_positive_work_units": true,
+    "rebind_preserves_progress": true,
+    "rebind_preserves_blockers": true,
+    "owner_verifier_must_differ": true,
+    "no_gate_weakening": true,
+    "no_self_certification": true,
+    "provider_write_enabled": false,
+    "money_movement": false,
+    "rights_grant": false,
+    "D3_auto": false,
+    "sovereign_vote_effect": false,
+    "direct_main_write": false,
+    "force_push": false,
+    "silent_delete": false
+  }
+}
