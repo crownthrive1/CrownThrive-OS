@@ -1,0 +1,20 @@
+---
+title: "Execution Builder Agent"
+description: "Dedicated cross-agent materialization worker for CrownThrive candidate builds."
+---
+
+# Execution Builder Agent
+
+The Execution Builder closes the gap between agents that know **what must be built** and the actual creation of the required candidate artifacts.
+
+## Routing
+
+The agent consumes bounded requests derived from `chlom_runtime.construction_work_queue` and future D0-D2 `institutional_federation.capability_execution_queue` agent-dispatch entries. Existing queues remain authoritative; this agent does not create a competing orchestration plane.
+
+## Output
+
+Every completed request produces an append-only build receipt containing candidate branch/head, output digest, artifact manifest, tests, rollback and custody state. The receipt state is always `BUILT_PENDING_INDEPENDENT_VERIFICATION` until another authorized verifier acts.
+
+## CIE initial use
+
+The first routed use is the current CIE completion delta derived from `ct.work.framework-precompile.cie.v1`. It may build missing CREATE/DOCUMENT/REUSE/PRODUCTIZE artifacts for the current CIE state, but it may not manufacture lifecycle PASS receipts or promote CIE.

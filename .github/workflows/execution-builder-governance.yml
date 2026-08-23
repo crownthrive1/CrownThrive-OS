@@ -1,0 +1,46 @@
+name: CrownThrive Execution Builder Governance
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/execution-builder-agent.v1.json"
+      - "developers/contracts/agent-build-request.v1.schema.json"
+      - "developers/contracts/agent-build-receipt.v1.schema.json"
+      - "skills/execution-builder-agent/**"
+      - "standards/agent-to-build-execution-standard.mdx"
+      - "automation/execution-builder-agent.mdx"
+      - "frameworks/framework-factory-execution-builder.mdx"
+      - "scripts/validate_execution_builder_agent.py"
+      - "supabase/migrations/20260823203000_execution_builder_agent_v1.sql"
+      - "supabase/rollback/20260823203000_execution_builder_agent_v1.rollback.sql"
+      - ".github/workflows/execution-builder-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Validate execution builder contract
+        run: python scripts/validate_execution_builder_agent.py
+      - name: Compile validator
+        run: python -m py_compile scripts/validate_execution_builder_agent.py
+      - name: Validate JSON
+        run: python - <<'PY'
+          import json, pathlib
+          for p in pathlib.Path('developers').rglob('*.json'):
+              if 'execution-builder' in p.as_posix() or 'agent-build-' in p.as_posix(): json.loads(p.read_text())
+          PY
+      - name: Check diff
+        run: git diff --check
