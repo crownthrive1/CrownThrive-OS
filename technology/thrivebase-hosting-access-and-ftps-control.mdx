@@ -1,0 +1,100 @@
+---
+title: "ThriveBase Hosting Access & FTPS Control"
+sidebarTitle: "ThriveBase FTPS Control"
+description: "Public-safe institutional record for ThriveBase hosting access, explicit FTPS verification, cPanel read control and fail-closed write authority."
+icon: "server"
+keywords: ["ThriveBase", "THIVEBASE", "FTPS", "hosting", "cPanel", "credential custody", "deployment access", "security"]
+---
+
+# ThriveBase Hosting Access & FTPS Control
+
+## Purpose
+
+This record governs the dedicated hosting-access path used for ThriveBase continuity work. It separates **credential custody**, **transport security**, **provider authentication**, **file-read capability**, **cPanel API read capability** and **write authority** so no successful layer is misrepresented as unrestricted deployment access.
+
+## Current state — August 22, 2026
+
+```yaml
+surface: ThriveBase hosting access
+provider_family: cPanel / WHM / Pure-FTPd
+ftps_transport: explicit FTPS on port 21
+credential_custody: verified_restricted
+ftps_provider_authentication: pass
+ftps_directory_listing: pass
+ftps_file_read_capability: pass_hash_only_canary
+ftps_probe_runtime: disabled_after_successful_read_canary
+cpanel_uapi_authentication: pass
+cpanel_uapi_verified_operation: StatsBar/get_stats(diskusage)
+cpanel_uapi_mode: read_only_verified
+whm_mode: read_only_verified
+provider_write_capability: closed
+state: READ_CERTIFIED_WRITE_CLOSED
+```
+
+The credentials remain restricted to the governed Vault/runtime path. Raw usernames, passwords, tokens, recovery aliases, private key material and provider-internal identifiers are not public documentation.
+
+## Transport finding
+
+The requested public FTP alias previously failed strict certificate-name validation. The institutional rule remains fail closed:
+
+- never disable certificate verification to force credential-bearing access;
+- never fall back to plaintext FTP;
+- never treat `AUTH TLS` or a TCP connection as authenticated access;
+- use only the certificate-valid provider endpoint established in restricted evidence.
+
+A strict explicit-FTPS probe against the provider-canonical endpoint passed certificate validation, authenticated successfully, listed the restricted FTP root and completed a hash-only safe read canary. The one-shot FTPS probe was then disabled after success.
+
+## Current cPanel and WHM control-plane state
+
+The earlier cPanel API `403` observation is superseded. Current THIVEBASE readback establishes a managed cPanel UAPI credential in Vault and an authenticated read through the JWT-protected `cpanel-account-api-control` adapter. The currently certified operation is the bounded `StatsBar/get_stats(diskusage)` read.
+
+WHM is separately authenticated for allowlisted read-only observations. Its provider-write policy remains disabled.
+
+These read certifications do **not** grant account, DNS, package, token, service, credential, filesystem or server mutation authority.
+
+## Credential state versus write authority
+
+```text
+Vault custody PASS
+      ↓
+TLS server identity PASS on restricted provider endpoint
+      ↓
+FTPS authentication PASS
+      ↓
+Directory listing + safe file-read canary PASS
+      ↓
+cPanel UAPI bounded read PASS
+      ↓
+WHM bounded reads PASS
+      ↓
+Hosting/provider write CLOSED
+```
+
+## Safe access rules
+
+Read and recovery probes must continue to exclude `.env` files, private keys, credential files, database dumps, backup archives and other secret-bearing artifacts unless a separately governed incident/recovery packet explicitly requires them.
+
+A provider-access capability is never equivalent to authority over THIVEBASE data, GitHub source, DNS, certificates, billing, user accounts or production application state.
+
+## Write gate
+
+Hosting writes remain closed. A future hosting mutation requires a separately bound target and all of the following before provider dispatch:
+
+1. exact resource/path identity;
+2. pre-state hash or equivalent snapshot;
+3. explicit non-destructive scope;
+4. bounded payload/schema;
+5. idempotency;
+6. read-after-write verification;
+7. rollback or compensation path;
+8. post-rollback readback where rollback is exercised;
+9. DAIL receipt;
+10. independent verification where required by risk class.
+
+<Warning>
+  The Founder authorization for CrownThrive.io platform-API writes is **not** hosting/WHM/cPanel authority. Hosting writes remain closed and were not activated by that API authorization.
+</Warning>
+
+## Current conclusion
+
+ThriveBase hosting access is read-certified across the established FTPS and cPanel/WHM read lanes, with credentials kept restricted. The FTPS one-shot probe is disabled after its successful canary. cPanel UAPI and WHM remain read-only. No provider-side hosting write is authorized or certified by this record.
