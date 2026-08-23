@@ -1,0 +1,143 @@
+---
+title: "Ecosystem Status and Incident Control"
+sidebarTitle: "Status Control"
+description: "The CrownThrive status, outage, incident, recovery, agent-observation, evidence, and public/private projection contract for THIVEBASE and the wider ecosystem."
+icon: "signal"
+keywords: ["status", "outage", "incident", "THIVEBASE", "heartbeat", "recovery", "observability", "agent reporting"]
+---
+
+# Ecosystem Status and Incident Control
+
+CrownThrive treats availability and outage history as **institutional evidence**, not transient chat context. The runtime source of truth is THIVEBASE; Mintlify is the public-safe, versioned projection of that evidence.
+
+<Info>
+  A positive public status may be published only after a fresh machine readback. Founder or provider statements can open an incident and authorize mitigation, but they do not replace recovery evidence.
+</Info>
+
+## Canonical runtime records
+
+The current THIVEBASE control plane maintains dedicated records for:
+
+| Record family | Purpose |
+| --- | --- |
+| `service_status_registry` | Canonical service identity, provider, criticality, expected heartbeat, owner and current state |
+| `heartbeats` | Dated machine readback for project, database and integration health |
+| `incidents` | Incident identity, severity, lifecycle, cause class, summaries and resolution |
+| `incident_events` | Append-only event timeline |
+| `incident_services` | Affected-service impact and recovery boundaries |
+| `incident_agent_observations` | Agent acknowledgement, impact, diagnosis, action, escalation and recovery readback |
+| `incident_lessons` | Post-incident lessons and required control changes |
+| `incident_factory_exports` | Governed conversion of validated lessons into reusable skills and factory assets |
+
+These are operational records. Public documentation must never become the only copy.
+
+## Service-state vocabulary
+
+Use a bounded vocabulary in downstream status surfaces:
+
+- `OPERATIONAL` — required health/readiness checks pass;
+- `DEGRADED` — service is available but material capability is impaired;
+- `MONITORING` — recovery or change is being actively observed;
+- `MAINTENANCE` — controlled maintenance is in progress;
+- `OUTAGE` — required service path is unavailable;
+- `UNKNOWN` — current evidence is insufficient.
+
+No agent may convert `UNKNOWN`, `OUTAGE`, `DEGRADED`, or `MONITORING` to `OPERATIONAL` from narrative confidence alone.
+
+## Incident lifecycle
+
+```text
+DETECTED
+  ↓
+INVESTIGATING
+  ↓
+MITIGATING
+  ↓
+MONITORING
+  ↓
+RESOLVED
+  ↓
+POSTMORTEM
+  ↓
+CLOSED
+```
+
+Each transition requires evidence appropriate to the service. Resolution does not erase the incident record.
+
+## Required incident envelope
+
+Every material outage or degradation must capture:
+
+1. stable incident ID and key;
+2. affected platform/service/provider;
+3. start, detection, mitigation and recovery timestamps when known;
+4. symptoms and customer/agent impact;
+5. evidence references rather than unsupported claims;
+6. root-cause class or `unknown`;
+7. actions taken and authority used;
+8. rollback or compensation state where applicable;
+9. recovery/readiness proof;
+10. downstream documentation impact;
+11. lessons and control changes;
+12. reusable-skill/factory eligibility;
+13. public/private classification.
+
+## All-agent observation requirement
+
+Every registered CrownThrive agent is bound to the incident-status continuity contract. An incident notice requires an acknowledgement record. When an agent is materially affected, it must add one or more of the following observations:
+
+- `impact`;
+- `no_impact`;
+- `diagnosis`;
+- `action`;
+- `recovery_readback`;
+- `lesson`;
+- `escalation`.
+
+An acknowledgement **does not** mean that every agent independently detected or diagnosed the event. It proves the agent estate received the institutional incident contract and is required to record downstream impact when relevant.
+
+## Credential and vault gate
+
+Availability recovery and credential custody are separate controls.
+
+```text
+provider/control-plane healthy
+        ↓
+fresh native heartbeat
+        ↓
+secret material correctly classified
+        ↓
+secure runtime entry
+        ↓
+vault write / version receipt
+        ↓
+readback without secret disclosure
+```
+
+An OAuth application ID, project ID, client ID, publishable key, or other identifier must not be silently reclassified as a secret API key. If actual secret material is absent, the vault write remains blocked even when service health has recovered.
+
+## Public/private boundary
+
+Public status may expose only what is needed to explain availability, impact and recovery. Keep the following restricted unless separately authorized:
+
+- provider account identifiers and credentials;
+- billing instruments and account-specific billing evidence;
+- private quotas, spend details and internal thresholds;
+- raw secret values;
+- security-sensitive diagnostics;
+- internal agent reasoning or protected automation bodies;
+- private customer or personnel data.
+
+## THIVEBASE recovery checkpoint — August 22, 2026
+
+A capacity-related THIVEBASE/Supabase interruption was recorded and remediated through a founder-authorized provider plan upgrade and restart. Post-restart control-plane health, native readiness/authentication health and a fresh THIVEBASE heartbeat subsequently passed. The service was therefore returned to `OPERATIONAL`.
+
+The credential gate remains separately governed: the supplied authorized-application UUID is classified as an OAuth application identifier, **not** as API secret material. No secret vault write is represented by that identifier.
+
+See also:
+
+- [THIVEBASE Capacity Recovery Case Study](/status/thivebase-capacity-recovery-2026-08-22)
+- [Incident Status Continuity Skill](/status/incident-status-continuity-skill)
+- [Resilience Factory and Monetization](/status/resilience-factory-and-monetization)
+- [Security, Privacy and Continuity](/technology/security-privacy-continuity)
+- [Adversarial Continuity Matrix](/governance/adversarial-continuity-matrix)
