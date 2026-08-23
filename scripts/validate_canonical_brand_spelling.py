@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEXT_SUFFIXES = {'.md', '.mdx', '.json', '.yml', '.yaml', '.py', '.txt'}
 SKIP_DIRS = {'.git', '.venv', 'venv', 'node_modules', '.mintlify', '__pycache__'}
-FORBIDDEN = 'Crown Thrive'
+FORBIDDEN = 'Crown' + ' ' + 'Thrive'
 errors = []
 
 for path in ROOT.rglob('*'):
@@ -27,4 +27,4 @@ if errors:
 
 print('PASS_CANONICAL_BRAND_SPELLING')
 print('canonical_brand=CrownThrive')
-print('forbidden_current_mutable_typo=Crown Thrive')
+print('forbidden_current_mutable_typo=' + FORBIDDEN)
