@@ -12,7 +12,7 @@ Current public-safe baseline as of **August 23, 2026**:
 - current execution state: `in_progress`;
 - Phase 3 entry: `blocked_pending_phase_2_99_hard_exit`;
 - last named institutional machine release baseline: `2.7.9.1`;
-- snapshot `main` head before this public-information refresh: `038d2eb9ca86745dd425afa941e1318175f08382`;
+- snapshot `main` head before this governed public-discovery/licensing update: `7eb9bef5a861b96f14529aa80b9a67f079e05878`;
 - Help Center forensic source universe: `795` recovered title/hierarchy records;
 - current reconstruction candidate mapping: `495/795`, with `300` remaining in the active reconstruction program;
 - Sprint 4 CHLOM reconstruction crosswalk: `297` recovered CHLOM titles reconciled without manufacturing missing historical bodies;
@@ -52,6 +52,7 @@ At minimum, inspect the applicable current versions of:
 - `standards/run-packet-project-management.mdx`
 - `standards/mcp-api-governance.mdx` when interfaces/tools are involved
 - `standards/search-seo-metadata-robots.mdx` when public routes or metadata are involved
+- `standards/documentation-source-of-truth-and-autonomous-governance.mdx` for documentation/source promotion
 - `technology/phase-3-readiness-gate.mdx` for Phase 3 preparation
 - `commerce/thriveevergreen.mdx` when a change can activate or represent economic state
 - the relevant platform, corridor, CHLOM, Legal Depot, workflow, and runbook records.
@@ -71,6 +72,8 @@ Never collapse these independent dimensions into one status:
 - visibility;
 - release/deployment;
 - rights/license;
+- source acceptance;
+- projection availability/indexing;
 - policy/economic/content/model/schema/API/MCP version.
 
 Unknown remains explicit: `uninspected`, `unverified`, `source_not_located`, `blocked`, or `deferred` with owner and reason.
@@ -180,6 +183,14 @@ After editing:
 6. update the release/changelog/ADR when required;
 7. preserve exact-head acceptance evidence before promotion.
 
+### Promotion rule
+
+A source candidate that has satisfied its **exact-head required documentation, security, governed-merge, authority, and applicable specialist gates** may proceed through the governed merge path. Do not keep a source candidate on HOLD solely because Mintlify is login-gated, anonymously unreachable, not indexed, waiting for propagation, or missing a custom domain.
+
+Those Mintlify conditions are separate projection/deployment evidence. They can and should block claims such as `publicly_available`, `indexed`, `canonical_host_live`, or `deployment_verified` when the evidence is absent. They do **not** by themselves create `source_merge_denied`.
+
+Green CI alone still does not override a separate explicit rights, legal, security, economic, authority, independent-verification, draft/HOLD, or destructive-action gate.
+
 ## 11. Mintlify and navigation
 
 `docs.json` is the navigation and presentation configuration, not the private source of institutional truth.
@@ -196,6 +207,8 @@ Every navigated page must:
 - avoid unrelated template branding and links.
 
 Custom-domain activation remains a separately governed deployment/continuity action. Hidden navigation, obscure URLs, `robots.txt`, or frontend-only role checks are not security controls.
+
+**Mintlify accessibility is never a substitute for repository governance.** If a source PR is otherwise eligible, push/merge it through the governed source path and record projection deployment/readback as a separate follow-up state. Conversely, a public Mintlify preview never authorizes a source merge that failed a required gate.
 
 ## 12. API, MCP, integrations, and vendors
 
@@ -215,7 +228,7 @@ Metadata resolves from governed records. Private/admin/account/token/evidence ro
 
 Do not generate fake locations, profiles, reviews, metrics, category pages, or mass-spun content. Programmatic pages require real differentiated value, stable IDs, lifecycle rules, claim evidence, and duplicate/canonical controls.
 
-Public search/indexability is a visibility decision, not a production, rights, legal, or authority state.
+Public search/indexability is a visibility decision, not a production, rights, legal, authority, or source-merge state.
 
 ## 14. Legal Depot and professional review
 
@@ -229,7 +242,7 @@ CrownThrive-specific original documentation, CHLOM, CIE, the Thrive Flywheel, MM
 
 Do not copy restricted CrownThrive source into public outputs. Do not remove author/source/ownership notices. Do not interpret a third-party template or dependency license as a grant over CrownThrive-specific content.
 
-Public repository visibility is not an open-source or open-content grant. Consult `LICENSE`, `THIRD_PARTY_NOTICES.md`, and file-level notices.
+Public repository visibility is not an open-source or open-content grant. Consult `LICENSE`, `THIRD_PARTY_NOTICES.md`, `TRADEMARKS.md`, and `support/licensing-and-ip-overview.mdx`.
 
 ## 16. Completion standard
 
