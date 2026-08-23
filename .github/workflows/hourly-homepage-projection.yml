@@ -1,0 +1,113 @@
+name: Hourly Homepage Projection
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: hourly-homepage-projection
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    name: Render governed homepage candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Check out canonical source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Bind run to exact current main
+        id: canonical
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          canonical_sha="$(git rev-parse origin/main)"
+          if [ "$canonical_sha" != "$GITHUB_SHA" ]; then
+            echo "main moved after this run was queued; the next run will reconcile the new snapshot"
+            exit 1
+          fi
+          echo "sha=$canonical_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Render and validate candidate
+        run: |
+          python -m py_compile scripts/render_homepage_projection.py
+          python scripts/render_homepage_projection.py --write
+          python scripts/render_homepage_projection.py --check
+          python scripts/validate_homepage_control_plane.py
+          python scripts/validate_docs.py
+          python scripts/validate_github_actions_runtime_policy.py
+          python scripts/validate_security_governance.py
+          git diff --check
+
+      - name: Detect semantic homepage change
+        id: change
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only)"
+          if [ -z "$changed" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No governed homepage state changed; this run is the hourly heartbeat."
+            exit 0
+          fi
+          if [ "$changed" != "index.mdx" ]; then
+            echo "renderer changed a path outside index.mdx"
+            printf '%s\n' "$changed"
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish exact-snapshot candidate pull request
+        if: steps.change.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANONICAL_SHA: ${{ steps.canonical.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="automation/homepage-$CANONICAL_SHA"
+          git config user.name "crownthrive-homepage-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git switch -c "$branch"
+          git add -- index.mdx
+          staged="$(git diff --cached --name-only)"
+          if [ "$staged" != "index.mdx" ]; then
+            echo "staged homepage candidate is not exactly index.mdx"
+            printf '%s\n' "$staged"
+            exit 1
+          fi
+          git commit -m "docs(homepage): reconcile governed projection"
+          candidate_sha="$(git rev-parse HEAD)"
+          git push origin "HEAD:$branch"
+
+          remote_sha="$(git ls-remote origin "refs/heads/$branch" | cut -f1)"
+          if [ "$remote_sha" != "$candidate_sha" ]; then
+            echo "homepage branch read-after-write mismatch"
+            exit 1
+          fi
+
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --base main --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$branch" \
+              --title "AUTO — governed homepage projection" \
+              --body "Automated hourly-on-change homepage reconciliation for canonical main \\`$CANONICAL_SHA\\`. Complete candidate diff: \\`index.mdx\\` only. Source acceptance is independent from Mintlify anonymous reachability, indexing, custom-domain state, or propagation. This PR may be automatically promoted only when Documentation Governance, Security Governance, and Governed Merge Gate all complete successfully for the exact PR head and current main still equals \\`$CANONICAL_SHA\\`. No direct main write or production/deployment claim is created by this workflow."
+          fi
