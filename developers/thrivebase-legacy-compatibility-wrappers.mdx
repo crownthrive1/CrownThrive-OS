@@ -12,7 +12,7 @@ keywords: ["ThriveBase", "compatibility wrappers", "runtime migration", "service
 
 **Contract:** `ct.manifest.thrivebase-legacy-compatibility-wrappers.v1`  
 **Institutional phase:** 2.99  
-**State:** `CONTROLLED_TEST_SOURCE_READY_RUNTIME_PENDING`  
+**State:** `CONTROLLED_TEST_RUNTIME_ACTIVE_LEGACY_REBINDING_DEFERRED`  
 **Production authority:** none
 
 This controlled tranche introduces canonical `thrivebase` function names without destructively renaming the pre-existing missing-r runtime estate.
@@ -60,6 +60,36 @@ This page covers the wrapper stage only.
 
 All wrappers are `SECURITY INVOKER`. `PUBLIC`, `anon`, and `authenticated` execution remain revoked.
 
+## Runtime readback
+
+The source contract passed at source commit `4d7a6659fde9e00360c39062f1df300741e8eac5`. ThriveBase then applied the wrapper migration and its append-only composite-parity correction:
+
+```yaml
+migrations:
+  - 20260823045336_thrivebase_legacy_compatibility_wrappers_v1
+  - 20260823045619_thrivebase_legacy_compatibility_wrappers_composite_parity_v2
+readback: PASS_THRIVEBASE_LEGACY_COMPATIBILITY_WRAPPER_READBACK
+canonical_wrappers: 8
+legacy_aliases_retained: 8
+service_role_wrappers: 7
+security_definer_wrappers: 0
+public_execute: false
+anon_execute: false
+authenticated_execute: false
+safe_behavior_parity_canaries: 2
+```
+
+The first readback held because the queue-status composite was returned as one packed value rather than expanded fields. The source was corrected to use composite field projection, the corrected source contract passed, and the superseding migration restored exact queue-status parity without changing any queue, trigger, consumer, schema, Vault secret, Edge deployment, or legacy identity.
+
+Public-safe readback digests:
+
+```yaml
+queue_status_sha256: 47797093dddc4801d0fc33dc0152dfb1a2486eb92737b6f7dbd04ed8a4dde8e0
+diagnostic_status_sha256: b50be95b24e77ff6037c2939ecfbdfb4bc83a063ce55fce9e6ccc65bffc6e90b
+```
+
+These digests prove parity for the readback snapshot only. They are not secrets, queue contents, credentials, or permanent operational-state values.
+
 ## Safe readback canaries
 
 Only two behavior-equivalence checks are authorized in this tranche:
@@ -67,7 +97,7 @@ Only two behavior-equivalence checks are authorized in this tranche:
 1. queue-status parity; and
 2. self-diagnostic-status parity.
 
-The following surfaces are not invoked during compatibility readback because they may consume, archive, authorize, write, lock, or create operational evidence:
+The following surfaces were not invoked during compatibility readback because they may consume, archive, authorize, write, lock, or create operational evidence:
 
 - queue read;
 - queue completion;
