@@ -32,14 +32,18 @@ SPECIFIC = {
     "Crown Affiliates": "/platforms/crown-affiliates-ambassadors-institutional-registry",
     "Crown Ambassadors": "/platforms/crown-affiliates-ambassadors-institutional-registry",
     "CrownFluence": "/platforms/crownfluence-institutional-registry",
-    "CrownLytics": "/platforms/crownlytics-institutional-registry",
+    # CrownLytics has a canonical operating-role record in the shared platform registry.
+    # Do not invent a dedicated deployment/provider registry until current evidence supports one.
+    "CrownLytics": "/ecosystem/platform-registry",
     "CrownPulse": "/platforms/crownpulse-institutional-registry",
     "CrownRewards (My CrownRewards)": "/platforms/crownrewards-institutional-registry",
     "CrownThrive IO": "/technology/crownthrive-io-domain-deployment-certification",
     "CrownThrive Studios": "/platforms/crownthrive-studios-institutional-registry",
     "CrownThriveU": "/platforms/crownthriveu-institutional-registry",
     "Locticians Community & Directory": "/platforms/locticians-institutional-registry",
-    "Melanated TV": "/platforms/melanated-tv-institutional-registry",
+    # Melanated TV is currently represented inside the governed media-federation record;
+    # a standalone deployment registry would overstate provider/runtime evidence.
+    "Melanated TV": "/platforms/media-federation-institutional-registry",
     "Melanin Magic": "/platforms/melanin-magic-institutional-registry",
     "Melanin Magic Wholesale": "/platforms/melanin-magic-institutional-registry",
     "Network Status": "/technology/ecosystem-status-resilience",
@@ -144,12 +148,12 @@ def classify(record: dict[str, Any]) -> dict[str, Any]:
 
     elif sub == "CrownRewards (My CrownRewards)":
         state = "loyalty_economic_and_member_reconciliation"
-        priority = "P0" if any(k in low for k in ["points", "rewards", "errors", "analytics", "qr", "partner"] ) else "P1"
+        priority = "P0" if any(k in low for k in ["points", "rewards", "errors", "analytics", "qr", "partner"]) else "P1"
         routes = list(COMMERCE)
 
     elif sub == "CrownThrive IO":
         state = "io_surface_and_machine_contract_reconciliation"
-        priority = "P0" if any(k in low for k in ["master standard", "executive", "director", "committee"] ) else "P1"
+        priority = "P0" if any(k in low for k in ["master standard", "executive", "director", "committee"]) else "P1"
         routes = list(API)
 
     elif sub == "CrownLytics":
@@ -168,7 +172,7 @@ def classify(record: dict[str, Any]) -> dict[str, Any]:
 
     elif sub in {"Melanin Magic", "Melanin Magic Wholesale"}:
         state = "commerce_product_professional_reconciliation"
-        priority = "P0" if any(k in low for k in ["confidential", "compliance", "risk", "wholesale", "inventory", "ordering", "certification"] ) else "P1"
+        priority = "P0" if any(k in low for k in ["confidential", "compliance", "risk", "wholesale", "inventory", "ordering", "certification"]) else "P1"
         routes = list(COMMERCE)
         if "confidential" in low:
             disposition = "restricted_record"
@@ -236,7 +240,6 @@ def classify(record: dict[str, Any]) -> dict[str, Any]:
         routes = list(API if sub in {"ThriveTools", "ThriveTools Opt", "ThriveTools SEO", "CrownPulse", "ThrivePush"} else CORE)
 
     routes = add_specific(sub, routes, flags)
-    # preserve order while deduping
     routes = list(dict.fromkeys(routes))
     missing = [r for r in routes if not route_exists(r)]
     if missing:
