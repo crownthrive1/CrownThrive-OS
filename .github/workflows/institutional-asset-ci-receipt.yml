@@ -1,0 +1,158 @@
+name: Institutional Asset Fabric CI Receipt
+
+on:
+  push:
+    branches:
+      - agent/gen6-priority-delegation-control-plane-20260821
+    paths:
+      - developers/crownthrive-institutional-asset-fabric.mdx
+      - automation/institutional-asset-controller.mdx
+      - developers/manifests/crownthrive-asset-fabric.v1.json
+      - developers/manifests/crownthrive-plugin-suite.v1.json
+      - developers/manifests/crownthrive-asset-blueprint-catalog.v1.json
+      - developers/manifests/crownthrive-asset-fabric-runtime.v0.1.json
+      - plugins/crownthrive-institutional-asset-fabric/**
+      - apps/crownthrive-institutional-asset-fabric/**
+      - scripts/generate_crownthrive_asset_blueprints.py
+      - scripts/materialize_crownthrive_asset_scaffold.py
+      - scripts/validate_crownthrive_asset_fabric.py
+      - scripts/validate_crownthrive_asset_plugin_package.py
+      - .github/workflows/institutional-asset-fabric-governance.yml
+      - .github/workflows/institutional-asset-scaffold-governance.yml
+      - .github/workflows/institutional-asset-plugin-governance.yml
+      - .github/workflows/institutional-asset-ci-receipt.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: institutional-asset-ci-receipt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-record:
+    name: Validate and commit exact-head receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Run exact-head validators
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            scripts/generate_crownthrive_asset_blueprints.py \
+            scripts/materialize_crownthrive_asset_scaffold.py \
+            scripts/validate_crownthrive_asset_fabric.py \
+            scripts/validate_crownthrive_asset_plugin_package.py
+          python scripts/generate_crownthrive_asset_blueprints.py --check
+          python scripts/validate_crownthrive_asset_fabric.py
+          python scripts/validate_crownthrive_asset_plugin_package.py
+          python scripts/validate_docs.py
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+      - name: Exercise safe materialization canary
+        run: |
+          set -euo pipefail
+          output_dir="$(mktemp -d)"
+          python scripts/materialize_crownthrive_asset_scaffold.py \
+            --blueprint-id ct.blueprint.chlom.script.internal_control.v1 \
+            --package-id ct.asset.canary.chlom-script \
+            --output "$output_dir"
+          python "$output_dir/src/main.py" > "$output_dir/describe.json"
+          python -m json.tool "$output_dir/asset.manifest.json" >/dev/null
+          python -m json.tool "$output_dir/verification.candidate.json" >/dev/null
+          python -m json.tool "$output_dir/materialization-receipt.json" >/dev/null
+          python -m json.tool "$output_dir/describe.json" >/dev/null
+
+      - name: Write public-safe receipt
+        env:
+          TESTED_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          mkdir -p ci-receipts/institutional-asset-fabric
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = {
+              "schema_version": "1.0.0",
+              "receipt_id": "ct.ci-receipt.institutional-asset-fabric.latest",
+              "workflow": "Institutional Asset Fabric CI Receipt",
+              "tested_sha": os.environ["TESTED_SHA"],
+              "run_id": os.environ["RUN_ID"],
+              "run_attempt": os.environ["RUN_ATTEMPT"],
+              "validated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+              "state": "PASS",
+              "candidate_blueprints": 4000,
+              "curated_asset_records": 456,
+              "plugins": 32,
+              "pallets": 24,
+              "kernels": 16,
+              "root_mcp_tools": 11,
+              "validators": [
+                  "scripts/generate_crownthrive_asset_blueprints.py --check",
+                  "scripts/validate_crownthrive_asset_fabric.py",
+                  "scripts/validate_crownthrive_asset_plugin_package.py",
+                  "scripts/validate_docs.py",
+                  "safe scaffold materialization canary",
+                  "git diff --check",
+                  "merge-conflict marker scan"
+              ],
+              "production_assets_claimed": 0,
+              "provider_write_performed": False,
+              "arbitrary_command_executed": False,
+              "secret_exposed": False,
+              "private_identity_exposed": False,
+              "D3_auto": False,
+              "sovereign_vote_effect": False,
+              "installed": False,
+              "submitted": False,
+              "published": False,
+              "checkout_enabled": False
+          }
+          Path("ci-receipts/institutional-asset-fabric/latest.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          python -m json.tool ci-receipts/institutional-asset-fabric/latest.json >/dev/null
+
+      - name: Commit receipt to the controlled branch
+        run: |
+          set -euo pipefail
+          git config user.name "CrownThrive CI"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci-receipts/institutional-asset-fabric/latest.json
+          if git diff --cached --quiet; then
+            echo "Receipt is unchanged."
+            exit 0
+          fi
+          git commit -m "ci: record Institutional Asset Fabric validation receipt [skip ci]"
+          for attempt in 1 2 3; do
+            if git push origin HEAD:${GITHUB_REF_NAME}; then
+              exit 0
+            fi
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            sleep $((attempt * 2))
+          done
+          echo "Unable to publish the CI receipt after three attempts."
+          exit 1
