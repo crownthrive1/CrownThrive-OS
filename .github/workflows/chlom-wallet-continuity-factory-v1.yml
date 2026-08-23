@@ -1,0 +1,55 @@
+name: CHLOM Wallet Continuity Factory v1
+
+on:
+  pull_request:
+    paths:
+      - 'developers/reference/chlom-wallet/continuity/**'
+      - 'developers/chlom-wallet-continuity-factory-v1.mdx'
+      - 'security/chlom-wallet-continuity-factory-threat-model.mdx'
+      - '.github/workflows/chlom-wallet-continuity-factory-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  continuity-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Deterministic continuity suite
+        run: node developers/reference/chlom-wallet/continuity/test-continuity-suite-v1.mjs
+      - name: Continuity chaos suite
+        run: node developers/reference/chlom-wallet/continuity/continuity-chaos-v1.mjs
+      - name: Runtime migration contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=developers/reference/chlom-wallet/continuity/sql/chlom-wallet-continuity-factory-v1.sql
+          grep -q 'register_continuity_suite_v1' "$f"
+          grep -q 'continuity_tick_v1' "$f"
+          grep -q 'continuity_status_v1' "$f"
+          grep -q "'-1=unlimited_local_ceiling;0=zero_requests;positive=exact_local_monthly_ceiling;null=unresolved_fail_closed'" "$f"
+          grep -q 'force row level security' "$f"
+          grep -q 'chlom-wallet-continuity-controlled-test-hourly-v1' "$f"
+          grep -q "provider_write boolean not null default false" "$f"
+          grep -q "money_movement boolean not null default false" "$f"
+          grep -q "chain_broadcast boolean not null default false" "$f"
+          echo PASS_CHLOM_WALLET_CONTINUITY_RUNTIME_CONTRACT_V1
+      - name: Interface boundary contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p='developers/reference/chlom-wallet/continuity/continuity-interface-pack.v1.json';
+          const j=JSON.parse(fs.readFileSync(p,'utf8'));
+          const b=j.boundary;
+          const forbidden=['provider_write','money_movement','rights_grant','chain_broadcast','credential_material_returned','destructive_recovery','production_activation','checkout_enabled'];
+          for (const k of forbidden) if (b[k] !== false) throw new Error(`boundary_${k}_not_false`);
+          if (j.mcp_tools.length !== 8 || j.modules.length !== 6 || j.plugins.length !== 4 || j.pallets.length !== 4) throw new Error('interface_count_drift');
+          console.log('PASS_CHLOM_WALLET_CONTINUITY_INTERFACE_BOUNDARY_V1');
+          NODE
