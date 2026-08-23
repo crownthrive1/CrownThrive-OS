@@ -1,0 +1,83 @@
+---
+title: "CHLOM Wallet Policy Source Identity Corrected Append-Only"
+sidebarTitle: "Policy Source Correction — Aug 23"
+description: "Append-only correction lineage for the exact committed policy-engine SHA-256, preserving prior values without changing source or runtime."
+icon: "fingerprint"
+---
+
+# CHLOM Wallet Policy Source Identity Corrected Append-Only
+
+**Date:** 2026-08-23  
+**PR:** `#230`  
+**State:** `CONTROLLED_TEST / DRAFT_HOLD`  
+**Institutional phase:** 2.99
+
+Exact-head CI recomputed the unchanged policy-engine Git blob in two separate workflow runs. Both runs printed the same committed-byte SHA-256:
+
+```text
+1fc7892cbfbbaa8a737c63e12f52ddaeac829089b0a9f283d8209ceb674f7867
+```
+
+The first append-only correction record had transcribed a different SHA-256 than the value printed by CI. The source blob itself did not change. The deployed Edge bundle did not change. The correction therefore required a second append-only source-identity record, not a rewritten historical row and not a fabricated redeployment.
+
+## Preserved lineage
+
+```text
+Original recorded digest
+b29e31e5061e66dd24a7d1a399b31df453c54acbf6fbfd0516b499f038b4d6da
+        ↓
+Correction v1 — preserved historical value
+1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c
+        ↓
+Correction v2 — effective exact-head CI digest
+1fc7892cbfbbaa8a737c63e12f52ddaeac829089b0a9f283d8209ceb674f7867
+```
+
+The unchanged committed Git blob remains:
+
+```text
+41edcecf931b6c653cda6b9f9118ea15b795c72a
+```
+
+## ThriveBase evidence
+
+```text
+ct.correction.chlom-wallet-policy-engine-source-sha256.v1
+ct.correction.chlom-wallet-policy-engine-source-sha256.v2
+```
+
+`v2` explicitly supersedes `v1`. Both remain append-only. The public-safe policy status function now reports the deployment-recorded digest separately from the effective correction-chain digest.
+
+The private metadata canary passed:
+
+```yaml
+result: PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY_V3
+canary_run_id: 74745296-0dd5-487f-a2e3-1a2bb19bc741
+deployment_receipt_id: ct.deploy.chlom-wallet-policy-assurance.v1.2
+function_version: 2
+source_identity_confirmed: true
+rulepack_identity_confirmed: true
+authenticated_runtime_canary_state: NOT_EXECUTED
+unauthorized_request_canary_state: NOT_EXECUTED
+```
+
+## No effect beyond evidence correction
+
+```yaml
+source_blob_changed: false
+runtime_redeployed: false
+production_activation: false
+provider_write: false
+custody: false
+token_issuance: false
+money_movement: false
+production_rights_grant: false
+chain_broadcast: false
+effective_price_publication: false
+checkout_activation: false
+phase_advancement: false
+merge_authorized: false
+vote_effect: none
+```
+
+This correction strengthens source identity and auditability. It does not satisfy authenticated runtime canaries, independent reviewer receipts, WalletKit pricing review, or the Phase 2.99 exit gate.
