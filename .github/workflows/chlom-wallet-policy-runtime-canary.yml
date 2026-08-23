@@ -1,0 +1,111 @@
+name: CHLOM Wallet Policy Authenticated Runtime Canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      enable_evaluate_persistence:
+        description: "Persist one controlled-test decision and verify exact replay. Requires explicit operator selection."
+        type: boolean
+        required: true
+        default: false
+      expected_disposition:
+        description: "Optional expected ECAC, HOLD, or DENY for evaluate mode. Leave ANY to accept any valid controlled disposition."
+        type: choice
+        required: true
+        default: "ANY"
+        options:
+          - ANY
+          - ECAC
+          - HOLD
+          - DENY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-policy-authenticated-runtime-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: Verify JWT-protected status, receipt integrity, and optional persistence
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: chlom-wallet-controlled-test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate runtime-canary source
+        run: |
+          node --version
+          node --check developers/reference/chlom-wallet/policy/edge/authenticated-runtime-canary.mjs
+          python -m json.tool developers/reference/chlom-wallet/policy/edge/runtime-deployment.v1.json >/dev/null
+
+      - name: Require restricted runtime inputs without printing values
+        shell: bash
+        env:
+          CHLOM_WALLET_POLICY_EDGE_URL: ${{ secrets.CHLOM_WALLET_POLICY_EDGE_URL }}
+          CHLOM_WALLET_POLICY_EDGE_JWT: ${{ secrets.CHLOM_WALLET_POLICY_EDGE_JWT }}
+        run: |
+          set -euo pipefail
+          test -n "$CHLOM_WALLET_POLICY_EDGE_URL"
+          test -n "$CHLOM_WALLET_POLICY_EDGE_JWT"
+          test "${#CHLOM_WALLET_POLICY_EDGE_JWT}" -ge 80
+          case "$CHLOM_WALLET_POLICY_EDGE_URL" in
+            https://*.supabase.co/functions/v1/chlom-wallet-policy-assurance) ;;
+            *) echo 'Restricted Edge URL does not match the policy service.'; exit 1 ;;
+          esac
+
+      - name: Execute authenticated controlled-test canary
+        shell: bash
+        env:
+          CHLOM_WALLET_POLICY_EDGE_URL: ${{ secrets.CHLOM_WALLET_POLICY_EDGE_URL }}
+          CHLOM_WALLET_POLICY_EDGE_JWT: ${{ secrets.CHLOM_WALLET_POLICY_EDGE_JWT }}
+          CHLOM_POLICY_CANARY_ENABLE_EVALUATE: ${{ inputs.enable_evaluate_persistence }}
+          CHLOM_POLICY_CANARY_EXPECTED_DISPOSITION: ${{ inputs.expected_disposition == 'ANY' && '' || inputs.expected_disposition }}
+        run: |
+          set -euo pipefail
+          node developers/reference/chlom-wallet/policy/edge/authenticated-runtime-canary.mjs \
+            | tee /tmp/chlom-wallet-policy-runtime-canary.json
+          python -m json.tool /tmp/chlom-wallet-policy-runtime-canary.json >/dev/null
+          python - <<'PY'
+          import json
+          result=json.load(open('/tmp/chlom-wallet-policy-runtime-canary.json'))
+          assert result['result']=='PASS_CHLOM_WALLET_POLICY_AUTHENTICATED_RUNTIME_CANARY'
+          assert result['status_verified'] is True
+          assert result['verify_receipt_verified'] is True
+          assert result['tampered_receipt_rejected'] is True
+          assert result['jwt_value_logged'] is False
+          for key in [
+            'production_activation','provider_write','custody','token_issuance','money_movement',
+            'production_rights_grant','chain_broadcast','effective_price_publication',
+            'checkout_activation','phase_advancement','merge_authorized'
+          ]:
+            assert result[key] is False, (key,result[key])
+          if result['evaluate_enabled']:
+            assert result['evaluate_evidence']['exact_replay_duplicate'] is True
+            assert result['evaluate_evidence']['disposition'] in ('ECAC','HOLD','DENY')
+          else:
+            assert result['evaluate_evidence'] is None
+          PY
+
+      - name: Enforce no secret or live-effect output
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE -- 'eyJ[A-Za-z0-9_-]{30,}[.][A-Za-z0-9_-]{20,}[.][A-Za-z0-9_-]{20,}|sk_live_|rk_live_|whsec_|sb_secret_|-----BEGIN .*PRIVATE KEY-----' /tmp/chlom-wallet-policy-runtime-canary.json; then
+            echo 'Potential credential material appeared in canary output.'
+            exit 1
+          fi
+          if grep -nE -- '"(production_activation|provider_write|custody|token_issuance|money_movement|production_rights_grant|chain_broadcast|effective_price_publication|checkout_activation|phase_advancement|merge_authorized)"[[:space:]]*:[[:space:]]*true' /tmp/chlom-wallet-policy-runtime-canary.json; then
+            echo 'Authenticated canary crossed a no-live or no-authority boundary.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo 'CONTROLLED_TEST: JWT-protected status and receipt-integrity verification.'
+          echo 'Evaluate/persistence executes only when explicitly selected and remains idempotent and no-live.'
+          echo 'No credential value is printed or retained as an artifact.'
+          echo 'No production activation, provider write, custody, token issuance, money movement, rights grant, chain broadcast, pricing publication, checkout, phase advancement, or merge authority occurs.'
