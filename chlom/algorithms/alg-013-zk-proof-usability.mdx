@@ -1,0 +1,117 @@
+---
+title: "ALG-013 — ZK Proof Usability"
+sidebarTitle: "ALG-013 ZK Proof Usability"
+description: "Standalone CHLOM procedure distinguishing cryptographic validity from current proof usability, policy scope and institutional authorization."
+icon: "shield-halved"
+keywords: ["CHLOM ALG-013", "ZK proof", "ZKP usability", "circuit version", "revocation", "policy scope"]
+---
+
+# ALG-013 — ZK Proof Usability
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-013
+name: ZK Proof Usability
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: historical ZKP layer; ZKX orchestration; credential lifecycle
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-013 answers a question that cryptographic verification alone cannot: **may this proof be relied upon for this policy decision now?** A proof can be mathematically valid yet unusable because its circuit is no longer approved, its witness source is stale or revoked, or its public claim does not match the requested action.
+
+## Core distinctions
+
+```text
+proof_valid != proof_usable
+proof_usable != action_authorized
+```
+
+## Inputs
+
+```yaml
+proof:
+  proof_id
+  scheme
+  circuit_id
+  circuit_version
+  verification_key_ref
+  public_inputs
+  witness_source_refs[]
+  created_at
+context:
+  policy_version
+  requested_claim
+  subject_or_object
+  freshness_requirements
+  revocation_requirements
+```
+
+## Procedure
+
+```text
+function use_zk_proof(proof, context):
+    if not cryptographic_verify(proof):
+        return DENY
+
+    if not circuit_version_allowed(proof.circuit):
+        return HOLD
+
+    if witness_state_revoked_or_stale(proof):
+        return HOLD
+
+    if not proof_scope_matches_policy(proof, context):
+        return DENY
+
+    return PASS_CANDIDATE
+```
+
+The `PASS_CANDIDATE` result deliberately preserves the separate authority gateway.
+
+## Cryptographic validation
+
+Validate the proof using the adopted verification scheme and correct key/circuit registry. Reject malformed proofs, unsupported schemes and verification-key mismatches.
+
+## Circuit governance
+
+Every accepted circuit should have a stable ID, version, purpose, public input schema, security review, activation status and retirement/revocation policy. A deprecated circuit may verify cryptographically yet no longer satisfy current policy.
+
+## Witness currentness
+
+Where proof validity depends on identity credentials, licenses, sanctions state, balance/solvency data or other changing facts, the system must determine whether the underlying witness source was current for the required policy window and not revoked.
+
+## Scope matching
+
+The proof's statement must match the action. A proof of age threshold is not a proof of professional licensure; a proof of solvency at time T is not a current proof forever; a proof for one tenant or asset must not be replayed into another scope.
+
+## Output
+
+```yaml
+proof_use_decision_id:
+proof_ref:
+cryptographic_state:
+circuit_state:
+witness_currentness:
+scope_match:
+disposition: PASS_CANDIDATE|HOLD|DENY
+reason_codes[]:
+algorithm_version:
+```
+
+## Replay and privacy
+
+Bind proof use to context when the circuit supports it, enforce nonce/domain separation where required, and never log private witnesses in DAIL. Store only public inputs, digests, circuit/version references and proof receipts permitted by classification.
+
+## DAIL evidence
+
+Record proof verification receipt, circuit registry version, currentness checks, policy context, disposition and later correction/revocation references.
+
+## Tests
+
+Test valid current proof, invalid proof, wrong circuit, retired circuit, wrong verification key, stale credential witness, revoked credential, wrong subject, wrong action scope, cross-tenant replay, nonce replay and proof created before a relevant revocation.
+
+## Versioning
+
+Proof usability policy is versioned independently from cryptographic libraries. Upgrading a proof scheme or circuit does not silently convert earlier proof decisions.
