@@ -1,0 +1,209 @@
+---
+title: "JavaScript / TypeScript SDK — CHLOM Client Library Contract"
+sidebarTitle: "JavaScript / TypeScript SDK"
+description: "Individual CHLOM developer article for a typed JavaScript/TypeScript SDK over REST, GraphQL, JSON-RPC, events and MCP-facing contracts with stable IDs, versioning, explicit result states and no hidden authority escalation."
+icon: "js"
+keywords: ["CHLOM JavaScript SDK", "TypeScript SDK", "developer toolkit", "typed SDK", "API client"]
+---
+
+# JavaScript / TypeScript SDK — CHLOM Client Library Contract
+
+## Institutional identity
+
+```yaml
+sdk_id: CT-CHLOM-SDK-JSTS-001
+name: JavaScript / TypeScript SDK
+source_status: explicitly_recovered_developer_tooling_target
+source_lineage: component atlas; recovered Developer Toolkits / SDK Quick-starts; SDK & API Gateway
+classification: source_grounded_current_sdk_contract
+exact_package_name: not_defined_by_this_article
+current_production_package: not_proven
+version: 1.0.0
+```
+
+## Source boundary
+
+The recovered CHLOM Full Component and Pallet Atlas explicitly names a **JavaScript/TypeScript SDK**. Recovered developer materials also reference SDK quick-starts and typed SDK surfaces. A standalone historical package source or definitive npm package name has not been identified in the current recovery corpus.
+
+This article institutionalizes the SDK family and its behavioral contract without inventing package names, methods or claiming a production release.
+
+## Purpose
+
+The JavaScript/TypeScript SDK provides a strongly typed client layer over CHLOM's versioned institutional interfaces so CrownThrive web apps, Node.js services, workers, partner integrations and approved toolchains do not each reimplement authentication, schemas, pagination, idempotency, error/result handling and stable-ID logic.
+
+## Transport abstraction
+
+The SDK can wrap one or more registered transports:
+
+```text
+REST
+GraphQL
+JSON-RPC
+Webhooks / event verification helpers
+MCP-facing or internal capability adapters where appropriate
+```
+
+The SDK API should expose institutional capability semantics rather than provider-native transport details wherever possible.
+
+## Canonical capability families
+
+Typed modules can correspond to:
+
+```text
+identity
+credentials / attestations
+assets / rights
+dla / entitlements
+lex
+dail / evidence
+policy / compliance
+calculations / economics
+cases / reviews / remedies
+proof / verifier
+integrations / health
+```
+
+Exact exported class/function names are implementation details and require a package manifest.
+
+## Typed stable IDs
+
+Where the language/tooling permits it, use distinct branded/string types or generated types for stable institutional IDs to reduce accidental interchange of asset, DLA, evidence, transaction or provider-alias identifiers.
+
+```ts
+// conceptual only
+AssetId
+DlaId
+EvidenceId
+TransactionId
+```
+
+This article does not prescribe literal TypeScript declarations.
+
+## Client configuration
+
+A safe configuration contract includes:
+
+```yaml
+base_environment_ref:
+client_id:
+auth_provider_or_token_source_ref:
+tenant_context:
+api_version:
+timeout_policy:
+retry_policy:
+user_agent_or_sdk_version:
+```
+
+Secret values are supplied through runtime secret/session mechanisms and never embedded in source examples or docs.
+
+## Authentication
+
+The SDK obtains or accepts authenticated session/client credentials according to the target application architecture. It should never make it easy to place administrative credentials in browser bundles.
+
+Authentication identifies the caller; it does not grant underlying institutional action authority.
+
+## Result modeling
+
+Domain results should preserve CHLOM states explicitly:
+
+```text
+PASS_CANDIDATE
+HOLD
+DENY
+PENDING
+CONFLICT
+STALE_VERSION
+MATCH
+HOLD_MISMATCH
+```
+
+The SDK should not collapse `HOLD` into generic transport failure or silently treat transport success as institutional PASS.
+
+## Errors
+
+Separate:
+
+- network/transport errors;
+- client authentication/scope errors;
+- schema/version errors;
+- rate-limit/dependency errors;
+- institutional domain states.
+
+This makes retries and user messaging safer and more deterministic.
+
+## Idempotency helpers
+
+For side-effect candidate calls, expose a clear way to supply or generate semantic idempotency references. Automatic random request IDs are not necessarily sufficient when a retry must map to the same business action.
+
+## Object-version helpers
+
+Typed resource objects should expose their institutional version/ETag/hash equivalent where required so an update/action can bind to the exact state the caller reviewed.
+
+## Pagination
+
+Provide typed cursor/page helpers without hiding the underlying ordering and filter semantics. Clients should be able to stop/resume pagination while preserving tenant and query context.
+
+## Event helpers
+
+Server-side JavaScript/TypeScript tooling can provide helpers for:
+
+- webhook/event envelope parsing;
+- registered signature/auth verification via supported adapter;
+- event schema validation;
+- canonical event ID/idempotency extraction;
+- correction/supersession handling;
+- safe event logging.
+
+Actual secret values or provider-specific signing internals remain outside public documentation.
+
+## Browser versus server runtime
+
+The SDK should make environment expectations explicit. Browser-safe modules expose only operations appropriate for end-user/session scopes. Server-only modules can support protected integration actions using runtime secret custody.
+
+## Generated schemas
+
+Types can be generated from OpenAPI, GraphQL schema, JSON Schema or a canonical CHLOM schema registry, but generated code must retain semantic documentation such as `HOLD` behavior, authority requirements and classification constraints.
+
+## Provider neutrality
+
+Provider IDs appear as aliases within typed objects; the SDK centers stable CHLOM IDs. Provider replacement should not require every consumer to rewrite domain semantics.
+
+## Telemetry
+
+SDK telemetry should be minimal and privacy-aware. It can expose version, operation name, latency and correlation IDs to the calling application without automatically transmitting protected payloads to third parties.
+
+## Compatibility policy
+
+The SDK declares supported API/schema versions. If a server version is unsupported, fail explicitly rather than continue with unknown semantics. Deprecation windows and migration guides accompany breaking changes.
+
+## Conformance kit
+
+Every release should run fixtures covering:
+
+- schema serialization/deserialization;
+- result-state preservation;
+- idempotent retries;
+- pagination;
+- stale version conflicts;
+- event parsing;
+- tenant context;
+- auth/scope failures;
+- restricted field omission;
+- provider alias stability.
+
+## Package/release provenance
+
+A production SDK release should record package name, semantic version, source commit, artifact digest where available, supported contract versions, changelog, test results and release status.
+
+## Current status
+
+```text
+recovered JavaScript/TypeScript SDK target
+!= identified production npm package
+```
+
+The SDK remains an institutional engineering target until implementation/package evidence is registered.
+
+## Versioning
+
+SDK semantic version, generated schema version and server API versions are tracked separately. Each SDK release declares its compatibility matrix.
