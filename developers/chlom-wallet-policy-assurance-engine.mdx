@@ -82,7 +82,23 @@ developers/reference/chlom-wallet/policy/policy-assurance.openapi.yaml
 developers/reference/chlom-wallet/policy/thrivebase-policy-assurance-readback-v1.sql
 ```
 
-The committed engine is bound to Git blob `41edcecf931b6c653cda6b9f9118ea15b795c72a` and SHA-256 `b29e31e5061e66dd24a7d1a399b31df453c54acbf6fbfd0516b499f038b4d6da`. The compiled rulepack digest is `c20767aaa8cce230d8b50af9c7a2b86e83bd7ffb65704c9af75f7d196da6a90b`.
+The committed engine is bound to Git blob `41edcecf931b6c653cda6b9f9118ea15b795c72a` and effective SHA-256 `1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c`. The compiled rulepack digest is `c20767aaa8cce230d8b50af9c7a2b86e83bd7ffb65704c9af75f7d196da6a90b`.
+
+### Source-identity correction
+
+The initially recorded engine SHA-256, `b29e31e5061e66dd24a7d1a399b31df453c54acbf6fbfd0516b499f038b4d6da`, came from a pre-commit local working copy. Exact-head CI recomputed the committed Git blob and established the effective digest above. The source Git blob did not change.
+
+The correction is append-only:
+
+```yaml
+correction_id: ct.correction.chlom-wallet-policy-engine-source-sha256.v1
+git_blob_sha1: 41edcecf931b6c653cda6b9f9118ea15b795c72a
+recorded_sha256: b29e31e5061e66dd24a7d1a399b31df453c54acbf6fbfd0516b499f038b4d6da
+corrected_sha256: 1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c
+source_blob_changed: false
+```
+
+The historical value remains preserved; it was not silently overwritten.
 
 ## Controlled evidence
 
@@ -116,6 +132,7 @@ chlom_wallet.policy_rulepacks_v1
 chlom_wallet.policy_decision_receipts_v1
 chlom_wallet.policy_assurance_canary_runs_v1
 chlom_wallet.policy_runtime_deployments_v1
+chlom_wallet.policy_source_identity_corrections_v1
 chlom_wallet.policy_runtime_deployment_canary_runs_v1
 ```
 
@@ -129,7 +146,7 @@ public.chlom_wallet_policy_assurance_status_v1()
 public.chlom_wallet_policy_authority_context_v1()
 ```
 
-Private tables are RLS deny-all and append-only. Decision and deployment receipt recording is service-role only. Public status is read-only and contains no private credential or fingerprint material.
+Private tables are RLS deny-all and append-only. Decision, deployment, and correction records are service-role controlled. Public status is read-only and contains no private credential or fingerprint material.
 
 ## Active Edge runtime
 
@@ -139,7 +156,7 @@ The JWT-protected controlled-test service is deployed as:
 service_id: ct.service.chlom-wallet-policy-assurance
 function_id: 815335ae-2b15-467a-80ca-37ca1fe7b993
 function_slug: chlom-wallet-policy-assurance
-function_version: 1
+function_version: 2
 status: ACTIVE
 verify_jwt: true
 allowed_origin: https://wallet.crownthrive.com
@@ -147,15 +164,18 @@ actions:
   - status
   - evaluate
   - verify-receipt
-deployment_bundle_sha256: 280772523f2158025fc4a6a74a3f5fffbe8e95f08f1028461a5f8ba62d5455e1
+deployment_receipt_id: ct.deploy.chlom-wallet-policy-assurance.v1.2
+supersedes_deployment_receipt_id: ct.deploy.chlom-wallet-policy-assurance.v1.1
+deployment_bundle_sha256: 00cedfe45163deeb3c71042f911eaedf3418189913a962c5daa1e838f820e9ac
 source_head_sha: 0261e0b4d3bfa5f041b59efd9bf78bc6e1f76591
 ```
 
-The deployment compiled and activated successfully. The private metadata canary passed:
+The deployment compiled and activated successfully. The v2 private metadata canary passed:
 
 ```yaml
-result: PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY
-active_deployment_count: 1
+result: PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY_V2
+effective_active_deployment_count: 1
+historical_deployment_receipt_count: 2
 verify_jwt_confirmed: true
 source_identity_confirmed: true
 rulepack_identity_confirmed: true
