@@ -1,0 +1,96 @@
+name: Governed Homepage Promotion
+
+on:
+  workflow_run:
+    workflows:
+      - Documentation Governance
+      - Security Governance
+      - Governed Merge Gate
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: governed-homepage-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote exact-head governed homepage
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify bounded candidate and all governance gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${EVENT_PR:-}" ] || [ "$EVENT_PR" = "null" ]; then
+            echo "Completed workflow is not attached to a pull request; nothing to promote."
+            exit 0
+          fi
+
+          pr_json="$(gh pr view "$EVENT_PR" --repo "$GITHUB_REPOSITORY" --json number,state,isDraft,headRefName,headRefOid,baseRefName,mergeStateStatus)"
+          state="$(jq -r '.state' <<<"$pr_json")"
+          draft="$(jq -r '.isDraft' <<<"$pr_json")"
+          branch="$(jq -r '.headRefName' <<<"$pr_json")"
+          head_sha="$(jq -r '.headRefOid' <<<"$pr_json")"
+          base="$(jq -r '.baseRefName' <<<"$pr_json")"
+
+          if [ "$state" != "OPEN" ] || [ "$draft" != "false" ] || [ "$base" != "main" ]; then
+            echo "PR is not an open, ready, main-targeting candidate."
+            exit 0
+          fi
+
+          prefix="automation/homepage-"
+          case "$branch" in
+            "$prefix"*) ;;
+            *) echo "PR is outside the governed homepage automation namespace; no action."; exit 0 ;;
+          esac
+
+          canonical_sha="${branch#${prefix}}"
+          current_main="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          if [ "$canonical_sha" != "$current_main" ]; then
+            echo "main moved after candidate creation; refusing stale automatic promotion."
+            exit 0
+          fi
+
+          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$EVENT_PR/files" --jq '.[].filename')"
+          if [ "$files" != "index.mdx" ]; then
+            echo "candidate diff is not exactly index.mdx; refusing automatic promotion."
+            printf '%s\n' "$files"
+            exit 1
+          fi
+
+          runs="$(gh run list --repo "$GITHUB_REPOSITORY" --commit "$head_sha" --event pull_request --limit 100 --json name,status,conclusion,headSha,event)"
+          required=("Documentation Governance" "Security Governance" "Governed Merge Gate")
+          for workflow in "${required[@]}"; do
+            conclusion="$(jq -r --arg name "$workflow" '[.[] | select(.name == $name and .status == "completed")][0].conclusion // "missing"' <<<"$runs")"
+            if [ "$conclusion" != "success" ]; then
+              echo "$workflow is not successful for exact head $head_sha: $conclusion"
+              exit 0
+            fi
+          done
+
+          merge_state="$(jq -r '.mergeStateStatus' <<<"$pr_json")"
+          if [ "$merge_state" = "DIRTY" ] || [ "$merge_state" = "UNKNOWN" ]; then
+            echo "candidate merge state is $merge_state; refusing automatic promotion."
+            exit 0
+          fi
+
+          result="$(gh api --method PUT "repos/$GITHUB_REPOSITORY/pulls/$EVENT_PR/merge" -f merge_method=squash -f sha="$head_sha")"
+          merged="$(jq -r '.merged' <<<"$result")"
+          if [ "$merged" != "true" ]; then
+            echo "GitHub did not merge the candidate."
+            jq . <<<"$result"
+            exit 1
+          fi
+          echo "Governed homepage candidate merged after exact-head three-gate success."
