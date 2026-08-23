@@ -12,25 +12,410 @@ keywords: ["CHLOM FORM-027", "reconstruction coverage", "795 titles", "recovery 
 
 ```yaml
 formula_id: FORM-027
+asset_id: ct.chlom.formula.form-027
+canonical_name: Reconstruction Coverage Metrics
 classification: derived_program_metric_family
-origin: CHLOM lost Help Center reconstruction
+origin: CHLOM lost Help Center reconstruction and institutionalization program
 historical_baseline_denominator: 795
+baseline_role: historical_help_center_census_not_future_corpus_ceiling
+formula_version: 1.0
 ```
 
-CHLOM recovery uses separate metrics so a recovered title is never confused with a recovered source body, a substantive reconstruction, an implementation mapping or a production certification.
+## Purpose
+
+FORM-027 prevents CHLOM recovery from collapsing several fundamentally different meanings of “done” into one misleading percentage.
+
+A recovered title is not a recovered body. A recovered body is not an implementation. An implementation is not production certification.
 
 ```text
-title_recovery_rate = recovered_titles / N
-source_body_recovery_rate = recovered_source_bodies / N
-substantive_reconstruction_rate = reconstructed_items / applicable_population
-implementation_mapping_rate = mapped_items / applicable_technical_items
-production_certification_rate = certified_items / applicable_implementation_items
+TITLE RECOVERED
+      !=
+SOURCE BODY RECOVERED
+      !=
+SUBSTANTIVE ARTICLE
+      !=
+ENGINEERING MAPPED
+      !=
+IMPLEMENTED
+      !=
+PRODUCTION CERTIFIED
 ```
 
-For the current historical lost-Help-Center census, `N = 795` unless a later documented census supersedes it. Decomposing one recovered paper into many algorithms, formulas, pallets, widgets or theorem articles increases the institutional corpus without changing the historic denominator.
+Each stage receives its own numerator and eligible denominator.
 
-Every numerator requires machine-readable status; title-only and placeholder records cannot count as recovered bodies or completed implementations.
+## Historical denominator
 
-## Tests and evidence
+The lost Help Center recovery program has a historical census baseline:
 
-Test title-only exclusion, duplicate source copies, restricted recovered body, one source decomposed into many articles and denominator revision. Snapshot every reported metric with census/status-registry version and calculation time.
+```text
+N_help_center = 795
+```
+
+This number is a denominator for that historical corpus. It is **not a ceiling on CHLOM institutional knowledge**.
+
+If a recovered paper decomposes into:
+
+- 20 algorithms;
+- 15 formulas;
+- 12 pallets;
+- 30 widgets;
+- 8 workflows;
+
+those new atomic IP records expand the current institutional corpus beyond 795 without changing the meaning of the historical 795-title census.
+
+## Metric family
+
+### Title recovery rate
+
+```text
+R_title = N_titles_recovered / N_help_center
+```
+
+A title can count when its identity is recovered with enough evidence to establish that the knowledge object existed.
+
+### Source-body recovery rate
+
+```text
+R_source_body = N_source_bodies_recovered / N_help_center
+```
+
+A body counts only when substantive original/reliable source content is recovered, including restricted-only source bodies where appropriate.
+
+### Substantive reconstruction rate
+
+```text
+R_reconstructed = N_substantive_reconstructions / N_reconstruction_population
+```
+
+`N_reconstruction_population` must be defined for the reporting snapshot. It may include historical title records requiring reconstruction plus newly decomposed institutional assets.
+
+### Navigation/wiring rate
+
+```text
+R_wired = N_substantive_articles_wired / N_substantive_articles
+```
+
+A file that exists in Git but is not discoverable through the intended knowledge architecture is preserved but not fully wired.
+
+### Restricted-companion binding rate
+
+```text
+R_vault_bound = N_restricted_assets_with_binding / N_assets_requiring_restricted_companion
+```
+
+This measures public/private institutionalization, not document count alone.
+
+### Implementation mapping rate
+
+```text
+R_mapped = N_technical_assets_with_current_mapping / N_applicable_technical_assets
+```
+
+A current mapping can be `deferred`, `historical-only`, `research`, `planned`, `prototype`, etc. Mapping does not imply code exists.
+
+### Implementation rate
+
+```text
+R_implemented = N_assets_with_verified_implementation / N_assets_selected_for_implementation
+```
+
+Implementation evidence requires code/runtime/service evidence under the applicable definition.
+
+### Production certification rate
+
+```text
+R_certified = N_production_certified_assets / N_assets_eligible_for_production_certification
+```
+
+Only assets with deployment/readback/monitoring/rollback and required authority evidence can count.
+
+## Numerator state model
+
+Every count should derive from a machine-readable registry rather than manual marketing claims.
+
+```yaml
+recovery_record_id: stable id
+artifact_ref: stable CHLOM asset id
+historical_census_member: boolean
+recovered_title: boolean
+source_body_state: not_located|partial|restricted_recovered|recovered
+reconstruction_state: none|placeholder|substantive|conflicted|adjudicated
+navigation_state: unwired|wired|deprecated_redirect
+restricted_companion_required: boolean
+restricted_companion_state: none|bound|verified
+implementation_mapping_state: unmapped|mapped
+development_state: source_recovered|reconciled|specified|prototype|test|staged|production|maintained|superseded
+production_certification_state: not_applicable|not_ready|hold|certified|expired
+snapshot_version: exact
+```
+
+## Counting rule: placeholders do not count as bodies
+
+```text
+frontmatter only
+navigation route only
+title-only stub
+empty placeholder
+```
+
+must satisfy:
+
+```text
+recovered_title = maybe true
+substantive_reconstruction = false
+```
+
+This rule is critical because persistence defects can create visible pages with no body.
+
+## Counting rule: restricted body still counts as recovered body
+
+If the original source is lawfully recovered but must remain private:
+
+```text
+source_body_state = restricted_recovered
+```
+
+It can count as source-body recovery while the public article contains only a safe projection.
+
+The private body must actually be in controlled custody; merely saying “restricted” is not enough.
+
+## Counting rule: duplicate files
+
+Multiple copies of the same substantive source do not multiply recovery.
+
+```text
+same canonical source identity + same version
+   -> one recovered body
+```
+
+Copies can be tracked for custody/integrity without inflating the numerator.
+
+## Counting rule: one source can create many institutional assets
+
+A paper can be decomposed into multiple unique IP assets.
+
+```text
+1 paper
+  -> 12 formulas
+  -> 8 algorithms
+  -> 5 schemas
+  -> 10 components
+```
+
+This increases `N_institutional_assets`, but not `N_help_center` unless those assets were also independently in the historical title census.
+
+## Counting rule: superseded versions
+
+Versions do not normally multiply the canonical asset count unless the metric explicitly counts versions.
+
+```text
+asset A v1
+asset A v2
+asset A v3
+```
+
+For canonical-asset count:
+
+```text
+N_assets += 1
+```
+
+For versioned-record count:
+
+```text
+N_versions += 3
+```
+
+Always label which metric is being reported.
+
+## Corpus size versus recovery coverage
+
+These are different dimensions.
+
+```text
+N_historical_census = 795
+N_current_institutional_assets >= historical recovered/decomposed assets
+```
+
+The current asset count may exceed 795 substantially as algorithms, formulas, pallets, schemas, workflows, wireframes and versions are institutionalized.
+
+## Coverage snapshot
+
+```yaml
+coverage_snapshot_id: stable id
+calculated_at: timestamp
+registry_version_refs: []
+historical_denominator: 795
+recovered_titles: integer
+recovered_source_bodies: integer
+substantive_reconstructions: integer
+wired_articles: integer
+restricted_companions_required: integer
+restricted_companions_bound: integer
+implementation_mapped: integer
+implemented_verified: integer
+production_certified: integer
+current_institutional_asset_count: integer
+calculation_version: FORM-027/v1
+```
+
+## Worked hypothetical example
+
+Assume a hypothetical snapshot:
+
+```text
+historical census = 795
+recovered titles = 700
+source bodies = 400
+```
+
+Then:
+
+```text
+R_title = 700 / 795 ≈ 0.8805 = 88.05%
+R_source_body = 400 / 795 ≈ 0.5031 = 50.31%
+```
+
+If decomposition creates 1,200 total current institutional assets, that does **not** make title recovery `1,200/795`. The denominator and numerator refer to different populations.
+
+This example is explanatory only and is not a current project status claim.
+
+## Current snapshot discipline
+
+Current progress reports should state the metric name, not merely “coverage.” For example:
+
+```text
+candidate mapping coverage
+substantive article-body coverage
+source-body recovery coverage
+```
+
+These are not interchangeable.
+
+## Candidate mapping
+
+A candidate map can associate a historical title with an existing or prospective article. It should not count as substantive body completion unless the mapped target contains a valid body meeting the reconstruction contract.
+
+## Body-integrity gate
+
+A simple automated body-integrity check can flag files below a structural threshold for human inspection, but byte size alone is not the final criterion.
+
+```text
+small file -> inspect
+frontmatter only -> defect
+concise theorem/formula with substantive body -> valid
+```
+
+The final classification should evaluate structure/content, not merely file size.
+
+## Wiring completeness
+
+An institutional article should be discoverable through the intended Mintlify navigation, crosslinks, registry or search index.
+
+```text
+substantive body in Git + no intended nav binding
+   -> preserved but partially institutionalized
+```
+
+## Private/public completeness
+
+For assets requiring restricted custody:
+
+```text
+public article
++ restricted source/companion
++ binding record
+= public/private institutionalization unit
+```
+
+A public summary without private master custody is not full recovery if the proprietary body is known to exist.
+
+## DAIL events
+
+```text
+ct.recovery.title.recovered.v1
+ct.recovery.source_body.recovered.v1
+ct.recovery.article.substantive.v1
+ct.recovery.article.wired.v1
+ct.recovery.restricted_companion.bound.v1
+ct.recovery.implementation.mapped.v1
+ct.recovery.implementation.verified.v1
+ct.recovery.production.certified.v1
+ct.recovery.coverage.snapshot.created.v1
+```
+
+## Failure modes
+
+- placeholder counted as substantive -> invalid metric;
+- duplicate copies counted twice -> inflated metric;
+- current asset count divided by historical denominator -> invalid comparison;
+- restricted source claimed but not actually in custody -> unsupported recovery claim;
+- implementation mapping counted as implementation -> invalid;
+- green CI counted as production certification -> invalid;
+- denominator changed without versioned census evidence -> invalid historical comparison.
+
+## Threat model
+
+Metric risks include:
+
+- vanity counting;
+- denominator drift;
+- duplicate inflation;
+- title/body conflation;
+- placeholder inflation;
+- map/implementation conflation;
+- production overclaiming;
+- selective exclusion of unresolved assets;
+- silently lowering the historical denominator.
+
+## Test vectors
+
+1. title only -> title numerator yes, body numerator no;
+2. restricted recovered PDF -> source-body numerator yes if custody verified;
+3. two identical copies -> one source body;
+4. one paper decomposed into 20 algorithms -> asset corpus +20, historical census unchanged unless individually historical titles;
+5. frontmatter-only Mintlify page -> body numerator no;
+6. article in Git but omitted from intended navigation -> substantive yes, wired no;
+7. prototype code -> implemented only if implementation definition/evidence satisfied, production certified no;
+8. production deployment without rollback/readback evidence -> not certified;
+9. new historical title discovered -> historical census revision requires versioned denominator decision;
+10. superseded article v1/v2 -> one canonical asset, two version records.
+
+## Observability
+
+Maintain dashboards for:
+
+- historical title denominator/version;
+- title/source-body/substantive/wired counts;
+- restricted binding coverage;
+- placeholder/stub defect count;
+- orphan/unwired body count;
+- conflict/adjudication queue;
+- implementation mapping/maturity;
+- production-certification state;
+- current corpus asset/version totals.
+
+## Restricted companion
+
+Private recovery registries may include restricted source locations, private source hashes, trade-secret asset IDs, legal/custody records and unreleased implementation evidence. Public progress metrics should not disclose restricted contents.
+
+## Invariants
+
+```text
+795 = historical baseline denominator, not corpus ceiling
+title != body
+body != implementation
+implementation != production certification
+candidate mapping != substantive reconstruction
+copy != unique source
+version count != canonical asset count
+public projection != restricted-master custody
+```
+
+## Versioning
+
+If forensic work discovers that the historical census itself was incomplete, create a new versioned denominator record and preserve the 795 baseline for historical comparability. Never silently rewrite earlier reported percentages.
+
+## Status
+
+`derived_program_metric_family + adopted_recovery_governance_reference`. All reported values require registry-backed snapshot evidence.
