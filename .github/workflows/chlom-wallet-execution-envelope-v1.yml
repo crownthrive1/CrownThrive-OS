@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "developers/chlom-wallet-execution-envelope-v1.mdx"
+      - "developers/manifests/chlom-wallet-execution-envelope-v1.json"
       - "developers/reference/chlom-wallet/execution/**"
       - "developers/reference/chlom-wallet/policy/**"
       - "automation/chlom-wallet-agent-skills-v2.json"
@@ -39,10 +40,13 @@ jobs:
           node --check developers/reference/chlom-wallet/execution/execution-envelope-v1.mjs
           node --check developers/reference/chlom-wallet/execution/test-execution-envelope-v1.mjs
           node --check developers/reference/chlom-wallet/execution/test-execution-profile-closure-v1.mjs
+          node --check developers/reference/chlom-wallet/execution/test-execution-manifest-v1.mjs
           node --check developers/reference/chlom-wallet/execution/execution-envelope-chaos-v1.mjs
 
-      - name: Validate JSON profile contract
-        run: python -m json.tool developers/reference/chlom-wallet/execution/execution-envelope-profiles.v1.json >/dev/null
+      - name: Validate JSON contracts
+        run: |
+          python -m json.tool developers/reference/chlom-wallet/execution/execution-envelope-profiles.v1.json >/dev/null
+          python -m json.tool developers/manifests/chlom-wallet-execution-envelope-v1.json >/dev/null
 
       - name: Verify profile closure
         run: node developers/reference/chlom-wallet/execution/test-execution-profile-closure-v1.mjs
@@ -52,6 +56,9 @@ jobs:
 
       - name: Run 30k adversarial envelope cases
         run: node developers/reference/chlom-wallet/execution/execution-envelope-chaos-v1.mjs
+
+      - name: Verify source/hash manifest
+        run: node developers/reference/chlom-wallet/execution/test-execution-manifest-v1.mjs
 
       - name: Enforce no-network reference boundary
         shell: bash
@@ -69,6 +76,7 @@ jobs:
           set -euo pipefail
           if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sb_secret_[A-Za-z0-9._-]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' \
             developers/reference/chlom-wallet/execution/* \
+            developers/manifests/chlom-wallet-execution-envelope-v1.json \
             developers/chlom-wallet-execution-envelope-v1.mdx \
             security/chlom-wallet-execution-envelope-threat-model.mdx; then
             echo "Potential secret-shaped material detected in execution-envelope projection."
