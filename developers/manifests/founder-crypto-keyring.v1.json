@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "keyring_id": "ct.crypto.keyring.founder.v1",
   "canonical_name": "CrownThrive Founder Master Recovery & Multi-Key Decryption Ring",
   "state": "CONTROLLED_TEST",
@@ -31,11 +31,11 @@
     {"handle":"K10","key_id":"ct.key.decrypt.k10.v1","vault_alias":"ct_vault_decrypt_k10_v1"}
   ],
   "profiles": [
-    {"profile_id":"ct.crypto.profile.s1.v1","sensitivity":1,"required_key_count":1,"key_slots":[1]},
-    {"profile_id":"ct.crypto.profile.s2.v1","sensitivity":2,"required_key_count":2,"key_slots":[2,3]},
-    {"profile_id":"ct.crypto.profile.s3.v1","sensitivity":3,"required_key_count":3,"key_slots":[4,5,6]},
-    {"profile_id":"ct.crypto.profile.s4.v1","sensitivity":4,"required_key_count":4,"key_slots":[7,8,9,10]},
-    {"profile_id":"ct.crypto.profile.s5.v1","sensitivity":5,"required_key_count":5,"key_slots":[1,3,5,7,9]}
+    {"profile_id":"ct.crypto.profile.s1.v1","sensitivity":1,"required_key_count":1,"key_slots":[1],"agent_max_ttl_seconds":900,"founder_max_ttl_seconds":1200},
+    {"profile_id":"ct.crypto.profile.s2.v1","sensitivity":2,"required_key_count":2,"key_slots":[2,3],"agent_max_ttl_seconds":600,"founder_max_ttl_seconds":900},
+    {"profile_id":"ct.crypto.profile.s3.v1","sensitivity":3,"required_key_count":3,"key_slots":[4,5,6],"agent_max_ttl_seconds":420,"founder_max_ttl_seconds":600},
+    {"profile_id":"ct.crypto.profile.s4.v1","sensitivity":4,"required_key_count":4,"key_slots":[7,8,9,10],"agent_max_ttl_seconds":300,"founder_max_ttl_seconds":420},
+    {"profile_id":"ct.crypto.profile.s5.v1","sensitivity":5,"required_key_count":5,"key_slots":[1,3,5,7,9],"agent_max_ttl_seconds":180,"founder_max_ttl_seconds":300}
   ],
   "custody": {
     "primary": "Supabase Vault encrypted-at-rest secret custody",
@@ -48,12 +48,31 @@
     "escrow_registry": "chlom_runtime.founder_crypto_key_escrow_v1"
   },
   "authorization": {
-    "founder_master_decrypt": "Founder only",
-    "multi_key_decrypt": "Founder or explicitly Founder-granted special agents",
+    "founder_master_decrypt": "Founder only with exact-resource short-lived lease",
+    "multi_key_decrypt": "Founder or explicitly Founder-granted special agent with exact-resource short-lived lease",
+    "standing_grant_only": true,
+    "standing_grant_is_execution_authority": false,
     "fresh_authorization_check_each_call": true,
+    "exact_resource_scope_required": true,
+    "unexpired_lease_required": true,
+    "lease_registry": "chlom_runtime.agent_authority_leases_v1",
+    "ttl_policy_registry": "chlom_runtime.founder_crypto_ttl_policy_v1",
     "reverse_agent_root_bypass": false,
     "anonymous_access": false,
     "ordinary_authenticated_access": false
+  },
+  "containment": {
+    "control_id": "ct.control.agent-authority-containment.v1",
+    "emergency_kill_switch": true,
+    "kill_state_registry": "chlom_runtime.agent_emergency_kill_state_v1",
+    "behavior_incident_registry": "chlom_runtime.agent_behavior_incidents_v1",
+    "guardian_registry": "chlom_runtime.agent_guardian_bindings_v1",
+    "scope_deviation_fail_closed": true,
+    "autonomy_anomaly_fail_closed": true,
+    "self_detection_can_kill": true,
+    "self_release_allowed": false,
+    "founder_release_restores_authority": false,
+    "release_requires_recertification": true
   },
   "verification": {
     "escrow_wrapped_total": 62,
@@ -62,9 +81,12 @@
     "five_key_canary": "VERIFIED",
     "founder_root_five_key_canary": "VERIFIED",
     "current_archive_founder_root_reverse": "VERIFIED",
-    "original_reverse_agent_regression": "VERIFIED",
-    "unauthorized_agent_negative_control": "DENIED_AS_REQUIRED",
+    "scope_and_ttl_canary": "PASS_SCOPE_AND_TTL_DENIAL",
+    "higher_agent_kill_canary": "KILLED_AND_QUARANTINED",
+    "self_detected_anomaly_kill_canary": "KILLED_AND_QUARANTINED",
+    "founder_release_canary": "RELEASED_TO_RECERTIFICATION_WITHOUT_AUTHORITY_RESTORE",
     "raw_key_material_returned": false,
-    "DAIL_event_id": "88851375-8c2e-4a3d-bfad-1478c42d3fa6"
+    "DAIL_checked_events": 622,
+    "DAIL_failure_count": 0
   }
 }
