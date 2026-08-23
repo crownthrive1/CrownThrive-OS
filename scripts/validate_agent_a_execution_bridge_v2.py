@@ -40,11 +40,11 @@ def main() -> None:
         require(m["invariants"][key] is False, f"{key} must remain false")
 
     for phrase in (
-        "WIP of 4",
-        "hard maximum of 6",
-        "sensor-to-actuator",
-        "packet-scoped",
-        "does not independently prove packet closure",
+        "Target WIP",
+        "Hard maximum WIP",
+        "Sensor-to-actuator correction",
+        "Packet-scoped measurement",
+        "do not independently prove packet closure",
         "did not manufacture a new blocker reduction",
     ):
         require(phrase.lower() in doc.lower(), f"documentation missing: {phrase}")
