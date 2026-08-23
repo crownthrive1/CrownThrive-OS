@@ -1,0 +1,94 @@
+name: CHLOM Wallet Execution Envelope v1
+
+on:
+  pull_request:
+    paths:
+      - "developers/chlom-wallet-execution-envelope-v1.mdx"
+      - "developers/reference/chlom-wallet/execution/**"
+      - "developers/reference/chlom-wallet/policy/**"
+      - "automation/chlom-wallet-agent-skills-v2.json"
+      - "automation/chlom-wallet-settlement-agent-phase-c-skills.json"
+      - "automation/chlom-wallet-agent-handoff-crosswalk.v1.json"
+      - "chlom/chlom-wallet-component-pallets.v1.json"
+      - "security/chlom-wallet-execution-envelope-threat-model.mdx"
+      - ".github/workflows/chlom-wallet-execution-envelope-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-execution-envelope-v1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  execution-envelope:
+    name: Profiles, handoffs, policy composition and chaos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify runtime
+        run: node --version
+
+      - name: Syntax check
+        run: |
+          node --check developers/reference/chlom-wallet/execution/handoff-evidence-router-v1.mjs
+          node --check developers/reference/chlom-wallet/execution/execution-envelope-v1.mjs
+          node --check developers/reference/chlom-wallet/execution/test-execution-envelope-v1.mjs
+          node --check developers/reference/chlom-wallet/execution/test-execution-profile-closure-v1.mjs
+          node --check developers/reference/chlom-wallet/execution/execution-envelope-chaos-v1.mjs
+
+      - name: Validate JSON profile contract
+        run: python -m json.tool developers/reference/chlom-wallet/execution/execution-envelope-profiles.v1.json >/dev/null
+
+      - name: Verify profile closure
+        run: node developers/reference/chlom-wallet/execution/test-execution-profile-closure-v1.mjs
+
+      - name: Verify execution envelopes and handoff routing
+        run: node developers/reference/chlom-wallet/execution/test-execution-envelope-v1.mjs
+
+      - name: Run 30k adversarial envelope cases
+        run: node developers/reference/chlom-wallet/execution/execution-envelope-chaos-v1.mjs
+
+      - name: Enforce no-network reference boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(developers/reference/chlom-wallet/execution/*.mjs)
+          if grep -nE 'https?://|wss?://|fetch\(|WebSocket\(' "${files[@]}"; then
+            echo "Execution-envelope reference code must remain deterministic and network-free."
+            exit 1
+          fi
+
+      - name: Enforce secret boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sb_secret_[A-Za-z0-9._-]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' \
+            developers/reference/chlom-wallet/execution/* \
+            developers/chlom-wallet-execution-envelope-v1.mdx \
+            security/chlom-wallet-execution-envelope-threat-model.mdx; then
+            echo "Potential secret-shaped material detected in execution-envelope projection."
+            exit 1
+          fi
+
+      - name: Enforce pending-alias and authority boundary
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const p=JSON.parse(fs.readFileSync('developers/reference/chlom-wallet/execution/execution-envelope-profiles.v1.json','utf8'));
+          if(p.authority.autonomy_ceiling!=='A2'||p.authority.decision_ceiling!=='D2'||p.authority.self_approval!==false||p.authority.ai_final_authority!==false) throw new Error('authority_boundary_invalid');
+          for(const [k,v] of Object.entries(p.hard_boundaries||{})) if(v!==false) throw new Error(`boundary_not_false:${k}`);
+          const aliases=new Set(['ct.agent.api-mcp','ct.agent.webhook-delivery']);
+          for(const profile of p.profiles){ for(const id of profile.required_handoffs||[]) if(aliases.has(id)) throw new Error(`pending_alias_became_required_executable_handoff:${profile.skill_id}:${id}`); }
+          NODE
+
+      - name: Record controlled-test boundary
+        run: |
+          echo "A registered skill is not execution authority."
+          echo "Independent handoff evidence must exist, match the exact source head, and remain independent."
+          echo "Agent E/H pending aliases remain non-executing labels."
+          echo "No provider write, custody, token issuance, money movement, rights grant, chain broadcast, effective price, checkout, merge, or phase advancement is authorized."
