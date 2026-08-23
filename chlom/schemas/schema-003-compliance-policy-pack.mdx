@@ -5,3 +5,390 @@ description: "Canonical CHLOM machine contract for versioned Compliance Packs, a
 icon: "layer-group"
 keywords: ["CHLOM schema", "Compliance Pack", "policy schema", "ACE", "policy engine"]
 ---
+
+# SCHEMA-003 — Compliance Pack / Policy Contract
+
+## Canonical record
+
+```yaml
+schema_id: ct.chlom.schema.schema-003
+canonical_name: Compliance Pack / Policy Contract
+artifact_class: machine_schema_contract
+lineage:
+  - Compliance Pack Registry
+  - Policy Engine / DSL Compiler
+  - Compliance Rules and Policy Pallet lineage
+  - ACE / Compliance Pre-check
+status: public_safe_schema_contract
+schema_authority: source_policy_and_governance_controlled
+restricted_companion: 04_Restricted_Algorithms_Formulas_Threat_Models_and_Trade_Secrets
+```
+
+## Purpose
+
+SCHEMA-003 defines the machine-readable envelope used to represent a **versioned bundle of source-authorized rules, evidence requirements, applicability conditions, precedence, overrides and decision effects**.
+
+A Compliance Pack is not merely a document collection. It is a governed policy object that can be evaluated reproducibly and traced to its source authority.
+
+```text
+SOURCE AUTHORITY / RULE TEXT
+          |
+          v
+NORMALIZED POLICY COMPONENTS
+          |
+          v
+SCHEMA-003 COMPLIANCE PACK
+          |
+VALIDATE / TEST / APPROVE
+          |
+          v
+POLICY REGISTRY
+          |
+          v
+ACE / PRE-CHECK / SERVICE
+```
+
+## Top-level contract
+
+```yaml
+policy_pack_id: stable institutional id
+canonical_name: string
+version: semantic_or_governed_version
+status: draft|review|approved|active|held|superseded|retired
+policy_family: compliance|rights|identity|economic|security|operational|other
+source_authority_refs: []
+source_document_refs: []
+jurisdiction_refs: []
+sector_refs: []
+tenant_scope: optional
+applicability: structured expression/control set
+controls: []
+evidence_requirements: []
+precedence: structured
+hard_blocks: []
+override_profile_ref: optional
+human_review_profile_ref: optional
+professional_review_profile_ref: optional
+effective_from: timestamp
+effective_until: optional
+supersedes: []
+superseded_by: optional
+classification: public|internal|restricted
+schema_version: ct.chlom.schema.schema-003/v1
+created_at: timestamp
+updated_at: timestamp
+```
+
+## Identity and versioning
+
+`policy_pack_id` is stable across versions of the same logical pack. Each adopted version must remain individually addressable.
+
+```text
+pack A v1 -> historical
+pack A v2 -> active
+pack A v3 -> candidate
+```
+
+A change to source authority, mandatory control semantics, precedence or decision effect creates a new version.
+
+## Source authority
+
+```yaml
+source_authority_ref:
+  authority_id: stable id
+  authority_type: law|regulation|contract|policy|charter|founder_ruling|professional_source|other
+  citation_or_source_ref: required
+  effective_period: optional
+  verification_state: verified|provisional|conflicted
+```
+
+A rule cannot become authoritative merely because it exists in a configuration file.
+
+## Applicability
+
+Applicability determines **when the pack participates** in a decision.
+
+```yaml
+applicability:
+  actions: []
+  object_types: []
+  jurisdictions: []
+  sectors: []
+  actor_roles: []
+  tenant_or_org_refs: []
+  asset_classes: []
+  channels: []
+  conditions: []
+```
+
+An empty dimension means only what the schema/profile explicitly defines; it must not silently mean universal applicability.
+
+## Control object
+
+```yaml
+control_id: stable within pack/version
+name: string
+control_type: requirement|prohibition|limit|eligibility|calculation_ref|workflow_gate|other
+description: human-readable
+condition: typed expression or DSL reference
+effect:
+  when_satisfied: continue|pass_fragment
+  when_unsatisfied: HOLD|DENY|other_governed_result
+evidence_requirement_refs: []
+reason_code: public-safe normalized code
+restricted_reason_ref: optional
+priority_or_order: explicit if meaningful
+status: active|held|deprecated
+```
+
+## Evidence requirement
+
+```yaml
+evidence_requirement_id: stable id
+evidence_type: credential|attestation|provider_readback|rights_source|professional_review|oracle|document|other
+source_profile_refs: []
+freshness_profile_ref: optional
+minimum_assurance_profile_ref: optional
+required: true|false
+failure_behavior: HOLD|DENY
+privacy_profile_ref: optional
+```
+
+The requirement should specify **what evidence is needed**, not embed secret credentials or raw evidence values.
+
+## Three-valued evaluation
+
+The schema supports CHLOM's first-class decision states:
+
+```text
+PASS
+HOLD
+DENY
+```
+
+A control that cannot be evaluated due to stale/missing/contradictory evidence should typically yield HOLD unless the authoritative source explicitly requires another disposition.
+
+## Hard blocks
+
+A hard block is a source-authorized condition that cannot be overridden by a lower authority.
+
+```yaml
+hard_block:
+  block_id: stable id
+  condition_ref: required
+  effect: DENY|HOLD
+  source_authority_ref: required
+  overrideable: false|restricted_to_named_higher_authority
+```
+
+The presence of an override mechanism must never imply that every rule is overrideable.
+
+## Precedence
+
+Several packs can apply simultaneously. Precedence must be explicit.
+
+Possible dimensions include:
+
+- higher legal/constitutional authority;
+- more specific jurisdiction/object scope;
+- later effective version of the same authority;
+- contract-specific constraints;
+- tenant/local policy that may tighten but not relax higher rules;
+- emergency/security controls within pre-authorized scope.
+
+```text
+conflict unresolved by adopted precedence -> HOLD
+```
+
+## Pack stacking
+
+```yaml
+policy_stack:
+  stack_id: stable id
+  applicable_pack_versions: []
+  precedence_profile_ref: required
+  resolved_control_refs: []
+  conflict_refs: []
+  calculated_at: timestamp
+```
+
+The actual stacking algorithm is versioned separately (`ALG-017`).
+
+## Override profile
+
+```yaml
+override_profile_ref:
+  allowed_authority_types: []
+  allowed_control_classes: []
+  justification_required: true
+  evidence_required: true
+  expires_or_reviews: required
+  rollback_or_restoration: optional|required
+  DAIL_receipt_required: true
+```
+
+Override never deletes the original control or failed condition.
+
+## Human/professional review
+
+```yaml
+human_review_profile:
+  required_for: []
+  eligible_roles: []
+  quorum_or_single_reviewer: explicit
+  conflict_check_required: true
+  decision_ceiling: explicit
+```
+
+Professional-gated decisions can additionally require current professional credentials/authority.
+
+## Effective time
+
+```text
+version v1 active [T0,T1)
+version v2 active [T1,T2)
+```
+
+A decision receipt must preserve the exact active pack versions used at the decision time.
+
+## Example public-safe pack
+
+```yaml
+policy_pack_id: ct.example.rights-transfer
+canonical_name: Example Rights Transfer Controls
+version: 1.0.0
+status: active
+source_authority_refs:
+  - contract://example-master-rights-policy-v3
+applicability:
+  actions: [transfer_license]
+  object_types: [DLA]
+controls:
+  - control_id: transferability
+    control_type: requirement
+    condition: "dla.transferability == allowed"
+    effect:
+      when_satisfied: continue
+      when_unsatisfied: DENY
+    evidence_requirement_refs: [current_dla]
+  - control_id: current_identity
+    control_type: requirement
+    condition: "actor.identity_state == current"
+    effect:
+      when_satisfied: continue
+      when_unsatisfied: HOLD
+    evidence_requirement_refs: [identity_currentness]
+effective_from: "2026-01-01T00:00:00Z"
+schema_version: ct.chlom.schema.schema-003/v1
+```
+
+This example demonstrates structure only; it is not an adopted real policy.
+
+## Validation rules
+
+A valid pack should satisfy:
+
+1. stable ID/version present;
+2. source authority present;
+3. effective time coherent;
+4. control IDs unique within version;
+5. referenced evidence requirements exist;
+6. decision effects belong to allowed vocabulary;
+7. precedence/override profiles resolve;
+8. no secret values embedded in public-safe schema;
+9. supersession references are acyclic and resolvable;
+10. all material expressions pass syntax/type validation.
+
+## Schema evolution
+
+Machine schema changes are separate from policy-pack content versions.
+
+```text
+SCHEMA-003/v1
+   supports pack A v1,v2,v3
+```
+
+If a new schema version changes field meaning, migration tooling must preserve prior semantics and receipts.
+
+## Policy compilation
+
+A human-readable/adopted policy can compile into runtime evaluable form:
+
+```text
+source document
+ -> normalized policy record
+ -> SCHEMA-003 validation
+ -> DSL/rule compilation
+ -> tests/simulation
+ -> approved registry version
+```
+
+Compilation success does not create authority without source/adoption evidence.
+
+## Events
+
+```text
+ct.policy_pack.created.v1
+ct.policy_pack.validated.v1
+ct.policy_pack.reviewed.v1
+ct.policy_pack.approved.v1
+ct.policy_pack.activated.v1
+ct.policy_pack.held.v1
+ct.policy_pack.superseded.v1
+ct.policy_pack.retired.v1
+ct.policy_pack.conflict.detected.v1
+```
+
+## Failure modes
+
+- source authority unresolved -> pack cannot activate;
+- invalid expression/schema -> reject candidate;
+- referenced evidence profile missing -> HOLD deployment;
+- precedence conflict -> HOLD decisions using conflicted stack;
+- effective date gap/overlap within same canonical lineage -> review/HOLD;
+- unauthorized override profile -> reject;
+- provider configuration diverges from pack -> drift/reconciliation, pack authority unchanged.
+
+## Threat model
+
+- policy injection;
+- hidden priority/precedence change;
+- source citation spoofing;
+- fail-open missing evidence;
+- secret thresholds exposed publicly;
+- tenant scope confusion;
+- unauthorized override;
+- stale policy cache;
+- schema migration changing meaning silently.
+
+## Test vectors
+
+1. valid active pack + complete source refs -> schema valid;
+2. missing source authority -> invalid for activation;
+3. duplicate control IDs -> invalid;
+4. evidence requirement missing -> invalid/HOLD;
+5. two mandatory packs conflict with no precedence rule -> HOLD;
+6. hard block plus lower-authority override -> override rejected;
+7. pack v2 effective tomorrow -> v1 remains current today;
+8. provider rule differs -> canonical pack unchanged, mismatch recorded;
+9. public export includes restricted reason detail -> privacy/security failure;
+10. schema migration -> historic pack remains interpretable.
+
+## Restricted companion
+
+Private custody may contain unpublished policies/contracts, exact fraud/security thresholds, protected legal interpretations, source scans, provider-specific mappings and sensitive control reasons.
+
+## Invariants
+
+```text
+configuration != policy authority
+pack title != adopted authority
+missing evidence != PASS
+hard block cannot be bypassed by lower authority
+source/effective version must remain traceable
+policy correction != erasure
+```
+
+## Status
+
+`reconstructed_source_grounded + canonical_machine_schema_contract`. Current operational policy packs require their own source/adoption and implementation evidence.
