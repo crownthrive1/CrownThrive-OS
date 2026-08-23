@@ -1,0 +1,113 @@
+{
+  "algorithm_pack_id": "ct.algorithm-pack.chlom-wallet-skill-handoff-orchestration.v1",
+  "semantic_version": "1.0.0",
+  "state": "CONTROLLED_TEST",
+  "engine_id": "ct.engine.chlom-wallet-skill-handoff-orchestration.v1",
+  "canonical_agent_id": "ct.agent.chlom-wallet-settlement",
+  "skill_suite_id": "ct.skill-suite.chlom-wallet.v2",
+  "downstream_policy_engine_id": "ct.engine.chlom-wallet-policy-assurance.v1",
+  "algorithms": [
+    {
+      "algorithm_key": "WISC",
+      "algorithm_id": "ct.algorithm.chlom-wallet.wisc.v1",
+      "name": "Wallet Intent & Skill Classifier",
+      "purpose": "Produce a bounded, deterministic, advisory-only skill candidate from normalized intent text without creating authority, evidence, scheduling, or execution.",
+      "inputs": ["intent_text", "controlled_skill_lexicon"],
+      "outputs": ["candidate_skill_ids", "confidence_bps", "ambiguity_state", "normalized_intent_sha256"],
+      "invariants": ["advisory_only", "no_match_holds", "ambiguous_match_holds", "same_input_same_candidate", "ai_final_authority_false"],
+      "deterministic": true,
+      "ai_advisory": true,
+      "final_authority": false
+    },
+    {
+      "algorithm_key": "SCOPE",
+      "algorithm_id": "ct.algorithm.chlom-wallet.scope.v1",
+      "name": "Skill Capability & Orchestration Policy Engine",
+      "purpose": "Validate exact-head, authority ceilings, plan-only mode, prohibited effects, canonical skill identity, and handoff requirements before producing a non-executing route receipt.",
+      "inputs": ["route_request", "skill_suite", "handoff_crosswalk", "exact_head_sha"],
+      "outputs": ["selected_skill", "route_disposition", "reason_codes", "route_digest_sha256"],
+      "invariants": ["D3_and_A3_denied", "live_effects_denied", "exact_head_required", "unknown_skill_denied", "policy_assurance_required", "execution_authorized_false"],
+      "deterministic": true,
+      "ai_advisory": false,
+      "final_authority": false
+    },
+    {
+      "algorithm_key": "HARP",
+      "algorithm_id": "ct.algorithm.chlom-wallet.harp.v1",
+      "name": "Handoff Authority Readiness Protocol",
+      "purpose": "Assess stable identity, registry binding, DID, public digest, exact head, fresh heartbeat, authority ceiling, and alias quarantine for every required specialist handoff.",
+      "inputs": ["skill_handoff_labels", "canonical_crosswalk", "identity_snapshot", "exact_head_sha", "freshness_window"],
+      "outputs": ["readiness_score", "handoff_assessments", "ready_count", "hold_count", "deny_count"],
+      "invariants": ["pending_alias_holds", "prospective_binding_holds", "stale_heartbeat_holds", "head_mismatch_holds", "invalid_identity_digest_denies", "no_capability_grant"],
+      "deterministic": true,
+      "ai_advisory": false,
+      "final_authority": false
+    }
+  ],
+  "route_dispositions": ["READY_FOR_POLICY_EVALUATION", "HOLD", "DENY"],
+  "source_control": {
+    "implementation_path": "developers/reference/chlom-wallet/skills/skill-handoff-orchestrator.mjs",
+    "implementation_sha256": "67c27180eefb81c0b3200f3fcd8afb3cdb3ff6ebff18b34d043ea33a55269c41",
+    "test_path": "developers/reference/chlom-wallet/skills/test-skill-handoff-orchestrator.mjs",
+    "test_sha256": "e048e42b3977c16d032beb6ff373412c638c3783ca61db007202748a3a588f7b",
+    "skill_registry_path": "automation/chlom-wallet-agent-skills-v2.json",
+    "handoff_crosswalk_path": "automation/chlom-wallet-agent-handoff-crosswalk.v1.json",
+    "exact_head_binding": "required_at_invocation"
+  },
+  "controlled_test_evidence": {
+    "result": "PASS_CHLOM_WALLET_SKILL_HANDOFF_ORCHESTRATION_CONTRACT",
+    "scenario_count": 11,
+    "verified_route_scenarios": 1,
+    "hold_scenarios": 6,
+    "deny_scenarios": 2,
+    "determinism_scenarios": 1,
+    "advisory_classifier_scenarios": 1,
+    "pending_aliases_quarantined": ["ct.agent.api-mcp", "ct.agent.webhook-delivery"],
+    "policy_engine_handoff_required": true,
+    "execution_authorized": false
+  },
+  "private_runtime": {
+    "algorithm_registry_table": "chlom_wallet.policy_algorithm_registry_v1",
+    "route_receipt_table": "chlom_wallet.skill_handoff_route_receipts_v1",
+    "canary_table": "chlom_wallet.skill_handoff_route_canary_runs_v1",
+    "canary_function": "chlom_wallet.run_skill_handoff_route_canary_v1",
+    "rls_deny_all": true,
+    "append_only": true,
+    "service_role_write_only": true,
+    "public_table_access": false,
+    "anon_table_access": false,
+    "authenticated_table_access": false
+  },
+  "ai_policy": {
+    "bounded_classifier_enabled": true,
+    "classifier_is_deterministic": true,
+    "classifier_is_advisory_only": true,
+    "classifier_may_not_select_authority": true,
+    "classifier_may_not_create_evidence": true,
+    "classifier_may_not_schedule_work": true,
+    "classifier_may_not_change_policy_disposition": true,
+    "retained_advisory_is_hash_bound": true,
+    "ai_final_authority": false
+  },
+  "hard_boundaries": {
+    "authority_granted": false,
+    "capability_grant_created": false,
+    "schedule_slot_created": false,
+    "certification_authority": false,
+    "credential_access": false,
+    "provider_write": false,
+    "custody": false,
+    "token_issuance": false,
+    "money_movement": false,
+    "production_rights_grant": false,
+    "chain_broadcast": false,
+    "effective_price_publication": false,
+    "checkout_activation": false,
+    "phase_advancement": false,
+    "merge_authorized": false,
+    "vote_effect": "none",
+    "ai_final_authority": false
+  },
+  "source_ref": "github:crownthrive1/CrownThrive-Support:pull/230",
+  "observed_on": "2026-08-23"
+}
