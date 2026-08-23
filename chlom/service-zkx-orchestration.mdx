@@ -1,0 +1,277 @@
+---
+title: "ZKX — Zero-Knowledge Orchestration Layer"
+sidebarTitle: "ZKX Orchestration"
+description: "Standalone CHLOM ZKX article for proof-policy orchestration, circuit/verifier selection, credential/revocation currentness, selective disclosure, proof receipts and safe integration with ACE/DLA without exposing raw evidence."
+icon: "shield-halved"
+keywords: ["CHLOM ZKX", "Zero-Knowledge Orchestration Layer", "ZKP", "proof orchestration", "selective disclosure", "privacy"]
+---
+
+# ZKX — Zero-Knowledge Orchestration Layer
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.service.zkx
+canonical_name: Zero-Knowledge Orchestration Layer
+canonical_short_name: ZKX
+artifact_class: privacy_proof_orchestration_service
+source_lineage:
+  - Genesis ZKX layer
+  - ZK-Proofs & Privacy Framework lineage
+  - Technical Blueprint verifier architecture
+  - recovered Help Center ZKX component
+recovery_state: reconstructed_source_grounded
+current_mapping:
+  - proof requirement resolution
+  - circuit/prover/verifier registry
+  - credential and revocation binding
+  - ACE/DLA authorization input
+production_state: proof_profile_specific_evidence_required
+```
+
+## Source basis
+
+Historical CHLOM names **ZKX** as a dedicated zero-knowledge orchestration/privacy layer. The recovered Help Center describes it as coordinating proofs for age, geography, identity and financial predicates without exposing raw user/business data. Separate Prover Cluster and ZK Verifier Pallet components handle proof generation and verification.
+
+## Purpose
+
+ZKX decides **which proof profile is required and how proof lifecycle components connect**.
+
+```text
+ACTION / POLICY REQUIREMENT
+          |
+          v
+        ZKX
+  resolve proof profile
+          |
+    +-----+-----+
+    |           |
+ existing     prove
+ proof          |
+    |       ZK Prover Cluster
+    |           |
+    +-----+-----+
+          v
+   ZK Verifier Pallet
+          |
+   currentness / revocation
+          |
+          v
+PROOF RESULT ENVELOPE
+          |
+     ACE / DLA / APP
+```
+
+## Non-purpose
+
+ZKX does not:
+
+- make a proof statement legally sufficient merely because cryptography verifies;
+- choose policy outside source authority;
+- reveal witness data;
+- make historical proof schemes current standards;
+- bypass credential revocation/currentness;
+- convert a proof result directly into rights or money movement without downstream authority.
+
+## Proof requirement profile
+
+```yaml
+proof_profile_id: stable ID
+predicate: machine/human readable statement
+applicable_actions: list
+subject_binding: required
+circuit_refs: allowed versions
+issuer_or_source_requirements: optional
+revocation_requirements: explicit
+freshness_or_validity_window: explicit
+public_input_schema_ref: required
+prover_profile_ref: required
+verifier_profile_ref: required
+failure_behavior: HOLD|DENY by policy class
+status: candidate|approved|held|retired
+```
+
+## Predicate examples
+
+Source-supported categories include proving that:
+
+- age satisfies a threshold;
+- a credential/license is valid;
+- a person/entity belongs to an allowed category/jurisdiction;
+- accreditation/qualification exists;
+- solvency/capital condition is satisfied;
+- a hidden transaction satisfies compliance constraints.
+
+Exact current predicates require adopted policy and reviewed circuits.
+
+## Selective disclosure
+
+The architecture aims to reveal only the result/public inputs required by the consuming action.
+
+```text
+private claim set
+    |
+ZK predicate
+    |
+proof result: "predicate true"
+```
+
+The consuming service should not request raw data when an approved proof suffices.
+
+## Proof result envelope
+
+```yaml
+proof_result_id: stable ID
+proof_ref: required
+proof_profile_ref: exact
+circuit_ref: exact
+subject_binding_ref: privacy-preserving
+result: valid|invalid|held
+verified_at: timestamp
+valid_until: optional
+revocation_snapshot_ref: where required
+verifier_ref: exact version
+reason_class: public-safe
+```
+
+## Currentness
+
+A proof can be cryptographically valid but stale for the business/compliance decision.
+
+```text
+PROOF VALID
+  + credential not revoked
+  + source current
+  + policy current
+  + action binding valid
+  + validity window current
+```
+
+Only then is the proof usable as an input to authorization.
+
+## Revocation
+
+If the underlying credential/license can be revoked, the proof profile must define how current revocation state is incorporated: witness, accumulator, status-list snapshot, online check, short validity or another reviewed method.
+
+## Proof reuse
+
+Reusable proofs require explicit profile support. A proof for one action/subject/context must not be generalized automatically.
+
+```text
+proof usable for A
+   != proof usable for B
+```
+
+## Circuit migration
+
+When a circuit/verifier is replaced:
+
+```text
+circuit v1 active
+ -> v2 approved
+ -> migration window
+ -> v1 retired/held
+```
+
+Prior proof receipts remain historical; current actions use profiles allowing current versions.
+
+## Policy integration
+
+Policy can say:
+
+```text
+for action X require proof profile Z
+```
+
+ZKX resolves the profile and result. It should not embed hidden policy decisions that are absent from the source policy/Compliance Pack.
+
+## DLA integration
+
+A DLA may require proofs for issuance/renewal/transfer. Proof satisfaction does not create the DLA; it satisfies one prerequisite.
+
+```text
+proof PASS + rights + issuer authority + policy + evidence -> DLA decision
+```
+
+## ACE integration
+
+ACE can consume ZKX result envelopes as typed evidence:
+
+```text
+zkx_result = valid/invalid/held
+```
+
+ACE determines overall PASS/HOLD/DENY with other requirements.
+
+## Auditability
+
+DAIL records should contain safe proof metadata/digests, profile/circuit/verifier versions, result and timestamps—not raw witnesses.
+
+## Failure modes
+
+- no applicable proof profile -\> HOLD;
+- no approved circuit -\> HOLD;
+- prover unavailable -\> queue/HOLD;
+- proof invalid -\> deny the predicate, not necessarily whole unrelated action;
+- verifier mismatch -\> invalid/hold;
+- revocation unavailable -\> HOLD where currentness required;
+- proof expired -\> regenerate;
+- policy changed -\> re-resolve proof requirements;
+- witness/raw data leakage -\> security incident.
+
+## Threat model
+
+- malicious circuit/profile;
+- proving/verifying key substitution;
+- stale revocation;
+- replay;
+- subject/action misbinding;
+- privacy leakage through public inputs;
+- correlation across repeated proofs;
+- verifier downgrade;
+- proof-validity confused with policy authority;
+- hidden requirement injected outside policy.
+
+## Test vectors
+
+1. valid proof \+ current credential \+ matching action -\> usable evidence;
+2. valid proof \+ revoked credential -\> not usable;
+3. valid proof for wrong subject -\> reject;
+4. valid proof for action A reused for B without profile permission -\> reject;
+5. old circuit retired -\> hold/migrate;
+6. verifier version mismatch -\> invalid;
+7. prover outage -\> HOLD, not bypass;
+8. policy no longer requires proof -\> no unnecessary disclosure;
+9. public input contains excessive sensitive data -\> privacy review failure;
+10. proof PASS but DLA rights absent -\> DLA still cannot issue.
+
+## Metrics
+
+- proof requests by profile;
+- proof-generation/verification success;
+- held/invalid reasons;
+- circuit migration status;
+- prover/verifier latency;
+- revocation-currentness failures;
+- replay/misbinding attempts;
+- privacy/security incidents.
+
+## Restricted companion
+
+May contain private circuit specifications, witness schemas, proving keys, trust setup information, security analyses, privacy leakage tests, correlation mitigations and unpublished proof profiles.
+
+## Invariants
+
+```text
+proof valid != action authorized
+ZKX profile != policy authority
+witness != public data
+circuit currentness matters
+revocation currentness matters
+subject/action binding matters
+proof receipt != underlying raw evidence
+```
+
+## Status
+
+`current_semantic_service_specification + historical_ZKX_lineage_preserved`; concrete circuits/provers/verifiers remain separately governed and evidenced.
