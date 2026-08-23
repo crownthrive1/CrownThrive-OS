@@ -1,0 +1,64 @@
+{
+  "pack_id": "ct.pack.chlom-wallet.continuity-interfaces.v1",
+  "semantic_version": "1.0.0",
+  "state": "CONTROLLED_TEST",
+  "existing_runtime_bindings": {
+    "modules": ["ct.chlom.backup-recovery"],
+    "plugins": ["ct.plugin.google-drive-continuity"]
+  },
+  "pallets": [
+    {"pallet_id":"ct.pallet.chlom-wallet.continuity-core.v1","name":"Continuity Core","state":"CONTROLLED_TEST"},
+    {"pallet_id":"ct.pallet.chlom-wallet.truth-lineage.v1","name":"Truth & Lineage","state":"CONTROLLED_TEST"},
+    {"pallet_id":"ct.pallet.chlom-wallet.oracle-reconciliation.v1","name":"Oracle Reconciliation","state":"CONTROLLED_TEST"},
+    {"pallet_id":"ct.pallet.chlom-wallet.recovery-control.v1","name":"Recovery Control","state":"CONTROLLED_TEST"}
+  ],
+  "modules": [
+    {"module_id":"ct.chlom.wallet-continuity-core","name":"CHLOM Wallet Continuity Core","class":"service","self_healing_class":"rollback_capable","api_enabled":true,"mcp_enabled":true},
+    {"module_id":"ct.chlom.wallet-truth-lineage","name":"CHLOM Wallet Truth & Lineage","class":"service","self_healing_class":"observe_only","api_enabled":true,"mcp_enabled":true},
+    {"module_id":"ct.chlom.wallet-oracle-router","name":"CHLOM Wallet Oracle Router","class":"service","self_healing_class":"observe_only","api_enabled":true,"mcp_enabled":true},
+    {"module_id":"ct.chlom.wallet-evidence-expiry","name":"CHLOM Wallet Evidence Expiry Engine","class":"service","self_healing_class":"rollback_capable","api_enabled":true,"mcp_enabled":true},
+    {"module_id":"ct.chlom.wallet-recovery-orchestrator","name":"CHLOM Wallet Recovery Orchestrator","class":"service","self_healing_class":"rollback_capable","api_enabled":true,"mcp_enabled":true},
+    {"module_id":"ct.chlom.wallet-factory-bridge","name":"CHLOM Wallet Proprietary Factory Bridge","class":"service","self_healing_class":"observe_only","api_enabled":true,"mcp_enabled":true}
+  ],
+  "plugins": [
+    {"plugin_id":"ct.plugin.chlom-wallet-continuity-core","name":"CHLOM Wallet Continuity Core Pack","kind":"adapter_pack","archetype":"governed_internal","auth_mode":"none_private_runtime","owner_agent_id":"ct.agent.gen6.factory.continuity-recovery.platform","verifier_agent_id":"ct.agent.gen6.factory.continuity-recovery.assurance"},
+    {"plugin_id":"ct.plugin.chlom-wallet-oracle-router","name":"CHLOM Wallet Oracle Router Pack","kind":"adapter_pack","archetype":"read_only_oracle","auth_mode":"vault_reference_only","owner_agent_id":"ct.agent.gen6.factory.continuity-recovery.data","verifier_agent_id":"ct.agent.gen6.factory.continuity-recovery.assurance"},
+    {"plugin_id":"ct.plugin.chlom-wallet-recovery","name":"CHLOM Wallet Recovery Pack","kind":"adapter_pack","archetype":"rollback_only","auth_mode":"none_private_runtime","owner_agent_id":"ct.agent.gen6.factory.continuity-recovery.platform","verifier_agent_id":"ct.agent.gen6.factory.continuity-recovery.assurance"},
+    {"plugin_id":"ct.plugin.chlom-wallet-culture-continuity","name":"CHLOM Wallet Cultural Continuity Pack","kind":"policy_pack","archetype":"cultural_imprint","auth_mode":"none_private_runtime","owner_agent_id":"ct.agent.gen6.factory.continuity-recovery.culture","verifier_agent_id":"ct.agent.gen6.factory.continuity-recovery.assurance"}
+  ],
+  "mcp_tools": [
+    {"tool_name":"chlom_wallet_continuity_status_v1","operation_key":"continuity.status","risk_class":"read_only","enabled":true,"requires_human_approval":false},
+    {"tool_name":"chlom_wallet_continuity_assets_v1","operation_key":"continuity.assets.list","risk_class":"read_only","enabled":true,"requires_human_approval":false},
+    {"tool_name":"chlom_wallet_continuity_dependencies_v1","operation_key":"continuity.dependencies.list","risk_class":"read_only","enabled":true,"requires_human_approval":false},
+    {"tool_name":"chlom_wallet_continuity_expiry_evaluate_v1","operation_key":"continuity.expiry.evaluate","risk_class":"private_append_only","enabled":true,"requires_human_approval":false},
+    {"tool_name":"chlom_wallet_continuity_oracle_observe_v1","operation_key":"continuity.oracle.observe","risk_class":"private_append_only","enabled":true,"requires_human_approval":false},
+    {"tool_name":"chlom_wallet_continuity_recovery_plan_v1","operation_key":"continuity.recovery.plan","risk_class":"private_append_only","enabled":true,"requires_human_approval":false},
+    {"tool_name":"chlom_wallet_continuity_truth_snapshot_v1","operation_key":"continuity.truth.snapshot","risk_class":"private_append_only","enabled":true,"requires_human_approval":false},
+    {"tool_name":"chlom_wallet_continuity_factory_projection_v1","operation_key":"continuity.factory.project","risk_class":"private_append_only","enabled":true,"requires_human_approval":false}
+  ],
+  "api": {
+    "api_id": "ct.api.chlom-wallet.continuity.v1",
+    "base_path": "/v1/chlom-wallet/continuity",
+    "auth": "service_role_or_governed_mcp",
+    "routes": [
+      {"method":"GET","path":"/status","authority":"READ_ONLY"},
+      {"method":"GET","path":"/assets","authority":"READ_ONLY"},
+      {"method":"GET","path":"/dependencies","authority":"READ_ONLY"},
+      {"method":"POST","path":"/evaluate-expiry","authority":"PRIVATE_APPEND_ONLY"},
+      {"method":"POST","path":"/observe-oracle","authority":"PRIVATE_APPEND_ONLY"},
+      {"method":"POST","path":"/plan-recovery","authority":"PRIVATE_APPEND_ONLY"},
+      {"method":"POST","path":"/truth-snapshot","authority":"PRIVATE_APPEND_ONLY"},
+      {"method":"POST","path":"/factory-projection","authority":"PRIVATE_APPEND_ONLY"}
+    ]
+  },
+  "boundary": {
+    "provider_write": false,
+    "money_movement": false,
+    "rights_grant": false,
+    "chain_broadcast": false,
+    "credential_material_returned": false,
+    "destructive_recovery": false,
+    "production_activation": false,
+    "checkout_enabled": false
+  }
+}
