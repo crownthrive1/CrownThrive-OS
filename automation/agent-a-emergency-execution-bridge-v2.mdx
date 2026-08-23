@@ -1,0 +1,83 @@
+---
+title: "Agent A Emergency Execution Bridge v2"
+sidebarTitle: "Agent A Execution Bridge v2"
+description: "Public-safe emergency control contract for WIP=4 continuation-first execution, stale-packet actuation, L–P telemetry, and packet-scoped throughput measurement."
+icon: "bolt"
+---
+
+# Agent A Emergency Execution Bridge v2
+
+**Runtime:** `chlom_runtime.agent_a_emergency_portfolio_cycle_v2`  
+**Stale actuator:** `chlom_runtime.gen7_actuate_stale_portfolio_v2`  
+**Authority:** D0–D2 controlled test  
+**Target WIP:** 4  
+**Hard maximum WIP:** 6
+
+This emergency patch closes the execution gap between Agent A's existing WIP=4 portfolio contract and its live runtime.
+
+## Required order
+
+Every Agent A portfolio cycle executes:
+
+`live truth -> stale continuation/verification actuation -> WIP/collision preflight -> bounded dispatch if capacity exists -> L–P control telemetry -> packet-scoped cycle metrics -> DAIL receipt`
+
+Continuation always precedes new dispatch. If four packets are already `running | verifying`, Agent A does not manufacture a fifth packet merely to show activity.
+
+## Sensor-to-actuator correction
+
+The prior stale observer recorded `continue_due | replan_due` but did not perform an actuation. The active v2 path preserves the sensor and adds a bounded actuator:
+
+- stale `running` packet with fewer than two governed retries: re-arm the already-governed owner and different verifier; preserve progress and blockers;
+- stale `verifying` packet: re-arm the current independent verifier; preserve progress and blockers;
+- stale `running` packet with two or more governed retries: create a bounded Agent A replan/escalation action rather than another blind continuation receipt.
+
+A rebind, heartbeat, or replan is not progress. Packet progress may increase only when the current owner submits new evidence and positive work units through the governed packet-continuation contract.
+
+## L–P telemetry
+
+Each Agent A cycle emits a current internal control-plane run for:
+
+- L — portfolio intake, dependencies, WIP routing;
+- M — source/state/blocker reconciliation;
+- N — proof, drift, and owner/verifier separation;
+- O — current-main, docs, homepage, and planned-packet reconciliation;
+- P — WIP, staleness, throughput, and backpressure.
+
+These runs prove that L–P are alive as internal subroutes. They do not independently prove packet closure.
+
+## Packet-scoped measurement
+
+`gen6_finalize_cycle` v2 excludes Agent A/L–P control-plane runs from packets-closed/hour and packet completion counts. Packet throughput is derived only from runs tied to a real `packet_id` plus the corresponding dispatch-decision lifecycle.
+
+The force test deliberately caught the old metric contamination: internal completed control-plane runs were initially miscounted as closed packets. That result was rejected and the packet-scoped metric function superseded it without deleting the historical receipt.
+
+## Force-test evidence
+
+The bounded 2026-08-23 force test proved:
+
+- active WIP readback = 4;
+- WIP target = 4, hard max = 6;
+- no new dispatch while all four slots are occupied;
+- #209 re-armed to C/B with progress 12 and 8 blockers preserved;
+- #169 re-armed to E/D with progress 12 and 5 blockers preserved;
+- #216 re-armed to F/B with progress 10 and 4 blockers preserved;
+- #220 independent S verification was re-armed with progress 70 and 2 blockers preserved;
+- after retry count reached two, #209/#169/#216 entered replan-escalation handling instead of endless sensor-only observations;
+- L–P current control-plane heartbeats were emitted;
+- packet-scoped force-test metrics reported zero packet closures and no fabricated progress.
+
+The current cumulative original-five blocker reduction remains two, inherited from the earlier #220 movement. The emergency force test itself did not manufacture a new blocker reduction.
+
+## Boundaries
+
+The patch does not:
+
+- weaken a governance or professional gate;
+- turn a heartbeat into progress;
+- create a sovereign vote;
+- self-certify originating work;
+- authorize D3;
+- move money or grant rights;
+- expose credentials, private identities, or protected algorithms;
+- authorize direct-main merge or force push;
+- mutate third-party providers merely because a packet is stale.
