@@ -1,0 +1,95 @@
+---
+title: Governance Observability and Archive Continuity
+description: CrownThrive standard for exact-head governance readback, failure classification, and resumable encrypted institutional archives.
+---
+
+# Governance Observability and Archive Continuity
+
+CrownThrive governance must distinguish a control decision from a failure in the machinery that gathers evidence for that decision. This standard institutionalizes that distinction and binds archive continuity to the same fail-closed operating model.
+
+## Prime rule
+
+A red CI job is not automatically an institutional `HOLD` or `DENY`.
+
+`HOLD` and `DENY` are institutional dispositions and require authoritative policy or evidence output. Git transport failures, stale source identity, unavailable runtime evidence, documentation-contract failures, security-contract failures, and supply-chain findings remain separately classified so the system does not manufacture governance meaning from infrastructure noise.
+
+The governed classifier uses these machine categories:
+
+- `PASS`
+- `POLICY_HOLD`
+- `POLICY_DENY`
+- `CI_EVIDENCE_HYDRATION_FAILURE`
+- `STALE_EXACT_HEAD`
+- `CONTRACT_ASSERTION_FAILURE`
+- `SUPPLY_CHAIN_DENY`
+- `RUNTIME_UNAVAILABLE`
+
+A policy disposition is accepted only when an authoritative validator explicitly emits the policy marker. It is never inferred from a generic nonzero exit code.
+
+## Exact-head source identity
+
+For pull-request transport and source identity, GitHub's current PR API state is authoritative over stale prose snapshots.
+
+The Governed Merge Gate keeps its bounded checkout and then hydrates the exact base and head refs named by the PR event before trusted-diff evaluation. Both commit objects must exist locally before the decision engine executes.
+
+This hydration is read-only. It does not grant GitHub API write authority, merge authority, sovereign voting authority, D3 authority, or permission to weaken any policy gate.
+
+A machine-owned PR readback comment reports the current base SHA, head SHA, branch refs, draft/open state, mergeability readback, and observed governance workflow state. Human-authored PR prose remains intact. The machine comment is refreshed when the PR head changes and when tracked governance workflows finish.
+
+## Interpretation firewall
+
+The following boundaries are mandatory:
+
+1. Missing Git objects are `CI_EVIDENCE_HYDRATION_FAILURE`, not policy denial.
+2. Exact-head mismatch is `STALE_EXACT_HEAD`, not policy denial.
+3. A deterministic security or documentation validator failure is `CONTRACT_ASSERTION_FAILURE` unless that validator also emits an authoritative policy disposition.
+4. Dependency review rejection is a supply-chain gate and remains separately attributable.
+5. Ordinary CI success does not manufacture institutional acceptance, independent review, or phase advancement.
+6. AI may summarize or route evidence but may not upgrade `HOLD` or `DENY` or create approval authority.
+
+## Resumable encrypted archive v2
+
+The former monolithic trade-secret archive path assembled the full restricted corpus and encrypted it in one database transaction. That design became unsafe as the corpus expanded because a database interruption required the entire archive operation to restart.
+
+Archive v2 replaces the monolith with a bounded, resumable sequence:
+
+**freeze membership → encrypt bounded chunks → persist ciphertext receipts → verify completeness → encrypt manifest → seal archive**
+
+Preparation freezes only member identity and source-version references. Secret plaintext is not staged in an archive table.
+
+For each bounded chunk, the runtime resolves the frozen members, constructs the chunk payload in memory, encrypts it immediately with the existing Vault-backed archive key path, and persists only ciphertext plus hashes, byte counts, ordinal bounds, and item counts. Plaintext is discarded when the transaction finishes.
+
+Completed ciphertext chunks are durable checkpoints. If the database restarts during a later chunk, completed chunks remain available and the next bounded cycle resumes from the first missing chunk rather than rebuilding the archive from zero.
+
+The final encrypted manifest binds source-membership identity, chunk ordering, per-chunk hashes, total item counts, and archive-level ciphertext identity. Sealing is prohibited until every expected chunk exists and aggregate item counts reconcile exactly.
+
+## Autonomous continuation
+
+Archive continuation reuses the existing CrownThrive Services Stack hourly database subroute. No new top-level scheduler slot is introduced.
+
+The active bounded profile processes no more than eight chunks during a CSS hourly cycle. A caught resource, runtime, lock, or archive-contract exception places the archive run into a normalized `hold` state and disables automatic retry for that run. A hard database restart rolls back only the in-flight transaction; previously committed chunks remain durable and resumable.
+
+The conservative v20 canary is preserved as superseded evidence rather than deleted. The active controlled-test profile is v21 with a larger but still bounded chunk size validated by runtime canaries. The former v19 monolithic automatic retry path remains retired.
+
+## Evidence and auditability
+
+Each preparation, encrypted chunk, hold, supersession, and final seal emits a restricted DAIL event. The archive tables use RLS, forced RLS, closed public access, service-role-only execution, append-only chunk/member/manifest controls, and fixed `search_path` privileged functions.
+
+Archive progress is observable by status metadata without returning secret plaintext. Export surfaces return encrypted archive objects only.
+
+## Authority boundary
+
+This standard creates no authority for:
+
+- direct-main merge;
+- D3 automation;
+- sovereign voting or quorum manufacture;
+- provider writes;
+- money movement or settlement;
+- Rights or license grants;
+- public pricing or checkout;
+- production credential disclosure;
+- legal or professional certification;
+- phase advancement.
+
+Governance observability improves attribution and recovery. It does not weaken the stop gates it observes.
