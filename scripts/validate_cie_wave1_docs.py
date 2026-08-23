@@ -117,7 +117,7 @@ def main() -> int:
         fail("Bonged Out! adult audience boundary missing")
     if "not plant-touching permission" not in bonged:
         fail("Bonged Out! plant-touching boundary missing")
-    for value in ("$50,000", "$40,000", "$150,000", "$120,000"):
+    for value in ("USD 50,000", "USD 40,000", "USD 150,000", "USD 120,000"):
         if value not in bonged:
             fail(f"Bonged Out! source commercial term missing: {value}")
     if "not automatically current public pricing" not in bonged:
@@ -130,6 +130,9 @@ def main() -> int:
         fail(f"Wave 1 source IDs incomplete: {sorted(found_source_ids)}")
     if "Commercial-source quarantine" not in sources:
         fail("Wave 1 commercial source quarantine missing")
+    for value in ("USD 50,000", "USD 40,000", "USD 150,000", "USD 120,000"):
+        if value not in sources:
+            fail(f"Wave 1 source registry commercial term missing: {value}")
 
     docs = json.loads(read("docs.json"))
     nav = flatten_nav(docs.get("navigation", {}))
