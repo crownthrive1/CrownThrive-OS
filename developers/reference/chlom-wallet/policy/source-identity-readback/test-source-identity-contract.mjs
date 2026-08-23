@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const contract = JSON.parse(readFileSync(join(HERE, 'runtime-contract.v1.json'), 'utf8'));
-const repoRoot = resolve(HERE, '../../../../../../');
+const repoRoot = resolve(HERE, '../../../../../');
 const sourcePath = resolve(repoRoot, contract.fixed_source.path);
 const sourceBytes = readFileSync(sourcePath);
 const gitHeader = Buffer.from(`blob ${sourceBytes.length}\0`, 'utf8');
@@ -28,6 +28,7 @@ assert.equal(contract.fixed_source.path, 'developers/reference/chlom-wallet/poli
 assert.equal(sourceBytes.length, contract.fixed_source.expected_size_bytes);
 assert.equal(gitBlobSha1, contract.fixed_source.expected_git_blob_sha1);
 assert.match(sourceSha256, /^[0-9a-f]{64}$/);
+assert.equal(sourceSha256, '1fc7892cbfbbaa8a737c63e12f52ddaeac829089b0a9f283d8209ceb674f7867');
 assert.equal(contract.fixed_source.content_sha256_state, 'DYNAMIC_FIXED_SOURCE_OBSERVATION');
 assert.equal(contract.persistence.append_only, true);
 assert.equal(contract.persistence.rls_deny_all, true);
