@@ -1,33 +1,20 @@
-name: Collision Governance v2
+name: Collision Governance v2 — candidate contract
 
 on:
   pull_request:
     types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review, closed]
-  pull_request_target:
-    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review, closed]
-  push:
-    branches: [main]
-  merge_group:
-    types: [checks_requested]
-  schedule:
-    - cron: "17 * * * *"
-  workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: read
+permissions: {}
 
 concurrency:
-  group: collision-governance-v2-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  group: collision-governance-candidate-v2-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   untrusted-head-contract-tests:
     name: Untrusted head — no-token contract tests
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    permissions: {}
     steps:
       - name: Checkout candidate without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,49 +30,3 @@ jobs:
       - name: Validate public-safe contract
         shell: bash
         run: python3 scripts/validate_collision_governance_v2.py
-
-  trusted-base-preflight:
-    name: Trusted base — live prevention and reaction
-    if: github.event_name == 'pull_request_target'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout trusted base without credentials
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          persist-credentials: false
-      - name: Evaluate candidate against a before/after-bound snapshot
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_EVENT_ACTION: ${{ github.event.action }}
-        shell: bash
-        run: >-
-          python3 scripts/governed_collision_agent_v2.py
-          --repository "${{ github.repository }}"
-          --branch "${{ github.event.pull_request.base.ref }}"
-          --candidate "${{ github.event.pull_request.number }}"
-          --output collision-governance-v2-report.json
-          --fail-on-severity 2
-
-  trusted-main-reconciliation:
-    name: Trusted main — continuous awareness and reaction
-    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout trusted main without credentials
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          persist-credentials: false
-      - name: Recompute the open collision graph
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        shell: bash
-        run: >-
-          python3 scripts/governed_collision_agent_v2.py
-          --repository "${{ github.repository }}"
-          --branch main
-          --output collision-governance-v2-report.json
-          --fail-on-severity 6

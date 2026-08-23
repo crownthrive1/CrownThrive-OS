@@ -11,7 +11,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/collision-governance-rtc.v2.json"
-WORKFLOW = ROOT / ".github/workflows/collision-governance-v2.yml"
+CANDIDATE_WORKFLOW = ROOT / ".github/workflows/collision-governance-v2.yml"
+TRUSTED_WORKFLOW = ROOT / ".github/workflows/collision-governance-trusted-v2.yml"
 CORE = ROOT / "scripts/collision_rtc_v2.py"
 ADAPTER = ROOT / "scripts/governed_collision_agent_v2.py"
 TESTS = ROOT / "tests/test_collision_rtc_v2.py"
@@ -25,14 +26,15 @@ def require(condition: bool, reason: str, failures: list[str]) -> None:
 
 def main() -> int:
     failures: list[str] = []
-    for path in (MANIFEST, WORKFLOW, CORE, ADAPTER, TESTS, ADAPTER_TESTS):
+    for path in (MANIFEST, CANDIDATE_WORKFLOW, TRUSTED_WORKFLOW, CORE, ADAPTER, TESTS, ADAPTER_TESTS):
         require(path.is_file(), f"missing:{path.relative_to(ROOT)}", failures)
     if failures:
         print(json.dumps({"state": "HOLD", "failures": failures}, indent=2))
         return 1
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    workflow = WORKFLOW.read_text(encoding="utf-8")
+    candidate_workflow = CANDIDATE_WORKFLOW.read_text(encoding="utf-8")
+    trusted_workflow = TRUSTED_WORKFLOW.read_text(encoding="utf-8")
     core = CORE.read_text(encoding="utf-8")
     adapter = ADAPTER.read_text(encoding="utf-8")
     tests = TESTS.read_text(encoding="utf-8")
@@ -58,16 +60,20 @@ def main() -> int:
     require(actual_agents == required_agents, "agent_set_drift", failures)
     require(all(item.get("authority_ceiling") != "D3" for item in manifest["agents"]), "agent_d3_forbidden", failures)
 
-    require("pull_request_target:" in workflow, "trusted_base_trigger_missing", failures)
-    require("merge_group:" in workflow, "merge_group_trigger_missing", failures)
-    require("persist-credentials: false" in workflow, "credential_persistence_not_disabled", failures)
-    require("permissions: {}" in workflow, "untrusted_job_permissions_not_empty", failures)
-    require("if: github.event_name == 'pull_request'" in workflow, "untrusted_job_boundary_missing", failures)
-    require("if: github.event_name == 'pull_request_target'" in workflow, "trusted_job_boundary_missing", failures)
-    untrusted_block = workflow.split("trusted-base-preflight:", 1)[0]
-    require("GITHUB_TOKEN" not in untrusted_block, "token_exposed_to_untrusted_head", failures)
-    require("--fail-on-severity 2" in workflow, "material_preflight_not_blocking", failures)
-    require("--fail-on-severity 6" in workflow, "awareness_sweep_should_not_claim_merge_gate", failures)
+    require("pull_request:" in candidate_workflow, "candidate_trigger_missing", failures)
+    require("pull_request_target:" not in candidate_workflow, "trusted_trigger_in_candidate_workflow", failures)
+    require("schedule:" not in candidate_workflow and "workflow_dispatch:" not in candidate_workflow, "privileged_trigger_in_candidate_workflow", failures)
+    require("permissions: {}" in candidate_workflow, "candidate_workflow_permissions_not_empty", failures)
+    require("GITHUB_TOKEN" not in candidate_workflow, "token_exposed_to_untrusted_head", failures)
+    require("github.event.pull_request.head.sha" in candidate_workflow, "candidate_checkout_binding_missing", failures)
+    require("pull_request_target:" in trusted_workflow, "trusted_base_trigger_missing", failures)
+    require("merge_group:" in trusted_workflow, "merge_group_trigger_missing", failures)
+    require("schedule:" in trusted_workflow and "workflow_dispatch:" in trusted_workflow, "trusted_recovery_trigger_missing", failures)
+    require("github.event.pull_request.head.sha" not in trusted_workflow, "candidate_code_reference_in_trusted_workflow", failures)
+    require("persist-credentials: false" in candidate_workflow and "persist-credentials: false" in trusted_workflow, "credential_persistence_not_disabled", failures)
+    require("if: github.event_name == 'pull_request_target'" in trusted_workflow, "trusted_job_boundary_missing", failures)
+    require("--fail-on-severity 2" in trusted_workflow, "material_preflight_not_blocking", failures)
+    require("--fail-on-severity 6" in trusted_workflow, "awareness_sweep_should_not_claim_merge_gate", failures)
 
     for symbol in (
         "snapshot_changed_during_evaluation",
@@ -99,7 +105,7 @@ def main() -> int:
         r"fingerprint_salt",
         r"vault[_ -]?location",
     ]
-    packet_text = "\n".join((workflow, core, adapter, json.dumps(manifest)))
+    packet_text = "\n".join((candidate_workflow, trusted_workflow, core, adapter, json.dumps(manifest)))
     for pattern in prohibited_runtime_patterns:
         require(not re.search(pattern, packet_text, re.IGNORECASE), f"protected_material_pattern:{pattern}", failures)
 
@@ -109,7 +115,7 @@ def main() -> int:
             {
                 "state": state,
                 "schema_version": "2.0.0",
-                "checks": 28,
+                "checks": 34,
                 "failures": failures,
                 "merge_authority": False,
                 "D3_auto": False,
