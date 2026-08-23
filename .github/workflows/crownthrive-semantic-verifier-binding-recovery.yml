@@ -1,0 +1,54 @@
+name: CrownThrive Semantic Verifier Binding Recovery
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/crownthrive-semantic-verifier-binding-recovery.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  recover:
+    name: Exact verifier binding recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request GitHub OIDC and execute bounded recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?}"
+          OIDC_RESPONSE="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=chlom-semantic-verifier-recovery")"
+          OIDC_TOKEN="$(jq -er '.value' <<<"${OIDC_RESPONSE}")"
+          PR_NUMBER="$(jq -er '.number' "${GITHUB_EVENT_PATH}")"
+          PR_HEAD_SHA="$(jq -er '.pull_request.head.sha' "${GITHUB_EVENT_PATH}")"
+          RESPONSE_FILE="${RUNNER_TEMP}/semantic-recovery-response.json"
+          HTTP_CODE="$(curl --silent --show-error \
+            --output "${RESPONSE_FILE}" \
+            --write-out "%{http_code}" \
+            -X POST "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crownthrive-semantic-verifier-binding-recovery" \
+            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$(jq -cn --argjson pr_number "${PR_NUMBER}" --arg pr_head_sha "${PR_HEAD_SHA}" '{pr_number:$pr_number,pr_head_sha:$pr_head_sha}')")"
+          RESPONSE="$(cat "${RESPONSE_FILE}")"
+          if [[ "${HTTP_CODE}" != "200" ]]; then
+            SAFE_ERROR="$(jq -r '.error // "unknown_recovery_error"' <<<"${RESPONSE}" 2>/dev/null || echo invalid_error_payload)"
+            echo "Semantic verifier recovery HOLD: ${SAFE_ERROR} (HTTP ${HTTP_CODE})" >&2
+            exit 22
+          fi
+          jq -e '
+            .ok == true
+            and .recovered == true
+            and .semantic_pass_issued == false
+            and .d3_authority_effect == false
+            and (.bindings | length == 2)
+            and (.bindings | all(.exact_readback == true))
+          ' <<<"${RESPONSE}" >/dev/null
+          echo "Exact verifier binding recovery PASS"
