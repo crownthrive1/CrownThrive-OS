@@ -18,8 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/homepage-projection.v2.json"
-START = "<!-- HOMEPAGE_PROJECTION:START -->"
-END = "<!-- HOMEPAGE_PROJECTION:END -->"
+START = "{/*  HOMEPAGE_PROJECTION:START  */}"
+END = "{/*  HOMEPAGE_PROJECTION:END  */}"
 
 
 def args() -> argparse.Namespace:
