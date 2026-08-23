@@ -33,10 +33,17 @@ for (let i = 0; i < cases; i++) {
     payload_digest: 'b'.repeat(64), now: '2026-08-23T05:00:00Z', source_confidence: oracleConfidence
   });
   const d = deriveContinuityDisposition({
-    profile_state:'ECAC', execution_envelope_state:'ECAC', source_head_match, identity_pin_match,
-    heartbeat_state:heartbeat.disposition, dependency_state: random() < 0.17 ? 'HOLD' : 'ECAC',
-    oracle_state:oracle.disposition, rollback_verified, security_state: random() < 0.07 ? 'DENY' : 'ECAC',
-    forbidden_boundary:forbidden, authority_escalation:authorityEscalation, secret_exposure:secretExposure
+    profile_state:'ECAC', execution_envelope_state:'ECAC',
+    source_head_match: sourceHeadMatch,
+    identity_pin_match: identityPinMatch,
+    heartbeat_state:heartbeat.disposition,
+    dependency_state: random() < 0.17 ? 'HOLD' : 'ECAC',
+    oracle_state:oracle.disposition,
+    rollback_verified: rollbackVerified,
+    security_state: random() < 0.07 ? 'DENY' : 'ECAC',
+    forbidden_boundary:forbidden,
+    authority_escalation:authorityEscalation,
+    secret_exposure:secretExposure
   });
   if (d === 'ECAC') ecac++; else if (d === 'HOLD') hold++; else if (d === 'DENY') deny++; else invariantFailures++;
   const unsafe = forbidden || secretExposure || authorityEscalation || !oracleReadOnly;
