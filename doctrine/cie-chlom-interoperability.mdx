@@ -132,18 +132,60 @@ COMPOSED_READY_NON_EXECUTING == production authority
 
 Interoperability depends on preserving the separation.
 
+## Wave 3B durable runtime state
+
+The Wave 2 contract now has a **durable internal controlled-test** evidence/runtime substrate in ThriveBase.
+
+```yaml
+runtime_id: ct.runtime.cie-chlom.durable.v1
+cie_system_id: ct.system.cie.runtime
+chlom_system_id: ct.system.chlom.runtime
+persistence_contract: ct.contract.cie-chlom.persistence.v1
+route_id: ct.route.cie-chlom.interop.v1
+contract_state: controlled_test
+route_state: controlled_test
+route_certification_state: candidate
+public_network_endpoint: not_deployed_by_wave_3b
+composition_ceiling: COMPOSED_READY_NON_EXECUTING
+```
+
+The durable path records one canonical payload for each `(correlation_id, direction)` and binds newly persisted exchange receipts to restricted DAIL evidence.
+
+Its runtime results include:
+
+- `RECORDED` for the first valid payload;
+- `IDEMPOTENT_DUPLICATE` for an exact replay;
+- `HOLD_REPLAY_CONFLICT` for the same key with a different payload;
+- `HOLD_ORPHAN_CHLOM_RECEIPT` when a CHLOM response has no prior CIE request.
+
+A replay conflict does not rewrite the original receipt. The runtime is forced-RLS and append-only, and the governed writer is service-role-only. Direct service-role insert/update/delete is not granted.
+
+The persistence contract has a bounded `write_effect=true` because it writes **internal evidence**. That write effect is not provider, customer, deployment, commerce, entitlement, scoring, D3 or sovereign authority.
+
+Current certification readback showed two durable receipts, one complete correlation, zero pending correlations, forced RLS, no anonymous/authenticated writer execution, and a positive composed result of `COMPOSED_READY_NON_EXECUTING` for the controlled synthetic test.
+
+No public network endpoint is claimed by this state. Declared API/MCP contracts, internal persistence and a live database function do not prove a public CIE service deployment.
+
+See [CIE Durable Runtime & Evidence](/doctrine/cie-durable-runtime-and-evidence) for the persistence, DAIL, replay, access and observability model.
+
 ## Machine implementation
 
-The CIE child repository implements the deterministic non-mutating contract in:
+The CIE child repository implements the deterministic contract and durable runtime in:
 
 - `contracts/chlom/cie-chlom-interoperability.v1.json`;
 - `engine/engine.py`;
 - `api/api-contract.v2.json`;
 - `mcp/mcp-tools.v2.json`;
 - `evals/wave2-interoperability-evals.v1.json`;
-- `scripts/validate_wave2_interoperability.py`.
+- `scripts/validate_wave2_interoperability.py`;
+- `runtime/cie-chlom-durable-runtime.v1.json`;
+- `runtime/migrations/cie_chlom_durable_interop_runtime_v1.sql`;
+- `runtime/migrations/cie_chlom_durable_interop_runtime_v1_hardening.sql`;
+- `runtime/migrations/cie_chlom_durable_interop_runtime_v1_performance.sql`;
+- `runtime/durable_interop_reference.py`;
+- `scripts/validate_wave3b_durable_interop.py`.
 
-The engine supports local `prepare-chlom-handoff`, `validate-chlom-receipt` and `compose-readiness` actions. Network/provider mutation remains separately gated.
+The Wave 2 engine continues to support local `prepare-chlom-handoff`, `validate-chlom-receipt` and `compose-readiness` actions. Wave 3B adds durable internal evidence transport and readback. Public network/provider mutation remains separately gated.
 
 ## Reopen triggers
 
@@ -157,4 +199,7 @@ Reopen interoperability review on:
 - replay/idempotency model change;
 - new mutating adapter;
 - D3/quorum/governance change;
-- new economic or entitlement effect.
+- new economic or entitlement effect;
+- durable-runtime ACL/RLS change;
+- route-state or certification-state change;
+- public network deployment.
