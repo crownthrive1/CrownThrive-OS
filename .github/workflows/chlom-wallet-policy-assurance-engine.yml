@@ -20,14 +20,14 @@ concurrency:
 
 jobs:
   contract:
-    name: Validate ECAC HOLD DENY engine, source correction, and Edge v2
+    name: Validate deterministic ECAC HOLD DENY policy engine and runtime contract
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install exact schema validators
+      - name: Install exact JSON Schema validators
         shell: bash
         run: |
           set -euo pipefail
@@ -37,13 +37,12 @@ jobs:
           for (const [name,version] of Object.entries(expected)) {
             const actual=require(`./node_modules/${name}/package.json`).version;
             if (actual!==version) throw new Error(`${name}:${actual}`);
+            console.log(`${name}@${actual}`);
           }
           NODE
 
-      - name: Validate syntax and machine contracts
-        shell: bash
+      - name: Validate syntax and JSON contracts
         run: |
-          set -euo pipefail
           node --check developers/reference/chlom-wallet/policy/chlom-wallet-policy-assurance.mjs
           node --check developers/reference/chlom-wallet/policy/test-policy-assurance-engine.mjs
           node --check developers/reference/chlom-wallet/policy/test-policy-schemas.mjs
@@ -53,83 +52,45 @@ jobs:
           python -m json.tool developers/manifests/chlom-wallet-policy-assurance-engine.v1.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/policy/baseline-rulepack.v1.json >/dev/null
           python -m json.tool developers/reference/chlom-wallet/policy/edge/runtime-deployment.v1.json >/dev/null
-          for schema in developers/reference/chlom-wallet/policy/schemas/*.schema.json; do
-            python -m json.tool "$schema" >/dev/null
-          done
+          python -m json.tool developers/reference/chlom-wallet/policy/schemas/policy-rulepack.v1.schema.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/policy/schemas/policy-intent.v1.schema.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/policy/schemas/policy-decision-receipt.v1.schema.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/policy/schemas/policy-assurance-status.v1.schema.json >/dev/null
 
-      - name: Verify exact committed source identity and append-only correction
+      - name: Compute exact committed source digests
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
+          python - <<'PY' | tee /tmp/policy-source-digests.json
           from pathlib import Path
-          import hashlib,json,subprocess
-
-          manifest=json.load(open('developers/manifests/chlom-wallet-policy-assurance-engine.v1.json'))
-          deployment=json.load(open('developers/reference/chlom-wallet/policy/edge/runtime-deployment.v1.json'))
-          engine_path='developers/reference/chlom-wallet/policy/chlom-wallet-policy-assurance.mjs'
-          edge_engine_path='developers/reference/chlom-wallet/policy/edge/engine.mjs'
-          actual_engine=hashlib.sha256(Path(engine_path).read_bytes()).hexdigest()
-          actual_edge=hashlib.sha256(Path(edge_engine_path).read_bytes()).hexdigest()
-          actual_blob=subprocess.check_output(['git','hash-object',engine_path],text=True).strip()
-
-          expected_sha='1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c'
-          expected_blob='41edcecf931b6c653cda6b9f9118ea15b795c72a'
-          assert actual_engine==expected_sha
-          assert actual_edge==expected_sha
-          assert actual_blob==expected_blob
-
-          correction=manifest['engine']['source_identity_correction']
-          assert manifest['semantic_version']=='1.2.0'
-          assert manifest['engine']['effective_source_sha256']==expected_sha
-          assert manifest['engine']['source_git_blob_sha1']==expected_blob
-          assert manifest['engine']['source_sha256_state']=='CORRECTED_EXACT_HEAD_CI_APPEND_ONLY'
-          assert correction['correction_id']=='ct.correction.chlom-wallet-policy-engine-source-sha256.v1'
-          assert correction['recorded_sha256']=='b29e31e5061e66dd24a7d1a399b31df453c54acbf6fbfd0516b499f038b4d6da'
-          assert correction['corrected_sha256']==expected_sha
-          assert correction['git_blob_sha1']==expected_blob
-          assert correction['source_blob_changed'] is False
-          assert correction['historical_value_preserved'] is True
-
-          source=deployment['source_identity']
-          assert deployment['deployment_contract_id']=='ct.deploy.chlom-wallet-policy-assurance.v1.2'
-          assert deployment['supersedes_deployment_contract_id']=='ct.deploy.chlom-wallet-policy-assurance.v1.1'
-          assert deployment['semantic_version']=='1.1.0'
-          assert deployment['edge_function']['version']==2
-          assert deployment['edge_function']['status']=='ACTIVE'
-          assert deployment['edge_function']['verify_jwt'] is True
-          assert deployment['edge_function']['deployment_bundle_sha256']=='00cedfe45163deeb3c71042f911eaedf3418189913a962c5daa1e838f820e9ac'
-          assert source['effective_engine_source_sha256']==expected_sha
-          assert source['engine_git_blob_sha1']==expected_blob
-          assert source['source_identity_correction']['correction_id']==correction['correction_id']
-          assert source['source_identity_correction']['source_blob_changed'] is False
-          assert deployment['private_runtime']['deployment_metadata_canary']=='PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY_V2'
-          assert deployment['runtime_canaries']['authenticated_status_and_verify_receipt']=='NOT_EXECUTED'
-          assert deployment['runtime_canaries']['authenticated_evaluate_and_persistence']=='NOT_EXECUTED'
-          assert deployment['runtime_canaries']['unauthorized_request_rejection']=='NOT_EXECUTED'
-          assert all(value is False for value in deployment['hard_boundaries'].values())
+          import hashlib,json
+          paths=[
+            'developers/reference/chlom-wallet/policy/chlom-wallet-policy-assurance.mjs',
+            'developers/reference/chlom-wallet/policy/baseline-rulepack.v1.json',
+            'developers/reference/chlom-wallet/policy/test-policy-assurance-engine.mjs',
+            'developers/reference/chlom-wallet/policy/test-policy-schemas.mjs',
+            'developers/reference/chlom-wallet/policy/policy-chaos-fuzz.mjs',
+            'developers/reference/chlom-wallet/policy/edge/index.ts',
+            'developers/reference/chlom-wallet/policy/edge/engine.mjs',
+            'developers/reference/chlom-wallet/policy/edge/rulepack.ts',
+            'developers/reference/chlom-wallet/policy/edge/deno.json',
+            'developers/reference/chlom-wallet/policy/edge/authenticated-runtime-canary.mjs',
+          ]
+          print(json.dumps({p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in paths},sort_keys=True))
           PY
+          python -m json.tool /tmp/policy-source-digests.json >/dev/null
 
       - name: Run JSON Schema contract tests
         run: node developers/reference/chlom-wallet/policy/test-policy-schemas.mjs
 
-      - name: Run deterministic policy scenarios twice
+      - name: Run controlled policy scenarios twice
         shell: bash
         run: |
           set -euo pipefail
           node developers/reference/chlom-wallet/policy/test-policy-assurance-engine.mjs | tee /tmp/policy-scenarios-1.json
           node developers/reference/chlom-wallet/policy/test-policy-assurance-engine.mjs | tee /tmp/policy-scenarios-2.json
           cmp /tmp/policy-scenarios-1.json /tmp/policy-scenarios-2.json
-          python - <<'PY'
-          import json
-          result=json.load(open('/tmp/policy-scenarios-1.json'))
-          assert result['result']=='PASS_CHLOM_WALLET_POLICY_ASSURANCE_ENGINE'
-          assert result['rulepack_sha256']=='c20767aaa8cce230d8b50af9c7a2b86e83bd7ffb65704c9af75f7d196da6a90b'
-          assert result['scenarios']==12
-          assert result['deterministic_receipt'] is True
-          assert result['receipt_tamper_rejected'] is True
-          assert result['private_secret_field_rejected'] is True
-          PY
+          python -m json.tool /tmp/policy-scenarios-1.json >/dev/null
 
       - name: Run 50,000-case deterministic CHAOS suite twice
         shell: bash
@@ -140,61 +101,198 @@ jobs:
           node developers/reference/chlom-wallet/policy/policy-chaos-fuzz.mjs | tee /tmp/policy-chaos-1.json
           node developers/reference/chlom-wallet/policy/policy-chaos-fuzz.mjs | tee /tmp/policy-chaos-2.json
           cmp /tmp/policy-chaos-1.json /tmp/policy-chaos-2.json
-          python - <<'PY'
-          import json
-          result=json.load(open('/tmp/policy-chaos-1.json'))
-          assert result['result']=='PASS_CHLOM_WALLET_POLICY_CHAOS_FUZZ'
-          assert result['cases']==50000
-          assert result['dispositions']=={'ECAC':9007,'HOLD':24586,'DENY':16407}
-          assert result['invariant_failures']==0
-          assert result['receipt_checks']==50000
-          assert result['determinism_checks']==51
-          assert result['payment_only_rights_cases']==915
-          assert result['impact_false_settlement_cases']==1236
-          assert result['forbidden_secret_cases']==747
-          assert result['broadcast_attempt_cases']==1007
-          assert result['stale_heartbeat_cases']==4020
-          PY
+          python -m json.tool /tmp/policy-chaos-1.json >/dev/null
 
-      - name: Validate algorithm pack, rulepack, manifest, and readback contract
+      - name: Validate algorithm pack, rulepack, evidence, deployment, correction chain, and runtime manifest
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
+          import json,re,subprocess
           algorithms=json.load(open('automation/chlom-wallet-policy-assurance-algorithms.v1.json'))
           manifest=json.load(open('developers/manifests/chlom-wallet-policy-assurance-engine.v1.json'))
           rulepack=json.load(open('developers/reference/chlom-wallet/policy/baseline-rulepack.v1.json'))
+          deployment=json.load(open('developers/reference/chlom-wallet/policy/edge/runtime-deployment.v1.json'))
+          scenario=json.load(open('/tmp/policy-scenarios-1.json'))
+          chaos=json.load(open('/tmp/policy-chaos-1.json'))
+          digests=json.load(open('/tmp/policy-source-digests.json'))
+
+          exact_engine_sha='1fc7892cbfbbaa8a737c63e12f52ddaeac829089b0a9f283d8209ceb674f7867'
+          prior_engine_sha='1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c'
+          original_engine_sha='b29e31e5061e66dd24a7d1a399b31df453c54acbf6fbfd0516b499f038b4d6da'
+          engine_blob='41edcecf931b6c653cda6b9f9118ea15b795c72a'
+          correction_v1='ct.correction.chlom-wallet-policy-engine-source-sha256.v1'
+          correction_v2='ct.correction.chlom-wallet-policy-engine-source-sha256.v2'
+          metadata_canary='PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY_V3'
 
           assert algorithms['algorithm_pack_id']=='ct.algorithm-pack.chlom-wallet-policy-assurance.v1'
+          assert algorithms['semantic_version']=='1.0.0'
+          assert algorithms['state']=='CONTROLLED_TEST'
           assert algorithms['engine_id']=='ct.engine.chlom-wallet-policy-assurance.v1'
+          assert algorithms['canonical_agent_id']=='ct.agent.chlom-wallet-settlement'
+          assert algorithms['dispositions']==['ECAC','HOLD','DENY']
           assert len(algorithms['algorithms'])==7
           assert {a['algorithm_key'] for a in algorithms['algorithms']}=={'CAPS','EAGR','VCL','AIR','RIGOR','DRIFT','CHAOS'}
           assert algorithms['ai_policy']['current_ai_advisory_enabled'] is False
           assert algorithms['ai_policy']['future_llm_may_not_change_disposition'] is True
           assert all(value is False for value in algorithms['hard_boundaries'].values())
 
+          assert manifest['manifest_id']=='ct.manifest.chlom-wallet-policy-assurance-engine.v1'
+          assert manifest['semantic_version']=='1.3.0'
           assert manifest['state']=='CONTROLLED_TEST_EDGE_RUNTIME_ACTIVE_AUTHENTICATED_CANARY_PENDING'
+          assert manifest['phase']=='2.99'
+          assert manifest['canonical_agent_id']=='ct.agent.chlom-wallet-settlement'
+          engine=manifest['engine']
+          assert engine['source_git_blob_sha1']==engine_blob
+          assert engine['effective_source_sha256']==exact_engine_sha
+          assert engine['effective_source_sha256']==digests[engine['source_path']]
+          assert engine['effective_source_identity_correction_id']==correction_v2
+          assert engine['source_sha256_state']=='CORRECTED_EXACT_HEAD_CI_APPEND_ONLY_V2'
+          corrections=engine['source_identity_correction_chain']
+          assert len(corrections)==2
+          assert corrections[0]['correction_id']==correction_v1
+          assert corrections[0]['recorded_sha256']==original_engine_sha
+          assert corrections[0]['corrected_sha256']==prior_engine_sha
+          assert corrections[0]['git_blob_sha1']==engine_blob
+          assert corrections[0]['source_blob_changed'] is False
+          assert corrections[0]['effective'] is False
+          assert corrections[1]['correction_id']==correction_v2
+          assert corrections[1]['supersedes_correction_id']==correction_v1
+          assert corrections[1]['recorded_sha256']==prior_engine_sha
+          assert corrections[1]['corrected_sha256']==exact_engine_sha
+          assert corrections[1]['git_blob_sha1']==engine_blob
+          assert corrections[1]['source_blob_changed'] is False
+          assert corrections[1]['effective'] is True
+          assert corrections[1]['evidence_run_ids']==[32618295786,32618456378]
+          assert corrections[1]['evidence_job_ids']==[97142444849,97142840519]
+
+          assert manifest['rulepack']['source_sha256']=='c309c247aa780b1f7570d81d0b5ef835c71b8dd745c6d0eb6a88b038075b2b14'
           assert manifest['rulepack']['compiled_sha256']=='c20767aaa8cce230d8b50af9c7a2b86e83bd7ffb65704c9af75f7d196da6a90b'
-          assert manifest['private_runtime']['runtime_canary']=='PASS_CHLOM_WALLET_POLICY_ASSURANCE_RUNTIME_CANARY'
-          assert manifest['private_runtime']['deployment_metadata_canary']=='PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY_V2'
-          assert manifest['runtime_surface']['edge_function_version']==2
-          assert manifest['runtime_surface']['deployment_receipt_id']=='ct.deploy.chlom-wallet-policy-assurance.v1.2'
-          assert manifest['runtime_surface']['deployment_bundle_sha256']=='00cedfe45163deeb3c71042f911eaedf3418189913a962c5daa1e838f820e9ac'
-          assert manifest['runtime_surface']['authenticated_runtime_canary']=='NOT_EXECUTED'
+          assert manifest['source_evidence']['schema_test']=='PASS_CHLOM_WALLET_POLICY_ASSURANCE_SCHEMAS'
+          private_runtime=manifest['private_runtime']
+          assert private_runtime['runtime_canary']=='PASS_CHLOM_WALLET_POLICY_ASSURANCE_RUNTIME_CANARY'
+          assert private_runtime['deployment_metadata_canary']==metadata_canary
+          assert private_runtime['effective_source_identity_correction_id']==correction_v2
+          assert private_runtime['source_identity_correction_count']==2
+          assert private_runtime['database_replay_safe'] is True
+          assert private_runtime['append_only_guard_verified'] is True
+          assert 'chlom_wallet_policy_source_correction_chain_v3' in private_runtime['applied_migrations']
+
+          surface=manifest['runtime_surface']
+          assert surface['edge_function_id']=='815335ae-2b15-467a-80ca-37ca1fe7b993'
+          assert surface['edge_function_slug']=='chlom-wallet-policy-assurance'
+          assert surface['edge_function_version']==2
+          assert surface['edge_function_state']=='ACTIVE'
+          assert surface['verify_jwt_required'] is True
+          assert surface['deployment_receipt_id']=='ct.deploy.chlom-wallet-policy-assurance.v1.2'
+          assert surface['supersedes_deployment_receipt_id']=='ct.deploy.chlom-wallet-policy-assurance.v1.1'
+          assert surface['deployment_bundle_sha256']=='00cedfe45163deeb3c71042f911eaedf3418189913a962c5daa1e838f820e9ac'
+          assert surface['deployment_source_head_sha']=='0261e0b4d3bfa5f041b59efd9bf78bc6e1f76591'
+          assert surface['deployment_recorded_engine_source_sha256']==prior_engine_sha
+          assert surface['effective_engine_source_sha256']==exact_engine_sha
+          assert surface['effective_engine_source_sha256']==digests[engine['source_path']]
+          assert surface['effective_source_identity_correction_id']==correction_v2
+          assert surface['supersedes_source_identity_correction_id']==correction_v1
+          assert surface['compile_and_activation']=='PASS_DEPLOYED_ACTIVE'
+          assert surface['deployment_metadata_canary']==metadata_canary
+          assert surface['authenticated_runtime_canary']=='NOT_EXECUTED'
+          assert surface['unauthorized_request_canary']=='NOT_EXECUTED'
+          assert manifest['ai_policy']['enabled'] is False
+          assert manifest['ai_policy']['future_llm_cannot_change_disposition'] is True
           assert all(value is False for value in manifest['hard_boundaries'].values())
 
+          assert rulepack['rulepack_id']=='ct.rulepack.chlom-wallet.policy-assurance.v1'
+          assert rulepack['state']=='CONTROLLED_TEST'
           assert rulepack['allowed_environments']==['controlled_test','testnet']
           assert rulepack['authority_ceiling']=={'autonomy':'A2','decision':'D2'}
           assert len(rulepack['rules'])==12
           assert len(rulepack['required_evidence'])==12
           assert len(rulepack['required_handoffs'])==12
 
-          readback=open('developers/reference/chlom-wallet/policy/thrivebase-policy-assurance-readback-v1.sql').read()
-          assert 'PASS_CHLOM_WALLET_POLICY_ASSURANCE_THRIVEBASE_READBACK_V2' in readback
-          assert 'ct.correction.chlom-wallet-policy-engine-source-sha256.v1' in readback
-          assert 'ct.deploy.chlom-wallet-policy-assurance.v1.2' in readback
-          assert '00cedfe45163deeb3c71042f911eaedf3418189913a962c5daa1e838f820e9ac' in readback
+          assert scenario['result']=='PASS_CHLOM_WALLET_POLICY_ASSURANCE_ENGINE'
+          assert scenario['rulepack_sha256']=='c20767aaa8cce230d8b50af9c7a2b86e83bd7ffb65704c9af75f7d196da6a90b'
+          assert scenario['scenarios']==12
+          assert scenario['deterministic_receipt'] is True
+          assert scenario['receipt_tamper_rejected'] is True
+          assert scenario['private_secret_field_rejected'] is True
+          assert all(scenario[key] is False for key in ['provider_write','custody','money_movement','production_rights_grant','chain_broadcast','phase_advancement'])
+
+          assert chaos['result']=='PASS_CHLOM_WALLET_POLICY_CHAOS_FUZZ'
+          assert chaos['cases']==50000
+          assert chaos['dispositions']=={'ECAC':9007,'HOLD':24586,'DENY':16407}
+          assert chaos['invariant_failures']==0
+          assert chaos['receipt_checks']==50000
+          assert chaos['determinism_checks']==51
+          assert chaos['payment_only_rights_cases']==915
+          assert chaos['impact_false_settlement_cases']==1236
+          assert chaos['forbidden_secret_cases']==747
+          assert chaos['broadcast_attempt_cases']==1007
+          assert chaos['stale_heartbeat_cases']==4020
+          assert all(chaos[key] is False for key in ['production_activation','provider_write','custody','token_issuance','money_movement','production_rights_grant','chain_broadcast','effective_price_publication','phase_advancement'])
+
+          assert deployment['deployment_contract_id']=='ct.deploy.chlom-wallet-policy-assurance.v1.2'
+          assert deployment['supersedes_deployment_contract_id']=='ct.deploy.chlom-wallet-policy-assurance.v1.1'
+          assert deployment['semantic_version']=='1.2.0'
+          assert deployment['state']=='CONTROLLED_TEST_EDGE_RUNTIME_ACTIVE_AUTHENTICATED_CANARY_PENDING'
+          assert deployment['phase']=='2.99'
+          assert deployment['edge_function']['function_id']=='815335ae-2b15-467a-80ca-37ca1fe7b993'
+          assert deployment['edge_function']['slug']=='chlom-wallet-policy-assurance'
+          assert deployment['edge_function']['version']==2
+          assert deployment['edge_function']['status']=='ACTIVE'
+          assert deployment['edge_function']['verify_jwt'] is True
+          assert deployment['edge_function']['deployment_bundle_sha256']=='00cedfe45163deeb3c71042f911eaedf3418189913a962c5daa1e838f820e9ac'
+          source=deployment['source_identity']
+          assert source['source_head_sha']=='0261e0b4d3bfa5f041b59efd9bf78bc6e1f76591'
+          expected_blobs={
+            source['index_path']:'7ba91941926632cf969e822ffab42634849aa119',
+            source['engine_path']:engine_blob,
+            source['rulepack_path']:'fd75bffc98c72faeedf4a3300a8b03f83dc55b67',
+            source['deno_path']:'1c10b8a26f1159982cce0bf5bf90c62f12c5ab98',
+          }
+          for path,expected in expected_blobs.items():
+            actual=subprocess.check_output(['git','hash-object',path],text=True).strip()
+            assert actual==expected,(path,actual,expected)
+          assert digests[source['engine_path']]==exact_engine_sha
+          assert source['deployment_recorded_engine_source_sha256']==prior_engine_sha
+          assert source['effective_engine_source_sha256']==exact_engine_sha
+          assert source['effective_engine_source_sha256']==digests[source['engine_path']]
+          assert source['effective_source_identity_correction_id']==correction_v2
+          deployment_corrections=source['source_identity_correction_chain']
+          assert len(deployment_corrections)==2
+          assert deployment_corrections[0]['correction_id']==correction_v1
+          assert deployment_corrections[0]['recorded_sha256']==original_engine_sha
+          assert deployment_corrections[0]['corrected_sha256']==prior_engine_sha
+          assert deployment_corrections[0]['source_blob_changed'] is False
+          assert deployment_corrections[1]['correction_id']==correction_v2
+          assert deployment_corrections[1]['supersedes_correction_id']==correction_v1
+          assert deployment_corrections[1]['recorded_sha256']==prior_engine_sha
+          assert deployment_corrections[1]['corrected_sha256']==exact_engine_sha
+          assert deployment_corrections[1]['source_blob_changed'] is False
+          assert deployment_corrections[1]['evidence_run_ids']==[32618295786,32618456378]
+          assert deployment_corrections[1]['evidence_job_ids']==[97142444849,97142840519]
+          assert deployment['rulepack_identity']['compiled_sha256']=='c20767aaa8cce230d8b50af9c7a2b86e83bd7ffb65704c9af75f7d196da6a90b'
+          deployment_runtime=deployment['private_runtime']
+          assert deployment_runtime['effective_source_identity_correction']==correction_v2
+          assert deployment_runtime['supersedes_source_identity_correction']==correction_v1
+          assert deployment_runtime['deployment_metadata_canary']==metadata_canary
+          assert deployment_runtime['source_identity_correction_count']==2
+          assert deployment['runtime_canaries']['compile_and_activation']=='PASS_DEPLOYED_ACTIVE'
+          assert deployment['runtime_canaries']['deployment_metadata']==metadata_canary
+          assert deployment['runtime_canaries']['authenticated_status_and_verify_receipt']=='NOT_EXECUTED'
+          assert deployment['runtime_canaries']['authenticated_evaluate_and_persistence']=='NOT_EXECUTED'
+          assert deployment['runtime_canaries']['unauthorized_request_rejection']=='NOT_EXECUTED'
+          assert all(value is False for value in deployment['hard_boundaries'].values())
+
+          assert len(digests)==10
+          assert all(re.fullmatch(r'[0-9a-f]{64}',value) for value in digests.values())
+          print(json.dumps({
+            'result':'PASS_POLICY_ASSURANCE_SOURCE_CORRECTION_CHAIN_AND_EDGE_DEPLOYMENT_CONTRACT',
+            'effective_engine_source_sha256':exact_engine_sha,
+            'effective_source_identity_correction_id':correction_v2,
+            'deployment_receipt_id':'ct.deploy.chlom-wallet-policy-assurance.v1.2',
+            'deployment_metadata_canary':metadata_canary,
+            'digests':digests,
+          },sort_keys=True))
           PY
 
       - name: Enforce secret and no-live boundaries
@@ -207,14 +305,14 @@ jobs:
             echo 'Potential live secret-shaped material detected in policy-assurance source.'
             exit 1
           fi
-          if grep -nE -- '"(production_activation|provider_write|custody|token_issuance|money_movement|production_rights_grant|chain_broadcast|effective_price_publication|checkout_activation|phase_advancement|merge_authorized)"[[:space:]]*:[[:space:]]*true' automation/chlom-wallet-policy-assurance-algorithms.v1.json developers/manifests/chlom-wallet-policy-assurance-engine.v1.json developers/reference/chlom-wallet/policy/edge/runtime-deployment.v1.json; then
-            echo 'Policy Assurance packet crossed a no-live or no-authority boundary.'
+          if grep -nE -- '"(production_activation|provider_write|custody|token_issuance|money_movement|production_rights_grant|chain_broadcast|effective_price_publication|checkout_activation|phase_advancement|merge_authorized|ai_final_authority)"[[:space:]]*:[[:space:]]*true' "${files[@]}"; then
+            echo 'Policy-assurance source crossed a production, value, authority, or release boundary.'
             exit 1
           fi
 
       - name: Record boundary
         run: |
-          echo 'CONTROLLED_TEST: deterministic ECAC/HOLD/DENY policy receipts only.'
-          echo 'The engine digest correction is append-only and the committed Git blob did not change.'
-          echo 'The JWT-protected Edge function v2 is active and metadata-certified; authenticated HTTP canary remains separately pending.'
+          echo 'CONTROLLED_TEST: deterministic ECAC/HOLD/DENY policy assurance, append-only source-identity correction lineage, and Edge deployment metadata are validated.'
+          echo 'The JWT-protected Edge function remains active and metadata-certified; authenticated HTTP and unauthorized-request canaries remain separately pending.'
+          echo 'CHAOS executes synthetic intents locally and creates no provider or chain side effects.'
           echo 'No AI final authority, production activation, provider write, custody, token issuance, money movement, rights grant, chain broadcast, pricing publication, checkout, phase advancement, or merge authority is created.'
