@@ -1,0 +1,185 @@
+---
+title: "Ecosystem Status and Incident Control"
+sidebarTitle: "Ecosystem Status"
+description: "Public-safe architecture for service health, outages, incident timelines, agent acknowledgements, recovery readbacks, lessons learned, and status projections across CrownThrive."
+icon: "signal"
+tag: "Controlled Test"
+---
+
+# Ecosystem Status and Incident Control
+
+CrownThrive treats availability, provider degradation, capacity exhaustion, failed heartbeats, recovery, and post-incident learning as institutional state. A vendor dashboard, chat message, or one successful request is evidence input; none of them is the sole source of truth.
+
+The authoritative operational records remain in the restricted THIVEBASE control plane. This page is the public-safe operating contract and must not expose credentials, private billing evidence, customer data, exploit-enabling detail, or trade-secret implementation bodies.
+
+## Stable service status model
+
+Every monitored P0/P1 service should resolve to a stable CrownThrive service identity independent of vendor, plan, domain, or deployment.
+
+```yaml
+service_id: ct.service.example
+canonical_name: Example Service
+criticality: P0
+provider: replaceable-provider
+status_state: RECOVERY_MONITORING
+expected_heartbeat_seconds: 3600
+owner_agent_id: ct.agent.example
+public_status_allowed: false
+```
+
+Recommended status vocabulary:
+
+- `OPERATIONAL`
+- `DEGRADED`
+- `MAINTENANCE`
+- `INCIDENT`
+- `RECOVERY_MONITORING`
+- `RECOVERED`
+- `UNKNOWN`
+
+A service may be reachable while still remaining in `RECOVERY_MONITORING` because native heartbeats, dependent canaries, reconciliation, or restore evidence have not passed.
+
+## Incident lifecycle
+
+```text
+Detect
+→ classify
+→ contain or degrade safely
+→ preserve evidence
+→ identify affected services and dependencies
+→ mitigate
+→ restore
+→ require native recovery readback
+→ reconcile dependent systems
+→ monitor
+→ postmortem
+→ convert validated lessons into controls, tests, runbooks, and factory candidates
+→ close
+```
+
+Institutional lifecycle values are:
+
+`detected → investigating → mitigating → monitoring → resolved → postmortem → closed`
+
+No incident is closed solely because a provider control plane reports healthy.
+
+## THIVEBASE control-plane records
+
+The restricted implementation uses these governed record families:
+
+- service-status registry;
+- provider-plan snapshots;
+- incident master records;
+- affected-service mappings;
+- append-only incident timeline events;
+- agent acknowledgements and observations;
+- incident lessons learned;
+- factory/export candidate links; and
+- credential-intake gates tied to recovery evidence.
+
+The operational database remains the authority for current state. Mintlify documents the contract, role boundaries, public-safe history, and institutional lessons.
+
+## All-agent acknowledgement rule
+
+Every operationally enabled CrownThrive agent is expected to evaluate an open incident and record one of the applicable outcomes:
+
+- `ack`;
+- `impact`;
+- `no_impact`;
+- `diagnosis`;
+- `action`;
+- `recovery_readback`;
+- `lesson`; or
+- `escalation`.
+
+The required-acknowledgement projection is derived from the active agent identity registry rather than a hand-maintained list. New operational agents therefore inherit open-incident acknowledgement duties without requiring a static roster rewrite.
+
+Acknowledgement does not grant execution authority. Each agent remains bounded by its autonomy class, data classification, role, tool scope, separation-of-duties requirements, and no-self-approval rule.
+
+## Evidence hierarchy during an outage
+
+Use independent evidence lanes instead of collapsing them:
+
+1. founder or authorized-operator report;
+2. provider control-plane/API state;
+3. CrownThrive native heartbeat;
+4. database/storage/API canaries;
+5. affected-platform synthetic checks;
+6. queue/webhook/job reconciliation;
+7. credential-custody and authorization checks;
+8. external/public reachability where relevant; and
+9. post-recovery monitoring window.
+
+A provider status of healthy can support recovery, but CrownThrive requires its own native readback before declaring institutional recovery.
+
+## Credential activation after recovery
+
+Provider restarts, plan changes, credential rotations, security events, and similar disruptions use a fail-closed credential gate.
+
+```text
+restart / capacity event
+        ↓
+provider control readback
+        ↓
+fresh native THIVEBASE heartbeat
+        ↓
+dependent service checks
+        ↓
+credential intake becomes eligible
+        ↓
+secret stored in approved Vault
+        ↓
+private fingerprint/registry update
+        ↓
+bounded runtime canary
+        ↓
+verified-active state
+```
+
+An OAuth application identifier, project identifier, public client identifier, or other reference is not silently treated as an API secret. Secret values are never copied into this repository or public documentation.
+
+## Provider-plan and capacity evidence
+
+Capacity, usage ceilings, retention, storage, egress, spend controls, billing windows, support levels, and other provider-plan facts are stored as restricted provider evidence when they can affect continuity.
+
+Public documentation may state that a provider-plan change occurred or that capacity controls affect availability. Exact account, payment, tax, credential, invoice, or private billing data remains restricted.
+
+A cost-control setting can create an availability tradeoff. Agents may monitor and recommend; they may not silently weaken spend controls or authorize additional charges without the applicable authority.
+
+## Public status projection
+
+A future public status surface may expose only approved fields such as:
+
+- CrownThrive service name;
+- operational/degraded/maintenance/incident state;
+- affected customer-facing functions at an appropriate level;
+- incident start and recovery timestamps;
+- current monitoring state;
+- resolved/postmortem notice; and
+- safe historical uptime/reliability metrics when methodologically supported.
+
+Do not expose internal IPs, database details, credential references, private provider identifiers, exact security findings, customer records, or restricted economic evidence.
+
+## Documentation impact
+
+Every material availability event must resolve one of:
+
+```text
+docs_updated
+docs_no_change
+docs_delta_opened
+```
+
+A meaningful incident normally updates at least the applicable platform changelog, status/continuity record, runbook or test corpus, and lesson/factory candidate where a reusable pattern was discovered.
+
+## Relationship to the operating spine
+
+Ecosystem Status is part of CrownThrive's Technology and Operating Spine. It connects THIVEBASE, CHLOM/DAIL evidence, CrownLytics observability, CrownPulse/ThrivePush communications where authorized, governed agents, support operations, and provider-exit/recovery planning.
+
+See also:
+
+- [Security, Privacy and Continuity](/technology/security-privacy-continuity)
+- [Dependency, Backup and Recovery Architecture](/technology/dependency-backup-and-recovery)
+- [Agentic Autonomy Operating Constitution](/standards/autonomy-operating-constitution)
+- [Provider Outage and Capacity Recovery Runbook](/runbooks/provider-outage-capacity-recovery)
+- [Outage Recovery Skill Factory](/automation/outage-recovery-skill-factory)
