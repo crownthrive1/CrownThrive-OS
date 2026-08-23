@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "agent_id": "ct.agent.archive-reverse-verifier",
   "canonical_name": "Archive Reverse & Decryption Verification Agent",
   "suite_id": "ct.skill-suite.archive-custody.v1",
@@ -10,10 +10,32 @@
   "invocation": "MANUAL_AUTHORIZED_ONLY",
   "authorization": {
     "allowed_principal_classes": ["founder", "explicitly_founder_granted_agent"],
+    "standing_registration_is_authority": false,
+    "standing_authorization_is_execution_authority": false,
     "fresh_check_each_call": true,
+    "exact_scope_lease_required": true,
+    "unexpired_lease_required": true,
     "service_role_execution_only": true,
     "self_authorization": false,
     "founder_root_bypass_for_agent": false
+  },
+  "authority_lease": {
+    "registry": "chlom_runtime.agent_authority_leases_v1",
+    "exact_scope_fields": ["capability", "resource_type", "resource_id", "sensitivity_level", "plaintext_return"],
+    "resource_types": ["archive_algorithm", "crypto_envelope", "crypto_asset"],
+    "key_material_return": false,
+    "minimum_ttl_seconds": 60,
+    "hard_global_max_ttl_seconds": 1200,
+    "s5_agent_max_ttl_seconds": 180,
+    "s5_founder_max_ttl_seconds": 300,
+    "fail_closed_on_missing_or_expired_lease": true
+  },
+  "sensitivity_ttl_seconds": {
+    "S1": {"agent_max": 900, "founder_max": 1200},
+    "S2": {"agent_max": 600, "founder_max": 900},
+    "S3": {"agent_max": 420, "founder_max": 600},
+    "S4": {"agent_max": 300, "founder_max": 420},
+    "S5": {"agent_max": 180, "founder_max": 300}
   },
   "capabilities": [
     "locate_archive_member",
@@ -24,6 +46,8 @@
     "compare_canonical_contract_digest",
     "multi_key_decrypt_verify",
     "founder_keyring_use",
+    "self_report_behavior_anomaly",
+    "self_trigger_emergency_kill",
     "append_restricted_receipt",
     "append_DAIL_event"
   ],
@@ -34,6 +58,11 @@
     "key_material_export",
     "founder_root_bypass",
     "plaintext_persistence",
+    "scope_widening",
+    "lease_extension_without_founder_issuance",
+    "kill_switch_disable",
+    "kill_switch_tamper",
+    "quarantine_self_release",
     "self_approve",
     "vote",
     "D3_action",
@@ -41,6 +70,44 @@
     "money_movement",
     "rights_grant",
     "auto_schedule"
+  ],
+  "emergency_containment": {
+    "kill_switch_enforced": true,
+    "kill_state_table": "chlom_runtime.agent_emergency_kill_state_v1",
+    "incident_table": "chlom_runtime.agent_behavior_incidents_v1",
+    "guardian_table": "chlom_runtime.agent_guardian_bindings_v1",
+    "automatic_kill_conditions": [
+      "scope_deviation",
+      "autonomy_anomaly",
+      "severity_4_or_5",
+      "SCOPE_ESCAPE",
+      "AUTHORITY_ESCALATION",
+      "SECRET_EXPORT_ATTEMPT",
+      "KEY_EXPORT_ATTEMPT",
+      "SELF_AUTHORIZATION",
+      "POLICY_TAMPER",
+      "KILL_SWITCH_TAMPER"
+    ],
+    "self_detection_can_kill": true,
+    "self_release_allowed": false,
+    "kill_effects": ["revoke_active_leases", "kill_standing_agent_authorizations", "quarantine_privilege_profile", "append_DAIL_event"],
+    "founder_release_destination": "RELEASED_TO_RECERTIFICATION",
+    "founder_release_restores_authority": false,
+    "new_lease_after_release_required": true
+  },
+  "guardians": [
+    {
+      "agent_id": "ct.agent.factory.security-red-team",
+      "state": "ACTIVE",
+      "can_trigger_kill": true,
+      "can_release_quarantine": false
+    },
+    {
+      "agent_id": "ct.chlom.agent.security",
+      "state": "PENDING_UNATTESTED",
+      "can_trigger_kill": false,
+      "activation_requires_identity_attestation": true
+    }
   ],
   "founder_crypto_hierarchy": {
     "keyring_id": "ct.crypto.keyring.founder.v1",
@@ -75,6 +142,7 @@
     "receipt_table": "chlom_runtime.archive_reverse_receipts",
     "founder_crypto_receipt_table": "chlom_runtime.founder_crypto_decryption_receipts_v1",
     "authorization_table": "chlom_runtime.archive_reverse_authorizations",
+    "authority_lease_table": "chlom_runtime.agent_authority_leases_v1",
     "key_ring_table": "chlom_runtime.founder_crypto_key_ring_v1",
     "key_escrow_table": "chlom_runtime.founder_crypto_key_escrow_v1",
     "drive_custody_required": true,
@@ -86,21 +154,26 @@
     "founder_root_archive_entrypoint": "chlom_runtime.founder_crypto_reverse_verify_algorithm_v1",
     "multi_key_decrypt_entrypoint": "chlom_runtime.founder_crypto_decrypt_envelope_v1",
     "multi_key_encrypt_entrypoint": "chlom_runtime.founder_crypto_encrypt_envelope_v1",
+    "lease_issue_entrypoint": "chlom_runtime.issue_agent_authority_lease_v1",
+    "behavior_observation_entrypoint": "chlom_runtime.record_agent_behavior_observation_v1",
+    "emergency_kill_entrypoint": "chlom_runtime.emergency_kill_agent_v1",
+    "founder_release_entrypoint": "chlom_runtime.founder_release_agent_quarantine_v1",
     "anon_execute": false,
     "authenticated_execute": false,
     "secret_body_return_default": false,
     "raw_key_material_return": false
   },
   "verification": {
-    "five_key_agent_receipt": "c5cfd508-dfd0-4cbd-91ea-3751b47f712a",
-    "five_key_founder_root_receipt": "50495bdd-9921-4dea-b027-f5ca9355c5f7",
-    "legacy_archive_founder_root_receipt": "721b912b-f3a2-4a8a-b84a-f4959aef26ea",
-    "original_reverse_agent_regression_receipt": "0bbc21da-8e57-4c5e-b2bf-53cc4c49cbb7",
-    "unauthorized_negative_control": "PASS_DENIED",
-    "escrow_wrapped_total": 62,
-    "unlock_ring_wrapped": 10,
-    "legacy_crypto_keys_wrapped": 52,
-    "DAIL_event_id": "88851375-8c2e-4a3d-bfad-1478c42d3fa6",
-    "DAIL_failure_count": 0
+    "scope_and_ttl_negative_canary": "PASS_SCOPE_AND_TTL_DENIAL",
+    "higher_agent_scope_escape_canary": "KILLED_AND_QUARANTINED",
+    "self_detected_autonomy_anomaly_canary": "KILLED_AND_QUARANTINED",
+    "founder_release_canary": "RELEASED_TO_RECERTIFICATION_WITHOUT_AUTHORITY_RESTORE",
+    "agent_s5_lease_receipt": "cb96a80f-2cd0-4ce0-b999-08341ba1bfdd",
+    "founder_s5_lease_receipt": "d120075d-9be8-448e-8de1-bfbdf5c97f6d",
+    "agent_archive_lease_receipt": "5a72693e-c095-4042-ac60-afa3ed2f49b4",
+    "founder_archive_lease_receipt": "6b938b31-f85e-41b1-8b68-ef5e59ecf34b",
+    "DAIL_checked_events": 622,
+    "DAIL_failure_count": 0,
+    "raw_key_material_returned": false
   }
 }
