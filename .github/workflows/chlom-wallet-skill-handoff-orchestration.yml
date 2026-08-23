@@ -1,0 +1,107 @@
+name: CHLOM Wallet Skill & Handoff Orchestration
+
+on:
+  pull_request:
+    paths:
+      - "automation/chlom-wallet-agent-skills-v2.json"
+      - "automation/chlom-wallet-agent-handoff-crosswalk.v1.json"
+      - "automation/chlom-wallet-skill-handoff-orchestration.v1.json"
+      - "developers/reference/chlom-wallet/skills/**"
+      - "developers/manifests/chlom-wallet-skill-handoff-orchestration.v1.json"
+      - "developers/chlom-wallet-skill-handoff-orchestration.mdx"
+      - "changelog/chlom-wallet-skill-handoff-orchestration-2026-08-23.mdx"
+      - ".github/workflows/chlom-wallet-skill-handoff-orchestration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-skill-handoff-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate deterministic skill routing and handoff readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify runtime
+        run: node --version
+
+      - name: Validate syntax and JSON
+        run: |
+          node --check developers/reference/chlom-wallet/skills/skill-handoff-orchestrator.mjs
+          node --check developers/reference/chlom-wallet/skills/test-skill-handoff-orchestrator.mjs
+          python -m json.tool automation/chlom-wallet-agent-skills-v2.json >/dev/null
+          python -m json.tool automation/chlom-wallet-agent-handoff-crosswalk.v1.json >/dev/null
+          python -m json.tool automation/chlom-wallet-skill-handoff-orchestration.v1.json >/dev/null
+          python -m json.tool developers/manifests/chlom-wallet-skill-handoff-orchestration.v1.json >/dev/null
+
+      - name: Verify source fingerprints
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json
+          manifest=json.load(open('automation/chlom-wallet-skill-handoff-orchestration.v1.json'))
+          source=manifest['source_control']
+          for path,key in [
+            (source['implementation_path'],'implementation_sha256'),
+            (source['test_path'],'test_sha256'),
+          ]:
+            actual=hashlib.sha256(open(path,'rb').read()).hexdigest()
+            assert actual==source[key], (path,actual,source[key])
+          assert manifest['state']=='CONTROLLED_TEST'
+          assert manifest['engine_id']=='ct.engine.chlom-wallet-skill-handoff-orchestration.v1'
+          assert manifest['skill_suite_id']=='ct.skill-suite.chlom-wallet.v2'
+          assert manifest['downstream_policy_engine_id']=='ct.engine.chlom-wallet-policy-assurance.v1'
+          algorithms=manifest['algorithms']
+          assert [a['algorithm_key'] for a in algorithms]==['WISC','SCOPE','HARP']
+          assert len({a['algorithm_id'] for a in algorithms})==3
+          assert all(a['deterministic'] is True for a in algorithms)
+          assert all(a['final_authority'] is False for a in algorithms)
+          wisc=next(a for a in algorithms if a['algorithm_key']=='WISC')
+          assert wisc['ai_advisory'] is True
+          assert manifest['controlled_test_evidence']['result']=='PASS_CHLOM_WALLET_SKILL_HANDOFF_ORCHESTRATION_CONTRACT'
+          assert manifest['controlled_test_evidence']['scenario_count']==11
+          assert manifest['controlled_test_evidence']['pending_aliases_quarantined']==['ct.agent.api-mcp','ct.agent.webhook-delivery']
+          boundaries=manifest['hard_boundaries']
+          assert boundaries['vote_effect']=='none'
+          assert all(value is False for key,value in boundaries.items() if key!='vote_effect')
+          PY
+
+      - name: Run deterministic orchestration contract
+        run: |
+          node developers/reference/chlom-wallet/skills/test-skill-handoff-orchestrator.mjs \
+            automation/chlom-wallet-agent-skills-v2.json \
+            automation/chlom-wallet-agent-handoff-crosswalk.v1.json
+
+      - name: Enforce alias quarantine and no-live boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            automation/chlom-wallet-skill-handoff-orchestration.v1.json
+            developers/reference/chlom-wallet/skills/skill-handoff-orchestrator.mjs
+            developers/reference/chlom-wallet/skills/test-skill-handoff-orchestrator.mjs
+            developers/manifests/chlom-wallet-skill-handoff-orchestration.v1.json
+            developers/chlom-wallet-skill-handoff-orchestration.mdx
+            changelog/chlom-wallet-skill-handoff-orchestration-2026-08-23.mdx
+          )
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${files[@]}"; then
+            echo 'Potential live secret-shaped material detected in skill orchestration projection.'
+            exit 1
+          fi
+          if grep -nE -- '"(execution_authorized|schedule_slot_created|capability_grant_created|authority_granted|certification_authority|credential_access|provider_write|custody|token_issuance|money_movement|production_rights_grant|chain_broadcast|effective_price_publication|checkout_activation|phase_advancement|merge_authorized|ai_final_authority)"[[:space:]]*:[[:space:]]*true' "${files[@]}"; then
+            echo 'Wallet skill orchestration crossed an authority, value, production, or release boundary.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo 'CONTROLLED_TEST: deterministic WISC/SCOPE/HARP routing validated against 20 Wallet skills and the canonical handoff crosswalk.'
+          echo 'No execution, scheduler slot, capability grant, authority, vote, credential access, provider write, custody, token issuance, money movement, rights grant, chain broadcast, public price, checkout, phase advancement, or merge authority is created.'
