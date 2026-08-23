@@ -5,3 +5,448 @@ description: "Standalone CHLOM algorithm for normalizing provider events and pre
 icon: "arrows-rotate"
 keywords: ["CHLOM ALG-008", "webhook idempotency", "payment events", "reconciliation", "duplicate prevention"]
 ---
+
+# ALG-008 — Payment Webhook Idempotency
+
+## Canonical record
+
+```yaml
+algorithm_id: ct.chlom.algorithm.alg-008
+canonical_name: Payment Webhook Idempotency
+artifact_class: economic_event_normalization_algorithm
+lineage:
+  - payment-and-fulfillment governance
+  - P-06 Commerce, Booking & Loyalty
+  - P-11 Capital, Revenue & Settlement
+  - ThriveEvergreen economic activation
+  - DAIL event/reconciliation architecture
+status: public_safe_algorithm_contract
+implementation_state: provider_adapter_specific_evidence_required
+restricted_companion: 04_Restricted_Algorithms_Formulas_Threat_Models_and_Trade_Secrets
+```
+
+## Purpose
+
+Payment providers frequently retry, reorder or duplicate webhook deliveries. ALG-008 guarantees that repeated provider notifications do **not** create repeated institutional effects such as duplicate orders, entitlements, credits, royalties, payouts or settlement records.
+
+```text
+PROVIDER WEBHOOK
+      |
+      v
+AUTHENTICATE / VERIFY
+      |
+NORMALIZE EVENT
+      |
+      v
+SEMANTIC EVENT IDENTITY
+      |
+IDEMPOTENCY LOOKUP
+   /          \
+NEW         SEEN
+ |            |
+PROCESS     RETURN PRIOR RESULT
+ |
+DOMAIN EFFECTS
+ |
+READBACK / RECONCILIATION
+ |
+DAIL RECEIPT
+```
+
+## Core invariant
+
+```text
+same semantic provider event
+    -> at most one institutional effect
+```
+
+Transport delivery count must never equal business-effect count.
+
+## Why transport IDs are insufficient
+
+Providers may:
+
+- redeliver the same event with the same ID;
+- generate a new event ID for the same underlying payment state;
+- deliver state transitions out of order;
+- send snapshots plus event notifications;
+- retry after a timeout even though the first request succeeded;
+- send separate events for payment, order, invoice and entitlement-related state.
+
+Therefore CHLOM needs both **provider-event idempotency** and **semantic/business idempotency**.
+
+## Input envelope
+
+```yaml
+webhook_ingress_id: stable internal receipt id
+provider_ref: registered provider/adapter
+provider_event_id: provider identifier if available
+provider_object_id: payment/order/invoice/session alias
+provider_event_type: raw type
+received_at: timestamp
+provider_created_at: optional
+raw_payload_digest_ref: restricted evidence digest
+signature_verification_ref: required
+adapter_version: exact
+```
+
+Raw payloads may be restricted and should not be copied into public DAIL projections.
+
+## Normalized event
+
+```yaml
+normalized_event_id: stable id
+provider_ref: required
+provider_event_ref: raw receipt
+semantic_event_type: canonical event type
+business_object_refs: order|invoice|payment|subscription|booking|other
+amount: optional typed
+currency: optional
+state: canonical state
+observed_at: provider/source time
+received_at: institutional time
+correlation_key: stable business correlation
+semantic_idempotency_key: required
+adapter_version: exact
+```
+
+## Semantic idempotency key
+
+The key should identify the intended business effect, not merely the network delivery.
+
+Conceptually:
+
+```text
+semantic_key = H(
+  provider_identity,
+  provider_business_object,
+  canonical_effect_type,
+  canonical_effect_version_or_transition,
+  relevant_amount_currency_scope
+)
+```
+
+The exact hash/canonicalization function is implementation-controlled and must be deterministic.
+
+## Idempotency store
+
+```yaml
+idempotency_record_id: stable id
+semantic_key: unique
+first_ingress_ref: required
+canonical_effect_ref: optional until committed
+processing_state: received|processing|committed|held|failed_retriable|failed_terminal
+result_digest_ref: optional
+created_at: timestamp
+updated_at: timestamp
+```
+
+A unique constraint or equivalent transactional guarantee should protect the semantic key.
+
+## Processing procedure
+
+```text
+1. verify provider signature/authentication
+2. reject malformed/untrusted ingress
+3. normalize raw provider event
+4. derive semantic event identity
+5. atomically acquire/create idempotency record
+6. if already committed -> return prior success/no-op
+7. if processing by another worker -> no duplicate side effect
+8. evaluate current institutional state and event ordering
+9. apply eligible domain transition exactly once
+10. persist canonical effect + DAIL receipt
+11. reconcile provider/canonical state
+12. mark idempotency record committed
+```
+
+## Public-safe pseudocode
+
+```text
+function handle_webhook(raw):
+    verified = verify_provider_webhook(raw)
+    if not verified:
+        reject_and_record_security_event()
+
+    event = normalize(raw)
+    key = semantic_idempotency_key(event)
+
+    lock = acquire_unique_idempotency_record(key)
+
+    if lock.state == COMMITTED:
+        return prior_result(lock)
+
+    if lock.state == PROCESSING_BY_OTHER_WORKER:
+        return accepted_or_retry_safe_response()
+
+    canonical = read_current_business_state(event)
+    disposition = reconcile_event_order(canonical, event)
+
+    if disposition == STALE_NOOP:
+        record_noop_receipt(event, key)
+        mark_committed(key)
+        return noop
+
+    if disposition == HOLD:
+        mark_held(key)
+        return HOLD
+
+    effect = apply_transition_transactionally(canonical, event)
+    append_DAIL(effect, event, key)
+    verify_postcondition(effect)
+    mark_committed(key, effect)
+    return effect
+```
+
+## Provider-event duplicate
+
+If the exact provider event ID was previously verified and mapped:
+
+```text
+same provider_event_id
+ -> no second business effect
+```
+
+The system can return a provider-compatible success response to stop retries.
+
+## Semantic duplicate with different provider event IDs
+
+Example:
+
+```text
+Event A: payment_intent.succeeded
+Event B: checkout.session.completed
+```
+
+Both may refer to the same purchase. Domain logic must ensure they do not independently create the same entitlement/order fulfillment twice.
+
+```text
+provider events many
+      -> one canonical payment/business transition
+```
+
+## Event ordering
+
+Webhook arrival order may differ from source-state order.
+
+```text
+provider event timestamps / object version
+     + canonical current state
+     -> transition disposition
+```
+
+A stale event should not roll current state backward unless a source-authorized reversal/correction transition explicitly requires it.
+
+## State monotonicity and reversible transitions
+
+For a simplified payment lifecycle:
+
+```text
+CREATED -> AUTHORIZED -> CAPTURED -> SETTLED
+                    \-> FAILED
+CAPTURED/SETTLED -> REFUND/REVERSAL states via explicit events
+```
+
+A late `AUTHORIZED` event must not overwrite `CAPTURED`. A refund is not a backward rewrite; it is a new explicit state/economic correction.
+
+## Entitlement boundary
+
+```text
+payment evidence
+   != entitlement automatically
+```
+
+Before entitlement activation, the commerce/economic authority path verifies:
+
+- canonical offer/SKU/product;
+- rights/licensing state where required;
+- amount/currency/price match;
+- order/customer subject mapping;
+- refund/dispute status;
+- other activation conditions.
+
+Idempotency prevents duplicates but does not replace entitlement authority.
+
+## Economic effects
+
+One payment can trigger multiple downstream obligations:
+
+```text
+payment reconciled
+   +--> order state
+   +--> entitlement candidate
+   +--> tax/fee records
+   +--> royalty/commission obligations
+   +--> accounting/settlement events
+```
+
+Each downstream effect should also have its own stable idempotency/correlation identity.
+
+## Failure and retry
+
+### Failure before any durable effect
+
+Record failure and allow safe retry.
+
+### Failure after canonical effect committed but before provider response
+
+A provider retry must resolve the committed idempotency record and return the prior result, not re-run the effect.
+
+### Partial cross-service failure
+
+Use a saga/compensation/reconciliation workflow. Do not delete the successful prior step.
+
+## Transaction boundary
+
+Where possible, the following should be atomic within one datastore transaction:
+
+```text
+idempotency claim
++ canonical state transition
++ domain outbox/event record
+```
+
+External provider/API side effects require separately idempotent adapters and readback.
+
+## Outbox/event pattern
+
+```text
+DB transaction:
+  update canonical business state
+  write outbox event
+  write idempotency result
+
+publisher:
+  deliver outbox event
+  retry safely
+```
+
+This prevents a successful database transition from being lost because an event-bus publish failed.
+
+## Reconciliation
+
+Periodic or event-driven reconciliation compares:
+
+```text
+provider object state
+vs
+canonical institutional payment/order state
+```
+
+Mismatch creates a reconciliation record/HOLD/case instead of repeated webhook side effects.
+
+## Refunds and disputes
+
+Refund, chargeback or dispute events are new semantic transitions with their own idempotency keys.
+
+```text
+original payment effect retained
+   -> refund/reversal effect
+   -> entitlement/remedy evaluation
+```
+
+No silent deletion.
+
+## Security checks
+
+Before idempotency processing:
+
+- signature/auth validation;
+- timestamp/replay constraints if provider supports them;
+- endpoint/provider identity;
+- payload size/schema validation;
+- secret rotation compatibility;
+- rate/burst protection.
+
+A forged duplicate should never be treated as a safe no-op without authentication evidence.
+
+## DAIL events
+
+```text
+ct.webhook.received.v1
+ct.webhook.verified.v1
+ct.webhook.rejected.v1
+ct.webhook.duplicate.detected.v1
+ct.payment.event.normalized.v1
+ct.payment.transition.applied.v1
+ct.payment.transition.noop.v1
+ct.payment.reconciliation.mismatch.v1
+ct.payment.refund.reconciled.v1
+```
+
+## Failure modes
+
+- invalid signature -> reject/security event;
+- unknown provider event -> archive/hold according to adapter policy;
+- duplicate semantic event -> no duplicate effect;
+- out-of-order stale event -> no rollback/no-op;
+- amount/currency mismatch -> HOLD/reconciliation;
+- idempotency store unavailable -> fail closed before side effect;
+- provider timeout after effect -> retry resolves prior result;
+- domain transaction fails -> no committed effect;
+- downstream delivery fails -> outbox retry.
+
+## Threat model
+
+- forged webhook;
+- replay attack;
+- provider duplicate delivery;
+- race between workers;
+- semantic duplicate across event types;
+- amount/currency substitution;
+- out-of-order rollback;
+- duplicate entitlement;
+- duplicate commission/royalty;
+- stale secret/signature handling;
+- provider success promoted as settlement without reconciliation.
+
+## Test vectors
+
+1. same provider event delivered 10 times -> one canonical effect;
+2. two workers receive same event concurrently -> one effect;
+3. different provider event IDs map to same purchase transition -> one effect;
+4. captured state receives late authorized event -> no regression;
+5. refund event delivered twice -> one refund effect;
+6. invalid signature with previously seen event ID -> reject, not trusted duplicate;
+7. effect commits but HTTP response times out -> retry returns prior result;
+8. amount/currency mismatch -> HOLD before entitlement;
+9. downstream royalty event publish fails -> outbox retries without duplicate order/payment effect;
+10. provider/canonical mismatch found later -> reconciliation case, not duplicated fulfillment.
+
+## Observability
+
+Track:
+
+- webhook volume by provider/type;
+- verification failures;
+- exact duplicates;
+- semantic duplicates;
+- stale/out-of-order events;
+- idempotency contention;
+- processing latency;
+- reconciliation mismatches;
+- duplicate-effect incidents (target zero);
+- provider retry rate.
+
+## Restricted companion
+
+Private custody may contain webhook secrets, raw provider payloads, provider object mappings, private fraud signals, exact canonicalization rules where security-sensitive, incident traces and reconciliation evidence.
+
+## Invariants
+
+```text
+delivery count != business-effect count
+provider event != canonical event automatically
+payment success != entitlement automatically
+payment success != settlement automatically
+refund != deletion of original payment
+same semantic event -> at most one institutional effect
+```
+
+## Versioning
+
+Provider adapter or semantic-key changes require explicit versioning and migration tests so older idempotency records remain interpretable.
+
+## Status
+
+`reconstructed_source_grounded + public_safe_algorithm_contract`. Provider credentials/raw events remain restricted and every live adapter requires provider-specific test evidence.
