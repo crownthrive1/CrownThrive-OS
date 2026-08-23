@@ -1,0 +1,117 @@
+---
+title: "ThriveBase Legacy Compatibility Wrappers"
+sidebarTitle: "ThriveBase Compatibility"
+description: "Reversible service-only canonical function aliases for the pre-existing missing-r ThriveBase runtime estate, with privilege parity and safe read-only behavior canaries."
+icon: "code-branch"
+tag: "Controlled Test"
+noindex: true
+keywords: ["ThriveBase", "compatibility wrappers", "runtime migration", "service role", "fail closed"]
+---
+
+# ThriveBase legacy compatibility wrappers
+
+**Contract:** `ct.manifest.thrivebase-legacy-compatibility-wrappers.v1`  
+**Institutional phase:** 2.99  
+**State:** `CONTROLLED_TEST_SOURCE_READY_RUNTIME_PENDING`  
+**Production authority:** none
+
+This controlled tranche introduces canonical `thrivebase` function names without destructively renaming the pre-existing missing-r runtime estate.
+
+<Warning>
+  The wrappers do not rename schemas, queues, triggers, consumers, Vault secrets, Edge functions, or legacy routines. They do not broaden public access, create provider-write authority, move money, grant rights, broadcast a chain transaction, advance the institutional phase, or authorize merge.
+</Warning>
+
+## Why wrappers come first
+
+A direct rename would risk breaking queue consumers, trigger functions, scheduler bindings, Vault lookups, Edge code, and historical evidence. The safer migration sequence is:
+
+```text
+Inventory legacy dependencies
+        ↓
+Create canonical service-only wrappers
+        ↓
+Verify signatures and privilege parity
+        ↓
+Run safe read-only behavior canaries
+        ↓
+Bind new source to canonical names
+        ↓
+Rebind consumers and triggers in controlled tranches
+        ↓
+Verify rollback and exact readback
+        ↓
+Retire legacy aliases only under explicit approval
+```
+
+This page covers the wrapper stage only.
+
+## Canonical wrapper surface
+
+| Canonical function | Access | Current purpose |
+| --- | --- | --- |
+| `thrivebase_async_queue_complete_v1(...)` | no new service-role grant | Preserve the original restricted completion surface without widening authority |
+| `thrivebase_async_queue_complete_v2(...)` | service role | Canonical completion alias |
+| `thrivebase_async_queue_read_v1(...)` | service role | Canonical bounded queue-read alias |
+| `thrivebase_async_queue_status_v1()` | service role | Canonical read-only queue status |
+| `thrivebase_async_webhook_authorize_v1(...)` | service role | Canonical authorization alias; existing Vault secret unchanged |
+| `thrivebase_health_snapshot()` | service role | Canonical health alias; existing heartbeat sink unchanged |
+| `thrivebase_self_diagnostic_run_v1()` | service role | Canonical diagnostic-run alias; existing agent binding unchanged |
+| `thrivebase_self_diagnostic_status_v1()` | service role | Canonical read-only diagnostic status |
+
+All wrappers are `SECURITY INVOKER`. `PUBLIC`, `anon`, and `authenticated` execution remain revoked.
+
+## Safe readback canaries
+
+Only two behavior-equivalence checks are authorized in this tranche:
+
+1. queue-status parity; and
+2. self-diagnostic-status parity.
+
+The following surfaces are not invoked during compatibility readback because they may consume, archive, authorize, write, lock, or create operational evidence:
+
+- queue read;
+- queue completion;
+- webhook authorization;
+- health snapshot;
+- diagnostic run.
+
+## Source-controlled contract
+
+```text
+developers/reference/thrivebase/runtime/thrivebase-legacy-compatibility-wrappers-v1.sql
+developers/reference/thrivebase/runtime/thrivebase-legacy-compatibility-readback-v1.sql
+developers/manifests/thrivebase-legacy-compatibility-wrappers.v1.json
+scripts/validate_thrivebase_compatibility_wrappers.py
+.github/workflows/thrivebase-legacy-compatibility-wrappers.yml
+```
+
+The source validator requires exactly eight canonical wrappers, seven service-role grants, eight `SECURITY INVOKER` definitions, two safe parity canaries, retained legacy aliases, and no destructive or authority-expanding operations.
+
+## Deferred runtime cutover
+
+The following remain separate controlled tranches:
+
+```yaml
+canonical_schema_and_queue_design: deferred
+trigger_rebinding: false
+consumer_rebinding: false
+vault_secret_renamed: false
+edge_rebinding: false
+legacy_alias_retired: false
+destructive_rename: false
+```
+
+The old runtime identities remain compatibility dependencies until each consumer is inventoried, rebound, canaried, and rollback-tested.
+
+## Hard boundaries
+
+```yaml
+production_authority_created: false
+provider_write_created: false
+credential_access_created: false
+money_movement_created: false
+rights_grant_created: false
+chain_broadcast_created: false
+phase_advancement: false
+merge_authorized: false
+```

@@ -1,0 +1,75 @@
+name: ThriveBase Legacy Compatibility Wrappers
+
+on:
+  pull_request:
+    paths:
+      - "developers/reference/thrivebase/runtime/**"
+      - "developers/manifests/thrivebase-legacy-compatibility-wrappers.v1.json"
+      - "developers/thrivebase-legacy-compatibility-wrappers.mdx"
+      - "scripts/validate_thrivebase_compatibility_wrappers.py"
+      - ".github/workflows/thrivebase-legacy-compatibility-wrappers.yml"
+  push:
+    branches:
+      - main
+      - "chlom-wallet/**"
+    paths:
+      - "developers/reference/thrivebase/runtime/**"
+      - "developers/manifests/thrivebase-legacy-compatibility-wrappers.v1.json"
+      - "developers/thrivebase-legacy-compatibility-wrappers.mdx"
+      - "scripts/validate_thrivebase_compatibility_wrappers.py"
+      - ".github/workflows/thrivebase-legacy-compatibility-wrappers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thrivebase-legacy-compatibility-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-contract:
+    name: Validate reversible canonical wrapper contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate source syntax
+        run: |
+          python -m py_compile scripts/validate_thrivebase_compatibility_wrappers.py
+          python -m json.tool developers/manifests/thrivebase-legacy-compatibility-wrappers.v1.json >/dev/null
+
+      - name: Validate compatibility contract
+        run: python scripts/validate_thrivebase_compatibility_wrappers.py
+
+      - name: Enforce no destructive or live-effect migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          migration="developers/reference/thrivebase/runtime/thrivebase-legacy-compatibility-wrappers-v1.sql"
+          if grep -niE -- '\b(drop[[:space:]]+(function|schema|table)|create[[:space:]]+trigger|alter[[:space:]]+trigger|create[[:space:]]+schema|deploy[_ -]?function)\b' "$migration"; then
+            echo "Compatibility migration crossed a prohibited boundary."
+            exit 1
+          fi
+          if grep -niE -- '"?(production_authority_created|provider_write_created|credential_access_created|money_movement_created|rights_grant_created|chain_broadcast_created|phase_advancement|merge_authorized)"?[[:space:]]*:[[:space:]]*true' developers/manifests/thrivebase-legacy-compatibility-wrappers.v1.json; then
+            echo "Compatibility manifest crossed a no-authority boundary."
+            exit 1
+          fi
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
