@@ -18,8 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/homepage-projection.v2.json"
-START = "<!-- HOMEPAGE_PROJECTION:START -->"
-END = "<!-- HOMEPAGE_PROJECTION:END -->"
+START = "{/*  HOMEPAGE_PROJECTION:START  */}"
+END = "{/*  HOMEPAGE_PROJECTION:END  */}"
 
 
 def args() -> argparse.Namespace:
@@ -75,6 +75,7 @@ def render(manifest: dict) -> str:
     return "\n".join(
         [
             START,
+            "",
             "## Governed automated projection",
             "",
             "This bounded region is generated from the current readiness gate and the homepage projection policy. Hourly no-op runs are heartbeats and do not churn documentation.",
@@ -97,6 +98,7 @@ def render(manifest: dict) -> str:
             "<Note>",
             "  Source acceptance and documentation reachability are independent. A login-gated or temporarily unavailable Mintlify projection can block a public-deployment or indexing claim, but it cannot by itself manufacture a source-governance HOLD after the exact-head required gates pass.",
             "</Note>",
+            "",
             END,
         ]
     )
