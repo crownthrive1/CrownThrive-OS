@@ -1,0 +1,64 @@
+name: Governance Observability Contract
+
+on:
+  pull_request:
+    paths:
+      - scripts/classify_governance_run.py
+      - scripts/upsert_pr_governance_state.py
+      - scripts/validate_governance_observability_archive.py
+      - .github/workflows/governance-observability.yml
+      - .github/workflows/governance-observability-contract.yml
+      - .github/workflows/governed-merge-gate.yml
+      - standards/governance-observability-and-archive-continuity.mdx
+      - developers/manifests/governance-observability-archive-continuity.v1.json
+  push:
+    branches:
+      - feature/governance-observability-archive-v2-20260823
+    paths:
+      - scripts/classify_governance_run.py
+      - scripts/upsert_pr_governance_state.py
+      - scripts/validate_governance_observability_archive.py
+      - .github/workflows/governance-observability.yml
+      - .github/workflows/governance-observability-contract.yml
+      - .github/workflows/governed-merge-gate.yml
+      - standards/governance-observability-and-archive-continuity.mdx
+      - developers/manifests/governance-observability-archive-continuity.v1.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governance-observability-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate classification, exact-head, and archive continuity boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Validate syntax
+        run: |
+          python -m py_compile scripts/classify_governance_run.py
+          python -m py_compile scripts/upsert_pr_governance_state.py
+          python -m py_compile scripts/validate_governance_observability_archive.py
+      - name: Validate classifier negative and positive controls
+        run: python scripts/classify_governance_run.py --self-test
+      - name: Validate institutional contract
+        run: python scripts/validate_governance_observability_archive.py
+      - name: Validate repository documentation
+        run: python scripts/validate_docs.py
+      - name: Check JSON syntax and whitespace
+        run: |
+          python -m json.tool developers/manifests/governance-observability-archive-continuity.v1.json >/dev/null
+          git diff --check
