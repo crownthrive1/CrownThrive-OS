@@ -1,0 +1,44 @@
+name: Executable Agent Contract Governance
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/agent-executable-contract-convergence.v1.json"
+      - "standards/executable-agent-contract-and-version-convergence.md"
+      - "skills/chlom-wallet-independent-review/**"
+      - "skills/sites-fleet-orchestration/**"
+      - "skills/frameworks/**"
+      - "scripts/validate_agent_executable_contract_convergence.py"
+      - ".github/workflows/agent-executable-contract-governance.yml"
+  push:
+    branches:
+      - "agent-contracts/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate executable agent contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile validator
+        run: |
+          python -m py_compile scripts/validate_agent_executable_contract_convergence.py
+      - name: Validate executable contract source
+        run: |
+          python scripts/validate_agent_executable_contract_convergence.py
+      - name: Check diff hygiene
+        run: |
+          git diff --check
