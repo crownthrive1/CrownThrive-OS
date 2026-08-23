@@ -1,12 +1,14 @@
--- CHLOM Wallet Policy Assurance Engine v1 — ThriveBase institutional readback.
--- This script verifies policy, receipt, source-correction, deployment, and public-status controls.
--- It performs no provider write, custody, money movement, rights grant,
--- chain broadcast, pricing, checkout, phase, or merge action.
+-- CHLOM Wallet Policy Assurance Engine v1 — ThriveBase institutional readback V3.
+-- Verifies private policy controls, the append-only source-correction chain,
+-- active Edge metadata, public-safe status projection, and all no-live boundaries.
+-- Performs no provider write, custody, value transfer, rights grant, chain
+-- broadcast, pricing, checkout, phase advancement, merge, or vote action.
 
 do $$
 declare
   v_tables integer;
   v_rls integer;
+  v_forced_rls integer;
   v_policies integer;
   v_triggers integer;
   v_private_table_access integer;
@@ -45,9 +47,11 @@ begin
     ('policy_source_identity_corrections_v1'),
     ('policy_runtime_deployment_canary_runs_v1')
   )
-  select count(*) into v_rls
+  select count(*) filter(where c.relrowsecurity),
+         count(*) filter(where c.relforcerowsecurity)
+    into v_rls,v_forced_rls
   from expected e
-  join pg_class c on c.relname=e.name and c.relrowsecurity
+  join pg_class c on c.relname=e.name
   join pg_namespace n on n.oid=c.relnamespace and n.nspname='chlom_wallet';
 
   with expected(name) as (values
@@ -63,7 +67,12 @@ begin
   from expected e
   where exists (
     select 1 from pg_policies p
-    where p.schemaname='chlom_wallet' and p.tablename=e.name
+    where p.schemaname='chlom_wallet'
+      and p.tablename=e.name
+      and p.permissive='RESTRICTIVE'
+      and p.roles='{public}'::name[]
+      and p.cmd='ALL'
+      and p.qual='false'
   );
 
   with expected(name) as (values
@@ -121,7 +130,8 @@ begin
     and p.proname='chlom_wallet_policy_assurance_status_v1'
     and p.prosecdef
     and has_function_privilege('anon',p.oid,'EXECUTE')
-    and has_function_privilege('authenticated',p.oid,'EXECUTE');
+    and has_function_privilege('authenticated',p.oid,'EXECUTE')
+    and not has_function_privilege('public',p.oid,'EXECUTE');
 
   select count(*) into v_algorithms from chlom_wallet.policy_algorithm_registry_v1;
   select count(*) into v_rulepacks
@@ -129,12 +139,28 @@ begin
   where rulepack_ref='ct.rulepack.chlom-wallet.policy-assurance.v1@1.0.0'
     and compiled_sha256='c20767aaa8cce230d8b50af9c7a2b86e83bd7ffb65704c9af75f7d196da6a90b';
   select count(*) into v_decisions from chlom_wallet.policy_decision_receipts_v1;
+
   select count(*) into v_corrections
-  from chlom_wallet.policy_source_identity_corrections_v1
-  where correction_id='ct.correction.chlom-wallet-policy-engine-source-sha256.v1'
-    and recorded_sha256='b29e31e5061e66dd24a7d1a399b31df453c54acbf6fbfd0516b499f038b4d6da'
-    and corrected_sha256='1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c'
-    and git_blob_sha1='41edcecf931b6c653cda6b9f9118ea15b795c72a';
+  from chlom_wallet.policy_source_identity_corrections_v1 c
+  where c.target_type='engine_source'
+    and c.target_id='developers/reference/chlom-wallet/policy/chlom-wallet-policy-assurance.mjs'
+    and c.git_blob_sha1='41edcecf931b6c653cda6b9f9118ea15b795c72a'
+    and (
+      (
+        c.correction_id='ct.correction.chlom-wallet-policy-engine-source-sha256.v1'
+        and c.supersedes_correction_id is null
+        and c.recorded_sha256='b29e31e5061e66dd24a7d1a399b31df453c54acbf6fbfd0516b499f038b4d6da'
+        and c.corrected_sha256='1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c'
+      )
+      or
+      (
+        c.correction_id='ct.correction.chlom-wallet-policy-engine-source-sha256.v2'
+        and c.supersedes_correction_id='ct.correction.chlom-wallet-policy-engine-source-sha256.v1'
+        and c.recorded_sha256='1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c'
+        and c.corrected_sha256='1fc7892cbfbbaa8a737c63e12f52ddaeac829089b0a9f283d8209ceb674f7867'
+      )
+    );
+
   select count(*) into v_deployments
   from chlom_wallet.policy_runtime_deployments_v1
   where deployment_receipt_id='ct.deploy.chlom-wallet-policy-assurance.v1.2'
@@ -148,6 +174,7 @@ begin
     and deployment_bundle_sha256='00cedfe45163deeb3c71042f911eaedf3418189913a962c5daa1e838f820e9ac'
     and engine_source_sha256='1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c'
     and source_head_sha='0261e0b4d3bfa5f041b59efd9bf78bc6e1f76591';
+
   select count(*) into v_runtime_canaries
   from chlom_wallet.policy_runtime_deployment_canary_runs_v1;
   select result into v_canary
@@ -158,22 +185,25 @@ begin
   order by created_at desc limit 1;
   v_status:=public.chlom_wallet_policy_assurance_status_v1();
 
-  if v_tables<>7 or v_rls<>7 or v_policies<>7 or v_triggers<>7
+  if v_tables<>7 or v_rls<>7 or v_forced_rls<>7 or v_policies<>7 or v_triggers<>7
      or v_private_table_access<>0 or v_private_function_access<>0
      or v_public_status_access<>1 or v_algorithms<>7 or v_rulepacks<>1
-     or v_decisions<3 or v_corrections<>1 or v_deployments<>1 or v_runtime_canaries<2
+     or v_decisions<3 or v_corrections<>2 or v_deployments<>1 or v_runtime_canaries<3
      or v_canary<>'PASS_CHLOM_WALLET_POLICY_ASSURANCE_RUNTIME_CANARY'
-     or v_deploy_canary<>'PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY_V2'
+     or v_deploy_canary<>'PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY_V3'
      or v_status#>>'{runtime_surface,state}'<>'ACTIVE'
      or (v_status#>>'{runtime_surface,function_version}')::integer<>2
      or coalesce((v_status#>>'{runtime_surface,verify_jwt}')::boolean,false) is not true
      or v_status#>>'{runtime_surface,deployment_bundle_sha256}'<>'00cedfe45163deeb3c71042f911eaedf3418189913a962c5daa1e838f820e9ac'
-     or v_status#>>'{runtime_surface,effective_engine_source_sha256}'<>'1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c'
-     or v_status#>>'{runtime_surface,source_identity_correction,correction_id}'<>'ct.correction.chlom-wallet-policy-engine-source-sha256.v1'
+     or v_status#>>'{runtime_surface,deployment_recorded_engine_source_sha256}'<>'1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c'
+     or v_status#>>'{runtime_surface,effective_engine_source_sha256}'<>'1fc7892cbfbbaa8a737c63e12f52ddaeac829089b0a9f283d8209ceb674f7867'
+     or v_status#>>'{runtime_surface,source_identity_correction,correction_id}'<>'ct.correction.chlom-wallet-policy-engine-source-sha256.v2'
+     or v_status#>>'{runtime_surface,source_identity_correction,supersedes_correction_id}'<>'ct.correction.chlom-wallet-policy-engine-source-sha256.v1'
      or v_status#>>'{runtime_surface,authenticated_runtime_canary_state}'<>'NOT_EXECUTED'
+     or v_status#>>'{runtime_surface,unauthorized_request_canary_state}'<>'NOT_EXECUTED'
      or exists (select 1 from jsonb_each(v_status->'hard_boundaries') e where e.value<>'false'::jsonb) then
-    raise exception 'policy_assurance_readback_failed tables=% rls=% policies=% triggers=% private_tables=% private_functions=% public_status=% algorithms=% rulepacks=% decisions=% corrections=% deployments=% runtime_canaries=% canary=% deployment_canary=% status=%',
-      v_tables,v_rls,v_policies,v_triggers,v_private_table_access,v_private_function_access,
+    raise exception 'policy_assurance_readback_v3_failed tables=% rls=% forced=% policies=% triggers=% private_tables=% private_functions=% public_status=% algorithms=% rulepacks=% decisions=% corrections=% deployments=% runtime_canaries=% canary=% deployment_canary=% status=%',
+      v_tables,v_rls,v_forced_rls,v_policies,v_triggers,v_private_table_access,v_private_function_access,
       v_public_status_access,v_algorithms,v_rulepacks,v_decisions,v_corrections,v_deployments,
       v_runtime_canaries,v_canary,v_deploy_canary,v_status;
   end if;
@@ -181,14 +211,18 @@ end;
 $$;
 
 select jsonb_build_object(
-  'result','PASS_CHLOM_WALLET_POLICY_ASSURANCE_THRIVEBASE_READBACK_V2',
+  'result','PASS_CHLOM_WALLET_POLICY_ASSURANCE_THRIVEBASE_READBACK_V3',
   'algorithm_count',7,
   'rulepack_ref','ct.rulepack.chlom-wallet.policy-assurance.v1@1.0.0',
   'rulepack_compiled_sha256','c20767aaa8cce230d8b50af9c7a2b86e83bd7ffb65704c9af75f7d196da6a90b',
   'private_tables',7,
-  'source_identity_correction_id','ct.correction.chlom-wallet-policy-engine-source-sha256.v1',
-  'effective_engine_source_sha256','1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c',
+  'source_identity_correction_count',2,
+  'effective_source_identity_correction_id','ct.correction.chlom-wallet-policy-engine-source-sha256.v2',
+  'supersedes_source_identity_correction_id','ct.correction.chlom-wallet-policy-engine-source-sha256.v1',
+  'deployment_recorded_engine_source_sha256','1fc78917285351ac08b0d8bdc1d80a1c816485cd66b3d35291cb715f0379f70c',
+  'effective_engine_source_sha256','1fc7892cbfbbaa8a737c63e12f52ddaeac829089b0a9f283d8209ceb674f7867',
   'rls_deny_all',true,
+  'rls_forced',true,
   'append_only_guards',true,
   'private_table_public_access',false,
   'private_function_public_execution',false,
@@ -201,7 +235,7 @@ select jsonb_build_object(
   'supersedes_deployment_receipt_id','ct.deploy.chlom-wallet-policy-assurance.v1.1',
   'verify_jwt',true,
   'deployment_bundle_sha256','00cedfe45163deeb3c71042f911eaedf3418189913a962c5daa1e838f820e9ac',
-  'deployment_metadata_canary','PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY_V2',
+  'deployment_metadata_canary','PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY_V3',
   'authenticated_runtime_canary','NOT_EXECUTED',
   'unauthorized_request_canary','NOT_EXECUTED',
   'production_activation',false,
