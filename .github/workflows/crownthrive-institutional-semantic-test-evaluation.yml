@@ -1,0 +1,31 @@
+name: CrownThrive Institutional Semantic Test Evaluation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "scripts/crownthrive-semantic-verifier.sh"
+      - ".github/workflows/crownthrive-institutional-semantic-independent-verifier.yml"
+      - ".github/workflows/crownthrive-institutional-semantic-test-evaluation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify:
+    name: Test Evaluation Agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_VERIFIER_AGENT_ID: ct.agent.factory.test-evaluation
+    steps:
+      - name: Checkout exact verification source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run OIDC semantic verifier
+        shell: bash
+        run: |
+          chmod +x scripts/crownthrive-semantic-verifier.sh
+          scripts/crownthrive-semantic-verifier.sh
