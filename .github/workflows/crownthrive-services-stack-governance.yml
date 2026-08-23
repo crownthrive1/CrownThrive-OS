@@ -1,0 +1,87 @@
+name: CrownThrive Services Stack Governance
+
+on:
+  pull_request:
+    paths:
+      - frameworks/crownthrive-services-stack.mdx
+      - developers/crownthrive-services-stack-api.mdx
+      - automation/css-agent-control-mesh.mdx
+      - skills/crownthrive-services-stack/**
+      - developers/manifests/crownthrive-services-stack*.json
+      - plugins/crownthrive-services-stack/**
+      - apps/crownthrive-services-stack/**
+      - data/css/**
+      - scripts/validate_crownthrive_services_stack.py
+      - .github/workflows/crownthrive-services-stack-governance.yml
+  push:
+    branches:
+      - feature/crownthrive-services-stack-css-20260823
+    paths:
+      - frameworks/crownthrive-services-stack.mdx
+      - developers/crownthrive-services-stack-api.mdx
+      - automation/css-agent-control-mesh.mdx
+      - skills/crownthrive-services-stack/**
+      - developers/manifests/crownthrive-services-stack*.json
+      - plugins/crownthrive-services-stack/**
+      - apps/crownthrive-services-stack/**
+      - data/css/**
+      - scripts/validate_crownthrive_services_stack.py
+      - .github/workflows/crownthrive-services-stack-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: css-governance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-css:
+    name: Validate CSS framework, plugin, runtime, CaaS, and boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Validate CSS invariants
+        run: python scripts/validate_crownthrive_services_stack.py
+      - name: Validate repository documentation
+        run: python scripts/validate_docs.py
+      - name: Check JSON syntax
+        run: |
+          python -m json.tool developers/manifests/crownthrive-services-stack.v1.json >/dev/null
+          python -m json.tool developers/manifests/crownthrive-services-stack-commercialization.v1.json >/dev/null
+          python -m json.tool plugins/crownthrive-services-stack/plugin.manifest.json >/dev/null
+          python -m json.tool plugins/crownthrive-services-stack/tool-contracts.json >/dev/null
+          python -m json.tool apps/crownthrive-services-stack/app-manifest.json >/dev/null
+          python -m json.tool apps/crownthrive-services-stack/mcp-resource-manifest.v0.1.json >/dev/null
+          python -m json.tool apps/crownthrive-services-stack/chatgpt-app-submission.candidate.v0.1.json >/dev/null
+          python -m json.tool data/css/css-controlled-test-evidence.v1.json >/dev/null
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+      - name: Publish controlled-test summary
+        run: |
+          {
+            echo "## CrownThrive Services Stack"
+            echo ""
+            echo "- Services: 14"
+            echo "- Provider bindings: 32"
+            echo "- Platform profiles: 5"
+            echo "- Assets: 120"
+            echo "- Vault assets: 22"
+            echo "- CaaS decisions: ALLOW | HOLD | DENY"
+            echo "- Provider writes, checkout, entitlements, legal certification, and D3: disabled"
+          } >> "$GITHUB_STEP_SUMMARY"
