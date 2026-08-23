@@ -1,0 +1,511 @@
+---
+title: "DAIL — Decentralized Autonomous Information Ledger"
+sidebarTitle: "DAIL"
+description: "Standalone current CHLOM DAIL article defining the append-only event, evidence, correction, provenance and audit ledger contract without requiring blockchain or collapsing historical DAL meanings."
+icon: "timeline"
+keywords: ["CHLOM DAIL", "Decentralized Autonomous Information Ledger", "event ledger", "evidence", "correction", "audit", "provenance"]
+---
+
+# DAIL — Decentralized Autonomous Information Ledger
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.system.dail
+canonical_name: Decentralized Autonomous Information Ledger
+canonical_short_name: DAIL
+artifact_class: institutional_event_evidence_ledger
+current_meaning: Decentralized Autonomous Information Ledger
+historical_name_collision:
+  - DAL / Decentralized Attestation Ledger
+  - DAL / Decentralized Adjudication Layer
+  - DAL distribution-related authority/layer lineage
+source_status: current_canonical_meaning_with_historical_lineage
+current_mapping:
+  - append-only event/evidence ledger
+  - audit/correction lineage
+  - cross-pallet institutional receipts
+  - public/private proof projections
+blockchain_required: false
+production_state: service_and_domain_specific_evidence_required
+restricted_companion_class: evidence_source_payloads_security_and_private_event_fields
+```
+
+## Purpose
+
+DAIL is CHLOM's canonical **institutional history and evidence spine**. It records what happened, under which authority/policy, to which object, using which evidence, with correction and supersession relationships preserved.
+
+```text
+DOMAIN EVENT / DECISION / EVIDENCE
+                |
+                v
+         DAIL EVENT ENVELOPE
+                |
+      validate + classify + append
+                |
+                v
+       APPEND-ONLY EVENT STORE
+                |
+      +---------+----------+
+      |                    |
+  indexes/views       proof/digest surfaces
+      |                    |
+      +---------+----------+
+                |
+        correction/supersession
+                |
+                v
+          CURRENT PROJECTION
+```
+
+## Core principle
+
+```text
+current state is a projection of preserved history
+```
+
+DAIL is designed so later corrections do not require pretending that the original event never occurred.
+
+## What DAIL is not
+
+DAIL is not:
+
+- a requirement for a public blockchain;
+- a database table name that alone creates governance;
+- a source of truth for facts that were never evidenced;
+- an adjudicator;
+- a rights issuer;
+- a payment processor;
+- a universal public transparency feed;
+- a reason to expose restricted event payloads;
+- any historical DAL meaning silently renamed.
+
+## Historical boundary
+
+Historical source documents used `DAL` for several distinct ideas. Those source-era definitions remain preserved separately. Current documentation uses:
+
+```text
+DAIL = Decentralized Autonomous Information Ledger
+```
+
+Historical DAL text must remain historically accurate in archived/source records rather than being search-and-replaced into DAIL.
+
+## Event envelope
+
+```yaml
+event_id: globally/stably unique id
+event_type: versioned canonical event name
+event_version: semantic/event schema version
+occurred_at: timestamp
+recorded_at: timestamp
+actor_refs: []
+authority_refs: []
+subject_refs: []
+tenant_or_org_scope: explicit
+prior_state_ref: optional
+new_state_ref: optional
+evidence_refs: []
+policy_refs: []
+decision_refs: []
+source_system_ref: required
+provider_event_refs: []
+correlation_id: optional|required by workflow
+causation_id: optional
+idempotency_key: optional|required for material effects
+classification: public|internal|restricted|secret_reference
+integrity_digest_ref: optional
+correction_of: optional
+supersedes: []
+status: recorded|held|corrected|superseded|reversed|invalidated
+```
+
+`SCHEMA-001` can provide the machine schema companion to this conceptual system article.
+
+## Event identity
+
+`event_id` identifies the institutional event record. It should not be reused when a provider retries delivery.
+
+```text
+provider webhook deliveries many
+   -> canonical semantic event one
+```
+
+Event idempotency and provider event identity are separate from DAIL event identity.
+
+## Event naming
+
+A stable event taxonomy can use names such as:
+
+```text
+ct.<domain>.<object>.<action>.v1
+```
+
+Examples:
+
+```text
+ct.dla.activated.v1
+ct.case.held.v1
+ct.payment.reconciled.v1
+ct.policy_pack.superseded.v1
+ct.identity.corrected.v1
+```
+
+Changing event meaning requires a new event/schema version.
+
+## Source system versus institutional event
+
+```text
+PROVIDER/SOURCE EVENT
+      |
+      v
+normalize / verify / reconcile
+      |
+      v
+INSTITUTIONAL DAIL EVENT
+```
+
+Provider event identity and provider claims remain evidence. CHLOM records the institutionally interpreted event with source references.
+
+## Evidence references
+
+DAIL should normally store references/digests/classification rather than duplicate every source artifact.
+
+```yaml
+evidence_ref:
+  evidence_id: stable id
+  custody_location_ref: protected/internal
+  digest_ref: optional|required by profile
+  evidence_type: typed
+  observed_at: optional
+  source_ref: required
+  classification: explicit
+```
+
+Public DAIL projections do not expose the custody path or restricted evidence body.
+
+## Authority references
+
+Material actions should retain the authority state used at the event time:
+
+- actor role/delegation;
+- governance decision;
+- founder/reserved authority;
+- issuer authority;
+- economic activation authority;
+- professional authorization;
+- emergency authority.
+
+```text
+event happened
+   != event was authorized
+```
+
+DAIL can record both an unauthorized provider event and the institutional response to it.
+
+## Policy references
+
+Decisions should record exact policy/Compliance Pack versions so historical outcomes remain reproducible.
+
+```text
+policy v3 used at T0
+policy v4 active now
+```
+
+A historical event must not be reinterpreted as though v4 existed at T0 unless a correction/adjudication explicitly says so.
+
+## Append-only correction
+
+If event/state `E1` was wrong or incomplete:
+
+```text
+E1 original
+ |
+ +--> E2 correction_of=E1
+       |
+       +--> current projection uses corrected meaning
+```
+
+The original record remains in the historical chain with classification/access controls.
+
+## Supersession
+
+Supersession is appropriate when a newer artifact/version replaces the operational meaning of an older one.
+
+```text
+policy v1 -> superseded by v2
+article v1 -> superseded by v2
+credential v1 -> superseded by reissued v2
+```
+
+Supersession differs from correction: v1 may have been valid for its historical period.
+
+## Reversal/compensation
+
+For economic/provider actions:
+
+```text
+original effect
+ -> reversal/refund/compensation event
+```
+
+Do not delete the original event merely because the effect was later reversed.
+
+## Current state projection
+
+Domain services can maintain fast current-state tables/views derived from DAIL events plus canonical object stores.
+
+```text
+append-only history
+   -> reducer/projector
+   -> current view/index
+```
+
+The index is not the canonical event history and can be rebuilt.
+
+## DAIL versus canonical object storage
+
+DAIL is not necessarily the only datastore.
+
+```text
+canonical object state
++ DAIL event history
++ Evidence Vault/source custody
++ indexes/search
+```
+
+The exact architecture may use relational databases, object storage, event buses, append-only tables, cryptographic anchors or future chain adapters.
+
+## Cryptographic anchoring
+
+Optional integrity mechanisms include:
+
+- event/payload hashes;
+- signed event receipts;
+- batch digests;
+- Merkle roots;
+- external notarization;
+- future blockchain anchors.
+
+```text
+cryptographic anchor != factual truth
+```
+
+It proves integrity/existence under the chosen scheme, not correctness of the underlying fact.
+
+## Public/private projections
+
+### Public-safe event
+
+May expose:
+
+- safe event ID/type;
+- object/public reference;
+- current status;
+- timestamp;
+- public proof/digest;
+- public correction link.
+
+### Restricted event
+
+May include:
+
+- private identity references;
+- case evidence;
+- contracts;
+- provider payloads;
+- internal security findings;
+- financial/tax details;
+- restricted algorithms/thresholds.
+
+The same event can have multiple role-safe projections.
+
+## Tenant isolation
+
+Each event must have an explicit tenant/org/institutional scope where multi-tenant data exists. Cross-tenant aggregation requires separate purpose/authority.
+
+```text
+tenant A event != tenant B visibility
+```
+
+## Correlation and causation
+
+Correlation groups related work; causation expresses a direct event chain.
+
+```text
+request -> decision -> provider execution -> readback -> reconciliation
+```
+
+These identifiers help reconstruct distributed workflows without assuming all events are synchronous.
+
+## Idempotency
+
+DAIL should not create duplicate semantic events when an upstream system retries.
+
+```text
+same business effect
+ -> one canonical effect/event
+```
+
+Domain-specific idempotency algorithms determine the semantic key.
+
+## Cases/disputes
+
+Cases can reference DAIL events as evidence and emit their own case lifecycle events. DAIL does not decide the case.
+
+## Governance
+
+Governance proposals, votes, approvals, timelocks and execution readbacks can all emit DAIL events so current governance state remains auditable.
+
+## Rights/DLA
+
+DAIL can preserve:
+
+- rights evidence registration;
+- DLA creation/activation;
+- renewal;
+- transfer;
+- sublicense;
+- suspension/revocation;
+- entitlement activation;
+- correction.
+
+The ledger records these transitions; it does not manufacture rights.
+
+## Economic events
+
+Economic event lineage can include:
+
+```text
+provider payment observed
+ -> payment reconciled
+ -> entitlement activated
+ -> allocation calculated
+ -> obligation created
+ -> payout submitted
+ -> settlement reconciled
+```
+
+These remain separate event types.
+
+## AI/model events
+
+Material AI-assisted decisions can record:
+
+- model/profile version;
+- task type;
+- source/evidence refs;
+- recommendation/disposition;
+- required human approval;
+- final authorized outcome.
+
+Prompts/private data need not be public event payloads.
+
+## DAIL write path
+
+```text
+candidate event
+ -> schema validation
+ -> identity/source validation
+ -> classification
+ -> idempotency/correlation
+ -> integrity digest/signing if required
+ -> append
+ -> index/project
+ -> monitor
+```
+
+## Public-safe pseudocode
+
+```text
+append_dail(event):
+  validate_schema(event)
+  validate_event_type_version(event)
+  validate_scope_and_classification(event)
+  if semantic_duplicate(event):
+      return prior_event_reference
+  digest = create_integrity_digest(event) if required
+  stored = append_immutable_record(event, digest)
+  publish_outbox(stored)
+  update_safe_projections(stored)
+  return stored.event_id
+```
+
+## Failure modes
+
+- event schema invalid -\> reject/hold;
+- source unknown -\> HOLD/reject according to event class;
+- event duplicated -\> idempotent prior reference;
+- append store unavailable -\> fail closed for events required before side effect;
+- indexer fails -\> history remains, projection stale/held;
+- evidence reference unavailable -\> event may remain but dependent decision can HOLD;
+- classification unknown -\> do not publish;
+- correction cycle/corruption -\> integrity incident;
+- provider/current-state mismatch -\> reconciliation event/case.
+
+## Threat model
+
+- event deletion;
+- event mutation;
+- fabricated actor/authority;
+- replay/duplicate events;
+- source/provider spoofing;
+- cross-tenant leakage;
+- classification bypass;
+- index poisoning;
+- timestamp manipulation;
+- correction chain abuse;
+- secret/private evidence embedded in public payload;
+- blockchain anchor marketed as proof of truth.
+
+## Test vectors
+
+1. valid new event -\> appended once;
+2. duplicate semantic event -\> prior event returned/no duplicate effect;
+3. invalid schema -\> rejected;
+4. correction -\> original retained \+ corrected projection;
+5. superseded policy -\> historical event still references prior version;
+6. index deleted -\> rebuild from history;
+7. restricted event -\> public projection excludes private fields;
+8. provider event conflicts with canonical state -\> reconciliation/HOLD event;
+9. event with wrong tenant scope -\> reject;
+10. external anchor validates digest but source fact false -\> integrity valid, factual correctness still unresolved.
+
+## Observability
+
+Track:
+
+- event volume by type/version;
+- append latency/error rate;
+- duplicate/idempotency rate;
+- index projection lag;
+- correction/supersession rate;
+- classification/publication incidents;
+- source/provider mismatch events;
+- orphan/causation-chain gaps;
+- digest/anchor verification failures;
+- tenant-isolation violations.
+
+## Restricted companion
+
+Private custody can contain raw event payloads, source/provider evidence, identity mappings, security incidents, private case/financial data, signing configuration, retention controls and proof-anchor implementation details.
+
+## Invariants
+
+```text
+DAIL != historical DAL meanings
+DAIL != blockchain requirement
+event recorded != event authorized
+provider event != institutional truth
+index != canonical history
+correction != erasure
+anchor != factual truth
+restricted event != public disclosure
+```
+
+## Versioning
+
+Event schemas, taxonomy, projection rules and integrity mechanisms are versioned. New architecture can migrate storage technology without changing the semantic meaning of existing DAIL events.
+
+## Status
+
+`current_canonical_CHLOM_system`. Concrete production deployments and domain integrations require their own implementation/readback evidence.
