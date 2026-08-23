@@ -1,0 +1,202 @@
+---
+title: "CHLOM Wallet Skill & Handoff Orchestration"
+sidebarTitle: "Wallet Skill Orchestration"
+description: "Deterministic skill selection, bounded AI advisory classification, exact-head handoff readiness, alias quarantine, and non-executing Wallet Agent route receipts."
+icon: "route"
+---
+
+# CHLOM Wallet Skill & Handoff Orchestration
+
+**Engine ID:** `ct.engine.chlom-wallet-skill-handoff-orchestration.v1`  
+**State:** `CONTROLLED_TEST`  
+**Skill suite:** `ct.skill-suite.chlom-wallet.v2`  
+**Canonical agent:** `ct.agent.chlom-wallet-settlement`  
+**Institutional phase:** 2.99  
+**Execution authority:** none
+
+The Wallet Agent already has a canonical 20-skill suite and a governed specialist crosswalk. This orchestration tranche makes those records operational without turning them into self-authorizing automation.
+
+The engine answers three bounded questions:
+
+1. Which registered Wallet skill is relevant to the submitted intent?
+2. Are every skill's required handoffs bound to stable, active, fresh, exact-head identities?
+3. Is the resulting plan eligible to proceed to the separate Wallet Policy Assurance Engine?
+
+It does **not** execute the skill, create a scheduler slot, grant a capability, certify a reviewer, access a credential, write a provider, move money, grant rights, broadcast a transaction, publish a price, activate checkout, advance a phase, authorize a merge, or cast a vote.
+
+```text
+Intent or explicit skill ID
+        ↓
+WISC — advisory-only skill candidate
+        ↓
+SCOPE — exact skill, authority, head, and effect validation
+        ↓
+HARP — stable ID, DID, digest, heartbeat, binding, and ceiling review
+        ↓
+READY_FOR_POLICY_EVALUATION | HOLD | DENY
+        ↓
+Wallet Policy Assurance Engine
+        ↓
+ECAC | HOLD | DENY
+```
+
+## Algorithms
+
+| Key | Algorithm | Function |
+| --- | --- | --- |
+| `WISC` | Wallet Intent & Skill Classifier | Uses a deterministic lexical model to propose a registered skill candidate. Ambiguous, low-signal, and unmatched intents hold. The output is advisory only. |
+| `SCOPE` | Skill Capability & Orchestration Policy Engine | Enforces plan-only mode, exact-head binding, A2/D2 ceilings, known skill identity, prohibited-effect denial, and downstream policy review. |
+| `HARP` | Handoff Authority Readiness Protocol | Reviews every required specialist for stable ID, active registry binding, DID, public identity digest, current heartbeat, exact source head, and sufficient bounded authority. |
+
+The route receipt is hash-bound. Replaying the same exact input produces the same route digest.
+
+## Route contract
+
+A valid request is explicit about the requested skill or supplies intent text for advisory classification.
+
+```json
+{
+  "request_id": "ct.request.wallet-route.example",
+  "source_head_sha": "<40-character exact Git head>",
+  "requested_mode": "PLAN_ONLY",
+  "requested_autonomy_ceiling": "A1",
+  "requested_decision_ceiling": "D1",
+  "requested_skill_id": "ct.skill.chlom-wallet.ledger-chain-verification.v1",
+  "requested_effects": {}
+}
+```
+
+The output never authorizes execution:
+
+```json
+{
+  "disposition": "READY_FOR_POLICY_EVALUATION",
+  "policy_evaluation_required": true,
+  "plan_only": true,
+  "execution_authorized": false,
+  "schedule_slot_created": false,
+  "capability_grant_created": false,
+  "authority_granted": false,
+  "vote_effect": "none"
+}
+```
+
+`READY_FOR_POLICY_EVALUATION` is not `ECAC`. It means only that the requested skill and required handoffs are structurally ready for the independent Wallet Policy Assurance Engine to evaluate the complete evidence, value-class, risk, and authority context.
+
+## Handoff readiness
+
+A verified route requires all primary handoffs to satisfy the same snapshot:
+
+- stable canonical agent or subagent ID;
+- active repository/registry binding;
+- valid DID reference;
+- valid public identity digest;
+- current heartbeat inside the configured freshness window;
+- heartbeat bound to the exact route head;
+- authority ceiling at or above the requested bounded decision class;
+- non-voting specialist status;
+- no capability or authority grant inferred from the crosswalk.
+
+Missing or stale identity evidence holds. Invalid identity digests or insufficient authority deny. Prospective bindings remain held until activated under the canonical registry.
+
+## Agent E and Agent H quarantine
+
+The unresolved labels remain:
+
+```text
+ct.agent.api-mcp
+ct.agent.webhook-delivery
+```
+
+They are role aliases, not executable identities. Any Wallet skill requiring either alias receives:
+
+```text
+HOLD_PENDING_STABLE_ID_CROSSWALK
+```
+
+The router cannot bypass the alias, substitute another specialist, create a temporary identity, fabricate a heartbeat, or infer authority from a role name.
+
+## AI policy
+
+`WISC` is a bounded advisory classifier. It is deterministic rather than generative and is registered with:
+
+```yaml
+ai_advisory: true
+final_authority: false
+```
+
+A later language model may improve intent explanation or candidate ranking only as an advisory layer. It may not alter the deterministic route disposition, manufacture identity or evidence, grant authority, schedule work, or bypass the policy engine. Any retained advisory output must remain hash-bound to the route receipt.
+
+## Source-controlled implementation
+
+```text
+automation/chlom-wallet-skill-handoff-orchestration.v1.json
+developers/reference/chlom-wallet/skills/skill-handoff-orchestrator.mjs
+developers/reference/chlom-wallet/skills/test-skill-handoff-orchestrator.mjs
+developers/manifests/chlom-wallet-skill-handoff-orchestration.v1.json
+.github/workflows/chlom-wallet-skill-handoff-orchestration.yml
+```
+
+## Controlled-test evidence
+
+The deterministic contract covers eleven source scenarios:
+
+- verified active route ready for policy evaluation;
+- Agent H alias quarantine;
+- Agent E alias quarantine;
+- unknown intent hold;
+- human-reserved D3/A3 denial;
+- prohibited live-effect denial;
+- request exact-head mismatch hold;
+- stale heartbeat hold;
+- prospective binding hold;
+- deterministic receipt replay;
+- bounded advisory classifier behavior.
+
+Current source result:
+
+```yaml
+result: PASS_CHLOM_WALLET_SKILL_HANDOFF_ORCHESTRATION_CONTRACT
+scenario_count: 11
+execution_authorized: false
+authority_granted: false
+ai_final_authority: false
+```
+
+## ThriveBase runtime
+
+The private runtime mirrors the source contract through:
+
+```text
+chlom_wallet.policy_algorithm_registry_v1
+chlom_wallet.skill_handoff_route_receipts_v1
+chlom_wallet.skill_handoff_route_canary_runs_v1
+chlom_wallet.run_skill_handoff_route_canary_v1()
+```
+
+The route and canary tables are private, RLS deny-all, append-only, and unavailable to `public`, `anon`, and `authenticated`. The database canary validates the three algorithm registrations, the 20-skill suite, the 19 verified handoffs, both quarantined aliases, source hashes, and all no-live boundaries.
+
+## Hard boundaries
+
+```yaml
+execution_authorized: false
+schedule_slot_created: false
+capability_grant_created: false
+authority_granted: false
+certification_authority: false
+credential_access: false
+provider_write: false
+custody: false
+token_issuance: false
+money_movement: false
+production_rights_grant: false
+chain_broadcast: false
+effective_price_publication: false
+checkout_activation: false
+phase_advancement: false
+merge_authorized: false
+vote_effect: none
+ai_final_authority: false
+```
+
+This tranche expands controlled institutional capability. It does not satisfy the five independent Wallet review lanes, activate the quarantined aliases, authorize WalletKit pricing, change Phase 2.99, or authorize PR #230 to merge.
