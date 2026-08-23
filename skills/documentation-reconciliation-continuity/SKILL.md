@@ -3,7 +3,7 @@
 ## Identity
 
 - Framework: `ct.framework.documentation-reconciliation-continuity`
-- Skill: `ct.skill.documentation-reconciliation-continuity.v1`
+- Skill: `ct.skill.documentation-reconciliation-continuity.v1.0.1`
 - Authority ceiling: D2
 - Default execution: D0/D1 only
 - Parent certification: `ct.relay.agent-d`
@@ -63,10 +63,6 @@ Do not add decorative links. Links must help a future operator reconstruct meani
 ## Phase impact rule
 
 Every material sprint records impacts across the current named Phase 1–10 roadmap and keeps explicit impact slots for Phase 11–20. Until authoritative definitions for 11–20 are recovered or adopted, those slots remain `reserved_horizon` / `definition_required`; they are not assigned invented objectives.
-
-## RMCT rule
-
-The founder shorthand `RMCT` is preserved as a literal institutional token because current recovered evidence does not establish its expansion. Do not fabricate an acronym expansion. Bind the token to this framework packet with `definition_state = needs_owner_validation` until stronger authority resolves it.
 
 ## Output contract
 
