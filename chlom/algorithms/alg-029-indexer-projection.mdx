@@ -1,0 +1,98 @@
+---
+title: "ALG-029 — Indexer Projection"
+sidebarTitle: "ALG-029 Indexer Projection"
+description: "Standalone CHLOM projection procedure that builds authorized searchable/read models from canonical DAIL or source records while keeping indexes disposable and rebuildable."
+icon: "magnifying-glass-chart"
+keywords: ["CHLOM ALG-029", "indexer", "projection", "DAIL", "search index", "canonical truth"]
+---
+
+# ALG-029 — Indexer Projection
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-029
+name: Indexer Projection
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Indexer/Observability; DAIL projections; Explorer surfaces
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-029 creates fast searchable/read models from canonical CHLOM records. Its primary architectural rule is that an index is a projection, not the source of truth.
+
+## Core invariant
+
+```text
+index != canonical record
+index can be rebuilt
+projection cannot broaden disclosure authority
+```
+
+## Inputs
+
+```yaml
+canonical_event_or_object_ref:
+projection_policy:
+projection_version:
+target_index_or_view:
+role_or_audience_context:
+```
+
+## Procedure
+
+```text
+function project_event(event):
+    canonical = read_canonical_event(event.id)
+    allowed = apply_projection_policy(canonical)
+    upsert_index(allowed)
+```
+
+## Canonical read
+
+The projector reads the current canonical event/object from DAIL or another explicitly authoritative registry. It does not treat an older indexed copy as the source when rebuilding.
+
+## Projection policy
+
+Projection policy determines which fields, derived values, relationships and summaries can appear for the target audience. Public, developer, operator, auditor and founder views can differ. Restricted evidence must not leak because a search index has weaker access controls than the evidence vault.
+
+## Effective state
+
+For append-only event chains, the index may project current effective state after authorized corrections while retaining references to the underlying lineage. A public view can show `status: revoked` without exposing the confidential evidence that caused the revocation.
+
+## Upsert semantics
+
+Index keys must be stable and tenant-scoped. Upsert is acceptable because the index is a materialized view; it does not rewrite canonical event history.
+
+## Rebuildability
+
+A complete index should be reconstructible from canonical sources plus projection rules. Rebuild jobs should support full replay and checkpointed incremental catch-up.
+
+## Output
+
+```yaml
+projection_receipt_id:
+canonical_ref:
+projection_policy_ref:
+target_view:
+indexed_version:
+projected_at:
+redaction_summary:
+```
+
+## Failure states
+
+Canonical record unavailable, projection-policy missing, classification ambiguity, cross-tenant key collision, schema incompatibility or index write failure. Failure should not mutate canonical state.
+
+## DAIL/observability
+
+Projection operations can emit operational receipts/metrics without flooding the canonical ledger with low-value noise; consequential projection-policy changes should be governed and evidenced.
+
+## Tests
+
+Test public redaction, founder restricted view, correction rebuild, deletion from index without deletion from canonical history, full rebuild, duplicate event, out-of-order event, tenant collision and projection-policy update.
+
+## Versioning
+
+Indexes store or infer projection version so behavior can be reproduced. A projection upgrade can rebuild current views without rewriting the underlying DAIL events.
