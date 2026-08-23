@@ -1,0 +1,160 @@
+---
+title: "CIE ↔ CHLOM Interoperability"
+sidebarTitle: "CIE ↔ CHLOM"
+description: "The typed, bidirectional, fail-closed interoperability contract between Cultural Imprint Engine and CHLOM without authority collapse."
+icon: "arrows-left-right"
+keywords: ["Cultural Imprint Engine", "CIE", "CHLOM", "interoperability", "rights", "licensing", "culture governance"]
+---
+
+# CIE ↔ CHLOM Interoperability
+
+**Cultural Imprint Engine and CHLOM are interoperable, not interchangeable.**
+
+The purpose of the contract is to let each authority consume the other's resolved state without duplicating or overriding it.
+
+## Authority split
+
+| Authority | Governs |
+| --- | --- |
+| Cultural Imprint Engine | cultural meaning, narrative continuity, imprint identity, representation, aesthetics, audience/canon constraints, responsible reuse |
+| CHLOM | ownership, rights, licensing, permissions, roles, evidence, records, remedies |
+
+CIE does not manufacture rights. CHLOM does not manufacture cultural alignment.
+
+## Contract identity
+
+```yaml
+contract_id: ct.contract.cie-chlom.interop.v1
+version: 1.0.0
+cie_framework_id: ct.framework.cultural-imprint-engine
+cie_canonical_name: Cultural Imprint Engine
+chlom_authority_id: ct.framework.chlom
+mode: bidirectional_typed_fail_closed
+mutation_authority: false
+authority_inheritance: false
+```
+
+## CIE → CHLOM envelope
+
+A handoff carries:
+
+- contract ID and version;
+- canonical CIE identity;
+- public-safe or internal-governed usage profile;
+- correlation ID;
+- object and use IDs;
+- CIE decision state;
+- CIE conditions;
+- audience class;
+- canon state;
+- source references;
+- envelope digest;
+- explicit zero authority effect.
+
+The envelope requests CHLOM resolution. It does not issue a license, ownership determination, entitlement or economic approval.
+
+## CHLOM → CIE receipt
+
+A receipt carries:
+
+- contract ID and version;
+- correlation ID;
+- CHLOM record ID;
+- rights state;
+- license state;
+- permission state;
+- evidence state;
+- CHLOM digest.
+
+The receipt informs CIE and the composition layer of rights state. It does not create or rewrite CIE cultural state.
+
+## Composition states
+
+CrownThrive uses explicit composition rather than collapsing two decisions into one opaque approval.
+
+| Composed state | Meaning |
+| --- | --- |
+| `DENY_CULTURAL` | CIE denied the proposed use. |
+| `HOLD_CIE` | CIE requires correction/evidence. |
+| `DENY_RIGHTS` | CHLOM denied permission. |
+| `HOLD_CHLOM` | CHLOM permission is held or unknown. |
+| `HOLD_CHLOM_RIGHTS` | rights are disputed or unknown. |
+| `HOLD_CHLOM_LICENSE` | required/current license state is unresolved. |
+| `HOLD_EVIDENCE` | CHLOM evidence state is below the v1 verified threshold. |
+| `COMPOSED_READY_NON_EXECUTING` | CIE and CHLOM are sufficiently resolved for the evaluated use, but no execution/economic/D3 authority is created. |
+
+`COMPOSED_READY_NON_EXECUTING` is intentionally bounded. It does not authorize:
+
+- provider or database writes;
+- production deployment;
+- ThriveEvergreen ECAC;
+- pricing or checkout;
+- license issuance beyond CHLOM's separately recorded rights state;
+- customer entitlement;
+- D3 action;
+- sovereign approval.
+
+## Public-safe interoperability
+
+Public-safe CIE callers may send only sanitized public fields. Private evidence references, raw evidence, secrets, protected calibration and private reasoning are forbidden.
+
+## Internal-governed interoperability
+
+Internal-governed callers may use approved opaque restricted-evidence references under RBAC. Raw credentials and raw private evidence do not cross this interoperability contract.
+
+See [CIE Public & Internal Usage](/doctrine/cie-public-internal-usage).
+
+## Version and digest discipline
+
+A contract-version or required digest mismatch is HOLD.
+
+Any future networked/mutating adapter must also provide:
+
+- correlation ID preservation;
+- replay/duplicate idempotency;
+- authenticated caller identity;
+- RBAC for internal payloads;
+- evidence/receipt lineage;
+- rollback/compensation appropriate to the downstream mutation;
+- explicit provider/economic authority separate from this contract.
+
+## Non-collapse invariants
+
+The following statements are always false:
+
+```text
+CIE PASS == CHLOM ALLOW
+CHLOM ALLOW == CIE PASS
+CIE == CHLOM
+CHLOM == Cultural Imprint Engine
+COMPOSED_READY_NON_EXECUTING == production authority
+```
+
+Interoperability depends on preserving the separation.
+
+## Machine implementation
+
+The CIE child repository implements the deterministic non-mutating contract in:
+
+- `contracts/chlom/cie-chlom-interoperability.v1.json`;
+- `engine/engine.py`;
+- `api/api-contract.v2.json`;
+- `mcp/mcp-tools.v2.json`;
+- `evals/wave2-interoperability-evals.v1.json`;
+- `scripts/validate_wave2_interoperability.py`.
+
+The engine supports local `prepare-chlom-handoff`, `validate-chlom-receipt` and `compose-readiness` actions. Network/provider mutation remains separately gated.
+
+## Reopen triggers
+
+Reopen interoperability review on:
+
+- contract/version change;
+- canonical CIE identity drift;
+- CHLOM schema/authority change;
+- evidence-state semantics change;
+- public/internal visibility change;
+- replay/idempotency model change;
+- new mutating adapter;
+- D3/quorum/governance change;
+- new economic or entitlement effect.
