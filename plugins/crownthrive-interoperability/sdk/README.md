@@ -54,6 +54,7 @@ The repository validator must reject:
 - inconsistent request-budget semantics;
 - secret-shaped package content;
 - destructive or open-ended root operations;
-- live commerce or public submission claims without evidence.
+- live commerce or public submission claims without evidence;
+- history handling that would silently erase prior route, evidence, or supersession records; governed history must append or supersede and **never silently delete**.
 
 The scaffold does not install or execute an adapter. It produces a governed candidate for the Adapter Foundry and Compatibility Verifier.
