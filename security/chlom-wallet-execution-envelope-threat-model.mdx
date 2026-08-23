@@ -1,0 +1,68 @@
+---
+title: "CHLOM Wallet Execution Envelope Threat Model"
+sidebarTitle: "Execution Envelope Threat Model"
+description: "Threat model for per-skill execution envelopes, independent-handoff evidence routing, pending aliases, and policy composition."
+icon: "shield"
+---
+
+# CHLOM Wallet Execution Envelope Threat Model
+
+This model protects the boundary between **having a governed skill** and **being eligible to execute a controlled-test action**. The layer is intentionally stricter than a skill registry: a valid skill still fails closed unless its pallet, action, value class, exact-head evidence, authority, and independent handoffs are valid.
+
+## Protected invariants
+
+1. every current Wallet skill has exactly one execution profile;
+2. every requested pallet is explicitly permitted for that skill;
+3. every action and value class is explicitly permitted for that skill;
+4. A2/D2 remains the maximum Wallet Agent authority;
+5. the originator cannot satisfy its own independent handoff;
+6. missing, stale, held, or wrong-head handoff evidence cannot produce `ECAC`;
+7. a `DENY` handoff cannot be weakened by policy, AI, or another handoff;
+8. pending Agent E/H aliases remain non-executing labels;
+9. routing validates existing reviewer evidence but never manufactures a heartbeat or reviewer receipt;
+10. final disposition is the strictest result across profile validation, handoff routing, and deterministic Policy Assurance v2;
+11. no execution envelope is itself a capability grant;
+12. no production/provider/money/rights/chain/pricing/checkout/merge/phase side effect is created.
+
+## Threat matrix
+
+| Threat | Failure mode | Control |
+| --- | --- | --- |
+| Skill-name privilege escalation | A registered skill is treated as permission to run | explicit per-skill action/pallet/value-class profile |
+| Pallet substitution | A benign skill is paired with a more powerful pallet | requested pallets must be a subset of the profile binding |
+| Action substitution | Read-only skill is invoked as settlement/merge/broadcast | action allowlist plus Policy Assurance hard boundaries |
+| Value-class collapse | Money evidence is silently treated as Rights or Impact authority | per-skill value-class allowlists + VCL policy checks |
+| Missing independent review | execution proceeds because the handoff was merely named | existing receipt required for each mandatory stable reviewer |
+| Stale review replay | old receipt is reused after source changed | exact source-head equality required |
+| Stale reviewer identity | receipt is present but reviewer heartbeat is stale | fresh-heartbeat flag required; otherwise HOLD |
+| Self-review | Wallet originator acts as independent reviewer | originator/reviewer equality is DENY |
+| Role impersonation | stable ID submits a receipt under the wrong specialist role | receipt role must equal crosswalk role |
+| Pending alias activation | Agent E/H nickname is submitted as a live reviewer | direct receipt from pending alias is DENY |
+| Reviewer DENY suppression | another PASS tries to cancel a DENY | strictest-disposition composition |
+| AI upgrade | model suggests ECAC despite HOLD/DENY | AI Counsel Firewall plus strictest composition |
+| Receipt fabrication by router | router invents missing evidence | router output fixes `heartbeat_created=false` and `receipt_created_for_reviewer=false` |
+| Duplicate/replay mutation | a prior envelope is silently changed | append-only runtime tables and unique envelope digest |
+| Secret leakage | credentials appear in receipt metadata or public envelope | secret-shape scan + public projection boundary |
+
+## Independent handoff custody
+
+The Wallet Agent is a **consumer and verifier** of independent handoff evidence. It is not the issuer of that evidence. An execution envelope can say that a reviewer receipt is missing, stale, held, denied, or accepted; it cannot create that reviewer’s DID binding, heartbeat, vote, receipt, or certification authority.
+
+## Pending aliases
+
+`ct.agent.api-mcp` and `ct.agent.webhook-delivery` remain `ROLE_ALIAS_PENDING_STABLE_ID_CROSSWALK`. They are allowed to appear as descriptive dependencies where historically relevant. Until an exact stable ID, DID/public digest, authority ceiling, repository binding, current heartbeat, and independent review are reconciled, they cannot satisfy an execution-envelope handoff.
+
+## Reopen conditions
+
+Reopen this model if any of the following changes:
+
+- Wallet skill suite or WalletKit pallet catalog;
+- handoff crosswalk or stable reviewer identities;
+- A/D ceilings;
+- pending Agent E/H alias disposition;
+- rulepack action/value-class semantics;
+- reviewer heartbeat/receipt schema;
+- production API/MCP/provider permissions;
+- money, Rights, Impact, chain, pricing, checkout, merge, or phase authority;
+- AI advisory role;
+- runtime RLS/append-only posture.
