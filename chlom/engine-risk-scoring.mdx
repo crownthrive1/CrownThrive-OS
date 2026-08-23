@@ -1,0 +1,286 @@
+---
+title: "CHLOM Risk Scoring Engine"
+sidebarTitle: "Risk Scoring Engine"
+description: "Standalone current CHLOM engine specification for versioned risk models, evidence inputs, normalized scores/bands, uncertainty, freshness, calibration, model governance, human review and ACE integration."
+icon: "gauge"
+keywords: ["CHLOM Risk Scoring Engine", "risk model", "confidence", "calibration", "ACE", "AIE", "HOLD"]
+---
+
+# CHLOM Risk Scoring Engine
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.risk-scoring
+canonical_name: Risk Scoring Engine
+artifact_class: decision_support_engine
+source_lineage:
+  - historical Risk/Scoring Pallet
+  - AIE/ACE architecture
+  - recovered component atlas
+  - quantitative risk-model lineage
+current_mapping:
+  - AIE intelligence
+  - ACE/P-02 decision support
+status: current_semantic_engine_specification
+production_models: individually_versioned_and_evidenced
+```
+
+## Purpose
+
+The Risk Scoring Engine produces **bounded, versioned risk estimates** from defined evidence for a specific purpose. It does not label a person/entity as generally risky and does not issue legal/compliance sanctions by itself.
+
+```text
+EVIDENCE / OBSERVATIONS
+       |
+       v
+FEATURE / NORMALIZATION VERSION
+       |
+       v
+RISK MODEL VERSION
+       |
+       v
+SCORE + BAND + UNCERTAINTY
+       |
+       v
+AIE / ACE / REVIEWER
+       |
+POLICY CONSEQUENCE
+```
+
+## Risk is purpose-specific
+
+Examples of separate risk models:
+
+- transaction anomaly risk;
+- provider integration risk;
+- rights/evidence uncertainty;
+- account/identity compromise risk;
+- settlement/reconciliation risk;
+- model/system health risk;
+- partner/provider operational risk.
+
+A score from one model must not be reused for an unrelated purpose without an adopted mapping.
+
+## Model record
+
+```yaml
+risk_model_id: stable ID
+purpose: explicit
+model_family: rule|statistical|ml|hybrid
+version: string
+input_schema_refs: []
+output_scale_ref: required
+calibration_ref: protected/public as appropriate
+approved_use_cases: []
+prohibited_use_cases: []
+status: research|candidate|controlled_test|approved|held|retired
+```
+
+## Score record
+
+```yaml
+risk_score_id: stable ID
+model_ref: exact version
+subject_ref: required
+purpose: required
+score: numeric or structured
+band: optional
+uncertainty_or_confidence: optional
+input_evidence_refs: []
+created_at: timestamp
+valid_until: nullable
+status: current|stale|superseded|disputed
+```
+
+## Historical weighted example
+
+Recovered CHLOM material includes weighted-risk examples. A generic public-safe model is:
+
+```text
+risk = α*x1 + β*x2 + γ*x3 + ...
+```
+
+Weights/features are model/version specific. Historical formulas are lineage, not production calibration.
+
+## Normalization
+
+If multiple features use different scales, the model must define normalization explicitly. Example conceptual normalization:
+
+```text
+z = (x - μ) / σ
+```
+
+or robust/min-max alternatives. This page does not declare a production method.
+
+## Score range
+
+If a model uses `[0,1]` or `[0,100]`, the scale definition is versioned. Consumers may not assume `100` always means worst risk across models.
+
+## Bands
+
+A band mapping can be:
+
+```text
+score -> LOW / MEDIUM / HIGH / CRITICAL
+```
+
+but thresholds belong to the exact model/policy and can be restricted.
+
+## Uncertainty
+
+```text
+score = 0.73
+uncertainty = high
+```
+
+can appropriately route HOLD/review rather than treating `0.73` as precise truth.
+
+## Freshness
+
+```text
+usable(score, t) = score.status == current AND t <= valid_until
+```
+
+where applicable. If no valid-until is explicit, domain policy controls reuse.
+
+## ACE relationship
+
+ACE consumes risk as one input:
+
+```text
+risk score HIGH
+      |
+policy says human review required
+      |
+HOLD + reviewer
+```
+
+A risk engine never hard-codes the business remedy unless that rule is formally part of the governed policy layer.
+
+## AIE relationship
+
+AIE can create anomaly/risk features and orchestrate multiple models; this engine owns risk-model execution/calibration contracts.
+
+## Evidence quality
+
+The engine can record evidence quality/provenance rather than silently treating all sources equally.
+
+```text
+provider-reported
+internal observed
+corroborated
+independently verified
+unknown/stale
+```
+
+No universal quality weights are declared here.
+
+## Calibration
+
+Calibration asks whether predicted risk corresponds to observed outcomes. When valid ground truth exists, metrics can include calibration error/Brier score or bucketed reliability. These are evaluation tools, not authority.
+
+## Threshold governance
+
+Threshold changes are versioned configuration/policy changes. They do not silently alter historical scores or decisions.
+
+## Human review feedback
+
+```text
+score / decision
+   |
+human review / verified outcome
+   |
+evaluation record
+   |
+model improvement candidate
+```
+
+Feedback does not automatically retrain/promote the model.
+
+## Drift
+
+Monitor:
+
+- feature distribution drift;
+- calibration drift;
+- outcome/base-rate drift;
+- provider/schema drift;
+- performance degradation.
+
+Material drift can HOLD the model/version.
+
+## API contract families
+
+- score subject/event;
+- explain safe factors/reason classes;
+- get score/currentness;
+- compare model versions;
+- evaluate calibration/drift;
+- hold/retire model;
+- generate review packet.
+
+## Events
+
+```text
+ct.risk.model.registered.v1
+ct.risk.model.activated.v1
+ct.risk.score.calculated.v1
+ct.risk.score.stale.v1
+ct.risk.model.drift.detected.v1
+ct.risk.model.held.v1
+ct.risk.review.outcome.recorded.v1
+```
+
+## Failure modes
+
+### Missing required feature
+
+Return incomplete/HOLD-compatible output, not a fabricated zero-risk value.
+
+### Model service unavailable
+
+If mandatory, ACE holds; no fail-open bypass.
+
+### Ground-truth labels unreliable
+
+Qualify evaluation results and avoid false precision.
+
+### Model update materially changes scoring
+
+Version and compare against regression/evaluation corpus before activation.
+
+### Provider schema changes
+
+Hold affected model until normalization validated.
+
+## Security/fairness
+
+- adversarial evasion;
+- score probing;
+- feature leakage;
+- data poisoning;
+- unfair proxy variables;
+- self-reinforcing feedback;
+- cross-tenant contamination;
+- unauthorized model replacement.
+
+## Restricted companion
+
+Contains production features, weights, thresholds, training/eval data, adversarial tests, model artifacts, prompts where used, provider mappings and fairness/security analyses.
+
+## Invariants
+
+```text
+risk score != violation
+score != authority
+confidence != permission
+missing feature != zero risk
+model version update != historical rewrite
+AIE signal != ACE result
+human review != model retraining authorization automatically
+```
+
+## Status
+
+The Risk Scoring Engine is a current CHLOM decision-support specification. Each production model/version requires its own evidence, evaluation, approval and monitoring state.
