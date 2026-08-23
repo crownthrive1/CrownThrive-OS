@@ -1,0 +1,70 @@
+---
+title: CHLOM Wallet Continuity Runtime API & MCP Threat Model
+description: Threat model for the service-role-only Edge Function, HTTP API, MCP transport, RPC bridge, receipts, and runtime binding evidence.
+---
+
+# CHLOM Wallet Continuity Runtime API & MCP Threat Model
+
+## Protected boundary
+
+The runtime is a private controlled-test interface over continuity evidence. It is not a general-purpose Wallet executor. Protected assets include service-role authority, exact source-head lineage, continuity receipts, institutional truth snapshots, oracle evidence, recovery plans, RPC execution privileges, and the distinction between a deployed interface and a verified institutional binding.
+
+## Threats and controls
+
+### Authenticated-user privilege escalation
+
+A normal Supabase authenticated token could attempt to reach service-role RPC functions through the Edge Function.
+
+**Controls:** gateway JWT verification plus an independent constant-time comparison requiring the incoming bearer/API key to equal the project service-role key. Public RPC functions also revoke `PUBLIC`, `anon`, and `authenticated` execution and grant only `service_role`.
+
+### Confused-deputy MCP routing
+
+A client could submit a benign `Mcp-Method` or `Mcp-Name` header while placing a different JSON-RPC method/tool in the request body.
+
+**Controls:** protocol-version, method, and tool-name headers are matched to the JSON-RPC body before dispatch. Mismatch returns `HeaderMismatch`; adversarial contract tests require zero accepted mismatches.
+
+### Tool-name injection
+
+A client could attempt to transform a tool name into an arbitrary RPC function name.
+
+**Control:** tool-to-RPC routing is a fixed source-controlled map. Client input is never concatenated into an RPC endpoint name.
+
+### Service-role credential disclosure
+
+Runtime error output, request receipts, or logs could expose the service-role key.
+
+**Controls:** the key is read only from the Edge Function environment, compared in memory, never returned, never persisted, and never included in receipt bodies. Request receipts store SHA-256 request/response digests rather than raw payloads.
+
+### Provider or oracle payload leakage
+
+An oracle call could become a path for raw provider evidence or credentials into continuity storage.
+
+**Control:** the oracle RPC accepts only oracle ID, observation timestamp, SHA-256 digest, and confidence. Raw payloads and provider credentials are not accepted.
+
+### Recovery execution through a planning API
+
+A client could treat an ECAC recovery response as permission to perform destructive or external actions.
+
+**Control:** recovery ECAC means `RECOVERY_PLAN_ELIGIBLE` only. Every stored plan fixes automatic destructive action, provider write, money movement, Rights grant, and chain broadcast to false.
+
+### Deployment-equals-certification error
+
+A successfully deployed Edge Function could be misrepresented as a verified runtime binding.
+
+**Control:** deployment records default to `DEPLOYED_CANARY_PENDING`. API/MCP binding cannot be reported as `BOUND_CONTROLLED_TEST` until an authenticated service-role runtime canary is recorded against the exact source head and deployed Edge Function version.
+
+### Unbounded response extraction
+
+A client could request the complete 600-asset registry repeatedly.
+
+**Control:** asset listing is capped at 200 records per call and paginated. CrownThrive-local request-budget semantics remain separately governed.
+
+### Protocol downgrade
+
+A client could invoke an obsolete MCP revision and bypass current header semantics.
+
+**Control:** the runtime accepts only protocol `2026-07-28` for this tranche and returns the supported version on rejection.
+
+## Non-authority invariants
+
+The runtime may never create provider writes, custody, token issuance, money movement, Rights grants, chain broadcast, effective pricing, checkout, destructive recovery, independent review, heartbeat evidence, merge authority, AI final authority, or phase advancement.
