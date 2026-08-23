@@ -1,0 +1,245 @@
+---
+title: "Escrow & Settlement Pallet — Historical Runtime Record"
+sidebarTitle: "Escrow & Settlement Pallet"
+description: "Individual reconstruction of CHLOM's historical Escrow & Settlement Pallet for conditional asset/payment holds, atomic release and settlement evidence, mapped to current saga/compensation and P-11 reconciliation."
+icon: "vault"
+keywords: ["CHLOM Escrow Pallet", "Settlement Pallet", "escrow", "atomic settlement", "LEX", "payment", "compensation"]
+---
+
+# Escrow & Settlement Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.escrow-settlement
+namespace: historical_runtime_pallet
+recovered_title: Escrow & Settlement Pallet
+source_lineage:
+  - recovered Help Center runtime pallet inventory
+  - Technical Blueprint LEX transfer flow
+  - historical LEX architecture
+source_recovery: substantive_architecture
+current_mapping:
+  - P-11 Capital, Revenue & Settlement
+  - P-06 commerce payment orchestration
+  - P-03 license transfer
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Escrow & Settlement Pallet was designed to make license/payment exchange atomic inside the historical CHLOM runtime: funds or value were held until compliance/transfer conditions were satisfied, then released only when the transaction completed.
+
+```text
+BUYER VALUE / FUNDS
+       |
+       v
+     ESCROW
+       |
+       +--> compliance / eligibility
+       +--> license/asset transfer condition
+       |
+ conditions satisfied?
+       |
+   +---+---+
+   |       |
+  no      yes
+   |       |
+refund   release + settlement
+```
+
+## Escrow is a conditional state
+
+Escrow does not mean ownership, entitlement or settlement.
+
+```text
+value held in escrow
+     !=
+transaction settled
+```
+
+## Reconstructed escrow object
+
+```yaml
+escrow_id: stable ID
+transaction_ref: required
+asset_or_license_ref: required when applicable
+payer_ref: identity/accounting entity
+payee_ref: identity/accounting entity
+amount_or_value_ref: structured
+conditions_ref: required
+opened_at: timestamp
+expires_at: nullable
+status: pending|funded|held|release_ready|released|refunded|cancelled|disputed
+```
+
+Exact historical storage fields are not fully recovered.
+
+## Historical atomicity
+
+Inside one runtime, CHLOM could model asset/license transfer and value release as one atomic state transition.
+
+```text
+if all preconditions true:
+    transfer license
+    release escrow
+else:
+    no final transfer/release
+```
+
+## Current distributed-system mapping
+
+Current provider-based payments and license services may not support true atomicity across systems.
+
+```text
+payment provider
+   +
+rights/license service
+   +
+commerce service
+   +
+settlement service
+```
+
+Therefore current CHLOM uses **sagas and compensating actions** where needed.
+
+```text
+STEP A succeeds
+STEP B fails
+   |
+COMPENSATE A / HOLD / REVIEW
+```
+
+Never call a multi-provider flow atomic unless its implementation actually guarantees atomicity.
+
+## Condition model
+
+Conditions can include:
+
+- payment/capture evidence;
+- active DLA/license;
+- transfer/sublicense eligibility;
+- counterparty verification;
+- agreement execution;
+- policy/compliance PASS;
+- timelock expiry;
+- delivery/acceptance condition;
+- dispute absence/resolution.
+
+## Timeout
+
+Escrow requires timeout/expiry semantics so funds/value are not stranded indefinitely.
+
+```text
+pending escrow
+   |
+expiry reached
+   |
+conditions still unresolved?
+   |
+refund / cancel / route governed review
+```
+
+## Dispute relationship
+
+Disputed escrow remains held until an authorized disposition determines release/refund/other remedy.
+
+## Settlement relationship
+
+```text
+escrow release
+    !=
+P-11 settlement automatically
+```
+
+P-11 reconciles expected obligation, provider/runtime receipts and final institutional status.
+
+## Historical operation families
+
+- create/open escrow;
+- fund/lock;
+- evaluate release conditions;
+- release;
+- refund/cancel;
+- dispute/hold;
+- query status.
+
+Exact historical extrinsic names are not recovered.
+
+## Current events
+
+```text
+ct.escrow.created.v1
+ct.escrow.funded.v1
+ct.escrow.held.v1
+ct.escrow.release.ready.v1
+ct.escrow.released.v1
+ct.escrow.refunded.v1
+ct.escrow.disputed.v1
+ct.settlement.reconciled.v1
+```
+
+## Idempotency
+
+Release/refund operations must be idempotent. Duplicate webhook/message processing cannot release/refund twice.
+
+## Failure cases
+
+### Payment captured, transfer fails
+
+Refund/compensate/hold under current policy; do not call transaction completed.
+
+### License transferred, provider payout fails
+
+Hold/retry/compensate according to agreement and rights state; preserve transferred-state evidence.
+
+### Conflicting dispute arrives during release
+
+Use ordered/atomic local controls where available; otherwise HOLD if release not finalized and preserve exact event sequence.
+
+### Provider says refunded, institutional order still active
+
+Reconcile entitlement/order/economic state; provider receipt is evidence.
+
+## Security threats
+
+- double release;
+- forged condition satisfaction;
+- escrow drain;
+- timeout manipulation;
+- reentrancy/runtime exploits historically;
+- race between dispute and release;
+- provider callback spoofing;
+- currency/value mismatch.
+
+## Public / restricted split
+
+Public-safe:
+
+- escrow lifecycle;
+- condition/compensation principles;
+- public transaction status where appropriate.
+
+Restricted:
+
+- provider/payment configuration;
+- private deal conditions;
+- security controls;
+- dispute evidence;
+- exploit-sensitive implementation detail.
+
+## Invariants
+
+```text
+escrow funded != settlement
+payment captured != license transferred
+atomic historical runtime != atomic multi-provider current flow
+release != reconciliation
+refund != deletion
+provider receipt != canonical settlement
+historical escrow pallet != current runtime deployment
+```
+
+## Status
+
+The Escrow & Settlement Pallet is preserved as historical transaction/runtime IP and maps to current P-06/P-03/P-11 conditional-execution, compensation and reconciliation workflows.
