@@ -1,0 +1,89 @@
+---
+title: "CrownThrive Services Stack API and MCP"
+sidebarTitle: "CSS API & MCP"
+description: "Public-safe contracts for CSS discovery, CHLOM CaaS evaluation, provider/profile planning, health, gaps, and evidence."
+icon: "code-branch"
+---
+
+# CrownThrive Services Stack API and MCP
+
+**MCP server:** `ct.mcp.crownthrive-services-stack`  
+**Plugin:** `ct.plugin.crownthrive-services-stack` `0.1.0`  
+**Runtime:** `crownthrive-services-stack` `0.1.0`  
+**Authentication:** required  
+**State:** controlled test
+
+The MCP surface is a governed control plane, not a generic secret getter, arbitrary SQL endpoint, provider-write proxy, payment API, or legal-compliance certification engine.
+
+## Tools
+
+| Tool | Class | Effect |
+| --- | --- | --- |
+| `css.status` | D0 | Read sanitized CSS state |
+| `css.services.list` | D0 | List provider-independent service identities |
+| `css.contracts.list` | D0 | List public-safe contracts and digests |
+| `css.providers.list` | D1 | List replaceable provider bindings and exit states |
+| `css.platforms.list` | D1 | List candidate platform/profile bindings |
+| `css.dependencies.list` | D0 | List service dependency graph |
+| `css.assets.list` | D0 | List asset identity, lifecycle, custody, and digests |
+| `css.caas.evaluate` | D1 | Produce `ALLOW | HOLD | DENY` operational decision |
+| `css.route.plan` | D1 | Create a non-executing route plan |
+| `css.binding.plan` | D2 | Create a non-executing platform/profile binding plan |
+| `css.health.snapshot` | D1 | Record module/provider health and freshness |
+| `css.gaps.scan` | D1 | Detect readiness and continuity gaps |
+| `css.receipts.list` | D0 | List sanitized immutable receipts |
+
+Every schema is closed by default. Tools are non-destructive, idempotent where applicable, and not open-world.
+
+## CaaS request contract
+
+A request contains:
+
+- `request_key` for idempotency;
+- platform key and stable platform ID where resolved;
+- CSS service ID and exact operation key;
+- contract version;
+- actor and tenant references;
+- declared purpose;
+- authority class;
+- data class;
+- evidence references;
+- authenticated, authorization, tenant, minimization, observability, environment, provider-write, payment, rights, professional-review, and legal-certification context.
+
+The same request key cannot be reused with a different context digest.
+
+## Decision precedence
+
+`DENY > HOLD > ALLOW`
+
+Hard-deny examples include:
+
+- autonomous D3 request;
+- automated legal-compliance certification;
+- unresolved restricted-data tenant;
+- authority mismatch;
+- service or contract no longer current;
+- requested data class above the service ceiling;
+- all provider bindings blocked.
+
+Hold examples include:
+
+- missing exact contract/version;
+- unresolved platform identity or profile;
+- no verified provider evidence;
+- provider write requested without a write-verified binding;
+- professional review required;
+- payment movement or rights grant requiring separate authority;
+- insufficient evidence, minimization, exit, or readiness state.
+
+## Readiness algorithm
+
+`ct.alg.gen7.css-readiness` evaluates contract, provider, platform identity, platform profile, authorization, tenant isolation, data minimization, observability, provider exit, documentation, and evidence freshness.
+
+Its weights and thresholds are Vault-only. Returned data includes score, band, feature digest, and receipt digest. The score does not evaluate people and cannot create authority.
+
+## Public/private boundary
+
+Public-safe output may contain stable IDs, versions, purpose, states, reason codes, evidence references, and cryptographic digests.
+
+Credentials, private identities, protected implementation policies, exact scoring weights, private evidence bodies, customer data, and provider account topology remain restricted.
