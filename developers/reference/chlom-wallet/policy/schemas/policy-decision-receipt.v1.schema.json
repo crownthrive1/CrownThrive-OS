@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.crownthrive.com/chlom/wallet-policy-decision-receipt.v1.schema.json",
+  "title": "CHLOM Wallet Policy Assurance Decision Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "engine_id",
+    "engine_version",
+    "algorithm_versions",
+    "rulepack_id",
+    "rulepack_version",
+    "rulepack_sha256",
+    "intent_id",
+    "intent_sha256",
+    "action_type",
+    "value_class",
+    "environment",
+    "disposition",
+    "risk_score",
+    "risk_band",
+    "hard_denials",
+    "hold_reasons",
+    "required_evidence",
+    "missing_evidence",
+    "stale_evidence",
+    "invalid_evidence",
+    "required_handoffs",
+    "risk_factors",
+    "explanation",
+    "execution_envelope",
+    "ai_advisory",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "engine_id": {"const": "ct.engine.chlom-wallet-policy-assurance.v1"},
+    "engine_version": {"const": "1.0.0"},
+    "algorithm_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["CAPS", "EAGR", "VCL", "AIR", "RIGOR", "DRIFT", "CHAOS"],
+      "properties": {
+        "CAPS": {"const": "1.0.0"},
+        "EAGR": {"const": "1.0.0"},
+        "VCL": {"const": "1.0.0"},
+        "AIR": {"const": "1.0.0"},
+        "RIGOR": {"const": "1.0.0"},
+        "DRIFT": {"const": "1.0.0"},
+        "CHAOS": {"const": "1.0.0"}
+      }
+    },
+    "rulepack_id": {"const": "ct.rulepack.chlom-wallet.policy-assurance.v1"},
+    "rulepack_version": {"const": "1.0.0"},
+    "rulepack_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "intent_id": {"type": "string", "pattern": "^ct[.]wallet[.]intent[.][a-z0-9._:-]{3,160}$"},
+    "intent_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "action_type": {"type": "string"},
+    "value_class": {"enum": ["identity", "money", "rights", "rewards", "impact", "proof", "unknown"]},
+    "environment": {"enum": ["controlled_test", "testnet"]},
+    "disposition": {"enum": ["ECAC", "HOLD", "DENY"]},
+    "risk_score": {"type": "integer", "minimum": 0, "maximum": 100},
+    "risk_band": {"enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]},
+    "hard_denials": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "hold_reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "required_evidence": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "missing_evidence": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "stale_evidence": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "invalid_evidence": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "required_handoffs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^ct[.][a-z0-9._-]+$"}},
+    "risk_factors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "weight"],
+        "properties": {
+          "code": {"type": "string"},
+          "weight": {"type": "integer", "minimum": 0, "maximum": 100}
+        }
+      }
+    },
+    "explanation": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "execution_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controlled_test_only",
+        "production_activation",
+        "provider_write",
+        "custody",
+        "token_issuance",
+        "money_movement",
+        "production_rights_grant",
+        "chain_broadcast",
+        "effective_price_publication",
+        "checkout_activation",
+        "phase_advancement",
+        "merge_authorized"
+      ],
+      "properties": {
+        "controlled_test_only": {"const": true},
+        "production_activation": {"const": false},
+        "provider_write": {"const": false},
+        "custody": {"const": false},
+        "token_issuance": {"const": false},
+        "money_movement": {"const": false},
+        "production_rights_grant": {"const": false},
+        "chain_broadcast": {"const": false},
+        "effective_price_publication": {"const": false},
+        "checkout_activation": {"const": false},
+        "phase_advancement": {"const": false},
+        "merge_authorized": {"const": false}
+      }
+    },
+    "ai_advisory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "final_authority", "explanation_mode", "future_llm_output_must_be_advisory_only"],
+      "properties": {
+        "enabled": {"const": false},
+        "final_authority": {"const": false},
+        "explanation_mode": {"const": "deterministic_reason_templates"},
+        "future_llm_output_must_be_advisory_only": {"const": true}
+      }
+    },
+    "receipt_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

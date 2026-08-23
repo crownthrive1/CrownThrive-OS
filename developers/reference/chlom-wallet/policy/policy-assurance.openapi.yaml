@@ -1,0 +1,216 @@
+openapi: 3.1.0
+info:
+  title: CHLOM Wallet Policy Assurance API
+  version: 1.0.0
+  description: >-
+    Controlled-test, JWT-protected interface for deterministic CHLOM Wallet
+    policy status, ECAC/HOLD/DENY evaluation, append-only decision receipts,
+    and receipt verification. The contract authorizes no production activation,
+    provider write, custody, money movement, rights grant, chain broadcast,
+    public pricing, checkout, phase advancement, or merge.
+  x-crownthrive-state: CONTROLLED_TEST_SOURCE_READY_NOT_DEPLOYED
+  x-crownthrive-engine-id: ct.engine.chlom-wallet-policy-assurance.v1
+  x-crownthrive-rulepack-id: ct.rulepack.chlom-wallet.policy-assurance.v1
+security:
+  - bearerAuth: []
+paths:
+  /:
+    get:
+      operationId: getPolicyAssuranceStatus
+      summary: Return public-safe engine and runtime status
+      responses:
+        '200':
+          description: Controlled-test status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Runtime status unavailable; no fallback authority is inferred
+    post:
+      operationId: executePolicyAssuranceAction
+      summary: Evaluate an intent, verify a receipt, or return status
+      parameters:
+        - in: header
+          name: x-crownthrive-correlation-id
+          required: false
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9._:-]{8,160}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/EvaluateRequest'
+                - $ref: '#/components/schemas/VerifyReceiptRequest'
+                - $ref: '#/components/schemas/StatusRequest'
+      responses:
+        '200':
+          description: Controlled-test result
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/EvaluateResponse'
+                  - $ref: '#/components/schemas/VerifyReceiptResponse'
+                  - $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Invalid or unsupported request
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Request exceeds the bounded payload size
+        '422':
+          description: Policy evaluation or receipt verification held or rejected
+        '503':
+          description: Required authority, rulepack, or persistence context unavailable
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: Missing, malformed, or expired JWT
+  schemas:
+    HardBoundaries:
+      type: object
+      additionalProperties: false
+      required:
+        - production_activation
+        - provider_write
+        - custody
+        - token_issuance
+        - money_movement
+        - production_rights_grant
+        - chain_broadcast
+        - effective_price_publication
+        - checkout_activation
+        - phase_advancement
+        - merge_authorized
+      properties:
+        production_activation: { const: false }
+        provider_write: { const: false }
+        custody: { const: false }
+        token_issuance: { const: false }
+        money_movement: { const: false }
+        production_rights_grant: { const: false }
+        chain_broadcast: { const: false }
+        effective_price_publication: { const: false }
+        checkout_activation: { const: false }
+        phase_advancement: { const: false }
+        merge_authorized: { const: false }
+    StatusRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action: { const: status }
+    EvaluateRequest:
+      type: object
+      additionalProperties: false
+      required: [action, intent]
+      properties:
+        action: { const: evaluate }
+        intent:
+          type: object
+          description: >-
+            Candidate intent. The service replaces any client-provided authority
+            object with the current server-resolved Wallet Agent authority context.
+          additionalProperties: true
+    VerifyReceiptRequest:
+      type: object
+      additionalProperties: false
+      required: [action, receipt]
+      properties:
+        action: { const: verify-receipt }
+        receipt:
+          type: object
+          additionalProperties: true
+    StatusResponse:
+      type: object
+      required:
+        - ok
+        - service_id
+        - state
+        - engine_id
+        - engine_version
+        - rulepack_id
+        - rulepack_version
+        - rulepack_sha256
+        - algorithms
+        - capabilities
+        - hard_boundaries
+      properties:
+        ok: { const: true }
+        service_id: { const: ct.service.chlom-wallet-policy-assurance }
+        state: { const: CONTROLLED_TEST_ACTIVE }
+        engine_id: { const: ct.engine.chlom-wallet-policy-assurance.v1 }
+        engine_version: { const: 1.0.0 }
+        rulepack_id: { const: ct.rulepack.chlom-wallet.policy-assurance.v1 }
+        rulepack_version: { const: 1.0.0 }
+        rulepack_sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        algorithms:
+          type: array
+          minItems: 7
+          maxItems: 7
+        capabilities:
+          const: [status, evaluate, verify-receipt]
+        database_status:
+          type: object
+        hard_boundaries:
+          $ref: '#/components/schemas/HardBoundaries'
+        ai_advisory:
+          type: object
+          properties:
+            enabled: { const: false }
+            final_authority: { const: false }
+    EvaluateResponse:
+      type: object
+      required:
+        - ok
+        - state
+        - correlation_id
+        - authority
+        - receipt
+        - persistence
+        - hard_boundaries
+      properties:
+        ok: { const: true }
+        state: { const: CONTROLLED_TEST_DECISION_RECORDED }
+        correlation_id:
+          type: string
+        authority:
+          type: object
+          required: [agent_id, head_sha, heartbeat_fresh, did_uri, public_identity_digest_sha256, phase]
+        receipt:
+          type: object
+          required: [engine_id, rulepack_id, intent_id, disposition, receipt_sha256]
+          properties:
+            disposition:
+              enum: [ECAC, HOLD, DENY]
+        persistence:
+          type: object
+        hard_boundaries:
+          $ref: '#/components/schemas/HardBoundaries'
+    VerifyReceiptResponse:
+      type: object
+      required: [ok, valid, hard_boundaries]
+      properties:
+        ok: { type: boolean }
+        valid: { type: boolean }
+        claimed:
+          type: [string, 'null']
+        computed:
+          type: [string, 'null']
+        reason:
+          type: [string, 'null']
+        hard_boundaries:
+          $ref: '#/components/schemas/HardBoundaries'
