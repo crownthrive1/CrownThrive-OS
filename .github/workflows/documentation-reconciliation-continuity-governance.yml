@@ -1,0 +1,45 @@
+name: Documentation Reconciliation Continuity
+
+on:
+  pull_request:
+    paths:
+      - 'frameworks/documentation-reconciliation-continuity/**'
+      - 'skills/documentation-reconciliation-continuity/**'
+      - 'plugins/documentation-reconciliation-continuity/**'
+      - 'evals/documentation-reconciliation-continuity.v1.json'
+      - 'data/documentation/**'
+      - 'scripts/validate_documentation_reconciliation_continuity.py'
+      - 'scripts/validate_sprint_documentation_continuity.py'
+      - '**/*.mdx'
+      - 'docs.json'
+  push:
+    branches: [main]
+    paths:
+      - 'frameworks/documentation-reconciliation-continuity/**'
+      - 'skills/documentation-reconciliation-continuity/**'
+      - 'plugins/documentation-reconciliation-continuity/**'
+      - 'evals/documentation-reconciliation-continuity.v1.json'
+      - 'data/documentation/**'
+      - 'scripts/validate_documentation_reconciliation_continuity.py'
+      - 'scripts/validate_sprint_documentation_continuity.py'
+      - '**/*.mdx'
+      - 'docs.json'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-documentation-reconciliation-continuity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Validate framework contracts
+        run: python scripts/validate_documentation_reconciliation_continuity.py
+      - name: Validate Sprint 1 continuity links
+        run: python scripts/validate_sprint_documentation_continuity.py
