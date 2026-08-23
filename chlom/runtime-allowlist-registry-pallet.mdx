@@ -1,0 +1,265 @@
+---
+title: "Allowlist / Registry Pallet — Historical Runtime Record"
+sidebarTitle: "Allowlist / Registry Pallet"
+description: "Individual reconstruction of CHLOM's historical allowlist/registry runtime module for approved verifiers, providers, strategies and actors with revocation, probation and current registry-service mapping."
+icon: "list-check"
+keywords: ["CHLOM Allowlist", "Registry Pallet", "verifiers", "providers", "strategies", "revocation", "probation"]
+---
+
+# Allowlist / Registry Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.allowlist-registry
+namespace: historical_runtime_pallet
+recovered_title: Allowlist/Registry Pallet
+recovered_help_center_description: allowlisted verifiers, strategies, and providers with revocation and probation controls
+source_recovery: substantive_title_and_related_architecture
+current_mapping:
+  - P-01 Identity & Access
+  - P-02 Governance & Compliance
+  - provider/issuer/verifier registries
+runtime_deployment: not_established
+```
+
+## Purpose
+
+The historical Allowlist/Registry Pallet was conceived as the runtime source for determining which actors, verifiers, providers or strategies were approved to participate in sensitive CHLOM operations.
+
+```text
+CANDIDATE ACTOR / PROVIDER / STRATEGY
+               |
+               v
+REGISTRY ENTRY
+               |
+        +------+------+
+        |             |
+     APPROVED      PROBATION
+        |             |
+        +------+------+
+               |
+             ACTIVE
+               |
+       SUSPEND / REVOKE
+```
+
+## Registry is not endorsement
+
+Allowlisting means an entity is approved for a defined scope under a defined version of policy. It does not mean CrownThrive guarantees quality, solvency, legal compliance or future suitability beyond that scope.
+
+## Historical object families
+
+The recovered description directly supports registry entries for:
+
+- verifiers;
+- providers;
+- strategies.
+
+Related CHLOM architecture supports mapping similar registry semantics to:
+
+- issuers;
+- oracles;
+- validators;
+- approved ZK circuits/verifiers;
+- approved economic/provider adapters;
+- approved integration endpoints.
+
+Those extensions are current architectural mappings, not claims about literal historical storage fields.
+
+## Reconstructed registry entry
+
+```yaml
+registry_entry_id: stable ID
+subject_type: verifier|provider|strategy|issuer|oracle|other
+subject_ref: stable institutional or provider reference
+scope: []
+status: candidate|approved|probation|suspended|revoked|expired
+approved_by_ref: authority
+approved_at: timestamp
+expires_at: nullable
+policy_refs: []
+evidence_refs: []
+```
+
+## Probation
+
+Probation is a bounded state in which participation may be narrowed, monitored or subject to additional conditions.
+
+```text
+APPROVED
+   |
+trigger / review
+   |
+PROBATION
+   |
+   +--> RESTORED
+   +--> SUSPENDED
+   +--> REVOKED
+```
+
+Probation should not be modeled as a hidden flag with no documented effect.
+
+## Revocation
+
+Revocation must propagate to dependent operations.
+
+If a verifier is revoked:
+
+- new verification should be blocked;
+- existing assertions may require review according to their own effective rules;
+- dependent systems receive updated registry state;
+- historical evidence remains preserved.
+
+If a provider/strategy is revoked:
+
+- no new activity should be routed through it;
+- existing open activity is reconciled/closed/migrated under explicit procedures;
+- provider exit evidence is retained.
+
+## Current mapping
+
+```text
+Historical Allowlist Pallet
+       |
+       +--> current provider registry
+       +--> verifier/issuer registry
+       +--> strategy allowlist
+       +--> P-02 eligibility/policy
+       +--> P-10 provider-evidence registry
+       +--> DAIL state change events
+```
+
+## Provider independence
+
+Provider IDs never become the stable institutional identity.
+
+```text
+registry subject ID
+       |
+       +--> provider account alias A
+       +--> provider account alias B
+```
+
+This permits provider migration without rewriting the registry's semantic identity.
+
+## Decision flow
+
+```text
+registry entry exists?
+   no -> HOLD/DENY according to operation
+   |
+  yes
+   v
+status == approved?
+   no -> HOLD/DENY
+   |
+  yes
+   v
+scope covers requested operation?
+   no -> DENY
+   |
+  yes
+   v
+entry/current evidence not expired?
+   no -> HOLD
+   |
+  yes
+   v
+PASS registry gate
+```
+
+Registry PASS is only one gate. Other policy/rights/authority checks still apply.
+
+## Historical runtime operations
+
+Source-supported capability intentions include:
+
+- add/approve entry;
+- place entry on probation;
+- suspend/revoke entry;
+- check registry status;
+- scope participation.
+
+Exact extrinsic names are not recovered and are not invented.
+
+## Current event mapping
+
+```text
+ct.registry.entry.created.v1
+ct.registry.entry.approved.v1
+ct.registry.entry.probation.v1
+ct.registry.entry.suspended.v1
+ct.registry.entry.revoked.v1
+ct.registry.entry.expired.v1
+```
+
+## Security concerns
+
+- stale allowlist state;
+- unauthorized approval;
+- provider impersonation;
+- scope escalation;
+- registry bypass;
+- fail-open behavior when registry is unavailable;
+- revoked entity cached as active;
+- mass approval without evidence;
+- compromised privileged registry editor.
+
+## Failure mode: stale cache
+
+```text
+canonical registry = REVOKED
+cached integration = APPROVED
+        |
+        v
+canonical state controls
+block new sensitive action
+record mismatch
+```
+
+## Evidence requirements
+
+A material registry change should preserve:
+
+```text
+subject
+scope
+prior status
+new status
+reason
+actor/authority
+evidence
+policy version
+effective time
+expiry/review time
+```
+
+## Public / restricted split
+
+Public-safe may expose approved public providers/verifiers only where disclosure is intended.
+
+Restricted companion can hold:
+
+- private provider lists;
+- eligibility evidence;
+- probation reasons;
+- security findings;
+- private strategy definitions;
+- exploit-sensitive revocation procedures.
+
+## Invariants
+
+```text
+allowlisted != universally trusted
+approved provider != canonical truth
+registry PASS != transaction PASS
+probation != silent approval
+revoked != deleted
+provider ID != registry identity
+historical runtime pallet != current deployment
+```
+
+## Status
+
+The historical Allowlist/Registry Pallet is preserved as a distinct CHLOM runtime module and mapped to current provider/verifier/strategy registries plus P-02 policy gates.
