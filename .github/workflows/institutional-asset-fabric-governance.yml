@@ -1,0 +1,109 @@
+name: Institutional Asset Fabric Governance
+
+on:
+  pull_request:
+    paths:
+      - developers/crownthrive-institutional-asset-fabric.mdx
+      - automation/institutional-asset-controller.mdx
+      - developers/manifests/crownthrive-asset-fabric.v1.json
+      - developers/manifests/crownthrive-plugin-suite.v1.json
+      - developers/manifests/crownthrive-asset-blueprint-catalog.v1.json
+      - apps/crownthrive-institutional-asset-fabric/**
+      - scripts/generate_crownthrive_asset_blueprints.py
+      - scripts/validate_crownthrive_asset_fabric.py
+      - .github/workflows/institutional-asset-fabric-governance.yml
+  push:
+    branches:
+      - agent/gen6-priority-delegation-control-plane-20260821
+    paths:
+      - developers/crownthrive-institutional-asset-fabric.mdx
+      - automation/institutional-asset-controller.mdx
+      - developers/manifests/crownthrive-asset-fabric.v1.json
+      - developers/manifests/crownthrive-plugin-suite.v1.json
+      - developers/manifests/crownthrive-asset-blueprint-catalog.v1.json
+      - apps/crownthrive-institutional-asset-fabric/**
+      - scripts/generate_crownthrive_asset_blueprints.py
+      - scripts/validate_crownthrive_asset_fabric.py
+      - .github/workflows/institutional-asset-fabric-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: institutional-asset-fabric-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Asset Fabric, plugin suite and blueprint factory
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out exact repository head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile scripts/generate_crownthrive_asset_blueprints.py
+          python -m py_compile scripts/validate_crownthrive_asset_fabric.py
+
+      - name: Validate deterministic 4,000-blueprint matrix
+        run: python scripts/generate_crownthrive_asset_blueprints.py --check
+
+      - name: Validate repository invariants
+        run: python scripts/validate_crownthrive_asset_fabric.py
+
+      - name: Exercise safe index generation in a temporary directory
+        run: |
+          output_dir="$(mktemp -d)"
+          python scripts/generate_crownthrive_asset_blueprints.py --output "$output_dir" --mode index
+          test -f "$output_dir/blueprints.jsonl"
+          test -f "$output_dir/generation-summary.json"
+          test "$(wc -l < "$output_dir/blueprints.jsonl")" -eq 4000
+          python -m json.tool "$output_dir/generation-summary.json" >/dev/null
+
+      - name: Validate JSON artifacts
+        run: |
+          python -m json.tool developers/manifests/crownthrive-asset-fabric.v1.json >/dev/null
+          python -m json.tool developers/manifests/crownthrive-plugin-suite.v1.json >/dev/null
+          python -m json.tool developers/manifests/crownthrive-asset-blueprint-catalog.v1.json >/dev/null
+          python -m json.tool apps/crownthrive-institutional-asset-fabric/app-manifest.json >/dev/null
+          python -m json.tool apps/crownthrive-institutional-asset-fabric/mcp-resource-manifest.json >/dev/null
+
+      - name: Run repository documentation governance
+        run: python scripts/validate_docs.py
+
+      - name: Check whitespace and conflict markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+      - name: Publish public-safe summary
+        run: |
+          {
+            echo "## CrownThrive Institutional Asset Fabric"
+            echo ""
+            echo "- Blueprint candidates: 4,000"
+            echo "- Curated asset specifications: 456"
+            echo "- Plugins / pallets / kernels: 32 / 24 / 16"
+            echo "- Scripts / workflows / skills / prompt packs: 96 / 64 / 64 / 64"
+            echo "- Root MCP tools: 11"
+            echo "- Production assets claimed: 0"
+            echo "- Arbitrary native-binary execution: disabled"
+            echo "- Provider writes, installation, publication, checkout and D3: disabled"
+          } >> "${GITHUB_STEP_SUMMARY}"
