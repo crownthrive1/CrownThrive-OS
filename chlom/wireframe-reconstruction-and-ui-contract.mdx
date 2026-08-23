@@ -1,0 +1,405 @@
+---
+title: "CHLOM Wireframe Reconstruction & UI Contract"
+sidebarTitle: "Wireframe Reconstruction Contract"
+description: "Canonical reconstruction and implementation contract for CHLOM wireframe, dashboard, portal and UI articles, separating recovered visual/source detail from source-grounded functional reconstruction."
+icon: "ruler-combined"
+keywords: ["CHLOM wireframes", "UI contract", "dashboard", "portal", "reconstruction", "accessibility", "state model"]
+---
+
+# CHLOM Wireframe Reconstruction & UI Contract
+
+## Canonical record
+
+```yaml
+artifact_id: ct.chlom.ui.wireframe-contract.v1
+artifact_class: ui_reconstruction_contract
+source_lineage:
+  - recovered CHLOM Help Center Wireframe Build titles
+  - CHLOM Technical Blueprint
+  - CHLOM Grand Prospectus
+  - July 2026 Technical Build Pack
+current_status: adopted_reconstruction_contract
+```
+
+## Purpose
+
+The lost CHLOM Help Center contained explicit wireframe and UI-build titles. A recovered title proves the screen/document existed as a knowledge object; it does **not** prove the original visual body survived. This contract preserves that distinction while still turning each recovered title into an implementation-ready article.
+
+```text
+EXACT RECOVERED TITLE
+        |
+        v
+ORIGINAL BODY / IMAGE LOCATED?
+   +----+----+
+   |         |
+  yes       no
+   |         |
+extract    reconstruct only from
+source     related architecture + title
+   |         |
+   +----+----+
+        |
+        v
+IMPLEMENTATION ARTICLE
+        |
+        +--> roles / access
+        +--> page regions
+        +--> fields / actions
+        +--> state machine
+        +--> API/data/events
+        +--> errors/HOLD
+        +--> ASCII wireframe
+        +--> accessibility
+        +--> current mapping
+```
+
+## Recovery status vocabulary
+
+Every screen article declares one status:
+
+```text
+visual_and_body_recovered
+body_recovered_visual_not_recovered
+partial_body_recovered
+exact_title_recovered_related_architecture_available
+exact_title_only_recovered
+source_not_located
+```
+
+A reconstructed layout is never labeled as the original visual.
+
+## Required article sections
+
+Each wireframe article should include, when applicable:
+
+- exact recovered title;
+- source-recovery status;
+- intended users/roles;
+- user goal;
+- entry conditions;
+- authority/access gates;
+- screen hierarchy;
+- regions/components;
+- data fields;
+- actions;
+- state machine;
+- PASS/HOLD/DENY behavior;
+- loading/empty/error states;
+- API/schema dependencies;
+- canonical events/DAIL effects;
+- privacy/security considerations;
+- accessibility;
+- responsive behavior;
+- ASCII wireframe;
+- current implementation mapping;
+- known unknowns;
+- restricted/private companion requirements.
+
+## Role boundary
+
+A screen being visible does not grant the role authority represented by an action button.
+
+```text
+UI ACCESS
+   !=
+ACTION AUTHORITY
+```
+
+Material actions re-check P-01/P-02 authority at execution time.
+
+## UI state model
+
+At minimum, stateful CHLOM interfaces should model:
+
+```text
+LOADING
+READY
+EMPTY
+PARTIAL
+HOLD
+DENIED
+ERROR
+STALE
+READ_ONLY
+SUCCESS_PENDING_READBACK
+CONFIRMED
+```
+
+A provider `200 OK` must not force `CONFIRMED` before institutional readback/reconciliation.
+
+## PASS / HOLD / DENY presentation
+
+Decision state must be visible and explainable without exposing protected detection logic.
+
+```text
+PASS  -> action may continue within exact scope
+HOLD  -> action paused; show reason class + next required step
+DENY  -> action prohibited; show safe reason + review/remedy path if available
+```
+
+Do not visually style HOLD as a soft success.
+
+## Optimistic UI boundary
+
+For low-risk reversible operations, optimistic UI can be allowed only when the canonical state model supports compensation/readback. For rights, economic, security, governance or professional actions, the UI should prefer explicit pending/readback states.
+
+```text
+CLICK
+  |
+REQUEST SENT
+  |
+PROVIDER/SERVICE SUCCESS
+  |
+INSTITUTIONAL READBACK
+  |
+CONFIRMED UI
+```
+
+## Canonical IDs
+
+UI routes/components should use stable institutional IDs rather than provider-only IDs when possible.
+
+Examples:
+
+```text
+dla_id
+asset_id
+case_id
+proposal_id
+attestation_id
+identity_id
+listing_id
+settlement_id
+```
+
+Provider IDs remain aliases.
+
+## Data classification
+
+Every field is classified for display:
+
+```text
+PUBLIC
+ROLE_VISIBLE
+INTERNAL
+RESTRICTED
+NEVER_RENDER_SECRET
+```
+
+A screen can reference existence of a protected object without rendering its content.
+
+## Evidence disclosure
+
+The UI should prefer evidence references and public-safe attestations over raw restricted evidence.
+
+```text
+Evidence available: 4 items
+Verified digest: abc…
+Public attestation: valid
+```
+
+rather than leaking contracts, identity documents or security evidence.
+
+## DAIL UX
+
+Material actions should expose a receipt/status reference where useful:
+
+```text
+Decision ID
+Event/receipt ID
+Policy/version
+Time
+Current state
+Correction/supersession link
+```
+
+The UI need not expose internal DAIL topology to ordinary users.
+
+## Accessibility
+
+Minimum implementation expectations:
+
+- keyboard-operable controls;
+- semantic headings/landmarks;
+- labels associated with fields;
+- status not conveyed by color alone;
+- focus management after dialogs/actions;
+- readable validation/error summaries;
+- scalable text;
+- accessible tables;
+- alternative text/descriptions for diagrams/charts;
+- reduced-motion consideration;
+- screen-reader announcement for asynchronous state changes.
+
+## Responsive behavior
+
+Desktop wireframes from historical docs are not a reason to produce desktop-only current interfaces.
+
+```text
+DESKTOP
+sidebar + main + detail drawer
+
+TABLET
+collapsible nav + main + modal/drawer
+
+MOBILE
+single-column task flow + progressive disclosure
+```
+
+## Tables
+
+Tables should support:
+
+- stable row identity;
+- explicit empty state;
+- sort/filter semantics;
+- pagination/cursor state;
+- accessible column headers;
+- status vocabulary;
+- safe export rules;
+- no secret fields in client payload merely because columns are hidden.
+
+## Forms
+
+Material forms use:
+
+```text
+DRAFT
+VALIDATE CLIENT
+VALIDATE SERVER/POLICY
+HOLD/ERROR RESOLUTION
+CONFIRM EXACT ACTION
+SUBMIT
+READBACK
+RECEIPT
+```
+
+## Confirmation dialogs
+
+High-impact confirmations identify:
+
+- exact object;
+- exact action;
+- scope;
+- irreversible/reversible nature;
+- economic/right/security effect;
+- authority used;
+- compensation/appeal where applicable.
+
+Generic `Are you sure?` is insufficient for high-risk actions.
+
+## Error model
+
+Errors distinguish:
+
+```text
+validation error
+permission denial
+policy HOLD
+provider unavailable
+provider mismatch
+canonical conflict
+network timeout
+stale data
+internal failure
+```
+
+A provider outage should not be rendered as a policy denial.
+
+## Empty state
+
+Empty state answers:
+
+```text
+Is there truly no data?
+Is data still syncing?
+Is access restricted?
+Is the filter hiding results?
+Is the provider unavailable?
+```
+
+Do not use the same empty card for all five.
+
+## Wireframe ASCII convention
+
+ASCII diagrams are implementation aids, not exact recovered screenshots unless explicitly labeled.
+
+```text
++-----------------------------------------------------------+
+| Header / identity / environment                           |
++----------------------+------------------------------------+
+| Navigation           | Main task region                   |
+|                      |                                    |
+|                      | +-------------------------------+  |
+|                      | | decision / data / form        |  |
+|                      | +-------------------------------+  |
++----------------------+------------------------------------+
+| Status / receipt / support                                |
++-----------------------------------------------------------+
+```
+
+## Component IDs
+
+Reusable components should receive stable names in the UI component registry rather than being reimplemented screen-by-screen.
+
+Possible families:
+
+```text
+DecisionBadge
+EvidenceReference
+IdentityChip
+DLAStatus
+RightsScopeViewer
+PolicyResultPanel
+DAILReceipt
+HoldResolutionCard
+ProviderReadbackStatus
+VersionBadge
+```
+
+These names are implementation candidates unless already registered elsewhere.
+
+## Public / restricted twin
+
+Public wireframe articles may expose page structure and safe fields. Restricted companions can hold:
+
+- fraud/security review views;
+- private financial fields;
+- case evidence;
+- protected admin actions;
+- unpublished partner/operator fields;
+- security-sensitive system topology;
+- exploit-sensitive workflow detail.
+
+## Versioning
+
+When a recovered visual later appears:
+
+```text
+reconstructed wireframe v1
+        |
+source visual recovered
+        |
+source comparison
+        |
+wireframe v2 + correction notes
+```
+
+The reconstructed v1 remains in lineage.
+
+## Invariants
+
+```text
+wireframe != deployed UI
+reconstructed layout != recovered screenshot
+button visible != action authorized
+provider success != confirmed UI state
+hidden field != protected data
+HOLD != success
+empty != unavailable
+public UI != unrestricted evidence access
+```
+
+## Completion rule
+
+No recovered CHLOM Wireframe Build title remains only a bullet in a catalog. Each gets its own article, source-recovery state and implementation mapping.
