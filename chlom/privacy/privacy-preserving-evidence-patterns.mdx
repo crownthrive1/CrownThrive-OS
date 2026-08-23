@@ -5,3 +5,461 @@ description: "Individual CHLOM privacy component article for evidence minimizati
 icon: "eye-slash"
 keywords: ["CHLOM privacy evidence", "selective disclosure", "ZK", "evidence minimization", "redaction", "attestation"]
 ---
+
+# Privacy-Preserving Evidence Patterns — CHLOM Component Contract
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.privacy.evidence-patterns
+canonical_name: Privacy-Preserving Evidence Patterns
+artifact_class: privacy_and_evidence_component
+lineage:
+  - Evidence Vault
+  - DAIL evidence references
+  - Fingerprint / DID / VC / SBT lineage
+  - ZK / ZKX architecture
+  - Attestation Mirror
+  - public/private documentation boundary
+status: public_safe_component_contract
+implementation_state: pattern_specific_evidence_required
+restricted_companion: 04_Restricted_Algorithms_Formulas_Threat_Models_and_Trade_Secrets
+```
+
+## Purpose
+
+CHLOM frequently needs to prove or review a fact **without exposing every underlying record**. This component defines reusable privacy patterns for keeping the source evidence protected while publishing or sharing only the minimum artifact necessary for verification.
+
+```text
+RESTRICTED SOURCE EVIDENCE
+           |
+           v
+CLASSIFY PURPOSE + AUDIENCE
+           |
+           v
+SELECT PRIVACY PATTERN
+   +-------+--------+--------+-------+
+   |       |        |        |       |
+redact  digest  attestation  ZK   selective
+                              proof disclosure
+   |       |        |        |       |
+   +-------+--------+--------+-------+
+           |
+           v
+PUBLIC / LIMITED PROJECTION
+           |
+           v
+VERIFICATION + DAIL REFERENCE
+```
+
+## Core principle
+
+```text
+prove what is necessary
+without publishing what is not necessary
+```
+
+Privacy is not achieved by merely hiding a URL or omitting a field from one screen. The storage, event, API, log, export, model and public-projection layers all have to respect the same classification boundary.
+
+## Evidence classes
+
+Examples include:
+
+- rights agreements and ownership records;
+- identity/credential evidence;
+- Fingerprint or biometric-derived evidence;
+- tax/financial records;
+- provider/account records;
+- audit artifacts;
+- case/dispute evidence;
+- algorithms, threat models and trade secrets;
+- security logs;
+- source documents supporting public claims.
+
+Each evidence object carries a classification and purpose profile.
+
+## Evidence reference contract
+
+```yaml
+evidence_ref_id: stable id
+source_asset_ref: restricted/internal source object
+content_digest_ref: optional|required by profile
+classification: public|internal|restricted|secret
+purpose_profile_ref: required
+access_policy_ref: required
+retention_profile_ref: optional
+redacted_projection_refs: []
+attestation_refs: []
+proof_refs: []
+created_at: timestamp
+status: active|held|superseded|retired
+```
+
+The evidence reference can be public-safe even when the evidence body is not.
+
+## Pattern 1 — Redacted projection
+
+Use when a human-readable document/output is necessary but specific data fields must remain hidden.
+
+```text
+MASTER DOCUMENT
+   |
+field classification
+   |
+redaction policy
+   |
+REDACTED PROJECTION
+```
+
+A redacted projection should preserve:
+
+- source/projection ID;
+- source version;
+- redaction profile/version;
+- projection creation time;
+- digest relationship where appropriate;
+- explicit indication that content was redacted.
+
+Do not create a redacted file by destructively editing the master.
+
+## Pattern 2 — Digest / commitment
+
+A cryptographic digest can demonstrate that a later-presented artifact matches a prior committed byte sequence.
+
+```text
+master bytes
+  -> canonicalization if required
+  -> digest
+  -> DAIL / proof-anchor reference
+```
+
+Digest integrity does **not** prove that the source content is factually true, legally valid or authorized.
+
+```text
+digest match != factual correctness
+```
+
+## Pattern 3 — Attestation
+
+An authorized issuer/reviewer can attest a limited claim derived from protected evidence.
+
+Example:
+
+```text
+private source: full credential record
+public-safe attestation: "credential type X was current at T"
+```
+
+The attestation must identify:
+
+- subject binding;
+- claim/predicate;
+- issuer/attester;
+- issuer authority scope;
+- evidence reference;
+- issue/effective/expiry times;
+- revocation/correction behavior.
+
+## Pattern 4 — Selective-disclosure credential
+
+Where supported, a credential holder can disclose only specific claims needed for a transaction rather than the full credential.
+
+```text
+credential claims:
+[name, birth_date, address, license_number, status]
+
+request requires:
+[status]
+
+projection/proof reveals:
+status only
+```
+
+The precise credential technology is provider/standard specific; the semantic requirement is data minimization.
+
+## Pattern 5 — Zero-knowledge proof
+
+Use when an approved circuit can prove a predicate without revealing its witness.
+
+```text
+private witness
+     |
+approved circuit
+     |
+    ZKP
+     |
+verifier learns predicate result
+```
+
+Examples from CHLOM lineage include age/eligibility, credential validity, license status and financial/compliance predicates.
+
+A valid proof is still only evidence for a predicate:
+
+```text
+proof valid != action authorized
+```
+
+## Pattern 6 — Pseudonymous stable reference
+
+Use a stable pseudonymous subject/object reference so multiple governed events can correlate without exposing the underlying private identifier.
+
+```text
+private identity
+   -> protected stable reference
+   -> public/internal event correlation
+```
+
+Low-entropy identifiers should not be exposed through unsalted/raw hashing schemes that can be reversed by guessing.
+
+## Pattern 7 — Tokenization / aliasing of provider identifiers
+
+Provider account IDs, wallet IDs, customer IDs or object IDs can be stored as restricted aliases linked to a canonical CHLOM object.
+
+```text
+canonical party/object id
+   -> restricted provider alias A
+   -> restricted provider alias B
+```
+
+Public articles/events use the canonical or safe pseudonymous identifier.
+
+## Pattern 8 — Public proof surface
+
+A public proof surface can expose a safe status such as:
+
+- verified/current;
+- expired;
+- held;
+- revoked;
+- source-backed as of a timestamp;
+- digest/anchor available.
+
+It should not expose the raw record used to reach the status.
+
+## Pattern 9 — Attestation Mirror
+
+The historical Attestation Mirror concept can publish selected attestations/statuses across systems while keeping private evidence in the source vault.
+
+```text
+restricted evidence
+  -> authorized attestation
+  -> mirror/public projection
+```
+
+Mirroring must preserve revocation/correction propagation.
+
+## Pattern 10 — Proof-on-demand access
+
+For some workflows, evidence remains private until an authorized reviewer requests verification.
+
+```text
+requester
+ -> authorization/purpose check
+ -> controlled verification
+ -> result/attestation
+```
+
+The requester may never receive the raw source if the result suffices.
+
+## Purpose limitation
+
+Before evidence is shared or transformed, resolve:
+
+- why the evidence is needed;
+- who can access it;
+- whether raw data is necessary;
+- whether a lower-disclosure pattern can satisfy the purpose;
+- retention period;
+- legal/contractual/organizational authority;
+- whether external provider/model processing is allowed.
+
+## Public/private publication workflow
+
+```text
+PRIVATE MASTER / SOURCE
+        |
+        v
+CLASSIFY / DECOMPOSE
+        |
+   +----+----+
+   |         |
+public-safe restricted
+projection  companion
+   |         |
+   +----+----+
+        v
+BINDING RECORD + DIGEST + VERSION
+```
+
+The public projection is never the custody master.
+
+## Redaction profile
+
+```yaml
+redaction_profile_id: stable id
+source_classes: []
+audience: public|partner|internal_role
+remove_fields: []
+mask_fields: []
+generalize_fields: []
+retain_required_context: []
+review_required: boolean
+version: exact
+```
+
+Redaction should be reproducible from the same source/version/profile.
+
+## Logs and telemetry
+
+Privacy boundaries apply to operational logs too. Avoid logging:
+
+- raw credentials;
+- secrets/tokens;
+- full biometric or identity records;
+- raw financial/tax data;
+- protected algorithm parameters;
+- private source documents.
+
+Use safe object IDs, classification tags and digest references.
+
+## AI/model processing
+
+Restricted evidence may be processed by AI only when the model/provider profile is authorized for that data class and purpose.
+
+```text
+model can process text
+   !=
+model/provider authorized to receive restricted evidence
+```
+
+Prompt injection from source documents must not override system/tool/data rules.
+
+## Revocation and correction
+
+A proof/attestation/public status can become stale when its source changes.
+
+```text
+source v1 -> attestation/proof v1
+source corrected/revoked
+   -> new evidence event
+   -> invalidate/revoke/supersede dependent projection
+```
+
+The public status should change without erasing the historical evidence chain.
+
+## Access tiers
+
+```text
+PUBLIC
+INTERNAL
+RESTRICTED
+SECRET / CREDENTIAL
+```
+
+A lower tier never automatically inherits access to a higher tier. Public article existence does not imply public source evidence.
+
+## Verification receipt
+
+```yaml
+verification_receipt_id: stable id
+evidence_ref: protected/source reference
+pattern: redaction|digest|attestation|selective_disclosure|zk|other
+verifier_ref: actor/service
+purpose_ref: required
+result: verified|held|invalid|expired
+verified_at: timestamp
+source_snapshot_or_digest_ref: required
+projection_ref: optional
+```
+
+## DAIL events
+
+```text
+ct.evidence.classified.v1
+ct.evidence.projection.created.v1
+ct.evidence.redacted.v1
+ct.evidence.digest.committed.v1
+ct.evidence.attestation.issued.v1
+ct.evidence.proof.created.v1
+ct.evidence.verification.completed.v1
+ct.evidence.access.denied.v1
+ct.evidence.projection.revoked.v1
+ct.evidence.projection.superseded.v1
+```
+
+## Failure modes
+
+- classification unknown -> HOLD publication/share;
+- source digest mismatch -> integrity failure/HOLD;
+- redaction profile unavailable -> no public projection;
+- proof circuit/verifier stale -> HOLD;
+- attester authority invalid -> attestation unusable;
+- revocation state unavailable -> HOLD for freshness-sensitive use;
+- public projection contains restricted field -> incident and removal/correction;
+- provider/model not approved -> block transfer.
+
+## Threat model
+
+- re-identification from pseudonyms;
+- digest brute forcing of low-entropy fields;
+- metadata leakage;
+- incomplete redaction;
+- screenshots/cache/export bypass;
+- model/provider retention;
+- proof correlation;
+- stale attestation;
+- unauthorized verifier;
+- public route accidentally exposing restricted source;
+- logs/telemetry leaking private values.
+
+## Test vectors
+
+1. restricted master + public redaction profile -> safe projection, master unchanged;
+2. redacted file altered -> digest relationship fails;
+3. valid attestation from unauthorized issuer -> not accepted;
+4. valid ZK proof + revoked credential -> downstream action not PASS;
+5. public API requests raw restricted evidence -> deny;
+6. provider alias appears in public event when classified restricted -> fail privacy test;
+7. source correction -> public projection superseded/revoked;
+8. AI provider not approved for data class -> processing blocked;
+9. pseudonymous reference stable across authorized events without exposing raw ID;
+10. historical mirror/public proof state -> no claim that raw source was public.
+
+## Observability
+
+Track:
+
+- projections by classification/pattern;
+- access denials;
+- redaction validation failures;
+- digest mismatches;
+- proof/attestation expiry;
+- revocation propagation latency;
+- public/private boundary incidents;
+- provider/model policy violations;
+- stale public proof surfaces.
+
+## Restricted companion
+
+Private custody can contain source evidence, biometric/identity records, private contracts, tax/financial data, provider aliases, exact redaction rules where security-sensitive, proof witnesses/keys, trade-secret algorithms and incident evidence.
+
+## Invariants
+
+```text
+public projection != source master
+digest integrity != factual truth
+attestation != universal authority
+proof valid != action authority
+pseudonym != permission to correlate for every purpose
+redaction != deletion of master
+classification must apply to logs/APIs/exports as well as pages
+correction != erasure
+```
+
+## Versioning
+
+Every material redaction/proof/attestation/privacy profile is versioned. A source update or classification change can require new projections and explicit supersession/revocation events.
+
+## Status
+
+`reconstructed_source_grounded + public_safe_component_contract`. Restricted evidence and implementation details remain Vault-bound.
