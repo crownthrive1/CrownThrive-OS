@@ -1,0 +1,255 @@
+---
+title: "Provider Outage and Capacity Recovery Runbook"
+sidebarTitle: "Provider Outage Recovery"
+description: "Fail-closed runbook for vendor outages, capacity exhaustion, provider-plan changes, restarts, recovery heartbeats, credential gates, reconciliation, and after-action learning."
+icon: "life-ring"
+tag: "Controlled Test"
+---
+
+# Provider Outage and Capacity Recovery Runbook
+
+Use this runbook when a CrownThrive service is unavailable, degraded, read-only, capacity-constrained, restarted, rate-limited, or otherwise impaired by a provider or infrastructure dependency.
+
+The objective is not merely to make the interface load again. The objective is to prove restoration, reconcile dependent state, preserve evidence, and make the next failure cheaper and safer.
+
+## Trigger conditions
+
+Open or attach to an incident when one or more of these conditions is observed:
+
+- native heartbeat becomes stale or fails;
+- provider reports outage/degradation;
+- application or database becomes unreachable;
+- storage, request, MAU, egress, quota, or other included capacity approaches or reaches a limit;
+- service enters read-only or protective mode;
+- provider-plan or add-on change requires restart/reconfiguration;
+- credential or authorization stops working;
+- webhook/job/queue backlog materially accumulates;
+- provider billing/cost-control behavior threatens availability; or
+- dependent CrownThrive platforms fail a synthetic canary.
+
+## Authority and roles
+
+| Function | Minimum responsibility |
+| --- | --- |
+| Incident owner | owns severity, scope, current state and handoff |
+| Infrastructure/security agent | diagnoses provider, capacity, access and security state |
+| Recovery/rollback agent | preserves rollback and degraded-mode options |
+| Platform agents | record `impact` or `no_impact` and platform-specific evidence |
+| Evidence auditor | verifies evidence completeness and separation of claims |
+| Documentation sentinel/steward | records documentation impact and public-safe projection |
+| Founder/finance/security authority | approves reserved spend, contractual, high-risk security or irreversible decisions |
+
+No role may infer permission from technical access.
+
+## 1. Detect and open the incident
+
+Create a stable incident ID/key and record:
+
+- detected timestamp in UTC;
+- affected service IDs;
+- initial severity;
+- reporter/source class;
+- known customer impact;
+- provider state;
+- most recent native heartbeat;
+- current capacity/usage evidence where relevant;
+- active deployments/configuration versions; and
+- known credential or authorization changes.
+
+If exact root cause is unknown, keep it unknown. Do not convert correlation into cause.
+
+## 2. Contain safely
+
+Choose the lowest-risk containment consistent with impact:
+
+- pause risky writes;
+- switch to approved read-only/degraded mode;
+- quarantine broken jobs or replay sources;
+- stop nonessential scheduled load;
+- preserve queues rather than dropping work;
+- prevent duplicate payment/entitlement/provider actions;
+- protect credentials and evidence; and
+- retain a tested rollback target.
+
+Do not change money destinations, rights, legal terms, security policy, or public claims to conceal a failure.
+
+## 3. Capture provider and capacity evidence
+
+Record provider evidence separately from CrownThrive evidence:
+
+- provider control-plane/API state;
+- plan/capacity state;
+- quota or retention limits implicated;
+- cost-control/spend-cap state when continuity-relevant;
+- add-on or plan-change timing;
+- provider incident/support reference where available; and
+- account evidence classification.
+
+Exact account billing, payment, tax, credential, or customer details stay restricted.
+
+Provider capability and provider plan state do not prove CrownThrive runtime recovery.
+
+## 4. Execute the approved mitigation
+
+Examples include:
+
+- provider-plan/capacity adjustment under authorized scope;
+- service restart;
+- storage cleanup only when retention/legal/rights rules permit;
+- traffic throttling or queue batching;
+- restoring from a verified recovery point;
+- switching to an approved fallback provider/path;
+- rotating or reissuing a credential when required; or
+- rolling back a deployment/configuration change.
+
+Every mitigation records actor, authority, timestamp, affected records, expected effect, rollback/compensation, and verification plan.
+
+## 5. Require a fresh native heartbeat
+
+A provider dashboard that says `healthy` is insufficient.
+
+The recovery gate requires a CrownThrive-native heartbeat generated after the mitigation/restart threshold. At minimum verify:
+
+- heartbeat timestamp is newer than the gate timestamp;
+- database/service check is successful;
+- project/runtime state is expected;
+- heartbeat evidence resolves to the intended service/environment; and
+- the heartbeat is not merely a replayed/stale record.
+
+If the heartbeat is absent, remain in `RECOVERY_MONITORING`.
+
+## 6. Re-run dependent canaries
+
+After the native heartbeat, test representative dependencies according to the service:
+
+- database read/write within bounded test scope;
+- auth/service identity;
+- storage read/write;
+- API/MCP read path;
+- scheduled job/queue flow;
+- webhook delivery/replay;
+- application health;
+- payment/entitlement canary where applicable;
+- backups/export path; and
+- cross-platform event/analytics handoff.
+
+A P0 recovery should not be declared from a single green check when dependent systems remain unreconciled.
+
+## 7. Credential gate
+
+If the incident involves a new or rotated provider credential, keep the credential workflow fail-closed:
+
+```text
+fresh heartbeat missing
+→ credential intake HOLD
+
+fresh heartbeat passes + secret not yet supplied
+→ ready to receive secret through restricted channel
+
+secret supplied
+→ encrypt/store in approved Vault
+→ record stable credential ID + Vault reference + fingerprint
+→ bounded runtime canary
+→ custody/readback verification
+→ verified active
+```
+
+Never treat an app ID, project ID, public client ID, token label, or screenshot reference as the secret itself.
+
+Never place the secret value in GitHub, Mintlify, chat-visible documentation, logs, screenshots, tickets, or analytics.
+
+## 8. Reconcile the incident
+
+Before `resolved`, reconcile:
+
+- affected platform states;
+- queued/retried jobs;
+- duplicate or missed provider events;
+- data written during degraded mode;
+- payments/entitlements/rights transitions where relevant;
+- monitoring state;
+- credential custody;
+- backup/restore evidence;
+- customer/support impact; and
+- documentation/changelog impact.
+
+Use compensating actions rather than deleting inconvenient history.
+
+## 9. Monitoring window
+
+Move to `monitoring` after service restoration. During the monitoring window:
+
+- watch fresh heartbeats;
+- inspect error and saturation trends;
+- compare capacity against thresholds;
+- validate scheduled jobs;
+- watch dependent services; and
+- preserve any recurrence as a linked event rather than silently resetting the incident clock.
+
+## 10. After-action review
+
+Every material incident must answer:
+
+- what happened;
+- what was affected;
+- what evidence established cause and recovery;
+- what control failed or was missing;
+- what prevented worse impact;
+- whether capacity thresholds were visible early enough;
+- whether backup/degraded/fallback paths worked;
+- whether communications were accurate;
+- what should be automated;
+- what test should be added; and
+- what reusable lesson should enter the capability factory.
+
+## 11. Convert lessons into institutional capability
+
+A validated recurring pattern may become:
+
+- alert/threshold rule;
+- synthetic canary;
+- status-control template;
+- incident schema;
+- runbook;
+- governed agent skill;
+- recovery drill;
+- provider-exit checklist;
+- evaluation fixture;
+- managed service; or
+- licensed public-safe template/package.
+
+Commercialization remains a separate governed state. A lesson being useful does not automatically make it releasable, licensable, legally sufficient, or safe to expose.
+
+## Required evidence packet
+
+```yaml
+incident_id: ct.incident.*
+service_ids: []
+severity: SEV2
+lifecycle_state: monitoring
+provider_evidence_refs: []
+native_heartbeat_ref: null
+dependent_canaries: []
+credential_gate_state: null
+agent_ack_summary: {}
+rollback_or_compensation: {}
+reconciliation: {}
+lesson_ids: []
+documentation_impact: docs_updated
+next_review_at: null
+```
+
+## Completion gate
+
+Do not close the incident until:
+
+- service is restored or an accepted degraded state is explicit;
+- a fresh native heartbeat exists;
+- required dependent checks pass or are explicitly held/deferred;
+- impacted agents/platforms have recorded their disposition;
+- credential custody is correct where applicable;
+- reconciliation is complete;
+- after-action evidence exists; and
+- documentation/lesson/factory impacts are recorded.
+
+See [Ecosystem Status and Incident Control](/technology/ecosystem-status-and-incident-control) and [Outage Recovery Skill Factory](/automation/outage-recovery-skill-factory).
