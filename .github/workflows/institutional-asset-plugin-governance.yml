@@ -1,0 +1,72 @@
+name: Institutional Asset Plugin Governance
+
+on:
+  pull_request:
+    paths:
+      - plugins/crownthrive-institutional-asset-fabric/**
+      - developers/manifests/crownthrive-asset-fabric-runtime.v0.1.json
+      - apps/crownthrive-institutional-asset-fabric/**
+      - scripts/validate_crownthrive_asset_plugin_package.py
+      - .github/workflows/institutional-asset-plugin-governance.yml
+  push:
+    branches:
+      - agent/gen6-priority-delegation-control-plane-20260821
+    paths:
+      - plugins/crownthrive-institutional-asset-fabric/**
+      - developers/manifests/crownthrive-asset-fabric-runtime.v0.1.json
+      - apps/crownthrive-institutional-asset-fabric/**
+      - scripts/validate_crownthrive_asset_plugin_package.py
+      - .github/workflows/institutional-asset-plugin-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: institutional-asset-plugin-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate plugin, runtime, tools, resource and submission candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact repository head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate Python syntax
+        run: python -m py_compile scripts/validate_crownthrive_asset_plugin_package.py
+
+      - name: Validate plugin package boundaries
+        run: python scripts/validate_crownthrive_asset_plugin_package.py
+
+      - name: Validate JSON artifacts
+        run: |
+          python -m json.tool plugins/crownthrive-institutional-asset-fabric/plugin.manifest.json >/dev/null
+          python -m json.tool plugins/crownthrive-institutional-asset-fabric/tool-contracts.json >/dev/null
+          python -m json.tool developers/manifests/crownthrive-asset-fabric-runtime.v0.1.json >/dev/null
+          python -m json.tool apps/crownthrive-institutional-asset-fabric/app-manifest.json >/dev/null
+          python -m json.tool apps/crownthrive-institutional-asset-fabric/chatgpt-app-submission.candidate.json >/dev/null
+          python -m json.tool apps/crownthrive-institutional-asset-fabric/mcp-resource-manifest.json >/dev/null
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- \
+            plugins/crownthrive-institutional-asset-fabric \
+            apps/crownthrive-institutional-asset-fabric \
+            developers/manifests/crownthrive-asset-fabric-runtime.v0.1.json \
+            scripts/validate_crownthrive_asset_plugin_package.py; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
