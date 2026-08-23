@@ -82,7 +82,7 @@ declare
   v_result pgmq.metrics_result;
   v_legacy_name text := 'thi' || 'vebase_async_queue_status_v1';
 begin
-  execute format('select public.%I()', v_legacy_name) into v_result;
+  execute format('select * from public.%I()', v_legacy_name) into v_result;
   return v_result;
 end;
 $$;
