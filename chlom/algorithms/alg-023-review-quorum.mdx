@@ -1,0 +1,106 @@
+---
+title: "ALG-023 — Review Quorum"
+sidebarTitle: "ALG-023 Review Quorum"
+description: "Standalone CHLOM procedure for validating reviewer eligibility and calculating weighted or unweighted review quorum without confusing candidate approval with execution authority."
+icon: "users"
+keywords: ["CHLOM ALG-023", "review quorum", "weighted approval", "Scribes", "assurance"]
+---
+
+# ALG-023 — Review Quorum
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-023
+name: Review Quorum
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Scribes/verifiers; governance; assurance review
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-023 evaluates whether a set of eligible human/domain reviews meets the threshold required by a policy. It is distinct from corporate/governance authority: satisfying a review quorum can produce an approved candidate while a separate authority is still required to execute the action.
+
+## Inputs
+
+```yaml
+reviews[]:
+  reviewer_id
+  assignment_ref
+  decision
+  weight_if_applicable
+  signed_at
+  conflict_state
+  credential_state
+policy:
+  minimum_count
+  threshold
+  weighting_method
+  abstention_semantics
+  independence_requirements
+```
+
+## Procedure
+
+```text
+function review_quorum(reviews, policy):
+    eligible = filter_valid_reviews(reviews)
+
+    if count(eligible) < policy.minimum_count:
+        return HOLD
+
+    support = sum(weight(r) for r in eligible if r.decision == APPROVE)
+    total = sum(weight(r) for r in eligible)
+
+    if support / total >= policy.threshold:
+        return APPROVED_CANDIDATE
+
+    return NOT_APPROVED
+```
+
+## Valid-review filter
+
+Reject or exclude reviews whose reviewer was not assigned/eligible, had an unresolved prohibited conflict, signed after authorization expired, duplicated another review under a one-person-one-review rule, or used an unsupported review schema.
+
+## Weighting
+
+Default to equal weights unless an adopted policy explicitly defines qualified weighting. Expertise/reputation weights are powerful governance choices and must be transparent, versioned and testable.
+
+## Abstentions and recusals
+
+Recusal generally removes the reviewer from eligible voting weight. Abstention semantics must be explicit: it may count toward participation but not support, or be excluded entirely depending on policy. Do not infer this from generic voting practice.
+
+## Output
+
+```yaml
+quorum_decision_id:
+review_set_ref:
+eligible_reviewers[]:
+excluded_reviews[]:
+support_weight:
+total_weight:
+ratio:
+threshold:
+result: APPROVED_CANDIDATE|NOT_APPROVED|HOLD
+```
+
+## Authority boundary
+
+```text
+APPROVED_CANDIDATE != institutional execution authority
+```
+
+ALG-002 or the applicable governance action must still authorize consequential execution.
+
+## DAIL evidence
+
+Store signed review references, eligibility/exclusion reasons, quorum policy version, calculation, result and subsequent appeals/corrections.
+
+## Tests
+
+Test exact minimum count, below minimum, threshold boundary, majority, weighted reviews, invalid reviewer, conflict exclusion, duplicate review, abstention, recusal, tie and reviewer credential revoked after signing but before execution.
+
+## Versioning
+
+Quorum policies and the algorithm are independently versioned. Historical quorum results retain their original threshold and eligible-review set.
