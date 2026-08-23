@@ -1,0 +1,65 @@
+---
+title: CHLOM Wallet Continuity Runtime API & MCP v1
+description: Service-role-only controlled-test HTTP and MCP runtime for the CHLOM Wallet continuity control plane.
+---
+
+# CHLOM Wallet Continuity Runtime API & MCP v1
+
+Phase F binds the source-complete continuity contracts to a deployable private runtime without expanding Wallet authority.
+
+The runtime is implemented as a Supabase Edge Function named `chlom-wallet-continuity`. It exposes the same eight continuity capabilities over private HTTP routes and MCP `2026-07-28` stateless requests.
+
+## Authorization
+
+The Edge Function requires Supabase JWT verification and then independently requires the incoming bearer/API key to match the project service-role key. Authenticated-user and anonymous tokens are insufficient.
+
+The function uses the service role only to invoke a narrowly scoped set of public Data API RPC names. Every RPC has default `PUBLIC` execution revoked and is explicitly executable only by `service_role`.
+
+## HTTP surface
+
+- `GET /api/status`
+- `GET /api/assets`
+- `GET /api/dependencies`
+- `POST /api/evaluate-expiry`
+- `POST /api/observe-oracle`
+- `POST /api/plan-recovery`
+- `POST /api/truth-snapshot`
+- `POST /api/factory-projection`
+
+Each successful request records an append-only request/response SHA-256 receipt. Raw request/response payloads are not persisted in the receipt ledger.
+
+## MCP surface
+
+The same function exposes `POST /mcp` and targets MCP protocol revision `2026-07-28`.
+
+It supports:
+
+- `server/discover`
+- `tools/list`
+- `tools/call`
+
+The server validates `MCP-Protocol-Version`, `Mcp-Method`, and `Mcp-Name` against the JSON-RPC body before dispatch. Header/body mismatch is rejected. The server is stateless and does not create an MCP session.
+
+Eight tool contracts map one-to-one to the governed continuity RPCs. All tools declare non-destructive behavior. D0 tools are read-only; D1/D2 tools may append private continuity evidence or recovery plans but cannot execute external changes.
+
+## Recovery boundary
+
+`chlom_wallet_continuity_recovery_plan_v1` may return ECAC only for **plan eligibility** when backup, rollback, exact-head, and independent-review evidence reconcile. It never means recovery execution is authorized.
+
+Automatic destructive action, provider write, money movement, Rights grant, chain broadcast, checkout, production activation, and phase advancement remain false.
+
+## Oracle boundary
+
+Oracle calls accept only an oracle identifier, timestamp, SHA-256 payload digest, and confidence score. Raw provider payloads and credentials are not accepted or stored. An unbound, stale, low-confidence, future-dated, non-read-only, or denied oracle fails closed to HOLD or DENY.
+
+## Runtime evidence
+
+The private runtime adds append-only ledgers for:
+
+- API/MCP request receipts;
+- runtime release bindings;
+- authenticated runtime canary runs.
+
+A deployment record is not sufficient to claim a verified API/MCP binding. The runtime remains `DEPLOYED_CANARY_PENDING` until an authenticated service-role canary is recorded against the exact source head and deployed Edge Function version.
+
+Current governance posture: **CONTROLLED_TEST / DRAFT_HOLD**.
