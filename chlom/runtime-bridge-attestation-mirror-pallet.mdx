@@ -1,0 +1,281 @@
+---
+title: "Bridge & Attestation Mirror Pallet — Historical Runtime Record"
+sidebarTitle: "Bridge & Attestation Mirror Pallet"
+description: "Individual reconstruction of CHLOM's recovered Bridge & Attestation Mirror Pallet/BAMP for mirroring selected attestations and claims across chains/systems with proof, finality and local-policy controls."
+icon: "arrows-rotate"
+keywords: ["CHLOM BAMP", "Bridge Attestation Mirror Pallet", "attestation mirror", "cross-chain", "proof portability"]
+---
+
+# Bridge & Attestation Mirror Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.bridge-attestation-mirror
+namespace: historical_runtime_pallet
+recovered_titles:
+  - Bridge & Attestation Mirror Pallet
+  - Bridge & Attestation Mirror Pallet (BAMP) Whitepaper
+source_lineage:
+  - recovered Help Center title census
+  - CHLOM Master Technical Compendium
+  - Attestations / Bridge-Claims architecture
+source_recovery: exact_title_plus_related_architecture
+current_mapping:
+  - Attestation Mirror service
+  - bridge / claims / messaging interoperability layer
+  - DAIL public-private proof projection
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+BAMP was the historical CHLOM runtime concept for **mirroring selected attestations or claims between systems** without copying every private evidence object or trusting an external chain/provider blindly.
+
+```text
+SOURCE CHAIN / SYSTEM
+        |
+ attestation / claim
+        |
+ proof + finality
+        |
+        v
+      BAMP
+        |
+ validate source / replay / schema / issuer
+        |
+        v
+LOCAL MIRROR RECORD
+        |
+        +--> policy
+        +--> DLA / LEX
+        +--> audit / explorer
+```
+
+## Mirror is not source authority
+
+```text
+mirrored attestation
+       !=
+local factual truth automatically
+       !=
+local authority to act
+```
+
+BAMP preserves origin and proof. Local CHLOM policy still decides how the imported assertion may be used.
+
+## Relationship to Bridge / Claims Pallet
+
+The two historical concepts are adjacent but distinct:
+
+```text
+Bridge / Claims Pallet
+  general external claims/messages/proofs
+
+BAMP
+  attestation-focused mirrored state/projection
+```
+
+A deployment could share transport infrastructure while retaining separate semantic records.
+
+## Reconstructed mirror record
+
+```yaml
+mirror_id: stable ID
+source_system_ref: required
+source_attestation_ref: required
+source_schema_ref: required
+source_issuer_ref: required
+proof_or_attestation_ref: required
+source_finality_ref: optional
+mirrored_subject_ref: local canonical alias or digest
+observed_at: timestamp
+verified_at: nullable
+status: candidate|verified|held|revoked|superseded|expired
+```
+
+The exact historical storage layout is not recovered and is not fabricated.
+
+## Selective projection
+
+BAMP's strongest reusable design is **minimal proof portability**.
+
+```text
+PRIVATE SOURCE EVIDENCE
+         |
+     attestation
+         |
+   minimal claim / digest
+         |
+         v
+      MIRROR
+         |
+PUBLIC / CROSS-SYSTEM VERIFICATION
+```
+
+The mirror should carry only the fields required for the cross-system purpose.
+
+## Schema/version gate
+
+A mirror is meaningful only if the local verifier understands the source attestation schema/version.
+
+```text
+source schema known and allowed?
+   no -> HOLD
+   yes
+     |
+issuer authorized for claim type?
+   no -> DENY/HOLD
+   yes
+     |
+proof/finality/replay checks pass?
+   no -> DENY/HOLD
+   yes
+     |
+LOCAL MIRROR VERIFIED
+```
+
+## Revocation propagation
+
+If the source attestation is revoked or superseded, BAMP must propagate that change rather than leaving a permanently valid local copy.
+
+```text
+SOURCE ATTESTATION A
+   |
+revoked / superseded
+   |
+BAMP update
+   |
+LOCAL MIRROR -> revoked / superseded
+```
+
+## Finality and rollback
+
+Source systems can have different finality models. A mirrored claim may remain `candidate` until its source reaches the required finality/confirmation threshold.
+
+If a source later reverses, the local mirror records a correction/revocation chain rather than deleting the imported history.
+
+## Replay protection
+
+```text
+(source_system, source_attestation_id, mirror_scope)
+```
+
+should map to a stable idempotency identity so repeated delivery does not create duplicate local authority/events.
+
+## Current DAIL mapping
+
+```text
+Historical BAMP
+    |
+    v
+DAIL / Attestation Mirror Service
+    |
+    +--> source provenance
+    +--> verification result
+    +--> public-safe projection
+    +--> correction / revocation lineage
+    +--> optional external cryptographic anchor
+```
+
+DAIL remains the Decentralized Autonomous Information Ledger and does not require a public chain.
+
+## Public Compliance Explorer relationship
+
+A current/public explorer can consume BAMP-style mirror records to answer narrow questions such as:
+
+```text
+Does attestation X exist?
+Which issuer/schema/version produced it?
+Is it currently valid, revoked or superseded?
+Which public proof/anchor supports the projection?
+```
+
+The explorer must not reveal private evidence merely because the attestation is verifiable.
+
+## Historical operation families
+
+Source architecture supports capability intentions such as:
+
+- submit/mirror attestation;
+- verify source proof/finality;
+- map subject/issuer/schema;
+- revoke/supersede mirrored record;
+- query mirror state.
+
+Exact historical extrinsic names are not recovered.
+
+## Current events
+
+```text
+ct.attestation.mirror.received.v1
+ct.attestation.mirror.verified.v1
+ct.attestation.mirror.held.v1
+ct.attestation.mirror.revoked.v1
+ct.attestation.mirror.superseded.v1
+ct.attestation.mirror.replay.blocked.v1
+```
+
+## Failure cases
+
+### Source attestation valid but issuer not locally trusted for this claim
+
+Keep the mirror as evidence if useful but do not treat it as a locally accepted compliance assertion.
+
+### Source system unavailable
+
+Do not infer current validity if the use case requires live revocation/currentness; apply the configured freshness/HOLD behavior.
+
+### Mirror provider duplicates message
+
+Idempotency prevents duplicate local state or downstream side effects.
+
+### Public mirror leaks private subject fields
+
+Contain/remove projection, preserve incident evidence, correct the public schema and re-certify.
+
+## Security threats
+
+- forged bridge proof;
+- compromised relayer;
+- stale revocation state;
+- subject misbinding;
+- schema substitution;
+- replay;
+- source-chain reorganization;
+- privacy leakage;
+- local policy bypass through a foreign attestation.
+
+## Public / restricted split
+
+Public-safe:
+
+- mirror architecture;
+- public issuer/schema/status;
+- public digests/anchors;
+- revocation/supersession state.
+
+Restricted:
+
+- source evidence;
+- private subject mapping;
+- relayer/bridge topology;
+- security thresholds;
+- private attestations;
+- exploit-sensitive validation logic.
+
+## Invariants
+
+```text
+mirror != source authority
+attestation valid != action authorized
+remote issuer != locally authorized issuer automatically
+proof valid != policy PASS
+mirror copied != data publication permission
+source reversal != historical erasure
+BAMP design != live cross-chain deployment
+```
+
+## Status
+
+BAMP is preserved as an individual historical runtime/paper asset. Its current semantic mapping is a privacy-aware Attestation Mirror and interoperability service layered over DAIL, with local policy revalidation and explicit revocation lineage.
