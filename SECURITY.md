@@ -1,6 +1,12 @@
-# Security and Private Disclosure
+# Security and Private Disclosure 🔐
 
 CrownThrive treats security, privacy, rights integrity, evidence custody, payment integrity, software-supply-chain integrity and institutional continuity as release requirements.
+
+## Current security posture
+
+As of the **August 23, 2026** public snapshot, CrownThrive is executing **Phase 2.99 — Private Core and Machine Seed Program** and Phase 3 entry remains `blocked_pending_phase_2_99_hard_exit`.
+
+Public documentation may describe specified, controlled-test, recovered, historical, or target-state security architecture. That documentation must not be interpreted as production certification. Controlled-test bindings, provider readbacks, API contracts, workflow success, or a public payment surface do not independently prove that a production capability is authorized, fully hardened, rights-cleared, or ready for unrestricted use.
 
 ## Report privately
 
@@ -54,6 +60,8 @@ The initial PR #63 security run proved that GitHub CodeQL default setup was alre
 
 GitHub security products are valuable evidence and defense-in-depth, but GitHub is not CrownThrive's sovereign merge authority. CrownThrive's coded agent policy requires a failed applicable critical/high security control to block automatic merge even if GitHub repository settings would technically permit it.
 
+The current Phase 2.99 readiness record also treats verified fail-closed repository enforcement as a separate gate. A workflow that runs is not automatically equivalent to a platform ruleset that prevents an unsafe merge.
+
 ## Agent security gate
 
 An automatic D0–D2-eligible repository promotion requires, as applicable:
@@ -94,6 +102,24 @@ Agents must not self-heal by:
 - silently expanding privileges or tool scopes;
 - deleting evidence or rewriting incident history;
 - self-approving the material change that created the finding.
+
+## Payment, Stripe, and public funding surfaces
+
+Public Stripe-hosted Payment Links may be intentionally published when they are approved for public use. The public URL is not a secret. The following remain private or restricted unless a governing record explicitly says otherwise:
+
+- Stripe secret/API keys and restricted keys;
+- webhook signing secrets;
+- Dashboard session data and privileged account links;
+- private customer/payment records;
+- private dispute, payout, balance, tax, identity, or banking records;
+- internal economic schedules or settlement instructions;
+- credentials or privileged runtime references used by CrownThrive services.
+
+Never paste a Stripe secret into a GitHub issue, pull request, documentation page, screenshot, code sample, or client-side application.
+
+A Stripe payment success, Payment Link checkout, webhook delivery, provider receipt, or balance event is provider evidence. It does **not** independently create CrownThrive license rights, ownership, governance authority, entitlement, settlement, payout, revenue-recognition truth, charitable status, tax deductibility, or institutional approval. Those states require the applicable CHLOM/ThriveEvergreen and institutional reconciliation.
+
+If a public Payment Link is suspected of tampering, misrouting, unauthorized replacement, credential compromise, or incorrect economic behavior, report it privately and treat affected downstream state as `HOLD` until reconciled.
 
 ## Response process
 
@@ -137,13 +163,13 @@ A model's confidence, output quality or quorum vote does not create legal or D3 
 
 ## Cryptography / blockchain / token security
 
-CHLOM's advanced cryptographic, blockchain, poly-chain and token concepts remain Phase 9 target architecture unless separately activated through the required gates. Before production activation, the security package must address at least key custody/recovery, wallet/role separation, smart-contract review, oracle/bridge threats, upgrade authority, replay/idempotency, chain reorganization/finality assumptions, incident response, reversibility/exit, privacy and public-data boundaries.
+CHLOM's advanced cryptographic, blockchain, poly-chain and token concepts remain gated target architecture unless separately activated through the required institutional gates. Before production activation, the security package must address at least key custody/recovery, wallet/role separation, smart-contract review, oracle/bridge threats, upgrade authority, replay/idempotency, chain reorganization/finality assumptions, incident response, reversibility/exit, privacy and public-data boundaries.
 
 Security readiness does not substitute for legal, securities, money-transmission/BSA-AML, sanctions, tax/accounting or jurisdiction-specific review.
 
 ## Notification and mailbox safety
 
-Project-management Gmail notifications must never contain credentials, private evidence bodies or unnecessary restricted data. The public repository stores logical notification-recipient references, not the private Collab Portal inbound tracking address. The Collab fallback mailbox remains a private runtime routing value until the adapter is fully certified, and its fallback notification is disabled only through the governed seven-gate certification rule.
+Project-management Gmail notifications must never contain credentials, private evidence bodies or unnecessary restricted data. The public repository stores logical notification-recipient references, not private routing values. Private fallback mailboxes and ticket-ingress addresses remain runtime routing data unless explicitly approved for publication.
 
 ## Research boundaries
 
