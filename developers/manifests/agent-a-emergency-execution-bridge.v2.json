@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0.1",
+  "schema_version": "2.0.2",
   "bridge_id": "ct.control.agent-a.execution-bridge.v2",
   "agent_id": "ct.relay.agent-a",
   "state": "CONTROLLED_TEST_ACTIVE_PRODUCTION_HOLD",
@@ -9,7 +9,10 @@
   "continuation_before_dispatch": true,
   "runtime_function": "chlom_runtime.agent_a_emergency_portfolio_cycle_v2",
   "stale_actuator_function": "chlom_runtime.gen7_actuate_stale_portfolio_v2",
+  "stale_maintenance_function": "chlom_runtime.gen7_stale_portfolio_maintenance_v2",
   "packet_metric_function": "chlom_runtime.gen6_finalize_cycle",
+  "heartbeat_function": "chlom_runtime.gen6_record_agent_heartbeat",
+  "heartbeat_freshness_function": "chlom_runtime.reconcile_gen6_agent_health_freshness",
   "stale_actuator": {
     "threshold_seconds": 1800,
     "running_retry_lt_2": "rebind_current_executor_preserve_progress_and_blockers",
@@ -17,14 +20,24 @@
     "running_retry_gte_2": "bounded_replan_escalation_no_progress_effect",
     "action_ledger": "chlom_runtime.gen7_stale_packet_actions",
     "cron_job": "gen7-stale-portfolio-actuator-10m",
-    "cron": "*/10 * * * *"
+    "cron": "*/10 * * * *",
+    "maintenance_includes_health_freshness": true
+  },
+  "heartbeat_truthfulness": {
+    "live_heartbeat_observed_on_non_canary": true,
+    "heartbeat_fresh_flag": true,
+    "heartbeat_ttl_from_agent_template": true,
+    "stale_health_becomes_degraded": true,
+    "stale_error_code": "HEARTBEAT_STALE",
+    "fresh_heartbeat_clears_stale_error": true
   },
   "l_p_telemetry": {
     "enabled": true,
     "agents": ["ct.gen6.agent-l", "ct.gen6.agent-m", "ct.gen6.agent-n", "ct.gen6.agent-o", "ct.gen6.agent-p"],
     "internal_subroutes": true,
     "packet_progress_effect": false,
-    "count_as_packets_closed": false
+    "count_as_packets_closed": false,
+    "final_force_test_live_heartbeats": true
   },
   "measurement": {
     "scope": "packet_only_for_throughput",
@@ -47,29 +60,36 @@
     ]
   },
   "force_test_2026_08_23": {
-    "cycle_id": "ct.cycle.agent-a.emergency-v2.20260823T1718Z",
+    "primary_cycle_id": "ct.cycle.agent-a.emergency-v2.20260823T1718Z",
+    "stability_cycle_id": "ct.cycle.agent-a.emergency-v2.20260823T1722Z",
+    "heartbeat_cycle_id": "ct.cycle.agent-a.emergency-v2.20260823T1727Z",
     "preflight_state": "pass",
     "active_wip": 4,
     "available_slots": 0,
     "new_dispatches": 0,
     "l_p_telemetry_live": true,
+    "agent_a_heartbeat_fresh": true,
+    "l_p_heartbeats_fresh": true,
     "progress_fabricated": false,
     "packet_metrics": {
       "active_wip": 4,
       "packets_done": 0,
       "packets_closed_per_hour": 0,
-      "cumulative_original_five_blocker_count_before": 27,
-      "cumulative_original_five_blocker_count_after": 25,
+      "stability_blocker_count_before": 25,
+      "stability_blocker_count_after": 25,
+      "stability_new_blocker_burndown": 0,
+      "cumulative_original_five_baseline_blockers": 27,
+      "cumulative_original_five_current_blockers": 25,
       "cumulative_blocker_burndown": 2,
       "control_plane_runs_excluded": 7
     },
     "stale_actions": [
-      {"packet": 209, "first_action": "rebind_current_executor", "retry_after": 2, "subsequent_action": "replan_escalation"},
+      {"packet": 209, "first_action": "rebind_current_executor", "retry_after": 2, "subsequent_action": "replan_escalation", "progress_preserved": 12, "blockers_preserved": 8},
       {"packet": 220, "action": "verifier_rearm", "progress_preserved": 70, "blockers_preserved": 2},
-      {"packet": 169, "first_action": "rebind_current_executor", "retry_after": 2, "subsequent_action": "replan_escalation"},
-      {"packet": 216, "first_action": "rebind_current_executor", "retry_after": 2, "subsequent_action": "replan_escalation"}
+      {"packet": 169, "first_action": "rebind_current_executor", "retry_after": 2, "subsequent_action": "replan_escalation", "progress_preserved": 12, "blockers_preserved": 5},
+      {"packet": 216, "first_action": "rebind_current_executor", "retry_after": 2, "subsequent_action": "replan_escalation", "progress_preserved": 10, "blockers_preserved": 4}
     ],
-    "note": "The two-blocker reduction is cumulative from earlier PR #220 movement; the force test did not fabricate a new blocker reduction."
+    "note": "The cumulative two-blocker reduction predates this emergency force test and comes from the earlier PR #220 movement. The repeat packet-scoped force test correctly reports zero new blocker burn-down and zero packet closures."
   },
   "invariants": {
     "progress_requires_new_evidence": true,
