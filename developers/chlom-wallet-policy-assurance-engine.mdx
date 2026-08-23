@@ -1,14 +1,14 @@
 ---
 title: "CHLOM Wallet Policy Assurance Engine"
 sidebarTitle: "Wallet Policy Assurance"
-description: "Deterministic policy compilation, evidence resolution, value-class protection, authority enforcement, risk resolution, decision receipts, and adversarial wallet simulation."
+description: "Deterministic policy compilation, evidence resolution, value-class protection, authority enforcement, risk resolution, decision receipts, adversarial simulation, and a JWT-protected controlled-test runtime."
 icon: "shield-halved"
 ---
 
 # CHLOM Wallet Policy Assurance Engine
 
 **Engine ID:** `ct.engine.chlom-wallet-policy-assurance.v1`  
-**State:** `CONTROLLED_TEST_RUNTIME_ACTIVE`  
+**State:** `CONTROLLED_TEST_EDGE_RUNTIME_ACTIVE_AUTHENTICATED_CANARY_PENDING`  
 **Rulepack:** `ct.rulepack.chlom-wallet.policy-assurance.v1@1.0.0`  
 **Institutional phase:** 2.99  
 **Production execution authority:** none
@@ -82,12 +82,13 @@ developers/reference/chlom-wallet/policy/policy-assurance.openapi.yaml
 developers/reference/chlom-wallet/policy/thrivebase-policy-assurance-readback-v1.sql
 ```
 
-The source identity is finalized through exact-head CI. The Git blob identity is already pinned; SHA-256 reconciliation is intentionally not invented before CI computes it from the committed bytes.
+The committed engine is bound to Git blob `41edcecf931b6c653cda6b9f9118ea15b795c72a` and SHA-256 `b29e31e5061e66dd24a7d1a399b31df453c54acbf6fbfd0516b499f038b4d6da`. The compiled rulepack digest is `c20767aaa8cce230d8b50af9c7a2b86e83bd7ffb65704c9af75f7d196da6a90b`.
 
 ## Controlled evidence
 
 ```yaml
 engine_scenarios: 12
+schema_contract: PASS_CHLOM_WALLET_POLICY_ASSURANCE_SCHEMAS
 chaos_cases: 50000
 chaos_dispositions:
   ECAC: 9007
@@ -114,6 +115,8 @@ chlom_wallet.policy_algorithm_registry_v1
 chlom_wallet.policy_rulepacks_v1
 chlom_wallet.policy_decision_receipts_v1
 chlom_wallet.policy_assurance_canary_runs_v1
+chlom_wallet.policy_runtime_deployments_v1
+chlom_wallet.policy_runtime_deployment_canary_runs_v1
 ```
 
 Key functions:
@@ -121,23 +124,64 @@ Key functions:
 ```text
 chlom_wallet.record_policy_decision_receipt_v1(...)
 chlom_wallet.run_policy_assurance_database_canary_v1()
+chlom_wallet.run_policy_runtime_deployment_canary_v1()
 public.chlom_wallet_policy_assurance_status_v1()
 public.chlom_wallet_policy_authority_context_v1()
 ```
 
-Private tables are RLS deny-all and append-only. Decision recording is service-role only. Public status is read-only and contains no private credential or fingerprint material.
+Private tables are RLS deny-all and append-only. Decision and deployment receipt recording is service-role only. Public status is read-only and contains no private credential or fingerprint material.
 
-## API surface
+## Active Edge runtime
 
-The planned JWT-protected Edge surface supports:
+The JWT-protected controlled-test service is deployed as:
 
-```text
-status
-evaluate
-verify-receipt
+```yaml
+service_id: ct.service.chlom-wallet-policy-assurance
+function_id: 815335ae-2b15-467a-80ca-37ca1fe7b993
+function_slug: chlom-wallet-policy-assurance
+function_version: 1
+status: ACTIVE
+verify_jwt: true
+allowed_origin: https://wallet.crownthrive.com
+actions:
+  - status
+  - evaluate
+  - verify-receipt
+deployment_bundle_sha256: 280772523f2158025fc4a6a74a3f5fffbe8e95f08f1028461a5f8ba62d5455e1
+source_head_sha: 0261e0b4d3bfa5f041b59efd9bf78bc6e1f76591
 ```
 
-The service replaces any client-supplied authority with the current server-resolved Wallet Agent identity, exact head, heartbeat, DID, public digest, and phase context. Source readiness does not imply deployment; authenticated runtime evaluation is a separate canary.
+The deployment compiled and activated successfully. The private metadata canary passed:
+
+```yaml
+result: PASS_CHLOM_WALLET_POLICY_EDGE_DEPLOYMENT_METADATA_CANARY
+active_deployment_count: 1
+verify_jwt_confirmed: true
+source_identity_confirmed: true
+rulepack_identity_confirmed: true
+database_status_confirmed: true
+```
+
+The service replaces any client-supplied authority with the current server-resolved Wallet Agent identity, exact head, heartbeat, DID, public digest, and phase context. Decision receipts are persisted through the private append-only RPC boundary.
+
+### Runtime canary boundary
+
+Authenticated HTTP status, receipt verification, and optional evaluate/replay testing are separately scripted:
+
+```text
+developers/reference/chlom-wallet/policy/edge/authenticated-runtime-canary.mjs
+.github/workflows/chlom-wallet-policy-runtime-canary.yml
+```
+
+Current state:
+
+```yaml
+authenticated_status_and_verify_receipt: NOT_EXECUTED
+authenticated_evaluate_and_persistence: NOT_EXECUTED
+unauthorized_request_rejection: NOT_EXECUTED
+```
+
+Those tests are not represented as complete merely because the function is active. The manual workflow requires restricted URL/JWT inputs and never prints or stores the credential value.
 
 ## AI policy
 
