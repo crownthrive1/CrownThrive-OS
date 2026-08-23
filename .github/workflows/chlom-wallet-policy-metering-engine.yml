@@ -1,0 +1,190 @@
+name: CHLOM Wallet Policy & Metering Engine
+
+on:
+  pull_request:
+    paths:
+      - "developers/chlom-wallet-policy-metering-engine.mdx"
+      - "developers/manifests/chlom-wallet-policy-metering-engine.v1.json"
+      - "developers/reference/chlom-wallet/policy/**"
+      - ".github/workflows/chlom-wallet-policy-metering-engine.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-policy-metering-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  assure:
+    name: Validate policy compiler, quota semantics, metering, simulation, and advisor
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify runtime
+        run: node --version
+
+      - name: Install exact schema validators
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-save --no-package-lock \
+            ajv@8.17.1 \
+            ajv-formats@3.0.1
+          node - <<'NODE'
+          const expected={ajv:'8.17.1','ajv-formats':'3.0.1'};
+          for (const [name,version] of Object.entries(expected)) {
+            const actual=require(`./node_modules/${name}/package.json`).version;
+            if (actual!==version) throw new Error(`${name}:${actual}`);
+            console.log(`${name}@${actual}`);
+          }
+          NODE
+
+      - name: Validate source syntax and JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check developers/reference/chlom-wallet/policy/policy-engine.mjs
+          node --check developers/reference/chlom-wallet/policy/metering-engine.mjs
+          node --check developers/reference/chlom-wallet/policy/policy-advisor.mjs
+          node --check developers/reference/chlom-wallet/policy/test-policy-metering-engine.mjs
+          node --check developers/reference/chlom-wallet/policy/test-policy-schemas.mjs
+          node --check developers/reference/chlom-wallet/policy/build-policy-metering-manifest.mjs
+          python -m json.tool developers/reference/chlom-wallet/policy/fixtures/walletkit-controlled-policy.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/policy/fixtures/walletkit-synthetic-license.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/policy/wallet-policy-package.v1.schema.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/policy/wallet-policy-decision-receipt.v1.schema.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/policy/wallet-usage-event.v1.schema.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/policy/wallet-license-candidate.v1.schema.json >/dev/null
+
+      - name: Run deterministic policy and metering stress suite
+        run: node developers/reference/chlom-wallet/policy/test-policy-metering-engine.mjs
+
+      - name: Run policy, decision, usage, and license schema suite
+        run: node developers/reference/chlom-wallet/policy/test-policy-schemas.mjs
+
+      - name: Rebuild policy/metering manifest twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          node developers/reference/chlom-wallet/policy/build-policy-metering-manifest.mjs /tmp/policy-metering-manifest-a.json
+          node developers/reference/chlom-wallet/policy/build-policy-metering-manifest.mjs /tmp/policy-metering-manifest-b.json
+          cmp /tmp/policy-metering-manifest-a.json /tmp/policy-metering-manifest-b.json
+          python -m json.tool /tmp/policy-metering-manifest-a.json >/dev/null
+          cat /tmp/policy-metering-manifest-a.json
+
+      - name: Validate exact founder-overridden limit semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          import { evaluateUsageBudget } from './developers/reference/chlom-wallet/policy/metering-engine.mjs';
+          const cases=[
+            [{limit:-1,used:999,requested:999},'ALLOW','UNLIMITED_LOCAL_LIMIT'],
+            [{limit:0,used:0,requested:1},'DENY','ZERO_LIMIT_DENIES_USAGE'],
+            [{limit:1,used:0,requested:1},'ALLOW','WITHIN_EXACT_LIMIT'],
+            [{limit:1,used:1,requested:1},'DENY','EXACT_LIMIT_EXCEEDED'],
+            [{limit:null,used:0,requested:1},'HOLD','LIMIT_UNRESOLVED_FAIL_CLOSED'],
+            [{limit:-2,used:0,requested:1},'DENY','LIMIT_NEGATIVE_INVALID'],
+          ];
+          for (const [input,decision,reason] of cases) {
+            const result=evaluateUsageBudget(input);
+            if (result.disposition!==decision || result.reason_code!==reason) throw new Error(JSON.stringify({input,result,decision,reason}));
+            if (result.provider_limits_still_authoritative!==true) throw new Error('provider_limit_boundary_missing');
+          }
+          console.log(JSON.stringify({result:'PASS_EXACT_FOUNDER_LIMIT_SEMANTICS',cases:cases.length}));
+          NODE
+
+      - name: Validate generated manifest boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,re
+          m=json.load(open('/tmp/policy-metering-manifest-a.json'))
+          assert m['manifest_id']=='ct.manifest.chlom-wallet-policy-metering-engine.v1'
+          assert m['semantic_version']=='1.0.0'
+          assert m['state']=='CONTROLLED_TEST'
+          assert m['phase']=='2.99'
+          assert m['canonical_agent_id']=='ct.agent.chlom-wallet-settlement'
+          assert m['subsystem_id']=='ct.subsystem.chlom-wallet.policy-metering-assurance.v1'
+          assert len(m['algorithm_suite']['algorithms'])==5
+          assert all(a['deterministic'] is True for a in m['algorithm_suite']['algorithms'])
+          assert all(a['external_model_call'] is False for a in m['algorithm_suite']['algorithms'])
+          assert all(a['auto_apply'] is False for a in m['algorithm_suite']['algorithms'])
+          assert m['policy']['rule_count']==10
+          assert re.fullmatch(r'[0-9a-f]{64}',m['policy']['source_digest_sha256'])
+          assert re.fullmatch(r'[0-9a-f]{64}',m['policy']['compiled_digest_sha256'])
+          assert m['policy']['unknown_input_disposition']=='HOLD'
+          assert m['policy']['effective_policy'] is False
+          assert m['simulation']['scenario_count']==10000
+          assert sum(m['simulation']['decisions'].values())==10000
+          assert re.fullmatch(r'[0-9a-f]{64}',m['simulation']['simulation_digest_sha256'])
+          limits=m['exact_limit_semantics']
+          assert limits['unlimited']==-1
+          assert limits['zero']==0
+          assert limits['positive_integer']=='EXACT_LIMIT'
+          assert limits['unresolved'] is None
+          assert limits['unresolved_disposition']=='HOLD_FAIL_CLOSED'
+          assert limits['invalid_below_negative_one']=='DENY'
+          assert limits['provider_limits_still_authoritative'] is True
+          assert len(m['meters'])==4
+          license=m['license_candidate']
+          assert license['limits']['ct.meter.wallet.internal.simulation.monthly']==-1
+          assert license['limits']['ct.meter.wallet.chain.broadcast.monthly']==0
+          assert license['limits']['ct.meter.wallet.api.requests.monthly']==100
+          assert license['limits']['ct.meter.wallet.proof.anchor.monthly'] is None
+          assert license['effective_offer'] is False
+          assert license['public_price_authorized'] is False
+          assert license['stripe_objects_created'] is False
+          assert license['checkout_enabled'] is False
+          advisor=m['algorithmic_advisor']
+          assert advisor['proposal_state']=='SUGGESTION_ONLY'
+          assert advisor['external_model_call_performed'] is False
+          assert advisor['auto_apply'] is False
+          assert advisor['policy_activation'] is False
+          assert advisor['effective_offer_change'] is False
+          assert m['private_runtime']['rls_deny_all'] is True
+          assert m['private_runtime']['append_or_version_only'] is True
+          assert m['private_runtime']['private_writes_service_role_only'] is True
+          assert m['private_runtime']['public_status_read_only'] is True
+          assert all(value is False for key,value in m['hard_boundaries'].items())
+          assert re.fullmatch(r'[0-9a-f]{64}',m['manifest_digest_sha256'])
+          PY
+
+      - name: Compare checked manifest when present
+        shell: bash
+        run: |
+          set -euo pipefail
+          checked=developers/manifests/chlom-wallet-policy-metering-engine.v1.json
+          if test -f "$checked"; then
+            cmp "$checked" /tmp/policy-metering-manifest-a.json
+            echo 'Checked policy/metering manifest matches deterministic rebuild.'
+          else
+            echo 'Checked manifest not yet present; deterministic build evidence printed above.'
+          fi
+
+      - name: Enforce secret, pricing, and no-live boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find developers/reference/chlom-wallet/policy developers/manifests -type f \
+            \( -name '*.mjs' -o -name '*.json' -o -name '*.sql' \) -print 2>/dev/null)
+          files+=(developers/chlom-wallet-policy-metering-engine.mdx)
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|sb_secret_[A-Za-z0-9._-]{16,}' "${files[@]}"; then
+            echo 'Potential live secret-shaped material detected in policy/metering projection.'
+            exit 1
+          fi
+          if grep -nE -- '"(effective_offer|public_price|public_price_authorized|stripe_objects_created|stripe_product_created|stripe_price_created|checkout_enabled|provider_write|production_rights_grant|credential_activation|chain_broadcast|custody|token_issuance|money_movement|effective_price_publication|checkout_activation|phase_advancement|merge_authorized|auto_apply|policy_activation)"[[:space:]]*:[[:space:]]*true' "${files[@]}"; then
+            echo 'Policy/metering packet crossed a commercial, value, authority, or release boundary.'
+            exit 1
+          fi
+
+      - name: Record boundary
+        run: |
+          echo 'CONTROLLED_TEST: deterministic policy compilation, exact quota semantics, append-only usage evidence, scenario assurance, and suggestion-only advisor output.'
+          echo 'No external model authority, policy activation, price, billing, Stripe object, checkout, provider write, production rights grant, credential activation, chain broadcast, custody, token issuance, money movement, phase advancement, or merge authority is created.'
