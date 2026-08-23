@@ -1,0 +1,100 @@
+openapi: 3.1.0
+info:
+  title: CHLOM Wallet Continuity API
+  version: 1.0.0
+  description: >-
+    Controlled-test continuity API. It exposes read-only status and private append-only
+    evaluation surfaces. It does not authorize provider writes, money movement, rights
+    grants, chain broadcast, credential access, checkout, destructive recovery, or phase advancement.
+servers:
+  - url: /v1/chlom-wallet/continuity
+x-chlom-state: CONTROLLED_TEST
+x-chlom-authority-ceiling: A2
+x-chlom-decision-ceiling: D2
+x-chlom-ai-final-authority: false
+paths:
+  /status:
+    get:
+      operationId: continuityStatus
+      x-chlom-authority: READ_ONLY
+      responses:
+        '200':
+          description: Exact-head continuity status.
+  /assets:
+    get:
+      operationId: continuityAssets
+      x-chlom-authority: READ_ONLY
+      responses:
+        '200':
+          description: Candidate-only continuity asset registry.
+  /dependencies:
+    get:
+      operationId: continuityDependencies
+      x-chlom-authority: READ_ONLY
+      responses:
+        '200':
+          description: Dependency graph and drift observations.
+  /evaluate-expiry:
+    post:
+      operationId: evaluateContinuityExpiry
+      x-chlom-authority: PRIVATE_APPEND_ONLY
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpiryRequest'
+      responses:
+        '200':
+          description: ECAC, HOLD, or DENY evaluation receipt.
+  /observe-oracle:
+    post:
+      operationId: observeContinuityOracle
+      x-chlom-authority: PRIVATE_APPEND_ONLY
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OracleObservation'
+      responses:
+        '200':
+          description: Read-only oracle observation receipt.
+  /plan-recovery:
+    post:
+      operationId: planContinuityRecovery
+      x-chlom-authority: PRIVATE_APPEND_ONLY
+      responses:
+        '200':
+          description: Reversible recovery plan; never an execution authorization.
+  /truth-snapshot:
+    post:
+      operationId: createContinuityTruthSnapshot
+      x-chlom-authority: PRIVATE_APPEND_ONLY
+      responses:
+        '200':
+          description: Institutional truth snapshot derived from reconciled evidence.
+  /factory-projection:
+    post:
+      operationId: projectContinuityFactoryAssets
+      x-chlom-authority: PRIVATE_APPEND_ONLY
+      responses:
+        '200':
+          description: Deterministic candidate-only factory projection without generation advancement.
+components:
+  schemas:
+    ExpiryRequest:
+      type: object
+      required: [observed_at, ttl_seconds]
+      properties:
+        observed_at: {type: string, format: date-time}
+        ttl_seconds: {type: integer, minimum: 1}
+        explicit_state: {type: string, enum: [PASS, HOLD, DENY]}
+    OracleObservation:
+      type: object
+      required: [oracle_id, observed_at, payload_digest]
+      properties:
+        oracle_id: {type: string}
+        observed_at: {type: string, format: date-time}
+        payload_digest: {type: string, pattern: '^[a-fA-F0-9]{64}$'}
+        source_confidence: {type: number, minimum: 0, maximum: 1}
