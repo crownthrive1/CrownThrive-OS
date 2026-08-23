@@ -1,0 +1,289 @@
+---
+title: "CHLOM Rate Limiting & Throttle Engine"
+sidebarTitle: "Rate Limiting & Throttle"
+description: "Standalone CHLOM engine article for request budgets, provider quotas, burst/rate controls, fail-closed unresolved limits, tenant/service scoping, metering and the canonical -1/0/N/null CrownThrive-local ceiling semantics."
+icon: "gauge-high"
+keywords: ["CHLOM rate limiting", "throttle engine", "request budgets", "quota", "-1 unlimited", "0 zero", "null fail closed"]
+---
+
+# CHLOM Rate Limiting & Throttle Engine
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.rate-throttle
+canonical_name: Rate Limiting & Throttle Engine
+artifact_class: control_engine
+source_lineage:
+  - recovered CHLOM component atlas
+  - current CrownThrive request-budget governance
+  - provider/API governance architecture
+current_mapping:
+  - P-02 Governance & Compliance
+  - API/service metering
+status: current_semantic_engine_specification
+```
+
+## Purpose
+
+This engine controls how much traffic, work or side-effect execution a CHLOM service is allowed to accept under **institutional budgets, provider limits, plan entitlements and safety controls**.
+
+It exists to prevent cost overruns, provider lockouts, accidental floods, denial-of-service amplification and ambiguous `unlimited` semantics.
+
+```text
+REQUEST
+  |
+identity / tenant / service / capability
+  |
+resolve institutional budget
+  + provider quota / contract / billing state
+  + safety/rate controls
+  |
+  v
+ALLOW | THROTTLE | HOLD | DENY
+  |
+meter / evidence / retry guidance
+```
+
+## Canonical CrownThrive-local monthly ceiling semantics
+
+```text
+-1   = unlimited CrownThrive-local monthly request ceiling
+0    = exactly zero requests permitted
+N>0  = exactly N requests permitted per month
+null = unresolved/unknown and must fail closed
+```
+
+This supersedes prior local interpretations that treated `0` as unlimited.
+
+## Provider limits remain authoritative
+
+```text
+CrownThrive local ceiling = -1
+      !=
+provider has infinite capacity
+```
+
+Provider throttles, contractual entitlements, quotas, spend caps, billing state and technical limits remain separate constraints.
+
+The effective allowance is bounded by every applicable authority:
+
+```text
+effective_capacity = intersection(
+  institutional budget,
+  provider entitlement,
+  safety limits,
+  policy/authority,
+  technical availability
+)
+```
+
+This is a conceptual set intersection, not a provider billing formula.
+
+## Budget object
+
+```yaml
+request_budget_id: stable ID
+subject_ref: tenant|service|agent|integration|capability
+period: month|day|hour|custom
+ceiling: -1|0|positive_integer|null
+scope: defined
+source_authority_ref: required
+version: string
+status: active|held|superseded|retired
+```
+
+## Rate policy
+
+Rate limit and budget are distinct:
+
+```text
+budget = amount allowed over a larger accounting period
+rate = allowed frequency in a short window
+burst = temporarily tolerated peak
+concurrency = simultaneous in-flight work
+```
+
+## Reconstructed rate rule
+
+```yaml
+rate_rule_id: stable ID
+scope_ref: required
+window_seconds: integer
+max_requests: integer
+burst_allowance: optional
+concurrency_limit: optional
+retry_policy_ref: optional
+status: active|held|superseded
+```
+
+Exact production thresholds can be restricted.
+
+## Decision flow
+
+```text
+budget value resolved?
+ no/null -> HOLD / fail closed
+ yes
+  |
+ budget == 0?
+ yes -> DENY
+ no
+  |
+ local monthly remaining?
+ no -> DENY/HOLD according to policy
+ yes or -1
+  |
+ provider current entitlement available?
+ no/unknown -> HOLD/DENY
+ yes
+  |
+ short-window rate/concurrency okay?
+ no -> THROTTLE / retry
+ yes
+  |
+ action authority/policy still valid?
+ no -> DENY/HOLD
+ yes -> ALLOW
+```
+
+## Metering
+
+Metering records the relevant unit:
+
+- request;
+- API call;
+- workflow execution;
+- side-effect action;
+- token/compute unit where separately defined;
+- provider-billed request;
+- agent task.
+
+Units cannot be mixed silently.
+
+## Meter record
+
+```yaml
+meter_event_id: stable ID
+subject_ref: required
+budget_ref: exact version
+unit_type: request|execution|other
+quantity: integer
+occurred_at: timestamp
+provider_receipt_ref: optional
+correlation_id: optional
+```
+
+## Provider accounting mismatch
+
+Provider usage and local usage can differ because of retries, provider-side counting rules or delayed reporting.
+
+```text
+local meter = 900
+provider reports = 915
+      |
+      v
+reconcile counting rules / retries / lag
+```
+
+Do not overwrite local records merely to match a provider dashboard without understanding the difference.
+
+## Retry behavior
+
+A throttled request can receive structured retry guidance:
+
+```text
+retry_after
+reason_class
+current limit scope
+```
+
+Automatic retries must use backoff/jitter/idempotency for side effects.
+
+## Side-effect protection
+
+Throttling/retries must not duplicate payments, licenses or governance actions.
+
+```text
+retry same idempotency key
+   -> same logical operation
+```
+
+## Agent budgets
+
+Agents receive budgets scoped to identity, skill/capability and delegation.
+
+```text
+agent budget != agent authority
+```
+
+An agent with remaining request budget cannot perform an un-delegated action.
+
+## Spend-cap relationship
+
+Some providers stop service or become read-only when spend caps/quotas are exhausted. The engine records provider-specific behavior and routes HOLD before assuming overage billing will occur.
+
+## Events
+
+```text
+ct.budget.created.v1
+ct.budget.updated.v1
+ct.budget.exhausted.v1
+ct.throttle.applied.v1
+ct.provider.quota.observed.v1
+ct.provider.quota.mismatch.v1
+ct.meter.event.recorded.v1
+```
+
+## Failure modes
+
+### Budget = null
+
+Fail closed; do not interpret as zero or unlimited.
+
+### Budget = 0
+
+Deny all requests in that governed scope.
+
+### Budget = -1 but provider quota exhausted
+
+Provider constraint controls actual execution; HOLD/DENY accordingly.
+
+### Provider dashboard stale
+
+Do not infer available quota if current provider state is required; use certified local guardrails and HOLD if necessary.
+
+### Retry storm
+
+Apply circuit breaker/backoff and preserve idempotency.
+
+## Security / abuse
+
+- distributed abuse across identities;
+- tenant evasion;
+- rate-limit bypass through aliases;
+- concurrency floods;
+- provider quota exhaustion attacks;
+- replay/retry duplication;
+- unbounded `-1` misunderstood as provider unlimited.
+
+## Restricted companion
+
+Contains production thresholds, provider plan/contract details, abuse controls, algorithm calibration, billing sensitivity and emergency throttles. Secret API credentials remain in secret storage.
+
+## Invariants
+
+```text
+-1 local != provider unlimited
+0 != unlimited
+null != unlimited
+budget != authority
+remaining quota != permission
+retry != duplicate side effect
+provider count != local count automatically
+throttle != policy DENY
+```
+
+## Status
+
+The Rate Limiting & Throttle Engine is a current CHLOM control specification. Provider- and service-specific limits remain separately verified and versioned.

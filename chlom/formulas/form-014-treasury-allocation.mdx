@@ -1,0 +1,75 @@
+---
+title: "FORM-014 — Treasury Allocation Mathematics"
+sidebarTitle: "FORM-014 Treasury Allocation"
+description: "Standalone CHLOM treasury allocation model for versioned category weights, reserve targets and overflow while preserving governance authority over all allocations."
+icon: "landmark"
+keywords: ["CHLOM FORM-014", "treasury allocation", "reserve target", "weights", "Smart Treasury"]
+---
+
+# FORM-014 — Treasury Allocation Mathematics
+
+## Formula identity
+
+```yaml
+formula_id: FORM-014
+classification: derived_public_safe_model
+origin: CHLOM Smart Treasury lineage
+adopted_weights: false
+```
+
+## Weighted allocation
+
+For treasury inflow `I` and approved category weights `w_i`:
+
+```text
+allocation_i = I * w_i
+```
+
+with:
+
+```text
+0 <= w_i <= 1
+Σ w_i = 1
+```
+
+if the entire governed inflow is allocated in that cycle.
+
+## Reserve-target extension
+
+For a reserve target `R_target`, current reserve balance `R_balance`, and policy share `w_reserve`:
+
+```text
+reserve_gap = max(0, R_target - R_balance)
+reserve_contribution = min(w_reserve * I, reserve_gap)
+overflow = w_reserve * I - reserve_contribution
+```
+
+The overflow destination must be explicit in policy; it cannot disappear or be redirected by implementation convenience.
+
+## Authority boundary
+
+The formula computes a schedule; it does not decide treasury policy. Category definitions, weights, reserve targets, caps, eligible expenditures and approval rights remain governed objects.
+
+## Inflow classification
+
+`I` must be a defined economic basis such as settled treasury revenue, designated contribution, fee allocation or another adopted class. Pending provider balances and expected receivables should not be mixed with settled funds without explicit accounting rules.
+
+## Conditional allocations
+
+Policies may add priority rules such as funding a reserve before growth allocation, capping a category, carrying unused amounts forward or holding funds pending review. Each condition must be deterministic and versioned.
+
+## Reconciliation
+
+Treasury allocation plans remain separate from provider/bank execution. Expected category allocations should reconcile to actual movements under ALG-010.
+
+## Tests
+
+Test weights summing exactly 1, under/over 1, reserve below target, reserve at target, reserve contribution larger than gap, zero inflow, negative/invalid weights, and currency precision.
+
+## DAIL evidence
+
+Record inflow basis, schedule/weight version, target/balance evidence, calculation, approvals and execution/reconciliation references.
+
+## Versioning
+
+Every adopted weight/target schedule has its own version and effective window. FORM-014 remains the reusable mathematical model.

@@ -1,0 +1,718 @@
+---
+title: "CHLOM Algorithm, Pseudocode and Execution Pattern Registry"
+sidebarTitle: "Algorithms & Pseudocode"
+description: "Public-safe institutional register for recovered and reconstructed CHLOM algorithms, pseudocode families, decision procedures, reconciliation routines, graph traversals, proof verification, policy evaluation and state-transition patterns."
+icon: "code"
+keywords: ["CHLOM algorithms", "pseudocode", "policy engine", "rights graph algorithm", "DAIL algorithm", "LEX algorithm", "oracle consensus", "settlement reconciliation", "proof verification"]
+---
+
+# CHLOM Algorithm, Pseudocode and Execution Pattern Registry
+
+CHLOM source papers explicitly reference novel algorithms, trade secrets, pseudocode, state machines and machine-executable compliance logic. The institutional knowledge base must register those assets without publishing protected implementation secrets as if documentation were source code.
+
+## Classification rule
+
+```yaml
+algorithm_visibility:
+  public_safe_pattern: may_document
+  internal_reference: summarize_only
+  restricted_algorithm: registry_metadata_only
+  trade_secret: no_public_pseudocode
+source_status:
+  recovered_source
+  reconstructed_from_requirements
+  derived_candidate
+  implementation_verified
+```
+
+## Algorithm lineage
+
+```text
+PAPER / SOURCE
+      |
+      v
+ALGORITHM CONCEPT
+      |
+      v
+PUBLIC-SAFE PSEUDOCODE
+      |
+      v
+MACHINE SPEC / TEST VECTORS
+      |
+      v
+IMPLEMENTATION
+      |
+      v
+EVAL / SECURITY / GOVERNANCE
+      |
+      v
+PRODUCTION VERSION
+```
+
+A public-safe algorithm describes institutional behavior. It does not expose secret heuristics, keys, credentials or exploit-sensitive internals.
+
+## ALG-001 — Three-valued policy evaluation
+
+**Purpose:** resolve required controls to PASS, HOLD or DENY.
+
+```text
+function evaluate_required_controls(controls):
+    disposition = PASS
+
+    for control in controls:
+        result = evaluate(control)
+
+        if result == DENY and control.hard_block:
+            return DENY
+
+        if result == DENY:
+            disposition = max_restrictive(disposition, DENY)
+        else if result == HOLD:
+            disposition = max_restrictive(disposition, HOLD)
+
+    return disposition
+```
+
+Invariant:
+
+```text
+UNKNOWN required fact != PASS
+```
+
+## ALG-002 — Authority-aware decision gateway
+
+```text
+function authorize(action, provisional_decision, actor, context):
+    if provisional_decision == DENY:
+        return DENY
+
+    authority = resolve_authority(actor, action, context)
+
+    if authority == NONE:
+        return DENY
+
+    if required_approval_missing(action, context):
+        return HOLD
+
+    if evidence_stale(action, context):
+        return HOLD
+
+    if provisional_decision == HOLD:
+        return HOLD
+
+    return PASS
+```
+
+Core invariant:
+
+```text
+AI recommendation != execution authority
+```
+
+## ALG-003 — DLA activation procedure
+
+```text
+function activate_dla(candidate):
+    rights = resolve_rights(candidate.asset, candidate.requested_scope)
+    if rights == DENY:
+        return DENY
+    if rights == UNKNOWN:
+        return HOLD
+
+    issuer = verify_issuer_authority(candidate.issuer, rights)
+    if issuer != PASS:
+        return issuer
+
+    licensee = evaluate_licensee_eligibility(candidate.licensee)
+    if licensee != PASS:
+        return licensee
+
+    policy = evaluate_license_policy(candidate)
+    if policy != PASS:
+        return policy
+
+    approvals = collect_required_approvals(candidate)
+    if approvals.incomplete:
+        return HOLD
+
+    dla = create_versioned_permission_package(candidate)
+    append_dail_event("DLA_ACTIVATED", dla)
+    return PASS
+```
+
+## ALG-004 — Rights graph closure
+
+Let a rights graph contain source nodes, claims, agreements, licenses and derivative grants.
+
+Public-safe traversal:
+
+```text
+function effective_rights(node):
+    if node.type == SOURCE_RIGHT:
+        return node.controlled_rights
+
+    parent = effective_rights(node.parent)
+    granted = node.granted_rights
+    constraints = node.constraints
+
+    return intersect(parent, granted, constraints)
+```
+
+Invariant:
+
+```text
+child_rights ⊆ parent_rights
+```
+
+## ALG-005 — Sublicense validation
+
+```text
+function validate_sublicense(parent_dla, requested_child):
+    if not parent_dla.active:
+        return DENY
+
+    if not parent_dla.sublicensing_allowed:
+        return DENY
+
+    if not subset(requested_child.rights, parent_dla.rights):
+        return DENY
+
+    if exceeds_term(requested_child, parent_dla):
+        return DENY
+
+    if exceeds_territory(requested_child, parent_dla):
+        return DENY
+
+    if missing_required_approval(requested_child):
+        return HOLD
+
+    return PASS
+```
+
+## ALG-006 — LEX listing eligibility
+
+```text
+function listing_eligibility(asset, dla, offer):
+    require asset.registered
+    require rights_clear(asset)
+    require dla.active
+    require offer.scope ⊆ dla.rights
+    require economic_schedule_valid(offer)
+    require listing_policy_passes(offer)
+
+    if any required fact unknown:
+        return HOLD
+
+    return PASS
+```
+
+## ALG-007 — LEX transaction state machine
+
+```text
+CANDIDATE
+   |
+   v
+RIGHTS_CHECK
+   |
+   +--> DENY
+   |
+   v
+ELIGIBILITY
+   |
+   +--> HOLD
+   |
+   v
+AGREEMENT_ACCEPTED
+   |
+   v
+PAYMENT_PENDING
+   |
+   v
+PAYMENT_EVIDENCE
+   |
+   v
+ENTITLEMENT_CHECK
+   |
+   +--> HOLD / REFUND PATH
+   |
+   v
+FULFILLED
+   |
+   v
+SETTLEMENT_RECONCILED
+```
+
+## ALG-008 — Payment webhook idempotency
+
+```text
+function process_provider_event(event):
+    key = semantic_idempotency_key(event)
+
+    if processed(key):
+        return existing_result(key)
+
+    normalized = normalize_provider_event(event)
+    result = reconcile(normalized)
+    store_result(key, result)
+    append_dail_event(result)
+    return result
+```
+
+## ALG-009 — Economic allocation
+
+```text
+function allocate(event, schedule):
+    gross = validated_gross(event)
+    deductions = authorized_deductions(event, schedule)
+    net = gross - sum(deductions)
+
+    allocations = []
+    for recipient in schedule.recipients:
+        raw = net * recipient.bps / 10000
+        allocations.append(raw)
+
+    allocations = deterministic_round(allocations, schedule.rounding)
+
+    assert gross == sum(deductions) + sum(allocations) + holds + residue
+    return allocation_plan
+```
+
+## ALG-010 — Settlement reconciliation
+
+```text
+function reconcile_settlement(expected, provider):
+    normalized_provider = normalize(provider)
+    variance = normalized_provider.amount - expected.amount
+
+    if same_semantic_event_already_settled(provider):
+        return DUPLICATE
+
+    if variance == 0 and identifiers_match:
+        return MATCH
+
+    if within_rounding_policy(variance):
+        return REVIEW_ROUNDING
+
+    if provider_event_reversed:
+        return REVERSAL_REQUIRED
+
+    return HOLD_MISMATCH
+```
+
+## ALG-011 — Oracle aggregation
+
+Historical CHLOM describes multiple sources, medians, reputation and cross-checking.
+
+```text
+function aggregate_numeric_oracles(observations):
+    valid = filter_authorized_fresh_sources(observations)
+
+    if independent_source_count(valid) < required_count:
+        return HOLD
+
+    if contradiction_exceeds_threshold(valid):
+        return HOLD
+
+    return weighted_median(valid)
+```
+
+## ALG-012 — Attestation verification
+
+```text
+function verify_attestation(attestation, policy):
+    require signature_valid(attestation)
+    require issuer_authorized(attestation.issuer, attestation.type)
+    require subject_matches(attestation.subject)
+    require not_revoked(attestation)
+    require not_expired(attestation)
+    require evidence_digest_valid(attestation)
+
+    if freshness_required and stale(attestation):
+        return HOLD
+
+    return PASS
+```
+
+## ALG-013 — ZK proof usability
+
+```text
+function use_zk_proof(proof, context):
+    if not cryptographic_verify(proof):
+        return DENY
+
+    if not circuit_version_allowed(proof.circuit):
+        return HOLD
+
+    if witness_state_revoked_or_stale(proof):
+        return HOLD
+
+    if not proof_scope_matches_policy(proof, context):
+        return DENY
+
+    return PASS_CANDIDATE
+```
+
+Then the authority gateway still executes separately.
+
+## ALG-014 — DAIL append
+
+```text
+function append_event(event):
+    validate_schema(event)
+    validate_actor_identity(event.actor)
+    validate_tenant_scope(event)
+    assign_stable_event_id(event)
+    persist_append_only(event)
+    project_authorized_views(event)
+    return receipt
+```
+
+## ALG-015 — DAIL correction
+
+```text
+function correct_event(original_id, correction):
+    original = get(original_id)
+    require correction.authority
+    require correction.reason
+    require correction.evidence_refs
+
+    correction.supersedes = original_id
+    append_event(correction)
+
+    recompute_effective_projection(original.subject)
+```
+
+Never mutate the historical source event out of existence.
+
+## ALG-016 — Evidence freshness gate
+
+```text
+function freshness_gate(evidence, TTL):
+    age = now - evidence.observed_at
+
+    if age <= TTL:
+        return PASS
+
+    return HOLD_REVERIFY
+```
+
+## ALG-017 — Policy-pack stacking
+
+```text
+function resolve_policy_stack(context):
+    packs = applicable_packs(context)
+    packs = sort_by_precedence_and_version(packs)
+
+    result = PASS
+    for pack in packs:
+        result = max_restrictive(result, evaluate(pack, context))
+
+        if result == DENY and pack.hard_block:
+            return DENY
+
+    return result
+```
+
+## ALG-018 — Policy version migration
+
+```text
+function adopt_policy(new_version):
+    validate_schema(new_version)
+    run_regression_suite(new_version)
+    simulate_against_historical_events(new_version)
+    compare_deltas(current_version, new_version)
+    require_governed_approval()
+    schedule_effective_time()
+    append_dail_event("POLICY_ADOPTED")
+```
+
+Simulation does not self-adopt.
+
+## ALG-019 — Risk scoring pipeline
+
+```text
+raw_events
+   |
+   v
+feature extraction
+   |
+   v
+feature validation
+   |
+   v
+risk model
+   |
+   v
+score + uncertainty + explanations
+   |
+   v
+policy thresholds
+   |
+   v
+PASS/HOLD/DENY candidate
+   |
+   v
+authority gate
+```
+
+## ALG-020 — Risk threshold evaluation
+
+```text
+function risk_disposition(score, uncertainty, rules):
+    if rules.hard_block:
+        return DENY
+
+    if rules.required_evidence_missing:
+        return HOLD
+
+    if uncertainty > rules.max_uncertainty:
+        return HOLD
+
+    if score >= rules.deny_threshold:
+        return DENY
+
+    if score >= rules.hold_threshold:
+        return HOLD
+
+    return PASS_CANDIDATE
+```
+
+## ALG-021 — Model drift watch
+
+```text
+function drift_check(current_metrics, reference_metrics):
+    deltas = compare(current_metrics, reference_metrics)
+
+    if any delta exceeds approved threshold:
+        emit DRIFT_ALERT
+        restrict consequential autonomy if policy requires
+        return HOLD_MODEL_REVIEW
+
+    return PASS
+```
+
+## ALG-022 — Human Scribe/verifier assignment
+
+```text
+function assign_review(case):
+    candidates = eligible_reviewers(case.domain)
+    candidates = remove_conflicts(candidates, case)
+    candidates = enforce_independence(candidates)
+
+    if count(candidates) < required_reviewers:
+        return HOLD_CAPACITY
+
+    return select_by_skill_load_and_independence(candidates)
+```
+
+## ALG-023 — Review quorum
+
+```text
+function review_quorum(reviews, policy):
+    eligible = filter_valid_reviews(reviews)
+
+    if count(eligible) < policy.minimum_count:
+        return HOLD
+
+    support = sum(weight(r) for r in eligible if r.decision == APPROVE)
+    total = sum(weight(r) for r in eligible)
+
+    if support / total >= policy.threshold:
+        return APPROVED_CANDIDATE
+
+    return NOT_APPROVED
+```
+
+Again, candidate approval may still require institutional authority.
+
+## ALG-024 — Continuous audit scheduler
+
+```text
+for governed_object in audit_population:
+    if due(governed_object) or risk_triggered(governed_object):
+        audit = create_audit(governed_object)
+        collect_required_evidence(audit)
+        evaluate_controls(audit)
+        route_findings(audit)
+        append_dail_receipt(audit)
+```
+
+## ALG-025 — Audit finding severity
+
+A public-safe rule engine can combine deterministic severity classes with contextual impact.
+
+```text
+if control_failure is prohibited hard condition:
+    CRITICAL
+elif material impact and active exposure:
+    HIGH
+elif control weakness without confirmed material event:
+    MEDIUM
+else:
+    LOW / ADVISORY
+```
+
+Exact scoring should be domain-specific and governed.
+
+## ALG-026 — Timelocked execution
+
+```text
+function execute_scheduled(decision):
+    require now >= decision.not_before
+    require decision.approval_still_valid
+    require evidence_still_fresh
+    require authority_still_valid
+    require no_new_hold
+    require idempotency_not_consumed
+
+    execute()
+    append_dail_event()
+```
+
+## ALG-027 — Sanctions-cache lookup
+
+```text
+function sanctions_check(subject):
+    entry = cache.lookup(subject.identifiers)
+
+    if entry.missing or entry.stale:
+        return HOLD_REFRESH
+
+    if entry.match_confirmed:
+        return DENY_OR_ESCALATE_PER_POLICY
+
+    return PASS
+```
+
+A fuzzy name match should not automatically equal confirmed identity.
+
+## ALG-028 — Bridge/claim import
+
+```text
+function import_remote_claim(message):
+    verify_transport_auth(message)
+    verify_replay_protection(message)
+    verify_source_registry(message.source)
+    verify_remote_finality_or_receipt(message)
+    normalize_claim(message)
+
+    local = local_policy_evaluate(message.claim)
+    append_dail_event("REMOTE_CLAIM_OBSERVED")
+
+    return local
+```
+
+Remote finality does not equal local authority.
+
+## ALG-029 — Indexer projection
+
+```text
+function project_event(event):
+    canonical = read_canonical_event(event.id)
+    allowed = apply_projection_policy(canonical)
+    upsert_index(allowed)
+```
+
+The index is rebuildable. Canonical truth stays in source records/DAIL.
+
+## ALG-030 — Paper reconstruction pipeline
+
+```text
+function reconstruct_paper(reference):
+    source = locate_source(reference)
+
+    if not source:
+        register_title_only(reference)
+        return SOURCE_NOT_LOCATED
+
+    verify_integrity(source)
+    extract_text_figures(source)
+    map_terminology(source)
+    classify_claims(source)
+    extract_algorithms_math_ascii(source)
+    separate_historical_current(source)
+    write_source_grounded_article(source)
+    mark_conflicts(source)
+    register_founder_adjudication(source)
+    return RECONSTRUCTED
+```
+
+## ALG-031 — Founder adjudication propagation
+
+```text
+function apply_adjudication(decision):
+    append_adjudication_record(decision)
+    affected = resolve_dependency_graph(decision.subject)
+
+    for record in affected:
+        update_effective_interpretation(record)
+        preserve_previous_version(record)
+
+    append_changelog(decision)
+    validate_machine_manifests()
+```
+
+## ALG-032 — Release certification
+
+```text
+function certify_release(head_sha):
+    require docs_governance(head_sha) == PASS
+    require continuity(head_sha) == PASS
+    require security(head_sha) == PASS
+    require governed_merge_gate(head_sha) == PASS
+    require body_integrity(head_sha) == PASS
+
+    return CERTIFIABLE_PACKET
+```
+
+`CERTIFIABLE_PACKET` is not the same as authority to merge or activate production.
+
+## Algorithm metadata schema
+
+```yaml
+algorithm_id:
+name:
+source_family:
+source_location:
+classification: recovered|reconstructed|derived
+visibility: public_safe|internal|restricted|trade_secret
+inputs:
+outputs:
+side_effects:
+preconditions:
+postconditions:
+invariants:
+authority_class:
+failure_states:
+idempotency:
+rollback_compensation:
+test_vector_refs:
+implementation_refs:
+version:
+```
+
+## Protected-IP rule
+
+If a recovered paper says a method is proprietary or a trade secret, documentation should record:
+
+```text
+algorithm exists
+purpose
+inputs/outputs
+safety invariants
+interface contract
+source lineage
+```
+
+without necessarily publishing the implementation method.
+
+## Final invariant
+
+```text
+PSEUDOCODE
+   != production code
+   != policy adoption
+   != authority
+```
+
+The registry exists so algorithms become **traceable institutional assets**, not invisible logic trapped in papers or chats.

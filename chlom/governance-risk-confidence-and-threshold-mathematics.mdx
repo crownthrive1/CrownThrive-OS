@@ -1,0 +1,623 @@
+---
+title: "Governance, Risk, Confidence and Threshold Mathematics"
+sidebarTitle: "Governance & Risk Math"
+description: "Quantitative CHLOM reference for quorum, approval thresholds, conviction, risk scoring, anomaly thresholds, evidence confidence, oracle aggregation, freshness, PASS/HOLD/DENY and authority-aware decision mathematics."
+icon: "scale-balanced"
+keywords: ["CHLOM quorum", "governance math", "risk scoring", "confidence", "oracle weighting", "PASS HOLD DENY", "thresholds", "conviction voting"]
+---
+
+# Governance, Risk, Confidence and Threshold Mathematics
+
+CHLOM mixes deterministic policy, probabilistic intelligence, human authority and multi-source evidence. That combination only works if **threshold math never outranks authority**.
+
+## Model classes
+
+```yaml
+historical_source_math:
+  - governance quorum examples
+  - majority and supermajority examples
+  - risk-score example
+  - oracle median/quorum concepts
+current_derived_math:
+  - normalized confidence model
+  - PASS/HOLD/DENY decision algebra
+  - uncertainty-aware thresholds
+  - authority gating
+adopted_parameters: none_from_this_page
+```
+
+## Decision stack
+
+```text
+                    ACTION REQUEST
+                         |
+                         v
+                  HARD POLICY RULES
+                         |
+              +----------+----------+
+              |                     |
+           BLOCKED                OPEN
+              |                     |
+              v                     v
+            DENY             EVIDENCE STATE
+                                    |
+                             +------+------+
+                             |             |
+                          MISSING       COMPLETE
+                             |             |
+                             v             v
+                           HOLD       RISK / CONFIDENCE
+                                           |
+                                    +------+------+ 
+                                    |             |
+                                  HIGH          LOW
+                                  RISK          RISK
+                                    |             |
+                                    v             v
+                              DENY / HOLD     AUTHORITY GATE
+                                                  |
+                                         +--------+--------+
+                                         |                 |
+                                      ALLOWED           NOT ALLOWED
+                                         |                 |
+                                         v                 v
+                                       PASS              HOLD/DENY
+```
+
+## 1. Governance participation ratio
+
+Historical source model:
+
+```text
+Q = W_participating / W_eligible
+```
+
+Where:
+
+- `W_participating` = participating voting weight;
+- `W_eligible` = total eligible voting weight.
+
+Historical example:
+
+```text
+Q >= 0.15
+```
+
+for a 15% quorum.
+
+This is illustrative historical governance research.
+
+## 2. Approval ratio
+
+```text
+A = W_yes / (W_yes + W_no)
+```
+
+Historical examples include:
+
+```text
+A > 0.50
+```
+
+for ordinary passage and approximately:
+
+```text
+A >= 2/3
+```
+
+for some constitutional changes.
+
+A real governance contract must define abstentions, delegation, invalid votes and denominator rules explicitly.
+
+## 3. Proposal pass predicate
+
+Derived authority-aware representation:
+
+```text
+PASS_PROPOSAL(p) =
+    Q >= q_min(p.type)
+AND A >= approval_threshold(p.type)
+AND voting_period_closed
+AND conflict_rules_satisfied
+AND timelock_rules_satisfied
+AND proposer_eligible
+AND decision_authority_allows(p.type)
+AND no_required_reserved_approval_missing
+```
+
+Token or member voting cannot manufacture corporate/legal authority absent an adopted rule.
+
+## 4. Supermajority table candidate
+
+A governance implementation might distinguish classes:
+
+| Decision class | Candidate approval logic |
+| --- | --- |
+| Routine parameter | simple majority after quorum |
+| Material policy | enhanced majority |
+| Constitutional/system charter | supermajority \+ reserved approval |
+| Emergency pause | emergency authority \+ short review window |
+| Irreversible/destructive | human-reserved authority |
+
+Exact thresholds require adoption.
+
+## 5. Conviction weighting
+
+Historical papers mention longer lock periods increasing vote weight.
+
+Generic model:
+
+```text
+W_effective = W_base * m(d)
+```
+
+Where `d` is lock duration and `m(d)` is an adopted multiplier.
+
+A bounded candidate form:
+
+```text
+m(d) = 1 + λ * log(1 + d / d0)
+```
+
+This is **derived mathematical illustration**, not historical CHLOM policy.
+
+## 6. Concentration-aware governance diagnostic
+
+A derived concentration metric:
+
+```text
+HHI_vote = Σ s_i²
+```
+
+where `s_i` is participant `i`'s share of eligible voting weight.
+
+High concentration can be flagged for governance review even if a vote mathematically passes.
+
+## 7. Historical risk-score model
+
+Genesis gives an illustrative expression:
+
+```text
+R_h = α * (transaction_amount / std_dev)
+    + β * peer_risk_avg
+    + γ * KYC_level
+```
+
+The source explicitly notes that production models would likely be more complex.
+
+## 8. Feature normalization
+
+Current model governance should normalize unlike units before combining them.
+
+Z-score example:
+
+```text
+z_x = (x - μ_x) / σ_x
+```
+
+Min-max example:
+
+```text
+x_norm = (x - x_min) / (x_max - x_min)
+```
+
+Normalization choice must be versioned with the model.
+
+## 9. Bounded risk probability
+
+A logistic candidate:
+
+```text
+z = b0 + Σ(w_i * x_i)
+R = 1 / (1 + e^(-z))
+```
+
+`R ∈ (0,1)`.
+
+But:
+
+```text
+R = 0.97 != 97% legally noncompliant
+```
+
+The model's calibration target must be named precisely.
+
+## 10. Risk bands
+
+Candidate bands:
+
+```text
+R < τ_hold                    -> advisory low risk
+τ_hold <= R < τ_deny          -> HOLD / review
+R >= τ_deny                   -> DENY candidate
+```
+
+Hard policy rules can override the score:
+
+```text
+hard_block == true -> DENY regardless of R
+missing evidence   -> HOLD regardless of R
+```
+
+## 11. Uncertainty-aware risk
+
+A model should retain uncertainty `U`, not only point estimate `R`.
+
+Candidate disposition:
+
+```text
+if U > U_max:
+    HOLD
+elif R >= τ_deny:
+    DENY
+elif R >= τ_hold:
+    HOLD
+else:
+    PASS_CANDIDATE
+```
+
+The final PASS still requires authority.
+
+## 12. Model confidence versus evidence confidence
+
+Separate:
+
+```text
+C_model
+C_evidence
+C_source
+C_identity
+```
+
+Do not collapse them into one unexplained score.
+
+A composite may be useful for prioritization:
+
+```text
+C_composite = geometric_mean(C_model, C_evidence, C_source)
+```
+
+but should never replace underlying dimensions in consequential decisions.
+
+## 13. Oracle weighted evidence
+
+Historical sources favor multiple oracles, median aggregation and reputation.
+
+Candidate weight:
+
+```text
+w_i = a_i * r_i * f_i * s_i
+```
+
+Where:
+
+- `a_i` = authority/source-quality coefficient;
+- `r_i` = reliability score;
+- `f_i` = freshness score;
+- `s_i` = scope/applicability score.
+
+Weighted aggregate:
+
+```text
+x_hat = Σ(w_i x_i) / Σw_i
+```
+
+For manipulation resistance, numeric feeds may use median or weighted median instead.
+
+## 14. Median oracle aggregation
+
+Historical example concept: aggregate several independent sources, such as the median of five price oracles.
+
+```text
+x_hat = median(x_1, x_2, ..., x_n)
+```
+
+For odd `n`, median reduces the influence of extreme outliers if fewer than half the sources are malicious/bad.
+
+## 15. Boolean attestation quorum
+
+For trusted weighted sources:
+
+```text
+support = Σ weights supporting claim
+eligible = Σ eligible source weights
+support_ratio = support / eligible
+```
+
+A policy can require:
+
+```text
+support_ratio >= θ_source
+AND number_of_independent_sources >= n_min
+```
+
+## 16. Source independence penalty
+
+Two providers using the same upstream database are not fully independent.
+
+A derived diversity adjustment:
+
+```text
+effective_source_count = Σ independence_factor_i
+```
+
+where correlated sources have factors below `1`.
+
+## 17. Freshness decay
+
+Binary freshness:
+
+```text
+fresh = age <= TTL
+```
+
+A derived continuous decay:
+
+```text
+f(age) = exp(-λ * age)
+```
+
+or piecewise:
+
+```text
+f = 1                      if age <= preferred_age
+f = linear_decay           if preferred_age < age <= TTL
+f = 0                      if age > TTL
+```
+
+Consequential rules may require binary validity rather than smooth decay.
+
+## 18. Contradiction score
+
+If sources disagree, contradiction should be visible.
+
+Derived candidate:
+
+```text
+C_divergence = max(x_i) - min(x_i)
+```
+
+or normalized:
+
+```text
+D = standard_deviation(source_values) / max(|mean|, epsilon)
+```
+
+If `D` exceeds an adopted threshold, route to HOLD.
+
+## 19. Reputation update
+
+A source reputation system may update from verified outcomes.
+
+Candidate exponentially weighted form:
+
+```text
+r_next = (1 - η) * r_current + η * outcome_score
+```
+
+This is a derived model. Historical sources describe reputation/staking qualitatively but do not establish this exact equation.
+
+## 20. Reviewer quorum
+
+Human assurance can use reviewer thresholds without pretending reviewer count equals truth.
+
+```text
+review_quorum_met = reviewer_count >= n_min
+```
+
+For weighted expertise:
+
+```text
+review_support_ratio = Σ approved_reviewer_weight / Σ participating_weight
+```
+
+Conflicts of interest can zero or reduce a reviewer's effective weight if policy requires.
+
+## 21. Conflict-of-interest factor
+
+Derived model:
+
+```text
+w_effective_i = w_base_i * independence_i * eligibility_i
+```
+
+where `eligibility_i ∈ {0,1}` under hard rules.
+
+A disqualified reviewer contributes zero decision weight.
+
+## 22. PASS / HOLD / DENY algebra
+
+Treat dispositions as ordered safety states rather than booleans.
+
+```text
+DENY > HOLD > PASS
+```
+
+for conservative aggregation, where `>` means more restrictive.
+
+Across independent required controls:
+
+```text
+final_disposition = max_restrictiveness(control_dispositions)
+```
+
+Examples:
+
+```text
+PASS + PASS + HOLD = HOLD
+PASS + DENY + PASS = DENY
+```
+
+This prevents one positive provider from overriding a critical negative control.
+
+## 23. Unknown / null handling
+
+Unknown is not zero.
+
+```text
+unknown_required_input -> HOLD
+```
+
+unless policy explicitly defines a different safe default.
+
+## 24. Fail-closed logical model
+
+For required predicates `p_i`:
+
+```text
+PASS iff all p_i == TRUE
+HOLD if no p_i == FALSE and at least one p_i == UNKNOWN
+DENY if any hard p_i == FALSE
+```
+
+This three-valued logic is useful for rights, credentials and policy evaluation.
+
+## 25. Threshold hysteresis
+
+To prevent rapid PASS/HOLD oscillation near a threshold, a derived control may use hysteresis:
+
+```text
+enter_hold if R >= τ_high
+return_pass only if R <= τ_low
+where τ_low < τ_high
+```
+
+This is an engineering candidate, not source doctrine.
+
+## 26. Drift detection
+
+For model metric `m_t` against reference `m_0`:
+
+```text
+drift = |m_t - m_0|
+```
+
+More sophisticated statistical tests may be used, but any adopted drift criterion must be recorded.
+
+A drift alert does not automatically authorize retraining or new enforcement thresholds.
+
+## 27. False-positive / false-negative economics
+
+Risk models should recognize asymmetric costs.
+
+Expected decision cost:
+
+```text
+E[cost] = P(FP)*Cost_FP + P(FN)*Cost_FN + P(review)*Cost_review
+```
+
+This is a derived decision-theory model for tuning, not legal valuation.
+
+## 28. Policy simulation delta
+
+For a candidate policy `P1` versus current `P0`:
+
+```text
+Δpass = pass_rate(P1) - pass_rate(P0)
+Δhold = hold_rate(P1) - hold_rate(P0)
+Δdeny = deny_rate(P1) - deny_rate(P0)
+```
+
+Also track subgroup/sector effects, evidence burden and operational queue volume.
+
+## 29. Adoption gate
+
+Simulation results cannot self-activate a policy.
+
+```text
+simulation_result
+      |
+      v
+review
+      |
+      v
+authority decision
+      |
+      v
+versioned adoption
+      |
+      v
+runtime deployment
+```
+
+## 30. Threshold record schema
+
+```yaml
+threshold_id:
+metric:
+value:
+unit:
+comparison:
+applicability:
+policy_version:
+source_basis:
+calibration_evidence:
+authority:
+effective_from:
+expires_at:
+review_interval:
+rollback_value:
+```
+
+## 31. Explainability vector
+
+A consequential risk output should preserve not only `R` but contributing factors:
+
+```text
+R = model(x)
+contributions = [c_1, c_2, ... c_n]
+```
+
+where contributions are interpretable enough for review, appeal and audit when required.
+
+## 32. Decision receipt
+
+```yaml
+decision_id:
+request_id:
+policy_version:
+model_version:
+risk_score:
+uncertainty:
+hard_rules:
+evidence_refs:
+thresholds:
+provisional_disposition:
+authority_gate:
+final_disposition:
+reason_codes:
+reviewer_refs:
+DAIL_event_ref:
+```
+
+## 33. Core mathematical invariant
+
+```text
+confidence ∈ [0,1]
+authority ∈ governed capability space
+
+confidence > threshold
+DOES NOT IMPLY
+authority == permitted
+```
+
+Or more compactly:
+
+```text
+high_confidence * zero_authority = zero_execution
+```
+
+## Final rule
+
+CHLOM uses math to make decisions inspectable—not to hide authority behind a score.
+
+```text
+RULES
+ + EVIDENCE
+ + RISK
+ + UNCERTAINTY
+ + THRESHOLDS
+ + HUMAN / INSTITUTIONAL AUTHORITY
+ + VERSIONED RECEIPT
+ = GOVERNED DECISION
+```

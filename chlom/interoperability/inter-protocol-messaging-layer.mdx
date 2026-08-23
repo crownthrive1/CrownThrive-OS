@@ -1,0 +1,187 @@
+---
+title: "Inter-Protocol Messaging Layer — Component Contract"
+sidebarTitle: "Inter-Protocol Messaging"
+description: "Individual CHLOM interoperability component for typed, authenticated, replay-protected messages across protocols and systems, with stable correlation, privacy, delivery evidence and local-policy interpretation."
+icon: "message"
+keywords: ["CHLOM inter-protocol messaging", "messaging layer", "claims", "events", "replay protection", "interoperability"]
+---
+
+# Inter-Protocol Messaging Layer — Component Contract
+
+## Institutional identity
+
+```yaml
+component_id: CT-CHLOM-IPM-001
+name: Inter-Protocol Messaging Layer
+source_status: recovered_named_component
+source_body_status: distinct_full_body_not_located
+source_lineage: component atlas; bridge/claims; Events/Topics; DAIL; adapter architecture
+classification: source_grounded_current_component_reconstruction
+version: 1.0.0
+```
+
+## Purpose
+
+The Inter-Protocol Messaging Layer defines how CHLOM transports **typed institutional messages** between different protocols, platforms, services and adapters without treating transport delivery as authority or canonical business state.
+
+It is more specific than the Interoperability Metabridge: the metabridge governs federation/trust and claim normalization, while this layer governs message envelopes, authentication, routing, replay, delivery, correlation and error semantics.
+
+## Core invariant
+
+```text
+message delivered != action authorized
+message signed != claim universally trusted
+transport success != institutional state success
+```
+
+## Message envelope
+
+```yaml
+message_id:
+schema_id:
+schema_version:
+message_type:
+source_system_ref:
+destination_system_ref_or_route:
+tenant_id:
+actor_or_service_ref:
+subject_refs[]:
+object_refs[]:
+correlation_id:
+causation_id:
+sequence_or_nonce:
+occurred_at:
+sent_at:
+expires_at:
+classification:
+payload_or_payload_ref:
+payload_digest:
+auth_or_signature_ref:
+idempotency_ref:
+reply_to_or_callback_ref:
+```
+
+Large or restricted payloads should use protected references rather than being copied into the transport envelope.
+
+## Message types
+
+Typed families can include:
+
+- observation/event;
+- command candidate;
+- query/request;
+- response;
+- attestation/proof receipt;
+- rights/license state notice;
+- economic/payment evidence;
+- revocation/correction;
+- provider health/control message;
+- governance/approval notice;
+- case/remedy notice.
+
+Each type has an explicit schema and side-effect class.
+
+## Commands versus events
+
+A command asks a destination to consider an action. An event states that a source observed or recorded something. The layer must not reinterpret an event as a command or vice versa.
+
+```text
+COMMAND_CANDIDATE -> destination authority/policy evaluation
+EVENT -> destination observation/reconciliation
+```
+
+## Authentication
+
+Messages must authenticate the source service/system according to the adapter/protocol contract. Authentication proves message origin/channel under that mechanism, not that the source possesses institutional authority for the payload's requested action.
+
+## Replay protection
+
+Replay protection can combine stable message ID, sequence/nonce, source system and semantic idempotency. Duplicate transport is expected in reliable systems and must not multiply consequential effects.
+
+## Ordering
+
+Protocols differ in ordering guarantees. The message contract must declare whether a message requires:
+
+- no ordering;
+- per-subject/object ordering;
+- source sequence ordering;
+- causal ordering;
+- finalized source order.
+
+If a required predecessor is missing, the destination can HOLD/queue rather than apply an ambiguous later state.
+
+## Expiration and currentness
+
+Commands/requests can expire. A delayed license activation or payment command cannot execute after its approval/evidence window merely because the queue eventually delivers it.
+
+## Routing
+
+Routing uses stable destination capability/service IDs rather than hard-coded provider URLs where possible. Adapters resolve actual endpoints and can be replaced without changing canonical message semantics.
+
+## Privacy and classification
+
+Every message carries classification. Public/partner transports must not carry restricted source bodies or secret values. Cross-system messages should use minimum required claims, proof receipts or evidence refs.
+
+## Delivery semantics
+
+The transport layer can report:
+
+```text
+QUEUED
+SENT
+DELIVERED
+ACKNOWLEDGED
+RETRYING
+DEAD_LETTER
+EXPIRED
+REJECTED_AUTH
+REJECTED_SCHEMA
+```
+
+These are delivery states. The destination's business result can separately be `PASS/HOLD/DENY`, `MATCH/HOLD_MISMATCH`, etc.
+
+## Error and retry policy
+
+Retry only failures classified as retryable. A policy DENY, invalid schema or revoked authority should not be hammered by transport retries as if it were a network timeout.
+
+## Correlation and causation
+
+`correlation_id` connects a cross-service workflow. `causation_id` points to the triggering event/command. This allows a DLA transaction, payment evidence, entitlement creation and settlement reconciliation to be traced without pretending they are one object.
+
+## DAIL relationship
+
+Not every low-level delivery attempt belongs in the canonical DAIL. Consequential messages/actions create or reference DAIL events; high-volume transport telemetry can stay in observability logs with stable correlation to the canonical event.
+
+## Protocol adapters
+
+The message layer can bridge REST/webhooks, queues, MCP tool events, event buses, WebSockets, partner APIs, blockchain messages or other transports. Each adapter declares authentication, delivery guarantee, ordering, rate limits, payload limits and failure semantics.
+
+## Security controls
+
+- source/destination allowlists or registries;
+- schema validation;
+- tenant isolation;
+- signature/auth verification;
+- replay protection;
+- rate/size limits;
+- classification enforcement;
+- secret redaction;
+- loop detection;
+- dead-letter protection;
+- exact action/version binding for consequential commands.
+
+## Threat model
+
+Replay, spoofed source, confused deputy, command/event confusion, message loop, duplicate economic action, stale command, schema downgrade, cross-tenant route, secret leakage, malicious oversized payload, out-of-order revocation and destination spoofing.
+
+## Tests
+
+Test at-least-once duplicate delivery, out-of-order events, expired command, bad signature, unsupported schema, dead-letter recovery, cross-tenant route, loop prevention, provider transport replacement and delivery success with destination policy HOLD.
+
+## Current status
+
+This is a provider-neutral component contract derived from recovered messaging/bridge architecture. A particular queue, broker or chain messaging protocol is not made canonical by this article.
+
+## Versioning
+
+Message schema, routing, adapter and delivery-policy versions are independent. Historical messages remain interpretable using their original schema/version.

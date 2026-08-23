@@ -1,0 +1,115 @@
+---
+title: "ALG-015 — DAIL Correction and Supersession"
+sidebarTitle: "ALG-015 DAIL Correction"
+description: "Standalone CHLOM append-only correction procedure preserving original DAIL events while creating authorized corrections, supersession lineage and recomputed effective projections."
+icon: "pen-to-square"
+keywords: ["CHLOM ALG-015", "DAIL correction", "supersession", "append only", "effective projection"]
+---
+
+# ALG-015 — DAIL Correction and Supersession
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-015
+name: DAIL Correction and Supersession
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: DAIL current architecture; founder adjudication; evidence correction lineage
+version: 1.0.0
+current_authority: specification_only
+```
+
+DAIL corrections are additive. ALG-015 ensures institutional memory can be corrected without deleting the evidence of what was originally recorded, who corrected it, why, and what evidence justified the new effective interpretation.
+
+## Constitutional rule
+
+```text
+correct != erase
+supersede != delete
+new truth claim must preserve prior lineage
+```
+
+## Inputs
+
+```yaml
+original_event_id:
+correction_type:
+correction_payload:
+correction_authority_ref:
+reason:
+evidence_refs[]:
+effective_time:
+classification:
+```
+
+## Procedure
+
+```text
+function correct_event(original_id, correction):
+    original = get(original_id)
+    require correction.authority
+    require correction.reason
+    require correction.evidence_refs
+
+    correction.supersedes = original_id
+    append_event(correction)
+
+    recompute_effective_projection(original.subject)
+```
+
+## Correction classes
+
+A correction may clarify metadata, correct a factual error, supersede an interpretation, record a revocation, reverse an economic event, replace an outdated provider mapping, or append a founder/governance adjudication. The event type must state which semantics apply.
+
+## Authority
+
+Not every actor who can observe an error can change the effective institutional state. The correction authority must match the subject and correction class. A provider can correct its observation; it cannot unilaterally change CrownThrive rights or governance authority unless the institutional rules grant that power.
+
+## Evidence
+
+The correction should identify why the earlier event is no longer the effective interpretation and point to the evidence supporting the correction. A bare 'fixed' entry is inadequate for high-consequence state.
+
+## Effective projection
+
+Consumers may read an effective state derived from the correction chain, but must be able to inspect the chain where authorized:
+
+```text
+E0 original
+  |
+  v
+E1 correction of E0
+  |
+  v
+E2 supersession of E1
+```
+
+The reducer selects the current effective representation according to valid event and authority semantics; it does not physically replace E0.
+
+## Output
+
+```yaml
+correction_event_id:
+original_event_id:
+supersedes_ref:
+authority_ref:
+reason_code:
+evidence_refs[]:
+effective_projection_version:
+```
+
+## Conflict handling
+
+Competing corrections with unresolved authority or evidence should create a conflict/HOLD state. The reducer must not choose whichever event arrived last if authority precedence is unresolved.
+
+## DAIL self-reference
+
+The correction itself is appended through ALG-014 and becomes part of DAIL. Corrections to corrections are allowed through the same mechanism, producing a complete audit chain.
+
+## Tests
+
+Test simple factual correction, revocation, two corrections in sequence, unauthorized correction, correction without evidence, conflicting corrections, correction to restricted evidence, projection rebuild, historical readback and founder adjudication propagation.
+
+## Versioning
+
+Reducer/correction semantics are versioned. A later algorithm upgrade cannot rewrite historical event bytes; it may recompute an effective projection with explicit version lineage.

@@ -1,0 +1,89 @@
+---
+title: "FORM-031 — Quantitative Unit Discipline"
+sidebarTitle: "FORM-031 Unit Discipline"
+description: "Standalone CHLOM quantitative rule preventing silent mixing of percentages, basis points, time rates, currencies, gross/net values, token units and confidence scales."
+icon: "ruler"
+keywords: ["CHLOM FORM-031", "units", "basis points", "percentages", "currency", "quantitative governance"]
+---
+
+# FORM-031 — Quantitative Unit Discipline
+
+## Formula identity
+
+```yaml
+formula_id: FORM-031
+classification: quantitative_safety_invariant
+origin: CHLOM calculation governance
+adopted_as_documentation_contract: yes
+```
+
+FORM-031 institutionalizes unit discipline as a first-class control. Many financial, risk and temporal failures are not caused by difficult mathematics; they are caused by combining numbers that look compatible but represent different units or semantic bases.
+
+## Forbidden silent mixes
+
+CHLOM calculations must not silently mix:
+
+- percentages and basis points;
+- annual and monthly rates;
+- nominal and real values;
+- gross and net receipts;
+- token units and fiat units;
+- integer minor units and decimal major units;
+- seconds and milliseconds;
+- event time and effective time;
+- current and historical supply;
+- confidence and probability without definition;
+- amount and count;
+- settled value and pending/provider-authorized value.
+
+## Typed value contract
+
+A consequential numeric value should carry:
+
+```yaml
+value:
+unit:
+scale_or_precision:
+basis:
+observation_time:
+source_ref:
+```
+
+For rates, also record numerator/denominator units and annualization/measurement period.
+
+## Percent versus basis points
+
+```text
+1% = 100 bps
+10,000 bps = 100%
+```
+
+The unit should be encoded, not inferred from magnitude.
+
+## Currency conversion
+
+Never add or compare unlike currencies without an explicit conversion event/model containing source rate, timestamp, pair direction, fees/spread policy and rounding.
+
+## Time rates
+
+A monthly rate cannot be multiplied by 12 and called an equivalent annual rate without defining whether compounding is ignored. The calculation must state nominal/effective assumptions.
+
+## Gross versus net
+
+Economic schedules must bind to a named basis. A 20% royalty on gross is economically different from 20% of net distributable.
+
+## Validation
+
+Schema validators should reject incompatible units where machine-detectable. Human-readable documents should include unit annotations on every table/formula where ambiguity could change meaning.
+
+## Tests
+
+Test percentage/bps conversion, cents/dollars, seconds/milliseconds, USD/token, gross/net mismatch, annual/monthly rate, timestamp unit and dimensionless score with undefined scale.
+
+## DAIL evidence
+
+Calculation records under FORM-030 include units and bases so later auditors can replay without guessing.
+
+## Versioning
+
+Unit vocabulary/schema can evolve, but aliases must resolve deterministically and historical records remain interpretable.

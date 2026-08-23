@@ -1,0 +1,109 @@
+---
+title: "ALG-031 — Founder Adjudication Propagation"
+sidebarTitle: "ALG-031 Adjudication Propagation"
+description: "Standalone CHLOM procedure for appending founder adjudications, resolving affected dependencies, preserving prior versions and validating downstream manifests."
+icon: "gavel"
+keywords: ["CHLOM ALG-031", "founder adjudication", "propagation", "dependency graph", "version preservation"]
+---
+
+# ALG-031 — Founder Adjudication Propagation
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-031
+name: Founder Adjudication Propagation
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: founder adjudication; terminology correction; reconstruction governance
+version: 1.0.0
+current_authority: active_documentation_method_where_founder_ruling_exists
+```
+
+ALG-031 defines how an explicit founder ruling changes the **effective interpretation** of CHLOM documentation and machine registries without deleting the older source record. It is central to reconciling years of evolving terminology, architecture and implementation decisions.
+
+## Inputs
+
+```yaml
+decision:
+  adjudication_id
+  subject
+  ruling
+  effective_at
+  scope
+  founder_authority_ref
+  rationale_or_context
+  evidence_refs[]
+dependency_graph:
+current_manifests:
+```
+
+## Procedure
+
+```text
+function apply_adjudication(decision):
+    append_adjudication_record(decision)
+    affected = resolve_dependency_graph(decision.subject)
+
+    for record in affected:
+        update_effective_interpretation(record)
+        preserve_previous_version(record)
+
+    append_changelog(decision)
+    validate_machine_manifests()
+```
+
+## Append first
+
+The ruling is first recorded as its own source-authority event. Downstream pages should cite or refer to that adjudication rather than relying on silent global find-and-replace.
+
+## Dependency resolution
+
+Dependencies can include terminology pages, module/pallet articles, wireframes, API schemas, governance rules, source reconstructions, navigation labels, machine manifests, tests, templates and future build tasks.
+
+For example, changing the current meaning of an acronym may update current architecture pages while historical paper reconstructions preserve the original meaning with a lineage note.
+
+## Effective interpretation
+
+Each affected record should distinguish:
+
+```yaml
+historical_source_meaning:
+current_canonical_meaning:
+superseded_interpretations[]:
+adjudication_ref:
+```
+
+This avoids corrupting historical provenance.
+
+## Version preservation
+
+Material page/schema changes receive a new version or explicit changelog section. Opaque external identifiers that cannot be renamed safely should retain compatibility aliases while human-readable semantics are corrected.
+
+## Machine-manifest validation
+
+After propagation, validate that registries, OpenAPI/event schemas, navigation, code mappings and tests do not contain contradictory effective terms. Failure creates a HOLD for release certification rather than pretending propagation is complete.
+
+## Output
+
+```yaml
+propagation_receipt_id:
+adjudication_ref:
+affected_records[]:
+updated_records[]:
+compatibility_aliases[]:
+unresolved_conflicts[]:
+manifest_validation:
+```
+
+## DAIL evidence
+
+Record the adjudication and propagation receipts. Historical source bodies remain separately preserved; current operational projections point to the effective ruling.
+
+## Tests
+
+Test current-name correction, historical acronym preservation, deprecated brand moved to lineage-only status, schema alias compatibility, conflicting earlier ruling, incomplete dependency graph and manifest validation failure.
+
+## Versioning
+
+Propagation logic evolves, but adjudication authority is determined by governance/founder rules, not by the algorithm.

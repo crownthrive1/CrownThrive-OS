@@ -1,0 +1,298 @@
+---
+title: "ZK and ZKX — Privacy-Preserving Compliance Proof Architecture"
+sidebarTitle: "ZK · ZKX"
+description: "Comprehensive reconstruction of CHLOM zero-knowledge compliance proofs, ZKX verification, circuit/version registries, credential witnesses, proof lifecycle and privacy boundaries."
+icon: "shield-halved"
+keywords: ["ZK", "ZKP", "ZKX", "zero knowledge proof", "compliance proof", "zkKYC", "privacy", "CHLOM"]
+---
+
+# ZK and ZKX — Privacy-Preserving Compliance Proof Architecture
+
+Historical CHLOM treats zero-knowledge proofs as a core mechanism for resolving a difficult problem: **how can a system prove that a compliance condition is satisfied without exposing the underlying confidential data?** The Genesis Volume names a dedicated verification layer **ZKX** and the whitepaper/Grand Prospectus describe identity, financial, transaction and audit proofs.
+
+Current CHLOM preserves the proof architecture as an advanced target/laboratory capability. Historical ZK language is not evidence that production circuits or a public verifier are currently deployed.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_source_grounded
+historical_terms:
+  - ZK
+  - ZKP
+  - ZKX
+historical_ZKX_role: proof_verification_layer
+current_status: advanced_target_and_laboratory
+production_ZK_claim: false_unless_separately_evidenced
+founder_adjudication: open_after_publication
+```
+
+## Core concept
+
+A zero-knowledge proof separates **the statement being proven** from **the private facts used to prove it**.
+
+```text
+PRIVATE WITNESS                      PUBLIC STATEMENT
+----------------                    ----------------
+birth date                           age >= 18
+credential body          --->        valid credential
+financial records                    assets > liabilities
+license terms                        license permits use X
+transaction details                  all policy checks passed
+```
+
+The verifier receives a proof and selected public inputs, not the underlying witness data.
+
+## CHLOM proof topology
+
+```text
++------------------------+
+| Protected Evidence     |
+| credentials / records  |
++-----------+------------+
+            |
+            v
++-----------+------------+
+| Witness Preparation    |
+| normalize + bind IDs   |
++-----------+------------+
+            |
+            v
++-----------+------------+
+| Circuit / Policy       |
+| Version                |
++-----------+------------+
+            |
+            v
++-----------+------------+
+| Prover                 |
+| local / trusted service|
++-----------+------------+
+            |
+            v
++-----------+------------+
+| Proof + Public Inputs  |
++-----------+------------+
+            |
+            v
++-----------+------------+
+| ZKX Verifier           |
++-----------+------------+
+            |
+      VALID / INVALID
+            |
+            v
++-----------+------------+
+| Policy / Decision Gate |
++-----------+------------+
+            |
+            v
++-----------+------------+
+| DAIL Proof Receipt     |
++------------------------+
+```
+
+## Proof validity is not final authority
+
+A mathematically valid proof establishes only that the encoded statement follows from the witness under the circuit and verification key.
+
+```text
+proof valid
+   != source evidence current
+   != credential not revoked
+   != circuit policy still authoritative
+   != action authorized
+   != legal conclusion
+```
+
+CHLOM must still resolve current policy, authority, effective dates and remedy state.
+
+## Historical proof categories
+
+Recovered source families describe at least four broad classes.
+
+### Identity and attribute proofs
+
+Examples include proving:
+
+- age threshold;
+- citizenship/residency property;
+- accreditation or professional status;
+- KYC verification;
+- possession of a valid license;
+- clearance/eligibility level.
+
+### Financial compliance proofs
+
+Historical examples include proving assets exceed liabilities, capital/liquidity constraints or portfolio rules without exposing complete financial statements.
+
+### Transaction compliance proofs
+
+A confidential transaction may hide amount/party details while proving that required KYC, limits or license conditions were satisfied.
+
+### Audit and code-assurance proofs
+
+The papers contemplate off-chain auditors or AI systems checking sensitive data/code and producing a proof that a defined policy condition passed.
+
+## Circuit registry
+
+A production proof system requires stable circuit identity and versioning.
+
+```yaml
+circuit_id: ct.zk.age-credential.v1
+statement: subject_meets_minimum_age
+policy_reference: ct.policy.pack.age-restricted.v3
+verification_key_id: vk_...
+proving_system: implementation_specific
+public_inputs:
+  - subject_commitment
+  - required_age
+  - credential_status_root
+witness_schema: restricted_reference
+created_at: timestamp
+effective_from: timestamp
+status: draft_test_active_retired
+security_review: reference
+```
+
+## Circuit version lifecycle
+
+```text
+DESIGN
+  |
+  v
+TEST VECTORS
+  |
+  v
+SECURITY REVIEW
+  |
+  v
+CONTROLLED TEST
+  |
+  v
+ACTIVE VERIFIER
+  |
+  +---- vulnerability ----> SUSPENDED
+  |
+  +---- policy change ----> RETIRED
+  |
+  v
+SUCCESSOR CIRCUIT
+```
+
+Old proofs remain interpretable against the circuit/version that existed when they were generated, but an old circuit may no longer satisfy current policy.
+
+## Credential and revocation binding
+
+A proof that relies on a credential must account for current status.
+
+```text
+credential issued
+      |
+      v
+commitment / status reference
+      |
+      v
+proof generated
+      |
+      v
+verifier checks proof
+      |
+      +--> revocation/status current?
+                  |
+             +----+----+
+             |         |
+            YES       NO
+             |         |
+             v         v
+          continue    DENY/HOLD
+```
+
+Without status binding, an old proof could incorrectly continue validating after a credential is revoked.
+
+## Public inputs and privacy minimization
+
+Public inputs should expose only what is necessary to verify the institutional statement.
+
+For example, proving that a license covers a territory should not require publishing the entire private agreement or a user's home address.
+
+## DAIL proof receipt
+
+DAIL should record only public-safe/protected metadata appropriate to the event, such as:
+
+- proof ID/digest;
+- circuit/version;
+- verification key ID;
+- statement type;
+- public input digest;
+- verifier identity/version;
+- verification result;
+- source credential/evidence references by protected ID;
+- policy version;
+- timestamp;
+- correction/revocation relationships.
+
+The raw witness should not be copied into DAIL merely because a proof exists.
+
+## ZKX historical role
+
+The Genesis Volume describes **ZKX** as a dedicated proof-verification layer that may verify proofs in the runtime and coordinate with historical DAL attestations and DLA enforcement.
+
+Modern mapping:
+
+```text
+ZKX historical pallet/module
+       |
+       +--> Circuit Registry
+       +--> Prover Interfaces
+       +--> Verification Service
+       +--> Proof Receipt Service
+       +--> Policy/Decision Gateway
+       +--> DAIL
+       +--> optional future chain verifier
+```
+
+## ZK rollup lineage
+
+Historical papers also contemplate zkRollup-style batching for scalability, with compliance checks embedded in the batch proof.
+
+Current treatment: advanced research. Rollup batching cannot be used to bypass transaction-level policy semantics merely because the batch root verifies.
+
+## Failure conditions
+
+Fail closed or HOLD when:
+
+- circuit/version is unknown or retired for current use;
+- verification key does not match;
+- proof is malformed/invalid;
+- required public inputs are missing;
+- credential status cannot be checked;
+- policy version has changed and compatibility is unresolved;
+- proof timestamp/freshness requirement is exceeded;
+- verifier implementation is untrusted/unreviewed;
+- a proof tries to establish a legal/authority fact that the circuit is not authorized to decide.
+
+## Threat model
+
+Key threats include:
+
+- flawed circuits proving the wrong statement;
+- compromised proving keys/witness handling;
+- stale revocation roots;
+- verifier bugs;
+- side-channel leakage;
+- weak random-number generation;
+- circuit/version confusion;
+- malicious public-input substitution;
+- overclaiming what a valid proof means.
+
+## Current implementation boundary
+
+Before production activation, CHLOM would need cryptographic design review, circuit test vectors, threat modeling, key lifecycle, trusted-setup analysis where applicable, privacy review, performance benchmarking, incident/rotation procedures and independent security review.
+
+The current cloud-first system can implement the underlying policy/evidence/credential semantics without waiting for ZK deployment.
+
+## Founder adjudication
+
+`open_after_publication`
+
+The Founder may later adjudicate whether ZKX remains the public name, which proof systems/circuits are prioritized, what is public versus restricted, and where on-chain verification belongs. Historical proof concepts remain attached to their source periods.

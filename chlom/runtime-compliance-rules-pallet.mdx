@@ -1,0 +1,241 @@
+---
+title: "Compliance Rules Pallet — Historical Runtime Record"
+sidebarTitle: "Compliance Rules Pallet"
+description: "Standalone reconstruction of CHLOM's historical Compliance Rules Pallet for governance-controlled global/regional rule parameters, forbidden conditions, limits and pre-check consumable rule state."
+icon: "scale-balanced"
+keywords: ["CHLOM Compliance Rules Pallet", "compliance rules", "regional policy", "runtime rules", "pre-check", "governance"]
+---
+
+# Compliance Rules Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.compliance-rules
+historical_name: Compliance Rules Pallet
+artifact_class: historical_runtime_pallet
+source_lineage:
+  - AI-Driven Decentralized Compliance and Licensing Whitepaper
+  - Building and Understanding the CHLOM Metaprotocol
+  - Technical Blueprint compliance pre-check architecture
+recovery_state: source_grounded_reconstruction
+current_mapping:
+  - Compliance Pack Registry
+  - Policy Engine / DSL Compiler
+  - Policy Pallet
+  - Parameter & Config Service
+production_state: historical_runtime_not_claimed_live
+```
+
+## Source basis
+
+Historical sources explicitly describe a **Compliance Rules Pallet** storing global/regional rule parameters such as maximum transaction sizes and forbidden counterparties, with governance able to update the rules and the Compliance Pre-check Pallet consulting them before execution.
+
+This source-era pallet overlaps conceptually with later Compliance Packs and the Policy Pallet, but they are not identical. This article preserves the specific **rule-state/configuration** role.
+
+## Purpose
+
+```text
+SOURCE RULE / ADOPTED POLICY
+      |
+      v
+NORMALIZE RULE PARAMETERS
+      |
+      v
+COMPLIANCE RULES PALLET
+      |
+ version + scope + effective period
+      |
+      v
+PRE-CHECK / ACE / OTHER MODULES
+```
+
+## Historical rule classes
+
+Source-backed examples and related architecture support classes such as:
+
+- transaction/value limits;
+- prohibited/allowlisted counterparties;
+- jurisdiction/region rules;
+- credential requirements;
+- license-state requirements;
+- transferability restrictions;
+- time/expiry rules;
+- risk threshold references;
+- oracle/source requirements;
+- governance-controlled runtime parameters.
+
+Exact live regulations/thresholds are not inferred.
+
+## Rule object
+
+```yaml
+rule_id: stable ID
+rule_version: semantic version
+rule_type: limit|prohibition|requirement|eligibility|reference|other
+scope: global|jurisdiction|sector|tenant|asset|license|action
+condition_schema_ref: typed schema
+parameter_refs: list
+effect: pass_condition|hold_condition|deny_condition
+source_authority_ref: required
+effective_from: timestamp
+effective_until: optional
+priority_or_precedence_ref: required if overlaps possible
+status: draft|approved|active|superseded|retired
+classification: public|internal|restricted
+```
+
+## Scope resolution
+
+A request may match several rule sets. Resolution must be deterministic and versioned.
+
+```text
+GLOBAL
+  + JURISDICTION
+  + SECTOR
+  + ORGANIZATION/TENANT
+  + ASSET/LICENSE
+  + ACTION-SPECIFIC
+      |
+      v
+RESOLVED RULE SET
+```
+
+Conflicting mandatory rules should create HOLD and adjudication/migration rather than arbitrary last-write-wins behavior.
+
+## Governance updates
+
+A rule change should follow:
+
+```text
+candidate
+ -> source/authority validation
+ -> tests/simulation
+ -> approval
+ -> effective date
+ -> activation
+ -> monitoring
+ -> supersession/rollback if needed
+```
+
+Historical governance-vote examples are one possible source-era mechanism, not the only current authority path.
+
+## Relationship to Compliance Packs
+
+```text
+Compliance Pack = curated/versioned policy bundle
+Compliance Rules Pallet = source-era runtime storage/evaluation parameters
+Policy Engine = modern compilation/evaluation service
+Policy Pallet = source-era/reference runtime policy enforcement
+```
+
+A Compliance Pack can compile/project adopted rules into a runtime/config representation without making the historical pallet the canonical source.
+
+## Relationship to Parameter & Config
+
+Some rule parameters may be stored as versioned configuration, but **configuration does not become policy authority merely because a number exists**.
+
+```text
+policy says max X
+  -> parameter/config value X
+  -> execution engine consumes X
+```
+
+The source authority remains attached.
+
+## Effective-time behavior
+
+A rule version should evaluate actions according to the applicable effective-time contract. Historical decisions must retain their exact rule version.
+
+```text
+rule v1 [T0,T1)
+rule v2 [T1,...)
+```
+
+A correction to source interpretation requires explicit supersession/correction records.
+
+## Public-safe evaluation pattern
+
+```text
+resolve_rules(action, context):
+  candidates = find_applicable_rules(action.scope)
+  candidates = filter_effective(candidates, action.time)
+  if unresolved_conflict(candidates): HOLD
+  resolved = apply_adopted_precedence(candidates)
+  return resolved
+```
+
+The detailed proprietary/regulated rule corpus is not published here.
+
+## Failure modes
+
+- source authority missing -\> HOLD;
+- rule version unknown -\> HOLD;
+- conflicting mandatory rules -\> HOLD;
+- parameter missing/null -\> fail closed according to definition;
+- stale rule projection -\> recompile/reload;
+- governance change not effective yet -\> continue current active version;
+- unauthorized config edit -\> ignore/reject and investigate;
+- rule cannot be evaluated from available evidence -\> HOLD.
+
+## DAIL events
+
+```text
+ct.rule.created.v1
+ct.rule.approved.v1
+ct.rule.activated.v1
+ct.rule.superseded.v1
+ct.rule.retired.v1
+ct.rule.conflict.detected.v1
+ct.rule.projection.generated.v1
+ct.rule.projection.failed.v1
+```
+
+## Security threats
+
+- unauthorized rule edit;
+- hidden priority manipulation;
+- stale rules;
+- cross-tenant leakage;
+- malicious rule injection;
+- fail-open null/default;
+- confusing policy with provider settings;
+- regulator/source impersonation;
+- secret threshold leakage.
+
+## Tests
+
+1. applicable rule resolves by scope/version;
+2. future rule not active early;
+3. expired rule not used;
+4. conflicting mandatory rules -\> HOLD;
+5. missing required parameter -\> fail closed;
+6. provider config differs -\> canonical rule unchanged, mismatch recorded;
+7. unauthorized edit -\> rejected;
+8. historic action replays with historic rule version for audit, not current decision;
+9. tenant-specific rule cannot leak into another tenant;
+10. source correction -\> explicit new version/supersession.
+
+## Current mapping
+
+Current CHLOM should treat this pallet as historical lineage for the Policy/Compliance Pack/Config architecture. Rule definitions should be provider-neutral, machine-readable, testable and evidence-linked.
+
+## Restricted companion
+
+Contains non-public rule tables, regulated thresholds, fraud/abuse controls, private policy interpretations, provider-specific mappings, security exclusions and protected test cases.
+
+## Invariants
+
+```text
+rule value != source authority
+config != policy
+historical rule != current rule automatically
+rule conflict != arbitrary winner
+null critical rule != unlimited/pass
+provider setting != canonical rule
+rule update != retroactive silent rewrite
+```
+
+## Status
+
+`historical_preserved + source_grounded_reconstruction`; mapped to current Compliance Pack/Policy Engine architecture without claiming a live source-era runtime pallet.

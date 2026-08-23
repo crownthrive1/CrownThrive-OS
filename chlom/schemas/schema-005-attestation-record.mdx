@@ -1,0 +1,100 @@
+---
+title: "SCHEMA-005 — Attestation Record"
+sidebarTitle: "SCHEMA-005 Attestation"
+description: "Canonical CHLOM machine schema for signed attestations, issuer/subject binding, evidence digests, expiry, revocation, public claims, privacy classification and verification lineage."
+icon: "stamp"
+keywords: ["CHLOM schema", "attestation", "issuer", "evidence digest", "revocation"]
+---
+
+# SCHEMA-005 — Attestation Record
+
+## Schema identity
+
+```yaml
+schema_id: SCHEMA-005
+name: Attestation Record
+classification: reconstructed_machine_contract
+version: 1.0.0
+related_algorithm: ALG-012
+```
+
+## Purpose
+
+SCHEMA-005 defines a provider-neutral CHLOM attestation: a signed or otherwise verifiable claim by a registered issuer about a person, organization, asset, license, event, control, calculation or other governed subject.
+
+## Core record
+
+```yaml
+attestation_id: string
+version: string
+tenant_id: string
+attestation_type: string
+issuer_id: string
+subject_refs: [stable_ref]
+claims: object
+public_claims: object|null
+evidence_refs: [stable_ref]
+evidence_digest:
+  algorithm: string|null
+  value: string|null
+issued_at: timestamp
+valid_from: timestamp|null
+expires_at: timestamp|null
+freshness_policy_ref: stable_ref|null
+signature_or_proof:
+  method: string
+  key_or_proof_ref: stable_ref
+schema_or_circuit_ref: stable_ref|null
+revocation_state: ACTIVE|REVOKED|SUPERSEDED|UNKNOWN
+revoked_at: timestamp|null
+supersedes: stable_ref|null
+classification: public|internal|restricted|trade_secret
+DAIL_refs: [stable_ref]
+```
+
+## Issuer authority
+
+A valid signature only proves control of the signing/proof key under its cryptographic model. CHLOM separately resolves whether the issuer was authorized for `attestation_type` and scope. Unsupported issuer authority makes the attestation unusable even if cryptographically valid.
+
+## Subject binding
+
+Subjects use stable CHLOM references. Alias resolution cannot permit a provider username, email or external account ID to collide across tenants/subjects. Multi-subject attestations must define relationship semantics explicitly.
+
+## Claims versus public claims
+
+`claims` may contain restricted information. `public_claims` is an approved minimum-disclosure projection where one is permitted. The schema never requires sensitive source evidence to be embedded in a public-readable object.
+
+## Evidence integrity
+
+An attestation can bind to source evidence through stable references and optional digest. Digest verification protects integrity of the referenced bytes/object; it does not establish that the content is true.
+
+## Lifecycle
+
+Expiration and revocation are distinct. A credential can remain unexpired but be revoked. A superseding attestation does not erase the historical version.
+
+## Freshness
+
+Policy may require a freshness window shorter than `expires_at`. Verification records therefore resolve both expiration and currentness when the attestation is used.
+
+## ZK integration
+
+Where an attestation is proven through a ZK circuit, `schema_or_circuit_ref` and proof method identify the approved contract. Private witness data is never written into the public record.
+
+## Validation rules
+
+- stable IDs/tenant;
+- supported attestation type/schema;
+- issuer and subject resolve;
+- issued/valid/expiry times are coherent;
+- signature/proof reference is syntactically valid;
+- evidence references/digest meet classification policy;
+- revocation/supersession states are consistent;
+- no secret/private witness leakage.
+
+## Tests
+
+Test valid attestation, unauthorized issuer, subject mismatch, expired, revoked, stale, superseded, digest mismatch, key rotation, cross-tenant alias collision and restricted/public projection.
+
+## Versioning
+
+Attestation versions remain immutable institutional records. Corrections, replacements and revocations append new lifecycle/provenance events.

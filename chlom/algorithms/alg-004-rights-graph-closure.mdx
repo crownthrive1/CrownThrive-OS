@@ -1,0 +1,403 @@
+---
+title: "ALG-004 — Rights Graph Closure"
+sidebarTitle: "ALG-004 Rights Closure"
+description: "Standalone CHLOM graph procedure for deriving effective rights through source, parent and child grants while enforcing rights conservation."
+icon: "diagram-project"
+keywords: ["CHLOM ALG-004", "rights graph", "rights closure", "sublicensing", "derivative rights"]
+---
+
+# ALG-004 — Rights Graph Closure
+
+## Canonical record
+
+```yaml
+algorithm_id: ct.chlom.algorithm.alg-004
+canonical_name: Rights Graph Closure
+artifact_class: rights_graph_algorithm
+lineage:
+  - Rights Graph / license hierarchy architecture
+  - DLA and LEX rights-before-license rules
+  - sublicensing and derivative-rights lineage
+status: public_safe_algorithm_contract
+implementation_state: implementation_specific_evidence_required
+restricted_companion: 04_Restricted_Algorithms_Formulas_Threat_Models_and_Trade_Secrets
+```
+
+## Purpose
+
+ALG-004 derives the **effective rights available to a subject/object at a point in time** by traversing source rights, grants, restrictions, parent/child licenses, revocations, territorial/term constraints and authority evidence.
+
+Its central rule is conservation:
+
+```text
+CHILD RIGHTS <= PARENT RIGHTS <= SOURCE RIGHTS
+```
+
+No graph traversal may manufacture a permission that does not exist upstream.
+
+## Rights graph model
+
+```text
+SOURCE / OWNER RIGHTS
+        |
+        +---- grant A ----> LICENSE / DLA A
+        |                       |
+        |                       +---- sublicense ----> CHILD A1
+        |                       |
+        |                       +---- derivative ----> CHILD A2
+        |
+        +---- grant B ----> LICENSE / DLA B
+```
+
+Edges carry permissions **and constraints**. Effective rights are not determined by node existence alone.
+
+## Node types
+
+```text
+source_asset
+rights_holder
+agreement
+license
+DLA
+derivative_asset
+sublicense
+territory
+term/window
+entitlement
+encumbrance
+revocation/hold
+```
+
+## Rights edge
+
+```yaml
+rights_edge_id: stable id
+from_ref: source/parent node
+to_ref: child/license/party node
+grant_type: ownership|license|sublicense|assignment|delegation|derivative|other
+permissions: typed set
+restrictions: typed set
+territory: explicit set/profile
+channels: optional set
+uses: optional set
+term_start: timestamp/date
+term_end: optional
+exclusive_scope: optional
+transferability: explicit
+sublicensing: explicit
+derivative_rights: explicit
+authority_ref: required
+source_evidence_refs: list
+status: candidate|active|held|revoked|expired|superseded
+version: string
+```
+
+## Effective-rights request
+
+```yaml
+rights_query_id: stable id
+subject_ref: actor/license/DLA/object
+action: semantic requested use
+asset_ref: canonical asset
+territory: optional|required
+channel: optional
+usage_context: optional
+at_time: timestamp
+policy_context_ref: optional
+```
+
+## Set representation
+
+A rights bundle can be modeled conceptually as dimensions:
+
+```text
+R = Permissions × Territory × Term × Channel × Usage × Transferability × Conditions
+```
+
+Implementations may normalize these dimensions differently, but equality/subset/intersection must be deterministic.
+
+## Closure procedure
+
+```text
+1. resolve canonical asset/source-rights root
+2. identify active incoming grant paths for subject
+3. discard revoked/expired/held edges
+4. verify each edge was authorized by its parent/source
+5. intersect permissions with every ancestor restriction
+6. intersect territory, term, channel and usage dimensions
+7. apply exclusive-capacity/encumbrance constraints
+8. resolve policy/currentness requirements
+9. produce effective-rights set + provenance paths
+10. HOLD if contradictory/unresolved material evidence remains
+```
+
+## Public-safe pseudocode
+
+```text
+function rights_closure(subject, asset, at_time):
+    roots = resolve_source_rights(asset)
+    if roots unresolved:
+        return HOLD("SOURCE_RIGHTS_UNRESOLVED")
+
+    paths = active_grant_paths(roots, subject, at_time)
+    if paths empty:
+        return DENY("NO_RIGHTS_PATH")
+
+    outputs = []
+    for path in paths:
+        effective = path.root.rights
+        provenance = [path.root]
+
+        for edge in path.edges:
+            if not edge_current(edge, at_time):
+                effective = EMPTY
+                break
+            if not grant_authorized_by_parent(edge, effective):
+                return HOLD("UPSTREAM_AUTHORITY_CONFLICT")
+
+            effective = intersect(effective, edge.permissions_and_constraints)
+            provenance.append(edge)
+
+        if effective not EMPTY:
+            outputs.append((effective, provenance))
+
+    if material_conflict(outputs):
+        return HOLD("RIGHTS_CONFLICT")
+
+    return union_only_compatible_nonexclusive_paths(outputs)
+```
+
+## Why intersection dominates
+
+A child grant cannot expand a restricted dimension.
+
+If:
+
+```text
+Parent territory = {US, CA}
+Child requested territory = {US, CA, UK}
+```
+
+then:
+
+```text
+Child effective territory = {US, CA}
+```
+
+and issuing `UK` rights would be invalid unless another independent valid path grants them.
+
+## Term closure
+
+For parent interval `[P_start, P_end)` and child interval `[C_start, C_end)`:
+
+```text
+child_effective_interval = intersection(parent_interval, child_interval)
+```
+
+If the intersection is empty, the child grant is not effective for that time.
+
+## Transfer/sublicense closure
+
+```text
+child_transferability <= parent_transferability
+child_sublicensing <= parent_sublicensing
+```
+
+A parent permission marked non-transferable or non-sublicensable blocks downstream propagation unless another source-authorized grant path exists.
+
+## Derivative rights
+
+Creation of a derivative asset does not imply broad rights to the source work.
+
+```text
+source permission to create derivative
+      |
+      v
+derivative asset exists
+      |
+      +--> derivative-specific rights
+      +--> continuing source restrictions
+```
+
+The graph should preserve both source and derivative provenance.
+
+## Exclusivity and capacity
+
+Exclusive rights require collision checks.
+
+```yaml
+exclusive_scope:
+  asset_ref: ...
+  permission: ...
+  territory: ...
+  term: ...
+  channel: ...
+```
+
+Two active exclusive grants with overlapping scope create a conflict unless the source contract expressly permits the relationship.
+
+## Encumbrances
+
+Financing, liens, prior commitments, reservations or other encumbrances can constrain disposition even if a permission otherwise exists. These constraints must be evidence-backed and current.
+
+## Revocation propagation
+
+A parent/source revocation can affect descendants.
+
+```text
+PARENT ACTIVE
+   |
+child A
+child B
+
+PARENT REVOKED
+   |
+recompute descendant closure
+   +--> revoke/hold descendants according to policy/agreement
+```
+
+The system must not erase the historical fact that descendants were previously active.
+
+## Multiple independent paths
+
+An actor can receive the same permission through multiple source-authorized paths. The closure result should preserve each path and avoid double-counting economic or capacity effects.
+
+```text
+path validity != economic obligation count
+```
+
+## Conflicting evidence
+
+Examples:
+
+- two alleged owners claim the same exclusive source right;
+- one contract grants transfer while another later amendment prohibits it;
+- provider metadata says active while source agreement says expired;
+- title/provenance evidence is incomplete.
+
+These situations should return `HOLD_RIGHTS_CONFLICT` rather than arbitrary graph precedence unless a source-authority rule resolves the conflict.
+
+## DLA relationship
+
+DLA activation queries ALG-004 to establish the licensable/effective rights set.
+
+```text
+rights closure PASS
+   + issuer authority
+   + policy/evidence
+   -> DLA candidate may proceed
+```
+
+The algorithm does not itself issue the DLA.
+
+## LEX relationship
+
+Before listing or transfer, LEX re-evaluates current rights closure. Search/index state is insufficient.
+
+## Economic relationship
+
+Rights closure can identify **who may be entitled** to economic terms, but the economic schedule/allocation remains separate.
+
+```text
+rights != payment
+rights path != royalty percentage
+```
+
+## Provenance result
+
+```yaml
+rights_closure_result_id: stable id
+query_ref: required
+result: PASS|HOLD|DENY
+effective_rights: structured set
+provenance_paths: list
+source_rights_refs: list
+active_edge_versions: list
+conflict_refs: optional
+calculated_at: timestamp
+valid_until: optional
+algorithm_version: exact
+```
+
+## Failure modes
+
+- source root missing -> HOLD;
+- no active grant path -> DENY;
+- parent expired -> child not current;
+- child exceeds parent -> trim only if query asks effective set; reject if attempting issuance beyond scope;
+- conflicting ownership -> HOLD;
+- exclusive overlap -> HOLD;
+- graph cycle -> invalid data/HOLD;
+- revoked parent -> descendants re-evaluated;
+- stale provider rights data -> canonical evidence wins or HOLD.
+
+## Cycle handling
+
+A valid license derivation graph should not require circular permission manufacturing.
+
+```text
+A grants B
+B grants A
+```
+
+cannot create rights absent an external source root. Cycle detection should stop traversal and raise a data/integrity issue.
+
+## Threat model
+
+- fabricated source-rights root;
+- unauthorized sublicensing;
+- graph cycle used to manufacture authority;
+- hidden exclusive overlap;
+- stale revocation;
+- provider metadata treated as source truth;
+- territory/term omission;
+- derivative-work rights inflation;
+- alias collision causing wrong party attribution.
+
+## Test vectors
+
+1. child permissions strict subset of parent -> PASS effective subset;
+2. child requests additional territory -> extra territory rejected;
+3. parent expired -> child not current;
+4. source rights unresolved -> HOLD;
+5. two conflicting exclusive roots -> HOLD;
+6. sublicensing prohibited upstream -> child sublicense invalid;
+7. derivative permission limited to one medium -> no rights in ungranted media;
+8. graph cycle with no source root -> invalid/HOLD;
+9. parent revoked -> descendants re-evaluated;
+10. multiple independent valid nonexclusive grants -> compatible effective rights preserved with separate provenance.
+
+## Observability
+
+Track:
+
+- closure PASS/HOLD/DENY;
+- unresolved source roots;
+- exclusive overlap conflicts;
+- revocation propagation lag;
+- graph-cycle/integrity errors;
+- provider/canonical rights mismatches;
+- algorithm version used by DLA/LEX decisions.
+
+## Restricted companion
+
+Private custody may contain full contracts, unpublished rights evidence, owner identities, confidential commercial terms, filing records, legal opinions, exclusive capacity, encumbrances and protected dispute evidence.
+
+## Invariants
+
+```text
+child_rights <= parent_rights <= source_rights
+provider metadata != source rights
+asset existence != licensable rights
+DLA existence != unlimited rights
+rights closure != economic schedule
+revocation/correction != deletion of history
+```
+
+## Versioning
+
+Changes to graph semantics, dimension definitions, exclusivity rules or conflict resolution require a new algorithm version. Old DLA/LEX decisions retain the exact closure version and source snapshots.
+
+## Status
+
+`reconstructed_source_grounded + public_safe_algorithm_contract`. Full proprietary rights evidence and legal source material remain restricted.

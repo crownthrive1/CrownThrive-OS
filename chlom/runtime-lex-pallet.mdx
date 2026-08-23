@@ -1,0 +1,346 @@
+---
+title: "LEX Pallet — Historical Runtime Record"
+sidebarTitle: "LEX Pallet"
+description: "Standalone reconstruction of the historical CHLOM LEX marketplace pallet for governed license listing, bidding/direct purchase, escrow, eligibility, transfer, settlement handoff and remedy integration."
+icon: "right-left"
+keywords: ["CHLOM LEX Pallet", "License Exchange", "marketplace pallet", "license transfer", "escrow", "eligibility"]
+---
+
+# LEX Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.lex
+historical_name: Marketplace / LEX Pallet
+artifact_class: historical_runtime_pallet
+source_lineage:
+  - CHLOM Technical Blueprint
+  - AI-Driven Decentralized Compliance and Licensing Whitepaper
+  - Building and Understanding the CHLOM Metaprotocol
+  - CHLOM LEX concept/roadmap family
+  - recovered Help Center LEX pallet/module titles
+recovery_state: reconstructed_source_grounded
+current_mapping:
+  - rights-gated LEX service
+  - DLA eligibility
+  - escrow/conditional settlement
+  - P-03 Rights & Licensing
+  - P-11 Capital, Revenue & Settlement
+production_state: planned_gated_service_not_historical_runtime_claim
+```
+
+## Historical purpose
+
+The historical pallet implemented a marketplace for tokenized licenses/assets. Source-era examples describe:
+
+- creating listings;
+- sale, transfer, rental or sublicensing;
+- direct purchase and possible bidding;
+- escrowed payment;
+- compliance eligibility before transfer;
+- license validity/revocation checks;
+- jurisdiction/credential constraints;
+- royalty obligations;
+- atomic transfer/release behavior.
+
+The current CHLOM mapping preserves the lifecycle but does not require NFTs, crypto or a public chain.
+
+```text
+RIGHTS CLEARED
+    |
+    v
+DLA ACTIVE / TRANSFERABLE
+    |
+    v
+LISTING CANDIDATE
+    |
+POLICY + SELLER AUTHORITY
+    |
+    v
+LISTING ACTIVE
+    |
+BUYER QUALIFICATION
+    |
+    +---- fail ----> HOLD / DENY
+    |
+    v
+AGREEMENT + PAYMENT HOLD
+    |
+TRANSFER / ENTITLEMENT
+    |
+    v
+RELEASE / RECONCILIATION
+    |
+    v
+DAIL + REMEDY WINDOW
+```
+
+## Marketplace object model
+
+### Listing
+
+```yaml
+listing_id: stable ID
+asset_or_dla_ref: required
+seller_or_licensor_ref: stable actor/org ID
+offer_type: sale|license|lease|sublicense|transfer|other
+rights_scope_ref: exact scope
+territory: explicit
+term: explicit
+quantity_or_capacity: optional
+price_or_offer_ref: economic authority object
+eligibility_policy_ref: required
+status: draft|review|active|held|reserved|completed|expired|withdrawn|revoked
+version: string
+```
+
+### Participant qualification
+
+```yaml
+qualification_id: stable ID
+participant_ref: buyer/licensee candidate
+listing_ref: required
+credential_refs: minimum necessary
+policy_version_ref: exact
+rights_eligibility_result: PASS|HOLD|DENY
+risk_result_ref: optional
+expires_at: timestamp
+```
+
+### Transaction
+
+```yaml
+lex_transaction_id: stable ID
+listing_ref: required
+buyer_ref: required
+seller_ref: required
+agreement_ref: required
+economic_basis_ref: required
+payment_intent_ref: optional
+escrow_ref: optional
+transfer_ref: optional
+entitlement_ref: optional
+settlement_ref: optional
+state: initiated|held|authorized|executing|transferred|settling|completed|reversed|disputed
+```
+
+## Rights gate
+
+LEX cannot list more rights than the source/licensor holds.
+
+```text
+LISTED_RIGHTS <= DLA_RIGHTS <= SOURCE_RIGHTS
+```
+
+Any contradiction is `HOLD_RIGHTS_CONFLICT`.
+
+## DLA dependency
+
+A listing can reference a current Dynamic Licensing Asset or another governed rights object. Historical license NFTs map to stable asset/DLA records plus optional future token adapters.
+
+```text
+historical tokenized license
+        |
+modern mapping
+        v
+rights record + DLA + optional provider token alias
+```
+
+## Eligibility checks
+
+Before final execution, LEX should resolve:
+
+- listing current and not withdrawn/expired;
+- seller authority still valid;
+- rights scope still available;
+- DLA active and transferable/sublicensable as required;
+- buyer credentials/role/territory eligibility;
+- policy version current;
+- sanctions/risk evidence current when applicable;
+- quantity/capacity available;
+- agreement/assent valid;
+- price/economic activation valid;
+- payment state appropriate;
+- timelock/review windows satisfied.
+
+## Payment/escrow boundary
+
+Historical sources describe atomic escrow. Current providers may require saga/compensation instead.
+
+```text
+PAYMENT AUTHORIZED
+      !=
+RIGHTS TRANSFERRED
+      !=
+ENTITLEMENT ACTIVATED
+      !=
+SETTLED
+```
+
+A provider payment success cannot manufacture an entitlement if transfer/rights gates fail.
+
+## Transaction state machine
+
+```text
+DRAFT LISTING
+   |
+ REVIEW
+   |
+ ACTIVE ----withdraw/expiry----> CLOSED
+   |
+ buyer initiates
+   v
+QUALIFICATION
+   |
+ PASS
+   v
+AGREEMENT / PAYMENT HOLD
+   |
+ EXECUTE TRANSFER
+   |       \
+ success   failure
+   |         \
+   v          v
+ENTITLEMENT   COMPENSATE/HOLD
+   |
+RECONCILE
+   |
+COMPLETED
+```
+
+## Sublicensing and rental
+
+A sublicensing/rental listing must enforce parent constraints:
+
+```text
+child term <= remaining parent term
+child territory ⊆ parent territory
+child permissions ⊆ parent permissions
+child transferability <= parent transferability
+```
+
+If the parent DLA is suspended/revoked, dependent children require policy-driven reevaluation/remedy.
+
+## Listing search/indexing
+
+Search/discovery is a projection. Search results must re-read canonical listing/rights state before transaction authorization.
+
+```text
+search says ACTIVE
+     !=
+transaction-time active
+```
+
+## Disputes/remedies
+
+LEX transactions can generate disputes about:
+
+- misrepresented rights;
+- non-delivery;
+- payment failure;
+- duplicate/overlapping rights;
+- entitlement mismatch;
+- cancellation/refund;
+- provider execution conflict.
+
+Those route to case/DREP/DAP rather than allowing the marketplace to erase its own history.
+
+## Event contract
+
+```text
+ct.lex.listing.created.v1
+ct.lex.listing.reviewed.v1
+ct.lex.listing.activated.v1
+ct.lex.listing.held.v1
+ct.lex.listing.withdrawn.v1
+ct.lex.qualification.completed.v1
+ct.lex.transaction.initiated.v1
+ct.lex.transfer.authorized.v1
+ct.lex.transfer.completed.v1
+ct.lex.transaction.compensated.v1
+ct.lex.transaction.completed.v1
+ct.lex.transaction.disputed.v1
+```
+
+## Public-safe pseudocode
+
+```text
+purchase(listing, buyer):
+  latest = read_canonical_listing(listing.id)
+  require latest.active
+  require rights_current(latest)
+  qualification = evaluate_buyer(latest, buyer)
+  if qualification != PASS: return qualification
+  agreement = require_valid_assent(latest, buyer)
+  payment = hold_payment(latest, buyer)
+  transfer = attempt_rights_transfer(latest, buyer)
+  if transfer.failed:
+      compensate(payment)
+      HOLD/FAIL with evidence
+  activate_entitlement(transfer)
+  reconcile(payment, transfer)
+  append_DAIL_receipts()
+```
+
+## Failure modes
+
+- stale listing -\> HOLD/re-read;
+- seller loses authority -\> listing held/revoked;
+- DLA revoked -\> deny execution;
+- buyer qualification expires -\> re-evaluate;
+- payment succeeds, transfer fails -\> compensate;
+- transfer succeeds, provider entitlement fails -\> remedy/recovery path;
+- rights overlap discovered after completion -\> dispute/remedy, no silent deletion;
+- provider outage -\> transaction held, not automatically denied as user fault.
+
+## Threat model
+
+- fake listings;
+- chain-of-title fraud;
+- stale eligibility;
+- double sale of exclusive capacity;
+- payment replay;
+- front-running/race conditions;
+- seller/provider alias substitution;
+- unauthorized sublicensing;
+- price/split tampering;
+- privacy leakage from qualification evidence;
+- marketplace admin bypassing CHLOM authority.
+
+## Tests
+
+1. active transferable DLA \+ eligible buyer -\> PASS flow;
+2. revoked DLA -\> DENY;
+3. seller authority removed -\> HOLD/revoke listing;
+4. child rights exceed parent -\> DENY;
+5. duplicate purchase on single exclusive capacity -\> one succeeds, other holds/fails;
+6. payment success \+ transfer failure -\> compensation;
+7. expired qualification -\> re-evaluate;
+8. stale search index -\> canonical state wins;
+9. provider outage -\> hold/retry, preserve idempotency;
+10. dispute -\> linked case and immutable transaction history.
+
+## Current mapping
+
+The current LEX service should remain **rights-first and provider-neutral**. Payment processors, storefronts, NFT standards, wallets and blockchain rails are replaceable adapters. ThriveEvergreen/current economic authority governs economic activation where applicable.
+
+## Restricted companion
+
+May contain private listing terms, counterparties, negotiated economics, provider IDs, fraud thresholds, hidden moderation/risk signals, unpublished assets and security test cases.
+
+## Invariants
+
+```text
+listing != rights
+payment != entitlement
+provider transfer != institutional rights truth
+search index != canonical state
+buyer identity != buyer eligibility automatically
+sublicense cannot exceed parent rights
+historical NFT architecture != current token deployment
+```
+
+## Status
+
+`historical_preserved + reconstructed_source_grounded`; modern mapping is planned/gated LEX service architecture, not evidence of a live decentralized marketplace.
