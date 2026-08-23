@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "agent_id": "ct.agent.archive-reverse-verifier",
   "canonical_name": "Archive Reverse & Decryption Verification Agent",
   "suite_id": "ct.skill-suite.archive-custody.v1",
@@ -12,37 +12,95 @@
     "allowed_principal_classes": ["founder", "explicitly_founder_granted_agent"],
     "fresh_check_each_call": true,
     "service_role_execution_only": true,
-    "self_authorization": false
+    "self_authorization": false,
+    "founder_root_bypass_for_agent": false
   },
-  "capabilities": ["locate_archive_member", "verify_ciphertext_sha256", "decrypt_single_bounded_chunk_in_memory", "verify_plaintext_sha256", "extract_authorized_algorithm_projection", "compare_canonical_contract_digest", "append_restricted_receipt", "append_DAIL_event"],
-  "prohibited": ["bulk_decrypt", "secret_body_export", "credential_export", "plaintext_persistence", "self_approve", "vote", "D3_action", "provider_write", "money_movement", "rights_grant", "auto_schedule"],
+  "capabilities": [
+    "locate_archive_member",
+    "verify_ciphertext_sha256",
+    "decrypt_single_bounded_chunk_in_memory",
+    "verify_plaintext_sha256",
+    "extract_authorized_algorithm_projection",
+    "compare_canonical_contract_digest",
+    "multi_key_decrypt_verify",
+    "founder_keyring_use",
+    "append_restricted_receipt",
+    "append_DAIL_event"
+  ],
+  "prohibited": [
+    "bulk_decrypt",
+    "secret_body_export",
+    "credential_export",
+    "key_material_export",
+    "founder_root_bypass",
+    "plaintext_persistence",
+    "self_approve",
+    "vote",
+    "D3_action",
+    "provider_write",
+    "money_movement",
+    "rights_grant",
+    "auto_schedule"
+  ],
+  "founder_crypto_hierarchy": {
+    "keyring_id": "ct.crypto.keyring.founder.v1",
+    "founder_root_key_id": "ct.key.founder.master-recovery.v1",
+    "unlock_key_ids": [
+      "ct.key.decrypt.k01.v1",
+      "ct.key.decrypt.k02.v1",
+      "ct.key.decrypt.k03.v1",
+      "ct.key.decrypt.k04.v1",
+      "ct.key.decrypt.k05.v1",
+      "ct.key.decrypt.k06.v1",
+      "ct.key.decrypt.k07.v1",
+      "ct.key.decrypt.k08.v1",
+      "ct.key.decrypt.k09.v1",
+      "ct.key.decrypt.k10.v1"
+    ],
+    "max_required_keys": 5,
+    "raw_key_export": false,
+    "provider_credentials_in_scope": false
+  },
+  "sensitivity_profiles": {
+    "S1": [1],
+    "S2": [2, 3],
+    "S3": [4, 5, 6],
+    "S4": [7, 8, 9, 10],
+    "S5": [1, 3, 5, 7, 9]
+  },
   "custody": {
-    "key_source": "existing_archive_key_alias_via_Supabase_Vault",
-    "key_material_copied": false,
+    "key_source": "Supabase_Vault_plus_Founder_root_ciphertext_escrow",
+    "key_material_copied_to_source_control": false,
     "plaintext_persisted": false,
     "receipt_table": "chlom_runtime.archive_reverse_receipts",
+    "founder_crypto_receipt_table": "chlom_runtime.founder_crypto_decryption_receipts_v1",
     "authorization_table": "chlom_runtime.archive_reverse_authorizations",
+    "key_ring_table": "chlom_runtime.founder_crypto_key_ring_v1",
+    "key_escrow_table": "chlom_runtime.founder_crypto_key_escrow_v1",
     "drive_custody_required": true,
     "supabase_storage_required": true,
     "source_packet_custody": "HOLD_PENDING_CANONICAL_MERGE_AND_CUSTODY_PROJECTION"
   },
   "runtime": {
     "authorized_entrypoint": "chlom_runtime.archive_reverse_verify_algorithm_v1",
-    "internal_decryptor": "chlom_runtime.decrypt_archive_payload_internal_v1",
+    "founder_root_archive_entrypoint": "chlom_runtime.founder_crypto_reverse_verify_algorithm_v1",
+    "multi_key_decrypt_entrypoint": "chlom_runtime.founder_crypto_decrypt_envelope_v1",
+    "multi_key_encrypt_entrypoint": "chlom_runtime.founder_crypto_encrypt_envelope_v1",
     "anon_execute": false,
     "authenticated_execute": false,
-    "secret_body_return": false
+    "secret_body_return_default": false,
+    "raw_key_material_return": false
   },
-  "test_evidence": {
-    "archive_run_id": "b8d9959f-7c91-4a9e-8da0-bb069953fa1b",
-    "algorithm_id": "ct.alg.factory.g43.rewards_loyalty.causal_forecaster.risk.v1",
-    "chunk_no": 38,
-    "ordinal": 37341,
-    "receipt_id": "ae1bfb5f-4a38-4e07-99b7-a2b449c6aa7e",
-    "ciphertext_hash_verified": true,
-    "plaintext_hash_verified": true,
-    "member_found": true,
-    "contract_digest_match": true,
-    "secret_body_returned": false
+  "verification": {
+    "five_key_agent_receipt": "c5cfd508-dfd0-4cbd-91ea-3751b47f712a",
+    "five_key_founder_root_receipt": "50495bdd-9921-4dea-b027-f5ca9355c5f7",
+    "legacy_archive_founder_root_receipt": "721b912b-f3a2-4a8a-b84a-f4959aef26ea",
+    "original_reverse_agent_regression_receipt": "0bbc21da-8e57-4c5e-b2bf-53cc4c49cbb7",
+    "unauthorized_negative_control": "PASS_DENIED",
+    "escrow_wrapped_total": 62,
+    "unlock_ring_wrapped": 10,
+    "legacy_crypto_keys_wrapped": 52,
+    "DAIL_event_id": "88851375-8c2e-4a3d-bfad-1478c42d3fa6",
+    "DAIL_failure_count": 0
   }
 }
