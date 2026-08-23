@@ -12,14 +12,31 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: chlom-wallet-continuity-factory-v1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   continuity-contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify runtime
+        run: node --version
+      - name: Syntax check
+        run: |
+          node --check developers/reference/chlom-wallet/continuity/continuity-core-v1.mjs
+          node --check developers/reference/chlom-wallet/continuity/test-continuity-suite-v1.mjs
+          node --check developers/reference/chlom-wallet/continuity/continuity-chaos-v1.mjs
+      - name: Validate JSON contracts
+        run: |
+          python -m json.tool developers/reference/chlom-wallet/continuity/continuity-factory-asset-catalog.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/continuity/continuity-agent-prompt-suite.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/continuity/continuity-interface-pack.v1.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/continuity/continuity-metaprotocol-ip.v1.json >/dev/null
+          python -m json.tool developers/manifests/chlom-wallet-continuity-factory-v1.json >/dev/null
       - name: Deterministic continuity suite
         run: node developers/reference/chlom-wallet/continuity/test-continuity-suite-v1.mjs
       - name: Continuity chaos suite
@@ -53,3 +70,28 @@ jobs:
           if (j.mcp_tools.length !== 8 || j.modules.length !== 6 || j.plugins.length !== 4 || j.pallets.length !== 4) throw new Error('interface_count_drift');
           console.log('PASS_CHLOM_WALLET_CONTINUITY_INTERFACE_BOUNDARY_V1');
           NODE
+      - name: Enforce deterministic no-network boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(developers/reference/chlom-wallet/continuity/*.mjs)
+          if grep -nE 'https?://|wss?://|fetch\(|WebSocket\(' "${files[@]}"; then
+            echo "Continuity reference algorithms must remain deterministic and network-free."
+            exit 1
+          fi
+      - name: Enforce secret boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sb_secret_[A-Za-z0-9._-]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' \
+            developers/reference/chlom-wallet/continuity \
+            developers/manifests/chlom-wallet-continuity-factory-v1.json \
+            developers/chlom-wallet-continuity-factory-v1.mdx \
+            security/chlom-wallet-continuity-factory-threat-model.mdx; then
+            echo "Potential secret-shaped material detected in continuity projection."
+            exit 1
+          fi
+      - name: Record controlled-test boundary
+        run: |
+          echo "Continuity can preserve and downgrade state; it cannot manufacture authority or evidence."
+          echo "No provider write, custody, token issuance, money movement, Rights grant, chain broadcast, effective pricing, checkout, destructive recovery, merge, or phase advancement is authorized."
