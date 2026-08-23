@@ -1,0 +1,77 @@
+---
+title: "FORM-023 — DAIL Append-Only Correction Relation"
+sidebarTitle: "FORM-023 DAIL Correction Chain"
+description: "Standalone CHLOM event-reduction model for original events, corrections and supersessions in the Decentralized Autonomous Information Ledger."
+icon: "timeline"
+keywords: ["CHLOM FORM-023", "DAIL correction", "event sourcing", "supersession", "reducer"]
+---
+
+# FORM-023 — DAIL Append-Only Correction Relation
+
+## Formula identity
+
+```yaml
+formula_id: FORM-023
+classification: derived_state_model
+origin: DAIL append-only correction requirements
+adopted_as_reconstruction_contract: yes
+related_algorithm: ALG-015
+```
+
+## Event chain
+
+A canonical correction sequence can be represented as:
+
+```text
+E0 = original event
+E1 = correction referencing E0
+E2 = supersession referencing E1
+...
+```
+
+The effective state at position `n` is derived by an event reducer:
+
+```text
+state_n = reduce(valid_events[0..n])
+```
+
+## Core rule
+
+The reducer determines current interpretation; it does **not** delete or rewrite `E0`.
+
+```text
+historical event bytes remain
+current effective state is derived
+```
+
+## Valid-event predicate
+
+Only schema-valid, scope-valid and appropriately authorized events participate in the effective-state reduction. A later unauthorized event cannot win merely by being last in time.
+
+## Supersession semantics
+
+Each correction/supersession should identify its predecessor and correction class. A chain can represent factual correction, interpretation update, revocation, reversal, founder adjudication or another typed change.
+
+## Branching conflicts
+
+If two valid-looking corrections branch from the same predecessor and precedence is unresolved, the reducer should represent conflict/HOLD rather than choose one arbitrarily.
+
+## Time dimensions
+
+Record event time, observed time and effective time separately where they differ. A correction entered today can state that a fact became effective earlier without pretending the original event was never recorded.
+
+## Rebuildability
+
+Current projections should be reconstructible from the immutable event chain and reducer version. Search indexes and dashboards are materialized views only.
+
+## Tests
+
+Test no correction, one correction, multi-step supersession, unauthorized correction ignored/held, conflicting branches, backdated effective time, revocation followed by reinstatement and reducer version migration.
+
+## DAIL evidence
+
+FORM-023 is itself the conceptual model underlying DAIL correction lineage. Every projection should retain a reference to the canonical event chain and reducer version.
+
+## Versioning
+
+Reducer semantics are versioned. Recomputing a projection under a newer reducer does not alter historical DAIL events.
