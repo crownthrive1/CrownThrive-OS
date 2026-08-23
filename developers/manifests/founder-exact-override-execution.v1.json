@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0.0",
+  "control_id": "ct.control.founder-exact-override-execution.v1",
+  "policy_id": "ct.policy.founder-continuity.v1",
+  "purpose": "Permit explicit human Founder approval to execute only against the exact approved snapshot without reusing surrogate-attestation semantics.",
+  "authority": {
+    "human_founder_only": true,
+    "surrogate_used": false,
+    "silence_is_authority": false,
+    "underlying_operation_requires_separate_authority": true,
+    "D3_auto": false
+  },
+  "runtime": {
+    "verify": "chlom_runtime.founder_continuity_verify_human_override_v1",
+    "record_execution": "chlom_runtime.founder_continuity_record_founder_execution_v1",
+    "receipt_table": "chlom_runtime.founder_override_execution_receipts_v1",
+    "legacy_surrogate_recorder": "chlom_runtime.founder_continuity_record_execution"
+  },
+  "required_checks": [
+    "human_signal_state == approved",
+    "human_authority_evidence_ref present",
+    "exact_version_ref matches request",
+    "content_sha256 matches request",
+    "policy remains active"
+  ],
+  "fail_closed": [
+    "stale exact version",
+    "stale content SHA-256",
+    "missing Founder authority evidence",
+    "legacy surrogate recorder used for direct Founder approval"
+  ],
+  "canary": {
+    "request_id": "fd3f74b8-72fa-4f0a-96b8-c507058ba8e4",
+    "pre_patch_failure": "active_attestation_required",
+    "post_patch_started_receipt": "e422d514-345a-435e-84a9-e8d02b223b10",
+    "post_patch_success_receipt": "4d18fbca-ac23-4494-8be9-af5d15e3c70d",
+    "success_receipt_sha256": "1b70a111071534b1223686626303e839025aec30f2589d49084cb9b84565f6df",
+    "stale_snapshot_valid": false,
+    "legacy_route_error": "human_founder_override_requires_exact_execution_v1"
+  },
+  "raw_secret_material_in_source": false
+}

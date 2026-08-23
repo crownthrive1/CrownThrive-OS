@@ -1,0 +1,52 @@
+{
+  "framework_id": "ct.framework.documentation-reconciliation-continuity",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "scan_stale_state",
+      "risk_class": "D0",
+      "mode": "read_only",
+      "inputs": ["page_paths", "canonical_rules", "source_refs"],
+      "outputs": ["stale_findings", "docs_no_change"]
+    },
+    {
+      "name": "apply_documentation_correction",
+      "risk_class": "D1",
+      "mode": "bounded_write",
+      "requires": ["evidence_ref", "rollback_ref", "post_write_readback"],
+      "forbidden": ["secret_publication", "history_erasure", "authority_expansion"]
+    },
+    {
+      "name": "scan_documentation_gaps",
+      "risk_class": "D0",
+      "mode": "read_only",
+      "inputs": ["page_paths", "article_seed", "phase_gate_contracts", "internal_link_graph"],
+      "outputs": ["gap_findings", "link_recommendations", "article_rebuild_deltas", "phase_impact_vector"]
+    },
+    {
+      "name": "apply_continuity_links",
+      "risk_class": "D0",
+      "mode": "bounded_write",
+      "requires": ["target_exists", "semantic_relevance", "post_write_link_validation"]
+    },
+    {
+      "name": "open_docs_delta",
+      "risk_class": "D0",
+      "mode": "append_only",
+      "inputs": ["unresolved_fact", "required_authority_or_source", "affected_pages", "phase_impacts"]
+    },
+    {
+      "name": "emit_sprint_receipt",
+      "risk_class": "D0",
+      "mode": "append_only",
+      "requires": ["baseline_commit", "page_outcomes", "validation_results", "next_state_handoff"]
+    }
+  ],
+  "authority": {
+    "d0_autonomous": true,
+    "d1_autonomous_when_evidence_bound": true,
+    "d2_requires_independent_review": true,
+    "d3_human_reserved": true,
+    "self_certification": false
+  }
+}

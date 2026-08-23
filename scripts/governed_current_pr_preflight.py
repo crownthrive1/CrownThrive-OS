@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 from typing import Any
 
 from governed_merge_decision import (
@@ -103,6 +102,23 @@ def classifications_for(
             }
         )
     return classifications, domains
+
+
+def neutral_domains_for(policy: dict[str, Any]) -> set[str]:
+    """Return only manifest-declared neutral domains.
+
+    Neutrality is policy-owned, not inferred by the preflight. An empty
+    specialist set is valid only when every derived changed domain is explicitly
+    present in this governed neutral-domain registry.
+    """
+    contract = policy.get("changed_domain_contract", {})
+    if not isinstance(contract, dict):
+        return set()
+    return {
+        normalize_domain(value)
+        for value in contract.get("neutral_domains", [])
+        if normalize_domain(value)
+    }
 
 
 def fixture_scores() -> dict[str, int]:
@@ -255,8 +271,18 @@ def main() -> int:
     trusted_files = trusted_changed_files_from_git(args.git_base, args.git_head)
     classifications, domains = classifications_for(trusted_files, policy)
     required_specialists = required_specialists_for(domains, policy)
-    if not required_specialists:
-        raise SystemExit("ERROR: D2 current-PR preflight resolved no specialist requirements")
+    neutral_domains = neutral_domains_for(policy)
+    neutral_only = bool(domains) and domains.issubset(neutral_domains)
+
+    # A D2 packet must resolve specialist coverage unless its entire derived
+    # domain set is explicitly neutral in the governed manifest. This preserves
+    # fail-closed behavior for any unknown/non-neutral domain while allowing
+    # documentation-only changes to remain genuinely neutral.
+    if not required_specialists and not neutral_only:
+        raise SystemExit(
+            "ERROR: D2 current-PR preflight resolved no specialist requirements "
+            "for non-neutral domains"
+        )
 
     packet = build_packet(trusted_files, classifications, domains, required_specialists)
     result = decide(packet, policy, trusted_files)
@@ -276,6 +302,7 @@ def main() -> int:
                 "trusted_changed_files_digest": changed_file_digest(trusted_files),
                 "trusted_changed_files_redacted": True,
                 "derived_changed_domains": sorted(domains),
+                "neutral_only": neutral_only,
                 "required_specialists": sorted(required_specialists),
                 "decision_engine_executed": True,
                 "positive_preflight_classification_clean": True,

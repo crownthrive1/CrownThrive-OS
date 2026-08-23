@@ -31,6 +31,7 @@ jobs:
           # locally available without granting network/API authority to the
           # decision engine itself.
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -58,6 +59,17 @@ jobs:
 
       - name: Validate GitHub Actions runtime and supply-chain policy
         run: python scripts/validate_github_actions_runtime_policy.py
+
+      - name: Hydrate exact immutable PR commits
+        if: github.event_name == 'pull_request'
+        env:
+          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_BASE_SHA}"
+          git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_HEAD_SHA}"
+          git cat-file -e "${CT_GIT_BASE_SHA}^{commit}"
+          git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}"
 
       - name: Bind governed changed files to trusted Git diff
         if: github.event_name == 'pull_request'

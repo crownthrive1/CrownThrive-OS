@@ -1,0 +1,148 @@
+{
+  "document_type": "release_contract",
+  "contract_id": "ct.contract.kjv-commerce-source-switch.v1",
+  "contract_version": "1.0.0",
+  "reconciled_at": "2026-08-22T22:45:00Z",
+  "owner": "CrownThrive, LLC",
+  "property": "KJV Visualized / The Sermon Toolkit",
+  "canonical_origin": "https://kjvsermontoolkit.crownthrive.com",
+  "source_state": "provider_write_required",
+  "current_defect": {
+    "surface": "authenticated Sanctuary plan selection",
+    "symptom": "direct membership path performs an unnecessary Stripe Account/KYC read before Checkout and can surface a restricted-key permission failure",
+    "root_cause_class": "stale_native_site_handler",
+    "must_remove": [
+      "Stripe Account/KYC preflight from direct membership Checkout",
+      "raw Stripe provider diagnostics from all customer-facing responses",
+      "restricted-key prefixes from client-visible errors",
+      "Stripe account identifiers from client-visible errors",
+      "permission names and Stripe Dashboard remediation URLs from client-visible errors"
+    ]
+  },
+  "target_controller": {
+    "provider": "Supabase Edge Functions",
+    "project_ref": "tzajnzshmtzjenqulehq",
+    "function_slug": "kjv-commerce-control",
+    "certified_function_version": 5,
+    "service_version": "ct.kjv-commerce-control.v3",
+    "method": "POST",
+    "action": "membership_checkout",
+    "authorization_modes": [
+      "Supabase authenticated bearer identity",
+      "governed Sites gateway identity"
+    ],
+    "required_request_fields": [
+      "plan_code_or_site_plan_code",
+      "interval",
+      "accepted_terms=true",
+      "terms_version"
+    ],
+    "optional_request_fields": [
+      "request_key"
+    ],
+    "success_contract": {
+      "state": "checkout_ready",
+      "returns": [
+        "checkout_url",
+        "intent_id",
+        "plan_code",
+        "site_plan_code"
+      ]
+    },
+    "public_failure_contract": {
+      "provider_failures": "commerce_temporarily_unavailable",
+      "raw_provider_error_allowed": false
+    },
+    "direct_checkout_uses_account_kyc_read": false
+  },
+  "stripe_architecture": {
+    "first_party_membership_rail": "Stripe Billing + hosted Checkout",
+    "first_party_credit_rail": "closed-loop Crown/Sanctuary Credits after separate activation gates",
+    "partner_circle_rail": "cash-only Stripe Connect destination charges",
+    "direct_and_connect_credentials_must_be_separate": true,
+    "credits_may_fund_connected_sellers": false,
+    "partner_circle_platform_fee_bps": 3000,
+    "partner_circle_seller_net_bps": 7000
+  },
+  "current_provider_evidence": {
+    "sanctuary_catalog": "PASS",
+    "hosted_recurring_checkout_construction": "PASS",
+    "stripe_tax": "ACTIVE",
+    "direct_webhook_event_coverage": "PASS",
+    "connect_webhook_event_coverage": "PASS",
+    "native_sites_membership_action": "HOLD_SOURCE_SWITCH",
+    "live_kjv_subscription_settlement": "HOLD_NO_SUBSCRIPTION_OBSERVED",
+    "partner_circle_destination_charge": "HOLD_NO_GOVERNED_TRANSACTION_OBSERVED",
+    "credit_topup_activation": "HOLD_LEGAL_TAX_AND_SETTLEMENT_GATES"
+  },
+  "deployment_sequence": [
+    "retrieve authoritative current Sites source/version",
+    "snapshot and hash exact pre-change source",
+    "replace direct membership handler with governed controller invocation",
+    "preserve reader, protected assets, existing routes, legacy rights, and terms display",
+    "verify no Account/KYC preflight is called for direct memberships",
+    "verify raw Stripe errors cannot render client-side",
+    "build and run route/unit/integration tests",
+    "publish exact version",
+    "public and authenticated readback",
+    "run lowest-risk membership Checkout creation canary without completing payment",
+    "verify Stripe Checkout Session metadata and exact Price binding",
+    "rollback to exact pre-change version",
+    "read back rollback",
+    "reapply approved version",
+    "read back second deployment",
+    "arm membership checkout only after evidence matches"
+  ],
+  "mandatory_post_deploy_tests": [
+    {
+      "id": "KJV-COM-001",
+      "assertion": "Choose Plan produces Stripe-hosted subscription Checkout for the exact selected Price"
+    },
+    {
+      "id": "KJV-COM-002",
+      "assertion": "No Stripe Account/KYC read occurs in direct membership Checkout"
+    },
+    {
+      "id": "KJV-COM-003",
+      "assertion": "Public error body contains no rk_live_, accounts_kyc_basic_read, provider account identifier, Permission denied, or Stripe Dashboard remediation URL"
+    },
+    {
+      "id": "KJV-COM-004",
+      "assertion": "Terms version and accepted_terms are required and preserved in Checkout metadata"
+    },
+    {
+      "id": "KJV-COM-005",
+      "assertion": "Checkout success redirect alone grants no membership benefit; signed webhook remains authoritative"
+    },
+    {
+      "id": "KJV-COM-006",
+      "assertion": "Customer Portal returns to the KJV account plans surface"
+    },
+    {
+      "id": "KJV-COM-007",
+      "assertion": "Partner Circle remains cash-only and credits_allowed=false"
+    },
+    {
+      "id": "KJV-COM-008",
+      "assertion": "Credit top-up remains unavailable until separate legal/tax, signed-settlement, replay, refund, and dispute gates pass"
+    }
+  ],
+  "rollback": {
+    "required": true,
+    "restore_target": "exact hashed pre-change Sites version",
+    "automatic_on": [
+      "Checkout Price mismatch",
+      "authentication bypass",
+      "provider diagnostic leakage",
+      "reader or protected-asset regression",
+      "webhook/entitlement regression",
+      "unexpected Partner Circle or credit-rail activation"
+    ]
+  },
+  "secrets_policy": {
+    "secrets_in_contract": false,
+    "client_secret_exposure_allowed": false,
+    "restricted_key_material_must_remain_runtime_only": true,
+    "webhook_signing_secrets_must_remain_runtime_only": true
+  }
+}
