@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.crownthrive.com/chlom/wallet-license-candidate.v1.schema.json",
+  "title": "CHLOM Wallet License Package Candidate v1",
+  "description": "Controlled-test capability and local-limit candidate. It is not an effective offer, price, Stripe object, checkout, entitlement, or production license.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "license_id",
+    "semantic_version",
+    "state",
+    "pallets",
+    "limits",
+    "support_class",
+    "effective_offer",
+    "public_price_authorized",
+    "stripe_objects_created",
+    "checkout_enabled",
+    "money_movement",
+    "rights_grant",
+    "chain_broadcast"
+  ],
+  "properties": {
+    "license_id": {
+      "type": "string",
+      "pattern": "^ct[.]license-candidate[.][a-z0-9._-]{3,180}$"
+    },
+    "semantic_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "state": {
+      "const": "CONTROLLED_TEST"
+    },
+    "pallets": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^ct[.]pallet[.]"
+      }
+    },
+    "limits": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^ct[.]meter[.][a-z0-9._-]{3,180}$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          { "const": -1 },
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          { "type": "null" }
+        ]
+      }
+    },
+    "support_class": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "effective_offer": { "const": false },
+    "public_price_authorized": { "const": false },
+    "stripe_objects_created": { "const": false },
+    "checkout_enabled": { "const": false },
+    "money_movement": { "const": false },
+    "rights_grant": { "const": false },
+    "chain_broadcast": { "const": false }
+  },
+  "not": {
+    "anyOf": [
+      { "required": ["price"] },
+      { "required": ["currency"] },
+      { "required": ["stripe_product_id"] },
+      { "required": ["stripe_price_id"] },
+      { "required": ["checkout_url"] },
+      { "required": ["private_key"] },
+      { "required": ["credential_value"] }
+    ]
+  }
+}
