@@ -14,10 +14,29 @@ import re
 from pathlib import Path
 
 POLICY_MARKER = re.compile(r"CT_POLICY_DISPOSITION\s*[:=]\s*(ECAC|ALLOW|HOLD|DENY)\b", re.I)
+STEP_ENV_KEYS = (
+    "CT_STEP_HYDRATE",
+    "CT_STEP_TRUSTED_DIFF",
+    "CT_STEP_DOCS",
+    "CT_STEP_SECURITY",
+    "CT_STEP_DEPENDENCY",
+)
+STEP_OUTCOMES = {"success", "failure", "cancelled", "skipped", "unknown"}
+SAFE_DISPLAY = {
+    "PASS": ("PASS", "NONE", "all_observed_governance_steps_passed_or_not_applicable"),
+    "POLICY_DENY": ("POLICY_DENY", "POLICY", "authoritative_validator_emitted_deny"),
+    "POLICY_HOLD": ("POLICY_HOLD", "POLICY", "authoritative_validator_emitted_hold"),
+    "CI_EVIDENCE_HYDRATION_FAILURE": ("CI_EVIDENCE_HYDRATION_FAILURE", "CI_EVIDENCE", "exact_or_trusted_git_evidence_unavailable"),
+    "STALE_EXACT_HEAD": ("STALE_EXACT_HEAD", "SOURCE_IDENTITY", "trusted_diff_exact_head_mismatch"),
+    "CONTRACT_ASSERTION_FAILURE": ("CONTRACT_ASSERTION_FAILURE", "GOVERNANCE_CONTRACT", "deterministic_contract_rejected"),
+    "SUPPLY_CHAIN_DENY": ("SUPPLY_CHAIN_DENY", "SUPPLY_CHAIN", "dependency_review_rejected_change"),
+    "RUNTIME_UNAVAILABLE": ("RUNTIME_UNAVAILABLE", "CI_RUNTIME", "required_ci_runtime_step_failed"),
+}
 
 
 def norm(value: str | None) -> str:
-    return (value or "unknown").strip().lower()
+    candidate = (value or "unknown").strip().lower()
+    return candidate if candidate in STEP_OUTCOMES else "unknown"
 
 
 def read_log(path: str | None) -> str:
@@ -26,6 +45,8 @@ def read_log(path: str | None) -> str:
     p = Path(path)
     if not p.is_file():
         return ""
+    # The log is used only as an input to deterministic predicates below. Its
+    # contents are never returned, persisted in the classification record, or logged.
     return p.read_text(encoding="utf-8", errors="replace")[-20000:]
 
 
@@ -96,11 +117,17 @@ def self_test() -> None:
         ({"CT_STEP_DEPENDENCY": "failure"}, "", "SUPPLY_CHAIN_DENY"),
         ({"CT_STEP_SECURITY": "failure"}, "CT_POLICY_DISPOSITION=DENY", "POLICY_DENY"),
         ({"CT_STEP_DOCS": "success", "CT_STEP_SECURITY": "success"}, "", "PASS"),
+        ({"CT_STEP_DOCS": "${{ secrets.NOT_A_REAL_SECRET }}"}, "", "PASS"),
     ]
     for env, logs, expected in cases:
         actual = classify(env, logs)["classification"]
         assert actual == expected, (env, expected, actual)
     print("Governance run classifier self-test: PASS")
+
+
+def safe_display(result: dict[str, object]) -> tuple[str, str, str]:
+    key = str(result.get("classification", "RUNTIME_UNAVAILABLE"))
+    return SAFE_DISPLAY.get(key, SAFE_DISPLAY["RUNTIME_UNAVAILABLE"])
 
 
 def main() -> int:
@@ -113,20 +140,24 @@ def main() -> int:
         self_test()
         return 0
 
-    result = classify(dict(os.environ), read_log(args.log))
+    step_env = {key: os.environ.get(key, "unknown") for key in STEP_ENV_KEYS}
+    result = classify(step_env, read_log(args.log))
     payload = json.dumps(result, sort_keys=True)
-    print(payload)
     if args.output:
         Path(args.output).write_text(payload + "\n", encoding="utf-8")
+
+    classification, domain, reason = safe_display(result)
+    print("Governance run classification completed; raw workflow logs were not emitted.")
 
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with Path(summary).open("a", encoding="utf-8") as handle:
             handle.write("\n## Governance classification\n\n")
-            handle.write(f"- Classification: `{result['classification']}`\n")
-            handle.write(f"- Domain: `{result['domain']}`\n")
-            handle.write(f"- Reason: `{result['reason']}`\n")
+            handle.write(f"- Classification: `{classification}`\n")
+            handle.write(f"- Domain: `{domain}`\n")
+            handle.write(f"- Reason: `{reason}`\n")
             handle.write("- CI failure is not automatically an institutional HOLD or DENY.\n")
+            handle.write("- Raw trusted-diff logs are not copied into the classification summary.\n")
     return 0
 
 
