@@ -1,0 +1,30 @@
+---
+title: "Agent A execution bridge v2 emergency patch"
+description: "Public-safe checkpoint for the WIP=4 execution bridge, stale actuator, L–P telemetry, packet-only metrics, and bounded force test."
+---
+
+# Agent A execution bridge v2
+
+A live audit found that the Gen-6/7 portfolio contract already modeled WIP=4, but the active stale-packet path was observation-only and Agent A's external prompt had drifted toward factory work without explicitly invoking the portfolio execution bridge.
+
+## Patched
+
+- coupled stale-packet detection to a bounded actuator;
+- kept continuation and verification ahead of new dispatch;
+- retained WIP target 4 and hard maximum 6;
+- added append-only stale action receipts;
+- added current L–P internal control-plane telemetry every Agent A cycle;
+- updated Agent A's external scheduler prompt to invoke the execution bridge before unrelated factory/routine work;
+- changed cycle throughput to packet-scoped measurement so Agent A/L–P control runs do not count as packet closures.
+
+## Force test
+
+The test ran with four active packets, so no fifth packet was dispatched. The actuator re-armed #209, #169, and #216 to their already-governed owners/verifiers, re-armed Agent S on verifying #220, and preserved every packet's progress and blocker set. Once retry count reached two, the three still-stale running packets entered bounded replan-escalation handling instead of receiving endless sensor-only `continue_due` observations.
+
+The first force-test metric pass exposed a telemetry defect: completed Agent A/L–P control runs were being counted as closed packets. That result was rejected. The packet-scoped metric function now excludes control-plane runs and reports zero closed packets for the force test. The historical bad receipt remains preserved rather than being deleted.
+
+The original five currently retain cumulative blocker burn-down of two from the earlier #220 movement. No new blocker reduction was fabricated by the emergency patch.
+
+## Boundaries
+
+No provider write, money movement, rights grant, D3 automation, sovereign vote, self-certification, direct-main merge, force push, credential exposure, protected algorithm disclosure, or silent deletion was authorized.
