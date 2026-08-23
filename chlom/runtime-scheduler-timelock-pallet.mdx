@@ -1,0 +1,258 @@
+---
+title: "Scheduler / Timelock Pallet — Historical Runtime Record"
+sidebarTitle: "Scheduler / Timelock Pallet"
+description: "Individual reconstruction of CHLOM's historical Scheduler/Timelock Pallet for delayed execution, recurring actions, review windows, cancellation and revalidation, mapped to current temporal-control services."
+icon: "clock"
+keywords: ["CHLOM Scheduler Pallet", "Timelock Pallet", "STSP", "delayed execution", "revalidation", "governance"]
+---
+
+# Scheduler / Timelock Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.scheduler-timelock
+namespace: historical_runtime_pallet
+recovered_titles:
+  - Scheduler/Timelock Pallet
+  - SLA & Timelock Scheduler Pallet (STSP) Whitepaper
+source_recovery: title_plus_related_temporal_architecture
+current_mapping:
+  - SLA & Timelock Scheduler service
+  - P-02 Governance & Compliance
+  - temporal controls
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Scheduler/Timelock Pallet provided protocol-native delayed and scheduled execution for actions that should not happen immediately after approval. Typical CHLOM use cases include governance enactment, license transitions, SLA deadlines, staged treasury activity and emergency review windows.
+
+```text
+ACTION APPROVED
+      |
+      v
+SCHEDULE / TIMELOCK
+      |
+      +--> cancel / supersede if authorized
+      |
+      v
+EXECUTION TIME REACHED
+      |
+      v
+REVALIDATE AUTHORITY + POLICY + STATE
+      |
+ PASS | HOLD | DENY
+      |
+      v
+EXECUTE + EVIDENCE
+```
+
+## Scheduled does not mean still authorized
+
+A central current invariant is:
+
+```text
+scheduled != eligible at execution time
+```
+
+Conditions can change between scheduling and execution. Current CHLOM therefore revalidates material actions before execution.
+
+## Reconstructed schedule object
+
+```yaml
+schedule_id: stable ID
+action_ref: command/proposal/obligation/license action
+scheduled_for: timestamp
+created_by_ref: actor
+authority_ref: required
+policy_refs: []
+preconditions_ref: required
+status: pending|ready|held|executed|cancelled|expired|superseded
+created_at: timestamp
+executed_at: nullable
+```
+
+## Timelock use cases
+
+Historical/current architectural uses include:
+
+- governance proposal enactment;
+- high-risk configuration change delay;
+- treasury/payment release delay;
+- DLA/license activation or expiry;
+- dispute/appeal windows;
+- revocation effective dates;
+- scheduled policy transition;
+- SLA/grace-period deadlines;
+- provider maintenance/cutover;
+- recurring audit/review tasks.
+
+## Timelock versus scheduler
+
+```text
+SCHEDULER
+executes at/after a defined time or recurrence
+
+TIMELOCK
+enforces a minimum delay before execution can occur
+```
+
+One system can implement both semantics.
+
+## Revalidation gate
+
+At execution time, verify:
+
+- action still pending/current;
+- actor/delegation still valid;
+- policy version/effective conditions;
+- target object state;
+- rights/eligibility;
+- evidence freshness;
+- budget/economic authority if relevant;
+- no emergency hold/revocation;
+- idempotency/not already executed.
+
+## Historical runtime operations
+
+Source-supported capability intentions:
+
+- schedule action;
+- cancel scheduled action;
+- execute due action;
+- apply timelock delay;
+- query pending actions.
+
+Exact historical extrinsic names are not recovered.
+
+## Recurrence
+
+Current mapping can support recurrence with explicit schedule version and stop conditions.
+
+```yaml
+recurrence:
+  rule: versioned schedule
+  start_at: timestamp
+  end_at: nullable
+  max_occurrences: nullable
+  timezone_or_clock_basis: explicit
+```
+
+## Time source
+
+Historical chain execution uses block/time assumptions. Current cloud scheduling must use explicit clocks/timezones and tolerate provider delays without misrepresenting exact execution time.
+
+## Idempotency
+
+```text
+due action already executed?
+   yes -> no second side effect
+   no  -> proceed after revalidation
+```
+
+## Current event mapping
+
+```text
+ct.schedule.created.v1
+ct.schedule.ready.v1
+ct.schedule.held.v1
+ct.schedule.executed.v1
+ct.schedule.cancelled.v1
+ct.timelock.started.v1
+ct.timelock.expired.v1
+```
+
+## Cancellation
+
+Cancellation requires authority and preserves the scheduled-action record.
+
+```text
+PENDING
+  |
+CANCEL AUTHORIZED
+  |
+CANCELLED
+```
+
+Cancellation is not deletion.
+
+## Failure modes
+
+### Policy changed during delay
+
+Revalidate current/effective policy; HOLD/DENY rather than executing stale authorization if the action is no longer permitted.
+
+### Worker outage delays execution
+
+Record actual execution time and missed/delayed state; do not falsify on-time execution.
+
+### Duplicate worker claims same action
+
+Use atomic/idempotent claim; only one material execution succeeds.
+
+### Clock/timezone ambiguity
+
+HOLD sensitive execution until the intended clock basis is resolved.
+
+### Scheduled treasury action after budget revoked
+
+DENY/HOLD under current economic authority even if original schedule was valid.
+
+## Current service mapping
+
+```text
+Historical Scheduler Pallet
+        |
+        v
+Temporal Control Service
+        |
+        +--> queue / scheduler
+        +--> policy/authority revalidation
+        +--> DAIL evidence
+        +--> provider adapters
+```
+
+## Security concerns
+
+- scheduler privilege escalation;
+- unauthorized cancellation;
+- stale authorization replay;
+- double execution;
+- clock manipulation;
+- hidden recurring jobs;
+- delayed emergency halt propagation;
+- indefinite pending actions with no review.
+
+## Public / restricted split
+
+Public-safe:
+
+- lifecycle;
+- revalidation principle;
+- public schedules where intended;
+- temporal event semantics.
+
+Restricted:
+
+- sensitive execution schedules;
+- treasury/security action timing;
+- emergency controls;
+- provider job identifiers;
+- anti-race implementation details.
+
+## Invariants
+
+```text
+scheduled != authorized forever
+time reached != automatic execution
+approval at T0 != eligibility at T1
+timelock expiry != PASS
+cancelled != deleted
+retry != duplicate side effect
+historical runtime pallet != current chain deployment
+```
+
+## Status
+
+The Scheduler/Timelock Pallet is preserved as historical runtime architecture and maps to the current temporal-control/SLA scheduler with execution-time revalidation and DAIL evidence.
