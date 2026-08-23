@@ -1,0 +1,244 @@
+---
+title: "CIE Activation Evidence Gate"
+sidebarTitle: "CIE Activation Gate"
+description: "The fail-closed Wave 4 gate that binds protected CIE scoring integration to durable CIE↔CHLOM evidence, exact parent-link receipts, contract identity, Agent D certification, independent review, and Founder ratification."
+icon: "shield-check"
+keywords: ["Cultural Imprint Engine", "CIE", "CHLOM", "activation gate", "protected scoring", "Agent D", "ThriveBase", "DAIL"]
+---
+
+# CIE Activation Evidence Gate
+
+The **Cultural Imprint Engine (CIE)** uses a separate activation-evidence gate before protected scoring source can be integrated or activated.
+
+Wave 4 institutionalizes:
+
+```yaml
+gate_id: ct.gate.cie.activation-evidence.v1
+framework_id: ct.framework.cultural-imprint-engine
+canonical_engine_name: Cultural Imprint Engine
+current_source_integration_state: HOLD_CONTRACT_DIGEST_MISMATCH
+current_activation_state: HOLD_SOURCE_INTEGRATION
+activation_authorized: false
+```
+
+The gate exists to prevent a technically valid but stale or semantically mismatched candidate from inheriting authority from newer CIE infrastructure.
+
+## Two separate gates
+
+Wave 4 separates **source integration** from **activation readiness**.
+
+### Stage 1 — source integration
+
+Protected-score source may be reconciled onto current CIE `main` only when all of the following are true:
+
+1. the Wave 3B durable CIE ↔ CHLOM runtime is live and fail-closed;
+2. the current CIE ↔ CrownThrive-Support technical parent-link receipt matches the intended exact repository heads;
+3. Guardian, repository-family, and interoperability predicates are verified;
+4. the candidate protected-score public-contract digest matches the live institutional algorithm registry;
+5. the CIE package remains `controlled_test`, D2, non-voting, and D3-human-reserved;
+6. no provider, economic, licensing, entitlement, D3, or sovereign authority is inferred.
+
+The current Stage 1 result is:
+
+`HOLD_CONTRACT_DIGEST_MISMATCH`
+
+### Stage 2 — activation readiness
+
+Even after Stage 1 becomes `SOURCE_INTEGRATION_READY`, protected scoring remains non-activated until separate evidence exists for:
+
+- Agent D parent certification;
+- independent semantic verification;
+- independent security review;
+- exact current head and contract-digest agreement;
+- Founder first-activation ratification.
+
+The highest Wave 4 machine result is:
+
+`READY_FOR_INDEPENDENT_REVIEW_AND_FOUNDER_RATIFICATION`
+
+That is a handoff state, **not execution authority**.
+
+## Current exact parent-link evidence
+
+Wave 4 refreshed the technical relationship after Wave 3B rather than reusing the stale establishment snapshot from CIE PR #18.
+
+The refresh bound:
+
+```text
+CIE main:     2067572bd9674766b4121c904c2042a87e4d5bcb
+Support main: bfe78d6955611fd43faf606c01257edc80943d51
+```
+
+and produced:
+
+```text
+link receipt: 4676a016-2089-4599-abd6-eec745702328
+DAIL event:   0dbd255c-27de-4e6f-8e6b-157c1b98c00a
+state:        TECHNICALLY_LINKED_PENDING_GOVERNANCE
+```
+
+At that receipt:
+
+```yaml
+guardian_verified: true
+family_verified: true
+interoperability_verified: true
+operational_activation: false
+vote_effect: false
+authority_effect: false
+```
+
+The old PR #18 snapshot remains history, but it is not reusable current authorization.
+
+## Protected-score contract mismatch
+
+The protected-score source candidate preserved in CIE PR #17 expects:
+
+```text
+2b22b422d8345424d27438972691addb6f0eeba800368aa8180593efabb66a9f
+```
+
+The live ThriveBase algorithm registry for `ct.algorithm.cie.v1` currently records:
+
+```text
+e5e6ac0e9cf6749ba361435bb65ad212f78562960d0b5522898e06583b8d86c2
+```
+
+Those digests do not match.
+
+Wave 4 intentionally does **not** choose one silently, alias them, or rewrite the institutional registry simply to clear the gate. The correct current result is HOLD.
+
+CIE PR #17 remains an open draft/source candidate. Its protected-runtime request/response contracts, no-local-scoring client, protected-field rejection and adapter tests remain available for deliberate reconciliation after contract identity is resolved.
+
+## Current CIE package boundary
+
+Live Wave 4 evidence retains:
+
+```yaml
+package_state: controlled_test
+authority_ceiling: D2
+can_vote: false
+d3_human_reserved: true
+parent_certification_state: pending
+operationally_enabled: false
+public_activation_allowed: false
+private_runtime_state: registered
+api_state: candidate
+mcp_state: disabled
+commercial_state: candidate
+exact_price_authorized: false
+checkout_enabled: false
+customer_entitlement_active: false
+```
+
+Passing the technical parent link does not change any of these states.
+
+## Live ThriveBase gate
+
+The service-role-only read gate is:
+
+`chlom_runtime.cie_wave4_activation_evidence_gate_v1(text,text,text)`
+
+It reads:
+
+- Wave 3B durable-runtime health;
+- latest exact repository parent-link receipt;
+- `ct.algorithm.cie.v1` institutional algorithm state;
+- `ct.framework-package.cie` package state.
+
+It does not mutate those objects.
+
+Live ACL readback showed:
+
+```yaml
+anon_execute: false
+authenticated_execute: false
+service_role_execute: true
+```
+
+The function uses a fixed search path and always returns the following authority effects as false:
+
+```yaml
+activation_authorized: false
+provider_write_authorized: false
+economic_activation_authorized: false
+license_issuance_authorized: false
+checkout_authorized: false
+entitlement_authorized: false
+d3_authorized: false
+sovereign_vote_effect: false
+```
+
+## Live gate result
+
+Against the refreshed exact parent link and the PR #17 candidate digest, the live gate returned:
+
+```yaml
+durable_runtime_ok: true
+parent_link_ok: true
+package_boundary_ok: true
+contract_digest_match: false
+parent_certification_state: pending
+parent_certified: false
+source_integration_state: HOLD_CONTRACT_DIGEST_MISMATCH
+activation_gate_state: HOLD_SOURCE_INTEGRATION
+activation_authorized: false
+```
+
+This is a successful fail-closed result.
+
+## DAIL evidence
+
+Wave 4 installation and live evaluation generated restricted DAIL events. Direct read-only verification using the exact current DAIL hashing construction confirmed for both events:
+
+```text
+payload_hash_valid  = true
+previous_link_valid = true
+event_hash_valid    = true
+```
+
+Because DAIL is a global ledger, unrelated events may occur between CIE events. Continuity is therefore verified against the global sequence, not by assuming CIE-specific events are contiguous.
+
+## Founder Override boundary
+
+Wave 4 does not establish a governance deadlock.
+
+The standing ask-first rule remains:
+
+```yaml
+must_ask_founder_before_override: true
+governance_deadlock_confirmed: false
+override_executable: false
+silence_is_not_authority: true
+```
+
+No Founder Override was invoked.
+
+## Source-controlled implementation
+
+Wave 4 is merged in `crownthrive1/CrownThrive-CIE` at:
+
+`2638cd6777023605db1ca1dcdaadbedc415a8b50`
+
+The accepted package includes:
+
+- `governance/wave4/cie-wave4-activation-evidence-gate.v1.json`;
+- `runtime/migrations/cie_wave4_activation_evidence_gate_v1.sql`;
+- deterministic reference model and tests;
+- static validator and read-only CI;
+- `docs/WAVE_4_ACTIVATION_EVIDENCE_GATE.md`;
+- `docs/WAVE_4_LIVE_GATE_RECEIPT.md`.
+
+## Reopen triggers
+
+Reopen Wave 4 review when any of these change:
+
+- CIE or Support exact head used for parent-link certification;
+- protected-score public contract digest;
+- `ct.algorithm.cie.v1` version or classification;
+- package state or D2/D3 boundary;
+- Agent D parent-certification state;
+- independent semantic/security review evidence;
+- protected-runtime endpoint or implementation binding;
+- provider/economic/entitlement effect;
+- Founder first-activation ratification state.
