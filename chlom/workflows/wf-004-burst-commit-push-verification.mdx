@@ -1,0 +1,112 @@
+---
+title: "WF-004 — Burst Commit / Push / Verification Workflow"
+sidebarTitle: "WF-004 Burst Push"
+description: "Canonical CHLOM workflow for small documentation bursts that are committed, pushed and independently verified before the next burst to reduce shared-editor freeze, rebase and loss risk."
+icon: "code-commit"
+keywords: ["CHLOM workflow", "burst commit", "push verification", "Git", "Mintlify", "freeze recovery"]
+---
+
+# WF-004 — Burst Commit / Push / Verification Workflow
+
+## Workflow identity
+
+```yaml
+workflow_id: WF-004
+name: Burst Commit / Push / Verification
+classification: canonical_documentation_delivery_workflow
+version: 1.0.0
+```
+
+## Purpose
+
+WF-004 governs long CHLOM reconstruction sessions when many articles must be institutionalized while multiple editor/agent processes can touch the same Mintlify/Git branch. Instead of accumulating a large fragile in-memory editor state, work is delivered in bounded bursts and verified against Git before the next burst.
+
+## Core invariant
+
+```text
+WRITE SMALL BATCH
+ -> COMMIT/PUSH
+ -> VERIFY GIT HEAD + REPRESENTATIVE BODIES
+ -> CONTINUE
+```
+
+A successful editor response is not sufficient evidence that the article survived a later rebase. Git readback is the persistence check.
+
+## Burst sizing
+
+Default burst size is one to five material articles depending on body size and navigation contention. If any `locked`, `resolve_failed`, incremental-nav conflict or active-session switch occurs, stop the burst immediately and verify what reached Git before writing more.
+
+## Stage 1 — Pin target branch
+
+Before each burst, explicitly checkout/activate the intended CHLOM branch and record the starting Git head. Never assume the shared editor is still attached to the previous branch.
+
+## Stage 2 — Write bounded set
+
+Create/update only the planned article set. Avoid unrelated cleanup during the burst. Every article still follows WF-001 and WF-002.
+
+## Stage 3 — Attempt flush
+
+Commit/save with a burst-specific message naming the object family and article range. If save reports a lock/rebase error, do not immediately recreate all content; first inspect the remote branch because the editor may already have flushed some or all files.
+
+## Stage 4 — Remote verification
+
+Verify:
+
+```yaml
+pr_or_branch:
+head_sha:
+changed_file_count:
+representative_file_exists: true
+representative_body_substantive: true
+navigation_or_route_present: true_if_expected
+```
+
+For high-value bursts, check every new path or at minimum list the directory and sample the longest/highest-risk article.
+
+## Stage 5 — Reconcile partial flush
+
+Classify each intended file as:
+
+```text
+PUSHED_AND_VERIFIED
+PUSHED_BODY_NAV_PENDING
+SESSION_ONLY
+MISSING_AFTER_REBASE
+CONFLICT_REQUIRES_REPLAY
+```
+
+Replay only missing items after repinning. Do not create duplicate substitute articles merely because the prior UI session became uncertain.
+
+## Stage 6 — Continue from verified head
+
+The next burst starts from the verified remote head, not the old editor baseline. Record commit SHA in the reconstruction register/changelog where material.
+
+## Freeze/rebase controls
+
+- Never exceed a large uncommitted batch merely for speed.
+- Stop on the first shared-nav conflict.
+- Prefer content survival over perfect article ordering; ordering can be corrected after persistence.
+- Keep the PR draft/HOLD until governance gates pass for the exact head.
+- Do not claim a burst pushed until Git confirms a new head or the intended files exist on the remote branch.
+
+## Evidence packet
+
+```yaml
+burst_id:
+starting_head:
+intended_articles[]:
+save_result:
+verified_head:
+verified_paths[]:
+missing_paths[]:
+conflicts[]:
+next_action:
+```
+
+## Tests
+
+Simulate branch switching, concurrent editor lock, save `resolve_failed`, successful save, partial file flush, navigation-only loss, duplicate replay risk and a commit whose head changes after certification.
+
+## Versioning
+
+WF-004 is part of CHLOM reconstruction continuity. Changes to persistence/verification requirements are versioned so later audits can understand how a documentation wave was delivered.

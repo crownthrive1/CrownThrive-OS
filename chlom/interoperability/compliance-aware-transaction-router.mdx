@@ -1,0 +1,178 @@
+---
+title: "Compliance-Aware Transaction Router — Component Contract"
+sidebarTitle: "Compliance-Aware Router"
+description: "Individual CHLOM interoperability component for routing candidate transactions only after identity, rights, policy, risk, proof, authority, temporal and dependency gates resolve for the exact action."
+icon: "route"
+keywords: ["CHLOM transaction router", "compliance aware router", "policy routing", "DLA", "authority gateway", "interoperability"]
+---
+
+# Compliance-Aware Transaction Router — Component Contract
+
+## Institutional identity
+
+```yaml
+component_id: CT-CHLOM-CATR-001
+name: Compliance-Aware Transaction Router
+source_status: recovered_named_component
+source_body_status: distinct_full_body_not_located
+source_lineage: component atlas; Compliance Pre-check Pallet; ACE; DLA; bridge/messaging; payment/economic controls
+classification: source_grounded_current_component_reconstruction
+version: 1.0.0
+```
+
+## Source boundary
+
+The recovered CHLOM component atlas explicitly lists **compliance-aware transaction router** as a distinct interoperability component. A standalone original specification/body has not been located. This article institutionalizes the recovered component name and a conservative current contract built from already recovered policy, DLA, authority, temporal, messaging and economic requirements.
+
+## Purpose
+
+The router selects a valid execution path for a **candidate transaction/action** only after the controls applicable to that action resolve. It is not a payment router only; a CHLOM transaction can mean a licensing state change, entitlement change, economic operation, governance enactment, bridge claim, credential action or another registered consequential command.
+
+## Core rule
+
+```text
+route only what is authorized for this exact context
+```
+
+The router never upgrades `HOLD` or `DENY` to execution just because an external provider route is available.
+
+## Candidate transaction envelope
+
+```yaml
+transaction_candidate_id:
+tenant_id:
+action_type:
+actor_ref:
+subject_refs[]:
+object_refs[]:
+object_version_refs[]:
+requested_scope:
+policy_context_ref:
+evidence_refs[]:
+authority_context_ref:
+not_before:
+expires_at:
+idempotency_ref:
+preferred_or_allowed_rail_refs[]:
+classification:
+```
+
+## Pre-route gate sequence
+
+A safe routing sequence is:
+
+```text
+1 identity / actor authentication
+2 tenant and object scope
+3 rights / DLA check if applicable
+4 policy pack stack
+5 evidence freshness / eligibility
+6 risk/proof checks where required
+7 approval / authority resolution
+8 temporal/timelock revalidation
+9 dependency / provider health if required
+10 idempotency / replay check
+11 route selection
+12 side-effect execution
+13 readback / reconciliation
+14 DAIL receipt
+```
+
+A domain can omit inapplicable gates only through an explicit action contract.
+
+## PASS / HOLD / DENY behavior
+
+`PASS_CANDIDATE` means the candidate may enter route selection after authority requirements resolve. `HOLD` means execution is not routed and the result identifies missing/stale/conflicting conditions. `DENY` means the candidate is rejected according to an authoritative rule.
+
+The router should never use fallback providers to circumvent a policy HOLD.
+
+## Route registry
+
+Each route/rail is registered with:
+
+```yaml
+route_id:
+capability:
+provider_or_service_ref:
+allowed_action_types[]:
+tenant_or_environment_scope:
+input_schema_ref:
+output_schema_ref:
+side_effect_class:
+authentication_ref:
+rate_or_capacity_ref:
+health_ref:
+rollback_or_compensation_ref:
+status:
+```
+
+Provider IDs are implementation aliases; stable route capability IDs remain institutional.
+
+## Route selection
+
+Route selection can consider capability compatibility, allowed environment, provider health, capacity, latency/cost policy, geographic constraints and approved fallback order. It may optimize only **within already-authorized route choices**.
+
+```text
+optimization cannot manufacture authority
+```
+
+## Rights and licensing routes
+
+DLA activation, renewal, transfer, sublicense, LEX acquisition and entitlement flows require current source-right/DLA state. A provider marketplace or contract service cannot be selected to execute rights the candidate does not possess.
+
+## Economic routes
+
+For payment/payout/settlement operations, the router selects an approved payment gateway adapter or rail after the obligation/action is authorized. Provider execution is reconciled back to canonical economic records.
+
+## Bridge / remote routes
+
+A cross-system route verifies source/destination adapter compatibility, replay/finality semantics, privacy classification and local policy. Remote execution/finality is not local authority.
+
+## Messaging routes
+
+The router can send a governed command through the Inter-Protocol Messaging Layer. The transport receipt and destination business result remain separate.
+
+## Temporal controls
+
+At execution time, revalidate authority, evidence, rights, policy and any emergency HOLD if the action was queued/timelocked. A route selected earlier is not permanently valid.
+
+## Fallback semantics
+
+A fallback is permitted only when:
+
+- the alternate route is independently approved for the capability;
+- its policy/tenant/jurisdiction constraints pass;
+- the action has not already executed on the primary route;
+- idempotency/semantic event identity is preserved;
+- compensation/readback state is known;
+- privacy/classification remains valid.
+
+Fallback must not duplicate side effects.
+
+## Reconciliation
+
+After execution, perform provider/service readback and compare to the expected action. Outcomes can include `MATCH`, `PENDING`, `HOLD_MISMATCH`, `REVERSAL_REQUIRED`, `EXECUTION_FAILED` or domain-specific equivalents.
+
+## Emergency / guardian controls
+
+Emergency policy can disable a route, provider, action type, tenant or capability. The router must check current emergency state at execution time and support safe disable/failover without exposing kill-switch internals publicly.
+
+## Observability
+
+Track candidate ID, gate results, route chosen, adapter/version, execution attempts, latency, provider result, reconciliation result, fallback, idempotency and DAIL references. High-volume telemetry can remain outside canonical DAIL while consequential receipts are preserved.
+
+## Failure states
+
+Unknown authority, stale evidence, rights conflict, policy DENY/HOLD, route unavailable, unsupported schema, rate/capacity exhaustion, duplicate/replay, primary executed but response lost, fallback would duplicate effect, provider mismatch, rollback unavailable, cross-tenant routing attempt.
+
+## Tests
+
+Test valid route, policy HOLD with healthy provider, provider outage with approved fallback, provider outage without fallback, duplicate execution risk, DLA revoked during queue delay, payment route wrong currency, bridge route replay, route emergency disable, cross-tenant candidate and readback mismatch.
+
+## Current status
+
+This is a current engineering component contract derived from recovered CHLOM architecture. A particular transaction router implementation is not production-canonical until code/deployment evidence is registered and certified.
+
+## Versioning
+
+Action contracts, route registry, provider adapters, policy dependencies and router implementation are independently versioned. Each execution receipt records the exact versions used.

@@ -1,0 +1,218 @@
+---
+title: "Royalty Streaming Pallet — Historical Runtime Record"
+sidebarTitle: "Royalty Streaming Pallet"
+description: "Individual reconstruction of CHLOM's historical Royalty Streaming Pallet/RSP for time/event-driven royalty accrual and streaming distributions, mapped to current P-11 obligations and reconciliation without implying live token streaming."
+icon: "water"
+keywords: ["CHLOM Royalty Streaming Pallet", "RSP", "royalty streaming", "accrual", "distribution", "P-11"]
+---
+
+# Royalty Streaming Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.royalty-streaming
+namespace: historical_runtime_pallet
+recovered_titles:
+  - Royalty Streaming Pallet
+  - Royalty Streaming Pallet (RSP) Whitepaper
+source_recovery: recovered_title_plus_royalty/settlement_architecture
+current_mapping:
+  - P-11 Capital, Revenue & Settlement
+  - event-driven royalty accrual/distribution service
+runtime_deployment: not_established
+live_token_streaming: not_claimed
+```
+
+## Historical purpose
+
+The Royalty Streaming Pallet extended static split allocation into **continuous or event-driven royalty accrual/distribution**, allowing CHLOM to model value flowing over time or as qualifying usage events accumulated.
+
+```text
+QUALIFYING USE / REVENUE EVENTS
+          |
+          v
+ROYALTY SCHEDULE
+          |
+          v
+ACCRUAL STREAM
+          |
+          v
+CLAIMABLE / PAYABLE OBLIGATIONS
+          |
+          v
+DISTRIBUTION / SETTLEMENT
+```
+
+## Streaming is an accounting/distribution pattern
+
+Historical `streaming` can mean continuously updating accruals or periodic micro-distributions. It does not mean a current live token stream or guaranteed real-time payout.
+
+```text
+continuous calculation concept
+      !=
+live payment rail
+```
+
+## Reconstructed stream object
+
+```yaml
+royalty_stream_id: stable ID
+asset_or_license_ref: required
+schedule_ref: exact version
+beneficiary_refs: []
+trigger_type: time|usage|sale|license_event|other
+start_at: timestamp
+end_at: nullable
+accrual_state_ref: required
+status: pending|active|paused|completed|revoked|held
+```
+
+## Accrual
+
+```text
+new qualifying event
+      |
+calculate incremental obligation
+      |
+append accrual entry
+      |
+update claimable projection
+```
+
+Accrual entries should be immutable/correctable rather than overwriting a single balance.
+
+## Time-based model
+
+A generic time-based stream can be represented as:
+
+```text
+accrued(t) = integral(rate(t), t0..t)
+```
+
+The actual rate function, units and basis must come from an authorized schedule. This equation is a model, not a current royalty promise.
+
+## Event-based model
+
+```text
+accrued_total = sum(royalty(event_i, schedule_version_i))
+```
+
+Each event remains tied to its applicable rights/agreement/schedule version.
+
+## RSP versus RSP-X
+
+```text
+RSP
+  Royalty Streaming Pallet
+  focuses on accrual/distribution over time/events
+
+RSP-X
+  Royalty & Splits Pallet
+  focuses on schedule/allocation structure
+```
+
+They are related historical modules and remain distinct articles.
+
+## Current mapping
+
+```text
+Historical Royalty Streaming Pallet
+      |
+      v
+P-11 event-driven obligation ledger
+      |
+      +--> accrual entries
+      +--> schedule versions
+      +--> payment batches/providers
+      +--> settlement reconciliation
+```
+
+## Pause/revocation
+
+A rights dispute or revoked license can pause future accrual/distribution according to governing agreement without deleting prior lawful accruals.
+
+## Micro-payment boundary
+
+Historical blockchain/token designs could perform very small automated transfers. Current provider/accounting systems may batch obligations for fees, minimum transfer amounts or operational efficiency. `streaming` semantics can therefore be implemented as a ledger stream with periodic settlement.
+
+## Historical operation families
+
+- create royalty stream;
+- post/accumulate accrual;
+- pause/resume;
+- claim/distribute;
+- close stream;
+- correct/reverse obligation.
+
+Exact historical extrinsic names are not recovered.
+
+## Current events
+
+```text
+ct.royalty.stream.created.v1
+ct.royalty.accrual.posted.v1
+ct.royalty.stream.paused.v1
+ct.royalty.distribution.authorized.v1
+ct.royalty.distribution.reconciled.v1
+ct.royalty.stream.closed.v1
+```
+
+## Failure cases
+
+### Duplicate usage event
+
+Idempotency prevents duplicate accrual.
+
+### Schedule changes mid-stream
+
+New events use the effective schedule version; historical accrual remains tied to prior versions.
+
+### Provider cannot economically send micro-payments
+
+Accrual remains ledgered and can batch under authorized rules; do not call unpaid accrual settled.
+
+### Rights disputed
+
+Pause future distribution/activation according to policy; preserve prior evidence.
+
+## Security/economic threats
+
+- duplicate accrual;
+- rate/schedule substitution;
+- beneficiary alias drift;
+- payout fragmentation/fee leakage;
+- premature distribution during dispute;
+- provider callbacks misclassified as settlement.
+
+## Public / restricted split
+
+Public-safe:
+
+- stream/accrual architecture;
+- versioning and rights prerequisites;
+- public-safe formulas.
+
+Restricted:
+
+- current royalty rates;
+- payment thresholds/batching rules;
+- beneficiary/account mappings;
+- private agreements;
+- fraud/abuse controls.
+
+## Invariants
+
+```text
+accrued != paid
+paid != settled until reconciled
+stream active != rights immutable
+historical streaming != live token rail
+RSP != RSP-X
+schedule change != historical accrual rewrite
+historical pallet != current runtime deployment
+```
+
+## Status
+
+The Royalty Streaming Pallet is preserved as a distinct historical CHLOM economic/runtime asset and maps to current P-11 event/time-based accrual ledgers and provider-independent settlement.

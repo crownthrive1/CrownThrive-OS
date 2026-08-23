@@ -1,0 +1,54 @@
+---
+title: "UI-ID-005 — Account / Provider Link State"
+sidebarTitle: "UI-ID-005 Provider Link"
+description: "Reusable CHLOM component showing the health and verification state of external account/provider aliases without confusing provider connectivity with CHLOM authority."
+icon: "link"
+keywords: ["CHLOM widget", "provider link", "account connection", "alias", "integration"]
+---
+
+# UI-ID-005 — Account / Provider Link State
+
+## Component identity
+
+```yaml
+surface_id: UI-ID-005
+component: Account / Provider Link State
+classification: public_safe_component_contract
+owner_capabilities: Identity; Integrations; DAIL
+```
+
+## Purpose
+
+This component shows whether an external provider account is linked to a canonical CHLOM identity/object and whether the link is usable. It preserves the architectural rule that a provider identity is an alias/execution relationship, not the source of CHLOM institutional authority.
+
+## Data contract
+
+Provider name/class, public-safe account alias, canonical subject/object ref, link state, last verified/synced time, credential-health state, scope summary, source evidence and mismatch status. Secrets/tokens are never exposed.
+
+## States
+
+`LINKED_VERIFIED`, `LINKED_STALE`, `SYNCING`, `MISMATCH`, `AUTH_REQUIRED`, `REVOKED`, `DISCONNECTED`, `HOLD_RECONCILIATION`, `ERROR`.
+
+## Semantics
+
+`LINKED_VERIFIED` means the alias relationship is verified, not that the provider can grant licenses, economic authority or governance powers. The consuming workflow still evaluates its own authority/policy requirements.
+
+## Actions
+
+Role-scoped actions can refresh evidence, reconnect through an approved integration flow, inspect alias lineage or resolve a mismatch. Credentials themselves remain in vault/runtime secret storage.
+
+## Failure behavior
+
+A provider outage or stale link should show an explicit HOLD/error state; the component must not backfill a previous healthy state as current.
+
+## Accessibility
+
+Display connection state and last verified time textually. Errors must be actionable and readable without relying on color.
+
+## Tests
+
+Test healthy link, expired authorization, stale sync, wrong provider account, alias changed, disconnected provider, cross-tenant collision and no secret leakage in rendered data.
+
+## Versioning
+
+Provider adapters can change independently; the component consumes provider-neutral normalized link states.

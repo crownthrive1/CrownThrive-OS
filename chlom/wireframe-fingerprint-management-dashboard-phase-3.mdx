@@ -1,0 +1,352 @@
+---
+title: "Wireframe: Fingerprint Management Dashboard (Phase 3)"
+sidebarTitle: "Fingerprint Dashboard"
+description: "Recovered-title implementation article for the CHLOM Fingerprint Management Dashboard, covering identity binding, credential state, recovery, key/provider aliases, risk-safe verification, privacy, revocation and audit history."
+icon: "fingerprint"
+keywords: ["CHLOM Fingerprint dashboard", "Fingerprint ID", "identity", "DID", "credentials", "recovery", "revocation"]
+---
+
+# Wireframe: Fingerprint Management Dashboard (Phase 3)
+
+## Recovery status
+
+```yaml
+ui_asset_id: ct.chlom.ui.fingerprint-management.phase3
+exact_recovered_title: "Wireframe: Fingerprint Management Dashboard (Phase 3)"
+recovery_status: exact_title_recovered_related_architecture_available
+original_visual_body: not_confirmed_recovered_for_this_article
+current_mapping:
+  - P-01 Identity & Access
+  - Fingerprint credential lifecycle
+  - DID / VC / ZK adapter layer
+```
+
+## Purpose
+
+The Fingerprint Management Dashboard is the governed identity-control surface for viewing and managing the CHLOM **Fingerprint identity lineage**: stable identity, provider aliases, credentials, verification assertions, key/control recovery, DID/VC links, public verification projections and material identity-security events.
+
+The dashboard must not reveal the protected composition of anti-fraud fingerprints, private identity documents or secret recovery factors.
+
+```text
+IDENTITY SUBJECT
+     |
+     +--> institutional identity ID
+     +--> provider aliases
+     +--> verification assertions
+     +--> credentials
+     +--> DID / VC adapters
+     +--> recovery / rotation history
+     +--> public-safe projection
+```
+
+## Primary roles
+
+```text
+identity subject
+organization identity administrator
+authorized verifier / issuer
+identity-security reviewer
+support/recovery operator
+```
+
+The user can view their own identity state without receiving verifier/admin authority.
+
+## ASCII wireframe
+
+```text
++-------------------------------------------------------------------------------+
+| Fingerprint ID | Identity status | Verification | Security | Support           |
++----------------------+--------------------------------------------------------+
+| Overview             | IDENTITY SUMMARY                                       |
+| Credentials          | Stable ID: ct.identity.…                               |
+| Verifications        | Status: ACTIVE / HOLD / RECOVERY                       |
+| Provider Aliases     | Verification level: defined assertion                  |
+| DID / VC             | Public projection: enabled/disabled                    |
+| Recovery & Keys      |                                                        |
+| Consent              | +----------------+ +----------------+                   |
+| Audit History        | | Credentials    | | Security state |                   |
+|                      | +----------------+ +----------------+                   |
++----------------------+--------------------------------------------------------+
+| DAIL history | Privacy | Export / correction | Help                           |
++-------------------------------------------------------------------------------+
+```
+
+## Overview
+
+The overview should show only safe summary state:
+
+- stable institutional identity ID;
+- identity status;
+- organization memberships/roles visible to actor;
+- current verification assertions;
+- active credential count;
+- current recovery/security HOLD;
+- public verification profile state;
+- last material identity change;
+- unresolved alias/provider mismatches.
+
+It should **not** show a universal trust score unless a separately governed model exists.
+
+## Fingerprint terminology
+
+Historical CHLOM Fingerprint ID combines identity/provenance/verification concepts. Current implementation should separate:
+
+```text
+stable identity
+verification evidence
+credential
+anti-fraud/device/behavioral signals
+DID / public key alias
+role/delegation
+```
+
+No screen should expose sensitive fingerprinting inputs as a public identifier.
+
+## Credentials tab
+
+Columns/cards:
+
+```text
+credential ID
+credential type
+issuer
+scope/meaning
+issued
+expires
+status
+public verification available?
+```
+
+Actions:
+
+- view safe details;
+- open public verification page;
+- request renewal where supported;
+- report error;
+- export permitted credential data;
+- view revocation/supersession history.
+
+Credential validity does not imply action authority.
+
+## Verifications tab
+
+Verification assertions can include identity, organization, program, eligibility or provider-backed claims.
+
+```yaml
+verification_id: stable ID
+verification_type: defined
+issuer_or_source: public-safe identity
+assurance_level: defined vocabulary
+status: valid|expired|revoked|held|superseded
+expires_at: nullable
+```
+
+The UI must label self-attested, provider-reported and independently verified states differently.
+
+## Provider aliases tab
+
+```text
+Provider / system
+Alias type
+Masked/public alias
+Binding status
+Last readback
+Mismatch state
+```
+
+Provider IDs never replace the canonical institutional identity.
+
+### Alias mismatch
+
+```text
+provider account says subject A
+institutional mapping says subject B / ambiguous
+        |
+        v
+HOLD identity-sensitive writes
+        |
+review / reconcile
+```
+
+## DID / VC tab
+
+Where adapters exist, display:
+
+- DID/public identifier;
+- DID method/provider;
+- public verification methods;
+- service refs;
+- credential/VC references;
+- status;
+- last rotation/update;
+- current adapter health.
+
+Do not display private keys, seeds or protected recovery material.
+
+## Recovery & Keys tab
+
+This screen is security-sensitive. Public/user-visible functions can show **status and safe actions**, not secret internals.
+
+```text
+Current control state: healthy / recovery pending / restricted
+Last key/control rotation: date
+Active recovery request: yes/no
+Verified recovery channels: safe labels only
+[Begin governed recovery]
+[Review active sessions]
+[Revoke session]
+```
+
+### Recovery flow
+
+```text
+RECOVERY REQUEST
+   |
+identity evidence / approved recovery process
+   |
+security review
+   |
+new control binding
+   |
+old compromised control retired
+   |
+roles/delegations re-evaluated
+   |
+DAIL receipt
+```
+
+Recovery does not restore revoked authority automatically.
+
+## Consent tab
+
+Show purpose-specific consent records the user is permitted to manage:
+
+```text
+purpose
+scope/channel
+status
+granted
+expires
+withdrawal available
+source/evidence
+```
+
+Authentication is not consent.
+
+## Public profile / proof projection
+
+The user can see exactly what a public verification surface exposes.
+
+```text
+PUBLIC VIEW PREVIEW
+- public identity alias/name if approved
+- defined verification badges
+- credential state where public
+- attestation/proof references
+- no raw private evidence
+```
+
+## Audit history
+
+Material events:
+
+```text
+identity created
+provider alias bound/unbound
+verification issued/revoked
+credential issued/revoked
+DID key rotated
+recovery started/completed
+role/delegation changed
+consent granted/withdrawn
+public projection changed
+```
+
+History links to DAIL receipts according to role/access.
+
+## Security HOLD
+
+If identity security is unresolved, high-impact controls show:
+
+```text
+SECURITY HOLD
+Reason class: recovery / compromise / identity conflict
+Affected actions: listed
+Next step: governed recovery/review
+```
+
+The UI should not reveal anti-fraud rules to an attacker.
+
+## Loading/empty states
+
+- credentials empty: `No credentials issued under this identity`;
+- provider aliases syncing: show `syncing`, not empty;
+- verification unavailable: show `verification service unavailable`, not `unverified` unless that is canonical state;
+- audit history restricted: explain permission boundary.
+
+## Error states
+
+- identity resolver unavailable;
+- credential service unavailable;
+- recovery state conflict;
+- provider alias mismatch;
+- revoked credential cache stale;
+- DID adapter failure;
+- privacy/public-projection validation failure.
+
+## Data dependencies
+
+- P-01 identity/organization/role/delegation;
+- credential registry;
+- DID/VC adapters;
+- ZK proof service;
+- Evidence Vault;
+- P-02 policy;
+- DAIL;
+- provider identity adapters.
+
+## Events
+
+```text
+ct.identity.alias.bound.v1
+ct.identity.verification.issued.v1
+ct.identity.verification.revoked.v1
+ct.credential.issued.v1
+ct.credential.revoked.v1
+ct.identity.did.key.rotated.v1
+ct.identity.recovery.started.v1
+ct.identity.recovery.completed.v1
+ct.consent.withdrawn.v1
+ct.identity.public_projection.updated.v1
+```
+
+## Accessibility
+
+- security status conveyed in text;
+- credential cards/table accessible;
+- recovery confirmation clearly states consequences;
+- copyable public IDs have accessible labels;
+- asynchronous recovery/readback state announced;
+- public-profile preview usable without visual-only badges.
+
+## Restricted companion
+
+Contains security-review/admin views, protected identity/fingerprint algorithms, private verification evidence, risk signals, recovery procedures, incident history and provider-security mappings. Secret factors/keys remain in approved secret storage.
+
+## Invariants
+
+```text
+Fingerprint ID != raw fingerprint telemetry
+identity != role
+verification != authority
+credential valid != action authorized
+provider account != institutional identity
+recovery != restoration of revoked role
+public badge != disclosure of private evidence
+DID public key != private key
+reconstructed layout != recovered original visual
+```
+
+## Known unknowns
+
+The exact original visual body is not confirmed recovered. The functional reconstruction is grounded in the recovered title and the Fingerprint/DID/credential architecture.

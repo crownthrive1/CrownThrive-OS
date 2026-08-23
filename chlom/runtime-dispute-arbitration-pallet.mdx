@@ -1,0 +1,291 @@
+---
+title: "Dispute & Arbitration Pallet — Historical Runtime Record"
+sidebarTitle: "Dispute & Arbitration Pallet"
+description: "Standalone reconstruction of the recovered CHLOM Dispute & Arbitration Pallet (DAP) for dispute intake, evidence references, holds, reviewer/arbitrator authority, decisions, remedies, appeals and DAIL lineage."
+icon: "gavel"
+keywords: ["CHLOM DAP", "Dispute Arbitration Pallet", "dispute", "arbitration", "appeal", "remedy", "DAIL"]
+---
+
+# Dispute & Arbitration Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.dispute-arbitration
+historical_name: Dispute & Arbitration Pallet
+historical_short_name: DAP
+recovered_article: CHLOM Dispute & Arbitration Pallet (DAP) Whitepaper
+artifact_class: historical_runtime_pallet
+recovery_state: reconstructed_from_recovered_title_and_related_sources
+current_mapping:
+  - case/remedy service
+  - DREP dispute-resolution engine
+  - P-02 governance/compliance
+  - DAIL evidence and correction lineage
+production_state: historical_design_not_production_evidence
+```
+
+## Source basis
+
+The recovered Help Center names a distinct **Dispute & Arbitration Pallet** and a corresponding `DAP Whitepaper`. It separately names the **Dispute Resolution Engine & Protocol (DREP)**, meaning the pallet and engine should not be collapsed into one record. The Grand Prospectus and historical papers describe disputes, arbitration, appeal windows, guardianship/pause, evidence, decisions and remedies as first-class CHLOM functions.
+
+This article preserves DAP as the stateful runtime-domain record; DREP is the orchestration/process engine that can operate over it.
+
+## Historical purpose
+
+DAP represented the durable dispute state machine:
+
+```text
+CLAIM / DISPUTE
+      |
+      v
+CASE CREATED
+      |
+EVIDENCE + PARTIES + SCOPE
+      |
+      v
+JURISDICTION / AUTHORITY CHECK
+      |
+      +---- unresolved ----> HOLD
+      |
+      v
+REVIEW / ARBITRATION
+      |
+      v
+DECISION
+      |
+      +--> REMEDY
+      +--> APPEAL WINDOW
+      +--> RESTORATION / CORRECTION
+      |
+      v
+DAIL LINEAGE
+```
+
+## Non-purpose
+
+DAP does not itself create:
+
+- governmental judicial authority;
+- mandatory arbitration outside an adopted agreement/policy;
+- legal conclusions by AI;
+- unilateral confiscation authority;
+- irreversible deletion of disputed evidence;
+- production deployment merely because the historical pallet was designed.
+
+## Core data objects
+
+### Dispute
+
+```yaml
+dispute_id: stable ID
+case_id: linked case
+subject_refs: license|DLA|transaction|rights|actor|policy|settlement
+initiator_ref: authorized actor
+respondent_refs: list
+issue_classes: typed
+opened_at: timestamp
+status: open|held|review|decided|appealed|closed|superseded
+policy_version_ref: required
+authority_profile_ref: required
+classification: internal|restricted|public_safe_projection
+```
+
+### Evidence reference
+
+```yaml
+evidence_ref_id: stable ID
+source_ref: custody/evidence object
+submitted_by: actor
+submitted_at: timestamp
+integrity_ref: digest/anchor
+admissibility_state: candidate|accepted|challenged|excluded
+classification: visibility class
+```
+
+### Decision
+
+```yaml
+decision_id: stable ID
+dispute_ref: required
+decision_type: sustain|deny|partial|dismiss|remand|other
+reason_codes: safe normalized set
+findings_refs: evidence-backed
+issued_by: authorized reviewer/body
+effective_at: timestamp
+appeal_deadline: optional
+remedy_refs: list
+supersedes: optional
+```
+
+## Authority model
+
+Reviewer/arbitrator assignment must resolve:
+
+- scope/jurisdiction under the adopted policy/agreement;
+- conflict-of-interest status;
+- role/delegation validity;
+- required quorum or professional qualification;
+- decision ceiling;
+- recusal and replacement rules.
+
+```text
+EXPERTISE != AUTHORITY
+ROLE != DELEGATION
+REVIEWER != ARBITRATOR AUTOMATICALLY
+AI != FINAL D3/PROFESSIONAL DECISION AUTHORITY
+```
+
+## HOLD semantics
+
+HOLD is not a loss or final ruling. It is a safety/control state when the dispute cannot validly advance.
+
+Common reasons:
+
+- evidence incomplete;
+- rights/chain-of-title unresolved;
+- reviewer conflict;
+- required professional input pending;
+- authority/jurisdiction unclear;
+- provider evidence mismatch;
+- appeal or timelock active;
+- security incident affecting evidence integrity.
+
+## Remedies
+
+A remedy must be separately authorized and scoped. Examples include:
+
+- restore prior license/entitlement state;
+- suspend or revoke within existing authority;
+- correct allocation/settlement records;
+- issue refund/credit only through economic authority;
+- require re-verification;
+- correct public/private records;
+- compensate/rollback a reversible provider action;
+- route to external professional/legal process.
+
+## Appeals
+
+An appeal is a new review path, not mutation of the old ruling.
+
+```text
+DECISION v1
+    |
+appeal filed
+    v
+APPEAL RECORD
+    |
+new reviewer/body
+    v
+AFFIRM / MODIFY / REVERSE / REMAND
+    |
+    v
+DECISION v2 + explicit supersession relationship
+```
+
+## Evidence preservation
+
+Original submissions and decisions remain preserved. Corrections should use append-only relationships:
+
+```text
+original evidence
+  -> challenge
+  -> corrected/superseding evidence
+```
+
+The system should not rewrite history to make the final decision appear inevitable.
+
+## Provider disputes
+
+Processor, marketplace, payment, hosting or identity-provider dispute outcomes are evidence. They do not automatically settle institution-wide CHLOM rights, entitlement or governance state.
+
+## DAIL events
+
+```text
+ct.dispute.opened.v1
+ct.dispute.evidence.submitted.v1
+ct.dispute.evidence.challenged.v1
+ct.dispute.held.v1
+ct.dispute.reviewer.assigned.v1
+ct.dispute.decision.issued.v1
+ct.dispute.remedy.authorized.v1
+ct.dispute.appeal.filed.v1
+ct.dispute.decision.superseded.v1
+ct.dispute.closed.v1
+```
+
+## Pseudocode pattern
+
+```text
+resolve_dispute(d):
+  assert current_policy(d.policy_version)
+  authority = resolve_decision_authority(d)
+  if authority unresolved: HOLD
+  if conflict(authority, d): HOLD
+  evidence = resolve_evidence(d)
+  if evidence insufficient: HOLD
+  proposed = evaluate_under_policy(evidence, d)
+  require_human_or_professional_gate_if_needed(proposed)
+  decision = issue_signed_decision(proposed, authority)
+  create_remedy_candidates(decision)
+  append_DAIL(decision)
+```
+
+This is a public-safe process pattern, not protected adjudication logic.
+
+## Security/threat model
+
+Threats include:
+
+- evidence tampering;
+- biased or conflicted reviewer;
+- forged authority/delegation;
+- hidden evidence deletion;
+- abuse of emergency pause as final punishment;
+- replaying an old decision against a new version/object;
+- leaking restricted evidence;
+- AI overreach;
+- provider outcome promoted as sovereign ruling;
+- appeal suppression.
+
+## Tests
+
+1. valid dispute \+ authorized reviewer \+ complete evidence -\> decision path;
+2. reviewer conflict -\> HOLD and reassign;
+3. missing authority -\> HOLD;
+4. disputed evidence integrity -\> evidence challenge state;
+5. decision with unauthorized remedy -\> remedy rejected;
+6. appeal -\> new decision lineage, old decision retained;
+7. provider refund -\> no automatic rights ruling;
+8. restricted evidence -\> redacted/public-safe projection only;
+9. professional/legal decision required -\> human/professional gate;
+10. correction -\> explicit supersession, never silent overwrite.
+
+## Current mapping
+
+Modern CHLOM can implement DAP through a case/dispute service backed by canonical records, Evidence Vault references, DAIL events, role/authority services, temporal controls and separate remedy executors. A blockchain runtime pallet is not required for the semantics to remain useful.
+
+## Restricted companion
+
+May include private evidence, protected reviewer mappings, conflict checks, legal/professional records, internal fraud signals, provider dispute payloads, sealed settlement schedules and incident evidence.
+
+## Invariants
+
+```text
+dispute != guilt
+HOLD != final adverse ruling
+evidence != finding
+finding != remedy
+reviewer expertise != authority
+provider dispute result != institutional ruling
+appeal != deletion of original decision
+AI recommendation != final professional/legal adjudication
+```
+
+## Version behavior
+
+If the original DAP whitepaper body is recovered later, add it as source-era v0.x lineage and compare its exact state transitions to this reconstruction. Preserve conflicts and issue a current mapping rather than silently replacing the article.
+
+## Status
+
+`historical_preserved + reconstructed_source_grounded`. DAP is institutionalized as a distinct CHLOM IP asset and state model; no live decentralized arbitration runtime is claimed.

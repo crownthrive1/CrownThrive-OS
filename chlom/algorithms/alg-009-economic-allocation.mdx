@@ -1,0 +1,116 @@
+---
+title: "ALG-009 — Economic Allocation"
+sidebarTitle: "ALG-009 Economic Allocation"
+description: "Standalone CHLOM algorithm for governed gross-to-net allocation using authorized deductions, versioned basis-point schedules, deterministic rounding and conservation checks."
+icon: "chart-pie"
+keywords: ["CHLOM ALG-009", "economic allocation", "basis points", "royalties", "rounding", "conservation"]
+---
+
+# ALG-009 — Economic Allocation
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-009
+name: Economic Allocation
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: royalty routing; Smart Treasury; P-11; historical splitter lineage
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-009 converts a validated economic event into a deterministic allocation plan. It is designed for royalties, commissions, platform fees, reserves, approved deductions and other multi-party obligations while keeping every cent/unit accounted for.
+
+## Core invariants
+
+```text
+provider evidence != approved deduction
+historical percentage != current schedule
+sum of authorized destinations + holds + residue = validated economic basis
+```
+
+No allocation is valid without a versioned schedule and a defined basis.
+
+## Inputs
+
+```yaml
+economic_event_id:
+validated_gross:
+currency:
+schedule_id:
+schedule_version:
+approved_deductions[]:
+recipient_shares[]:
+holds[]:
+rounding_policy:
+effective_at:
+```
+
+Shares should preferably be represented as integer basis points or another exact fixed-point unit, not floating-point percentages.
+
+## Procedure
+
+```text
+function allocate(event, schedule):
+    gross = validated_gross(event)
+    deductions = authorized_deductions(event, schedule)
+    net = gross - sum(deductions)
+
+    allocations = []
+    for recipient in schedule.recipients:
+        raw = net * recipient.bps / 10000
+        allocations.append(raw)
+
+    allocations = deterministic_round(allocations, schedule.rounding)
+
+    assert gross == sum(deductions) + sum(allocations) + holds + residue
+    return allocation_plan
+```
+
+## Schedule contract
+
+A schedule should declare gross or net basis, recipient stable IDs, basis points or fixed amounts, priority/order, floors/caps if adopted, reserve treatment, recoupment if applicable, effective period, currency precision, rounding/residue policy and authority/source evidence.
+
+## Deductions
+
+Only deductions authorized by the governing agreement/policy are allowed. A payment processor's fee may be observed in provider evidence, but whether it is borne by a seller, shared, reimbursed or excluded from distributable basis depends on the adopted schedule.
+
+## Deterministic rounding
+
+Rounding must define mode, precision, ordering/tie handling and residue destination. The same input snapshot and schedule version must produce the same allocation result across implementations.
+
+## Output
+
+```yaml
+allocation_plan_id:
+economic_event_ref:
+schedule_ref:
+gross:
+deductions[]:
+net_distributable:
+allocations[]:
+holds[]:
+rounding_residue:
+conservation_check:
+calculated_at:
+algorithm_version:
+```
+
+The allocation plan is an obligation/calculation record. Provider payout execution and final settlement are separate stages.
+
+## Safety and authority
+
+ALG-009 does not decide who deserves a share. It computes an already-authorized schedule. AI may simulate alternative allocations but cannot change the active schedule through this algorithm.
+
+## DAIL evidence
+
+Store the calculation inputs, schedule version, evidence refs, exact arithmetic result, rounding result, conservation assertion and downstream payout/settlement references. Corrections create reversing or superseding records rather than deleting the original calculation.
+
+## Tests
+
+Test full 10,000 bps distribution, partial distribution with reserve, exact decimals, one-cent residue, zero gross, refunds/negative adjustments, duplicate recipients, share total over 10,000, unsupported currency precision, schedule version change and reversal.
+
+## Versioning
+
+Arithmetic rules, rounding or schedule interpretation changes require a new algorithm version. Existing allocations remain tied to the version that generated them.

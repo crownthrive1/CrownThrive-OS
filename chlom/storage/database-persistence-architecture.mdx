@@ -1,0 +1,146 @@
+---
+title: "Database Persistence Architecture — CHLOM Component Contract"
+sidebarTitle: "Database Persistence"
+description: "Individual CHLOM storage article for canonical structured records, multi-tenant isolation, stable IDs, append-only event history, transactional writes, migrations, backups and provider-independent database persistence."
+icon: "database"
+keywords: ["CHLOM database", "persistence architecture", "multi tenant", "DAIL", "structured records"]
+---
+
+# Database Persistence Architecture — CHLOM Component Contract
+
+## Institutional identity
+
+```yaml
+component_id: CT-CHLOM-STORAGE-DB-001
+name: Database Persistence Architecture
+source_status: recovered_grouped_storage_component
+source_lineage: component atlas storage architecture; Technical Build Pack; DAIL/registry architecture
+source_body_status: distinct_database_storage_body_not_located
+classification: source_grounded_current_storage_contract
+version: 1.0.0
+```
+
+## Source boundary
+
+The recovered CHLOM component atlas groups **database/object store/IPFS/Arweave research** under storage architecture. This article decomposes the database portion as its own institutional object. A standalone historical database architecture body has not been located, so this page defines the current provider-neutral persistence contract from recovered cloud-first, multi-tenant, API-first and evidence-driven requirements.
+
+## Purpose
+
+The database layer persists structured CHLOM institutional state requiring transactional consistency, indexed relationships, tenant isolation, versioning and governed read/write behavior.
+
+Typical record families include identity and aliases, assets/source rights, DLA/license state, policy metadata, DAIL event metadata/projections, evidence references, cases/reviews/tasks, economic schedules/calculations/settlements, API/client/adapter registries and configuration/version registries.
+
+Large binary/source evidence can remain in object/private custody while the database holds stable references and integrity metadata.
+
+## Canonical versus projected state
+
+```text
+CANONICAL TABLES / EVENT RECORDS
+        |
+        +--> append-only DAIL/event lineage
+        +--> normalized institutional objects
+        |
+        v
+DERIVED VIEWS / MATERIALIZED PROJECTIONS / SEARCH INDEXES
+```
+
+A projection can be updated or rebuilt without rewriting canonical historical events.
+
+## Multi-tenant isolation
+
+Every tenant-scoped object carries an explicit tenant scope. Database and service policy must prevent one tenant from reading or mutating another tenant's records. The exact provider mechanism is implementation-specific; the institutional requirement is isolation plus auditable exception handling.
+
+## Stable identity
+
+Database row IDs or provider-generated keys should not be confused with institutional stable IDs when portability matters.
+
+```yaml
+institutional_id:
+provider_or_row_aliases[]:
+version:
+tenant_id:
+```
+
+Stable IDs survive schema migrations, provider changes and derived projections.
+
+## Transaction boundaries
+
+Consequential multi-record changes should use atomic transactions or another controlled consistency pattern when the writes belong to one institutional state transition.
+
+Examples include DLA activation plus event receipt, entitlement creation plus idempotency record, calculation plus obligations, correction plus effective projection update and provider-event normalization plus processing receipt.
+
+External provider effects are reconciled separately because they cannot always share the same database transaction.
+
+## DAIL/event persistence
+
+DAIL events are append-only institutional records. Corrections are new events that reference earlier events. A mutable current-state projection may exist for efficient reads, but it does not replace the historical event chain.
+
+## Versioned objects
+
+DLA records, Compliance Packs, economic schedules, formulas/models, schemas, agreements and configurations retain explicit versions and supersession relationships. Replacing the latest row is not enough for institutional history.
+
+## Structural constraints
+
+Database constraints can reinforce stable IDs, required tenant/object fields, supported lifecycle states, referential integrity, numeric ranges and uniqueness rules. These controls complement rather than replace policy/authority logic.
+
+## Time semantics
+
+Store distinct event, observation, recording, effective and expiry/currentness times where those meanings differ. A generic creation timestamp cannot substitute for every temporal concept.
+
+## Concurrency
+
+Consequential mutable projections should use version checks, serialization or another consistency method so simultaneous actions cannot silently overwrite a newer state.
+
+## Idempotency
+
+Persist semantic idempotency records/results for side-effect workflows. Record retention must cover the realistic replay window so a delayed duplicate cannot become a new economic, rights or entitlement effect.
+
+## Evidence references
+
+Structured evidence metadata belongs in database registries while source bytes can remain in protected storage. Evidence records retain custody reference, digest, source, time, classification, currentness and supersession state.
+
+## Access separation
+
+Different application and administrative roles receive only the database capabilities required for their function. Public/member views use governed projections; sensitive evidence and maintenance operations remain separated from ordinary application access.
+
+## Migration discipline
+
+Every schema change records migration ID/version, source release, forward effect, compatibility, backfill, restore/forward-fix plan and validation results.
+
+Institutional history cannot be discarded merely because a schema changed. Retired fields/tables are transformed or archived with explicit provenance when retention is required.
+
+## Backup and recovery
+
+Define backup frequency, retention, restore procedure, recovery authorization and restore testing appropriate to the provider and consequence class. Backup existence is insufficient without verified recovery.
+
+## Availability
+
+Availability/failover behavior is provider-specific. The institutional requirement is that failover must not create conflicting canonical state or bypass tenant/consistency rules.
+
+## Sensitive data
+
+Use the protection features appropriate to the data classification. Secrets should normally live in dedicated secret custody. Highly sensitive evidence can remain outside general application tables while the database stores opaque references.
+
+## Observability
+
+Track migration state, database health, storage growth, connection/service health, failed validations, backup/restore status and data-integrity checks without unnecessarily logging protected payloads.
+
+## Provider neutrality
+
+The institutional contract can be implemented with a relational database or another system that satisfies required semantics. Provider-specific extensions remain implementation choices; export and stable schemas should preserve migration options.
+
+## Failure handling
+
+Design for destructive migration error, tenant-isolation failure, stale reads for consequential state, partial writes, lost idempotency, backup/restore failure, provider outage and divergence between canonical and derived views.
+
+## Tests
+
+Test tenant isolation, concurrent DLA update, DAIL append/correction, rollback of partial transaction, idempotent provider event, schema migration/backfill, backup restore, stale-read handling, stable-ID export/import and provider migration fixtures.
+
+## Current status
+
+This is the current provider-neutral database persistence contract. Exact provider/project configuration remains separate implementation evidence.
+
+## Versioning
+
+Database schemas, migrations, persistence policies and provider implementations are independently versioned. Every release identifies the schema/migration version it requires.

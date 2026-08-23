@@ -1,0 +1,93 @@
+---
+title: "ALG-025 — Audit Finding Severity"
+sidebarTitle: "ALG-025 Finding Severity"
+description: "Standalone CHLOM finding-classification procedure for critical, high, medium and advisory states using governed control failure and impact semantics."
+icon: "triangle-exclamation"
+keywords: ["CHLOM ALG-025", "audit severity", "finding classification", "critical high medium", "assurance"]
+---
+
+# ALG-025 — Audit Finding Severity
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-025
+name: Audit Finding Severity
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: audit/certification; ACE controls; case management
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-025 classifies audit/control findings into operational severity bands. The public algorithm intentionally avoids a universal proprietary numeric score because severity depends on control domain, exposure, materiality and adopted policy.
+
+## Public-safe decision pattern
+
+```text
+if control_failure is prohibited hard condition:
+    CRITICAL
+elif material impact and active exposure:
+    HIGH
+elif control weakness without confirmed material event:
+    MEDIUM
+else:
+    LOW / ADVISORY
+```
+
+## Inputs
+
+```yaml
+finding:
+  failed_control_ref
+  control_class
+  observed_condition
+  evidence_refs[]
+impact_assessment:
+exposure_state:
+materiality_context:
+policy_version:
+```
+
+## Severity semantics
+
+**CRITICAL** means a prohibited or catastrophic control condition requiring immediate governed response under the applicable policy. **HIGH** represents material active exposure or a significant failure requiring urgent remediation. **MEDIUM** represents a meaningful weakness without confirmed material impact at the time of assessment. **LOW/ADVISORY** represents limited-impact gaps, opportunities or informational deviations.
+
+These labels are not legal conclusions and should not be presented as external certifications unless an authorized assurance process supports that claim.
+
+## Deterministic factors
+
+The policy can define hard mappings such as a known revoked production credential still in use, public exposure of a restricted secret, unauthorized rights grant, or execution beyond authority. Other domains may require contextual review.
+
+## Human review
+
+Where materiality or impact is uncertain, the system should preserve the algorithm's preliminary class and route to a qualified reviewer rather than forcing a false precision score.
+
+## Output
+
+```yaml
+severity_assessment_id:
+finding_ref:
+severity: CRITICAL|HIGH|MEDIUM|LOW|ADVISORY
+hard_rule_refs[]:
+impact_refs[]:
+uncertainties[]:
+review_required:
+reason_codes[]:
+```
+
+## Remediation linkage
+
+Severity can determine SLA, escalation and temporary safeguards, but remediation authority remains governed. A CRITICAL finding may trigger an emergency hold if the adopted policy allows it; the severity label itself is not the pause authority.
+
+## DAIL evidence
+
+Record finding, evidence, policy version, preliminary severity, reviewer adjustments and final accepted severity. If a reviewer changes the class, append the change with reason rather than overwriting the preliminary evaluation.
+
+## Tests
+
+Test hard-prohibited condition, active material exposure, weakness without incident, advisory item, uncertain impact, competing control classes, reviewer downgrade/upgrade and policy-severity mapping change.
+
+## Versioning
+
+Severity definitions and mappings are versioned by domain. Avoid changing the historical meaning of prior labels without a migration/adjudication record.

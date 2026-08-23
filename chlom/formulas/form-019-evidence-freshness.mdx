@@ -1,0 +1,79 @@
+---
+title: "FORM-019 — Evidence Freshness"
+sidebarTitle: "FORM-019 Evidence Freshness"
+description: "Standalone CHLOM temporal formula comparing evidence age to an adopted time-to-live or freshness policy before consequential reuse."
+icon: "clock"
+keywords: ["CHLOM FORM-019", "evidence freshness", "TTL", "stale evidence", "time"]
+---
+
+# FORM-019 — Evidence Freshness
+
+## Formula identity
+
+```yaml
+formula_id: FORM-019
+classification: derived_model
+origin: CHLOM temporal controls, Oracle Lattice and DAIL evidence requirements
+adopted_global_TTL: false
+related_algorithm: ALG-016
+```
+
+## Expression
+
+For evidence observed at `t_obs`, evaluated at `t_now`, with allowed time-to-live `TTL`:
+
+```text
+age = t_now - t_obs
+fresh = age <= TTL
+```
+
+Policy can then require:
+
+```text
+if fresh == false:
+    HOLD or REVERIFY
+```
+
+## Critical rule
+
+A stale historical PASS is not a current PASS. Evidence reuse must respect the currentness demanded by the fact being proven.
+
+## Timestamp semantics
+
+`t_obs` should represent when the underlying fact was actually observed, not merely when an API response was received or indexed. If those timestamps differ, both should be preserved.
+
+## Domain-specific TTL
+
+There is no universal CHLOM TTL. Sanctions status, identity credentials, provider capacity, license state, settlement evidence, regulatory data, risk scores and infrastructure health may all require different freshness windows.
+
+## Boundary behavior
+
+The expression uses inclusive `<=` at the TTL boundary. If a policy needs strict `<`, that must be versioned explicitly.
+
+## Clock safety
+
+Implementations need UTC/monotonic-time discipline, acceptable clock-skew policy, future timestamp detection and clear behavior when time sources are unavailable.
+
+## Revocation precedence
+
+Freshness never overrides a known revocation or correction. Evidence can be young and still unusable because its underlying status was later invalidated.
+
+## Calculation record
+
+```yaml
+evidence_ref:
+observed_at:
+evaluated_at:
+age:
+TTL:
+TTL_policy_ref:
+freshness_result:
+```
+
+## Tests
+
+Test before TTL, exactly at TTL, after TTL, negative/future age, missing timestamp, clock skew, revoked fresh evidence, refreshed replacement evidence and TTL policy change.
+
+## Versioning
+
+The formula is reusable; TTL values live in domain policy/version records.

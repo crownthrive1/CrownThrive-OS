@@ -1,0 +1,91 @@
+---
+title: "ALG-016 — Evidence Freshness Gate"
+sidebarTitle: "ALG-016 Freshness Gate"
+description: "Standalone CHLOM temporal procedure for determining whether time-sensitive evidence remains current or must be reverified before consequential use."
+icon: "clock"
+keywords: ["CHLOM ALG-016", "evidence freshness", "TTL", "stale evidence", "reverify"]
+---
+
+# ALG-016 — Evidence Freshness Gate
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-016
+name: Evidence Freshness Gate
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Oracle Lattice; DAIL; temporal controls; Compliance Packs
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-016 enforces currentness for evidence whose usefulness decays over time. A prior PASS is not automatically a current PASS when the underlying fact can change.
+
+## Inputs
+
+```yaml
+evidence_id:
+observed_at:
+source_time_if_distinct:
+TTL_or_freshness_policy:
+current_time:
+evidence_type:
+policy_version:
+revocation_or_update_refs[]:
+```
+
+## Procedure
+
+```text
+function freshness_gate(evidence, TTL):
+    age = now - evidence.observed_at
+
+    if age <= TTL:
+        return PASS
+
+    return HOLD_REVERIFY
+```
+
+This simple expression is the public core. Production semantics must also define which timestamp controls, clock tolerance, timezone/UTC normalization and whether a more recent revocation/update exists.
+
+## Freshness policy
+
+Freshness is domain-specific. Identity, sanctions, account status, pricing, risk observations, license validity, provider capacity and legal/regulatory state may require different windows. Documentation must not invent one global TTL.
+
+## Timestamp precedence
+
+Where provider receipt time differs from source observation time, the policy should use the time that reflects factual currentness. A delayed API response cannot make old evidence fresh merely because it was received recently.
+
+## Output
+
+```yaml
+freshness_decision_id:
+evidence_ref:
+age:
+TTL_or_rule_ref:
+state: PASS|HOLD_REVERIFY
+observed_at:
+evaluated_at:
+reason_codes[]:
+```
+
+## Revocation interaction
+
+Freshness PASS does not override a known revocation. A recently issued credential that is explicitly revoked is unusable even though its age is small.
+
+## Failure states
+
+Missing observation time, ambiguous timestamp source, future timestamp beyond tolerated skew, unknown freshness policy, stale mandatory evidence or unavailable refresh path must not be coerced to PASS.
+
+## DAIL evidence
+
+Consequential freshness decisions should retain the evidence ID, timestamps, TTL/policy version and result. Reverification creates new evidence and a new decision rather than changing the old observation timestamp.
+
+## Tests
+
+Test age just below TTL, exactly at TTL, above TTL, missing timestamp, future timestamp, clock skew, newer revocation, source observed before provider received, policy TTL update and evidence with no expiry requirement.
+
+## Versioning
+
+Changes to timestamp precedence, boundary inclusivity or clock-skew handling require a new version.

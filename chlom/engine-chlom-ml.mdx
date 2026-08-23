@@ -1,0 +1,321 @@
+---
+title: "CHLOM ML — Model Lifecycle & Assurance"
+sidebarTitle: "CHLOM ML"
+description: "Standalone CHLOM ML article for feature/data provenance, training, evaluation, bias/risk review, model registry, deployment, monitoring, drift, rollback and safe integration with AIE/ACE and CHLOM AI."
+icon: "chart-line"
+keywords: ["CHLOM ML", "machine learning", "feature store", "model registry", "bias testing", "drift", "model governance"]
+---
+
+# CHLOM ML — Model Lifecycle & Assurance
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.engine.ml
+canonical_name: CHLOM ML
+artifact_class: model_lifecycle_suite
+source_lineage:
+  - recovered Help Center CHLOM ML component
+  - AIE/ACE historical intelligence architecture
+  - Phase 0 AI/ML/Compliance Frameworks & Algorithms family
+  - Risk & Bias Assessment / Model Card lineage
+recovery_state: reconstructed_source_grounded
+current_mapping:
+  - model registry
+  - feature/data governance
+  - evaluation and deployment controls
+  - AIE/ACE/CHLOM AI support
+production_state: model_specific_evidence_required
+```
+
+## Source basis
+
+The recovered Help Center describes **CHLOM ML** as a model lifecycle suite spanning feature stores, training pipelines, bias testing, performance monitoring and secure deployment. Separate historical documents describe fraud detection, anomaly scoring, compliance/risk models and model changes as governance-relevant events.
+
+## Purpose
+
+CHLOM ML governs how machine-learning artifacts are created, evaluated, released and retired.
+
+```text
+DATA / EVIDENCE
+      |
+      v
+FEATURE DEFINITION / PROVENANCE
+      |
+      v
+TRAIN / VALIDATE
+      |
+      v
+EVAL + RISK/BIAS + SECURITY
+      |
+      v
+MODEL REGISTRY CANDIDATE
+      |
+CONTROLLED TEST / REVIEW
+      |
+      v
+APPROVED DEPLOYMENT PROFILE
+      |
+MONITOR / DRIFT / INCIDENTS
+      |
+      +--> retrain / rollback / retire
+```
+
+## Non-purpose
+
+CHLOM ML does not:
+
+- make model predictions authoritative facts;
+- permit opaque high-impact decisions without policy/human controls;
+- treat training accuracy as production fitness;
+- allow raw sensitive data into any provider by default;
+- make historical fraud/AI formulas current production models;
+- claim all described ML infrastructure is deployed.
+
+## Model registry object
+
+```yaml
+model_asset_id: stable CHLOM ID
+model_family: risk|anomaly|classification|ranking|forecast|other
+version: exact
+provider_or_framework_alias: optional
+training_data_snapshot_ref: protected/source-governed
+feature_set_ref: exact
+training_code_digest_ref: optional/restricted
+model_artifact_digest_ref: required for governed deployment
+evaluation_bundle_ref: required
+risk_bias_assessment_ref: required by profile
+model_card_ref: required
+approved_task_classes: list
+deployment_status: candidate|controlled_test|approved|held|retired
+```
+
+## Feature definition
+
+```yaml
+feature_id: stable ID
+name: canonical
+data_type: typed
+semantic_definition: explicit
+source_refs: list
+purpose: explicit
+transformation_ref: versioned
+freshness_profile_ref: optional
+classification: public|internal|restricted
+allowed_models_or_tasks: explicit
+```
+
+A feature name is insufficient without semantic/source/version definition.
+
+## Training data provenance
+
+Training/retraining should record:
+
+- source datasets;
+- collection/use purpose;
+- rights/permissions;
+- time ranges;
+- preprocessing versions;
+- excluded fields/groups;
+- label provenance;
+- data-quality findings;
+- privacy/de-identification state.
+
+## Evaluation bundle
+
+A model candidate should be evaluated against task-appropriate metrics. Possible families:
+
+```text
+predictive performance
+calibration
+false-positive / false-negative behavior
+subgroup/fairness analysis where applicable
+robustness / adversarial behavior
+out-of-distribution behavior
+stability across time
+explainability / feature attribution
+privacy/security tests
+latency/cost/resource constraints
+```
+
+No universal metric or threshold is invented.
+
+## Model card
+
+Model cards should state:
+
+- intended use;
+- prohibited/out-of-scope use;
+- training/evaluation data summary;
+- model/version;
+- metrics;
+- limitations;
+- known failure modes;
+- human review requirement;
+- data/privacy considerations;
+- deployment status;
+- rollback/monitoring plan.
+
+## Risk & bias assessment
+
+High-impact use requires explicit review of:
+
+- decision consequences;
+- protected/sensitive attributes and proxies;
+- disparate error risks;
+- feedback loops;
+- data representativeness;
+- explainability needs;
+- appeal/remedy;
+- human oversight;
+- drift sensitivity.
+
+This is governance/engineering analysis, not a blanket legal certification.
+
+## Deployment profile
+
+```yaml
+deployment_profile_id: stable ID
+model_ref: exact version
+environment: dev|test|controlled_test|staging|production
+allowed_actions: advisory|ranking|flagging|bounded_auto_action
+traffic_or_scope: explicit
+fallback_ref: required
+monitoring_profile_ref: required
+human_review_profile_ref: optional|required
+rollback_ref: required
+status: active|held|retired
+```
+
+## AIE/ACE relationship
+
+AIE may consume models for risk/anomaly intelligence. ACE may consume AIE/model outputs as one input to policy decisions. CHLOM AI may orchestrate/retrieve/explain model outputs.
+
+```text
+MODEL OUTPUT
+  -> AIE intelligence artifact
+  -> ACE policy evaluation
+  -> PASS/HOLD/DENY under authority
+```
+
+A model output alone does not become enforcement authority.
+
+## Drift
+
+Drift types can include:
+
+- input/data distribution drift;
+- label/outcome drift;
+- performance drift;
+- calibration drift;
+- feature availability drift;
+- provider/model-version drift;
+- policy/meaning drift.
+
+A drift signal can trigger review, controlled-test fallback or model HOLD.
+
+## Retraining
+
+Retraining creates a new model version.
+
+```text
+v1 remains historical
+new data/process -> v2 candidate
+v2 must pass evaluation/release gates
+```
+
+It must not silently overwrite v1 while old decisions continue to reference the wrong model.
+
+## Explainability
+
+Explainability should be appropriate to the model/task. Public-safe decision reason classes should not reveal protected anti-fraud features or thresholds. Restricted reviewer surfaces can retain deeper model evidence where authorized.
+
+## Human feedback
+
+Human review outcomes may inform evaluation/retraining, but feedback must be labeled and governed to avoid circular bias or self-confirming labels.
+
+## DAIL events
+
+```text
+ct.ml.model.registered.v1
+ct.ml.model.evaluated.v1
+ct.ml.model.controlled_test.started.v1
+ct.ml.model.approved.v1
+ct.ml.model.held.v1
+ct.ml.model.drift.detected.v1
+ct.ml.model.rollback.executed.v1
+ct.ml.model.retired.v1
+ct.ml.feature.versioned.v1
+```
+
+## Failure modes
+
+- missing provenance -\> HOLD model;
+- evaluation regression -\> HOLD/reject;
+- feature unavailable -\> fallback/HOLD;
+- model output malformed -\> no downstream enforcement;
+- provider silently changes model -\> detect/hold depending on task risk;
+- drift exceeds adopted threshold -\> review/rollback;
+- restricted data use not authorized -\> block/security incident;
+- model card/risk review missing for high-impact task -\> no release.
+
+## Threat model
+
+- data poisoning;
+- label leakage;
+- feature leakage/privacy breach;
+- adversarial examples/evasion;
+- model extraction;
+- prompt/tool crossover where LLMs used;
+- hidden provider update;
+- biased training/evaluation;
+- metric gaming;
+- feedback-loop amplification;
+- model overreach into unauthorized decisions.
+
+## Test vectors
+
+1. model candidate with full provenance/evals -\> eligible for controlled test;
+2. missing model card -\> no high-impact release;
+3. provider/model digest mismatch -\> hold;
+4. feature missing -\> safe fallback/HOLD;
+5. drift detected -\> review/rollback path;
+6. model predicts high risk -\> does not itself create violation finding;
+7. v2 released -\> historical v1 decisions remain tied to v1;
+8. restricted feature used by public model without authority -\> fail;
+9. human reviewer disagrees -\> correction/eval signal, not silent label mutation;
+10. model retired -\> no new use while audit history remains.
+
+## Metrics
+
+Model governance should track at least:
+
+- model versions by environment;
+- evaluation status;
+- drift events;
+- rollback/incident counts;
+- prediction/flag rates by task;
+- human override/correction rates;
+- data/feature failures;
+- provider/version mismatches.
+
+## Restricted companion
+
+May contain training data, model weights, private feature definitions, thresholds, evaluation sets, subgroup analyses, vulnerability/red-team results, provider credentials/config, protected anti-fraud signals and proprietary training code.
+
+## Invariants
+
+```text
+model != policy
+prediction != finding
+score != violation
+model accuracy != authority
+retrain != overwrite history
+provider model alias != institutional model identity
+high-impact release requires governed evaluation
+restricted feature != public disclosure
+```
+
+## Status
+
+`current_semantic_model_lifecycle_specification`; every concrete model/deployment remains separately versioned, evaluated and evidenced.

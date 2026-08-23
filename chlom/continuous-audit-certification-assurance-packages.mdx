@@ -1,0 +1,557 @@
+---
+title: "Continuous Audit, Certification and Assurance Packages"
+sidebarTitle: "Audit & Certification"
+description: "Comprehensive CHLOM reconstruction of continuous audit, scheduled compliance review, certification packages, case linkage, remediation, evidence retention and public-safe assurance claims."
+icon: "clipboard-check"
+keywords: ["CHLOM audit", "continuous audit", "certification", "assurance package", "case management", "compliance review", "audit evidence"]
+---
+
+# Continuous Audit, Certification and Assurance Packages
+
+The Grand Prospectus treats **continuous audit** as a core CHLOM assurance function. It describes technical checks, scheduled compliance audits, independent reviewers, evidence logging, code/security review, case management and remediation. Current CHLOM converts that design into explicit audit objects and bounded certification claims.
+
+The critical rule is:
+
+```text
+audit passed
+   != legal certification
+   != regulator approval
+   != permanent compliance
+```
+
+An audit only proves what was tested, against which criteria, using which evidence, during which period.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_source_grounded
+source_families:
+  - Grand Prospectus Part 12 Audit, Arbitration & Case Management
+  - Compliance Pack scheduled-audit concepts
+  - Genesis/Blueprint evidence and proof lineage
+  - current documentation/security governance practice
+current_mapping:
+  - Audit Service
+  - Certification / Assurance Package Service
+  - Evidence Vault
+  - DAIL
+  - Cases / Remedies
+  - public assurance projection
+founder_adjudication: open_after_publication
+```
+
+## Audit classes
+
+CHLOM should distinguish different audit purposes.
+
+### Technical integrity audit
+
+Checks system behavior such as:
+
+- configuration;
+- code or contract state;
+- data integrity;
+- access control;
+- event continuity;
+- routing correctness;
+- treasury/revenue reconciliation;
+- backup/recovery behavior;
+- API/runtime controls;
+- security findings.
+
+### Compliance-process audit
+
+Checks whether a governed process follows its required controls:
+
+- required credentials present;
+- required approvals captured;
+- required evidence retained;
+- policy pack/version correct;
+- reviews performed on schedule;
+- prohibited bypasses absent;
+- remediation completed.
+
+### Rights/licensing audit
+
+Checks:
+
+- source rights/chain of title;
+- active DLA terms;
+- sublicensing hierarchy;
+- entitlement alignment;
+- public usage versus granted scope;
+- royalty/reporting obligations.
+
+### Operational audit
+
+Checks:
+
+- SLA performance;
+- incident handling;
+- provider reconciliation;
+- workflow timeliness;
+- support/remedy response;
+- continuity controls.
+
+### Financial/economic audit
+
+May inspect allocation and settlement records, but accounting/tax conclusions require the appropriate financial/professional authority.
+
+## Audit topology
+
+```text
+                   AUDIT SUBJECT
+                        |
+                        v
+              +-------------------+
+              | Audit Definition  |
+              | scope + criteria  |
+              +---------+---------+
+                        |
+          +-------------+-------------+
+          |                           |
+          v                           v
+ automated checks               human checks
+          |                           |
+          +-------------+-------------+
+                        |
+                        v
+                 Evidence Package
+                        |
+                        v
+                 Findings / Results
+                        |
+          +-------------+-------------+
+          |             |             |
+          v             v             v
+        PASS           HOLD          FAIL
+          |             |             |
+          v             v             v
+ assurance        remediation      case/remedy
+ package          + re-audit        workflow
+          \             |             /
+           +------------+------------+
+                        |
+                        v
+                       DAIL
+```
+
+## Audit definition
+
+Every audit should have a stable definition.
+
+```yaml
+audit_definition_id: stable-id
+name: name
+subject_type: platform|license|process|organization|system|model
+criteria_refs:
+  - policy/test/control/version
+scope:
+  inclusions: []
+  exclusions: []
+evidence_requirements: []
+reviewer_requirements: []
+automation_allowed: true|false
+frequency: optional
+severity_rules: {}
+pass_rule: explicit
+hold_rule: explicit
+fail_rule: explicit
+remediation_window: optional
+public_claim_template_ref: optional
+version: semantic-version
+```
+
+Without scope and criteria, an `audit_passed` flag is too ambiguous to trust.
+
+## Audit instance
+
+```yaml
+audit_id: stable-id
+definition_ref: audit-definition/version
+subject_id: stable-subject
+period_start: timestamp
+period_end: timestamp
+started_at: timestamp
+completed_at: timestamp
+reviewers:
+  - reviewer-id
+automated_check_refs:
+  - run-id
+evidence_refs:
+  - evidence-id
+findings:
+  - finding-id
+result: pass|conditional_pass|hold|fail|inconclusive
+limitations:
+  - limitation
+remediation_plan_ref: optional
+expires_at: optional
+DAIL_event_ref: event-id
+```
+
+## Continuous audit
+
+Continuous audit does not mean every control runs every millisecond. It means relevant controls are evaluated on a defined cadence or trigger rather than only during rare manual reviews.
+
+```text
+EVENT / TIMER / STATE CHANGE
+          |
+          v
+     audit trigger
+          |
+          v
+    control checks
+          |
+          +--> no issue -> evidence receipt
+          |
+          +--> anomaly -> alert/HOLD/case
+```
+
+Examples:
+
+- daily treasury reconciliation;
+- every DLA transfer checked against rights hierarchy;
+- weekly backup restore test evidence;
+- monthly sanctions/credential freshness review;
+- quarterly compliance process audit;
+- model drift evaluation after material model update.
+
+## Scheduled audit requirements in Compliance Packs
+
+A Compliance Pack may define a recurring requirement:
+
+```yaml
+control: quarterly_external_review
+required_for: regulated_service_class_A
+frequency: P3M
+reviewer_class: approved_independent_auditor
+late_behavior: HOLD_new_activity
+failure_behavior: case_and_remediation
+```
+
+The pack should reference the audit definition rather than embed one-off ad hoc procedures.
+
+## Findings
+
+A finding is not just free text.
+
+```yaml
+finding_id: stable-id
+audit_id: audit-id
+control_ref: control/version
+severity: info|low|medium|high|critical
+status: open|accepted|remediating|resolved|waived
+summary: public-safe-summary
+restricted_detail_ref: evidence-or-note
+root_cause_class: optional
+owner_role: role
+opened_at: timestamp
+due_at: timestamp
+resolved_at: optional
+resolution_evidence_refs: []
+```
+
+## Pass / conditional pass / hold / fail
+
+```text
+PASS
+  all mandatory controls satisfied
+
+CONDITIONAL PASS
+  allowed only when policy explicitly permits non-material exceptions
+
+HOLD
+  evidence/reviewer/dependency incomplete or unresolved
+
+FAIL
+  mandatory control demonstrably not satisfied
+```
+
+A conditional pass must never be invented as a convenient way around a hard failure.
+
+## Remediation lifecycle
+
+```text
+finding opened
+    |
+    v
+owner assigned
+    |
+    v
+remediation plan
+    |
+    v
+corrective action
+    |
+    v
+verification / re-test
+    |
+  +--+--+
+  |     |
+ PASS  FAIL
+  |     |
+  v     v
+close  reopen/escalate
+```
+
+The original finding remains in history after resolution.
+
+## Audit-to-case escalation
+
+Some audit findings require a case rather than routine remediation.
+
+Triggers may include:
+
+- suspected fraud;
+- rights conflict;
+- material unauthorized access;
+- repeated control bypass;
+- unresolved financial discrepancy;
+- sanctions issue;
+- critical safety risk;
+- evidence tampering;
+- dispute over responsibility.
+
+```text
+AUDIT FINDING
+     |
+severity / dispute gate
+     |
+ +---+---+
+ |       |
+remedy   CASE
+```
+
+## Certification versus assurance
+
+The word **certification** can imply external legal/professional authority. CHLOM should distinguish:
+
+```text
+INSTITUTIONAL ASSURANCE
+"CrownThrive controls X passed defined checks Y during period Z"
+
+PROFESSIONAL CERTIFICATION
+requires authorized professional/certification body
+
+REGULATORY APPROVAL
+requires regulator or legally authorized body
+```
+
+Internal audit success must not be marketed as the latter two.
+
+## Assurance package
+
+A public-safe assurance package may contain:
+
+- subject name/ID;
+- audit definition/version;
+- scope summary;
+- audit period;
+- result;
+- issue/expiry dates;
+- issuing institution;
+- verification reference;
+- limitations;
+- public evidence digest;
+- revocation/supersession status.
+
+Restricted evidence remains private.
+
+## Assurance receipt ASCII
+
+```text
++------------------------------------------------+
+| CHLOM ASSURANCE RECEIPT                        |
++------------------------------------------------+
+| Subject:        ct.platform.example            |
+| Audit:          CT-AUDIT-ACCESS-v3             |
+| Period:         2026-Q3                        |
+| Result:         PASS                           |
+| Issued:         2026-08-23                     |
+| Expires:        2026-11-23                     |
+| Evidence:       digest/ref                     |
+| Limitations:    scope-specific                 |
+| Verify:         public-safe reference          |
++------------------------------------------------+
+```
+
+This is an institutional receipt, not a claim of government accreditation.
+
+## Code/security audit lineage
+
+Historical sources discuss independent code review, formal verification and publishing technical audit reports before major deployment.
+
+Current governance should separate:
+
+- lint/static checks;
+- unit/integration tests;
+- security scanning;
+- dependency review;
+- threat-model review;
+- penetration/adversarial testing;
+- independent audit;
+- formal verification where appropriate.
+
+A green CI check does not equal an independent security audit.
+
+## Audit evidence chain
+
+```text
+control definition
+      |
+      v
+test/check execution
+      |
+      v
+raw result / evidence
+      |
+      v
+verification
+      |
+      v
+finding/result
+      |
+      v
+DAIL receipt
+      |
+      v
+public assurance projection if eligible
+```
+
+## Public claim policy
+
+A public assurance statement should say exactly what was checked.
+
+Good:
+
+> Access-control audit v3 passed for the documented scope and period.
+
+Bad:
+
+> Fully compliant and secure.
+
+The latter is too broad unless an appropriate authority and evidence actually support it.
+
+## Expiry and re-audit
+
+Audit results should expire when the system or evidence changes materially.
+
+Triggers may include:
+
+- material release;
+- policy version change;
+- provider migration;
+- security incident;
+- rights ownership change;
+- model version change;
+- credential/authority revocation;
+- scheduled expiration.
+
+```text
+PASS
+ |
+material change
+ |
+ v
+STALE / RE-AUDIT REQUIRED
+```
+
+## Sampling
+
+Not every audit can inspect every event manually. Sampling must be explicit:
+
+- population;
+- sample method;
+- sample size;
+- selection period;
+- known limitations.
+
+Sampling results should not be represented as exhaustive when they are not.
+
+## Independent review
+
+For high-impact controls, the audit reviewer should be independent of the implementation owner where practical.
+
+```text
+builder ----> evidence
+               |
+               v
+         independent reviewer
+               |
+               v
+             result
+```
+
+## Audit automation agents
+
+Agents may run deterministic audit checks, assemble evidence, detect deltas and prepare findings.
+
+They may not self-certify their own authority expansion or convert ambiguous evidence into PASS.
+
+## Failure states
+
+| Condition | Disposition |
+| --- | --- |
+| audit definition missing | HOLD |
+| criteria version unresolved | HOLD |
+| evidence missing | HOLD |
+| mandatory control failed | FAIL |
+| reviewer conflict | reassign/HOLD |
+| audit expired | re-audit required |
+| material change after pass | stale/HOLD claim |
+| provider says success but institutional evidence conflicts | finding/HOLD |
+| public assurance exceeds scope | correct/withdraw |
+
+## API/service candidates
+
+```text
+POST /v1/audits
+GET  /v1/audits/{id}
+POST /v1/audits/{id}/checks
+POST /v1/audits/{id}/findings
+POST /v1/findings/{id}/remediation
+POST /v1/findings/{id}/verify
+POST /v1/assurance-packages
+GET  /v1/public/assurance/{ref}
+POST /v1/assurance/{id}/revoke
+```
+
+## Required test vectors
+
+1. all mandatory controls pass;
+2. missing evidence;
+3. conditional-pass attempt where not allowed;
+4. critical finding escalation;
+5. expired assurance package;
+6. system material change after audit;
+7. reviewer conflict of interest;
+8. audit sampling limitation;
+9. public projection redaction;
+10. remediation closes finding with evidence;
+11. provider-reported success conflicts with institutional record;
+12. duplicate audit run/idempotency;
+13. cross-tenant evidence access attempt;
+14. AI-generated finding with no source evidence.
+
+## Core invariants
+
+```text
+CI green != independent audit
+audit pass != legal certification
+audit pass != permanent compliance
+finding resolved != finding erased
+public assurance <= audited scope
+stale audit cannot certify current state
+reviewer expertise != regulatory authority
+```
+
+## Current implementation boundary
+
+Continuous audits, findings, remediation, assurance packages and DAIL receipts are compatible with the current cloud-first architecture. Historical on-chain Audit Log contracts or decentralized auditor staking can remain target/research adapters.
+
+## Founder adjudication
+
+`open_after_publication`
+
+A founder ruling may refine audit classes, certification vocabulary, public assurance branding, expiration policy, reviewer requirements, audit cadence or external auditor relationships. Historical source intent remains preserved.

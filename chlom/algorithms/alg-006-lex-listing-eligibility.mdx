@@ -1,0 +1,118 @@
+---
+title: "ALG-006 — LEX Listing Eligibility"
+sidebarTitle: "ALG-006 LEX Listing"
+description: "Standalone CHLOM procedure for determining whether a rights-bearing asset and DLA may be listed on LEX under current rights, policy and economic constraints."
+icon: "right-left"
+keywords: ["CHLOM ALG-006", "LEX listing", "license exchange", "rights eligibility", "listing policy"]
+---
+
+# ALG-006 — LEX Listing Eligibility
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-006
+name: LEX Listing Eligibility
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: CHLOM LEX; DLA; rights-before-commerce
+version: 1.0.0
+current_authority: specification_only
+```
+
+LEX Listing Eligibility determines whether a proposed license, permission, brand right or other governed rights-bearing asset is eligible to enter the CHLOM License Exchange workflow.
+
+## Core invariant
+
+```text
+marketability does not create rights
+payment capability does not create rights
+listing creation does not activate a license
+```
+
+A listing is a governed offer projection of already-resolved rights.
+
+## Inputs
+
+```yaml
+asset_id:
+dla_id:
+dla_version:
+offer:
+  offered_scope
+  price_or_economic_schedule
+  term
+  territory
+  transfer_mode
+  sublicensing_or_lease_mode
+  listing_window
+seller_or_licensor_id:
+policy_context:
+evidence_refs[]:
+```
+
+## Procedure
+
+```text
+function listing_eligibility(asset, dla, offer):
+    require asset.registered
+    require rights_clear(asset)
+    require dla.active
+    require offer.scope ⊆ dla.rights
+    require economic_schedule_valid(offer)
+    require listing_policy_passes(offer)
+
+    if any required fact unknown:
+        return HOLD
+
+    return PASS
+```
+
+## Rights checks
+
+The listing must trace to source rights and an active DLA/version. The offered scope must not exceed territory, duration, channels, exclusivity, transferability or derivative-use limits. If the DLA allows use but prohibits transfer, the asset cannot be projected as freely tradable.
+
+## Seller/issuer checks
+
+The actor creating the listing must have authority to offer the exact right. A platform administrator may have technical ability to create a record without being legally or institutionally authorized to offer the right.
+
+## Economic checks
+
+Economic validation covers the existence and version of an approved schedule, supported currency/rail, required royalties or commissions, fee handling, tax/professional gates where applicable, refund/escrow expectations and deterministic rounding rules. It does not treat historical tokenomics or sample percentages as current commercial terms.
+
+## Policy checks
+
+Applicable Compliance Packs can impose eligibility rules, disclosure requirements, prohibited categories, transfer constraints, required evidence, jurisdiction restrictions or review gates. Unknown required policy facts route to HOLD.
+
+## Output
+
+```yaml
+disposition: PASS|HOLD|DENY
+listing_candidate_id:
+asset_ref:
+dla_ref:
+offer_scope_hash:
+economic_schedule_ref:
+policy_versions[]:
+reason_codes[]:
+missing_items[]:
+valid_until:
+```
+
+PASS means eligible to proceed into a listing-creation action, not that a later buyer transaction is approved.
+
+## Lifecycle interaction
+
+Eligibility must be rechecked when a listing is renewed, materially edited, or executed after relevant rights/policy state has changed. Revocation or suspension of the underlying DLA should prevent further execution and may deactivate the marketplace projection.
+
+## DAIL evidence
+
+Record the eligibility snapshot and the exact DLA, source-right, policy and economic versions used. Provider marketplace IDs are aliases that may be attached after creation.
+
+## Tests
+
+Test unregistered asset, disputed rights, inactive DLA, scope overrun, transfer-prohibited DLA, invalid economic schedule, unsupported currency, missing disclosure, stale evidence, listing edit after approval, DLA revoked after listing, and exact-scope valid listing.
+
+## Versioning
+
+Material changes to listability rules require a new version; historical listings retain the rule version under which they were assessed.

@@ -1,0 +1,341 @@
+---
+title: "Functional Specification and UI Wireframe Outline"
+sidebarTitle: "Functional Specification & UI"
+description: "Recovered-title CHLOM functional specification and UI outline defining roles, domain capabilities, route/screen contracts, state semantics, data/API dependencies, cross-pallet handoffs and production acceptance criteria."
+icon: "file-code"
+keywords: ["CHLOM functional specification", "UI wireframe outline", "requirements", "screen contracts", "acceptance criteria"]
+---
+
+# Functional Specification and UI Wireframe Outline
+
+## Recovery status
+
+```yaml
+artifact_id: ct.chlom.ui.functional-spec-outline
+exact_recovered_title: "Functional Specification and UI Wireframe Outline"
+recovery_status: exact_title_recovered_related_architecture_available
+original_full_body: not_confirmed_recovered_for_this_article
+artifact_class: functional_ui_specification
+```
+
+## Purpose
+
+This artifact is the bridge between CHLOM's architecture and its user-facing application. It specifies **what the interface must let each role do, which canonical objects those screens manipulate, which governance states must be visible, and what counts as a successful end-to-end interaction**.
+
+```text
+DOMAIN REQUIREMENT
+      |
+      v
+ROLE / AUTHORITY
+      |
+      v
+USER TASK
+      |
+      v
+SCREEN / COMPONENT
+      |
+      v
+API / POLICY / EVIDENCE
+      |
+      v
+STATE CHANGE
+      |
+      v
+READBACK / DAIL / ACCEPTANCE TEST
+```
+
+## Functional domains
+
+The UI estate should cover, as separately articleized screens/components:
+
+```text
+Identity / Fingerprint / credentials
+Assets / rights graph
+DLA lifecycle
+LEX exchange
+Evidence / attestations / DAIL
+Compliance decisions / holds
+Cases / disputes / remedies
+Governance / proposals / overrides
+Treasury / settlement / economic receipts
+Oracle / ZK / verification status
+Integrations / API / provider state
+Audit / observability / support
+```
+
+## Role matrix
+
+| Role | Primary UI responsibilities |
+| --- | --- |
+| Participant | identity, applications, licenses, evidence, requests |
+| Holder/licensee | DLA scope, renewal, transfer requests, proofs |
+| Issuer/steward | issuance candidates, scope, approvals, renewals, revocation |
+| Verifier/reviewer | evidence review, policy checks, attestations |
+| Governance reviewer | proposals, decisions, overrides, timelocks |
+| Operator/support | cases, provider mismatches, recovery, audit |
+| Developer/integrator | APIs, webhooks, schemas, test fixtures |
+
+Actual authority is resolved dynamically and is not inferred from route visibility.
+
+## Functional requirement template
+
+Every UI function can be documented as:
+
+```yaml
+function_id: stable ID
+user_goal: explicit
+actor_roles: []
+preconditions: []
+input_schema_ref: required
+policy_gate_ref: optional
+side_effect_class: read|write|rights|economic|security|governance|external
+success_state: defined
+hold_states: []
+deny_states: []
+error_states: []
+event_refs: []
+readback_requirement: none|service|provider|multi-system
+```
+
+## Side-effect classes
+
+The interface should visibly distinguish high-impact actions from ordinary data entry.
+
+```text
+READ
+LOW-RISK WRITE
+RIGHTS CHANGE
+ECONOMIC CHANGE
+GOVERNANCE CHANGE
+SECURITY / ACCESS CHANGE
+EXTERNAL PROVIDER ACTION
+```
+
+Confirmation, approval and readback requirements increase with impact.
+
+## Screen contract
+
+Every screen has:
+
+```text
+screen ID
+route
+role visibility
+canonical object type(s)
+query/read model
+material actions
+empty/loading/error/HOLD states
+public/restricted fields
+analytics/events
+acceptance tests
+```
+
+## Canonical object dependency graph
+
+```text
+Identity ----+
+             +--> Asset / Rights ----> DLA ----> LEX
+Policy ------+            |              |        |
+Evidence ----+------------+--------------+--------+
+             |                                  |
+             +--> Case / Governance             +--> Commerce / Settlement
+                         |                                  |
+                         +---------------+------------------+
+                                         |
+                                        DAIL
+```
+
+The UI should not create duplicate independent versions of these objects.
+
+## Form behavior
+
+### Draft
+
+Local/user-entered state can be saved without implying approval.
+
+### Validation
+
+Client validation improves usability; canonical server/domain validation remains authoritative.
+
+### Policy preflight
+
+For material actions, preflight can return PASS/HOLD/DENY before final submit.
+
+### Confirmation
+
+Confirm exact object/version/effect.
+
+### Submission
+
+Use idempotency/correlation IDs.
+
+### Readback
+
+Wait for institutional/provider confirmation where required.
+
+## Decision result component
+
+```text
++----------------------------------------------------+
+| Decision: HOLD                                     |
+| Request: Transfer DLA-123                          |
+| Reason class: recipient verification incomplete   |
+| Policy/version: CP-... v4                          |
+| Valid as of: ...                                   |
+| Next step: Complete verification                   |
+| [Open requirements] [View receipt]                 |
++----------------------------------------------------+
+```
+
+## Version conflict behavior
+
+When a user acts on stale state:
+
+```text
+loaded object version = 5
+canonical object version = 6
+       |
+       v
+409 / version conflict
+       |
+show current changes
+       |
+reload / reapply candidate
+```
+
+Do not last-write-win material governance/right state.
+
+## Cross-screen handoffs
+
+Examples:
+
+```text
+License Detail -> Open dispute -> Case intake
+DLA application -> Evidence missing -> Evidence upload/reference flow
+LEX transaction -> Payment captured/transfer failed -> Compensation case
+Governance proposal -> Approved -> Timelock status
+Fingerprint dashboard -> Credential revoked -> Affected DLA eligibility
+```
+
+A handoff carries stable IDs/correlation, not copied mutable state.
+
+## Search and navigation
+
+Global search must respect classification and role. Search indexes are projections; detail pages re-read canonical state before writes.
+
+## Notifications
+
+Notification payloads should carry stable subject/event references and safe summary text. The target page re-resolves current state.
+
+## Auditability
+
+Material screen actions should be reconstructable from:
+
+```text
+actor
+session/context
+action/object/version
+input digest/reference
+policy/decision
+provider/service result
+readback
+DAIL receipt
+```
+
+## Analytics boundary
+
+UX analytics can measure flows, but analytics must not expose private evidence or be confused with audit evidence.
+
+## Acceptance criteria
+
+A screen is not `done` because it renders. For a material action, acceptance includes:
+
+```text
+[ ] authorization enforced server-side
+[ ] canonical version checked
+[ ] PASS/HOLD/DENY rendered correctly
+[ ] restricted fields protected at data layer
+[ ] side effect idempotent
+[ ] provider/service readback verified
+[ ] failure/compensation path tested
+[ ] DAIL/material event emitted
+[ ] accessibility path passes
+[ ] mobile/responsive state usable
+[ ] support/remedy route works
+```
+
+## Responsive architecture
+
+```text
+Desktop: persistent nav + tables + split panes
+Tablet: collapsible nav + drawers
+Mobile: task-first single column + cards + staged forms
+```
+
+Material scope/terms cannot disappear on mobile.
+
+## Accessibility requirements
+
+- WCAG-aligned semantic controls;
+- keyboard complete;
+- no color-only decision states;
+- accessible error summary;
+- focus return after async dialogs;
+- status announcements;
+- logical reading order;
+- accessible tables/charts/diagrams;
+- confirmation text understandable without iconography.
+
+## Security/privacy requirements
+
+- secrets never rendered;
+- protected evidence fetched only after authorization;
+- no hidden restricted fields shipped to unauthorized clients;
+- CSRF/session protections appropriate to stack;
+- sensitive actions can require re-auth/step-up if policy defines;
+- audit/log data minimized by role;
+- downloads/exports classified.
+
+## Prototype-to-production boundary
+
+```text
+wireframe/prototype
+      |
+functional spec
+      |
+schemas/APIs
+      |
+implementation
+      |
+tests/security
+      |
+staging/readback
+      |
+production certification
+```
+
+A wireframe approval is not deployment authorization.
+
+## Current mapping
+
+This document is a reconstructed functional/UI umbrella spec based on the exact recovered title and current CHLOM object/governance architecture. It supports the individual screen articles but does not replace them.
+
+## Restricted companion
+
+Can contain internal component contracts, private admin/reviewer functions, security threat paths, protected design-system tokens, unpublished routes and provider-specific operational states.
+
+## Invariants
+
+```text
+UI state != canonical state unless read back
+client validation != policy authority
+route access != action authority
+screen renders != feature production-ready
+prototype data != production data
+analytics != audit
+wireframe approval != deployment
+```
+
+## Known unknowns
+
+The exact original full functional-spec body has not been established in this article's source set. Later recovery must be versioned against this reconstruction.
