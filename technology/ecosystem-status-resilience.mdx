@@ -1,0 +1,122 @@
+---
+title: "Ecosystem Status & Resilience Control"
+sidebarTitle: "Status & Resilience"
+description: "The CrownThrive service-status, incident, heartbeat, recovery, public/private projection and reusable resilience-evidence contract for ThriveBase and the wider ecosystem."
+icon: "signal"
+keywords: ["status", "resilience", "incident", "heartbeat", "ThriveBase", "recovery", "continuity", "service health"]
+---
+
+# Ecosystem Status & Resilience Control
+
+The **Ecosystem Status & Resilience Control** defines how CrownThrive records, verifies, communicates and learns from service degradation and recovery without turning one provider's health signal into institutional truth.
+
+This page closes the documentation gap identified by the August 22 [ThriveBase Capacity Recovery & Status Resilience](/changelog/2026-08-22-thrivebase-capacity-recovery-status-resilience) checkpoint.
+
+## Status object
+
+```yaml
+service_id:
+status: OPERATIONAL | DEGRADED | PARTIAL_OUTAGE | OUTAGE | RECOVERING | MAINTENANCE | UNKNOWN
+observed_at:
+evidence_refs: []
+provider_state:
+institutional_readback:
+customer_impact:
+agent_impact:
+public_projection:
+incident_id:
+last_known_good:
+recovery_verified_at:
+```
+
+A provider dashboard, HTTP response, heartbeat or database query is evidence for a status decision; it is not the decision by itself.
+
+## Incident lifecycle
+
+```text
+DETECTED
+→ TRIAGED
+→ CONTAINED
+→ RECOVERING
+→ READBACK_VERIFIED
+→ RESOLVED
+→ POSTMORTEM / LESSON
+→ FACTORY CANDIDATE (optional)
+```
+
+A resolved incident remains append-only history. Reopening creates a new state transition rather than erasing the earlier resolution.
+
+## Heartbeat rule
+
+Heartbeats must identify the exact service/capability measured and cannot be used to certify unrelated dependencies.
+
+For example:
+
+- database readiness does not prove Stripe checkout;
+- cPanel account health does not prove DNS/TLS/application health;
+- Mintlify availability does not prove GitHub source integrity;
+- an agent heartbeat does not prove its current authority, review receipt or downstream tool health.
+
+## Public/private projection
+
+Public-safe status may disclose:
+
+- affected CrownThrive service/capability;
+- high-level state;
+- start/resolution windows;
+- user-visible impact;
+- recovery confirmation;
+- sanitized postmortem lesson.
+
+Restricted operational evidence includes provider billing/capacity detail, account IDs, credentials, private thresholds, raw payloads, customer data, attack indicators and security-sensitive recovery material.
+
+See [Security, Privacy and Continuity](/technology/security-privacy-continuity) and [Restricted Source Register](/knowledge/restricted-source-register).
+
+## Agent incident notation
+
+Every agent affected by a material incident should be able to record:
+
+```yaml
+agent_id:
+incident_id:
+impact: none | degraded | blocked | unsafe
+last_successful_action:
+blocked_dependency:
+recovery_readback:
+authority_changed: false
+next_safe_action:
+```
+
+An outage never creates emergency authority expansion by default.
+
+## Recovery gate
+
+A service moves from `RECOVERING` to `OPERATIONAL` only after an institutional readback verifies the relevant capability. Where multiple dependencies matter, each dependency keeps its own state.
+
+## Factory lesson handoff
+
+A repeated or valuable incident pattern may become a Framework/Capability Factory candidate only after:
+
+- sanitized problem statement;
+- repeatability evidence;
+- safe input/output contract;
+- authority boundary;
+- test fixtures;
+- rollback/recovery model;
+- independent verification requirement;
+- no secret/public-data leakage.
+
+Candidate status is not public product activation or guaranteed resilience.
+
+## Phase and continuity links
+
+- [Phase 2.9 Adversarial Continuity](/changelog/phase-2-9)
+- [Dependency, Backup and Recovery Architecture](/technology/dependency-backup-and-recovery)
+- [Phase 3 Readiness Gate](/technology/phase-3-readiness-gate)
+- [Agent Evals, Observability and Failure Policy](/automation/evals-observability-and-failure)
+- [Documentation Reconciliation & Continuity Framework](/standards/documentation-reconciliation-continuity-framework)
+- [Twenty-Phase Horizon Reconciliation](/standards/twenty-phase-horizon-reconciliation)
+
+## Success condition
+
+A future operator can determine what failed, what evidence established impact, what was changed, whether recovery actually passed, which agents/platforms were affected, what remains private, and what lesson should carry into later phases.
