@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.crownthrive.com/chlom/wallet-policy-intent.v1.schema.json",
+  "title": "CHLOM Wallet Policy Assurance Intent v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "intent_id",
+    "action_type",
+    "value_class",
+    "environment",
+    "authority",
+    "evidence",
+    "requested_effects",
+    "governance"
+  ],
+  "properties": {
+    "intent_id": {"type": "string", "pattern": "^ct[.]wallet[.]intent[.][a-z0-9._:-]{3,160}$"},
+    "action_type": {
+      "enum": [
+        "allocation_preview",
+        "entitlement_evaluate",
+        "passkey_assertion",
+        "passkey_recovery",
+        "passkey_registration",
+        "pricing_candidate",
+        "proof_anchor_prepare",
+        "provider_event_translate",
+        "provider_exit",
+        "smart_account_intent",
+        "thrivefund_obligation",
+        "wallet_public_projection"
+      ]
+    },
+    "value_class": {"enum": ["identity", "money", "rights", "rewards", "impact", "proof", "unknown"]},
+    "environment": {"enum": ["controlled_test", "testnet"]},
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "autonomy_class", "decision_class", "self_approval", "vote_effect", "heartbeat_fresh", "exact_head_bound"],
+      "properties": {
+        "agent_id": {"type": "string", "pattern": "^ct[.][a-z0-9._-]+$"},
+        "autonomy_class": {"enum": ["A0", "A1", "A2", "A3", "A4"]},
+        "decision_class": {"enum": ["D0", "D1", "D2", "D3", "D4"]},
+        "self_approval": {"type": "boolean"},
+        "vote_effect": {"type": "string"},
+        "heartbeat_fresh": {"type": "boolean"},
+        "exact_head_bound": {"type": "boolean"}
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidence_type", "state"],
+        "properties": {
+          "evidence_type": {"type": "string", "pattern": "^[a-z0-9._-]{2,120}$"},
+          "state": {"enum": ["present", "verified", "stale", "invalid", "missing"]},
+          "digest_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+          "source_ref": {"type": ["string", "null"], "maxLength": 500},
+          "observed_at": {"type": ["string", "null"]},
+          "expires_at": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "requested_effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "production_activation",
+        "provider_write",
+        "custody",
+        "token_issuance",
+        "money_movement",
+        "production_rights_grant",
+        "chain_broadcast",
+        "effective_price_publication",
+        "checkout_activation",
+        "phase_advancement",
+        "merge_authorized"
+      ],
+      "properties": {
+        "production_activation": {"type": "boolean"},
+        "provider_write": {"type": "boolean"},
+        "custody": {"type": "boolean"},
+        "token_issuance": {"type": "boolean"},
+        "money_movement": {"type": "boolean"},
+        "production_rights_grant": {"type": "boolean"},
+        "chain_broadcast": {"type": "boolean"},
+        "effective_price_publication": {"type": "boolean"},
+        "checkout_activation": {"type": "boolean"},
+        "phase_advancement": {"type": "boolean"},
+        "merge_authorized": {"type": "boolean"}
+      }
+    },
+    "governance": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["rollback_plan_present", "evidence_digest_bound"],
+      "properties": {
+        "independent_review_required": {"type": "boolean"},
+        "independent_review_state": {"type": "string"},
+        "phase_gate_required": {"type": "boolean"},
+        "phase_gate_state": {"type": "string"},
+        "rollback_plan_present": {"type": "boolean"},
+        "evidence_digest_bound": {"type": "boolean"}
+      }
+    }
+  }
+}

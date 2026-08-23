@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.crownthrive.com/chlom/wallet-policy-rulepack.v1.schema.json",
+  "title": "CHLOM Wallet Policy Rulepack v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rulepack_id",
+    "semantic_version",
+    "state",
+    "allowed_actions",
+    "allowed_value_classes",
+    "allowed_environments",
+    "authority_ceiling",
+    "risk_thresholds",
+    "rules",
+    "required_evidence",
+    "required_handoffs"
+  ],
+  "properties": {
+    "rulepack_id": {"const": "ct.rulepack.chlom-wallet.policy-assurance.v1"},
+    "semantic_version": {"const": "1.0.0"},
+    "state": {"const": "CONTROLLED_TEST"},
+    "allowed_actions": {
+      "type": "array",
+      "minItems": 12,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9._-]{2,120}$"}
+    },
+    "allowed_value_classes": {
+      "type": "array",
+      "minItems": 7,
+      "uniqueItems": true,
+      "items": {"enum": ["identity", "money", "rights", "rewards", "impact", "proof", "unknown"]}
+    },
+    "allowed_environments": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["controlled_test", "testnet"]},
+      "not": {"contains": {"const": "production"}}
+    },
+    "authority_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["autonomy", "decision"],
+      "properties": {
+        "autonomy": {"const": "A2"},
+        "decision": {"const": "D2"}
+      }
+    },
+    "risk_thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["low_max", "medium_max", "high_max"],
+      "properties": {
+        "low_max": {"type": "integer", "minimum": 0, "maximum": 24},
+        "medium_max": {"type": "integer", "minimum": 25, "maximum": 49},
+        "high_max": {"type": "integer", "minimum": 50, "maximum": 74}
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule_id", "effect", "reason_code", "weight", "description"],
+        "properties": {
+          "rule_id": {"type": "string", "pattern": "^ct[.]rule[.]wallet[.][a-z0-9._-]+[.]v1$"},
+          "effect": {"enum": ["DENY", "HOLD", "RISK"]},
+          "reason_code": {"type": "string", "pattern": "^[A-Z0-9_:-]{3,120}$"},
+          "weight": {"type": "integer", "minimum": 0, "maximum": 100},
+          "description": {"type": "string", "minLength": 8, "maxLength": 500}
+        }
+      }
+    },
+    "required_evidence": {
+      "type": "object",
+      "minProperties": 12,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {"type": "string", "pattern": "^[a-z0-9._-]{2,120}$"}
+      }
+    },
+    "required_handoffs": {
+      "type": "object",
+      "minProperties": 12,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {"type": "string", "pattern": "^ct[.][a-z0-9._-]+$"}
+      }
+    }
+  },
+  "not": {
+    "anyOf": [
+      {"required": ["private_key"]},
+      {"required": ["seed_phrase"]},
+      {"required": ["mnemonic"]},
+      {"required": ["credential_value"]},
+      {"required": ["client_secret"]},
+      {"required": ["api_key"]}
+    ]
+  }
+}
