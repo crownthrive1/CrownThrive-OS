@@ -1,0 +1,149 @@
+{
+  "schema_version": "1.0.0",
+  "policy_id": "ct.policy.chlom-wallet.walletkit-controlled.v1",
+  "semantic_version": "1.0.0",
+  "state": "CONTROLLED_TEST",
+  "scope": {
+    "tenant_ref": "ct.tenant.crownthrive",
+    "pallets": [
+      "ct.pallet.chlom-wallet-core.v1",
+      "ct.pallet.chlom-money-evidence-adapter.v1",
+      "ct.pallet.chlom-rights-wallet.v1",
+      "ct.pallet.chlom-unified-value-receipt.v1",
+      "ct.pallet.chlom-split-obligation-ledger.v1",
+      "ct.pallet.thrivefund-router.v1",
+      "ct.pallet.chlom-proof-anchor.v1",
+      "ct.pallet.chlom-passkey-identity.v1",
+      "ct.pallet.chlom-smart-account-preflight.v1",
+      "ct.pallet.chlom-provider-portability.v1",
+      "ct.pallet.chlom-wallet-sdk-api.v1",
+      "ct.pallet.chlom-wallet-enterprise-control-plane.v1"
+    ]
+  },
+  "defaults": {
+    "decision": "HOLD",
+    "unknown": "HOLD"
+  },
+  "rules": [
+    {
+      "rule_id": "ct.rule.wallet.deny-live-provider-write.v1",
+      "priority": 1000,
+      "effect": "DENY",
+      "reason_code": "LIVE_PROVIDER_WRITE_NOT_AUTHORIZED",
+      "when": { "field": "action.provider_write", "op": "eq", "value": true }
+    },
+    {
+      "rule_id": "ct.rule.wallet.deny-money-movement.v1",
+      "priority": 1000,
+      "effect": "DENY",
+      "reason_code": "MONEY_MOVEMENT_NOT_AUTHORIZED",
+      "when": { "field": "action.money_movement", "op": "eq", "value": true }
+    },
+    {
+      "rule_id": "ct.rule.wallet.deny-production-rights-grant.v1",
+      "priority": 1000,
+      "effect": "DENY",
+      "reason_code": "PRODUCTION_RIGHTS_GRANT_NOT_AUTHORIZED",
+      "when": { "field": "action.production_rights_grant", "op": "eq", "value": true }
+    },
+    {
+      "rule_id": "ct.rule.wallet.deny-chain-broadcast.v1",
+      "priority": 1000,
+      "effect": "DENY",
+      "reason_code": "CHAIN_BROADCAST_NOT_AUTHORIZED",
+      "when": { "field": "action.chain_broadcast", "op": "eq", "value": true }
+    },
+    {
+      "rule_id": "ct.rule.wallet.hold-unverified-provider-evidence.v1",
+      "priority": 900,
+      "effect": "HOLD",
+      "reason_code": "PROVIDER_EVIDENCE_NOT_VERIFIED",
+      "when": {
+        "all": [
+          { "field": "action.category", "op": "eq", "value": "provider_translation" },
+          { "field": "evidence.provider_signature_verified", "op": "neq", "value": true }
+        ]
+      }
+    },
+    {
+      "rule_id": "ct.rule.wallet.hold-rights-without-independent-evidence.v1",
+      "priority": 900,
+      "effect": "HOLD",
+      "reason_code": "INDEPENDENT_RIGHTS_EVIDENCE_REQUIRED",
+      "when": {
+        "all": [
+          { "field": "action.category", "op": "eq", "value": "rights_decision" },
+          { "field": "evidence.independent_rights_active", "op": "neq", "value": true }
+        ]
+      }
+    },
+    {
+      "rule_id": "ct.rule.wallet.hold-effective-offer-change.v1",
+      "priority": 850,
+      "effect": "HOLD",
+      "reason_code": "INDEPENDENT_PRICE_AND_RELEASE_REVIEW_REQUIRED",
+      "when": { "field": "action.effective_offer_change", "op": "eq", "value": true }
+    },
+    {
+      "rule_id": "ct.rule.wallet.allow-controlled-provider-translation.v1",
+      "priority": 500,
+      "effect": "ALLOW",
+      "reason_code": "CONTROLLED_PROVIDER_TRANSLATION_ALLOWED",
+      "when": {
+        "all": [
+          { "field": "environment", "op": "eq", "value": "CONTROLLED_TEST" },
+          { "field": "action.category", "op": "eq", "value": "provider_translation" },
+          { "field": "evidence.provider_signature_verified", "op": "eq", "value": true },
+          { "field": "action.provider_write", "op": "eq", "value": false }
+        ]
+      }
+    },
+    {
+      "rule_id": "ct.rule.wallet.allow-controlled-rights-evaluation.v1",
+      "priority": 500,
+      "effect": "ALLOW",
+      "reason_code": "CONTROLLED_RIGHTS_EVALUATION_ALLOWED",
+      "when": {
+        "all": [
+          { "field": "environment", "op": "eq", "value": "CONTROLLED_TEST" },
+          { "field": "action.category", "op": "eq", "value": "rights_decision" },
+          { "field": "evidence.independent_rights_active", "op": "eq", "value": true },
+          { "field": "action.production_rights_grant", "op": "eq", "value": false }
+        ]
+      }
+    },
+    {
+      "rule_id": "ct.rule.wallet.allow-controlled-simulation.v1",
+      "priority": 400,
+      "effect": "ALLOW",
+      "reason_code": "CONTROLLED_SIMULATION_ALLOWED",
+      "when": {
+        "all": [
+          { "field": "environment", "op": "eq", "value": "CONTROLLED_TEST" },
+          { "field": "action.category", "op": "in", "value": ["policy_simulation", "usage_preview", "advisor_preview"] },
+          { "field": "action.provider_write", "op": "eq", "value": false },
+          { "field": "action.money_movement", "op": "eq", "value": false },
+          { "field": "action.chain_broadcast", "op": "eq", "value": false }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "algorithm_suite": "ct.algorithm-suite.chlom-wallet-policy-metering.v1",
+    "institutional_phase": "2.99",
+    "candidate_only": true,
+    "source_ref": "github:crownthrive1/CrownThrive-Support:pull/230"
+  },
+  "hard_boundaries": {
+    "provider_write": false,
+    "production_rights_grant": false,
+    "credential_activation": false,
+    "chain_broadcast": false,
+    "custody": false,
+    "money_movement": false,
+    "effective_price_publication": false,
+    "checkout_activation": false,
+    "phase_advancement": false,
+    "merge_authorized": false
+  }
+}
