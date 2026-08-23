@@ -1,0 +1,107 @@
+name: CHLOM Wallet Policy Assurance v2
+
+on:
+  pull_request:
+    paths:
+      - "developers/chlom-wallet-policy-assurance-v2.mdx"
+      - "developers/manifests/chlom-wallet-policy-assurance-v2.json"
+      - "developers/reference/chlom-wallet/policy/**"
+      - "security/chlom-wallet-policy-assurance-threat-model.mdx"
+      - "automation/chlom-wallet-agent-skills-v2.json"
+      - "automation/chlom-wallet-settlement-agent-phase-c-skills.json"
+      - "chlom/chlom-wallet-component-pallets.v1.json"
+      - ".github/workflows/chlom-wallet-policy-assurance-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-policy-assurance-v2-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy-assurance:
+    name: Deterministic policy, AI firewall, closure and chaos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify runtime
+        run: node --version
+
+      - name: Syntax check
+        run: |
+          node --check developers/reference/chlom-wallet/policy/chlom-wallet-policy-assurance-v2.mjs
+          node --check developers/reference/chlom-wallet/policy/ai-counsel-firewall-v1.mjs
+          node --check developers/reference/chlom-wallet/policy/policy-chaos-fuzz-v2.mjs
+          node --check developers/reference/chlom-wallet/policy/test-policy-assurance-v2.mjs
+          node --check developers/reference/chlom-wallet/policy/test-ai-counsel-firewall-v1.mjs
+          node --check developers/reference/chlom-wallet/policy/test-skill-pallet-closure-v2.mjs
+          node --check developers/reference/chlom-wallet/policy/test-policy-manifest-v2.mjs
+
+      - name: Validate JSON contracts
+        run: |
+          python -m json.tool developers/reference/chlom-wallet/policy/policy-rulepack.v2.json >/dev/null
+          python -m json.tool developers/reference/chlom-wallet/policy/skill-pallet-closure.v2.json >/dev/null
+          python -m json.tool developers/manifests/chlom-wallet-policy-assurance-v2.json >/dev/null
+
+      - name: Run deterministic policy contract
+        run: node developers/reference/chlom-wallet/policy/test-policy-assurance-v2.mjs
+
+      - name: Run AI counsel firewall contract
+        run: node developers/reference/chlom-wallet/policy/test-ai-counsel-firewall-v1.mjs
+
+      - name: Run skill-to-pallet closure contract
+        run: node developers/reference/chlom-wallet/policy/test-skill-pallet-closure-v2.mjs
+
+      - name: Run 50k deterministic chaos suite
+        run: node developers/reference/chlom-wallet/policy/policy-chaos-fuzz-v2.mjs
+
+      - name: Verify machine manifest
+        run: node developers/reference/chlom-wallet/policy/test-policy-manifest-v2.mjs
+
+      - name: Enforce no-network boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(developers/reference/chlom-wallet/policy/*.mjs)
+          if grep -nE 'https?://|wss?://|fetch\(|WebSocket\(' "${files[@]}"; then
+            echo "Policy assurance reference code must remain deterministic and network-free."
+            exit 1
+          fi
+
+      - name: Enforce public secret boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sb_secret_[A-Za-z0-9._-]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' \
+            developers/reference/chlom-wallet/policy/* \
+            developers/manifests/chlom-wallet-policy-assurance-v2.json \
+            developers/chlom-wallet-policy-assurance-v2.mdx \
+            security/chlom-wallet-policy-assurance-threat-model.mdx; then
+            echo "Potential secret-shaped material detected in Wallet policy projection."
+            exit 1
+          fi
+
+      - name: Enforce fail-closed governance boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const m=JSON.parse(fs.readFileSync('developers/manifests/chlom-wallet-policy-assurance-v2.json','utf8'));
+          const hard=['production_activation','provider_write','custody','token_issuance','money_movement','production_rights_grant','chain_broadcast','effective_price_publication','checkout_activation','phase_advancement','merge_authorized','ai_final_authority'];
+          for(const k of hard){if(m.governance[k]!==false) throw new Error(`boundary_not_false:${k}`)}
+          if(m.governance.independent_reviewer_heartbeats_modified!==false) throw new Error('reviewer_heartbeats_must_remain_untouched');
+          if(m.governance.independent_review_receipts_fabricated!==false) throw new Error('review_receipts_must_not_be_fabricated');
+          NODE
+
+      - name: Record controlled-test boundary
+        run: |
+          echo "Policy assurance v2 is deterministic controlled-test evidence only."
+          echo "ECAC is an eligible controlled-action candidate, not sovereign approval."
+          echo "AI counsel is advisory only and cannot upgrade deterministic HOLD/DENY."
+          echo "No provider write, custody, token issuance, money movement, rights grant, chain broadcast, effective price, checkout, merge, or phase advancement is authorized."
