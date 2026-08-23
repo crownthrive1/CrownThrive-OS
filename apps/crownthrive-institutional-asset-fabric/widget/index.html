@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CrownThrive Institutional Asset Fabric</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body { margin: 0; padding: 1rem; background: Canvas; color: CanvasText; }
+    main { max-width: 76rem; margin: 0 auto; }
+    header { display: grid; gap: .35rem; margin-bottom: 1rem; }
+    h1 { margin: 0; font-size: clamp(1.35rem, 3vw, 2rem); }
+    h2 { margin-top: 1.4rem; }
+    p { margin: 0; line-height: 1.5; }
+    .notice, .card {
+      border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+      border-radius: .85rem;
+      padding: .9rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      gap: .75rem;
+      margin: 1rem 0;
+    }
+    .label { font-size: .76rem; opacity: .72; text-transform: uppercase; letter-spacing: .05em; }
+    .value { margin-top: .35rem; font-size: 1.45rem; font-weight: 750; overflow-wrap: anywhere; }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      text-align: left;
+      padding: .65rem;
+      border-bottom: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+      vertical-align: top;
+    }
+    th { font-size: .8rem; }
+    .muted { opacity: .72; }
+    .badge {
+      display: inline-block;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      padding: .15rem .45rem;
+      font-size: .75rem;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>CrownThrive Institutional Asset Fabric</h1>
+    <p>Controlled-test view of governed blueprints, assets, plugins, pallets, kernels and scrutiny state.</p>
+  </header>
+
+  <section class="notice" aria-label="Evidence boundary">
+    <strong>Evidence boundary:</strong> a blueprint or package record is not proof of materialized source, production certification, installation, publication or live commerce. Protected kernels, credentials and private identities are not displayed.
+  </section>
+
+  <section class="grid" id="metrics" aria-label="Institutional asset metrics"></section>
+
+  <section>
+    <h2>Asset classes</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Class</th><th>Count</th></tr></thead>
+        <tbody id="classes"><tr><td colspan="2" class="muted">No asset-class data supplied.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Hard boundaries</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Control</th><th>State</th></tr></thead>
+        <tbody id="controls"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="muted" id="status" role="status" aria-live="polite">Waiting for tool output.</p>
+</main>
+<script>
+(() => {
+  "use strict";
+  const safeObject = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const output = safeObject(window.openai?.toolOutput || window.openai?.structuredContent || {});
+  const status = safeObject(output.status || output);
+
+  const metrics = [
+    ["Blueprints", status.blueprints],
+    ["Curated assets", status.curated_assets],
+    ["Plugins", status.plugins],
+    ["Pallets", status.pallets],
+    ["Kernels", status.kernels],
+    ["Open findings", status.open_findings]
+  ];
+
+  document.getElementById("metrics").replaceChildren(...metrics.map(([label, value]) => {
+    const card = document.createElement("article");
+    card.className = "card";
+    const labelNode = document.createElement("div");
+    labelNode.className = "label";
+    labelNode.textContent = String(label);
+    const valueNode = document.createElement("div");
+    valueNode.className = "value";
+    valueNode.textContent = value ?? "—";
+    card.append(labelNode, valueNode);
+    return card;
+  }));
+
+  const classes = safeObject(status.asset_classes);
+  const classEntries = Object.entries(classes).sort(([a], [b]) => a.localeCompare(b));
+  if (classEntries.length) {
+    document.getElementById("classes").replaceChildren(...classEntries.map(([name, count]) => {
+      const row = document.createElement("tr");
+      const nameCell = document.createElement("td");
+      nameCell.textContent = name;
+      const countCell = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = String(count);
+      countCell.append(badge);
+      row.append(nameCell, countCell);
+      return row;
+    }));
+  }
+
+  const controls = [
+    ["Provider writes", status.provider_write_enabled === false ? "Disabled" : "Unknown"],
+    ["Arbitrary native execution", status.arbitrary_native_binary_execution === false ? "Disabled" : "Unknown"],
+    ["Installed plugins", String(status.installed_plugins ?? "—")],
+    ["Submitted plugins", String(status.submitted_plugins ?? "—")],
+    ["Published plugins", String(status.published_plugins ?? "—")],
+    ["Checkout-enabled assets", String(status.checkout_enabled_assets ?? "—")],
+    ["D3 automation", status.D3_auto === false ? "Disabled" : "Unknown"],
+    ["Sovereign-vote effect", status.sovereign_vote_effect === false ? "None" : "Unknown"]
+  ];
+  document.getElementById("controls").replaceChildren(...controls.map(([control, state]) => {
+    const row = document.createElement("tr");
+    const controlCell = document.createElement("td");
+    controlCell.textContent = control;
+    const stateCell = document.createElement("td");
+    stateCell.textContent = state;
+    row.append(controlCell, stateCell);
+    return row;
+  }));
+
+  document.getElementById("status").textContent = window.openai
+    ? "Tool output rendered. Protected fields remain unavailable to the widget."
+    : "Standalone candidate preview. Connect through the governed MCP runtime for current data.";
+})();
+</script>
+</body>
+</html>
