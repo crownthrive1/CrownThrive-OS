@@ -1,3 +1,4 @@
+-- No-op rollback: the prerequisite migration performs read-only topology assertions only.
 begin;
-drop index if exists chlom_runtime.capability_contracts_capability_id_uq;
+select 1;
 commit;
