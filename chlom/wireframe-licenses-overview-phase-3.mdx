@@ -1,0 +1,280 @@
+---
+title: "Wireframe: Licenses Overview (Phase 3)"
+sidebarTitle: "Licenses Overview Wireframe"
+description: "Recovered-title implementation article for the Phase 3 Licenses Overview, with role-scoped DLA/license tables, lifecycle filters, expirations, holds, source-right status, transferability and canonical readback."
+icon: "list"
+keywords: ["CHLOM licenses overview", "DLA table", "Phase 3", "license lifecycle", "rights", "HOLD"]
+---
+
+# Wireframe: Licenses Overview (Phase 3)
+
+## Recovery status
+
+```yaml
+ui_asset_id: ct.chlom.ui.licenses-overview.phase3
+exact_recovered_title: "Wireframe: Licenses Overview (Phase 3)"
+recovery_status: exact_title_recovered_related_architecture_available
+original_visual_body: not_confirmed_recovered_for_this_article
+current_mapping: P-03 license/DLA portfolio view
+```
+
+## Purpose
+
+The Licenses Overview gives an authorized actor a current, filterable portfolio of license/DLA records without reducing a complex rights state to a single `active` checkbox.
+
+```text
+ROLE / SCOPE
+   |
+   v
+AUTHORIZED LICENSE SET
+   |
+   +--> active
+   +--> pending
+   +--> HOLD
+   +--> expiring
+   +--> suspended/revoked
+   +--> disputed
+```
+
+## ASCII wireframe
+
+```text
++--------------------------------------------------------------------------------+
+| Licenses | [Search] [Filters] [Saved view]                [Create if allowed]   |
++--------------------------------------------------------------------------------+
+| Summary: Active | Pending | HOLD | Expiring | Suspended/Revoked | Disputed      |
++--------------------------------------------------------------------------------+
+| DLA ID | Asset | Holder | Issuer | Scope | Version | Expires | Status | Action |
+|--------|-------|--------|--------|-------|---------|---------|--------|--------|
+| ...                                                                            |
++--------------------------------------------------------------------------------+
+| Pagination / cursor | as-of/readback state                                      |
++--------------------------------------------------------------------------------+
+```
+
+## Role scoping
+
+The overview can show different sets:
+
+- licenses held by actor;
+- licenses issued/stewarded by actor;
+- organization portfolio;
+- reviewer queue;
+- case-related licenses;
+- public verification subset.
+
+Every view states its scope.
+
+## Summary counts
+
+Counts require exact definitions:
+
+```text
+Active = current status ACTIVE and visible to role at as_of
+Expiring = active and expiration falls in selected presentation window
+HOLD = current state blocks requested/defined action
+```
+
+Do not double-count a record across summary cards unless UI explicitly explains overlapping categories.
+
+## Table columns
+
+Recommended core columns:
+
+```text
+DLA ID
+asset / public title
+license type
+holder/licensee
+issuer/steward
+rights scope summary
+version
+status
+effective date
+expiration
+transferability
+open case/HOLD
+verification freshness
+```
+
+Sensitive identity/economic fields are role/classification gated.
+
+## Filters
+
+```text
+status
+holder / issuer
+asset class
+territory
+media/channel
+expiry window
+transferability
+sublicensing
+verification state
+case/dispute state
+organization / tenant
+```
+
+Filter labels must map to defined schema fields.
+
+## Status semantics
+
+```text
+DRAFT
+PENDING_EVIDENCE
+PENDING_REVIEW
+ACTIVE
+HOLD
+SUSPENDED
+DISPUTED
+EXPIRED
+REVOKED
+TERMINATED
+SUPERSEDED
+```
+
+The exact status enum is implementation-version controlled; historical source labels remain mapped rather than silently discarded.
+
+## Row status
+
+A row can show multiple orthogonal states:
+
+```text
+DLA: ACTIVE
+Evidence: STALE
+Transfer eligibility: HOLD
+Provider projection: MISMATCH
+```
+
+Do not force all dimensions into one misleading color badge.
+
+## Bulk actions
+
+Bulk actions are restricted because rights actions are high impact. Allowed examples can include export/assign-review rather than mass revocation by default.
+
+Any material bulk action requires:
+
+- exact selected set;
+- authorization;
+- policy preflight;
+- confirmation;
+- idempotent execution;
+- per-object results;
+- DAIL receipts.
+
+## Saved views
+
+A saved view stores filters/layout, not a frozen rights state. Reopening re-queries current canonical data.
+
+## Expiration management
+
+Selecting `Expiring` can show:
+
+```text
+DLA
+expires at
+renewal permitted?
+required evidence
+current holder/issuer state
+renewal candidate status
+```
+
+The list cannot assume renewal is permitted.
+
+## HOLD queue
+
+HOLD rows expose safe reason class and next step:
+
+```text
+DLA-123 | HOLD | rights evidence conflict | Review case C-55
+```
+
+Protected fraud/security reasons can use generalized reason classes.
+
+## Stale/readback indicator
+
+Each table fetch has an `as_of` and service/readback state. If a dependent provider/index is stale, the UI marks the affected field/row rather than pretending all values are current.
+
+## Search
+
+Search results can match DLA ID, asset/public title, permitted participant identifier, agreement/public tag and provider alias when authorized.
+
+Search index results are revalidated on detail/material action.
+
+## Export
+
+Exports are classified. Public-safe export differs from internal rights/evidence export.
+
+```text
+public export -> safe metadata
+internal export -> role-authorized fields
+restricted export -> explicit elevated permission / audit
+```
+
+## Empty states
+
+- no licenses in scope;
+- no matches for filters;
+- data unavailable/syncing;
+- role lacks visibility.
+
+These are distinct states.
+
+## Error states
+
+- rights service unavailable;
+- filter/schema mismatch;
+- evidence currentness unavailable;
+- provider/index mismatch;
+- tenant context unavailable;
+- permission change during session.
+
+## Data dependencies
+
+- P-01 actor/organization scope;
+- P-03 DLA/right graph;
+- P-02 policy/HOLD state;
+- case service;
+- Evidence Vault/DAIL;
+- search/indexer;
+- provider projections.
+
+## Events
+
+Material list-level operations can reference:
+
+```text
+ct.dla.review.assigned.v1
+ct.dla.export.generated.v1
+```
+
+Ordinary views/search are UX analytics only if intentionally collected.
+
+## Accessibility
+
+- table headers/sort announced;
+- filters labeled;
+- status text plus icons;
+- horizontal overflow manageable;
+- mobile card view retains DLA ID/status/scope/action;
+- row menus keyboard accessible.
+
+## Restricted companion
+
+Can include private rights/economic columns, reviewer queues, protected conflict indicators, provider reconciliation details and administrator-only bulk operations.
+
+## Invariants
+
+```text
+row ACTIVE != every action PASS
+portfolio count != public rights claim
+saved view != frozen state
+index search != canonical state
+export visibility != source ownership
+bulk UI != bulk authority
+reconstructed layout != recovered visual
+```
+
+## Known unknowns
+
+The exact original visual body is not confirmed recovered. This article preserves the title and specifies the current P-03 implementation contract.
