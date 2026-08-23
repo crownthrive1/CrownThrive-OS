@@ -1,0 +1,97 @@
+name: Institutional Asset Scaffold Governance
+
+on:
+  pull_request:
+    paths:
+      - scripts/materialize_crownthrive_asset_scaffold.py
+      - scripts/generate_crownthrive_asset_blueprints.py
+      - developers/manifests/crownthrive-asset-blueprint-catalog.v1.json
+      - .github/workflows/institutional-asset-scaffold-governance.yml
+  push:
+    branches:
+      - agent/gen6-priority-delegation-control-plane-20260821
+    paths:
+      - scripts/materialize_crownthrive_asset_scaffold.py
+      - scripts/generate_crownthrive_asset_blueprints.py
+      - developers/manifests/crownthrive-asset-blueprint-catalog.v1.json
+      - .github/workflows/institutional-asset-scaffold-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: institutional-asset-scaffold-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scaffold-canary:
+    name: Materialize and inspect one safe source scaffold
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact repository head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate source syntax
+        run: |
+          python -m py_compile scripts/generate_crownthrive_asset_blueprints.py
+          python -m py_compile scripts/materialize_crownthrive_asset_scaffold.py
+
+      - name: Materialize a controlled script scaffold
+        run: |
+          output_dir="$(mktemp -d)"
+          python scripts/materialize_crownthrive_asset_scaffold.py \
+            --blueprint-id ct.blueprint.chlom.script.internal_control.v1 \
+            --package-id ct.asset.canary.chlom-script \
+            --output "$output_dir"
+          test -f "$output_dir/asset.manifest.json"
+          test -f "$output_dir/src/main.py"
+          test -f "$output_dir/verification.candidate.json"
+          test -f "$output_dir/materialization-receipt.json"
+          python -m json.tool "$output_dir/asset.manifest.json" >/dev/null
+          python -m json.tool "$output_dir/verification.candidate.json" >/dev/null
+          python -m json.tool "$output_dir/materialization-receipt.json" >/dev/null
+          python "$output_dir/src/main.py" > "$output_dir/describe.json"
+          python -m json.tool "$output_dir/describe.json" >/dev/null
+          python - <<'PY' "$output_dir"
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          manifest = json.loads((root / "asset.manifest.json").read_text())
+          verify = json.loads((root / "verification.candidate.json").read_text())
+          described = json.loads((root / "describe.json").read_text())
+          assert manifest["state"] == "scaffold_only"
+          assert manifest["source_materialized"] is True
+          assert manifest["independently_verified"] is False
+          assert manifest["provider_write_enabled"] is False
+          assert manifest["arbitrary_command_execution"] is False
+          assert manifest["opaque_native_binary_generation"] is False
+          assert manifest["installed"] is False
+          assert manifest["published"] is False
+          assert manifest["checkout_enabled"] is False
+          assert verify["owner_can_self_verify"] is False
+          assert "independent_test_receipts_missing" in verify["blockers"]
+          assert described["asset_state"] == "scaffold_only"
+          assert described["provider_write_performed"] is False
+          assert described["secret_accessed"] is False
+          assert described["D3_auto"] is False
+          PY
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- \
+            scripts/materialize_crownthrive_asset_scaffold.py \
+            scripts/generate_crownthrive_asset_blueprints.py; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
