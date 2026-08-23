@@ -25,13 +25,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The decision engine binds to the exact base/head SHAs supplied by
-          # the pull_request event. A synthetic merge ref can lag the current
-          # base while the PR is moving; shallow depth 2 therefore does not
-          # guarantee that github.event.pull_request.base.sha is present.
-          # Full read-only history makes both exact objects locally available
-          # without adding API/write authority to the decision engine.
-          fetch-depth: 0
+          # Pull-request checkout uses a synthetic merge commit. Keep the
+          # bounded initial checkout, then explicitly hydrate the event's exact
+          # base/head refs before trusted-diff validation so base movement does
+          # not create a false "bad object" failure.
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -65,7 +63,23 @@ jobs:
         env:
           CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CT_GIT_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          CT_GIT_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
+          # Hydrate the actual branch histories referenced by the PR event.
+          # This is read-only Git transport; the decision engine still receives
+          # only exact base/head SHAs and has no GitHub API/write authority.
+          if [ -f .git/shallow ]; then
+            git fetch --no-tags --no-recurse-submodules --unshallow origin \
+              "+refs/heads/${CT_GIT_BASE_REF}:refs/remotes/origin/${CT_GIT_BASE_REF}" \
+              "+refs/heads/${CT_GIT_HEAD_REF}:refs/remotes/origin/${CT_GIT_HEAD_REF}"
+          else
+            git fetch --no-tags --no-recurse-submodules origin \
+              "+refs/heads/${CT_GIT_BASE_REF}:refs/remotes/origin/${CT_GIT_BASE_REF}" \
+              "+refs/heads/${CT_GIT_HEAD_REF}:refs/remotes/origin/${CT_GIT_HEAD_REF}"
+          fi
+          git cat-file -e "${CT_GIT_BASE_SHA}^{commit}"
+          git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}"
           python scripts/governed_merge_decision.py \
             --verify-git-diff \
             --git-base "$CT_GIT_BASE_SHA" \
