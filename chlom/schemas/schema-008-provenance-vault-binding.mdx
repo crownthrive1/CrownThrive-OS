@@ -1,0 +1,106 @@
+---
+title: "SCHEMA-008 — Provenance / Vault Binding Record"
+sidebarTitle: "SCHEMA-008 Vault Binding"
+description: "Canonical CHLOM machine schema linking private source custody, source versions and digests to public-safe articles, restricted technical assets, Git paths and supersession lineage."
+icon: "vault"
+keywords: ["CHLOM schema", "vault binding", "provenance", "private public", "digest", "IP"]
+---
+
+# SCHEMA-008 — Provenance / Vault Binding Record
+
+## Schema identity
+
+```yaml
+schema_id: SCHEMA-008
+name: Provenance / Vault Binding Record
+classification: reconstructed_machine_contract
+version: 1.0.0
+related_workflow: WF-002; WF-006
+```
+
+## Purpose
+
+SCHEMA-008 is the machine binding between protected CHLOM source custody and the public-safe institutional objects derived from it. It allows CHLOM to prove lineage and maintain updates without placing confidential/trade-secret source material into public Git or Mintlify.
+
+## Core record
+
+```yaml
+binding_id: string
+institutional_object_id: string
+object_type: string
+classification: public_safe|internal|restricted|trade_secret|secret_reference
+private_source:
+  source_id: string
+  source_version: string|null
+  custody_ref: stable_ref
+  digest_algorithm: string|null
+  digest_value: string|null
+  confidentiality_label: string|null
+public_derivatives:
+  - article_id: string
+    article_version: string|null
+    git_path: string|null
+    first_commit_sha: string|null
+restricted_derivatives:
+  - object_id: string
+    object_type: string
+    custody_ref: stable_ref
+redaction_basis_refs: [stable_ref]
+source_section_refs: [string]
+created_at: timestamp
+updated_at: timestamp
+supersedes: stable_ref|null
+provenance_refs: [stable_ref]
+DAIL_refs: [stable_ref]
+```
+
+## Private source
+
+The private source identity and custody reference are mandatory for protected bindings. Public-safe projections can replace a sensitive custody path/title with an opaque ID while retaining the internal full record.
+
+## Public derivatives
+
+A single protected source can produce many public articles: source record, theorem records, safe algorithms, architecture articles and workflow/schema pages. Each derivative records the version/commit path that materialized the safe projection.
+
+## Restricted derivatives
+
+Some extracted objects stay private entirely, such as model weights, exact proprietary algorithms, private Fingerprint logic, circuit/witness details, secret-bearing configurations or confidential economic schedules. Their existence can be referenced without exposing body content.
+
+## Redaction basis
+
+Redaction is reasoned and versioned. Basis references can point to trade-secret classification, credential/secret policy, privacy restrictions, legal/confidentiality terms or exploit-sensitive security classification.
+
+## Digest and source identity
+
+The source digest identifies the exact protected source representation where available. It does not require the public to possess the source body and does not prove factual accuracy.
+
+## Source sections
+
+Where safe, `source_section_refs` record page/section/appendix lineage so a future maintainer can verify which protected section generated the public-safe object without re-reading an entire corpus.
+
+## Git linkage
+
+Public derivatives bind to Git paths and first/material commit SHA where known. A later article version can append/update lineage without changing the original source binding.
+
+## Supersession
+
+When a protected source is revised, create a new source/binding version linked to the old one. Public derivatives are reviewed under WF-002 and updated only for new safe material.
+
+## Validation rules
+
+- stable binding/object/source IDs;
+- private protected assets have custody refs;
+- classification matches redaction/public projection;
+- public article paths do not contain secrets/private source bodies;
+- digest pair is coherent when present;
+- derivative IDs resolve;
+- supersession chain is acyclic;
+- sensitive custody paths are not exposed publicly when prohibited.
+
+## Tests
+
+Test one private source to one article, one-to-many derivation, private-only derivative, revised source, digest mismatch, public-path secret scan, broken custody reference and source-section correction.
+
+## Versioning
+
+Binding records are append-only/versioned provenance objects. Public/private relationship history remains available even after a source or article is superseded.

@@ -1,0 +1,127 @@
+---
+title: "ALG-001 — Three-Valued Policy Evaluation"
+sidebarTitle: "ALG-001 Policy Evaluation"
+description: "Standalone CHLOM algorithm specification for deterministic PASS, HOLD and DENY evaluation of required controls, preserving fail-closed semantics and source lineage."
+icon: "code"
+keywords: ["CHLOM ALG-001", "PASS HOLD DENY", "policy evaluation", "fail closed", "compliance algorithm"]
+---
+
+# ALG-001 — Three-Valued Policy Evaluation
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-001
+name: Three-Valued Policy Evaluation
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: CHLOM algorithm registry; Compliance Packs; ACE policy lineage
+version: 1.0.0
+current_authority: specification_only
+```
+
+This algorithm resolves a set of required CHLOM controls into one of three dispositions: **PASS**, **HOLD**, or **DENY**. It exists to prevent binary logic from converting missing, stale, contradictory, or unresolved evidence into an accidental approval.
+
+## Problem contract
+
+A governed action may depend on multiple controls: rights, identity, credential freshness, policy, jurisdiction, sanctions, approvals, payment prerequisites, or other evidence. Those controls do not all fail in the same way.
+
+- **PASS** means the evaluated control is satisfied for the present context.
+- **HOLD** means execution cannot be approved yet because a required fact is unresolved, stale, incomplete, contradictory, or awaiting authorized review.
+- **DENY** means a rule or authoritative condition affirmatively blocks the action.
+
+The central invariant is:
+
+```text
+UNKNOWN required fact != PASS
+```
+
+## Inputs
+
+```yaml
+controls:
+  - control_id
+  - control_version
+  - required: boolean
+  - hard_block: boolean
+  - evaluator_ref
+  - evidence_refs[]
+  - context
+```
+
+Every evaluator must return a typed disposition plus evidence/reason metadata. A bare boolean is insufficient when a distinction between `false` and `unknown` matters.
+
+## Public-safe procedure
+
+```text
+function evaluate_required_controls(controls):
+    disposition = PASS
+
+    for control in controls:
+        result = evaluate(control)
+
+        if result == DENY and control.hard_block:
+            return DENY
+
+        if result == DENY:
+            disposition = max_restrictive(disposition, DENY)
+        else if result == HOLD:
+            disposition = max_restrictive(disposition, HOLD)
+
+    return disposition
+```
+
+The restriction ordering is:
+
+```text
+PASS < HOLD < DENY
+```
+
+unless a policy explicitly defines a narrower domain-specific transition. A hard block terminates evaluation early because later evidence cannot override a prohibited condition without a separately authorized override path.
+
+## Preconditions
+
+- applicable policy versions are resolved;
+- control evaluators are authorized for their control type;
+- evidence classification and tenant scope are known;
+- required controls cannot silently disappear because a provider is unavailable.
+
+## Postconditions
+
+The result must include:
+
+```yaml
+disposition: PASS|HOLD|DENY
+control_results[]:
+reason_codes[]:
+evidence_refs[]:
+policy_versions[]:
+evaluated_at:
+expires_or_reverify_at:
+```
+
+A PASS is contextual and time-bound where underlying evidence has freshness requirements.
+
+## Failure states
+
+`HOLD` is required for missing evidence, stale evidence, unresolved identity, conflicting authoritative sources, incomplete approvals, evaluator outage where the control is mandatory, or an unsupported policy version. `DENY` is appropriate only when an authoritative rule or verified condition affirmatively blocks the action.
+
+## Authority boundary
+
+This algorithm computes a **policy disposition**. It does not manufacture institutional authority. A PASS may still need the authority-aware decision gateway before execution.
+
+```text
+policy PASS != authority to execute
+```
+
+## DAIL evidence
+
+Consequential evaluations should create or reference DAIL records containing the request context, policy versions, control results, reason codes, source evidence, algorithm version, and effective expiry. Corrections are append-only; prior decisions are not erased.
+
+## Test obligations
+
+At minimum test: all-pass, one-hold, one-deny, hard-block deny, evaluator unavailable, stale evidence, contradictory evidence, duplicate controls, policy-version mismatch, and repeated/idempotent evaluation of the same immutable snapshot.
+
+## Versioning rule
+
+A change to restriction ordering, hard-block behavior, control semantics, or evidence treatment requires a new algorithm version and regression replay against prior test vectors. Documentation alone cannot activate the new version.

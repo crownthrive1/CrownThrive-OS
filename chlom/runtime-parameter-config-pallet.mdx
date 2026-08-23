@@ -1,0 +1,211 @@
+---
+title: "Parameter / Runtime Config Pallet — Historical Runtime Record"
+sidebarTitle: "Parameter / Runtime Config Pallet"
+description: "Individual reconstruction of CHLOM's historical Parameter/Runtime Config Pallet for governed protocol parameters, versioned configuration, effective periods and current configuration-service mapping."
+icon: "sliders"
+keywords: ["CHLOM Parameter Pallet", "Runtime Config Pallet", "protocol parameters", "configuration", "governance"]
+---
+
+# Parameter / Runtime Config Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.parameter-config
+namespace: historical_runtime_pallet
+recovered_title: Parameter/Runtime Config Pallet
+recovered_help_center_description: governed runtime parameters and configuration used across CHLOM modules
+source_recovery: title_plus_related_architecture
+current_mapping:
+  - Parameter & Config Service
+  - P-02 Governance & Compliance
+  - versioned runtime/service configuration
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Parameter/Runtime Config Pallet represented CHLOM's protocol-level configuration plane: values that many pallets needed to read but only authorized governance/administrative processes could change.
+
+```text
+AUTHORIZED CONFIG CHANGE
+        |
+        v
+PARAMETER / CONFIG PALLET
+        |
+  versioned effective state
+        |
+        +--> DLA / LEX
+        +--> fees
+        +--> governance
+        +--> scheduler
+        +--> risk / policy
+```
+
+## Parameter is not policy authority
+
+A parameter can implement an adopted policy but cannot create the policy that authorizes it.
+
+```text
+source rule / decision
+       |
+       v
+parameter definition
+       |
+       v
+approved value/version
+       |
+       v
+runtime/service consumption
+```
+
+## Reconstructed parameter record
+
+```yaml
+parameter_id: stable ID
+namespace: module/service scope
+value_type: integer|decimal|string|duration|boolean|enum|reference
+value: public-safe or protected reference
+unit: optional
+source_authority_ref: required
+version: string
+effective_from: timestamp
+effective_until: nullable
+status: candidate|active|superseded|retired
+```
+
+Exact historical storage keys are not recovered unless separately found.
+
+## Effective periods
+
+Configuration changes should preserve historical effective state.
+
+```text
+parameter v1 --effective until T1
+parameter v2 --effective from T1
+```
+
+Historical events retain the parameter/config version used at execution.
+
+## Protected values
+
+Not every runtime/config value belongs in public docs. Public records can expose semantic ranges/types while protected thresholds/calibration/security settings remain in restricted/Vault-bound configuration.
+
+## Current mapping
+
+```text
+Historical Parameter Pallet
+        |
+        v
+Parameter & Config Service
+        |
+        +--> policy-governed values
+        +--> feature/runtime configuration
+        +--> provider adapter config references
+        +--> environment-specific projections
+        |
+        v
+DAIL version/change evidence
+```
+
+## Change workflow
+
+```text
+CHANGE REQUEST
+    |
+source authority / policy
+    |
+validation / tests
+    |
+approval
+    |
+new version
+    |
+deploy / readback
+    |
+DAIL
+```
+
+A config editor having write capability is not sufficient authority.
+
+## Validation
+
+A parameter definition should include:
+
+- type;
+- allowed domain/range;
+- units;
+- default behavior;
+- fail behavior;
+- dependencies;
+- whether changing it is breaking;
+- whether it is public or restricted.
+
+## Failure mode: unresolved config
+
+For material controls:
+
+```text
+missing / null / invalid
+      -> HOLD or fail closed
+```
+
+The exact response is parameter-specific and policy-governed.
+
+## Rollback
+
+Rollback creates a new effective change or returns to a prior validated version with evidence; it does not erase the failed version/deployment event.
+
+## Current events
+
+```text
+ct.config.parameter.created.v1
+ct.config.parameter.versioned.v1
+ct.config.parameter.activated.v1
+ct.config.parameter.rollback.v1
+ct.config.parameter.validation.failed.v1
+```
+
+## Security risks
+
+- unauthorized configuration change;
+- integer/unit mistakes;
+- hidden defaults;
+- environment drift;
+- rollback to vulnerable value;
+- public disclosure of protected thresholds;
+- stale configuration cache;
+- cross-tenant configuration bleed.
+
+## Public / restricted split
+
+Public-safe:
+
+- parameter names/purpose where appropriate;
+- type/unit;
+- versioning semantics;
+- current mapping.
+
+Restricted:
+
+- anti-abuse thresholds;
+- sensitive economic limits;
+- security timings;
+- provider/runtime secrets references;
+- protected model calibration.
+
+## Invariants
+
+```text
+parameter value != policy authority
+config write access != permission to change
+historical value != current value
+rollback != erase
+missing protected config != default PASS
+provider config != canonical institutional config
+historical runtime pallet != deployed runtime
+```
+
+## Status
+
+The Parameter/Runtime Config Pallet is preserved as historical runtime architecture and maps to the current versioned Parameter & Config Service plus P-02-governed configuration workflows.

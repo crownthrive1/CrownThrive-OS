@@ -1,0 +1,143 @@
+---
+title: "License Revocation & Renewal Components — Lifecycle Contract"
+sidebarTitle: "Revocation & Renewal"
+description: "Individual CHLOM component contract for DLA/license renewal, expiration, suspension, revocation, reinstatement, amendments, evidence refresh and downstream entitlement propagation."
+icon: "rotate"
+keywords: ["CHLOM license renewal", "license revocation", "DLA lifecycle", "reinstatement", "expiration", "renewal"]
+---
+
+# License Revocation & Renewal Components — Lifecycle Contract
+
+## Institutional identity
+
+```yaml
+component_id: CT-CHLOM-LRR-001
+name: License Revocation & Renewal Components
+source_status: recovered_named_component_family
+source_lineage: DLA lifecycle; Genesis duration/renewal; ZK issuance/renewal; rights/remedies sources
+classification: source_grounded_component_reconstruction
+version: 1.0.0
+```
+
+## Purpose
+
+This component family governs what happens after a license/DLA has been created: expiration, evidence refresh, renewal, amendment, suspension, revocation, reinstatement and downstream propagation to sublicenses, entitlements, listings and economic obligations.
+
+The core rule is that `ACTIVE` is not a permanent Boolean. License validity is time-, evidence-, rights-, policy- and authority-dependent.
+
+## Lifecycle states
+
+```text
+DRAFT
+ -> PENDING_GATES
+ -> ACTIVE
+      |\
+      | +--> RENEWAL_REVIEW -> RENEWED / HOLD / EXPIRED
+      | +--> AMENDMENT_REVIEW -> SUPERSEDED_VERSION
+      | +--> SUSPENDED -> RESTORED / REVOKED
+      | +--> REVOKED
+      +--> EXPIRED
+```
+
+A later reinstatement or renewed version does not erase the suspension, revocation or expired historical record.
+
+## Renewal trigger
+
+Renewal can be triggered by approaching `valid_until`, a renewal window in the governing agreement, a recurring licensing program, licensee request or an authorized automated schedule. Renewal initiation does not itself extend the term.
+
+## Renewal re-evaluation
+
+A renewal should re-evaluate at minimum:
+
+- source rights still controlled;
+- issuer authority still valid;
+- requested scope still within controlled rights;
+- licensee identity/eligibility;
+- required credentials/proofs/currentness;
+- applicable policy versions;
+- unresolved disputes/holds;
+- updated economic schedule/fees where contractually applicable;
+- required approvals and assent to new terms.
+
+A payment renewal cannot bypass a failed rights or policy re-evaluation.
+
+## Renewal output
+
+Depending on the governing contract, renewal can create:
+
+```text
+new DLA version
+OR explicit term-extension event
+OR replacement agreement/entitlement version
+```
+
+The method must be defined; implementations cannot silently mutate the old record.
+
+## Expiration
+
+Expiration is an effective-time state. Downstream actions after expiration must fail or HOLD according to policy. Previously valid historical uses remain historical records and are not reclassified as unauthorized merely because the license later expired.
+
+## Suspension
+
+Suspension is normally temporary and scope-specific. The suspension record identifies cause, authority, affected rights/actions, start, review/expiry, remediation and restoration rules. It should not automatically mean permanent revocation.
+
+## Revocation
+
+Revocation requires a valid source of authority: contract/lifecycle rule, upstream rights loss, case/remedy, fraud/security finding, issuer action within rights, governance decision or another adopted basis. The exact reason/evidence and effective time are recorded.
+
+## Upstream propagation
+
+When a source/parent license becomes invalid, dependent child licenses and entitlements must be recalculated.
+
+```text
+parent revoked
+ -> effective rights closure recomputed
+ -> affected children HOLD/REVOKE per policy
+ -> LEX listings disabled/held
+ -> entitlements re-evaluated
+ -> provider fulfillment reconciled
+ -> future economic actions stopped/adjusted
+```
+
+Propagation never deletes the historical child grant; it changes its current effective usability.
+
+## Reinstatement/restoration
+
+Restoration can occur only through an authorized lifecycle/remedy event after the blocking condition is resolved. It must identify whether the same license version is restored or a new version is created.
+
+## Amendment versus renewal
+
+An amendment changes substantive terms; renewal extends/reissues under a defined renewal mechanism. If scope, parties, economics or restrictions materially change, the system should not hide the change behind a renewal label.
+
+## Evidence freshness
+
+Scheduled renewal should trigger evidence currentness checks before effective continuation. ZK proofs/attestations can satisfy defined prerequisites but do not themselves renew the DLA.
+
+## Provider reconciliation
+
+External subscription, marketplace, storage or fulfillment state must be synchronized with the institutional lifecycle. Provider auto-renew success while DLA renewal is HOLD creates a mismatch requiring compensation/correction, not automatic license continuation.
+
+## DAIL events
+
+Recommended event classes include:
+
+```text
+DLA_RENEWAL_REQUESTED
+DLA_RENEWAL_APPROVED
+DLA_RENEWAL_HELD
+DLA_EXPIRED
+DLA_SUSPENDED
+DLA_RESTORED
+DLA_REVOKED
+DLA_AMENDED
+DLA_SUPERSEDED
+ENTITLEMENT_REEVALUATED
+```
+
+## Tests
+
+Test renewal before/after window, stale credentials, source right lost, provider auto-renew while institutional HOLD, parent revocation, child propagation, suspension expiry, restoration, amendment mislabeled as renewal, and historical-use preservation.
+
+## Versioning
+
+Lifecycle transition rules are versioned policy. Each DLA retains the transition/policy versions used for consequential changes.

@@ -1,0 +1,77 @@
+---
+title: "FORM-022 — Timelock Execution Condition"
+sidebarTitle: "FORM-022 Timelock Condition"
+description: "Standalone CHLOM temporal predicate requiring approval, elapsed delay, current evidence, valid authority and no new HOLD before scheduled execution."
+icon: "clock"
+keywords: ["CHLOM FORM-022", "timelock", "execution condition", "approval", "freshness"]
+---
+
+# FORM-022 — Timelock Execution Condition
+
+## Formula identity
+
+```yaml
+formula_id: FORM-022
+classification: derived_boolean_predicate
+origin: CHLOM Scheduler/Timelock and governance requirements
+adopted_as_reconstruction_contract: yes
+related_algorithm: ALG-026
+```
+
+## Predicate
+
+A scheduled decision is executable only when:
+
+```text
+executable =
+    approved
+AND current_time >= approval_time + timelock_duration
+AND evidence_still_current
+AND authority_still_valid
+AND no_hold_or_revocation
+```
+
+Implementations should also bind the exact action version and idempotency state.
+
+## Purpose
+
+The predicate stops a once-approved action from executing after the factual or authority context has changed. Timelock is therefore a **delay plus revalidation**, not merely a sleep timer.
+
+## Variables
+
+- `approved`: approval remains valid for the exact decision/action version;
+- `approval_time`: effective timestamp of approval;
+- `timelock_duration`: governed delay;
+- `evidence_still_current`: all mandatory evidence passes currentness/revocation checks;
+- `authority_still_valid`: executing principal/delegation is active and scoped;
+- `no_hold_or_revocation`: no intervening incident, policy, rights or governance state blocks execution.
+
+## Expiry extension
+
+Policies can also define:
+
+```text
+current_time <= expires_at
+```
+
+where an approved action becomes too old to execute after a maximum window.
+
+## Time units
+
+All timestamps/durations must use explicit units and normalized clocks. Mixed seconds/milliseconds or local timezone arithmetic can create serious execution errors.
+
+## Authority boundary
+
+Satisfying time conditions never creates missing authority. The predicate is conjunctive: every term is required.
+
+## Tests
+
+Test too early, exact not-before boundary, late but before expiry, after expiry, authority revoked, evidence stale, new HOLD, approval revoked, changed payload and duplicate execution.
+
+## DAIL evidence
+
+Record approval, schedule, execution-attempt time, revalidation results and final execution/hold result.
+
+## Versioning
+
+Changes to inclusivity, revalidation requirements or expiry semantics require a new predicate/policy version.

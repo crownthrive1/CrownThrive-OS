@@ -1,0 +1,264 @@
+---
+title: "Smart Contract Pallet — Historical Runtime Record"
+sidebarTitle: "Smart Contract Pallet"
+description: "Standalone reconstruction of CHLOM's optional historical smart-contract runtime environment, compliance-category registration, pre-execution hooks, upgrade/security boundaries and current adapter mapping."
+icon: "code"
+keywords: ["CHLOM Smart Contract Pallet", "pallet-contracts", "EVM", "Wasm", "compliance hooks", "smart contracts"]
+---
+
+# Smart Contract Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.smart-contract
+historical_name: Smart Contract Pallet
+artifact_class: historical_runtime_pallet
+source_lineage:
+  - AI-Driven Decentralized Compliance and Licensing Whitepaper
+  - Technical Blueprint
+  - Building and Understanding the CHLOM Metaprotocol
+recovery_state: source_grounded_reconstruction
+historical_implementation_options:
+  - Substrate pallet-contracts / Wasm
+  - EVM-compatible runtime
+current_mapping:
+  - governed execution adapters
+  - policy pre-check middleware
+  - contract/template registry research
+production_state: historical_optional_design_not_current_deployment
+```
+
+## Source basis
+
+Recovered historical sources explicitly describe an optional **Smart Contract Pallet** using a Wasm or EVM-style execution environment. CHLOM's distinctive requirement was that third-party contracts/dApps remain subject to compliance hooks and declare a compliance category so execution could be constrained by identity, licensing and runtime policy.
+
+## Historical purpose
+
+```text
+CONTRACT / DAPP CANDIDATE
+       |
+REGISTER CATEGORY + METADATA
+       |
+SECURITY / POLICY REVIEW
+       |
+       v
+DEPLOYMENT AUTHORIZED
+       |
+       v
+CALL REQUEST
+       |
+COMPLIANCE PRE-CHECK
+       |
+PASS / HOLD / DENY
+       |
+       v
+CONTRACT EXECUTION
+       |
+EVENTS / STATE / DAIL
+```
+
+## Non-purpose
+
+The historical pallet does not prove:
+
+- that CHLOM currently runs an EVM/Wasm chain;
+- that arbitrary contracts may execute without governance/security review;
+- that contract code itself creates legal rights;
+- that a successful transaction is automatically compliant;
+- that external contract standards are current CHLOM canonical storage.
+
+## Contract registration
+
+```yaml
+contract_id: stable CHLOM ID
+provider_or_chain_alias: optional
+code_digest_ref: required for executable artifact
+runtime_family: wasm|evm|other|offchain_adapter
+contract_version: version
+compliance_category_ref: required
+policy_profile_ref: required
+owner/controller_ref: stable identity/organization
+authority_ref: deployment authority
+upgrade_profile_ref: optional
+status: candidate|review|approved|active|held|deprecated|retired
+```
+
+## Compliance category
+
+A contract category can determine mandatory hooks such as:
+
+- identity/credential checks;
+- DLA/license verification;
+- rights scope;
+- transaction/value limits;
+- sanctions/risk evidence;
+- ZK proof requirements;
+- economic authority;
+- timelock/governance approval;
+- case/dispute integration.
+
+The category must be versioned; the contract must not self-select a lower-control category to evade policy.
+
+## Pre-execution hook
+
+```text
+call(actor, contract, method, args)
+   |
+resolve semantic action
+   |
+resolve current contract/category/version
+   |
+CHLOM pre-check
+   |
+PASS -> execute
+HOLD -> no side effect
+DENY -> no side effect
+```
+
+## Semantic action mapping
+
+Raw function names are insufficient. A method should map to a canonical semantic action class, for example:
+
+```text
+transfer_license
+issue_entitlement
+move_value
+update_rights
+publish_attestation
+change_parameter
+```
+
+Authorization is based on semantic side effects, not only ABI method text.
+
+## Upgradeability
+
+Historical docs contemplated proxy/upgradability patterns. Current doctrine requires:
+
+```text
+new implementation
+ -> code digest
+ -> compatibility/security tests
+ -> policy impact review
+ -> authority approval
+ -> timelock if required
+ -> activate
+ -> verify/readback
+```
+
+An upgrade must preserve version history and cannot silently change the meaning of prior receipts.
+
+## State and event evidence
+
+Contract-native events are provider/runtime evidence. Material institutional state should be normalized into CHLOM event contracts and DAIL.
+
+```text
+contract event
+  -> adapter/normalizer
+  -> canonical domain event
+  -> DAIL
+```
+
+## External calls/oracles
+
+Contracts consuming external data should reference governed Oracle Hub/source profiles. An arbitrary web/API response cannot silently become trusted runtime truth.
+
+## Failure/revert semantics
+
+A contract revert should leave the intended atomic scope unchanged. Cross-provider workflows require saga/compensation because atomicity may not span systems.
+
+```text
+on-chain atomicity != cross-system atomicity
+```
+
+## Security requirements
+
+- code review/static analysis;
+- dependency/runtime version control;
+- reentrancy/state consistency where applicable;
+- integer/decimal safety;
+- authorization bypass testing;
+- oracle manipulation testing;
+- upgrade/admin-key security;
+- emergency pause behavior;
+- event/log correctness;
+- privacy/data minimization;
+- economic conservation tests.
+
+## Public-safe pseudocode
+
+```text
+execute_contract_call(req):
+  contract = resolve_registered_contract(req.contract_id)
+  require contract.active
+  semantic_action = map_method_to_action(contract, req.method)
+  decision = precheck(semantic_action, req.actor, req.context)
+  if decision != PASS: return decision
+  result = runtime.execute(req)
+  normalize_events(result)
+  append_DAIL_receipts()
+  return result
+```
+
+## DAIL events
+
+```text
+ct.contract.registered.v1
+ct.contract.reviewed.v1
+ct.contract.activated.v1
+ct.contract.call.prechecked.v1
+ct.contract.call.executed.v1
+ct.contract.call.failed.v1
+ct.contract.upgrade.proposed.v1
+ct.contract.upgrade.activated.v1
+ct.contract.held.v1
+ct.contract.retired.v1
+```
+
+## Failure modes
+
+- unregistered contract -\> deny/hold;
+- unknown compliance category -\> hold;
+- code digest mismatch -\> deny/quarantine;
+- pre-check dependency unavailable -\> hold/fail closed;
+- runtime revert -\> no success state;
+- upgrade changes semantic action mapping -\> require new review/version;
+- provider event cannot normalize -\> hold downstream state;
+- external call stale/untrusted -\> hold.
+
+## Test vectors
+
+1. approved contract \+ authorized action -\> execute;
+2. unregistered contract -\> reject;
+3. active contract, caller unauthorized -\> deny;
+4. category mismatch/bypass attempt -\> deny;
+5. code hash differs from approved -\> hold/quarantine;
+6. upgrade without authority -\> reject;
+7. valid contract execution but provider event mismatch -\> reconciliation hold;
+8. cross-system second step fails -\> compensation path;
+9. hidden secret/private data emitted -\> security failure;
+10. historic EVM/Wasm assumptions -\> not treated as current production proof.
+
+## Current mapping
+
+Current CHLOM can preserve these semantics through API/service adapters, workflow engines or future sandboxed contract runtimes. The invariant is governed execution, not a requirement that all logic live on-chain.
+
+## Restricted companion
+
+May include bytecode/source, private contract templates, vulnerabilities, security tests, admin/upgrade topology, signing identities, provider endpoints and unpublished economic logic.
+
+## Invariants
+
+```text
+code != authority
+contract success != institutional truth automatically
+provider event != DAIL until normalized
+method name != semantic permission
+upgrade != silent semantic rewrite
+on-chain atomicity != cross-provider atomicity
+historical runtime option != current deployment
+```
+
+## Status
+
+`historical_preserved + source_grounded_reconstruction`. The Smart Contract Pallet is retained as a distinct execution architecture and future adapter family, not a claim of a live CHLOM chain.

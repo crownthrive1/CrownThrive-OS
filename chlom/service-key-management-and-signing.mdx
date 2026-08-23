@@ -1,0 +1,299 @@
+---
+title: "Key Management & Signing (HSM/KMS)"
+sidebarTitle: "Key Management & Signing"
+description: "Standalone CHLOM security-service article for key custody, signing authority, HSM/KMS boundaries, rotation, revocation, multi-approval, audit evidence and separation of cryptographic control from institutional authority."
+icon: "key"
+keywords: ["CHLOM key management", "HSM", "KMS", "signing", "key rotation", "custody", "cryptographic authority"]
+---
+
+# Key Management & Signing (HSM/KMS)
+
+## Canonical record
+
+```yaml
+service_id: ct.chlom.service.key-management-signing
+canonical_name: Key Management & Signing (HSM/KMS)
+artifact_class: security_service
+source_lineage:
+  - recovered CHLOM component atlas
+  - DID / attestation / bridge / treasury / provider-signing architecture
+  - current security and Vault boundaries
+current_mapping:
+  - P-01 Identity & Access
+  - P-02 Governance & Compliance
+status: current_semantic_service_specification
+production_state: provider_and_key_specific_evidence_required
+```
+
+## Purpose
+
+This service governs **cryptographic key custody and signing operations** used by CHLOM services without conflating possession of a private key with institutional authority.
+
+```text
+INSTITUTIONAL AUTHORITY / POLICY
+            |
+            v
+SIGNING REQUEST
+            |
+actor + purpose + object + digest + scope
+            |
+            v
+KMS/HSM POLICY + APPROVALS
+            |
+            v
+SIGN OPERATION
+            |
+            v
+SIGNATURE RECEIPT + DAIL / AUDIT
+```
+
+## Fundamental separation
+
+```text
+private key can sign
+      !=
+actor is authorized to cause business/legal effect
+```
+
+Authority is resolved before/around signing through P-01/P-02 and domain policy.
+
+## Key classes
+
+Potential key-purpose classes include:
+
+- service signing;
+- DAIL/attestation signing;
+- webhook/provider verification;
+- DID/public verification methods;
+- document/evidence signing;
+- release/artifact signing;
+- future chain/bridge signing;
+- treasury/provider execution signing where separately governed.
+
+Keys are not reused across unrelated purposes without explicit security design.
+
+## Key record
+
+Public/ordinary application records store references, not private values:
+
+```yaml
+key_ref: kms://provider/key-id-or-stable-reference
+purpose: defined
+owner_or_service_ref: required
+algorithm: versioned
+public_key_or_fingerprint: public if intended
+created_at: timestamp
+rotates_at: nullable
+status: active|disabled|retired|compromised|destroyed
+custody_class: HSM|KMS|other approved
+```
+
+Private keys/seeds are never written into Mintlify, GitHub or Drive docs.
+
+## Signing request
+
+```yaml
+signing_request_id: stable ID
+key_ref: required
+requester_ref: actor/service
+authority_ref: required
+purpose: explicit
+payload_digest: required
+payload_schema_ref: optional
+expires_at: nullable
+approval_refs: []
+status: candidate|authorized|held|signed|denied|expired|failed
+```
+
+## Payload digest binding
+
+Approval/signature should bind to the exact payload/action:
+
+```text
+signature = Sign(key, H(payload + context/version))
+```
+
+The exact algorithm/encoding is implementation-specific and versioned. The principle prevents an approval for one payload from being reused for another.
+
+## HSM/KMS boundary
+
+```text
+application
+   |
+request to sign digest/payload
+   |
+HSM/KMS policy boundary
+   |
+private key never returned
+   |
+signature returned
+```
+
+Applications should not export long-lived private keys merely for convenience.
+
+## Approval / multisig
+
+High-risk signing can require multi-approver workflow before KMS/HSM execution.
+
+```text
+request
+  |
+P-02 approval matrix
+  |
+threshold/quorum satisfied
+  |
+KMS/HSM sign
+```
+
+Multiple software agents acting for one principal do not automatically satisfy independent-human approval requirements.
+
+## Rotation
+
+```text
+KEY v1 active
+   |
+new key v2 generated
+   |
+public/consumer trust updated
+   |
+dual/transition period if needed
+   |
+v1 disabled/retired
+```
+
+Rotation preserves historical signature verification capability where required.
+
+## Compromise
+
+```text
+COMPROMISE SIGNAL
+   |
+security HOLD
+   |
+disable affected signing
+   |
+rotate / replace
+   |
+identify signatures/actions during exposure window
+   |
+reconcile dependent systems
+   |
+DAIL / incident lineage
+```
+
+Key compromise does not automatically prove every historical signature was fraudulent, but affected evidence/actions may require review.
+
+## Revocation / retirement
+
+Key retirement is separate from revoking a credential, DLA or institutional role.
+
+```text
+key retired
+ !=
+identity retired
+ !=
+role revoked automatically
+```
+
+Dependent systems must receive current verification-key state.
+
+## DID relationship
+
+DID verification-method keys can be generated/rotated under the same custody principles while preserving DID document/version history.
+
+## Attestation relationship
+
+Attestations can be signed by authorized issuer/service keys. Verifiers check:
+
+- signature;
+- current/historical key validity at signing time;
+- issuer authority for claim scope;
+- schema/currentness as applicable.
+
+## Provider signing
+
+Some providers use API secrets/webhook signing secrets rather than asymmetric keys. These remain in the approved secret store and are referenced only indirectly.
+
+## Events
+
+```text
+ct.key.created.v1
+ct.key.rotated.v1
+ct.key.disabled.v1
+ct.key.compromise.detected.v1
+ct.signing.request.created.v1
+ct.signing.request.authorized.v1
+ct.signing.completed.v1
+ct.signing.failed.v1
+```
+
+Public DAIL records should avoid secret/key-material leakage.
+
+## Audit evidence
+
+A material signing receipt can preserve:
+
+```text
+request ID
+key public reference/fingerprint
+purpose
+payload digest
+authority/approval refs
+time
+result
+signature reference
+```
+
+## Failure modes
+
+### KMS unavailable
+
+HOLD material signing-dependent actions; do not fall back to an unmanaged key unless an explicit certified contingency exists.
+
+### Key disabled after request authorization
+
+Revalidate at execution; signing does not proceed.
+
+### Wrong key purpose
+
+DENY; do not use a convenient key outside its purpose/domain.
+
+### Provider requires exported private key
+
+Route security review; do not weaken custody silently.
+
+### Signature valid, issuer role revoked before action
+
+Domain policy determines whether historical signing time or current execution time controls. Cryptographic validity does not bypass authority currentness.
+
+## Security threats
+
+- key exfiltration;
+- signing-oracle abuse;
+- payload substitution;
+- approval replay;
+- overbroad IAM on KMS;
+- logging secret material;
+- weak/legacy algorithms;
+- cross-environment key reuse;
+- compromised recovery/admin account.
+
+## Restricted companion
+
+Contains provider/key identifiers where sensitive, IAM/policy architecture, rotation/incident procedures, approval topology, cryptographic implementation details and security test evidence. No private key values.
+
+## Invariants
+
+```text
+key possession != institutional authority
+valid signature != valid business action automatically
+KMS reference != secret disclosure
+rotation != identity change
+key retired != historical signatures erased
+multi-agent != independent multisig quorum
+fallback key != allowed unless explicitly certified
+```
+
+## Status
+
+Key Management & Signing is a first-class CHLOM security service specification supporting identity, attestations, evidence, governance and future interoperability. Actual production key providers/configuration require private verified evidence.

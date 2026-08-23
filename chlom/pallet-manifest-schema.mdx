@@ -1,0 +1,449 @@
+---
+title: "CHLOM Pallet Manifest Schema"
+sidebarTitle: "Pallet Manifest Schema"
+description: "The canonical schema and validation rules for declaring a CHLOM capability pallet, including identity, capabilities, policies, data contracts, commercial model, integrations, operating procedures, metrics, evidence and release state."
+icon: "file-code"
+keywords: ["CHLOM pallet manifest", "manifest schema", "pallet schema", "capability pallet", "validation"]
+---
+
+# CHLOM Pallet Manifest Schema
+
+## Status
+
+```yaml
+artifact_id: ct.chlom.pallet-manifest.schema.v1
+namespace: current_capability_pallet
+source_lineage:
+  - CHLOM-BIZ-006 July 29 2026 Technical Build Pack
+  - CHLOM Pallet Container Contract
+current_status: reconstructed_source_grounded
+public_projection: public_safe
+```
+
+## Purpose
+
+The **Pallet Manifest** is the machine-readable declaration of a current CHLOM capability pallet. The July 2026 Technical Build Pack requires eight manifest domains: Identity, Capabilities, Policies, Data Contracts, Commercial Model, Integrations, Operating Procedures and Metrics. This article expands that source requirement into a validation-ready institutional schema without changing the source meaning.
+
+```text
+PALLET CONTAINER
+      |
+      v
+PALLET MANIFEST
+      |
+      +--> validates identity
+      +--> enumerates capability
+      +--> binds policy
+      +--> names data contracts
+      +--> declares integrations
+      +--> records commercial authority
+      +--> points to procedures
+      +--> defines metrics
+      +--> binds evidence / release state
+```
+
+## Canonical top-level shape
+
+The following example is illustrative. It is not a live deployment manifest by itself.
+
+```yaml
+manifest_version: "1.0"
+pallet:
+  id: "P-XX"
+  canonical_name: "Example Pallet"
+  namespace: "current_capability_pallet"
+  semantic_version: "1.0.0"
+  priority: "foundation"
+  maturity: "specified"
+  visibility: "public"
+identity: {}
+capabilities: []
+policies: []
+data_contracts: []
+commercial_model: {}
+integrations: []
+operating_procedures: []
+metrics: []
+evidence: {}
+release: {}
+security: {}
+recovery: {}
+```
+
+## Validation rule 1 — stable identity
+
+A manifest is invalid without a stable pallet ID and canonical name.
+
+```text
+valid:
+  P-03 / Rights & Licensing
+
+invalid:
+  "new licensing thing"
+```
+
+Display names may evolve. `pallet.id` remains stable unless a formal migration allocates a successor ID.
+
+## Validation rule 2 — namespace required
+
+Historical runtime pallets and current capability pallets must never share an ambiguous namespace.
+
+```yaml
+namespace: current_capability_pallet
+```
+
+or
+
+```yaml
+namespace: historical_runtime_pallet
+```
+
+A manifest missing the namespace fails closed.
+
+## Identity object
+
+```yaml
+identity:
+  institutional_owner: "CrownThrive"
+  steward_role: "role reference"
+  support_owner: "role reference"
+  tenant_scope: "global|tenant|organization|platform"
+  allowed_actor_classes:
+    - human
+    - agent
+    - service
+  authority_ceiling: "A0-Ax reference"
+  delegation_ceiling: "D0-Dx reference"
+  verification_requirements: []
+  consent_requirements: []
+```
+
+The manifest references authority. It does not create authority.
+
+## Capability object
+
+Every material pallet behavior is enumerated separately.
+
+```yaml
+capabilities:
+  - capability_id: "ct.capability.example.read"
+    name: "Read Example"
+    side_effect_class: "read"
+    required_authority: "A1"
+    input_schema: "schema://example.request.v1"
+    output_schema: "schema://example.response.v1"
+    evidence_required: false
+    failure_states: [PASS, HOLD, DENY, ERROR]
+```
+
+A write/economic/rights/security capability cannot be hidden behind a generic `manage` capability.
+
+## Side-effect classes
+
+Recommended public-safe classes are:
+
+```text
+READ
+WRITE
+RIGHTS
+ECONOMIC
+SECURITY
+EXTERNAL
+GOVERNANCE
+PROFESSIONAL_RESERVED
+```
+
+A capability can carry multiple tags when necessary, but its highest-risk side effect controls the minimum gate.
+
+## Policies object
+
+```yaml
+policies:
+  - policy_id: "ct.policy.example.v1"
+    role: "governing"
+    scope: "pallet"
+    version: "1.0.0"
+    precedence: 100
+    effective_from: "timestamp"
+    effective_until: null
+    conflict_behavior: "HOLD"
+```
+
+The manifest should distinguish:
+
+- governing policy;
+- eligibility policy;
+- privacy policy;
+- security policy;
+- economic policy;
+- asset policy;
+- event policy;
+- provider/corridor constraints.
+
+## Policy precedence
+
+```text
+higher-authority institutional rule
+             |
+             v
+corridor / cross-pallet rule
+             |
+             v
+pallet rule
+             |
+             v
+tenant / platform specialization
+             |
+             v
+asset/event-specific rule
+```
+
+A lower layer may narrow authority. It cannot silently expand an upper layer.
+
+## Data-contract object
+
+```yaml
+data_contracts:
+  - contract_id: "ct.schema.example.v1"
+    object_type: "event|record|command|projection"
+    canonical_id_field: "example_id"
+    schema_version: "1.0.0"
+    visibility: "internal"
+    retention_class: "institutional"
+    exportable: true
+    public_projection: "schema://example.public.v1"
+```
+
+Required characteristics include stable IDs, schema versions, classification, lineage, retention and export behavior.
+
+## Event declaration
+
+```yaml
+events:
+  - event_type: "ct.example.created.v1"
+    source_pallet: "P-XX"
+    evidence_class: "institutional"
+    dail_required: true
+    idempotency_required: true
+```
+
+Event names are versioned contracts, not prose labels.
+
+## Commercial model
+
+A pallet manifest may declare economic surfaces without activating them.
+
+```yaml
+commercial_model:
+  activation_required: true
+  economic_authority: "reference"
+  object_types:
+    - product
+    - sku
+    - offer
+    - fee_schedule
+    - commission_schedule
+  current_schedule_ids: []
+  historical_source_rates_are_active: false
+```
+
+Where ThriveEvergreen applies, the manifest may reference ECAC/commerce-activation requirements rather than duplicating authority.
+
+## Integration object
+
+```yaml
+integrations:
+  - integration_id: "ct.integration.example.provider"
+    provider_class: "replaceable_adapter"
+    direction: "inbound|outbound|bidirectional"
+    auth_reference: "vault reference only"
+    health_check_required: true
+    readback_required: true
+    idempotency_required: true
+    rollback_or_compensation: true
+    provider_exit_required: true
+```
+
+Secret values never belong in the public manifest.
+
+## Operating-procedure object
+
+```yaml
+operating_procedures:
+  - procedure_id: "ct.runbook.example.onboarding"
+    trigger: "new tenant activation"
+    owner_role: "reference"
+    maximum_automation: "bounded"
+    evidence_required: true
+    rollback_required: true
+```
+
+The manifest points to full runbooks rather than embedding exploit-sensitive detail in public docs.
+
+## Metrics object
+
+```yaml
+metrics:
+  - metric_id: "ct.metric.example.activation_rate"
+    definition: "activated objects / eligible objects"
+    source_event: "ct.example.activation.v1"
+    aggregation_window: "30d"
+    classification: "internal"
+    completeness_gate: "posted events through as_of"
+```
+
+A metric name without a definition is not a valid metric contract.
+
+## Evidence object
+
+```yaml
+evidence:
+  dail_required: true
+  source_lineage_required: true
+  provider_readback_required_for_writes: true
+  correction_chain_required: true
+  public_projection_allowed: true
+```
+
+## Release object
+
+```yaml
+release:
+  maturity: "specified"
+  exact_version: "1.0.0"
+  release_gate: "HOLD"
+  phase_effect: "none"
+  production_claim_allowed: false
+  required_checks:
+    - documentation_governance
+    - security_governance
+    - reconciliation_continuity
+    - governed_merge_gate
+```
+
+The list of required checks is an institutional mapping; green checks validate an artifact but do not automatically create production authority.
+
+## Security object
+
+```yaml
+security:
+  classification: "public_safe"
+  restricted_companion: true
+  secrets_in_manifest: false
+  threat_model_ref: "reference"
+  abuse_controls_ref: "restricted reference"
+```
+
+## Recovery object
+
+```yaml
+recovery:
+  provider_exit: true
+  backup_or_export_ref: "reference"
+  state_readback: true
+  rollback_or_compensation: true
+  supersession_behavior: "append_lineage"
+```
+
+## Required field matrix
+
+| Domain | Required | Can be empty? | Fail behavior |
+| --- | --- | --- | --- |
+| Pallet identity | yes | no | invalid manifest |
+| Namespace | yes | no | invalid manifest |
+| Identity/authority | yes | no | HOLD |
+| Capabilities | yes | no | invalid manifest |
+| Policies | yes | only for explicitly non-governed read-only utility | HOLD |
+| Data contracts | yes | no | HOLD |
+| Commercial model | yes | yes, with `activation_required:false` | none |
+| Integrations | yes | yes | none |
+| Operating procedures | yes | no for deployed pallet | HOLD |
+| Metrics | yes | no for production pallet | HOLD |
+| Evidence | yes | no | HOLD |
+| Release | yes | no | invalid manifest |
+| Security | yes | no | HOLD |
+| Recovery | yes | no for side-effecting pallet | HOLD |
+
+## Manifest-level PASS/HOLD/DENY
+
+```text
+SCHEMA VALID?
+   no -> DENY
+   |
+  yes
+   v
+AUTHORITY RESOLVED?
+   no -> HOLD
+   |
+  yes
+   v
+POLICIES CURRENT?
+   no/unknown -> HOLD
+   |
+  yes
+   v
+SECURITY / RECOVERY COMPLETE FOR SIDE EFFECTS?
+   no -> HOLD
+   |
+  yes
+   v
+RELEASE GATE AUTHORIZED?
+   no -> HOLD
+   |
+  yes
+   v
+PASS
+```
+
+## Versioning
+
+Every manifest change is versioned.
+
+### Patch
+
+Clarification that does not alter contract semantics.
+
+### Minor
+
+Backward-compatible addition of a capability, metric, integration or optional field.
+
+### Major
+
+Breaking change to data contracts, authority, lifecycle, external interfaces, economic semantics or removed capability.
+
+## Supersession
+
+Superseded manifests are retained.
+
+```text
+v1.2.0 --superseded_by--> v2.0.0
+```
+
+Historical execution/evidence continues to reference the version effective at the time.
+
+## Public and restricted twins
+
+A public manifest can reference a restricted companion.
+
+```yaml
+public_manifest:
+  protected_details: "withheld"
+  restricted_companion_id: "ct.vault.binding.pallet.P-XX.v1"
+```
+
+The restricted twin may hold protected algorithm identifiers, model calibration, provider/security detail and unpublished economics. It still must not duplicate raw secrets that belong in the secret store.
+
+## Manifest invariants
+
+```text
+manifest valid != pallet deployed
+release PASS != phase advance
+provider adapter != canonical state
+public manifest != full protected implementation
+historical runtime pallet != current capability pallet
+unknown authority => HOLD
+unknown policy version => HOLD
+```
+
+## Relationship to the twelve current pallets
+
+P-01 through P-12 are each required to have their own manifest under this schema. Each receives a dedicated article and, where restricted material exists, a private companion binding.

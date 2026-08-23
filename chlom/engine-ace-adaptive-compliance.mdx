@@ -1,0 +1,442 @@
+---
+title: "ACE — Adaptive Compliance Engine"
+sidebarTitle: "ACE — Adaptive Compliance Engine"
+description: "Standalone comprehensive CHLOM engine article for the Adaptive Compliance Engine: policy intake, context resolution, evidence evaluation, rule execution, explainable PASS/HOLD/DENY decisions, overrides, simulation and current P-02 integration."
+icon: "shield-check"
+keywords: ["CHLOM ACE", "Adaptive Compliance Engine", "compliance engine", "policy evaluation", "PASS HOLD DENY", "explainability"]
+---
+
+# ACE — Adaptive Compliance Engine
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.ace
+canonical_name: Adaptive Compliance Engine
+canonical_acronym: ACE
+artifact_class: engine
+source_lineage:
+  - CHLOM Genesis Volume
+  - CHLOM Grand Prospectus
+  - Technical Blueprint
+  - recovered Help Center engine/module estate
+current_mapping:
+  - P-02 Governance & Compliance
+  - Compliance Pack Registry
+  - Policy Engine / Policy DSL Compiler
+status: historical_core_concept_with_current_semantic_mapping
+production_state: implementation_evidence_required_per_service
+```
+
+## Purpose
+
+ACE is CHLOM's core **compliance-decision engine concept**: resolve the rules that apply to an action, gather the evidence needed to evaluate them, execute deterministic checks where possible, route unresolved/high-risk matters to appropriate review, and produce an explainable bounded decision.
+
+```text
+ACTION / REQUEST / EVENT
+          |
+          v
+CONTEXT RESOLUTION
+ actor / tenant / asset / jurisdiction / purpose / time
+          |
+          v
+POLICY RESOLUTION
+          |
+          v
+EVIDENCE RESOLUTION
+          |
+          v
+RULE EVALUATION
+          |
+          +--> deterministic checks
+          +--> external/oracle evidence
+          +--> AI/risk recommendations
+          +--> human-reserved review
+          |
+          v
+PASS | HOLD | DENY
+          |
+          v
+DECISION RECEIPT + DAIL + REMEDY PATH
+```
+
+## Historical position
+
+Early CHLOM architecture positioned ACE as the enforcement brain sitting between identity/intelligence inputs and downstream licensing, exchange, governance and treasury modules. The concept remains valuable even when implemented as cloud services rather than an on-chain runtime.
+
+## ACE is not legal authority
+
+```text
+ACE result
+   !=
+statutory legal opinion
+   !=
+professional license decision beyond delegated authority
+```
+
+ACE executes adopted institutional policy. It does not invent or expand the authority behind that policy.
+
+## Inputs
+
+ACE can consume:
+
+- actor/organization identity;
+- role/delegation;
+- asset/right/DLA state;
+- applicable Compliance Packs;
+- agreement/contract conditions;
+- current policy versions;
+- evidence/attestations;
+- oracle/external-source observations;
+- risk/anomaly signals from AIE;
+- current configuration/parameters;
+- temporal/freshness state;
+- prior case/hold/override state.
+
+## Context envelope
+
+```yaml
+context_id: stable/correlation ID
+actor_ref: required
+tenant_or_org_ref: optional
+requested_capability: required
+subject_refs: []
+purpose: explicit
+jurisdiction_refs: []
+time: timestamp
+policy_snapshot_ref: required
+evidence_snapshot_refs: []
+```
+
+A decision without a reproducible context snapshot is difficult to audit or replay.
+
+## Policy resolution
+
+ACE should identify the exact applicable policy set before evaluating rules.
+
+```text
+institutional rules
+        |
+corridor / cross-pallet rules
+        |
+pallet / service rules
+        |
+tenant / program rules
+        |
+asset / event / transaction rules
+        |
+        v
+effective policy set
+```
+
+Conflicts use explicit precedence or HOLD; no silent last-write-wins.
+
+## Decision algebra
+
+ACE's current public-safe decision vocabulary is:
+
+```text
+PASS
+HOLD
+DENY
+```
+
+### PASS
+
+All mandatory conditions satisfied under current authority/evidence.
+
+### HOLD
+
+The system must not proceed yet because material state is unresolved, stale, conflicting, pending review or insufficient.
+
+### DENY
+
+An explicit current rule or authority state prohibits the requested action.
+
+## Mandatory-gate composition
+
+A safe base rule is:
+
+```text
+if exists mandatory DENY:
+    DENY
+else if exists mandatory HOLD:
+    HOLD
+else:
+    PASS
+```
+
+Weighted/risk-derived inputs may inform HOLD/review but cannot override a mandatory DENY unless a separately authorized override rule exists.
+
+## Rule classes
+
+ACE can evaluate rule families such as:
+
+```text
+identity / role
+credential / verification
+rights / DLA
+consent / purpose
+jurisdiction / eligibility
+sanctions / external evidence
+risk / anomaly
+budget / economic authority
+capacity / inventory
+security / incident
+freshness / expiry
+case / dispute / hold
+```
+
+## Deterministic versus advisory checks
+
+```text
+DETERMINISTIC
+  exact rule evaluates from resolved inputs
+
+ADVISORY
+  AI/model/reviewer recommendation requiring policy interpretation
+```
+
+ACE should label the provenance of each check.
+
+## AIE relationship
+
+AIE provides intelligence/risk/anomaly evidence; ACE determines the policy consequence.
+
+```text
+AIE signal
+   |
+   v
+ACE rule / threshold / human-review condition
+   |
+PASS | HOLD | DENY
+```
+
+AIE cannot self-enact an ACE decision outside delegated design.
+
+## Policy Engine relationship
+
+The Policy Engine executes machine rules; ACE orchestrates the broader decision context.
+
+```text
+ACE
+  |
+  +--> policy resolver
+  +--> Policy Engine
+  +--> evidence resolver
+  +--> risk/AIE
+  +--> reviewer workflow
+  +--> decision receipt
+```
+
+## Compliance Packs
+
+Compliance Packs provide versioned policy bundles.
+
+ACE should record:
+
+- pack IDs/versions;
+- applicability decisions;
+- rule IDs;
+- input evidence versions;
+- outputs/reasons;
+- overrides/exceptions.
+
+## Explainability
+
+Every material ACE result should be explainable enough to answer:
+
+```text
+what was requested?
+which policies applied?
+which evidence was used?
+which mandatory checks passed/held/denied?
+which model/reviewer inputs influenced the outcome?
+who/what had authority?
+what remedy/review path exists?
+```
+
+Protected fraud/security logic can expose reason classes rather than exploitable internals.
+
+## Decision receipt
+
+```yaml
+decision_id: stable ID
+context_ref: required
+policy_refs: exact versions
+check_results: []
+result: PASS|HOLD|DENY
+reason_codes: []
+authority_ref: required
+model_refs: []
+reviewer_refs: []
+decided_at: timestamp
+valid_until: nullable
+override_ref: optional
+```
+
+## Decision freshness
+
+A PASS can expire.
+
+```text
+PASS at T0
+    |
+credential expires / policy changes / asset revoked
+    |
+PASS no longer reusable at T1
+```
+
+Consumers should re-evaluate when applicable evidence/policy freshness requires it.
+
+## Override
+
+Overrides are explicit new decisions linked to the original outcome.
+
+```text
+ACE DENY/HOLD
+   |
+override request
+   |
+authority + scope + evidence + safeguards
+   |
+OVERRIDE DECISION
+   |
+DAIL
+```
+
+The original result remains intact.
+
+## Simulation
+
+ACE can run a non-authoritative policy simulation:
+
+```text
+proposed policy / parameter
+      |
+historical/synthetic scenarios
+      |
+ACE simulation
+      |
+impact report
+```
+
+Simulation results are inputs to governance—not adopted policy.
+
+## Current event families
+
+```text
+ct.ace.evaluation.started.v1
+ct.ace.policy.resolved.v1
+ct.ace.evidence.insufficient.v1
+ct.ace.decision.pass.v1
+ct.ace.decision.hold.v1
+ct.ace.decision.deny.v1
+ct.ace.override.applied.v1
+ct.ace.simulation.completed.v1
+```
+
+## Algorithm registry bindings
+
+ACE-related algorithm families include:
+
+- policy applicability resolution;
+- policy precedence;
+- three-valued gate composition;
+- evidence sufficiency;
+- freshness evaluation;
+- override eligibility;
+- decision explanation generation;
+- policy simulation/replay.
+
+Protected implementation/calibration receives restricted asset IDs rather than public disclosure.
+
+## Failure modes
+
+### Missing policy source
+
+HOLD rather than infer permission.
+
+### Conflicting rules
+
+Resolve adopted precedence; otherwise HOLD/adjudicate.
+
+### Provider says eligible, local rights say revoked
+
+P-03/current institutional rights controls; ACE denies/holds and records mismatch.
+
+### Model recommends PASS, mandatory rule DENY
+
+DENY.
+
+### Rule evaluator unavailable
+
+Fail closed for material action; do not silently bypass ACE.
+
+### Stale PASS reused after revocation
+
+Reject based on decision/evidence expiry and re-evaluate.
+
+## Security threats
+
+- policy injection;
+- rule bypass;
+- stale cache;
+- model prompt/data poisoning;
+- reason-code leakage enabling evasion;
+- unauthorized override;
+- cross-tenant context bleed;
+- incomplete evidence treated as false/clear;
+- decision replay outside scope.
+
+## Public / restricted twin
+
+Public-safe:
+
+- decision architecture;
+- PASS/HOLD/DENY semantics;
+- public policy/rule IDs where allowed;
+- explainability contract;
+- non-sensitive examples.
+
+Restricted:
+
+- fraud/security rule internals;
+- protected thresholds;
+- model features/calibration;
+- confidential legal/contract mappings;
+- red-team/eval corpora;
+- emergency override procedures.
+
+## Metrics
+
+Potential exact-definition metrics:
+
+- decision volumes by result;
+- HOLD age/reason;
+- rule/evidence coverage;
+- stale-decision rejection count;
+- override rate;
+- policy conflict rate;
+- reviewer escalation rate;
+- false-positive/false-negative evaluation where ground truth exists;
+- model/rule drift;
+- provider mismatch incidents.
+
+## Invariants
+
+```text
+ACE != legal authority
+policy execution != policy creation
+AI recommendation != ACE authority
+PASS != permanent entitlement
+HOLD != DENY
+provider success != ACE PASS
+simulation != adoption
+override != erasure
+unknown required state != PASS
+```
+
+## Status
+
+ACE is preserved as a core CHLOM engine/IP asset and mapped to the current P-02 compliance orchestration plane. Each executable implementation still requires exact service/code/runtime evidence.

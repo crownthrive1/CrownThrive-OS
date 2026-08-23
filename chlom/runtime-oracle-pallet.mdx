@@ -1,0 +1,269 @@
+---
+title: "Oracle Pallet — Historical Runtime Record"
+sidebarTitle: "Oracle Pallet"
+description: "Individual reconstruction of CHLOM's historical Oracle Pallet for signed external-data submissions, quorum/freshness checks and runtime-consumable evidence, mapped to the current Oracle Hub/Lattice."
+icon: "tower-broadcast"
+keywords: ["CHLOM Oracle Pallet", "oracle", "external data", "quorum", "freshness", "Oracle Hub", "Oracle Lattice"]
+---
+
+# Oracle Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.oracle-pallet
+namespace: historical_runtime_pallet
+recovered_title: Oracle Pallet
+recovered_help_center_description: signed external-data submissions and quorum/freshness state for runtime consumers
+source_recovery: substantive_title_plus_oracle_lattice_architecture
+current_mapping:
+  - Oracle Hub / Oracle Lattice
+  - external evidence service
+  - P-02 Governance & Compliance
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Oracle Pallet was the historical runtime boundary through which off-chain facts—sanctions data, identity status, market/risk data, regulatory feeds or AI outputs—could become consumable by CHLOM's deterministic on-chain modules.
+
+```text
+EXTERNAL SOURCES
+      |
+      +--> source A
+      +--> source B
+      +--> source C
+      |
+      v
+ORACLE SUBMISSIONS
+      |
+signature / identity / freshness / quorum
+      |
+      v
+ORACLE PALLET
+      |
+      +--> Policy
+      +--> DLA / LEX
+      +--> Risk
+      +--> Treasury
+```
+
+## Oracle fact versus truth
+
+An oracle submission is evidence from a source.
+
+```text
+source report
+  !=
+objective truth
+  !=
+authority to take arbitrary action
+```
+
+CHLOM therefore separates source identity, freshness, corroboration and policy consequences.
+
+## Reconstructed observation
+
+```yaml
+observation_id: stable ID
+source_ref: registered oracle/source
+subject_ref: asset|identity|event|market|rule|other
+observation_type: controlled vocabulary
+value_or_digest: structured
+unit: optional
+observed_at: timestamp
+submitted_at: timestamp
+expires_at: nullable
+signature_or_attestation_ref: required when applicable
+status: candidate|accepted|held|rejected|superseded
+```
+
+## Source registry
+
+Oracle sources should carry:
+
+- stable source identity;
+- approved scope/data types;
+- authentication/signature method;
+- freshness expectation;
+- reliability/assurance state;
+- provider aliases;
+- suspension/revocation state.
+
+Source registration does not mean every observation is accepted.
+
+## Freshness
+
+```text
+observation_age = now - observed_at
+```
+
+If the applicable policy requires `observation_age <= max_age`, stale data produces HOLD/requery rather than silent PASS.
+
+The actual maximum age is data/policy specific.
+
+## Quorum / aggregation
+
+Historical Oracle Lattice concepts use multiple sources to reduce dependence on a single provider.
+
+A generic median model for numeric observations is:
+
+```text
+aggregate = median(x_1, x_2, ..., x_n)
+```
+
+A generic weighted model is:
+
+```text
+aggregate = sum(w_i * x_i) / sum(w_i)
+```
+
+These are public-safe algorithm families, not adopted production weights.
+
+## Quorum gate
+
+```text
+eligible sources >= required quorum?
+   no -> HOLD
+   |
+  yes
+   v
+observations fresh?
+   no -> HOLD
+   |
+  yes
+   v
+conflict within tolerated rule?
+   no -> HOLD / review
+   |
+  yes
+   v
+aggregate / accepted observation
+```
+
+## Non-numeric evidence
+
+For sanctions, credential or regulatory claims, aggregation can mean corroborated claims rather than arithmetic averaging.
+
+```text
+source A says X
+source B says X
+source C says not-X / unavailable
+     |
+policy-specific confidence / review
+```
+
+## AI oracle relationship
+
+Historical CHLOM AI could act as an oracle source for risk/compliance results. Current mapping treats AI as evidence/recommendation, not final authority.
+
+## Current Oracle Hub/Lattice mapping
+
+```text
+Historical Oracle Pallet
+        |
+        v
+Oracle Hub / Lattice Service
+        |
+        +--> source adapters
+        +--> source registry
+        +--> freshness
+        +--> aggregation/corroboration
+        +--> conflict handling
+        +--> DAIL evidence
+        |
+        v
+P-02 / domain consumers
+```
+
+## Historical operation families
+
+- register/authorize oracle source;
+- submit signed observation;
+- aggregate/query current value;
+- reject/stale observation;
+- suspend/revoke source.
+
+Exact historical extrinsic names are not recovered.
+
+## Current events
+
+```text
+ct.oracle.source.registered.v1
+ct.oracle.observation.received.v1
+ct.oracle.observation.accepted.v1
+ct.oracle.observation.stale.v1
+ct.oracle.conflict.detected.v1
+ct.oracle.aggregate.updated.v1
+ct.oracle.source.suspended.v1
+```
+
+## Oracle accountability
+
+Historical Gold Paper/theorem lineage includes oracle accountability concepts. Current architecture can preserve accountability via signed submissions, source registration, performance evidence, dispute/correction and possible economic assurance where separately adopted.
+
+No current staking/slashing/bond parameter is inferred.
+
+## Failure cases
+
+### One source unavailable
+
+Use applicable quorum/freshness policy; do not invent data.
+
+### Two sources conflict materially
+
+HOLD high-impact decisions or route review rather than selecting preferred data silently.
+
+### Source changes historical record
+
+Preserve original observation and new/corrected source evidence; propagate correction through DAIL where necessary.
+
+### AI source produces unexpected risk spike
+
+Treat as input to P-02/AIE/ACE review; do not automatically punish subject.
+
+## Security threats
+
+- source compromise;
+- forged submissions;
+- Sybil sources controlled by one actor;
+- stale replay;
+- data poisoning;
+- front-running/manipulated market values;
+- source collusion;
+- hidden provider dependency;
+- unit/scale mismatch.
+
+## Public / restricted split
+
+Public-safe:
+
+- source categories;
+- freshness/quorum architecture;
+- public observation schemas where appropriate;
+- current mapping.
+
+Restricted:
+
+- private source/provider details;
+- trust weights;
+- anti-manipulation algorithms;
+- protected thresholds;
+- security incidents;
+- private observation data.
+
+## Invariants
+
+```text
+oracle != truth
+source registered != every claim accepted
+fresh != correct automatically
+quorum reached != action authorized
+AI oracle != decision authority
+provider API != canonical state
+historical oracle pallet != live runtime deployment
+```
+
+## Status
+
+The Oracle Pallet is preserved as a historical runtime module and maps to the current Oracle Hub/Lattice external-evidence service with source registry, freshness, corroboration, conflict handling and DAIL lineage.

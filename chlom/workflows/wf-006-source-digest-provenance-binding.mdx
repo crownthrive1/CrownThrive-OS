@@ -1,0 +1,98 @@
+---
+title: "WF-006 — Source Digest / Provenance Binding Workflow"
+sidebarTitle: "WF-006 Provenance Binding"
+description: "Canonical CHLOM workflow for binding recovered source files and institutional articles to stable provenance, digest, version, custody, lineage and public/private relationship records."
+icon: "fingerprint"
+keywords: ["CHLOM workflow", "provenance", "digest", "hash", "source custody", "lineage"]
+---
+
+# WF-006 — Source Digest / Provenance Binding Workflow
+
+## Workflow identity
+
+```yaml
+workflow_id: WF-006
+name: Source Digest / Provenance Binding
+classification: canonical_provenance_workflow
+version: 1.0.0
+```
+
+## Purpose
+
+WF-006 gives every consequential CHLOM source and derived institutional article a stable provenance chain. The workflow is designed so a future builder can answer **what source supported this object, which version was used, where the protected master lives, what public article derives from it, and what changed later?**
+
+## Provenance object
+
+```yaml
+provenance_id:
+object_id:
+object_type:
+source_title:
+source_version:
+source_date:
+source_location_or_custody_ref:
+source_digest:
+digest_algorithm:
+classification:
+recovered_at:
+article_refs[]:
+private_vault_refs[]:
+supersedes_or_duplicate_of:
+notes:
+```
+
+A digest is an integrity identifier, not a truth score.
+
+## Stage 1 — Resolve source identity
+
+Determine whether the source is a unique work, duplicate copy, revision, export, compiled master or excerpt. Preserve aliases/filenames but assign a canonical source/provenance ID where supported.
+
+## Stage 2 — Capture version and custody
+
+Record the source's stated version/date and its custody location. If version metadata is absent, mark it unknown rather than inventing a sequence number. Protected material receives vault custody under WF-002.
+
+## Stage 3 — Compute or ingest digest
+
+Where the custody/runtime workflow supports it, bind a cryptographic digest using an approved algorithm such as SHA-256. The record states exactly what bytes/object the digest represents. Never publish secret material merely to make a hash verifiable.
+
+## Stage 4 — Bind derived objects
+
+Every material article, formula, algorithm, theorem, diagram, schema, pallet or workflow extracted from the source references the provenance ID and source location/section where possible. One source can produce many institutional objects.
+
+## Stage 5 — Duplicate and revision handling
+
+Identical digests can indicate duplicate bytes; similar titles or content do not. A revised source creates a new source-version/digest record linked by `supersedes` or `revision_of`. Do not overwrite the old digest.
+
+## Stage 6 — Public/private dual binding
+
+For protected sources, preserve:
+
+```text
+private source/version/digest
+        |
+        +--> public-safe article(s)
+        +--> restricted algorithm/model records
+        +--> implementation/test refs
+```
+
+Public documentation can expose safe provenance metadata and the existence of a private binding without exposing the protected body.
+
+## Stage 7 — Git/release linkage
+
+When institutional articles are pushed, record the Git path and commit/head that first introduced or materially updated the object. Release certification can then verify that the documented body corresponds to the provenance registry snapshot.
+
+## Correction behavior
+
+If the wrong source/version was attached, append a provenance correction and update derived-object lineage under WF-003. Do not silently substitute a different source while leaving the old article looking source-grounded.
+
+## Security and privacy
+
+Digests, paths and source titles can themselves leak information. Restricted filenames, personal data or secret store paths should be represented by opaque stable IDs when public disclosure is not appropriate.
+
+## Tests
+
+Test exact duplicate file, revised source, missing version, protected source, article extracted from several sources, wrong-source correction, digest mismatch and restore/readback from custody.
+
+## Versioning
+
+Provenance schema and approved digest algorithms are versioned. Existing records keep the algorithm/version originally used.

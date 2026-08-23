@@ -1,0 +1,92 @@
+---
+title: "ThriveLedger™ Private API & MCP"
+sidebarTitle: "ThriveLedger API/MCP"
+description: "Private service-role API and MCP contract for bounded ThriveLedger evidence ingestion, reconciliation, audit and CHLOM evidence export."
+icon: "shield-keyhole"
+keywords: ["ThriveLedger API", "ThriveLedger MCP", "private MCP", "financial evidence", "CrownThrive API"]
+---
+
+# ThriveLedger™ Private API & MCP
+
+ThriveLedger's network interface is a **restricted CrownThrive operations surface**. It is not a public financial API and does not expose bank records, transaction bodies, credentials, Vault material or private provider identifiers.
+
+## Runtime identity
+
+| Field | Current state |
+| --- | --- |
+| Edge service | `thriveledger-control` |
+| Service version | `1.0.0` |
+| MCP target profile | `2026-07-28` |
+| Supabase JWT verification | enabled |
+| Additional service authorization | required |
+| Maximum request body | 64 KiB |
+| Public financial access | prohibited |
+| Provider writes | prohibited |
+| Money movement | prohibited |
+
+The runtime also requires CrownThrive service authorization after platform JWT validation. A deployed function is not considered an enabled MCP merely because the code exists.
+
+## Registered tools
+
+| Tool | Risk | Side effect class | Current registry state |
+| --- | --- | --- | --- |
+| `thriveledger.status` | D0 | sanitized read | registered; exact HTTP canary pending |
+| `thriveledger.ingest` | D1 | internal append-only evidence write | registered; exact HTTP canary pending |
+| `thriveledger.balance.observe` | D1 | internal append-only observation | registered; exact HTTP canary pending |
+| `thriveledger.reconcile` | D1 | creates reconciliation receipts/HOLDs | registered; exact HTTP canary pending |
+| `thriveledger.audit` | D1 | creates audit findings/receipts | registered; exact HTTP canary pending |
+| `thriveledger.chlom.export` | D1 | digest-only evidence read | registered; exact HTTP canary pending |
+
+The MCP and endpoint-catalog execution flags remain disabled until an authenticated network canary proves the deployed route, authorization boundary and response contract. SQL-level capability tests and Edge source/deployment verification do not substitute for that final HTTP test.
+
+## API routes
+
+The controlled-test contract defines:
+
+- `GET /health`
+- `GET /api/status`
+- `POST /api/evidence`
+- `POST /api/balance-observation`
+- `POST /api/reconcile`
+- `POST /api/audit`
+- `GET /api/chlom-evidence`
+- `POST /mcp`
+
+The MCP endpoint supports `initialize`, `tools/list` and `tools/call` under the adopted target protocol profile.
+
+## Data minimization
+
+Evidence ingestion is digest-first. The interface rejects or avoids raw secret material and is designed to store provider references as hashes or governed references rather than copying sensitive identifiers into the institutional ledger.
+
+Permitted evidence metadata is limited to what is needed to establish source class, occurrence time, shape, confidence, reconciliation state, correlation and integrity. Raw financial bodies remain in the applicable protected source system.
+
+## Internal writes are not provider writes
+
+Some ThriveLedger tools write append-only internal evidence, audit or reconciliation records. These are classified as internal mutations because they strengthen CrownThrive's evidence trail. They do **not** authorize:
+
+- charging or refunding a customer;
+- transferring funds;
+- changing a bank record;
+- modifying a Stripe object;
+- changing CHLOM Wallet economic state;
+- filing taxes;
+- granting a license or entitlement;
+- executing a D3 action.
+
+## Request-budget semantics
+
+ThriveLedger is governed by Founder Directive V4 with a CrownThrive-local monthly ceiling of `-1`, meaning unlimited local requests. `0` would mean zero permitted requests and `null` would fail closed. Provider and connector limits remain independently authoritative.
+
+## Audit and reconciliation behavior
+
+`reconcile` does not invent missing entries. It detects unmatched evidence, stale sources, conflicts, cross-entity contamination and unbalanced journals, then returns PASS/HOLD/FAIL evidence.
+
+`audit` independently verifies evidence-chain continuity, double-entry conservation, legal-entity boundaries and reversal integrity. Corrections use reversals or superseding records rather than historical deletion.
+
+## CHLOM export
+
+The CHLOM export surface is proof-oriented. It returns bounded assertion receipts and source-chain heads, not bank statements or payment-provider payloads. `economic_truth_authority=false` is part of the v1 export contract.
+
+## Release gate
+
+The v1 API/MCP remains a controlled-test private surface until the exact authenticated HTTP canary is recorded. Public exposure, customer access and provider-write expansion are not implied by this documentation.

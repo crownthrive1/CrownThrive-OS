@@ -1,0 +1,319 @@
+---
+title: "Scheduler, Timelock, SLA and Sanctions Cache — Temporal Control Lineage"
+sidebarTitle: "Temporal Controls"
+description: "Reconstructed CHLOM temporal-control family covering delayed execution, scheduling, SLA evidence, sanctions cache freshness, expiry, fail-closed behavior and modern service mapping."
+icon: "clock"
+keywords: ["CHLOM scheduler", "timelock", "SLA", "sanctions cache", "temporal controls", "freshness", "delayed execution"]
+---
+
+# Scheduler, Timelock, SLA and Sanctions Cache — Temporal Control Lineage
+
+Recovered CHLOM Help Center and paper-family records include **SLA/Timelock**, **SLA Metrics**, **Scheduler**, and **Sanctions Cache** module families. The Grand Prospectus also contains governance templates, time-bounded override concepts, oracle freshness/fallback behavior, validator uptime monitoring and compliance-rule timing. The exact original body of every module-specific article has not been recovered, so this page is a **source-bounded reconstruction** rather than a verbatim recovery.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_from_partial_source_family
+source_support:
+  module_titles: recovered
+  governance_and_timing_concepts: recovered
+  exact_original_module_bodies: not_fully_recovered
+current_mapping: temporal_control_services
+founder_adjudication: open_after_publication
+```
+
+## Why time is a compliance input
+
+A policy decision can be correct at one moment and invalid later. CHLOM therefore needs to model not only **what** is allowed, but **when** it is allowed, how long evidence remains valid, when a decision can execute, and what happens if a required external source becomes stale.
+
+```text
+AUTHORITY + EVIDENCE + POLICY + TIME
+                |
+                v
+        EFFECTIVE DECISION
+```
+
+## Temporal-control stack
+
+```text
++-------------------------+
+| Policy / Decision       |
++------------+------------+
+             |
+             v
++------------+------------+
+| Effective-Date Resolver |
++------------+------------+
+             |
+      +------+------+
+      |             |
+   immediate      future
+      |             |
+      v             v
++-----+-----+  +----+------+
+| Execute   |  | Scheduler |
++-----+-----+  +----+------+
+                   |
+                   v
+             +-----+------+
+             | Timelock   |
+             | / delay    |
+             +-----+------+
+                   |
+                   v
+             pre-execution
+             revalidation
+                   |
+             PASS/HOLD/DENY
+                   |
+                   v
+                 DAIL
+```
+
+## Scheduler
+
+A Scheduler is the mechanism that records **an authorized future action** and the conditions under which it may become eligible to run.
+
+A schedule should identify:
+
+- schedule ID;
+- action type;
+- target stable ID;
+- originating decision/approval;
+- earliest execution time;
+- latest execution/expiry time where relevant;
+- revalidation requirements;
+- retry policy;
+- cancellation authority;
+- idempotency key;
+- current state.
+
+```text
+AUTHORIZED
+    |
+    v
+SCHEDULED
+    |
+    +--> CANCELED
+    +--> EXPIRED
+    |
+    v
+DUE
+    |
+    v
+REVALIDATE
+    |
+ +--+----------+
+ |             |
+PASS        HOLD/DENY
+ |             |
+ v             v
+EXECUTE      no side effect
+```
+
+Scheduling does not freeze reality. A future action must be revalidated if rights, credentials, sanctions state, policy, funding or authority could have changed.
+
+## Timelock
+
+Historical governance designs use delayed execution to give stakeholders time to observe or challenge consequential changes.
+
+Modern timelock invariant:
+
+```text
+proposal / approved change
+          |
+          v
+      TIMELOCKED
+          |
+    challenge window
+          |
+   +------+------+
+   |             |
+ no issue      hold/cancel
+   |             |
+   v             v
+execute      review/remedy
+```
+
+A timelock is not only a delay; it is a **control window** between authorization and irreversible effect.
+
+Potential uses include:
+
+- major policy changes;
+- governance/configuration changes;
+- high-impact license revocations;
+- treasury configuration changes;
+- provider migrations;
+- key/authority rotations;
+- public-chain adapter upgrades.
+
+Exact classes and durations require adopted policy.
+
+## SLA lineage
+
+Recovered CHLOM materials include SLA and SLA Metrics families, and the Grand Prospectus discusses validator uptime, responsiveness, network health and operational metrics.
+
+A modern SLA object can represent a service expectation such as availability, response time, evidence freshness, incident response, recovery time or processing latency.
+
+```yaml
+sla_id: ct.sla.example
+service_id: stable_service
+metric: availability
+objective: policy_defined
+window: rolling_period
+measurement_source: evidence_reference
+breach_severity: defined
+remedy: defined
+status: active
+```
+
+## SLA measurement pipeline
+
+```text
+telemetry / provider evidence
+            |
+            v
+normalize measurements
+            |
+            v
+window + objective evaluation
+            |
+       +----+----+
+       |         |
+      PASS     BREACH
+       |         |
+       v         v
+      DAIL    incident/case/remedy
+```
+
+Provider dashboards are evidence; the institutional SLA evaluation should be reproducible from the accepted metric definition.
+
+## Sanctions Cache
+
+A sanctions or restricted-party check is highly time-sensitive. The historical module name **Sanctions Cache** reflects the need to use external sanctions data efficiently without treating cached data as permanently valid.
+
+```text
+Authoritative sanctions source
+          |
+          v
+fetch / verify / normalize
+          |
+          v
++---------+----------+
+| Sanctions Cache    |
+| version + fetched  |
+| at + fresh_until   |
++---------+----------+
+          |
+          v
+policy check
+```
+
+## Cache freshness rule
+
+```text
+cached result exists
+       |
+       v
+current_time <= fresh_until ?
+       |
+   +---+---+
+   |       |
+  YES     NO
+   |       |
+   v       v
+usable   refresh required
+          |
+          +--> unavailable -> HOLD / fail closed
+```
+
+A cached `not sanctioned` result cannot be used indefinitely.
+
+## Time semantics that must not be conflated
+
+```text
+observed_at    = when external reality was observed
+recorded_at    = when CHLOM recorded it
+effective_from = when a rule/decision begins applying
+expires_at     = when it stops being valid
+execute_at     = when a scheduled side effect becomes due
+fresh_until    = latest time evidence is acceptable
+```
+
+These timestamps answer different questions.
+
+## Revalidation before execution
+
+A scheduled or timelocked operation should re-check any dynamic prerequisite.
+
+```text
+approval at T0
+     |
+     +-- rights valid at T0
+     +-- credential valid at T0
+     +-- sanctions clear at T0
+     |
+wait
+     |
+execution at T1
+     |
+     +-- rights still valid?
+     +-- credential still valid?
+     +-- sanctions still clear?
+     +-- policy version compatible?
+     +-- authority still active?
+```
+
+If any required dynamic condition fails, execution does not proceed simply because an old approval exists.
+
+## Incident and breach states
+
+```text
+SLA / freshness / execution breach
+           |
+           v
+      incident event
+           |
+    +------+------+
+    |             |
+ recoverable    consequential
+    |             |
+    v             v
+retry/failover   HOLD + case
+    |             |
+    +------+------+
+           v
+        DAIL
+```
+
+## Modern implementation mapping
+
+This historical family decomposes into:
+
+- Scheduler Service;
+- Timelock/Delayed-Execution Policy;
+- Evidence Freshness Resolver;
+- SLA Registry and Evaluator;
+- Sanctions/Restricted-Party Adapter \+ cache;
+- Incident/Remedy Service;
+- DAIL temporal receipts;
+- monitoring/alerting surfaces.
+
+## Failure conditions
+
+Fail closed or HOLD when:
+
+- the clock/effective period cannot be resolved reliably;
+- a scheduled action lost its authority before execution;
+- required evidence expired;
+- sanctions data is stale and cannot be refreshed;
+- the action already executed but idempotency cannot be proven;
+- a timelock was bypassed;
+- an SLA breach requires a remedy not yet adjudicated;
+- retry behavior could duplicate an irreversible side effect.
+
+## Founder adjudication
+
+`open_after_publication`
+
+Because exact original module bodies are not fully recovered, later source discovery or founder adjudication may refine these module boundaries. New evidence should append and supersede specific reconstructed interpretations rather than erasing the lineage.

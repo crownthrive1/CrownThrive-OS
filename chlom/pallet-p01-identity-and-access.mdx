@@ -1,0 +1,607 @@
+---
+title: "P-01 Identity & Access Pallet"
+sidebarTitle: "P-01 Identity & Access"
+description: "Comprehensive current CHLOM capability-pallet contract for tenant and participant identity, organization identity, OIDC/SSO, roles, verification, consent, delegated authority and access evidence."
+icon: "id-card"
+keywords: ["CHLOM P-01", "Identity and Access", "OIDC", "SSO", "roles", "verification", "consent", "delegated authority"]
+---
+
+# P-01 Identity & Access Pallet
+
+## Canonical record
+
+```yaml
+pallet_id: P-01
+canonical_name: Identity & Access
+namespace: current_capability_pallet
+source_priority: Foundation
+source_components:
+  - ThriveApps
+  - BrandCards
+  - organization identity
+  - OIDC/SSO
+  - roles
+  - verification
+  - consent
+current_status: reconstructed_source_grounded
+production_status: not_implied_by_documentation
+public_projection: public_safe
+restricted_companion_required: true
+```
+
+## Purpose
+
+P-01 is CHLOM's current capability container for establishing **who or what is acting, under which organizational context, with what verified attributes, delegated scope, consent state and access rights**.
+
+Identity is deliberately separated from authority. A person, organization, agent, service, wallet, provider account or device can be identified without automatically receiving permission to act.
+
+```text
+IDENTITY
+   |
+   v
+VERIFICATION
+   |
+   v
+ROLE / RELATIONSHIP
+   |
+   v
+DELEGATION / AUTHORITY
+   |
+   v
+CONSENT / PURPOSE
+   |
+   v
+ACCESS DECISION
+   |
+ PASS | HOLD | DENY
+```
+
+## CHLOM Six Functions mapping
+
+| Function | P-01 responsibility |
+| --- | --- |
+| Rights | Establish which subject may hold or exercise an entitlement |
+| Rules | Apply authentication, verification, consent and access policies |
+| Roles | Canonical role, organization, delegation and actor relationships |
+| Revenue | Bind economic actions to an accountable actor without creating economic authority |
+| Records | Identity, verification, consent, delegation and access evidence |
+| Remedies | Suspend, revoke, recover, rotate, correct or appeal access/identity state |
+
+## Scope
+
+P-01 covers the current cloud/API identity-and-access plane. It may map to historical DID/Fingerprint/SBT concepts, but it is not defined by a requirement to deploy a public blockchain.
+
+### In scope
+
+- CrownThrive participant identity;
+- organization and tenant identity;
+- platform/account aliases;
+- OIDC and SSO integration;
+- authentication state;
+- role and group membership;
+- verification tiers;
+- delegated authority records;
+- consent and purpose bindings;
+- access-control decisions;
+- identity recovery and key/account rotation;
+- machine/service/agent identity;
+- provider identity aliases;
+- public-safe identity projection;
+- DAIL evidence for material identity changes.
+
+### Out of scope unless separately delegated
+
+- granting legal/professional licensure merely from a verified account;
+- financial authorization merely from identity;
+- rights ownership merely from possession of an account;
+- autonomous expansion of an agent's authority;
+- publication of private identity evidence;
+- raw secret or credential storage in documentation.
+
+## Source-component interpretation
+
+### ThriveApps
+
+Within P-01, ThriveApps represents a consumer of shared identity/access capabilities and a source of account/application identity surfaces. Its inclusion in the build-pack pallet does not imply every ThriveApps deployment currently uses every P-01 interface.
+
+### BrandCards
+
+BrandCards can consume participant, brand, organization, public-profile and verification-state projections. Public BrandCards must receive only the identity fields authorized for public projection.
+
+### Organization identity
+
+Organization identity is distinct from individual identity.
+
+```text
+PERSON ----member_of----> ORGANIZATION
+  |                           |
+  |                           +--> tenant scope
+  +--> role                   +--> policies
+  +--> delegation             +--> provider aliases
+```
+
+An actor can have different authority in different organizations.
+
+### OIDC / SSO
+
+OIDC/SSO provides authentication and identity federation. It does not make the external identity provider the sovereign source for every CrownThrive role, right or entitlement.
+
+```text
+External IdP
+    |
+ authenticate
+    |
+    v
+CrownThrive Identity Resolver
+    |
+    +--> map stable subject
+    +--> resolve tenant
+    +--> resolve local roles
+    +--> resolve verification
+    +--> resolve consent
+    |
+    v
+Authorization decision
+```
+
+### Roles
+
+Roles describe institutional relationships. They are versioned and scoped.
+
+### Verification
+
+Verification states are evidence-backed assertions, not permanent universal trust scores.
+
+### Consent
+
+Consent is purpose-specific, time-aware and revocable where applicable. Authentication is not consent.
+
+## Actor model
+
+P-01 recognizes multiple actor classes:
+
+```text
+human
+organization
+agent
+service
+application
+provider account
+external verifier
+reviewer
+issuer
+```
+
+Each actor receives a stable institutional identifier independent of replaceable provider IDs.
+
+## Canonical identity graph
+
+```text
+                     [Institution]
+                          |
+              +-----------+-----------+
+              |                       |
+         [Organization]          [Platform]
+              |                       |
+        +-----+------+                |
+        |            |                |
+     [Human]      [Agent]---------->[Service]
+        |            |
+        +----roles---+
+        |
+   verification
+        |
+      consent
+        |
+   delegation
+```
+
+The graph is directional and versioned. Historical relationships remain available through lineage rather than destructive overwrite.
+
+## Core objects
+
+### Identity record
+
+```yaml
+identity_id: ct.identity.<stable>
+actor_class: human|organization|agent|service|application
+status: active|restricted|suspended|revoked|archived
+canonical_subject_ref: opaque stable reference
+created_at: timestamp
+version: integer
+classification: restricted
+```
+
+### Organization relationship
+
+```yaml
+relationship_id: stable ID
+subject_id: identity ID
+organization_id: organization ID
+relationship_type: member|staff|owner|contractor|agent|service
+role_refs: []
+effective_from: timestamp
+effective_until: null
+status: active
+```
+
+### Verification assertion
+
+```yaml
+verification_id: stable ID
+subject_id: identity ID
+verification_type: string
+issuer_ref: stable issuer ID
+assurance_level: controlled vocabulary
+issued_at: timestamp
+expires_at: nullable
+status: valid|expired|revoked|superseded|unknown
+evidence_refs: []
+```
+
+### Consent record
+
+```yaml
+consent_id: stable ID
+subject_id: identity ID
+purpose: explicit purpose
+scope: explicit scope
+granted_at: timestamp
+expires_at: nullable
+withdrawn_at: nullable
+source_evidence_ref: required
+```
+
+### Delegation record
+
+```yaml
+delegation_id: stable ID
+principal_id: identity ID
+delegate_id: identity ID
+capability_scope: []
+authority_ceiling: reference
+decision_ceiling: reference
+effective_from: timestamp
+expires_at: timestamp|nullable
+revocable: true
+status: active|expired|revoked|suspended
+```
+
+## Authentication and authorization separation
+
+```text
+AUTHENTICATION QUESTION
+"Are you the subject represented by this session?"
+
+            !=
+
+AUTHORIZATION QUESTION
+"May this subject perform this action on this object now?"
+```
+
+P-01 must never treat successful login as sufficient permission for rights, economic, security or governance actions.
+
+## Access decision inputs
+
+A material authorization decision can include:
+
+- actor identity;
+- organization/tenant;
+- role;
+- delegation;
+- verification requirements;
+- consent/purpose;
+- target resource;
+- requested capability;
+- current policy versions;
+- time window;
+- risk/security state;
+- applicable HOLD/deny controls.
+
+## PASS / HOLD / DENY
+
+```text
+identity resolved? -------- no --------> DENY
+      |
+     yes
+      v
+required verification current? -- no/unknown --> HOLD or DENY
+      |
+     yes
+      v
+role/delegation permits action? --- no -------> DENY
+      |
+     yes
+      v
+consent/purpose satisfied? ---- no/unknown ---> HOLD or DENY
+      |
+     yes
+      v
+higher-order policy/security gate clear? -- no --> HOLD/DENY
+      |
+     yes
+      v
+PASS
+```
+
+The precise distinction between HOLD and DENY is policy-controlled.
+
+## Session model
+
+A session is temporary evidence of authenticated continuity.
+
+A session should bind:
+
+```text
+session ID
+subject ID
+tenant/organization
+authentication method
+issued time
+expiry
+risk/security context
+scopes or claims
+revocation state
+```
+
+A stale session cannot override a newly revoked role, delegation or verification.
+
+## Agent identity
+
+Agents require stable institutional identity separate from the human who created them.
+
+```text
+FOUNDER / PRINCIPAL
+       |
+    delegates
+       |
+       v
+   AGENT ID
+       |
+  capability scope
+       |
+  authority ceiling
+       |
+  evidence obligation
+```
+
+An agent may not self-issue higher authority, self-certify protected verification or become vote-eligible merely because it can call an API.
+
+## Historical identity lineage
+
+Historical CHLOM sources describe:
+
+- DIDs;
+- Fingerprint ID;
+- SBTs;
+- on-chain identity registries;
+- ZK identity proofs;
+- cross-chain identity portability.
+
+P-01 preserves those concepts as identity architecture lineage. Current implementations may use database, OIDC, credential, cryptographic or future decentralized adapters without changing the institutional meaning of identity, verification, role and delegation.
+
+## Data/event contracts
+
+Recommended event families include:
+
+```text
+ct.identity.created.v1
+ct.identity.status.changed.v1
+ct.organization.relationship.created.v1
+ct.organization.relationship.revoked.v1
+ct.role.assigned.v1
+ct.role.revoked.v1
+ct.verification.issued.v1
+ct.verification.expired.v1
+ct.verification.revoked.v1
+ct.consent.granted.v1
+ct.consent.withdrawn.v1
+ct.delegation.created.v1
+ct.delegation.revoked.v1
+ct.access.decision.v1
+ct.identity.recovery.completed.v1
+```
+
+Material state changes require DAIL lineage.
+
+## Integrations
+
+Potential integration classes include:
+
+- CrownThrive ID / SSO;
+- platform account adapters;
+- verified identity/credential providers;
+- ThriveApps;
+- BrandCards;
+- P-02 Governance & Compliance;
+- P-03 Rights & Licensing;
+- P-06 Commerce, Booking & Loyalty;
+- P-10 Operations & Institutional Memory;
+- provider-managed authentication systems;
+- future DID/VC/ZK adapters.
+
+All external providers remain replaceable adapters.
+
+## Cross-pallet dependencies
+
+```text
+P-01 Identity & Access
+    |
+    +--> P-02 policy / eligibility
+    +--> P-03 rights holder / issuer identity
+    +--> P-06 buyer / merchant / booking identity
+    +--> P-08 learner / instructor / credential identity
+    +--> P-09 operator / place identity
+    +--> P-11 payee / approver identity
+    +--> P-12 evidence claimant / verifier identity
+```
+
+P-01 supplies identity facts. Consuming pallets remain responsible for their own authority and policy decisions.
+
+## Operating procedures
+
+### Onboarding
+
+1. create/resume stable subject;
+2. attach tenant/organization context;
+3. authenticate through approved method;
+4. gather only required verification;
+5. assign roles through authorized process;
+6. record consent by purpose;
+7. create delegations if explicitly authorized;
+8. emit evidence and read back final state.
+
+### Role change
+
+Role change requires authority, effective time, prior-state preservation and DAIL evidence.
+
+### Revocation
+
+Revocation must propagate to relevant access decisions. A provider-side removal that is not reconciled institutionally remains incomplete.
+
+### Recovery
+
+Recovery restores control without silently restoring revoked authority.
+
+### Offboarding
+
+Offboarding terminates current relationships/delegations while retaining required historical evidence.
+
+## Failure modes
+
+### Identity collision
+
+Two provider accounts appear to represent one subject or one provider account appears mapped to multiple institutional subjects.
+
+**Response:** HOLD identity-sensitive actions until reconciled.
+
+### Stale role
+
+External provider says `admin`, institutional role was revoked.
+
+**Response:** institutional role state controls; provider mismatch becomes reconciliation evidence.
+
+### Verification unavailable
+
+Required verification provider is unavailable or evidence is stale.
+
+**Response:** fail closed for operations that require that verification.
+
+### Consent ambiguity
+
+No purpose-specific consent can be resolved.
+
+**Response:** do not infer consent from account existence or prior unrelated activity.
+
+### Agent scope drift
+
+Agent attempts capability outside its delegation.
+
+**Response:** DENY and emit security/governance evidence.
+
+## Security controls
+
+Public documentation does not expose:
+
+- authentication secrets;
+- OAuth client secrets;
+- recovery factors;
+- private identity evidence;
+- anti-fraud fingerprint composition;
+- private verification-provider credentials;
+- account-takeover detection thresholds.
+
+Those belong in the secret store or restricted companion artifacts as applicable.
+
+## Privacy model
+
+```text
+PRIVATE IDENTITY DATA
+       |
+  purpose / policy
+       |
+       v
+MINIMUM REQUIRED ASSERTION
+       |
+       +--> internal authorized use
+       |
+       +--> public-safe projection
+```
+
+P-01 should favor claims/assertions over unnecessary raw-document propagation.
+
+## Metrics
+
+Possible institutional metrics, once exact definitions are adopted, include:
+
+- identity resolution success rate;
+- unresolved identity collisions;
+- verification freshness rate;
+- role/delegation drift incidents;
+- consent-record completeness;
+- access HOLD rate;
+- access DENY rate;
+- recovery completion time;
+- provider mismatch age;
+- orphaned account/identity aliases.
+
+No target percentage is invented by this article.
+
+## Public / restricted twin
+
+### Public-safe article
+
+This page exposes architecture, roles, lifecycle, objects, interfaces and failure semantics.
+
+### Restricted companion
+
+The private companion may contain:
+
+- provider-specific identity mappings;
+- internal verification rules;
+- protected fingerprint/anti-abuse algorithms;
+- security incident procedures;
+- confidential identity-data flows;
+- private test corpora;
+- secret references without values.
+
+## Release gates
+
+Before production certification:
+
+```text
+[ ] stable subject IDs verified
+[ ] organization scope enforced
+[ ] authentication provider readback tested
+[ ] role/delegation checks tested
+[ ] revocation propagation tested
+[ ] consent model verified
+[ ] recovery path tested
+[ ] agent identity/delegation enforced
+[ ] restricted/public projection reviewed
+[ ] DAIL evidence verified
+[ ] provider-exit path tested
+```
+
+## Invariants
+
+```text
+identity != authority
+authentication != authorization
+role != delegation
+verification != permission
+account != person
+provider ID != institutional ID
+consent for purpose A != consent for purpose B
+agent capability != founder authority
+recovery != authority restoration
+public profile != private identity record
+```
+
+## Versioning and correction
+
+New identity sources, provider integrations, DID/VC adapters or revised role semantics update this page through versioned correction. Historical identity architecture remains linked rather than overwritten.
+
+## Current implementation effect
+
+P-01 is a **Foundation** pallet in the July 2026 build architecture. That priority means implementation sequencing importance; it does not itself prove every named capability is already deployed across every CrownThrive platform.

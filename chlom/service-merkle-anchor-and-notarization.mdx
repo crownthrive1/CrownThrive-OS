@@ -1,0 +1,229 @@
+---
+title: "Merkle Anchor & Notarization Service"
+sidebarTitle: "Merkle Anchor & Notarization"
+description: "Standalone CHLOM service article for batching evidence/event digests into verifiable roots, optional external anchoring/notarization, inclusion proofs, timestamp lineage and the boundary between integrity and factual truth."
+icon: "link"
+keywords: ["CHLOM Merkle Anchor", "notarization", "Merkle root", "proof anchor", "DAIL", "evidence integrity"]
+---
+
+# Merkle Anchor & Notarization Service
+
+## Canonical record
+
+```yaml
+service_id: ct.chlom.service.merkle-anchor-notarization
+canonical_name: Merkle Anchor & Notarization
+artifact_class: integrity_service
+source_lineage:
+  - recovered CHLOM component atlas
+  - Evidence Vault / Attestations / DAIL architecture
+  - historical blockchain/notarization research
+current_mapping:
+  - DAIL proof anchoring
+  - Evidence Vault integrity
+status: current_semantic_service_with_optional_external_anchor
+production_anchor_backends: implementation_evidence_required
+```
+
+## Purpose
+
+This service creates compact cryptographic integrity proofs for batches of CHLOM evidence/events and can optionally publish or notarize a root to an external system. It improves **tamper evidence and temporal/provenance assurance**, not factual truth.
+
+```text
+EVIDENCE / DAIL RECORD DIGESTS
+          |
+          v
+CANONICAL SORT / BATCH
+          |
+          v
+MERKLE TREE
+          |
+          v
+ROOT
+          |
+   +------+------+
+   |             |
+private record   external/notary anchor
+   |             |
+   +------+------+
+          |
+  inclusion proofs / verification
+```
+
+## Integrity boundary
+
+```text
+record included in valid Merkle root
+      !=
+record's claim factually true
+```
+
+The service proves content inclusion/immutability properties under the chosen hash/anchor assumptions.
+
+## Canonical leaf
+
+A leaf should bind exact content/version:
+
+```text
+leaf = H(domain_separator || record_id || record_version || content_digest)
+```
+
+The exact serialization/domain separator/hash algorithm is implementation-version controlled.
+
+## Deterministic ordering
+
+Batch construction requires deterministic ordering, such as stable sorted leaf identifiers or explicit sequence. The exact algorithm must be versioned so inclusion proofs remain reproducible.
+
+## Merkle root
+
+For pairs of child nodes:
+
+```text
+parent = H(left || right)
+```
+
+Odd-leaf behavior must be explicitly defined by implementation; do not leave it implicit.
+
+## Anchor batch record
+
+```yaml
+anchor_batch_id: stable ID
+batch_version: string
+record_refs: protected/indexed
+leaf_count: integer
+hash_algorithm: versioned
+root_digest: required
+created_at: timestamp
+anchor_backend_ref: optional
+external_anchor_ref: optional
+status: built|anchoring|anchored|failed|superseded
+```
+
+## Inclusion proof
+
+A verifier needs:
+
+- leaf construction rule/version;
+- sibling path;
+- ordering/direction bits;
+- expected root;
+- hash algorithm/version.
+
+```text
+Verify(leaf, proof_path) == root
+```
+
+## External anchor options
+
+The design can support:
+
+- timestamp/notary services;
+- public blockchain transaction;
+- transparency log;
+- signed institutional checkpoint;
+- third-party archival/notarization service.
+
+No specific backend is canonical merely because historical papers referenced a chain.
+
+## DAIL relationship
+
+DAIL can preserve an anchor event:
+
+```text
+ct.anchor.batch.created.v1
+ct.anchor.external.submitted.v1
+ct.anchor.external.confirmed.v1
+ct.anchor.external.failed.v1
+```
+
+The anchor references DAIL/evidence records; it does not replace them.
+
+## Correction behavior
+
+Corrections produce new records/digests and can be included in later anchor batches.
+
+```text
+original record R1 -> anchored root A1
+correction C1 / superseding R2 -> anchored root A2
+```
+
+A1 remains valid proof that R1 existed in that earlier state.
+
+## Timestamp boundary
+
+An external anchor timestamp can support `record/root existed no later than...` semantics depending on backend. It does not prove the source event actually occurred at the claimed business time.
+
+## Public proof API
+
+Public-safe verification can expose:
+
+```text
+record/public digest
+anchor batch ID
+root digest
+external anchor reference
+inclusion proof
+verification algorithm/version
+```
+
+without revealing restricted record contents.
+
+## Evidence Vault relationship
+
+Evidence Vault stores source objects/content digests; this service batches only approved digests/identifiers.
+
+## Privacy
+
+Avoid predictable hashes of low-entropy private values that enable guessing. Use content-digest designs appropriate to the evidence class; protected preimage/salting strategies may be required and belong in restricted design.
+
+## Failure modes
+
+### Anchor provider unavailable
+
+Batch can remain locally built/unanchored; do not claim external anchoring.
+
+### External anchor transaction submitted but unconfirmed
+
+Status remains pending until backend finality/readback satisfies policy.
+
+### Hash algorithm deprecated
+
+Create a new anchor/version/migration strategy; preserve old verification capability where feasible.
+
+### Record digest generated using wrong canonicalization
+
+Mark batch/record verification defect, correct with new version, preserve original lineage.
+
+### Inclusion proof fails
+
+HOLD integrity claim and investigate data/path/version mismatch.
+
+## Security threats
+
+- hash/canonicalization ambiguity;
+- leaf ordering manipulation;
+- anchor-provider spoofing;
+- backend reorg/finality error;
+- private-data inference from hashes;
+- unsigned local root substitution;
+- algorithm downgrade.
+
+## Restricted companion
+
+Contains canonicalization code/spec, private leaf-domain strategies, anchor backend configuration, security tests, key references and incident/recovery procedures. Secrets/keys remain in approved custody.
+
+## Invariants
+
+```text
+anchor != truth
+hash match != legal validity
+external transaction != DAIL authority
+correction != rewrite prior root
+unconfirmed anchor != confirmed proof
+public digest != permission to expose private source
+historical blockchain anchor != current chain dependency
+```
+
+## Status
+
+Merkle Anchor & Notarization is a current CHLOM integrity-service specification that can operate with local signed checkpoints and optional external anchors; production backends require independent deployment/readback evidence.

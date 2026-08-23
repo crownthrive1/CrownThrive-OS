@@ -1,0 +1,407 @@
+---
+title: "FORM-020 — SLA Availability Mathematics"
+sidebarTitle: "FORM-020 Availability"
+description: "Standalone CHLOM service-availability formula with explicit measurement-period, downtime and evidence requirements; targets remain contract-specific."
+icon: "signal"
+keywords: ["CHLOM FORM-020", "SLA availability", "uptime", "downtime", "SLO"]
+---
+
+# FORM-020 — SLA Availability Mathematics
+
+## Formula identity
+
+```yaml
+formula_id: FORM-020
+asset_id: ct.chlom.formula.form-020
+canonical_name: SLA Availability Mathematics
+classification: standard_engineering_model_adopted_for_reference
+origin:
+  - CHLOM SLA Metrics lineage
+  - Indexing & Observability Engine
+  - SLA & Timelock Scheduler
+  - provider/service certification workflows
+adopted_target: false
+formula_version: 1.0
+unit_domain: time_ratio
+```
+
+## Purpose
+
+FORM-020 defines a reproducible time-based availability metric for a clearly bounded service over a clearly bounded measurement period.
+
+```text
+availability = 1 - downtime / measurement_period
+```
+
+Equivalent percentage form:
+
+```text
+availability_percent
+= 100 * (measurement_period - downtime) / measurement_period
+```
+
+The equation is mathematically simple. The institutional work is defining **what counts as the service, the period and downtime** without changing the definition after an outage.
+
+## Variables
+
+```yaml
+measurement_period:
+  symbol: T
+  unit: seconds|milliseconds|minutes|other_consistent_time_unit
+  definition: total eligible observation time in the reporting window
+
+downtime:
+  symbol: D
+  unit: same as T
+  definition: eligible time classified unavailable under the metric profile
+
+availability:
+  symbol: A
+  unit: ratio in [0,1]
+```
+
+Then:
+
+```text
+A = 1 - D/T
+```
+
+with required conditions:
+
+```text
+T > 0
+0 <= D <= T
+```
+
+## Availability is definition-sensitive
+
+A service availability record is incomplete without a measurement profile.
+
+```yaml
+availability_profile_id: stable id
+service_boundary_ref: required
+measurement_window: explicit
+monitor/source_refs: []
+unavailable_condition: explicit
+degraded_condition: explicit
+planned_maintenance_treatment: explicit
+provider_exclusion_treatment: explicit
+partial_region_treatment: explicit
+clock/timezone: explicit
+rounding_precision: explicit
+missing_telemetry_behavior: HOLD|unavailable|excluded_by_adopted_rule
+version: exact
+```
+
+## Service boundary
+
+A page, API, worker, region and full product are different service boundaries.
+
+```text
+API endpoint availability
+    !=
+whole platform availability automatically
+```
+
+Composite availability requires an explicit composition model.
+
+## Measurement period
+
+The denominator may be:
+
+- calendar month;
+- rolling 30 days;
+- exact billing period;
+- UTC day;
+- contract-specific period;
+- controlled-test observation window.
+
+The period must be frozen in the calculation receipt.
+
+## Downtime classification
+
+A period counts as downtime only according to the adopted measurement profile. Examples that may need explicit treatment include:
+
+- connection failures;
+- server errors;
+- timeouts;
+- severe latency beyond an adopted service condition;
+- regional failure;
+- authentication dependency failure;
+- maintenance;
+- provider upstream outage;
+- missing telemetry.
+
+No universal classification is assumed by FORM-020.
+
+## Planned maintenance
+
+Two valid contracts can treat planned maintenance differently:
+
+```text
+Profile A: maintenance remains in denominator and may count as downtime
+Profile B: approved maintenance window excluded from eligible measurement time
+```
+
+If excluded, adjust the denominator explicitly:
+
+```text
+T_eligible = T_total - T_excluded
+A = 1 - D_counted / T_eligible
+```
+
+`T_excluded` must be evidenced and policy-authorized; it cannot be invented after an incident.
+
+## Degraded service
+
+Binary availability can hide severe degradation. A metric profile may separately report degraded minutes or define a threshold at which degradation becomes unavailable.
+
+```text
+AVAILABLE
+DEGRADED
+UNAVAILABLE
+UNKNOWN
+```
+
+If only binary FORM-020 is reported, the conversion from these states must be explicit.
+
+## Missing telemetry
+
+Missing monitoring evidence is not automatically uptime.
+
+Current-safe behavior:
+
+```text
+monitoring gap
+   -> UNKNOWN / HOLD
+```
+
+unless an adopted measurement profile defines a supported alternative evidence source.
+
+## Request success rate is a different metric
+
+Request success rate:
+
+```text
+success_rate = successful_requests / eligible_requests
+```
+
+Time availability:
+
+```text
+availability = available_time / eligible_time
+```
+
+A service can have 99.9% time availability while request success rate differs materially. Do not label one as the other.
+
+## Multi-monitor evidence
+
+If several monitors disagree, the availability profile must define source precedence/corroboration.
+
+```text
+monitor A says DOWN
+monitor B says UP
+provider status says DEGRADED
+        |
+        v
+measurement evidence conflict
+        |
+      review/HOLD
+```
+
+No arbitrary averaging is implied.
+
+## Composite services
+
+For a strict serial dependency where the product requires both A and B continuously, a simplified independent approximation is sometimes written:
+
+```text
+A_composite ≈ A_A * A_B
+```
+
+CHLOM does **not** adopt this automatically because dependency failures may be correlated and architecture-specific. Composite metrics require their own formula/profile record.
+
+## Worked example
+
+For a 30-day window:
+
+```text
+T = 30 * 24 * 60 = 43,200 minutes
+D = 43.2 minutes
+```
+
+Then:
+
+```text
+A = 1 - 43.2/43,200
+  = 0.999
+
+availability_percent = 99.9%
+```
+
+This is a mathematical example only. It is not a CrownThrive or provider SLA commitment.
+
+## Error budget relationship
+
+For an adopted target `A_target`, a corresponding downtime budget is:
+
+```text
+D_budget = T * (1 - A_target)
+```
+
+Again, FORM-020 does not choose `A_target`. Contract/policy/service authority does.
+
+## Breach predicate
+
+A possible service contract can define:
+
+```text
+breach = measured_availability < adopted_target
+```
+
+But a breach determination also needs:
+
+- exact profile version;
+- valid observation evidence;
+- exclusions;
+- period closure;
+- rounding rules;
+- dispute/correction handling.
+
+## Calculation record
+
+```yaml
+availability_calculation_id: stable id
+formula_ref: FORM-020/v1
+availability_profile_ref: exact version
+service_ref: canonical service
+period_start: timestamp
+period_end: timestamp
+measurement_period: numeric + unit
+excluded_time: numeric + unit
+downtime: numeric + unit
+availability_ratio: decimal
+availability_percent: decimal
+source_evidence_refs: []
+calculated_at: timestamp
+review_state: draft|reviewed|held|certified_for_defined_use
+DAIL_receipt_ref: optional|required by workflow
+```
+
+## Rounding
+
+Store enough precision for reproducibility before formatting a public percentage.
+
+```text
+stored calculation != display rounding
+```
+
+For example, a displayed `99.95%` must preserve the underlying numerator/denominator so the value can be recomputed.
+
+## Evidence hierarchy
+
+Possible evidence can include:
+
+- first-party telemetry;
+- independent synthetic monitor;
+- provider logs/status evidence;
+- request traces;
+- incident records;
+- uptime probe results.
+
+Provider status pages are evidence, not automatically the sole institutional source.
+
+## Corrections
+
+If telemetry or incident classification is corrected after reporting:
+
+```text
+calculation v1
+   -> correction evidence
+   -> calculation v2
+```
+
+Do not overwrite the original reported result without lineage.
+
+## DAIL events
+
+```text
+ct.sla.measurement.window.opened.v1
+ct.sla.downtime.observed.v1
+ct.sla.measurement.conflict.detected.v1
+ct.sla.availability.calculated.v1
+ct.sla.availability.reviewed.v1
+ct.sla.breach.detected.v1
+ct.sla.calculation.corrected.v1
+```
+
+## Failure modes
+
+- `T <= 0` -> invalid calculation;
+- `D < 0` or `D > T` -> invalid data;
+- units mismatch -> invalid/HOLD;
+- missing measurement profile -> not governable;
+- telemetry gap -> UNKNOWN/HOLD unless profile resolves;
+- overlapping incidents double-counted -> reconciliation failure;
+- retroactive exclusion added without authority -> invalid correction;
+- source clocks misaligned -> normalize/review.
+
+## Threat model
+
+- cherry-picked measurement period;
+- hidden exclusions;
+- monitor suppression;
+- duplicate downtime counting;
+- treating missing data as uptime;
+- changing metric definition after incident;
+- provider-only evidence treated as canonical truth;
+- rounding used to conceal breach.
+
+## Test vectors
+
+1. zero downtime -> `A = 1`;
+2. full-period downtime -> `A = 0`;
+3. 43.2 minutes in 30 days -> 99.9% mathematical example;
+4. `T = 0` -> invalid;
+5. mixed seconds/minutes -> reject until normalized;
+6. approved maintenance exclusion -> denominator adjusted exactly once;
+7. missing telemetry -> HOLD/UNKNOWN under fail-closed profile;
+8. overlapping incident intervals -> union intervals, not double count;
+9. corrected incident duration -> new calculation version;
+10. request success metric supplied instead of time availability -> reject mislabeled metric.
+
+## Observability
+
+Track:
+
+- calculation/profile versions;
+- monitoring gaps;
+- evidence conflicts;
+- exclusion totals;
+- downtime by reason class;
+- correction rate;
+- breach count against adopted targets;
+- provider vs independent-monitor divergence.
+
+## Restricted companion
+
+Private custody can include raw telemetry, incident details, infrastructure topology, internal thresholds, provider contract terms, root-cause evidence and security-sensitive outage details.
+
+## Invariants
+
+```text
+availability metric != SLA target
+provider status != canonical truth automatically
+missing telemetry != uptime
+request success != time availability
+display rounding != source calculation
+metric definition change != retroactive silent rewrite
+```
+
+## Versioning
+
+Formula semantics are versioned separately from SLA targets and measurement profiles. A target change does not require a new FORM-020 version if the availability equation remains unchanged.
+
+## Status
+
+`standard_engineering_model_adopted_for_reference`. No service-specific SLA/SLO target is created by this formula article.

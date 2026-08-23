@@ -1,0 +1,109 @@
+---
+title: "ALG-028 — Bridge / Claim Import"
+sidebarTitle: "ALG-028 Claim Import"
+description: "Standalone CHLOM interoperability procedure for authenticated, replay-protected import of remote claims while preserving local policy and authority evaluation."
+icon: "bridge"
+keywords: ["CHLOM ALG-028", "bridge claims", "interoperability", "remote finality", "local authority"]
+---
+
+# ALG-028 — Bridge / Claim Import
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-028
+name: Bridge / Claim Import
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Bridge/Claims pallet; BAMP/BCP lineage; proof portability
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-028 imports an externally generated claim or proof into CHLOM without treating remote consensus/finality or provider assertion as local institutional authority.
+
+## Core invariant
+
+```text
+remote finality != local authority
+remote proof != local policy PASS
+```
+
+## Inputs
+
+```yaml
+message:
+  source_system
+  source_registry_ref
+  message_id
+  claim_type
+  subject_ref_or_alias
+  claim_payload
+  proof_or_receipt
+  source_finality_evidence
+  nonce_or_replay_ref
+  occurred_at
+transport_context:
+local_policy_context:
+```
+
+## Procedure
+
+```text
+function import_remote_claim(message):
+    verify_transport_auth(message)
+    verify_replay_protection(message)
+    verify_source_registry(message.source)
+    verify_remote_finality_or_receipt(message)
+    normalize_claim(message)
+
+    local = local_policy_evaluate(message.claim)
+    append_dail_event("REMOTE_CLAIM_OBSERVED")
+
+    return local
+```
+
+## Transport and source verification
+
+Authenticate the transport/channel, then resolve the source system to a registered adapter/trust contract. A valid message from an unregistered or revoked source cannot be treated as trusted institutional input.
+
+## Replay protection
+
+Use stable remote message identity, nonce/domain separation or equivalent mechanisms so the same remote event cannot mint duplicate local entitlements, settlements or claims.
+
+## Finality/receipt verification
+
+Different remote systems have different evidence models: blockchain finality, signed provider receipts, federated attestations, API confirmations or other mechanisms. The adapter must state what was verified without overclaiming universality.
+
+## Normalization
+
+Convert remote identifiers, claim types, timestamps and evidence into a stable CHLOM schema. Preserve original aliases and source digest for audit.
+
+## Local evaluation
+
+Once imported, the claim is evaluated under CHLOM rights, policy, identity, evidence freshness and authority rules. A source may assert ownership, payment or credential status; CHLOM decides what institutional effect, if any, that evidence permits.
+
+## Output
+
+```yaml
+import_receipt_id:
+remote_message_ref:
+source_ref:
+normalized_claim_ref:
+transport_verification:
+remote_receipt_state:
+local_disposition:
+DAIL_event_ref:
+```
+
+## DAIL evidence
+
+Append the remote observation and local interpretation separately where useful. Corrections/reorgs/reversals from the source append new events and trigger local reconciliation.
+
+## Tests
+
+Test valid message, bad transport auth, replay, unregistered source, source revoked, remote reversal/reorg, wrong tenant, alias collision, proof valid but local policy deny, duplicate entitlement attempt and source adapter version migration.
+
+## Versioning
+
+Each source adapter and ALG-028 are versioned. Trust assumptions must remain explicit and auditable.

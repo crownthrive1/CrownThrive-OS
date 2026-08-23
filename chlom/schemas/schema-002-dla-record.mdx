@@ -1,0 +1,112 @@
+---
+title: "SCHEMA-002 — Dynamic Licensing Asset Record"
+sidebarTitle: "SCHEMA-002 DLA Record"
+description: "Canonical public-safe CHLOM machine schema for versioned Dynamic Licensing Asset identity, source rights, issuer/licensee, scope, lifecycle, policy, economics, approvals and evidence."
+icon: "file-signature"
+keywords: ["CHLOM schema", "DLA", "Dynamic Licensing Asset", "license schema", "rights"]
+---
+
+# SCHEMA-002 — Dynamic Licensing Asset Record
+
+## Schema identity
+
+```yaml
+schema_id: SCHEMA-002
+name: Dynamic Licensing Asset Record
+classification: reconstructed_machine_contract
+version: 1.0.0
+related_algorithm: ALG-003; ALG-004; ALG-005
+```
+
+## Purpose
+
+SCHEMA-002 defines the canonical CHLOM record for a **Dynamic Licensing Asset (DLA)**. It separates the stable institutional license/permission identity from provider contracts, storefront listing IDs, payment records or historical Decentralized Licensing Authority terminology.
+
+## Core record
+
+```yaml
+dla_id: string
+version: string
+tenant_id: string
+asset_id: string
+source_right_refs: [stable_ref]
+parent_dla_refs: [stable_ref]
+issuer_id: string
+licensee_id: string
+rights_scope:
+  right_types: [string]
+  media_or_channels: [string]
+  territories: [string]
+  derivative_scope: object|null
+  exclusivity: string|null
+  quantitative_cap: number|string|null
+  cap_unit: string|null
+term:
+  valid_from: timestamp|null
+  valid_until: timestamp|null
+transferability:
+  allowed: boolean
+  conditions_ref: stable_ref|null
+sublicensing:
+  allowed: boolean
+  max_depth: integer|null
+  conditions_ref: stable_ref|null
+policy_pack_refs: [stable_ref]
+credential_requirement_refs: [stable_ref]
+economic_schedule_ref: stable_ref|null
+approval_refs: [stable_ref]
+evidence_refs: [stable_ref]
+provider_aliases: [alias_ref]
+status: DRAFT|PENDING_GATES|ACTIVE|SUSPENDED|REVOKED|EXPIRED|SUPERSEDED|HOLD
+activated_at: timestamp|null
+revoked_at: timestamp|null
+supersedes_version: stable_ref|null
+DAIL_refs: [stable_ref]
+```
+
+## Rights-source requirement
+
+A DLA must bind to source rights or a valid parent chain. `source_right_refs` cannot be replaced by a marketplace listing, payment receipt or administrative assertion. Child/sublicensed rights must satisfy FORM-009 and ALG-004/005.
+
+## Scope representation
+
+Rights are multidimensional. Media/channel, territory, term, exclusivity, derivative rights, transferability, sublicensing and quantitative limits are explicit fields or structured subobjects. Unknown scope is not represented as global/perpetual/unlimited.
+
+## Issuer and licensee
+
+Issuer and licensee use canonical CHLOM identity IDs. Provider/customer IDs can appear only in aliases. Issuer identity and issuer authority are separate; activation requires current authority over the exact rights being granted.
+
+## Lifecycle
+
+Status is event-backed. `ACTIVE` is not a permanent Boolean: revocation, suspension, expiry, amendment and supersession create DAIL/lifecycle events. Historical versions remain readable.
+
+## Policy and credentials
+
+A DLA references the exact Compliance Pack and credential requirement versions applicable to activation/use. When currentness matters, downstream validity evaluation rechecks evidence rather than trusting an old activation snapshot indefinitely.
+
+## Economic schedule
+
+Commercial terms reference a versioned economic schedule. Payment evidence and settlement records are separate objects. A provider charge or checkout state cannot directly mutate the DLA into `ACTIVE` without the governing transition.
+
+## Provider aliases
+
+Examples can include external contract IDs, marketplace offer IDs or payment metadata. Aliases aid reconciliation but never become the canonical DLA key.
+
+## Validation rules
+
+- stable DLA/version/tenant IDs;
+- asset/source-right references resolve;
+- issuer/licensee identities resolve;
+- child scope does not exceed parents/source;
+- terms and territories are syntactically/semantically valid;
+- policy/approval/evidence requirements resolve;
+- status transitions follow lifecycle rules;
+- no secret/confidential body is embedded in public projection.
+
+## Tests
+
+Test direct source grant, parent/child license, attempted overscope, expired term, explicit unlimited cap, unknown cap, issuer authority revoked, economic schedule changed, provider alias changed and superseded version.
+
+## Versioning
+
+DLA versions are immutable snapshots plus lifecycle events. Material scope/party/economic changes create a new version or explicit amendment object under adopted policy.
