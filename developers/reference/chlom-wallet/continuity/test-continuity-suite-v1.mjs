@@ -68,10 +68,26 @@ assert.equal(ip.assets.length, 8);
 assert.equal(promptSuite.ai_final_authority, false);
 assert.equal(interfaces.boundary.production_activation, false);
 
+const runtime = interfaces.runtime_registry_constraints;
+for (const plugin of interfaces.plugins) {
+  assert.ok(runtime.plugin_kind.includes(plugin.kind), `invalid_plugin_kind:${plugin.plugin_id}:${plugin.kind}`);
+  assert.ok(runtime.plugin_archetype.includes(plugin.archetype), `invalid_plugin_archetype:${plugin.plugin_id}:${plugin.archetype}`);
+  assert.notEqual(plugin.owner_agent_id, plugin.verifier_agent_id, `plugin_separation_of_duties:${plugin.plugin_id}`);
+}
+for (const tool of interfaces.mcp_tools) {
+  assert.ok(runtime.mcp_risk_class.includes(tool.risk_class), `invalid_mcp_risk:${tool.tool_name}:${tool.risk_class}`);
+  assert.equal(tool.contract_registered, true);
+  assert.equal(tool.enabled, false);
+  assert.equal(tool.runtime_binding_state, 'HOLD_UNBOUND_MCP_SERVER');
+}
+assert.equal(runtime.service_monthly_request_limit, -1);
+assert.equal(interfaces.api.deployment_state, 'CONTRACT_ONLY_HOLD_UNBOUND_SERVER');
+
 const suiteDigest = sha256({
   catalog: catalog.catalog_id,
   prompts: promptSuite.suite_id,
   interfaces: interfaces.pack_id,
+  interfaces_version: interfaces.semantic_version,
   ip: ip.registry_id,
   assets: assets.map(a => a.asset_sha256)
 });
@@ -86,8 +102,11 @@ console.log(JSON.stringify({
   modules: interfaces.modules.length,
   plugins: interfaces.plugins.length,
   mcp_tools: interfaces.mcp_tools.length,
+  mcp_runtime_binding: 'HOLD_UNBOUND_MCP_SERVER',
+  api_runtime_binding: interfaces.api.deployment_state,
   proprietary_metaprotocol_assets: ip.assets.length,
   budget_semantics_correct: true,
+  runtime_registry_compatible: true,
   ai_final_authority: false,
   production_activation: false,
   suite_digest_sha256: suiteDigest
