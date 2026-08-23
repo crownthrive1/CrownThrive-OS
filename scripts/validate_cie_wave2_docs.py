@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate CrownThrive CIE Wave 2 core documentation and public-safe manifests."""
+"""Validate CrownThrive CIE Wave 2 documentation, manifests and Mintlify navigation."""
 from __future__ import annotations
 
 import json
@@ -18,6 +18,12 @@ REQUIRED_FILES = (
     "changelog/cie-institutionalization-wave-2-2026-08-23.mdx",
 )
 
+REQUIRED_NAV = {
+    "doctrine/cie-public-internal-usage",
+    "doctrine/cie-chlom-interoperability",
+    "changelog/cie-institutionalization-wave-2-2026-08-23",
+}
+
 
 def fail(message: str) -> None:
     raise SystemExit(f"ERROR: {message}")
@@ -35,6 +41,19 @@ def load_json(rel: str) -> dict:
     if not isinstance(value, dict):
         fail(f"JSON object required: {rel}")
     return value
+
+
+def flatten_nav(value: object) -> set[str]:
+    found: set[str] = set()
+    if isinstance(value, str):
+        found.add(value)
+    elif isinstance(value, list):
+        for item in value:
+            found.update(flatten_nav(item))
+    elif isinstance(value, dict):
+        for item in value.values():
+            found.update(flatten_nav(item))
+    return found
 
 
 def main() -> int:
@@ -122,6 +141,12 @@ def main() -> int:
         if effects.get(key) is not False:
             fail(f"positive composed state authority drift: {key}")
 
+    docs = load_json("docs.json")
+    nav = flatten_nav(docs.get("navigation", {}))
+    missing_nav = sorted(REQUIRED_NAV - nav)
+    if missing_nav:
+        fail(f"Mintlify navigation missing Wave 2 pages: {missing_nav}")
+
     joined = "\n".join(read(rel) for rel in REQUIRED_FILES)
     credential_patterns = (
         r"\bgh[pousr]_[A-Za-z0-9]{20,}\b",
@@ -135,9 +160,9 @@ def main() -> int:
             fail("credential-shaped value detected in public Wave 2 docs")
 
     print(
-        "CIE Wave 2 core docs validation PASS: Cultural Imprint Engine is canonical-only; "
+        "CIE Wave 2 docs validation PASS: Cultural Imprint Engine is canonical-only; "
         "public/internal profiles are one engine; CHLOM interoperability is typed, bidirectional, "
-        "fail-closed and non-executing. Mintlify navigation is a separate post-merge gate."
+        "fail-closed and non-executing; Mintlify navigation is wired and enforced."
     )
     return 0
 
