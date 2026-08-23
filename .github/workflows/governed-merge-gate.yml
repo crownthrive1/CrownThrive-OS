@@ -25,10 +25,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Pull-request checkout uses a synthetic merge commit. Depth 2 retains
-          # both exact parents so the trusted base/head diff can be derived
-          # without granting network/API authority to the decision engine.
-          fetch-depth: 2
+          # The decision engine binds to the exact base/head SHAs supplied by
+          # the pull_request event. A synthetic merge ref can lag the current
+          # base while the PR is moving; shallow depth 2 therefore does not
+          # guarantee that github.event.pull_request.base.sha is present.
+          # Full read-only history makes both exact objects locally available
+          # without adding API/write authority to the decision engine.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
