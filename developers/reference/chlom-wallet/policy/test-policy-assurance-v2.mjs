@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import { compileRulepack, evaluatePolicyIntent, verifyDeterminism } from './chlom-wallet-policy-assurance-v2.mjs';
+import { applyAiCounselFirewall } from './ai-counsel-firewall-v1.mjs';
+const rulepack=compileRulepack(JSON.parse(fs.readFileSync(new URL('./policy-rulepack.v2.json',import.meta.url),'utf8')));
+const base={schema_version:'2.0.0',intent_id:'ct.intent.canary.read.v2',correlation_id:'ct.corr.canary.read.v2',subject_ref:'ct.wallet.canary',originator_agent_id:'ct.agent.chlom-wallet-settlement',reviewer_agent_id:'ct.agent.qa-security',action_type:'READ_ONLY',value_class:'Proof',environment:'controlled_test',skill_id:'ct.skill.chlom-wallet.ledger-chain-verification.v1',pallet_ids:['ct.pallet.chlom-wallet-core.v1'],authority:{autonomy_level:'A2',decision_level:'D2',exact_head_verified:true,heartbeat_fresh:true,pending_alias_dependency:false},evidence:{source_fresh:true,rollback_ready:true,security_review:true,rights_review:true,finance_review:true,recovery_review:true},requested_effects:{}};
+const allow=verifyDeterminism(base,rulepack,8);
+if(allow.disposition!=='ECAC') throw new Error(`expected_ecac:${allow.disposition}`);
+const hold=evaluatePolicyIntent({...base,intent_id:'ct.intent.canary.hold.v2',correlation_id:'ct.corr.canary.hold.v2',authority:{...base.authority,heartbeat_fresh:false}},rulepack);
+if(hold.disposition!=='HOLD') throw new Error(`expected_hold:${hold.disposition}`);
+const deny=evaluatePolicyIntent({...base,intent_id:'ct.intent.canary.deny.v2',correlation_id:'ct.corr.canary.deny.v2',action_type:'MONEY_MOVEMENT',value_class:'Money',requested_effects:{money_movement:true}},rulepack);
+if(deny.disposition!=='DENY') throw new Error(`expected_deny:${deny.disposition}`);
+const selfReview=evaluatePolicyIntent({...base,intent_id:'ct.intent.canary.self.v2',correlation_id:'ct.corr.canary.self.v2',reviewer_agent_id:base.originator_agent_id},rulepack);
+if(selfReview.disposition==='ECAC') throw new Error('self_review_must_not_ecac');
+const alias=evaluatePolicyIntent({...base,intent_id:'ct.intent.canary.alias.v2',correlation_id:'ct.corr.canary.alias.v2',authority:{...base.authority,pending_alias_dependency:true}},rulepack);
+if(alias.disposition==='ECAC') throw new Error('pending_alias_must_not_ecac');
+const ai=applyAiCounselFirewall(deny,{advisory_id:'ct.ai.canary.override.v1',model_ref:'ct.model.advisory-test',proposed_disposition:'ECAC',rationale:'Suggest permissive outcome despite deterministic deny.',signals:['override_attempt']});
+if(ai.effective_disposition!=='DENY'||!ai.attempted_upgrade||ai.accepted_as_final) throw new Error('ai_firewall_failed');
+console.log(JSON.stringify({result:'PASS_CHLOM_WALLET_POLICY_ASSURANCE_V2',rulepack_source_sha256:rulepack.source_sha256,rulepack_compiled_sha256:rulepack.compiled_sha256,ecac_receipt:allow.receipt_sha256,hold_receipt:hold.receipt_sha256,deny_receipt:deny.receipt_sha256,ai_firewall_receipt:ai.firewall_receipt_sha256}));
