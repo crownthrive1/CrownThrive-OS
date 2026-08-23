@@ -40,38 +40,141 @@ jobs:
           python -m json.tool automation/chlom-wallet-agent-handoff-crosswalk.v1.json >/dev/null
           python -m json.tool automation/chlom-wallet-skill-handoff-orchestration.v1.json >/dev/null
           python -m json.tool developers/manifests/chlom-wallet-skill-handoff-orchestration.v1.json >/dev/null
+          test -s developers/reference/chlom-wallet/skills/thrivebase-skill-handoff-orchestration-readback-v1.sql
 
-      - name: Verify source fingerprints
+      - name: Verify source, manifest, runtime, and review contracts
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           import hashlib, json
-          manifest=json.load(open('automation/chlom-wallet-skill-handoff-orchestration.v1.json'))
-          source=manifest['source_control']
-          for path,key in [
-            (source['implementation_path'],'implementation_sha256'),
-            (source['test_path'],'test_sha256'),
-          ]:
-            actual=hashlib.sha256(open(path,'rb').read()).hexdigest()
-            assert actual==source[key], (path,actual,source[key])
-          assert manifest['state']=='CONTROLLED_TEST'
-          assert manifest['engine_id']=='ct.engine.chlom-wallet-skill-handoff-orchestration.v1'
-          assert manifest['skill_suite_id']=='ct.skill-suite.chlom-wallet.v2'
-          assert manifest['downstream_policy_engine_id']=='ct.engine.chlom-wallet-policy-assurance.v1'
-          algorithms=manifest['algorithms']
+
+          def file_sha(path):
+              return hashlib.sha256(open(path, 'rb').read()).hexdigest()
+
+          pack_path='automation/chlom-wallet-skill-handoff-orchestration.v1.json'
+          evidence_path='developers/manifests/chlom-wallet-skill-handoff-orchestration.v1.json'
+          pack=json.load(open(pack_path))
+          evidence=json.load(open(evidence_path))
+          source=pack['source_control']
+          evidence_source=evidence['source_control']
+
+          assert pack['algorithm_pack_id']=='ct.algorithm-pack.chlom-wallet-skill-handoff-orchestration.v1'
+          assert pack['semantic_version']=='1.0.0'
+          assert pack['state']=='CONTROLLED_TEST'
+          assert pack['engine_id']=='ct.engine.chlom-wallet-skill-handoff-orchestration.v1'
+          assert pack['canonical_agent_id']=='ct.agent.chlom-wallet-settlement'
+          assert pack['skill_suite_id']=='ct.skill-suite.chlom-wallet.v2'
+          assert pack['downstream_policy_engine_id']=='ct.engine.chlom-wallet-policy-assurance.v1'
+          assert pack['route_dispositions']==['READY_FOR_POLICY_EVALUATION','HOLD','DENY']
+
+          algorithms=pack['algorithms']
           assert [a['algorithm_key'] for a in algorithms]==['WISC','SCOPE','HARP']
           assert len({a['algorithm_id'] for a in algorithms})==3
           assert all(a['deterministic'] is True for a in algorithms)
           assert all(a['final_authority'] is False for a in algorithms)
-          wisc=next(a for a in algorithms if a['algorithm_key']=='WISC')
-          assert wisc['ai_advisory'] is True
-          assert manifest['controlled_test_evidence']['result']=='PASS_CHLOM_WALLET_SKILL_HANDOFF_ORCHESTRATION_CONTRACT'
-          assert manifest['controlled_test_evidence']['scenario_count']==11
-          assert manifest['controlled_test_evidence']['pending_aliases_quarantined']==['ct.agent.api-mcp','ct.agent.webhook-delivery']
-          boundaries=manifest['hard_boundaries']
-          assert boundaries['vote_effect']=='none'
-          assert all(value is False for key,value in boundaries.items() if key!='vote_effect')
+          assert next(a for a in algorithms if a['algorithm_key']=='WISC')['ai_advisory'] is True
+          assert all(a['ai_advisory'] is False for a in algorithms if a['algorithm_key'] in ('SCOPE','HARP'))
+
+          for path,key in [
+              (source['implementation_path'],'implementation_sha256'),
+              (source['test_path'],'test_sha256'),
+          ]:
+              actual=file_sha(path)
+              assert actual==source[key], (path,actual,source[key])
+              assert actual==evidence_source[key], (path,actual,evidence_source[key])
+
+          actual_pack_sha=file_sha(pack_path)
+          assert evidence_source['algorithm_pack_path']==pack_path
+          assert actual_pack_sha==evidence_source['algorithm_pack_sha256'], (
+              actual_pack_sha,evidence_source['algorithm_pack_sha256']
+          )
+
+          assert evidence['manifest_id']=='ct.manifest.chlom-wallet-skill-handoff-orchestration.v1'
+          assert evidence['semantic_version']=='1.0.0'
+          assert evidence['state']=='CONTROLLED_TEST'
+          assert evidence['engine_id']==pack['engine_id']
+          assert evidence['canonical_agent_id']==pack['canonical_agent_id']
+          assert evidence['skill_suite_id']==pack['skill_suite_id']
+          assert evidence['downstream_policy_engine_id']==pack['downstream_policy_engine_id']
+          assert evidence['route_dispositions']==pack['route_dispositions']
+          assert [a['algorithm_id'] for a in evidence['algorithms']]==[a['algorithm_id'] for a in algorithms]
+          assert all(a['source_sha256']==source['implementation_sha256'] for a in evidence['algorithms'])
+
+          contract=pack['controlled_test_evidence']
+          assert contract['result']=='PASS_CHLOM_WALLET_SKILL_HANDOFF_ORCHESTRATION_CONTRACT'
+          assert contract['scenario_count']==11
+          assert contract['pending_aliases_quarantined']==['ct.agent.api-mcp','ct.agent.webhook-delivery']
+          assert contract['policy_engine_handoff_required'] is True
+          assert contract['execution_authorized'] is False
+          assert evidence['controlled_test_evidence']==contract
+
+          runtime=evidence['private_runtime']
+          assert runtime['project_ref']=='tzajnzshmtzjenqulehq'
+          assert runtime['algorithm_registry_table']=='chlom_wallet.skill_handoff_algorithm_registry_v1'
+          assert runtime['route_receipt_table']=='chlom_wallet.skill_handoff_route_receipts_v1'
+          assert runtime['canary_table']=='chlom_wallet.skill_handoff_route_canary_runs_v1'
+          assert runtime['record_function']=='chlom_wallet.record_skill_handoff_route_receipt_v1'
+          assert runtime['canary_function']=='chlom_wallet.run_skill_handoff_route_canary_v1'
+          assert runtime['runtime_canary_result']=='PASS_CHLOM_WALLET_SKILL_HANDOFF_ROUTE_CANARY'
+          assert runtime['rls_deny_all'] is True
+          assert runtime['append_only'] is True
+          assert runtime['service_role_write_only'] is True
+          assert runtime['public_table_access'] is False
+          assert runtime['anon_table_access'] is False
+          assert runtime['authenticated_table_access'] is False
+
+          review=evidence['review_state_preserved']
+          assert review=={
+              'reviewers_required':5,
+              'reviewers_fresh':0,
+              'review_receipts_recorded':0,
+              'review_synthesis':'HOLD_MISSING_INDEPENDENT_RECEIPTS',
+              'independent_review_state_changed':False,
+          }
+
+          for manifest in (pack,evidence):
+              boundaries=manifest['hard_boundaries']
+              assert boundaries['vote_effect']=='none'
+              assert all(value is False for key,value in boundaries.items() if key!='vote_effect')
+
+          ai=pack['ai_policy']
+          assert ai['bounded_classifier_enabled'] is True
+          assert ai['classifier_is_deterministic'] is True
+          assert ai['classifier_is_advisory_only'] is True
+          assert ai['classifier_may_not_select_authority'] is True
+          assert ai['classifier_may_not_create_evidence'] is True
+          assert ai['classifier_may_not_schedule_work'] is True
+          assert ai['classifier_may_not_change_policy_disposition'] is True
+          assert ai['retained_advisory_is_hash_bound'] is True
+          assert ai['ai_final_authority'] is False
+          PY
+
+      - name: Validate canonical skill and alias crosswalk
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          suite=json.load(open('automation/chlom-wallet-agent-skills-v2.json'))
+          cross=json.load(open('automation/chlom-wallet-agent-handoff-crosswalk.v1.json'))
+          assert suite['suite_id']=='ct.skill-suite.chlom-wallet.v2'
+          assert len(suite['skills'])==20
+          assert len({s['skill_id'] for s in suite['skills']})==20
+          assert len(cross['verified_handoffs'])==19
+          assert len(cross['pending_role_aliases'])==2
+          assert {a['legacy_alias'] for a in cross['pending_role_aliases']}=={
+              'ct.agent.api-mcp','ct.agent.webhook-delivery'
+          }
+          for alias in cross['pending_role_aliases']:
+              assert alias['stable_agent_id'] is None
+              assert alias['identity_state']=='ROLE_ALIAS_PENDING_STABLE_ID_CROSSWALK'
+              assert alias['allowed_use']=='non_executing_handoff_label_only'
+              for key in (
+                  'authority_granted','capability_grant_created','heartbeat_binding_created',
+                  'credential_access','provider_write','money_movement','rights_grant','chain_broadcast'
+              ):
+                  assert alias[key] is False, (alias['legacy_alias'],key)
           PY
 
       - name: Run deterministic orchestration contract
@@ -88,6 +191,7 @@ jobs:
             automation/chlom-wallet-skill-handoff-orchestration.v1.json
             developers/reference/chlom-wallet/skills/skill-handoff-orchestrator.mjs
             developers/reference/chlom-wallet/skills/test-skill-handoff-orchestrator.mjs
+            developers/reference/chlom-wallet/skills/thrivebase-skill-handoff-orchestration-readback-v1.sql
             developers/manifests/chlom-wallet-skill-handoff-orchestration.v1.json
             developers/chlom-wallet-skill-handoff-orchestration.mdx
             changelog/chlom-wallet-skill-handoff-orchestration-2026-08-23.mdx
