@@ -4,15 +4,23 @@ These instructions govern every human, AI, ML, LLM, agent, script, connector, an
 
 ## 1. Mission
 
-Maintain CrownThrive's institutional knowledge as a durable, versioned, public-safe projection of governed records. Every run must strengthen the next run, preserve CrownThrive intellectual property and cultural identity, and avoid converting plans, historical sources, interfaces, or model outputs into unsupported current claims.
+Maintain CrownThrive's institutional knowledge as a durable, versioned, public-safe projection of governed records. Every run must strengthen the next run, preserve CrownThrive intellectual property and cultural identity, and avoid converting plans, historical sources, interfaces, provider responses, payments, or model outputs into unsupported current claims.
 
-Current baseline:
+Current public-safe baseline as of **August 23, 2026**:
 
-- human program phase: `2.97`
-- human patch: `2.97.1`
-- machine institutional release: `2.7.9.1`
-- release state: `accepted` at merge commit `52762bd4bd629ea8012fac6ceb3790d0955b0499`
-- next required passes: `2.98` platform extraction, then `2.99` private-core and machine-seed preparation
+- human program phase: `2.99` — Private Core and Machine Seed Program;
+- current execution state: `in_progress`;
+- Phase 3 entry: `blocked_pending_phase_2_99_hard_exit`;
+- last named institutional machine release baseline: `2.7.9.1`;
+- snapshot `main` head before this public-information refresh: `038d2eb9ca86745dd425afa941e1318175f08382`;
+- Help Center forensic source universe: `795` recovered title/hierarchy records;
+- current reconstruction candidate mapping: `495/795`, with `300` remaining in the active reconstruction program;
+- Sprint 4 CHLOM reconstruction crosswalk: `297` recovered CHLOM titles reconciled without manufacturing missing historical bodies;
+- current required gate: complete the applicable Phase 2.99 hard-exit requirements before Phase 3 promotion.
+
+`technology/phase-3-readiness-gate.mdx` is the current public gate record for Phase 3 eligibility. `changelog/phase-2-99-plan.mdx` is the current Phase 2.99 program plan. A commit hash in this section is an **as-of snapshot**, not a permanent release identifier; update it when the public baseline is intentionally refreshed.
+
+The `2.7.9.1` value is retained as the last named institutional machine-release baseline. Post-release Phase 2.98/2.99 repository work must not be mislabeled as a new machine release unless a governing release record explicitly assigns one.
 
 ## 2. Instruction and source precedence
 
@@ -45,6 +53,7 @@ At minimum, inspect the applicable current versions of:
 - `standards/mcp-api-governance.mdx` when interfaces/tools are involved
 - `standards/search-seo-metadata-robots.mdx` when public routes or metadata are involved
 - `technology/phase-3-readiness-gate.mdx` for Phase 3 preparation
+- `commerce/thriveevergreen.mdx` when a change can activate or represent economic state
 - the relevant platform, corridor, CHLOM, Legal Depot, workflow, and runbook records.
 
 Do not rely on a summary when the controlling page is available.
@@ -70,14 +79,17 @@ Unknown remains explicit: `uninspected`, `unverified`, `source_not_located`, `bl
 
 Use the correct namespace:
 
-- human phase: `2.97`
-- human patch: `2.97.1`
-- institutional machine release: `2.7.9.1`
-- service/API/schema/content/policy/rights/economic/model/deployment versions: independent identifiers.
+- human program phase: `2.99`;
+- human audit/remediation patch: use only when a current governing record explicitly assigns one;
+- last named institutional machine release baseline: `2.7.9.1`;
+- service/API/schema/content/policy/rights/economic/model/deployment versions: independent identifiers;
+- source, snapshot and effective-period versions: independent evidence records.
 
 Material corrections append. They do not overwrite history without a linked correction or supersession record.
 
-Every audit, grade, evaluation, standards reference, and prior assistant conclusion is itself correctable. Preserve the original statement, stronger evidence, downstream effect, and corrected conclusion.
+Every audit, grade, evaluation, standards reference, prior assistant conclusion, provider readback and public snapshot is itself correctable. Preserve the original statement, stronger evidence, downstream effect, and corrected conclusion.
+
+Do not infer a new machine release number from Git commits, documentation sprints, workstream completion, provider updates, or controlled-test activation.
 
 ## 6. Evidence and public claims
 
@@ -90,6 +102,8 @@ Dynamic claims require a definition, source, period/as-of date, evidence class, 
 A public page proves what was represented. It does not automatically prove the underlying system worked.
 
 A historical source proves design history. It does not automatically prove current legal, financial, filing, franchise, token, DAO, smart-contract, or deployment status.
+
+A provider response, payment, webhook, checkout success, delivery event or API `2xx` is evidence from that provider. It does not independently create CrownThrive rights, entitlement, settlement, revenue recognition, payout, license, public-performance truth or institutional authority.
 
 ## 7. Rights, culture, canon, and protected people
 
@@ -113,7 +127,7 @@ Never place in this public repository:
 - restricted rights evidence;
 - unreleased masters or confidential source assets;
 - exploit-enabling security details;
-- proprietary Fingerprint, policy, economic, or other trade-secret implementation details.
+- proprietary Fingerprint, policy, economic, cryptographic, algorithmic, or other trade-secret implementation details.
 
 Public summaries may reference protected evidence without reproducing it.
 
@@ -131,7 +145,9 @@ Use the autonomy classes:
 
 Agents may not self-approve consequential actions. For A3/A4 work, separate planning, rights/policy/security review, execution, verification, and rollback or incident response.
 
-Stop or hold when authority, evidence, rights, version, dependency, or rollback is missing.
+Stop or hold when authority, evidence, rights, version, dependency, recovery, or rollback is missing.
+
+A model vote, confidence score, successful workflow, generated artifact, or agent quorum does not manufacture founder-reserved, legal, rights, security, economic, or other D3/D4 authority.
 
 ## 10. Repository workflow
 
@@ -151,19 +167,24 @@ During editing:
 - avoid broken internal links and orphaned pages;
 - do not add frontmatter-only placeholder pages to navigation;
 - do not change current claims without evidence and date;
-- do not change live-domain, payment, credential, rights, or legal representations through documentation alone.
+- do not change live-domain, payment, credential, rights, legal, or production representations through documentation alone;
+- do not promote a controlled-test, specified, recovered, historical, or provider-reported state into production without the required current evidence.
 
 After editing:
 
 1. run `python3 scripts/validate_docs.py`;
-2. inspect the diff;
-3. document changed records, corrections, deferred items, source/evidence, tests, risks, and next inherited baseline;
-4. use a reviewed PR for material changes;
-5. update the release/changelog/ADR when required.
+2. run every scope-specific validator applicable to the changed files;
+3. inspect the diff;
+4. document changed records, corrections, deferred items, source/evidence, tests, risks, and next inherited baseline;
+5. use a reviewed pull request for material changes;
+6. update the release/changelog/ADR when required;
+7. preserve exact-head acceptance evidence before promotion.
 
 ## 11. Mintlify and navigation
 
 `docs.json` is the navigation and presentation configuration, not the private source of institutional truth.
+
+The current public documentation projection is Git-backed from `crownthrive1/CrownThrive-Support` on `main`. Mintlify remains a replaceable projection service. A configured documentation projection does not prove a final public Help Center, authenticated knowledge portal, custom CrownThrive documentation domain, or private institutional core exists.
 
 Every navigated page must:
 
@@ -174,17 +195,19 @@ Every navigated page must:
 - remain public-safe;
 - avoid unrelated template branding and links.
 
-The current deployment is a phased working/review projection. Do not claim the final public Help Center or private portal exists merely because the editor route renders. A CrownThrive custom domain is a later approved launch gate.
+Custom-domain activation remains a separately governed deployment/continuity action. Hidden navigation, obscure URLs, `robots.txt`, or frontend-only role checks are not security controls.
 
 ## 12. API, MCP, integrations, and vendors
 
 Do not invent base URLs, endpoints, webhooks, scopes, or integration status.
 
-Prefer supported APIs over brittle automation. Record exact provider/product/version, auth, scopes, data class, rate limits, events, failure behavior, owner, support, export, and replacement path.
+Prefer supported APIs over brittle automation. Record exact provider/product/version, auth, scopes, data class, rate limits, events, failure behavior, owner, support, export, replacement path, and current evidence state.
 
-New production MCP designs target the `2026-07-28` protocol profile. Earlier versions require explicit compatibility and migration records. Tool descriptions must disclose side effects, data class, autonomy class, approval, and rollback or compensation behavior.
+New production MCP designs target the `2026-07-28` protocol profile. Earlier versions require explicit compatibility and migration records. Tool descriptions must disclose side effects, data class, autonomy class, approval, version, and rollback or compensation behavior.
 
 A vendor implementation is replaceable. The CrownThrive stable platform/service identity survives it.
+
+Provider IDs, product IDs, price IDs, payment-link IDs, checkout sessions and webhook receipts remain provider aliases/evidence unless the governing CrownThrive record says otherwise.
 
 ## 13. Search, metadata, robots, and sitemaps
 
@@ -192,17 +215,21 @@ Metadata resolves from governed records. Private/admin/account/token/evidence ro
 
 Do not generate fake locations, profiles, reviews, metrics, category pages, or mass-spun content. Programmatic pages require real differentiated value, stable IDs, lifecycle rules, claim evidence, and duplicate/canonical controls.
 
+Public search/indexability is a visibility decision, not a production, rights, legal, or authority state.
+
 ## 14. Legal Depot and professional review
 
 Agents may inventory, compare, classify, prepare redlines, map applicability, identify counsel questions, and draft controlled work product.
 
-Agents may not represent that legal sufficiency, registration, filing, franchise authority, securities status, tax treatment, enforceability, nonprofit status, investment-fund status, or regulatory approval has been established without current verified authority.
+Agents may not represent that legal sufficiency, registration, filing, franchise authority, securities status, tax treatment, enforceability, nonprofit status, investment-fund status, charitable status, tax deductibility, or regulatory approval has been established without current verified authority.
 
 ## 15. Intellectual property
 
-CrownThrive-specific original documentation, CHLOM, CIE, the Thrive Flywheel, MM Suites architecture, registries, research summaries, platform systems, imprints, universes, characters, policies, and confidential methods remain governed CrownThrive intellectual property unless a specific written license says otherwise.
+CrownThrive-specific original documentation, CHLOM, CIE, the Thrive Flywheel, MM Suites architecture, ThriveBase public-safe specifications, ThriveEvergreen materials, registries, research summaries, platform systems, imprints, universes, characters, policies, and confidential methods remain governed CrownThrive intellectual property unless a specific written license says otherwise.
 
 Do not copy restricted CrownThrive source into public outputs. Do not remove author/source/ownership notices. Do not interpret a third-party template or dependency license as a grant over CrownThrive-specific content.
+
+Public repository visibility is not an open-source or open-content grant. Consult `LICENSE`, `THIRD_PARTY_NOTICES.md`, and file-level notices.
 
 ## 16. Completion standard
 
@@ -215,7 +242,7 @@ A task is complete only when:
 - approvals are captured where required;
 - public claims match evidence;
 - failures remain visible;
-- rollback or correction exists;
+- rollback, compensation, or correction exists where required;
 - the next run can inherit an exact baseline without rediscovery.
 
-A convincing interface, successful build, or confident message is not completion evidence by itself.
+A merged documentation change is evidence that the documentation change was accepted. It is not independent proof that every described runtime, legal, economic, rights, provider, security, domain, API, MCP, or production capability is live or certified.
