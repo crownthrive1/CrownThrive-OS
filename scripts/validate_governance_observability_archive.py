@@ -61,16 +61,28 @@ def main() -> None:
 
     require("POLICY_MARKER" in classifier and "policy_disposition_inferred" in classifier, "classifier policy firewall missing")
     require("CI_EVIDENCE_HYDRATION_FAILURE" in classifier and "STALE_EXACT_HEAD" in classifier, "classifier source-identity classes missing")
+    require("STEP_ENV_KEYS" in classifier and "STEP_OUTCOMES" in classifier, "classifier environment allowlist missing")
+    require("dict(os.environ)" not in classifier, "classifier must not ingest the full environment")
+    require("print(payload)" not in classifier, "classification payload must not be logged")
+    require("raw workflow logs were not emitted" in classifier, "sensitive-log firewall acknowledgement missing")
+
     require("ct-governance-observability-v1" in readback, "machine comment marker missing")
     require("Institutional disposition: `NOT_DERIVED_FROM_CI`" in readback, "PR interpretation firewall missing")
     require("pull_request_target:" in obs and "workflow_run:" in obs, "observability triggers incomplete")
     require("ref: ${{ github.event.repository.default_branch }}" in obs, "pull_request_target must execute canonical code")
     require("persist-credentials: false" in obs, "observability checkout must not persist credentials")
+
     require("Hydrate exact PR source identity" in merge, "merge-gate hydration step missing")
     require("git cat-file -e" in merge, "exact git object verification missing")
     require("classify_governance_run.py" in merge, "merge-gate classification missing")
-    require("A red CI job is not automatically" in standard, "institutional doctrine firewall missing")
+    require("CT_GIT_HEAD_SHA" in merge and "CT_GIT_BASE_SHA" in merge, "immutable exact SHA inputs missing")
+    require("github.event.pull_request.head.ref" not in merge, "mutable contributor head ref forbidden in privileged merge gate")
+    require("CT_GIT_HEAD_REF" not in merge and "CT_GIT_BASE_REF" not in merge, "mutable branch-ref hydration forbidden")
+    require('git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_HEAD_SHA}"' in merge, "exact head SHA fetch missing")
+    require('git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_BASE_SHA}"' in merge, "exact base SHA fetch missing")
+    require("persist-credentials: false" in merge, "merge-gate checkout must not persist Git credentials")
 
+    require("A red CI job is not automatically" in standard, "institutional doctrine firewall missing")
     require(all(value is False for value in manifest["hard_boundaries"].values()), "authority boundary widened")
     print("Governance observability and archive continuity contract: PASS")
 
