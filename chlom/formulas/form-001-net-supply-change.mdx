@@ -1,0 +1,95 @@
+---
+title: "FORM-001 — Historical Net Supply Change"
+sidebarTitle: "FORM-001 Net Supply"
+description: "Standalone historical CHLOM tokenomics formula for annual net supply change as issuance minus transaction-linked burn, with provenance and non-production boundary."
+icon: "square-root-variable"
+keywords: ["CHLOM FORM-001", "net supply", "inflation", "burn", "tokenomics"]
+---
+
+# FORM-001 — Historical Net Supply Change
+
+## Formula identity
+
+```yaml
+formula_id: FORM-001
+stable_id: ct.chlom.formula.supply.net-change.v1
+classification: historical_source_formula
+origin: CHLOM Genesis Volume quantitative/tokenomics discussion
+adopted: false
+production_parameter: false
+```
+
+## Expression
+
+```text
+new_coins_per_year = i * S
+coins_burned_per_year = b * N
+net_supply_change = iS - bN
+```
+
+Where:
+
+- `i` = annual inflation rate, dimensionless fraction/year assumption;
+- `S` = current token supply in CHLOM units;
+- `b` = average CHLOM burned per transaction;
+- `N` = transactions per year.
+
+The historical equilibrium condition is:
+
+```text
+iS ≈ bN
+```
+
+which means annual modeled issuance approximately equals modeled annual burn.
+
+## Source interpretation
+
+The Genesis-era architecture used this equation to reason about a hypothetical CHLOM Coin economy in which issuance rewards network participation and fee burn can offset supply expansion. It is preserved because it is part of CHLOM's technical/economic IP lineage.
+
+It is **not evidence that a CHLOM token is currently issued, publicly offered, staked, burned or operating under these parameters**.
+
+## Dimensional check
+
+`i*S` produces token units per year. `b*N` produces token units per year when `N` is annual transaction count. Both sides of `ΔS = iS - bN` therefore share units.
+
+## Historical worked example
+
+```text
+i = 0.05
+S = 1,000,000,000
+b = 0.001
+N = 50,000,000,000
+
+issuance = 50,000,000
+burn = 50,000,000
+net_supply_change = 0
+```
+
+This example demonstrates arithmetic equilibrium only. It is not a forecast or adopted monetary policy.
+
+## Sensitivity
+
+Holding other inputs constant:
+
+- higher `i` increases modeled net supply;
+- higher `S` increases issuance under proportional inflation;
+- higher `b` reduces net supply through greater modeled burn;
+- higher `N` increases modeled burn.
+
+The formula does not model price, demand elasticity, validator behavior, fee-market response, changing transaction mix, or legal/economic constraints.
+
+## Governance boundary
+
+To become operational, the model would require explicit decisions on whether a token exists, supply definition, issuance schedule, burn authority, fee mechanics, validator economics, legal/regulatory analysis and production configuration. None is created by preserving the equation.
+
+## Calculation record requirements
+
+Any simulation using FORM-001 should record input units, date/source for `S`, whether `i` is nominal annual rate, how `b` is estimated, how transaction count is defined, rounding policy and scenario label.
+
+## Test vectors
+
+Test zero inflation, zero transactions, zero burn, high transaction volume, negative/invalid inputs rejected, unit mismatch and the equilibrium example above.
+
+## Version lineage
+
+Version 1 preserves the recovered historical equation. Any expanded current economic model must receive a separate formula/model ID rather than modifying the historical source expression.
