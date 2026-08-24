@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:crownthrive:chlom:dail-event:v1",
+  "title": "CHLOM DAIL Event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "event_id",
+    "event_type",
+    "sequence",
+    "occurred_at",
+    "subject_ref",
+    "decision_ref",
+    "correlation_id",
+    "causation_id",
+    "classification",
+    "source_refs",
+    "evidence_refs",
+    "state",
+    "reason_code",
+    "supersedes_event_id",
+    "previous_hash",
+    "payload_hash",
+    "event_hash",
+    "docs_impact"
+  ],
+  "properties": {
+    "schema_id": {"const": "ct.contract.chlom.dail-event.v1"},
+    "schema_version": {"const": "1.0.0"},
+    "event_id": {"type": "string", "pattern": "^ct\\.dail\\.event\\.[A-Za-z0-9._-]+$"},
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "source_observed",
+        "source_conflict_opened",
+        "decision_recorded",
+        "correction_recorded",
+        "attestation_recorded",
+        "export_recorded"
+      ]
+    },
+    "sequence": {"type": "integer", "minimum": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "subject_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+    "decision_ref": {"type": "string", "minLength": 1, "maxLength": 256},
+    "correlation_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "causation_id": {"type": ["string", "null"], "maxLength": 256},
+    "classification": {
+      "type": "string",
+      "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED", "SEALED"]
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "maxLength": 256},
+      "uniqueItems": true,
+      "maxItems": 64
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^ct\\.evidence\\.ref\\.[A-Za-z0-9._-]+$"},
+      "uniqueItems": true,
+      "maxItems": 64
+    },
+    "state": {"type": "string", "enum": ["observed", "allow", "deny", "hold", "corrected", "attested", "exported"]},
+    "reason_code": {"type": "string", "minLength": 1, "maxLength": 128},
+    "supersedes_event_id": {"type": ["string", "null"], "maxLength": 256},
+    "previous_hash": {"type": "string", "pattern": "^(GENESIS|[a-f0-9]{64})$"},
+    "payload_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "event_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "docs_impact": {"type": "string", "enum": ["docs_updated", "docs_no_change", "docs_delta_opened"]}
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "fixture_id": "ct.fixture.chlom.dail-evidence-contract.v1",
+  "fixture_version": "1.0.0",
+  "state": "prototype_contract_fixture",
+  "raw_restricted_evidence_included": false,
+  "evidence_references": [
+    {
+      "schema_id": "ct.contract.chlom.evidence-reference.v1",
+      "schema_version": "1.0.0",
+      "evidence_ref_id": "ct.evidence.ref.source-001",
+      "kind": "content_hash",
+      "classification": "INTERNAL",
+      "source_ref": "S-EXAMPLE-001",
+      "locator_ref": "vault://evidence/S-EXAMPLE-001",
+      "digest_sha256": "0f6bffa9661cb5a13481c14ef4fc133b9bfe3f6c532c48d432e4d41bf68a4985",
+      "content_included": false,
+      "public_projection_allowed": false,
+      "retention_class": "long_term"
+    },
+    {
+      "schema_id": "ct.contract.chlom.evidence-reference.v1",
+      "schema_version": "1.0.0",
+      "evidence_ref_id": "ct.evidence.ref.restricted-001",
+      "kind": "restricted_pointer",
+      "classification": "RESTRICTED",
+      "source_ref": "S-RESTRICTED-001",
+      "locator_ref": "sealed://evidence/S-RESTRICTED-001",
+      "digest_sha256": "1bfb4d5b4d24bde5763d2a2d9c4df54344d7315deeeecb111ffec57a02b72fe5",
+      "content_included": false,
+      "public_projection_allowed": false,
+      "retention_class": "sealed_archive"
+    }
+  ],
+  "event_inputs": [
+    {
+      "event_id": "ct.dail.event.case-001-source",
+      "event_type": "source_observed",
+      "occurred_at": "2026-08-19T05:00:00Z",
+      "subject_ref": "ct.subject.fixture-001",
+      "decision_ref": "ct.decision.fixture-001",
+      "correlation_id": "ct.correlation.fixture-001",
+      "causation_id": null,
+      "classification": "INTERNAL",
+      "source_refs": ["S-EXAMPLE-001"],
+      "evidence_refs": ["ct.evidence.ref.source-001"],
+      "state": "observed",
+      "reason_code": "source_observed",
+      "supersedes_event_id": null,
+      "docs_impact": "docs_no_change"
+    },
+    {
+      "event_id": "ct.dail.event.case-002-decision",
+      "event_type": "decision_recorded",
+      "occurred_at": "2026-08-19T05:00:01Z",
+      "subject_ref": "ct.subject.fixture-001",
+      "decision_ref": "ct.decision.fixture-001",
+      "correlation_id": "ct.correlation.fixture-001",
+      "causation_id": "ct.dail.event.case-001-source",
+      "classification": "INTERNAL",
+      "source_refs": ["S-EXAMPLE-001"],
+      "evidence_refs": ["ct.evidence.ref.source-001"],
+      "state": "allow",
+      "reason_code": "evidence_supported_allow",
+      "supersedes_event_id": null,
+      "docs_impact": "docs_updated"
+    },
+    {
+      "event_id": "ct.dail.event.case-003-conflict",
+      "event_type": "source_conflict_opened",
+      "occurred_at": "2026-08-19T05:00:02Z",
+      "subject_ref": "ct.subject.fixture-001",
+      "decision_ref": "ct.decision.fixture-001",
+      "correlation_id": "ct.correlation.fixture-001",
+      "causation_id": "ct.dail.event.case-002-decision",
+      "classification": "RESTRICTED",
+      "source_refs": ["S-EXAMPLE-001", "S-RESTRICTED-001"],
+      "evidence_refs": ["ct.evidence.ref.source-001", "ct.evidence.ref.restricted-001"],
+      "state": "hold",
+      "reason_code": "source_conflict_requires_adjudication",
+      "supersedes_event_id": "ct.dail.event.case-002-decision",
+      "docs_impact": "docs_delta_opened"
+    },
+    {
+      "event_id": "ct.dail.event.case-004-correction",
+      "event_type": "correction_recorded",
+      "occurred_at": "2026-08-19T05:00:03Z",
+      "subject_ref": "ct.subject.fixture-001",
+      "decision_ref": "ct.decision.fixture-001",
+      "correlation_id": "ct.correlation.fixture-001",
+      "causation_id": "ct.dail.event.case-003-conflict",
+      "classification": "INTERNAL",
+      "source_refs": ["S-EXAMPLE-001", "S-RESTRICTED-001"],
+      "evidence_refs": ["ct.evidence.ref.source-001", "ct.evidence.ref.restricted-001"],
+      "state": "corrected",
+      "reason_code": "correction_preserves_prior_history",
+      "supersedes_event_id": "ct.dail.event.case-003-conflict",
+      "docs_impact": "docs_updated"
+    }
+  ],
+  "expectations": {
+    "chain_verified": true,
+    "event_count": 4,
+    "single_correlation_id": true,
+    "causation_must_reference_prior_event": true,
+    "tamper_changes_chain_to_invalid": true,
+    "correction_preserves_prior_event": true,
+    "source_conflict_state": "hold",
+    "restricted_evidence_content_included": false,
+    "restricted_evidence_public_projection_allowed": false,
+    "export_reconstructable": true
+  }
+}

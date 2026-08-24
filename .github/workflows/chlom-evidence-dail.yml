@@ -1,0 +1,52 @@
+name: CHLOM Evidence DAIL Contract
+
+on:
+  pull_request:
+    paths:
+      - "contracts/chlom/evidence/**"
+      - "reference/chlom_runtime/evidence_contract.py"
+      - "reference/chlom_runtime/fixtures/dail_evidence_contract.v1.json"
+      - "reference/chlom_runtime/tests/test_evidence_contract.py"
+      - "developers/manifests/chlom-cell-04-evidence-dail.v1.json"
+      - "changelog/phase-2-99-chlom-cell-04-evidence-dail-v1.md"
+      - ".github/workflows/chlom-evidence-dail.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-evidence-dail-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate CHLOM evidence and DAIL contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - name: Verify syntax
+        run: |
+          python -m py_compile reference/chlom_runtime/evidence_contract.py
+          python -m py_compile reference/chlom_runtime/tests/test_evidence_contract.py
+      - name: Run evidence and DAIL contract tests
+        run: python -m unittest reference.chlom_runtime.tests.test_evidence_contract
+      - name: Re-run parent CHLOM runtime tests
+        run: python -m unittest reference.chlom_runtime.tests.test_runtime
+      - name: Validate parent CHLOM builder program
+        run: python scripts/validate_chlom_build_program.py
+      - name: Re-run repository documentation governance
+        run: python scripts/validate_docs.py
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
