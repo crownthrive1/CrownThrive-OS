@@ -1,0 +1,118 @@
+name: Sprint 12 Docs and Navigation Writer
+
+on:
+  push:
+    branches:
+      - docs-sprint-12-ai-collision-hygiene-cie-wave6-20260824
+    paths:
+      - 'scripts/reconcile_pre_wave6_navigation.py'
+      - 'knowledge/documentation-substantive-rebuild-wave-6.mdx'
+      - 'changelog/docs-substantive-rebuild-sprint-12-wave-6-2026-08-24.mdx'
+      - '.github/workflows/sprint12-docs-navigation-writer.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Materialize Mintlify navigation
+        run: python scripts/reconcile_pre_wave6_navigation.py --write
+      - name: Reconcile gap register and coverage census
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          gap = Path('knowledge/documentation-gap-article-rebuild-register.mdx')
+          text = gap.read_text(encoding='utf-8')
+          marker = '\n## Phase 3 unlock relationship\n'
+          section = '''
+## Sprint 12 substantive rebuild state
+
+Sprint 12 converts the Sprint 11 AI/agent/algorithm collision finding into a deterministic non-terminal classification overlay before admitting another substantive cohort. All **35** remaining P0 `ai_agent_algorithm_reconciliation` records are preserved, **0** are broadly machine-qualified, and the historical Sprint 4 crosswalk is not rewritten.
+
+```yaml
+ai_collision_p0_candidates: 35
+ai_collision_machine_admission: 0
+ai_collision_family_broadly_qualified: false
+historical_sprint_4_crosswalk_rewritten: false
+ai_collision_overlay_sha256: f9b621dce0c92f1ad594a10edac9419d7a19c13ef0303968f26c131ee7d7cabf
+```
+
+The overlay routes the mixed family into explicit rights/license, rights+economic, economic, authority/governance, identity, and architecture/governance hold lanes rather than allowing AI/model terminology to imply current authority.
+
+Pass B then admits exactly three bounded P0 Cultural Imprint Engine framework records: `HC-0212`, `HC-0213`, and `HC-0214`. They resolve through the dedicated [CIE Framework Reconciliation Contract](/doctrine/cie-framework-reconciliation-contract), which separates framework lineage from implementation, provider, authority, rights/economic and production state.
+
+```yaml
+p0_candidate_estate: 449
+prior_waves_machine_qualified: 58
+wave_6_machine_qualified: 3
+cumulative_machine_qualified_p0: 61
+p0_outside_waves_1_2_3_4_5_6: 388
+selected_state: cie_framework_reconciliation
+wave_6_anchor: /doctrine/cie-framework-reconciliation-contract
+qualification_state: substantive_current_successor_machine_verified_parent_review
+terminal_disposition_accepted: false
+parent_certification_required: true
+wave_sha256: c4389ff5f19674813e0a89734a9aa6b65b7e6ecba2e4b3710278fa05a4616caa
+```
+
+See [Documentation Substantive Rebuild — Wave 6](/knowledge/documentation-substantive-rebuild-wave-6). The 795 / 795 candidate map remains complete; historical-body reconstruction and terminal acceptance remain separate incomplete layers.
+'''
+          if '## Sprint 12 substantive rebuild state' not in text:
+              if marker not in text:
+                  raise SystemExit('gap register Phase 3 marker missing')
+              text = text.replace(marker, '\n' + section + marker, 1)
+              gap.write_text(text, encoding='utf-8')
+
+          census = Path('knowledge/documentation-rebuild-coverage-census.mdx')
+          text = census.read_text(encoding='utf-8')
+          replacements = {
+              'After Sprint 11, the exact P0 wave state is:': 'After Sprint 12, the exact P0 wave state is:',
+              '| 5 | 11 | 1 | **58** | **391** |': '| 5 | 11 | 1 | 58 | 391 |\n| 6 | 12 | 3 | **61** | **388** |',
+              'p0_substantive_current_successor_machine_qualified: 58': 'p0_substantive_current_successor_machine_qualified: 61',
+              'p0_pending_substantive_or_specialist_resolution: 391': 'p0_pending_substantive_or_specialist_resolution: 388',
+              'See [Documentation Substantive Rebuild — Wave 5](/knowledge/documentation-substantive-rebuild-wave-5) and the [Documentation Gap & Article Rebuild Register](/knowledge/documentation-gap-article-rebuild-register) for the current wave boundary.': 'Sprint 12 then classifies all 35 AI/agent/algorithm collision records into explicit non-terminal specialist/semantic hold lanes with zero broad admission and qualifies three bounded CIE framework records through the [CIE Framework Reconciliation Contract](/doctrine/cie-framework-reconciliation-contract).\n\nSee [Documentation Substantive Rebuild — Wave 6](/knowledge/documentation-substantive-rebuild-wave-6) and the [Documentation Gap & Article Rebuild Register](/knowledge/documentation-gap-article-rebuild-register) for the current wave boundary.'
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'census marker missing: {old}')
+              text = text.replace(old, new, 1)
+          yaml_anchor = 'sprint_11_pivot_state: io_surface_and_machine_contract_reconciliation\n'
+          sprint12 = '''sprint_12_ai_collision_candidates_classified: 35
+sprint_12_ai_collision_machine_admission: 0
+sprint_12_ai_collision_overlay_sha256: f9b621dce0c92f1ad594a10edac9419d7a19c13ef0303968f26c131ee7d7cabf
+sprint_12_wave_6_selected_count: 3
+sprint_12_wave_6_selected_state: cie_framework_reconciliation
+sprint_12_wave_6_wave_sha256: c4389ff5f19674813e0a89734a9aa6b65b7e6ecba2e4b3710278fa05a4616caa
+'''
+          if sprint12.splitlines()[0] not in text:
+              if yaml_anchor not in text:
+                  raise SystemExit('census Sprint 11 YAML anchor missing')
+              text = text.replace(yaml_anchor, yaml_anchor + sprint12, 1)
+          census.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate navigation after write
+        run: python scripts/reconcile_pre_wave6_navigation.py
+      - name: Commit generated current-state projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add docs.json knowledge/documentation-gap-article-rebuild-register.mdx knowledge/documentation-rebuild-coverage-census.mdx
+          if git diff --cached --quiet; then
+            echo 'Sprint 12 projections already materialized.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-documentation-bot'
+          git config user.email '109931778+mintlify[bot]@users.noreply.github.com'
+          git commit -m 'Materialize Sprint 12 Wave 6 docs and navigation projections'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
