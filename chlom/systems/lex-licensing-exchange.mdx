@@ -1,0 +1,499 @@
+---
+title: "LEX — Licensing Exchange System"
+sidebarTitle: "LEX — Licensing Exchange"
+description: "Standalone current CHLOM LEX article defining the planned/gated rights-first licensing exchange, listing, qualification, agreement, payment, entitlement, settlement, remedies, API and provider-neutral marketplace boundaries."
+icon: "right-left"
+keywords: ["CHLOM LEX", "Licensing Exchange", "rights marketplace", "DLA", "listing", "entitlement", "settlement"]
+---
+
+# LEX — Licensing Exchange System
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.system.lex
+canonical_name: Licensing Exchange
+canonical_short_name: LEX
+artifact_class: rights_gated_licensing_exchange
+source_status:
+  - historical LEX concept recovered
+  - historical LEX runtime/pallet lineage recovered
+  - current rights-first lifecycle mapped
+current_status: planned_gated_service_architecture
+current_mapping:
+  - P-03 Rights & Licensing
+  - Dynamic Licensing Asset
+  - Licensing Stewardship / Issuer Authority
+  - Rights Graph
+  - agreement/entitlement layer
+  - P-11 economic schedules and reconciliation
+  - ThriveEvergreen for CrownThrive economic activation
+  - DAIL
+production_exchange_claim: false_without_current_runtime_evidence
+provider_neutral: true
+tokenization_required: false
+```
+
+## Why LEX has its own current system record
+
+CHLOM preserves several LEX artifacts: a historical concept paper, runtime pallet, lifecycle article, API specification, deployment runbook and marketplace-engine lineage. They are related, but not identical.
+
+This article defines the **current canonical system identity** those source-era artifacts map into.
+
+```text
+Historical LEX papers / pallet / UI
+             |
+             v
+CURRENT LEX SYSTEM IDENTITY
+             |
+ rights-first service architecture
+```
+
+## Purpose
+
+LEX is the governed exchange layer for discovering, offering, negotiating and transacting **eligible licensing rights**.
+
+```text
+SOURCE RIGHTS
+    |
+LICENSING STEWARDSHIP
+    |
+DYNAMIC LICENSING ASSET / RIGHTS PACKAGE
+    |
+LISTING ELIGIBILITY
+    |
+    v
+   LEX
+  / | \
+discovery qualification agreement
+  \ | /
+ payment/economic activation
+       |
+rights transfer / entitlement
+       |
+settlement / reporting / remedies
+       |
+      DAIL
+```
+
+## What LEX is not
+
+LEX is not:
+
+- a generic ecommerce marketplace;
+- proof of ownership;
+- a rights issuer;
+- a payment processor;
+- a token/NFT exchange requirement;
+- a live public exchange merely because historical papers exist;
+- permission to list every CrownThrive asset;
+- authority to sell or sublicense rights a seller does not control;
+- a replacement for agreements/contracts;
+- a reason to collapse payment, license, entitlement and settlement into one state.
+
+## Rights-before-listing invariant
+
+```text
+LISTED_RIGHTS <= DLA/LICENSABLE_RIGHTS <= SOURCE_RIGHTS
+```
+
+A listing cannot expand source rights or issuer authority.
+
+## Listing object
+
+```yaml
+listing_id: stable id
+asset_ref: canonical asset/right
+DLA_or_rights_package_ref: required
+licensor_or_seller_ref: institutional identity
+issuer_authority_ref: required
+listing_type: license|lease|sublicense|transfer|assignment_candidate|other
+rights_scope: structured
+territory: structured
+term: structured
+channels: []
+uses: []
+exclusivity: structured
+capacity_or_quantity: optional
+eligibility_policy_refs: []
+agreement_template_ref: optional|required by profile
+economic_offer_ref: required for priced offer
+settlement_profile_ref: optional
+remedy_profile_ref: required
+status: draft|review|active|held|reserved|completed|expired|withdrawn|revoked|superseded
+version: exact
+published_at: optional
+expires_at: optional
+```
+
+## Listing eligibility
+
+Before activation:
+
+1. canonical asset/right exists;
+2. licensor/issuer authority is current;
+3. offered rights are within source/DLA scope;
+4. exclusivity/capacity is available;
+5. territory and term are valid;
+6. applicable policy/Compliance Packs resolve;
+7. agreement terms exist where required;
+8. economic offer/schedule is authorized;
+9. public/private classification is appropriate;
+10. required approvals are complete.
+
+Unresolved material rights state yields HOLD.
+
+## Search/discovery
+
+LEX search and index state are projections.
+
+```text
+search result says ACTIVE
+   != transaction-time canonical state
+```
+
+Transaction authorization must re-read canonical listing, DLA, authority, policy and currentness.
+
+## Participant identity
+
+```yaml
+participant_ref: canonical institutional identity
+roles: licensor|licensee|buyer|seller|agent|reviewer
+credential_refs: optional|required
+eligibility_profile_ref: required by listing
+```
+
+Marketplace/provider account identity is an alias, not the canonical participant identity.
+
+## Qualification
+
+```yaml
+qualification_id: stable id
+listing_ref: exact version
+participant_ref: candidate holder/licensee
+policy_pack_refs: []
+credential_refs: []
+proof_refs: []
+rights_or_role_refs: []
+result: PASS|HOLD|DENY
+issued_at: timestamp
+valid_until: optional
+reason_codes: public-safe
+```
+
+Qualification is temporal and can expire before execution.
+
+## Agreement/assent
+
+A LEX transaction should reference a versioned agreement or rights instrument.
+
+```text
+listing terms
+ -> agreement instance
+ -> participant assent/signature
+ -> evidence reference
+```
+
+A checkout click or payment does not prove assent to terms that were not properly presented and recorded.
+
+## Economic offer
+
+The economic offer is separate from the rights listing:
+
+```yaml
+economic_offer_ref:
+  product_or_offer_id: canonical
+  price_or_schedule_ref: current
+  currency: explicit
+  tax_fee_profile_refs: optional
+  royalty_commission_refs: optional
+  expiry_effective_period: explicit
+```
+
+For CrownThrive economic activation, ThriveEvergreen/current economic authority governs SKU, offer, price, payment, settlement and reconciliation state.
+
+## Transaction object
+
+```yaml
+lex_transaction_id: stable id
+listing_ref: exact
+licensor_ref: canonical
+licensee_ref: canonical
+qualification_ref: required
+agreement_ref: required
+economic_offer_ref: required when consideration exists
+payment_ref: optional
+transfer_or_issuance_ref: optional
+entitlement_ref: optional
+settlement_ref: optional
+case_or_dispute_ref: optional
+status: initiated|held|authorized|payment_pending|rights_pending|entitled|settling|completed|reversed|disputed|cancelled
+idempotency_key: required
+created_at: timestamp
+```
+
+## Transaction lifecycle
+
+```text
+ACTIVE LISTING
+     |
+PARTICIPANT QUALIFICATION
+     |
+AGREEMENT / ASSENT
+     |
+ECONOMIC AUTHORIZATION
+     |
+PAYMENT HOLD / AUTHORIZATION if required
+     |
+RIGHTS ISSUE / TRANSFER
+     |
+ENTITLEMENT / FULFILLMENT
+     |
+RECONCILIATION / SETTLEMENT
+     |
+COMPLETED
+```
+
+Failure at any stage preserves prior events and routes compensation/remedy rather than fabricating completion.
+
+## Payment boundary
+
+```text
+provider payment success
+   != license issued
+   != rights transferred
+   != entitlement active
+   != settlement reconciled
+```
+
+Payment is evidence for one stage only.
+
+## Rights issuance/transfer
+
+LEX requests the governed rights action from Licensing Stewardship/DLA services. It does not manufacture a license itself.
+
+```text
+LEX transaction authorized
+   -> issuer/rights action
+   -> DLA/version/holder state changes
+   -> DAIL event
+```
+
+## Entitlement
+
+An entitlement grants access, download, service or use only after required DLA, agreement and economic conditions are satisfied.
+
+```text
+DLA/right valid
++ agreement
++ required economic state
+ -> entitlement candidate
+```
+
+## Sublicensing
+
+A sublicensing listing must satisfy conservation:
+
+```text
+child rights <= parent DLA rights
+child term <= parent remaining term
+child territory <= parent territory
+child transfer/sublicense rights <= parent permissions
+```
+
+Rights Graph and ALG-004 enforce closure.
+
+## Lease/rental
+
+Historical LEX research includes rental/lease structures. Current implementation can model a time-bounded license and entitlement rather than a transfer of ownership.
+
+## Auctions and bidding
+
+Historical sources contemplate auctions/bids. These are optional modules, not baseline current functionality. If implemented they require:
+
+- bid identity;
+- bid validity;
+- reserve/eligibility;
+- anti-manipulation controls;
+- timing/expiry;
+- final offer conversion;
+- payment/rights lifecycle.
+
+## Fractional licensing
+
+Historical fractionalization concepts are research. Fractional rights/economic products can create significant legal, securities, rights and accounting complexity and require separate professional/legal/economic review.
+
+No current fractional product is created by this article.
+
+## Token/NFT representations
+
+Historical LEX may exchange tokenized license representations.
+
+Current rule:
+
+```text
+canonical rights/DLA state
+ -> optional provider/token representation
+```
+
+Exchange semantics do not require tokenization.
+
+## Provider/storefront adapters
+
+LEX can integrate with web storefronts, marketplaces, payment providers, identity systems, signature providers, blockchain rails and fulfillment systems. These are execution/distribution adapters, not rights truth.
+
+## API families
+
+Possible current API/MCP/SDK functions include:
+
+```text
+create listing candidate
+validate listing eligibility
+publish/hold/withdraw listing
+search/filter safe listings
+qualify participant
+instantiate agreement
+initiate transaction
+attach payment evidence
+request rights issue/transfer
+resolve entitlement
+reconcile settlement
+open dispute/case
+renew/transfer/sublicense
+query status/proof
+```
+
+## DAIL events
+
+```text
+ct.lex.listing.candidate.created.v1
+ct.lex.listing.activated.v1
+ct.lex.listing.held.v1
+ct.lex.listing.withdrawn.v1
+ct.lex.participant.qualified.v1
+ct.lex.transaction.initiated.v1
+ct.lex.agreement.accepted.v1
+ct.lex.payment.observed.v1
+ct.lex.rights.action.requested.v1
+ct.lex.rights.action.completed.v1
+ct.lex.entitlement.activated.v1
+ct.lex.transaction.reconciled.v1
+ct.lex.transaction.completed.v1
+ct.lex.transaction.disputed.v1
+ct.lex.transaction.reversed.v1
+```
+
+## Idempotency
+
+All material transaction stages use stable semantic identifiers so provider/webhook retries cannot create duplicate licenses, entitlements or obligations.
+
+## Holds
+
+LEX can HOLD for:
+
+- rights conflict;
+- issuer authority conflict;
+- stale qualification;
+- missing agreement;
+- economic mismatch;
+- provider failure;
+- sanctions/risk evidence;
+- DLA suspension/revocation;
+- capacity/exclusivity conflict;
+- dispute/case.
+
+HOLD is an explicit remediable state, not silent failure.
+
+## Disputes/remedies
+
+A transaction can route to case/DREP/DAP workflows for misrepresented rights, duplicate exclusivity, payment/refund disputes, non-delivery, entitlement mismatch, unauthorized sublicense or provider execution conflict.
+
+Original transaction events remain in lineage after correction or reversal.
+
+## Accessibility/privacy/support
+
+A public LEX requires accessible listing, checkout and agreement interfaces; clear license-rights summaries; privacy-safe identity verification; support/remedy paths; current terms/disclosures; data-handling controls and anti-fraud/security protections.
+
+## Public-safe listing projection
+
+Can expose:
+
+- safe asset/title;
+- licensor identity/brand where intended;
+- DLA/license class;
+- territory/term/use summary;
+- public price/offer;
+- availability/currentness;
+- safe proof/attestation;
+- current version.
+
+Private rights agreements, evidence and protected economics remain restricted.
+
+## Failure modes
+
+- listing published without rights proof -> HOLD/governance defect;
+- provider marketplace account not mapped to issuer authority -> deny/hold;
+- payment succeeds but rights transfer fails -> compensate/reconcile;
+- rights transfer succeeds but fulfillment fails -> remedy/recovery;
+- search index stale -> canonical read wins;
+- qualification expires -> re-evaluate;
+- duplicate transaction -> idempotency/capacity control;
+- parent DLA revoked -> child/listing reevaluation;
+- provider marketplace disappears -> canonical LEX/DLA state survives.
+
+## Threat model
+
+- counterfeit rights listings;
+- account takeover;
+- double sale of exclusive rights;
+- unauthorized sublicensing;
+- payment replay;
+- duplicate entitlement;
+- hidden term changes;
+- price/split manipulation;
+- privacy leakage;
+- provider lock-in;
+- token/rights divergence;
+- AI-generated rights metadata presented as proof.
+
+## Test vectors
+
+1. valid rights + active issuer + eligible participant -> transaction can progress;
+2. no source rights -> listing cannot activate;
+3. duplicate exclusive capacity -> conflict/HOLD;
+4. stale qualification -> re-evaluate;
+5. payment succeeds + transfer fails -> no entitlement; compensation path;
+6. transfer completes + fulfillment fails -> case/remedy;
+7. same webhook replayed -> one semantic effect;
+8. token representation absent -> LEX can still operate;
+9. historical fractional feature requested -> separate legal/economic gate;
+10. listing withdrawn -> canonical state changes immediately and index catches up.
+
+## Observability
+
+Track listing states, rights/authority HOLDs, qualification outcomes, transaction funnel stages, payment/rights/entitlement mismatches, idempotency prevention, settlement latency, disputes/refunds, adapter health and public/private disclosure incidents.
+
+## Restricted companion
+
+Private custody can include underlying rights agreements, counterparty identities, private offers/pricing, royalty/commission schedules, provider IDs, fraud/risk controls, unreleased assets, security tests and dispute evidence.
+
+## Invariants
+
+```text
+LEX = Licensing Exchange
+listing != rights
+DLA != listing
+payment != entitlement
+provider account != issuer authority
+search index != canonical state
+historical token exchange != current token requirement
+transaction completion requires rights + economic + entitlement reconciliation
+```
+
+## Versioning
+
+LEX architecture, listing schemas, transaction states, APIs and optional modules are versioned. Historical papers and pallet records remain source-era lineage rather than being overwritten by this current mapping.
+
+## Status
+
+`current_planned_gated_CHLOM_system`. Public/production activation requires separate rights, legal, economic, security, accessibility, provider and runtime certification.
