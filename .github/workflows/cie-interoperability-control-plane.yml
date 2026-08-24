@@ -1,0 +1,43 @@
+name: CIE Interoperability Control Plane
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cie-interoperability-control-plane.yml"
+      - "automation/cie-interoperability-current-state.mdx"
+      - "changelog/cie-interoperability-v2-2026-08-22.mdx"
+      - "developers/manifests/cie-*.json"
+      - "developers/manifests/chlom-cie-capability-binding.v1.json"
+      - "developers/manifests/framework-sequence-handoff.v1.json"
+      - "developers/templates/framework-child-federation-backlink.v1.json"
+      - "rollback/cie-interoperability-v2.md"
+      - "scripts/validate_cie_interoperability_control_plane.py"
+      - "security/cie-interoperability-threat-model-v1.md"
+      - "supabase/cie-interoperability-registry-reconciliation-v2.sql"
+      - "tests/fixtures/cie-interoperability-negative.v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate exact heads, gates, IP and commercial invariants
+        run: python scripts/validate_cie_interoperability_control_plane.py
+      - name: Verify hidden page is not added to Mintlify navigation
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          docs=json.loads(Path('docs.json').read_text())
+          rendered=json.dumps(docs)
+          assert 'automation/cie-interoperability-current-state' not in rendered
+          page=Path('automation/cie-interoperability-current-state.mdx').read_text()
+          assert 'noindex: true' in page
+          PY
