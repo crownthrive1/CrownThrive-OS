@@ -1,0 +1,228 @@
+---
+title: "Functional Spec: CHLOM Decentralized Licensing Authority (DLA) – Phase 3"
+sidebarTitle: "Historical DLA Phase 3 Spec"
+description: "Exact-title reconstruction of the historical Phase 3 DLA functional specification, preserving documented licensing lifecycle requirements while mapping them into current Dynamic Licensing Asset and Licensing Stewardship architecture."
+icon: "list-check"
+keywords: ["DLA functional spec", "CHLOM Phase 3", "Decentralized Licensing Authority", "Dynamic Licensing Asset", "licensing lifecycle"]
+---
+
+# Functional Spec: CHLOM Decentralized Licensing Authority (DLA) – Phase 3
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.historical-dla-functional-spec-phase3
+exact_recovered_title: Functional Spec: CHLOM Decentralized Licensing Authority (DLA) – Phase 3
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+source_basis: related CHLOM whitepaper + Genesis + Grand Prospectus + Technical Blueprint
+historical_DLA: Decentralized Licensing Authority
+current_DLA: Dynamic Licensing Asset
+current_authority: Licensing Stewardship / Issuer Authority
+phase_label: historical_source_phase_3
+```
+
+## Recovery boundary
+
+The lost Help Center proves this functional-spec title existed. Related source bodies establish the historical DLA function family, but the exact original article body has not been authenticated. Requirements below are therefore **reconstructed requirements**, not a verbatim recovery.
+
+## Historical functional objective
+
+The historical DLA was intended to provide a governed license lifecycle capable of:
+
+1. accepting a license/application request;
+2. resolving participant identity and credentials;
+3. evaluating eligibility and compliance conditions;
+4. creating a license record/token when approved;
+5. exposing license status for verification;
+6. enforcing transfer/use restrictions;
+7. supporting renewal, amendment, suspension and revocation;
+8. recording evidence and lifecycle events;
+9. interoperating with LEX, oracles, compliance logic and governance.
+
+## Reconstructed actors
+
+```yaml
+actors:
+  applicant: requests permission/license
+  rights_holder_or_issuer: supplies source authority
+  historical_dla_service: evaluates and records lifecycle
+  identity_service: supplies DID/credential state
+  compliance_engine: supplies policy/risk result
+  oracle: supplies authorized external evidence
+  governance_or_override_role: handles exceptional governed actions
+  lex: optional downstream exchange surface
+  auditor_or_reviewer: reviews evidence and exceptions
+```
+
+Actor names are normalization labels; they do not assert the exact lost nomenclature.
+
+## Core functional requirements
+
+### FR-01 — Stable license identity
+
+Every governed license object needs a stable identifier and explicit version/state.
+
+### FR-02 — Source authority resolution
+
+A license cannot be issued solely because an applicant asks for one. The historical authority concept is normalized today to a source-rights-backed issuer authority.
+
+### FR-03 — Identity resolution
+
+The subject and issuer must resolve to governed identity records. Historical source material connects DLA to DID, SBT/credential and Fingerprint constructs.
+
+### FR-04 — Eligibility evaluation
+
+Required credentials, policy conditions and other prerequisites must be evaluable before issuance.
+
+### FR-05 — Approval disposition
+
+The decision surface should support at minimum:
+
+```text
+PASS / APPROVE
+HOLD / REVIEW
+DENY
+```
+
+Current CHLOM does not equate model confidence with authority.
+
+### FR-06 — Issuance
+
+Approved requests create an active license object with explicit scope, term and restrictions.
+
+### FR-07 — Verification
+
+A relying system must be able to determine whether a license is current and usable without trusting an unauthenticated screenshot or provider claim.
+
+### FR-08 — Lifecycle transitions
+
+```text
+candidate -> review -> active
+active -> amended/renewed
+active -> held/suspended
+active -> expired
+active -> revoked/terminated
+```
+
+### FR-09 — Transfer/sublicense control
+
+Transfer and sublicensing must be explicit, never assumed from possession of a token or record.
+
+### FR-10 — Hierarchical licensing
+
+Historical source material supports parent-child/sub-license relationships. Child rights cannot exceed parent/source rights.
+
+### FR-11 — Revocation and suspension
+
+The system must support reversible suspension where appropriate and irreversible/terminal revocation where the governing source permits it.
+
+### FR-12 — Audit events
+
+Each material lifecycle change needs attributable evidence/event history.
+
+## Historical state model
+
+```text
+[APPLICATION]
+     |
+ identity + evidence
+     |
+ compliance checks
+     |
+ +---+----+
+ |   |    |
+PASS HOLD DENY
+ |    |
+ v    v
+ISSUE REVIEW
+ |
+ACTIVE
+ |\
+ | +--> RENEW / AMEND
+ | +--> TRANSFER / SUBLICENSE if permitted
+ | +--> SUSPEND -> REACTIVATE or REVOKE
+ +----> EXPIRE / TERMINATE
+```
+
+## Functional data contract
+
+```yaml
+license_record:
+  license_id: required
+  version: required
+  subject_ref: required
+  issuer_authority_ref: required
+  source_rights_refs: required
+  permissions: required
+  restrictions: required
+  territory: explicit_or_profiled
+  term: explicit
+  transferability: explicit
+  sublicensing: explicit
+  credential_requirements: []
+  policy_refs: []
+  evidence_refs: []
+  status: explicit
+  created_at: required
+  updated_at: required
+```
+
+This is the current-safe reconstructed shape, not proof of the exact historical schema.
+
+## Current decomposition
+
+Historical `DLA authority + license object + lifecycle` is no longer one canonical concept.
+
+```text
+Licensing Stewardship / Issuer Authority
+            |
+            v
+   Dynamic Licensing Asset
+            |
+ Rules Registry + Approval Service
+            |
+    entitlement / LEX
+            |
+           DAIL
+```
+
+## Current invariants
+
+```text
+issued_rights <= issuer_permission_ceiling <= licensable_source_rights
+child_rights <= parent_rights
+transfer_rights <= active_license_transfer_scope
+```
+
+## Required evidence gates
+
+A current implementation should fail closed when material facts are unresolved:
+
+- source rights unknown;
+- issuer authority unknown;
+- identity unresolved;
+- mandatory policy result unresolved;
+- license version/status ambiguous;
+- required evidence stale or missing.
+
+## Nonfunctional expectations inherited from source architecture
+
+Related sources emphasize auditability, privacy-preserving verification, modularity, interoperability and automation. These are architectural goals, not proof of current production performance or SLA.
+
+## Current canonical links
+
+- [Historical Decentralized Licensing Authority](/chlom/systems/historical-decentralized-licensing-authority)
+- [Dynamic Licensing Asset](/chlom/systems/dynamic-licensing-asset)
+- [Licensing Stewardship / Issuer Authority](/chlom/systems/licensing-stewardship-issuer-authority)
+- [Approval Service](/chlom/systems/approval-service)
+- [Rules Registry](/chlom/systems/rules-registry)
+- [DAIL](/chlom/systems/dail-decentralized-autonomous-information-ledger)
+
+## Protected companion material
+
+Implementation code, authority matrices, exact policy thresholds, real credential data, private contracts and unreleased cryptographic/anti-fraud logic remain restricted.
+
+## Status
+
+`TITLE_RECOVERED + FUNCTIONAL_REQUIREMENTS_RECONSTRUCTED + EXACT_BODY_NOT_LOCATED + HISTORICAL_PHASE_LABEL_PRESERVED`
