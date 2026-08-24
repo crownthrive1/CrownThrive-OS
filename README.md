@@ -5,6 +5,7 @@
 This repository is the version-controlled public projection for **CrownThrive, LLC** and its Convergent Ecosystem. It documents how CrownThrive's doctrine, platforms, corridors, intellectual property, CHLOM, Cultural Imprint Engine, Thrive Flywheel, MM Suites, ThriveBase, ThriveEvergreen, media, commerce, education, support, data, APIs, MCP servers, automation, recovery, and selective future decentralization fit together without exposing the private institutional core.
 
 **Website:** https://crownthrive.com  
+**Documentation:** https://crown-thrive.mintlify.site/index<br />
 **Contact:** contact@crownthrive.com  
 **Repository:** https://github.com/crownthrive1/CrownThrive-Support
 
@@ -36,7 +37,7 @@ These entry points are intentionally concise. The complete institutional taxonom
 | Documentation reconstruction | **495 / 795** mapped candidate titles; **300** remain in the current reconstruction program |
 | CHLOM Sprint 4 | all **297** recovered CHLOM titles crosswalked for stale-state, continuity, framework/Vault closure, and Phase 3 impact without manufacturing missing historical bodies |
 | Runtime posture | controlled-test or specified where explicitly evidenced; documentation acceptance does **not** imply production activation |
-| Documentation projection | Git-backed Mintlify projection from `main`; custom-domain activation, anonymous reachability and indexing remain separately governed projection states |
+| Documentation projection | Current default: https://crown-thrive.mintlify.site/index; Git-backed from `main`; future custom-domain activation and indexing remain separately governed projection states |
 
 The current Phase 3 gate records that Workstream 0 articleization remains in progress, Workstream 1 topology is accepted but repository-enforcement evidence remains a blocking checkpoint, Workstream 2 architecture is selected but implementation-gated, Workstream 3 schema/reconciliation contracts are accepted but seed population is incomplete, and Workstream 3A macro identity/source reconciliation remains in progress. Workstreams 4–10 have not completed the Phase 2.99 hard exit.
 

@@ -9,6 +9,7 @@ part of every material change.
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -19,6 +20,10 @@ READINESS = ROOT / "technology/phase-3-readiness-gate.mdx"
 DOCS_STANDARD = ROOT / "standards/documentation-source-of-truth-and-autonomous-governance.mdx"
 NON_NEGOTIABLES = ROOT / "standards/non-negotiables.mdx"
 PR_TEMPLATE = ROOT / ".github/pull_request_template.md"
+MANIFEST = ROOT / "developers/manifests/homepage-projection.v2.json"
+MINTLIFY_REGISTRY = ROOT / "platforms/mintlify-documentation-service-registry.mdx"
+README = ROOT / "README.md"
+SOURCE_REGISTER = ROOT / "knowledge/source-register.mdx"
 
 
 def read(path: Path) -> str:
@@ -28,7 +33,17 @@ def read(path: Path) -> str:
 def main() -> int:
     errors: list[str] = []
 
-    required_files = [INDEX, READINESS, DOCS_STANDARD, NON_NEGOTIABLES, PR_TEMPLATE]
+    required_files = [
+        INDEX,
+        READINESS,
+        DOCS_STANDARD,
+        NON_NEGOTIABLES,
+        PR_TEMPLATE,
+        MANIFEST,
+        MINTLIFY_REGISTRY,
+        README,
+        SOURCE_REGISTER,
+    ]
     for path in required_files:
         if not path.is_file():
             errors.append(f"Missing required control-plane file: {path.relative_to(ROOT)}")
@@ -43,6 +58,48 @@ def main() -> int:
     docs_standard = read(DOCS_STANDARD)
     non_negotiables = read(NON_NEGOTIABLES)
     pr_template = read(PR_TEMPLATE)
+    mintlify_registry = read(MINTLIFY_REGISTRY)
+    readme = read(README)
+    source_register = read(SOURCE_REGISTER)
+
+    manifest: dict = {}
+    try:
+        manifest = json.loads(read(MANIFEST))
+    except (json.JSONDecodeError, OSError) as exc:
+        errors.append(f"Homepage projection manifest is not readable JSON: {exc}")
+
+    expected_endpoint = "https://crown-thrive.mintlify.site/index"
+    expected_projection = {
+        "current_default_endpoint": expected_endpoint,
+        "current_default_host": "crown-thrive.mintlify.site",
+        "entry_path": "/index",
+        "readback_state": "verified_rendered_readback",
+        "custom_domain_target": "docs.crownthrive.io",
+        "custom_domain_state": "governed_deferred",
+        "legacy_host_state": "superseded_for_default_readback",
+        "readback_scope": "anonymous_rendered_page",
+        "indexing_state": "unverified",
+    }
+    projection = manifest.get("public_projection", {})
+    for field, expected in expected_projection.items():
+        actual = projection.get(field)
+        if actual != expected:
+            errors.append(
+                "Homepage projection manifest has stale Mintlify endpoint field "
+                f"{field!r}: expected {expected!r}, found {actual!r}"
+            )
+    if projection.get("root_also_rendered") is not True:
+        errors.append("Homepage projection manifest must record the rendered provider root")
+    if projection.get("source_acceptance_separate") is not True:
+        errors.append("Mintlify reachability must remain separate from source acceptance")
+    for label, source in {
+        "Mintlify service registry": mintlify_registry,
+        "documentation governance standard": docs_standard,
+        "repository README": readme,
+        "institutional source register": source_register,
+    }.items():
+        if expected_endpoint not in source:
+            errors.append(f"{label} does not project the current default Mintlify endpoint")
 
     required_homepage_markers = {
         "control-plane H1": "# CrownThrive OS // Institutional Control Plane",
@@ -121,6 +178,7 @@ def main() -> int:
     print("- pull/source propagation rules are present")
     print("- PR template requires homepage and documentation impact")
     print("- stale Phase 2.97 / Phase 3 bypass language is absent")
+    print("- default Mintlify public endpoint is manifest-bound and institutionally projected")
     return 0
 
 
