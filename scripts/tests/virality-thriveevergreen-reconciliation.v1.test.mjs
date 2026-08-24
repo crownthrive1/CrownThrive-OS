@@ -88,6 +88,11 @@ assert.ok(attachments.assets.every((asset) => asset.decision === "HOLD"));
 const edgeSource = read(
   "developers/supabase/functions/virality-commerce-control/index.ts",
 );
+const candidateRoot =
+  "developers/candidates/supabase/virality-commerce-control-v1.1.2";
+const candidateEdgeSource = read(`${candidateRoot}/index.ts`);
+const candidateControlSource = read(`${candidateRoot}/control.ts`);
+const candidateState = parse(`${candidateRoot}/candidate-state.json`);
 assert.match(edgeSource, /version: "1\.1\.1"/);
 assert.match(edgeSource, /const ALLOWED_ORIGIN = "https:\/\/vm\.crownthrive\.com"/);
 assert.match(edgeSource, /origin_not_allowed/);
@@ -119,8 +124,72 @@ assert.doesNotMatch(edgeSource, /checkout_authorized\s*:\s*true/);
 assert.doesNotMatch(edgeSource, /checkout_authorized\s*:\s*!/);
 assert.doesNotMatch(edgeSource, /crown_credit_topups_authorized\s*:\s*!/);
 
+assert.match(candidateEdgeSource, /version: "1\.1\.2-staged-candidate"/);
+assert.match(
+  candidateEdgeSource,
+  /deployment_state: "STAGED_REPOSITORY_ONLY_NOT_DEPLOYED"/,
+);
+assert.match(candidateEdgeSource, /createHandler,/);
+assert.match(candidateEdgeSource, /from "\.\/control\.ts";/);
+assert.match(candidateEdgeSource, /Deno\.serve\(createHandler\(manifest\)\);/);
+assert.match(
+  candidateControlSource,
+  /ALLOWED_ORIGIN = "https:\/\/vm\.crownthrive\.com"/,
+);
+assert.match(candidateControlSource, /request\.body\.getReader\(\)/);
+assert.doesNotMatch(candidateControlSource, /request\.text\(\)/);
+assert.match(
+  candidateControlSource,
+  /HOLD_REGISTRY_FLAG_TRUE_UNAUTHORIZED/,
+);
+assert.match(
+  candidateControlSource,
+  /HOLD_REGISTRY_STATE_MISSING_OR_UNREADABLE/,
+);
+assert.match(candidateControlSource, /effective_enabled: false/);
+assert.match(candidateControlSource, /execution_authorized: false/);
+assert.doesNotMatch(candidateEdgeSource, /select project_key,/);
+assert.match(
+  candidateEdgeSource,
+  /project_key is not null as project_key_configured/,
+);
+assert.equal(candidateState.state, "STAGED_REPOSITORY_ONLY_NOT_DEPLOYED");
+assert.equal(candidateState.live_edge_function_version, 4);
+assert.equal(candidateState.live_state, "HOLD_UNCHANGED");
+assert.equal(candidateState.deployment_authorized, false);
+assert.equal(candidateState.provider_mutation_authorized, false);
+
 const digest = (path) =>
   createHash("sha256").update(read(path)).digest("hex");
+const candidateBundleDigest = createHash("sha256")
+  .update(candidateEdgeSource)
+  .update("\0")
+  .update(candidateControlSource)
+  .digest("hex");
+assert.equal(
+  candidateState.artifact_sha256.index_ts,
+  digest(`${candidateRoot}/index.ts`),
+);
+assert.equal(
+  candidateState.artifact_sha256.control_ts,
+  digest(`${candidateRoot}/control.ts`),
+);
+assert.equal(
+  candidateState.artifact_sha256.deno_json,
+  digest(`${candidateRoot}/deno.json`),
+);
+assert.equal(
+  candidateState.artifact_sha256.control_test_ts,
+  digest(`${candidateRoot}/control.test.ts`),
+);
+assert.equal(
+  candidateState.artifact_sha256.source_contract_test_py,
+  digest(`${candidateRoot}/source_contract_test.py`),
+);
+assert.equal(
+  candidateState.artifact_sha256.index_control_bundle,
+  candidateBundleDigest,
+);
 
 const acceptance = parse(
   "developers/certification/virality-thriveevergreen-production-integration-2026-08-24.v1.json",
@@ -200,6 +269,13 @@ console.log(
       edge_source_sha256: digest(
         "developers/supabase/functions/virality-commerce-control/index.ts",
       ),
+      edge_candidate: {
+        state: candidateState.state,
+        deployed: false,
+        index_sha256: digest(`${candidateRoot}/index.ts`),
+        control_sha256: digest(`${candidateRoot}/control.ts`),
+        source_bundle_sha256: candidateBundleDigest,
+      },
     },
     null,
     2,

@@ -1,0 +1,959 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:crownthrive:contract:thriveevergreen-production-fabric-policy-reducer:1.1.0",
+  "schemaVersion": "1.1.0",
+  "contractPackId": "ct.contract-pack.thriveevergreen-production-fabric-policy-reducer.v1-1",
+  "classification": "public",
+  "compatibility": {
+    "changeClass": "additive_hardening",
+    "predecessor": "ct.contract-pack.thriveevergreen-production-fabric.v1",
+    "predecessorFile": "developers/contracts/thriveevergreen/production-fabric.contracts.v1.json",
+    "runtimeFile": "developers/scripts/thriveevergreen/production-fabric-policy-reducer.v1.1.ts",
+    "predecessorMutation": false
+  },
+  "constitutionalInvariants": [
+    "ThriveEvergreen may optimize within authority. It may never manufacture authority.",
+    "Every valid economic evaluation resolves to exact-version ECAC, HOLD, or DENY.",
+    "Provider success is evidence and never independently creates CrownThrive economic truth.",
+    "ML output is advisory only and cannot issue ECAC or cause an economic effect.",
+    "D3 is human reserved.",
+    "Generalized external thriveevergreen.publish.dispatch remains disabled and HOLD.",
+    "Consequential mutations require idempotency, pre-read, second-read, post-read, and rollback or compensation evidence."
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "iso4217": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "providerId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
+    },
+    "stableId": {
+      "type": "string",
+      "pattern": "^ct\\.[a-z0-9]+(?:[.-][a-z0-9]+)+$",
+      "maxLength": 255
+    },
+    "exactVersionRef": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+/@-]{0,254}$"
+    },
+    "utcInstant": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?!0000)[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,9})?Z$"
+    },
+    "safeNonnegativeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "signedSafeInteger": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "ecacDecision": {
+      "enum": ["ECAC", "HOLD", "DENY"]
+    },
+    "gateState": {
+      "enum": ["PASS", "HOLD", "DENY", "NOT_APPLICABLE"]
+    },
+    "rightsState": {
+      "enum": ["PASS", "HOLD", "DENY"]
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amountMinor", "currency"],
+      "properties": {
+        "amountMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "currency": { "$ref": "#/$defs/iso4217" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "subjectRef",
+        "exactVersionRef",
+        "contentSha256",
+        "rightsState",
+        "channel",
+        "currency"
+      ],
+      "properties": {
+        "candidateId": { "$ref": "#/$defs/uuid" },
+        "subjectRef": { "$ref": "#/$defs/stableId" },
+        "exactVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "contentSha256": { "$ref": "#/$defs/sha256" },
+        "rightsState": { "$ref": "#/$defs/rightsState" },
+        "cieState": { "$ref": "#/$defs/gateState" },
+        "channel": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "currency": { "$ref": "#/$defs/iso4217" },
+        "requestedEffects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 255 }
+        },
+        "providerAliases": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_.-]{1,63}$" },
+          "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 255 }
+        }
+      }
+    },
+    "gateRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gateKey", "allowNotApplicable"],
+      "properties": {
+        "gateKey": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+        "allowNotApplicable": { "type": "boolean" }
+      }
+    },
+    "gateProfileMaterial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registryId",
+        "registryVersion",
+        "registrySnapshotSha256",
+        "profileId",
+        "profileVersion",
+        "exactCandidateVersionRef",
+        "activeFrom",
+        "activeUntil",
+        "gates"
+      ],
+      "properties": {
+        "registryId": { "$ref": "#/$defs/stableId" },
+        "registryVersion": { "$ref": "#/$defs/exactVersionRef" },
+        "registrySnapshotSha256": { "$ref": "#/$defs/sha256" },
+        "profileId": { "$ref": "#/$defs/stableId" },
+        "profileVersion": { "$ref": "#/$defs/exactVersionRef" },
+        "exactCandidateVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "activeFrom": { "$ref": "#/$defs/utcInstant" },
+        "activeUntil": {
+          "oneOf": [
+            { "$ref": "#/$defs/utcInstant" },
+            { "type": "null" }
+          ]
+        },
+        "gates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/gateRequirement" }
+        }
+      }
+    },
+    "exactGateProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registryId",
+        "registryVersion",
+        "registrySnapshotSha256",
+        "profileId",
+        "profileVersion",
+        "exactCandidateVersionRef",
+        "activeFrom",
+        "activeUntil",
+        "gates",
+        "profileDigest"
+      ],
+      "properties": {
+        "registryId": { "$ref": "#/$defs/stableId" },
+        "registryVersion": { "$ref": "#/$defs/exactVersionRef" },
+        "registrySnapshotSha256": { "$ref": "#/$defs/sha256" },
+        "profileId": { "$ref": "#/$defs/stableId" },
+        "profileVersion": { "$ref": "#/$defs/exactVersionRef" },
+        "exactCandidateVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "activeFrom": { "$ref": "#/$defs/utcInstant" },
+        "activeUntil": {
+          "oneOf": [
+            { "$ref": "#/$defs/utcInstant" },
+            { "type": "null" }
+          ]
+        },
+        "gates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/gateRequirement" }
+        },
+        "profileDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "providerEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "providerSuccess", "evidenceSha256", "observedAt"],
+      "properties": {
+        "provider": { "$ref": "#/$defs/providerId" },
+        "providerSuccess": { "type": "boolean" },
+        "evidenceSha256": { "$ref": "#/$defs/sha256" },
+        "observedAt": { "$ref": "#/$defs/utcInstant" }
+      }
+    },
+    "ecacInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate",
+        "gateProfile",
+        "expectedRegistrySnapshotSha256",
+        "expectedGateProfileDigest",
+        "expectedCandidateSha256",
+        "expectedCandidateVersionRef",
+        "gates",
+        "evidenceRefs",
+        "providerEvidence",
+        "evaluatedAt"
+      ],
+      "properties": {
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "gateProfile": { "$ref": "#/$defs/exactGateProfile" },
+        "expectedRegistrySnapshotSha256": { "$ref": "#/$defs/sha256" },
+        "expectedGateProfileDigest": { "$ref": "#/$defs/sha256" },
+        "expectedCandidateSha256": { "$ref": "#/$defs/sha256" },
+        "expectedCandidateVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "gates": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+          "additionalProperties": { "$ref": "#/$defs/gateState" }
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 255 }
+        },
+        "providerEvidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/providerEvidence" }
+        },
+        "evaluatedAt": { "$ref": "#/$defs/utcInstant" }
+      }
+    },
+    "ecacOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "evaluatorContractVersion",
+        "candidateId",
+        "exactCandidateVersionRef",
+        "candidateSha256",
+        "gateProfileId",
+        "gateProfileVersion",
+        "gateRegistryId",
+        "gateRegistryVersion",
+        "gateRegistrySnapshotSha256",
+        "gateProfileDigest",
+        "gateDigest",
+        "blockers",
+        "providerEvidenceCount",
+        "providerSuccessEvidenceCount",
+        "providerSuccessTreatedAsEvidenceOnly",
+        "moneyMovementAuthorized",
+        "providerWriteAuthorized",
+        "rightsGrantAuthorized",
+        "pricePublicationAuthorized",
+        "entitlementActivationAuthorized",
+        "selfApproval",
+        "d3HumanReserved"
+      ],
+      "properties": {
+        "decision": { "$ref": "#/$defs/ecacDecision" },
+        "evaluatorContractVersion": { "const": "1.1.0" },
+        "candidateId": { "$ref": "#/$defs/uuid" },
+        "exactCandidateVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "candidateSha256": { "$ref": "#/$defs/sha256" },
+        "gateProfileId": { "$ref": "#/$defs/stableId" },
+        "gateProfileVersion": { "$ref": "#/$defs/exactVersionRef" },
+        "gateRegistryId": { "$ref": "#/$defs/stableId" },
+        "gateRegistryVersion": { "$ref": "#/$defs/exactVersionRef" },
+        "gateRegistrySnapshotSha256": { "$ref": "#/$defs/sha256" },
+        "gateProfileDigest": { "$ref": "#/$defs/sha256" },
+        "gateDigest": { "$ref": "#/$defs/sha256" },
+        "blockers": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "providerEvidenceCount": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "providerSuccessEvidenceCount": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "providerSuccessTreatedAsEvidenceOnly": { "const": true },
+        "moneyMovementAuthorized": { "const": false },
+        "providerWriteAuthorized": { "const": false },
+        "rightsGrantAuthorized": { "const": false },
+        "pricePublicationAuthorized": { "const": false },
+        "entitlementActivationAuthorized": { "const": false },
+        "selfApproval": { "const": false },
+        "d3HumanReserved": { "const": true }
+      }
+    },
+    "priceEnvelopeInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "costMinor",
+        "providerFeeMinor",
+        "fulfillmentMinor",
+        "supportMinor",
+        "riskMinor",
+        "royaltyMinor",
+        "commissionMinor",
+        "targetMarginBps",
+        "strategicPremiumBps"
+      ],
+      "properties": {
+        "currency": { "$ref": "#/$defs/iso4217" },
+        "costMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "providerFeeMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "fulfillmentMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "supportMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "riskMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "royaltyMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "commissionMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "targetMarginBps": { "type": "integer", "minimum": 0, "maximum": 9500 },
+        "strategicPremiumBps": { "type": "integer", "minimum": 0, "maximum": 100000 }
+      }
+    },
+    "priceEnvelopeOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "floorMinor",
+        "sustainableMinor",
+        "targetMinor",
+        "premiumMinor",
+        "promotionFloorMinor",
+        "walkawayMinor",
+        "inputsSha256",
+        "authority",
+        "effectivePriceAuthorityIssued"
+      ],
+      "properties": {
+        "currency": { "$ref": "#/$defs/iso4217" },
+        "floorMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "sustainableMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "targetMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "premiumMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "promotionFloorMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "walkawayMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "inputsSha256": { "$ref": "#/$defs/sha256" },
+        "authority": { "const": "ADVISORY_ENVELOPE" },
+        "effectivePriceAuthorityIssued": { "const": false }
+      }
+    },
+    "providerReadbackInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected", "observed"],
+      "properties": {
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["amount", "state", "exactVersionRef"],
+          "properties": {
+            "amount": { "$ref": "#/$defs/money" },
+            "state": { "type": "string", "minLength": 1, "maxLength": 255 },
+            "exactVersionRef": { "$ref": "#/$defs/exactVersionRef" }
+          }
+        },
+        "observed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "amount",
+            "state",
+            "exactVersionRef",
+            "providerSuccess",
+            "providerEvidenceSha256",
+            "observedAt"
+          ],
+          "properties": {
+            "amount": { "$ref": "#/$defs/money" },
+            "state": { "type": "string", "minLength": 1, "maxLength": 255 },
+            "exactVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+            "providerSuccess": { "type": "boolean" },
+            "providerEvidenceSha256": { "$ref": "#/$defs/sha256" },
+            "observedAt": { "$ref": "#/$defs/utcInstant" }
+          }
+        }
+      }
+    },
+    "providerReadbackOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reconciledState",
+        "mismatchCodes",
+        "institutionalEffectAllowed",
+        "providerSuccessTreatedAsEvidenceOnly",
+        "providerSuccess",
+        "readbackDigest"
+      ],
+      "properties": {
+        "reconciledState": { "enum": ["PASS", "HOLD"] },
+        "mismatchCodes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["AMOUNT_MISMATCH", "CURRENCY_MISMATCH", "STATE_MISMATCH", "VERSION_MISMATCH"] }
+        },
+        "institutionalEffectAllowed": { "const": false },
+        "providerSuccessTreatedAsEvidenceOnly": { "const": true },
+        "providerSuccess": { "type": "boolean" },
+        "readbackDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "entitlementState": {
+      "enum": ["PENDING", "ACTIVE", "SUSPENDED", "REVOKED", "REFUNDED", "DISPUTED", "EXPIRED"]
+    },
+    "entitlementInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entitlementId",
+        "priorState",
+        "requestedState",
+        "priorExactVersionRef",
+        "expectedPriorVersionRef",
+        "qualifyingEventSha256",
+        "qualifyingEventState",
+        "licenseState",
+        "paymentState",
+        "refundState",
+        "disputeState"
+      ],
+      "properties": {
+        "entitlementId": { "$ref": "#/$defs/stableId" },
+        "priorState": { "$ref": "#/$defs/entitlementState" },
+        "requestedState": { "$ref": "#/$defs/entitlementState" },
+        "priorExactVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "expectedPriorVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "qualifyingEventSha256": { "$ref": "#/$defs/sha256" },
+        "qualifyingEventState": { "$ref": "#/$defs/rightsState" },
+        "licenseState": { "$ref": "#/$defs/rightsState" },
+        "paymentState": { "$ref": "#/$defs/rightsState" },
+        "refundState": { "enum": ["NONE", "PENDING", "REFUNDED"] },
+        "disputeState": { "enum": ["NONE", "OPEN", "RESOLVED"] }
+      }
+    },
+    "entitlementOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "priorState",
+        "nextState",
+        "reasonCodes",
+        "transitionDigest",
+        "entitlementMutationAuthorized",
+        "terminalStateCreatesNewEntitlementOnRenewal"
+      ],
+      "properties": {
+        "priorState": { "$ref": "#/$defs/entitlementState" },
+        "nextState": { "$ref": "#/$defs/entitlementState" },
+        "reasonCodes": { "type": "array", "items": { "type": "string" } },
+        "transitionDigest": { "$ref": "#/$defs/sha256" },
+        "entitlementMutationAuthorized": { "const": false },
+        "terminalStateCreatesNewEntitlementOnRenewal": { "const": true }
+      }
+    },
+    "settlementAllocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allocationId", "category", "recipientRef", "amountMinor"],
+      "properties": {
+        "allocationId": { "$ref": "#/$defs/uuid" },
+        "category": { "enum": ["ROYALTY", "COMMISSION"] },
+        "recipientRef": { "$ref": "#/$defs/stableId" },
+        "amountMinor": { "$ref": "#/$defs/safeNonnegativeInteger" }
+      }
+    },
+    "settlementInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "orderRef",
+        "currency",
+        "grossMinor",
+        "taxMinor",
+        "refundMinor",
+        "providerFeeMinor",
+        "royaltyMinor",
+        "commissionMinor",
+        "allocationRules",
+        "expectedNetMinor"
+      ],
+      "properties": {
+        "orderRef": { "$ref": "#/$defs/stableId" },
+        "currency": { "$ref": "#/$defs/iso4217" },
+        "grossMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "taxMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "refundMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "providerFeeMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "royaltyMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "commissionMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "allocationRules": { "type": "array", "items": { "$ref": "#/$defs/settlementAllocation" } },
+        "expectedNetMinor": { "$ref": "#/$defs/safeNonnegativeInteger" }
+      }
+    },
+    "settlementOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "netPlatformMinor",
+        "expectedNetMinor",
+        "reconciliationDeltaMinor",
+        "allocationLines",
+        "totals",
+        "state",
+        "availableRemedies",
+        "settlementAuthorityIssued",
+        "settlementDigest"
+      ],
+      "properties": {
+        "currency": { "$ref": "#/$defs/iso4217" },
+        "netPlatformMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "expectedNetMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+        "reconciliationDeltaMinor": { "$ref": "#/$defs/signedSafeInteger" },
+        "allocationLines": { "type": "array", "items": { "$ref": "#/$defs/settlementAllocation" } },
+        "totals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "grossMinor",
+            "deductionsMinor",
+            "taxMinor",
+            "refundMinor",
+            "providerFeeMinor",
+            "royaltyMinor",
+            "commissionMinor"
+          ],
+          "properties": {
+            "grossMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+            "deductionsMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+            "taxMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+            "refundMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+            "providerFeeMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+            "royaltyMinor": { "$ref": "#/$defs/safeNonnegativeInteger" },
+            "commissionMinor": { "$ref": "#/$defs/safeNonnegativeInteger" }
+          }
+        },
+        "state": { "enum": ["PASS", "HOLD"] },
+        "availableRemedies": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["CORRECT", "COMPENSATE"] }
+        },
+        "settlementAuthorityIssued": { "const": false },
+        "settlementDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "rollbackInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effectRef",
+        "effectType",
+        "exactVersionRef",
+        "providerReversible",
+        "institutionalReversible",
+        "adverseEvidenceRefs",
+        "preReadSha256",
+        "postFailureReadSha256"
+      ],
+      "properties": {
+        "effectRef": { "$ref": "#/$defs/stableId" },
+        "effectType": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "exactVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "providerReversible": { "type": "boolean" },
+        "institutionalReversible": { "type": "boolean" },
+        "adverseEvidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 255 }
+        },
+        "preReadSha256": { "$ref": "#/$defs/sha256" },
+        "postFailureReadSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "rollbackOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "steps",
+        "requiresHuman",
+        "appendOnlyReceiptRequired",
+        "compensationRequired",
+        "planDigest",
+        "receiptContract",
+        "executionAuthorized"
+      ],
+      "properties": {
+        "action": { "enum": ["NOOP", "ROLLBACK", "COMPENSATE", "QUARANTINE", "ESCALATE"] },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sequence", "operation", "required"],
+            "properties": {
+              "sequence": { "type": "integer", "minimum": 1 },
+              "operation": { "type": "string", "minLength": 1 },
+              "required": { "type": "boolean" }
+            }
+          }
+        },
+        "requiresHuman": { "const": true },
+        "appendOnlyReceiptRequired": { "const": true },
+        "compensationRequired": { "type": "boolean" },
+        "planDigest": { "$ref": "#/$defs/sha256" },
+        "receiptContract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "requiredFields"],
+          "properties": {
+            "status": { "const": "REQUIRED" },
+            "requiredFields": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "executionAuthorized": { "const": false }
+      }
+    },
+    "stateRead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subjectRef", "exactVersionRef", "stateSha256", "observedAt"],
+      "properties": {
+        "subjectRef": { "$ref": "#/$defs/stableId" },
+        "exactVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "stateSha256": { "$ref": "#/$defs/sha256" },
+        "observedAt": { "$ref": "#/$defs/utcInstant" }
+      }
+    },
+    "mutationEnvelopeInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionId",
+        "idempotencyKey",
+        "wrapperId",
+        "candidateId",
+        "expectedVersionRef",
+        "gateDecisionDigest",
+        "preRead",
+        "secondRead",
+        "proposedEffectSha256",
+        "postRead",
+        "compensation"
+      ],
+      "properties": {
+        "executionId": { "$ref": "#/$defs/uuid" },
+        "idempotencyKey": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,254}$" },
+        "wrapperId": { "$ref": "#/$defs/stableId" },
+        "candidateId": { "$ref": "#/$defs/uuid" },
+        "expectedVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "gateDecisionDigest": { "$ref": "#/$defs/sha256" },
+        "preRead": { "$ref": "#/$defs/stateRead" },
+        "secondRead": { "$ref": "#/$defs/stateRead" },
+        "proposedEffectSha256": { "$ref": "#/$defs/sha256" },
+        "postRead": { "$ref": "#/$defs/stateRead" },
+        "compensation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["planSha256", "receiptRequired", "compensatingActionRef"],
+          "properties": {
+            "planSha256": { "$ref": "#/$defs/sha256" },
+            "receiptRequired": { "const": true },
+            "compensatingActionRef": { "$ref": "#/$defs/stableId" }
+          }
+        }
+      }
+    },
+    "mutationEnvelopeOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionId",
+        "idempotencyKey",
+        "wrapperId",
+        "candidateId",
+        "expectedVersionRef",
+        "gateDecisionDigest",
+        "preRead",
+        "secondRead",
+        "proposedEffectSha256",
+        "postRead",
+        "compensation",
+        "envelopeDigest",
+        "contractState",
+        "effectAuthorizationIssued"
+      ],
+      "properties": {
+        "executionId": { "$ref": "#/$defs/uuid" },
+        "idempotencyKey": { "type": "string" },
+        "wrapperId": { "$ref": "#/$defs/stableId" },
+        "candidateId": { "$ref": "#/$defs/uuid" },
+        "expectedVersionRef": { "$ref": "#/$defs/exactVersionRef" },
+        "gateDecisionDigest": { "$ref": "#/$defs/sha256" },
+        "preRead": { "$ref": "#/$defs/stateRead" },
+        "secondRead": { "$ref": "#/$defs/stateRead" },
+        "proposedEffectSha256": { "$ref": "#/$defs/sha256" },
+        "postRead": { "$ref": "#/$defs/stateRead" },
+        "compensation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["planSha256", "receiptRequired", "compensatingActionRef"],
+          "properties": {
+            "planSha256": { "$ref": "#/$defs/sha256" },
+            "receiptRequired": { "const": true },
+            "compensatingActionRef": { "$ref": "#/$defs/stableId" }
+          }
+        },
+        "envelopeDigest": { "$ref": "#/$defs/sha256" },
+        "contractState": { "const": "VALIDATED_NOT_AUTHORIZED" },
+        "effectAuthorizationIssued": { "const": false }
+      }
+    },
+    "mlRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purpose", "featureSchemaVersion", "observationWindow", "requestedEffects"],
+      "properties": {
+        "purpose": { "enum": ["RANK", "FORECAST", "RECOMMEND", "DETECT_ANOMALY", "SUGGEST_HOLD_REVIEW"] },
+        "featureSchemaVersion": { "$ref": "#/$defs/exactVersionRef" },
+        "observationWindow": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "requestedEffects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["RANK", "FORECAST", "RECOMMEND", "DETECT_ANOMALY", "SUGGEST_HOLD_REVIEW"] }
+        }
+      }
+    },
+    "mlExplanation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "value"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" }
+      }
+    },
+    "mlOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "modelId",
+        "modelVersion",
+        "modelDigest",
+        "score",
+        "confidence",
+        "explanations",
+        "featureDigest",
+        "recommendation",
+        "authority",
+        "institutionalEffectAllowed",
+        "prohibitedEffects"
+      ],
+      "properties": {
+        "modelId": { "$ref": "#/$defs/stableId" },
+        "modelVersion": { "$ref": "#/$defs/exactVersionRef" },
+        "modelDigest": { "$ref": "#/$defs/sha256" },
+        "score": { "type": "number" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "explanations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/mlExplanation" } },
+        "featureDigest": { "$ref": "#/$defs/sha256" },
+        "recommendation": { "enum": ["REVIEW", "SUGGEST_HOLD_REVIEW"] },
+        "authority": { "const": "ADVISORY_ONLY" },
+        "institutionalEffectAllowed": { "const": false },
+        "prohibitedEffects": {
+          "type": "array",
+          "minItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "ECAC",
+              "RIGHTS_GRANT",
+              "PRICE_PUBLICATION",
+              "MONEY_MOVEMENT",
+              "PROVIDER_WRITE",
+              "PAYOUT",
+              "ENTITLEMENT_ACTIVATION",
+              "VOTE"
+            ]
+          }
+        }
+      }
+    },
+    "dispatchInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "toolId",
+        "mode",
+        "wrapperId",
+        "requestedEnabled",
+        "expectedGateDigest",
+        "gateDecisionDigest",
+        "idempotencyKey"
+      ],
+      "properties": {
+        "toolId": { "const": "ct.mcp-tool.thriveevergreen.publish.dispatch" },
+        "mode": { "const": "WRAPPER_ONLY" },
+        "wrapperId": { "$ref": "#/$defs/stableId" },
+        "requestedEnabled": { "const": false },
+        "expectedGateDigest": { "$ref": "#/$defs/sha256" },
+        "gateDecisionDigest": { "$ref": "#/$defs/sha256" },
+        "idempotencyKey": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,254}$" }
+      }
+    },
+    "dispatchOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "toolId",
+        "contractVersion",
+        "decision",
+        "generalizedDispatchEnabled",
+        "wrapperOnly",
+        "blocker",
+        "wrapperId",
+        "idempotencyKey",
+        "wrapperExecutionAuthorized",
+        "providerWriteAuthorized",
+        "dispatchEvaluationDigest"
+      ],
+      "properties": {
+        "toolId": { "const": "ct.mcp-tool.thriveevergreen.publish.dispatch" },
+        "contractVersion": { "const": "1.1.0" },
+        "decision": { "const": "HOLD" },
+        "generalizedDispatchEnabled": { "const": false },
+        "wrapperOnly": { "const": true },
+        "blocker": { "const": "generalized_external_dispatch_not_independently_certified" },
+        "wrapperId": { "$ref": "#/$defs/stableId" },
+        "idempotencyKey": { "type": "string" },
+        "wrapperExecutionAuthorized": { "const": false },
+        "providerWriteAuthorized": { "const": false },
+        "dispatchEvaluationDigest": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  },
+  "semanticValidators": [
+    "Gate profiles are nonempty, unique, sorted, content-digested, registry-bound by an independently trusted wrapper-pinned expected digest, and effective-dated; caller-supplied matching values are validation material only.",
+    "The independently trusted wrapper-pinned expected registry snapshot SHA-256 equals the registry snapshot bound into the canonical gate-profile digest; an untrusted caller cannot establish that expectation.",
+    "The independently trusted wrapper-pinned expected candidate SHA-256 equals the canonical digest of the full normalized candidate, including subject, content, and requested effects; an untrusted caller cannot establish that expectation.",
+    "The supplied gate object contains every and only the exact gate profile keys.",
+    "The candidate, expected version, and gate-profile candidate version are identical.",
+    "All monetary inputs are safe, nonnegative integers; invalid negatives are rejected rather than clamped.",
+    "The canonical JSON implementation rejects non-I-JSON values and hashes supported values independently of object insertion order.",
+    "UTC instants are real-calendar RFC 3339 Z timestamps with zero to nine fractional digits; offsets and impossible dates are rejected.",
+    "Provider identifiers are lowercase ASCII identifiers and provider evidence is sorted by deterministic code-unit order.",
+    "REVOKED, REFUNDED, and EXPIRED entitlements cannot reactivate; renewal creates a new exact-version entitlement.",
+    "Provider readback mismatch returns HOLD, and provider success remains evidence only.",
+    "A validated mutation envelope is not effect authorization.",
+    "ML authority attempts are contract violations.",
+    "All derived ML scores, confidence values, and explanation values are finite before output.",
+    "Generalized dispatch requests are rejected; a valid wrapper-only request still returns HOLD and does not authorize execution."
+  ],
+  "contracts": {
+    "candidateNormalization": {
+      "inputSchema": { "$ref": "#/$defs/candidate" },
+      "outputAuthority": "none"
+    },
+    "gateProfileRegistration": {
+      "inputSchema": { "$ref": "#/$defs/gateProfileMaterial" },
+      "outputSchema": { "$ref": "#/$defs/exactGateProfile" },
+      "registryBindingRequired": true
+    },
+    "exactEcacEvaluation": {
+      "inputSchema": { "$ref": "#/$defs/ecacInput" },
+      "outputSchema": { "$ref": "#/$defs/ecacOutput" },
+      "outputAuthority": "validation_only_not_execution_authority",
+      "decisionValues": ["ECAC", "HOLD", "DENY"],
+      "providerSuccessAuthority": false
+    },
+    "priceEnvelope": {
+      "inputSchema": { "$ref": "#/$defs/priceEnvelopeInput" },
+      "outputSchema": { "$ref": "#/$defs/priceEnvelopeOutput" },
+      "authority": "advisory_only"
+    },
+    "providerReadback": {
+      "inputSchema": { "$ref": "#/$defs/providerReadbackInput" },
+      "outputSchema": { "$ref": "#/$defs/providerReadbackOutput" },
+      "institutionalEffectAllowedDefault": false
+    },
+    "entitlementTransition": {
+      "inputSchema": { "$ref": "#/$defs/entitlementInput" },
+      "outputSchema": { "$ref": "#/$defs/entitlementOutput" },
+      "terminalStates": ["REVOKED", "REFUNDED", "EXPIRED"],
+      "terminalReactivation": false,
+      "transitionMatrix": {
+        "PENDING": ["PENDING", "ACTIVE", "SUSPENDED", "REVOKED", "REFUNDED", "DISPUTED", "EXPIRED"],
+        "ACTIVE": ["ACTIVE", "SUSPENDED", "REVOKED", "REFUNDED", "DISPUTED", "EXPIRED"],
+        "SUSPENDED": ["SUSPENDED", "ACTIVE", "REVOKED", "REFUNDED", "DISPUTED", "EXPIRED"],
+        "DISPUTED": ["DISPUTED", "SUSPENDED", "REVOKED", "REFUNDED", "EXPIRED"],
+        "REVOKED": ["REVOKED"],
+        "REFUNDED": ["REFUNDED"],
+        "EXPIRED": ["EXPIRED"]
+      }
+    },
+    "settlement": {
+      "inputSchema": { "$ref": "#/$defs/settlementInput" },
+      "outputSchema": { "$ref": "#/$defs/settlementOutput" },
+      "stateValues": ["PASS", "HOLD"],
+      "remedyValues": ["CORRECT", "COMPENSATE"],
+      "providerSettlementAuthority": false
+    },
+    "rollbackCompensation": {
+      "inputSchema": { "$ref": "#/$defs/rollbackInput" },
+      "outputSchema": { "$ref": "#/$defs/rollbackOutput" },
+      "appendOnlyReceiptRequired": true
+    },
+    "mutationExecutionEnvelope": {
+      "inputSchema": { "$ref": "#/$defs/mutationEnvelopeInput" },
+      "outputSchema": { "$ref": "#/$defs/mutationEnvelopeOutput" },
+      "requiredControls": ["idempotency", "pre_read", "second_read", "post_read", "compensation"],
+      "effectAuthority": false
+    },
+    "mlAdvisory": {
+      "inputRequestSchema": { "$ref": "#/$defs/mlRequest" },
+      "outputSchema": { "$ref": "#/$defs/mlOutput" },
+      "models": [
+        "ct.ml.thriveevergreen.demand-score",
+        "ct.ml.thriveevergreen.price-elasticity-advisor",
+        "ct.ml.thriveevergreen.anomaly-risk"
+      ],
+      "authority": "advisory_only"
+    },
+    "generalizedDispatch": {
+      "inputSchema": { "$ref": "#/$defs/dispatchInput" },
+      "outputSchema": { "$ref": "#/$defs/dispatchOutput" },
+      "state": "HOLD",
+      "enabled": false,
+      "wrapperOnly": true
+    }
+  }
+}
