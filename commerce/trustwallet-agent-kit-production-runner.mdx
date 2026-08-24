@@ -1,132 +1,64 @@
 ---
-title: "Trust Wallet Agent Kit Production Runner"
-description: "Production contract for Trust Wallet Agent Kit hosted intelligence, local MCP/CLI wallet operations, holdings, signing, and CHLOM Wallet integration."
+title: "Trust Wallet Agent Kit & CHLOM Managed Agent Wallet"
+description: "Current production contract for Trust Wallet Agent Kit intelligence/routing and CrownThrive's managed Base/USDC CHLOM Agent Wallet execution lane."
 sidebarTitle: "Trust Wallet Agent Kit"
 icon: "wallet"
-keywords: ["Trust Wallet Agent Kit", "TWAK", "CHLOM Wallet", "WalletConnect", "Agent Wallet", "portfolio", "holdings", "swap"]
+keywords: ["Trust Wallet Agent Kit", "TWAK", "CHLOM Wallet", "Agent Wallet", "Base", "USDC", "ThriveBase Vault", "WalletConnect"]
 ---
 
-# Trust Wallet Agent Kit production runner
+# Trust Wallet Agent Kit & CHLOM Managed Agent Wallet
 
-Trust Wallet Agent Kit is integrated into CrownThrive as two related but distinct execution planes:
+Trust Wallet Agent Kit and the CrownThrive-managed Agent Wallet serve **different but complementary production roles**.
 
-1. a **production hosted HMAC gateway** for market and routing intelligence; and
-2. a **persistent local TWAK CLI/MCP runner** for wallet holdings, portfolio, signing, and autonomous Agent Wallet execution.
+1. **Trust Wallet hosted HMAC plane** supplies multichain price, market, provider, route and swap-quote intelligence.
+2. **CHLOM Managed Agent Wallet** is CrownThrive's governed signing/custody lane for machine-executable wallet actions.
+3. **WalletConnect / MetaMask Embedded Wallets** remain separate human-approved wallet lanes.
 
-The hosted plane is active. CrownThrive has selected a dual execution model for wallet actions: **user-approved WalletConnect plus a dedicated bounded Agent Wallet**. Each lane has an independent activation gate.
+A provider quote, transaction build, signature or chain receipt is evidence. It never manufactures CrownThrive economic authority by itself.
 
-## Current state
+## Current production state
 
-| Capability | State | Boundary |
+| Capability | Current state | Boundary |
 | --- | --- | --- |
-| API credentials | **VERIFIED / vaulted** | Values are private and never returned by public CrownThrive APIs or docs. |
-| Live price query | **PASS / production** | Hosted HMAC API. |
-| Trending/market data | **ACTIVE / production** | Hosted HMAC API. |
-| Routing domains | **PASS / production** | 32 live provider-routing domains observed in the current canary. |
-| Swap providers | **ACTIVE / production** | Hosted routing plane. |
-| Swap quote | **PASS / production** | Quote only; does not sign or broadcast. |
-| Transaction step construction | **ACTIVE / production gated** | Produces transaction material only. |
-| Own-wallet balance | **STAGED** | Requires installed TWAK local runner plus bound Agent Wallet. |
-| Own-wallet portfolio | **STAGED** | Requires installed TWAK local runner plus bound Agent Wallet. |
-| Any-address balance | **STAGED** | Official TWAK CLI operation; requires durable installed CLI/MCP runner. |
-| WalletConnect user approval | **PRODUCTION CONTRACT / frontend pending** | Human confirmation is mandatory; current unattended ceiling is zero. |
-| Dedicated Agent Wallet | **PRODUCTION CONTRACT / runner pending** | Persistent runner and encrypted wallet are not yet bound; current unattended ceiling is zero. |
-| Agent Wallet policy evaluation | **STAGED** | Exact evaluator runtime is promoted only with the persistent Agent Wallet runner. |
-| Signing/broadcast | **STAGED** | No signing tool is production-exposed until its lane-specific gate passes. |
+| Trust Wallet API credentials | **VERIFIED / VAULTED** | Secret values are not returned by public APIs or docs. |
+| Token pricing / market intelligence | **ACTIVE / production** | Hosted HMAC plane. |
+| Routing domains | **PASS / production** | 32 routing domains observed in certified provider readback. |
+| Provider inventory | **ACTIVE / production** | Hosted routing plane. |
+| Swap quote | **PASS / production** | Quote is not execution authority. |
+| Transaction-step construction | **ACTIVE / production-gated** | Material construction only; exact ECAC still required. |
+| CHLOM Managed Agent Wallet | **ACTIVE / production** | CrownThrive-managed encrypted-keystore custody. |
+| Agent Wallet public address | `0x7bc35BEab3bd346590fA6f68C218ccf249759Ab0` | Public identity only. |
+| Default chain | **Base Mainnet / 8453** | Canonical first execution chain. |
+| Default asset | **native USDC** | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| Wallet signing canary | **PASS** | No-value signature recovered to the bound address. |
+| Base chain / USDC canaries | **PASS** | Chain-ID and contract-code readbacks passed. |
+| Money-movement capability | **AUTHORIZED / production** | `money_movement_authorized=true`; exact ECAC still required. |
+| Autonomous unattended ceiling | **0** | No positive unattended transfer is currently allowed. |
+| WalletConnect | **Production contract / frontend-gated** | Human approval required. |
+| MetaMask Embedded Wallet | **Production control / frontend-gated** | Human approval required. |
 
-## First provider request
+## Managed custody model
 
-The production HMAC credentials were canaried successfully against Trust Wallet's live service. The first CrownThrive production request returned a live BNB/USD ticker.
+The Agent Wallet was generated inside the governed CrownThrive control runtime, encrypted as an Ethereum V3 keystore and bound to ThriveBase Vault.
 
-A separate live route canary returned 32 current routing domains, and a BNB-to-USDT quote returned multiple provider routes, fee data, price-impact data, and an expiry.
+The encrypted keystore and its decryption credential are stored under **separate Vault aliases**. Public-safe machine readback asserts:
 
-No wallet was created and no transaction was signed or broadcast during certification.
-
-## Official installation
-
-On a persistent macOS, Linux, WSL, Codex CLI, Claude Code, Cursor, or compatible MCP runner, use Trust Wallet's official installer:
-
-```bash
-curl -fsSL https://agent-kit.trustwallet.com/install.sh | bash
+```text
+wallet_creation_performed        true
+durable_runner_bound             true
+private_material_vaulted         true
+raw_private_key_persisted        false
+mnemonic_persisted               false
+private_material_returned        false
 ```
 
-The installer:
+The bootstrap is idempotent. Replaying initialization reuses the existing encrypted wallet rather than creating a second institutional address.
 
-- installs the `twak` CLI;
-- prompts for the Trust Wallet Access ID and HMAC secret;
-- verifies and stores them locally;
-- wires supported agent harnesses;
-- offers an Agent Wallet, WalletConnect, or read-only path;
-- exposes the tool surface through `twak serve` for MCP clients.
+No wallet secret, mnemonic, raw private key, keystore password or bootstrap secret may appear in source control, Mintlify, Drive documentation, DAIL payloads, logs, MCP responses or ordinary model output.
 
-CrownThrive credentials are already vaulted in ThriveBase. Do not publish them in source control, documentation, screenshots, issue bodies, logs, or MCP responses.
+## Trust Wallet hosted production MCPs
 
-## Verify a local installation
-
-After installation:
-
-```bash
-twak auth status --json
-```
-
-Market-data smoke test:
-
-```bash
-twak price BNB --json
-```
-
-Quote-only smoke test:
-
-```bash
-twak swap 100 USDC ETH --quote-only --json
-```
-
-The exact asset/network arguments must match the intended route. Quote success does not authorize execution.
-
-## Holdings and portfolio
-
-Trust Wallet's Agent Kit wallet skill defines holdings through the local CLI/MCP wallet plane.
-
-Own-wallet balance:
-
-```bash
-twak wallet balance --chain ethereum --json
-twak wallet balance --chain solana --json
-twak wallet balance --all --json
-```
-
-Full portfolio:
-
-```bash
-twak wallet portfolio --json
-twak wallet portfolio --chains ethereum,base,bsc,solana --json
-```
-
-Any-address read:
-
-```bash
-twak balance --address <address> --coin 60 --json
-twak balance --address <address> --chain bsc --json
-```
-
-A canary against an assumed hosted `/v1/balance` path returned HTTP 404. CrownThrive therefore does **not** expose a fabricated hosted balance API. Wallet holdings remain attached to the official local TWAK CLI/MCP contract.
-
-## Staged CrownThrive MCP contracts
-
-The following Trust Wallet runner contracts are registered but disabled until a persistent TWAK runner is bound:
-
-- `trustwallet.wallet.balance`
-- `trustwallet.wallet.portfolio`
-- `trustwallet.balance.address`
-- `trustwallet.wallet.sign`
-- `chlom_wallet.agent_wallet.evaluate`
-- `chlom_wallet.agent_wallet.execute`
-
-`chlom_wallet.agent_wallet.evaluate` is intentionally staged because the exact evaluator must run against the same persistent Agent Wallet environment it governs. It cannot be treated as executable merely because an authority record exists.
-
-## Production CrownThrive MCP contracts
-
-The hosted production plane currently exposes:
+The hosted intelligence plane exposes:
 
 - `trustwallet.price.read`
 - `trustwallet.trending.read`
@@ -135,130 +67,101 @@ The hosted production plane currently exposes:
 - `trustwallet.swap.quote`
 - `trustwallet.swap.step.build`
 
-`trustwallet.swap.step.build` remains transaction-material construction only. It never converts a quote into permission to sign.
+`trustwallet.swap.step.build` can create transaction material but cannot authorize a signature or broadcast.
 
-The CHLOM production policy surface exposes `chlom_wallet.execution_modes.status` as a read-only authority-state contract. WalletConnect request, Agent Wallet evaluation, and Agent Wallet execution remain separately staged behind their lane-specific gates.
+## Agent Wallet production control
 
-## Dual wallet trust model selected
-
-CrownThrive uses both wallet modes because they solve different authority problems.
-
-### WalletConnect — user-approved lane
-
-Stable ID:
+Canonical runner:
 
 ```text
-ct.wallet-mode.walletconnect.user-approved.v1
+ct.runner.chlom-agent-wallet.base-usdc.v1
 ```
 
-Use this lane when a human-controlled wallet should retain per-transaction sovereignty.
-
-Characteristics:
-
-- user self-custody;
-- transaction proposed by CrownThrive/CHLOM;
-- explicit modal wallet approval required;
-- autonomous execution disabled;
-- unattended value ceiling `0`;
-- D2 maximum policy ceiling;
-- suitable for consumer, founder, treasury-approval, or other human-signature flows.
-
-For the Virality Music implementation, MetaMask Embedded Wallets Wallet Services supplies the user-facing WalletConnect/funding corridor. Its frontend request tool remains staged until the Mainnet origin is allowlisted and the VM Sites binding passes readback.
-
-### Dedicated Agent Wallet — bounded autonomous lane
-
-Stable ID:
+Control endpoint:
 
 ```text
-ct.wallet-mode.agent-wallet.autonomous.v1
+https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-agent-wallet-control
 ```
 
-Use this lane for machine-executable operations that have already passed exact CHLOM and ThriveEvergreen policy.
-
-Characteristics:
-
-- dedicated institutional Agent Wallet;
-- encrypted wallet material stays on a persistent trusted runner;
-- policy can define asset allowlists, address allowlists, value limits, and automation boundaries;
-- current unattended value ceiling is `0`, so architecture does not equal permission to move funds;
-- D3 remains human-reserved;
-- suitable for future DCA, limit strategies, x402, agent commerce, or other bounded workflows only after separate execution certification.
-
-Current state:
+Current production identity:
 
 ```text
-runtime contract: production
-activation: configured_pending_runner
-wallet creation performed: false
-durable runner bound: false
-policy evaluator: staged
-money movement: deny-by-default
+address     0x7bc35BEab3bd346590fA6f68C218ccf249759Ab0
+network     Base Mainnet
+chain_id    8453
+asset       native USDC
+USDC        0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+health      PASS
 ```
 
-An Agent Wallet is not created inside a transient Supabase Edge Function or ordinary ChatGPT response runtime.
+## Authority vs. execution
 
-## MetaMask Embedded Wallet relationship
-
-The user-approved wallet lane is complemented by the production MetaMask Embedded Wallets control plane documented at [MetaMask Embedded Wallets Funding & Dual Wallet Execution](/commerce/metamask-embedded-wallets-funding-and-dual-wallet).
-
-MetaMask handles the embedded user-wallet/funding/WalletConnect experience; Trust Wallet Agent Kit remains the multichain intelligence and dedicated Agent Wallet execution engine. These are interoperable roles, not competing sources of authority.
-
-## CHLOM Wallet relationship
-
-CHLOM Wallet remains the institutional evidence, rights, policy, and economic-lineage wallet. It is not silently converted into a hosted custodial crypto wallet.
-
-The Trust Wallet adapter is bound as:
+The current commerce acceptance state is intentionally:
 
 ```text
-ct.adapter.trustwallet.agentkit.v1
+snapshot_state                    AUTHORIZED_CONFIGURED_NOT_EXECUTED
+money_movement_authorized         true
+money_movement_execution_count    0
+max_unattended_value_minor        0
+candidate_decision                HOLD
+checkout_state                    HOLD
+agent_wallet_state                active
 ```
 
-Current CHLOM state:
+**Authorized configuration is not a performed transaction.**
 
-```text
-hosted market/routing plane: production
-dual execution model: selected
-WalletConnect mode: configured_pending_frontend
-Agent Wallet mode: configured_pending_runner
-wallet account bound: false
-holdings/portfolio: local runner required
-provider execution: denied until exact lane gate passes
-```
+An hourly acceptance snapshot preserves this distinction so later agents cannot flatten capability authorization into a false transaction claim.
 
 ## ThriveEvergreen boundary
 
-A Trust Wallet route, quote, signed transaction, or on-chain confirmation is provider evidence. It cannot create CrownThrive economic authority by itself.
+ThriveEvergreen v2 is the economic-execution authority. The engine is `production_write`, production effects are enabled, and economic execution may occur only after the exact action clears the applicable `ECAC | HOLD | DENY` gate.
 
-The canonical VM-facing authority is ThriveEvergreen v2. Its internal engine is `production_write` and `production_publisher_active` with production effects enabled and `ECAC` publication activation. Its generalized external mutation/dispatch API remains separately held; exact candidate evaluation is available without mutation.
+For the Agent Wallet:
 
-Any CrownThrive commerce effect remains subject to ThriveEvergreen's exact `ECAC | HOLD | DENY` decision and the relevant CHLOM policy/rights/settlement gates.
+- `money_movement_authorized=true` means the production capability exists;
+- action-specific execution still requires exact ECAC and all execution controls;
+- the current unattended ceiling of `0` blocks positive autonomous transfers even though the capability itself is production-authorized;
+- D3 remains human-reserved;
+- provider success cannot manufacture entitlement, rights, payout truth, settlement truth or economic authority.
 
-## WalletConnect completion gate
+## Production broadcast boundary
 
-The user-approved lane becomes transaction-active only after:
+Base's public RPC was used only for chain and contract canaries. Production chain broadcast requires a governed production-grade RPC/provider path or another independently certified broadcast provider.
 
-1. the required production wallet frontend is injected through a certified site write;
-2. the provider origin/allowlist gate passes;
-3. wallet connection and identity readback pass;
-4. a no-value signature canary passes;
-5. a negative unauthorized-sign canary passes;
-6. modal approval remains mandatory;
-7. provider and ThriveEvergreen readback are reconciled.
+Before positive autonomous value can move, CrownThrive must preserve:
 
-## Agent Wallet completion gate
+1. exact ECAC immediately before execution;
+2. asset and destination allowlists;
+3. bounded amount/value policy;
+4. simulation/preflight;
+5. idempotency/replay protection;
+6. production RPC/provider certification;
+7. post-broadcast receipt/readback;
+8. rollback or compensation path;
+9. incident/quarantine controls;
+10. append-only acceptance and DAIL evidence.
 
-The autonomous lane becomes transaction-active only after:
+## WalletConnect and MetaMask relationship
 
-1. persistent TWAK CLI/MCP runner installed;
-2. credentials verified without secret leakage;
-3. dedicated Agent Wallet created on that persistent runner;
-4. only public addresses/account IDs registered in CHLOM Wallet;
-5. exact policy evaluator bound to the persistent runner and canaried;
-6. holdings canary passes on the bound wallet;
-7. transaction build canary passes;
-8. unauthorized-sign test proves denial;
-9. asset/address allowlists, unattended-value ceiling, rollback/compensation, and incident controls are certified;
-10. exact ThriveEvergreen ECAC authorization is enforced immediately before each economic effect;
-11. signing/broadcast MCP exposure is promoted only after readback.
+WalletConnect and MetaMask Embedded Wallets are the **human-sovereignty lanes**. They require user confirmation and do not become autonomous merely because the CHLOM Agent Wallet exists.
 
-Until those lane-specific gates pass, the hosted intelligence/quote plane remains production while transaction execution remains fail-closed.
+The managed Agent Wallet is the bounded machine-execution lane; WalletConnect/MetaMask are user-approved lanes. All remain subordinate to CHLOM rights/policy and ThriveEvergreen economic authority.
+
+## Trust Wallet local CLI / failover path
+
+Trust Wallet's local TWAK CLI/MCP remains useful for holdings, portfolio, testing, portability, local tooling and a future failover custody path. Typical local operations include:
+
+```bash
+twak auth status --json
+twak wallet balance --chain base --json
+twak wallet portfolio --chains ethereum,base,bsc,solana --json
+twak swap 100 USDC ETH --quote-only --json
+```
+
+The hosted market HMAC plane does not expose a fabricated `/v1/balance` endpoint; a prior canary against that assumed route returned HTTP 404.
+
+## Superseded local-runner plan
+
+Earlier CrownThrive documentation described a persistent local TWAK Agent Wallet runner as the planned primary signing path. That architecture is retained as historical design and portability/failover guidance, but it is **superseded as the primary production custody path** by the CrownThrive-managed encrypted-keystore wallet documented here.
+
+It is no longer accurate to describe the institutional Agent Wallet as `configured_pending_runner`, `wallet creation performed: false`, `wallet account bound: false`, or `money movement: deny-by-default`.
