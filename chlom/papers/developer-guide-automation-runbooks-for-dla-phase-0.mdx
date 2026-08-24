@@ -1,0 +1,163 @@
+---
+title: "Developer Guide — Automation Runbooks for DLA (Phase 0 — Extremely High-Level)"
+sidebarTitle: "Historical DLA Runbooks"
+description: "Exact-title reconstruction of the historical DLA automation runbook guide, defining safe operational patterns for license lifecycle automation, evidence checks, holds, retries, correction and human/governed escalation without inventing lost procedures."
+icon: "gears"
+keywords: ["Automation Runbooks for DLA", "DLA developer guide", "CHLOM automation", "license operations", "SAFE_HOLD"]
+---
+
+# Developer Guide — Automation Runbooks for DLA (Phase 0 — Extremely High-Level)
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.devguide-dla-automation-runbooks-phase0
+exact_recovered_title: Developer Guide — Automation Runbooks for DLA (Phase 0 — Extremely High-Level)
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+historical_DLA: Decentralized Licensing Authority
+current_DLA: Dynamic Licensing Asset
+runbook_detail_level: public_safe_high_level
+```
+
+## Operational principle
+
+Automation may perform repetitive licensing work only inside explicit authority and deterministic safety gates.
+
+```text
+AUTOMATION MAY OPTIMIZE EXECUTION
+AUTOMATION MAY NOT MANUFACTURE AUTHORITY
+```
+
+## Runbook family
+
+This reconstruction preserves the operational domains implied by historical DLA source architecture:
+
+- candidate intake;
+- eligibility/evidence refresh;
+- issuance/activation;
+- renewal/expiry;
+- transfer/sublicense validation;
+- suspension/revocation;
+- dependency/oracle failure;
+- duplicate/idempotency recovery;
+- correction/supersession;
+- manual/governed review escalation.
+
+## Runbook 1 — Candidate intake
+
+```text
+receive request
+ -> validate request envelope
+ -> resolve identity
+ -> resolve source rights / issuer authority
+ -> create candidate version
+ -> resolve policies/evidence
+ -> evaluate
+ -> PASS | HOLD | DENY
+```
+
+Never activate on malformed or incomplete input.
+
+## Runbook 2 — Evidence refresh
+
+```text
+scheduled/event trigger
+ -> identify expiring/stale evidence
+ -> refresh from authorized source
+ -> compare prior/current state
+ -> no material change: record refresh
+ -> material conflict: HOLD affected action/object
+ -> route review
+```
+
+## Runbook 3 — Renewal
+
+Renewal requires current license state, current issuer authority, current source rights and current holder predicates. Payment auto-renewal alone is not licensing renewal.
+
+## Runbook 4 — Expiry
+
+When a hard expiry condition is reached, mark or project the DLA state according to the governing term profile and create a DAIL event. Do not delete the historical record.
+
+## Runbook 5 — Transfer/sublicense
+
+```text
+requested rights
+ <= active DLA transfer/sublicense ceiling
+ <= issuer/source-rights ceiling
+```
+
+Then evaluate recipient eligibility, territory/term, approval requirements and settlement/entitlement dependencies.
+
+## Runbook 6 — Suspension/revocation
+
+Use `SAFE_HOLD`/suspension for unresolved or reversible conditions where the policy permits. Use revocation/termination only with appropriate authority/evidence.
+
+## Runbook 7 — Dependency failure
+
+```text
+provider/oracle unavailable
+      |
+can decision be safely made from current authoritative evidence?
+   /     \
+ yes      no
+ |        |
+continue HOLD / retry / review
+```
+
+Never treat timeout as PASS.
+
+## Runbook 8 — Retry/idempotency
+
+Every externally retried state-changing action needs an idempotency key. A retry must not create a second license, payment obligation or revocation event.
+
+## Runbook 9 — Correction/supersession
+
+Incorrect institutional state is corrected by appending a superseding version/event with reason and evidence rather than deleting history.
+
+## Runbook 10 — Human/governed escalation
+
+Escalate when:
+
+- rights are disputed;
+- evidence conflicts;
+- policy returns HOLD requiring judgment;
+- override/remedy authority is needed;
+- a high-impact correction is proposed;
+- automation encounters an undefined state transition.
+
+## Operational event schema
+
+```yaml
+runbook_event:
+  run_id: stable
+  action: explicit
+  target_ref: required
+  prior_state_ref: optional
+  authority_ref: required_for_mutation
+  evidence_refs: []
+  attempt: integer
+  disposition: pass|hold|deny|retry|error
+  reason_codes: []
+  dail_event_ref: required_for_material_state_change
+```
+
+## Rollback/compensation
+
+Where a write is reversible, automate rollback only if the compensation path is preauthorized and tested. Otherwise HOLD and escalate.
+
+## Current links
+
+- [Dynamic Licensing Asset](/chlom/systems/dynamic-licensing-asset)
+- [DAIL](/chlom/systems/dail-decentralized-autonomous-information-ledger)
+- [Evidence Freshness Gate](/chlom/algorithms/alg-016-evidence-freshness-gate)
+- [DLA Activation Procedure](/chlom/algorithms/alg-003-dla-activation-procedure)
+- [Versioned Correction Workflow](/chlom/workflows/wf-003-versioned-correction-and-adjudication)
+
+## Restricted companion class
+
+Production credentials, private job schedules, provider endpoints, exact thresholds, incident evidence, security controls and protected remediation scripts remain restricted.
+
+## Status
+
+`TITLE_RECOVERED + RUNBOOK_FAMILY_RECONSTRUCTED + EXACT_PROCEDURES_NOT_INVENTED + EXACT_BODY_NOT_LOCATED`
