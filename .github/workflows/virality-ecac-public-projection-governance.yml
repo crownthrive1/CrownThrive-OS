@@ -1,0 +1,84 @@
+name: Virality ECAC Public Projection Governance
+
+on:
+  pull_request:
+    paths:
+      - 'commerce/virality-music-ecac-candidate-controls-2026-08-24.mdx'
+      - 'developers/manifests/virality-music-ecac-public-projection.2026-08-24.v1.json'
+      - 'changelog/virality-music-ecac-private-redacted-release-2026-08-24.mdx'
+      - 'docs.json'
+      - '.github/workflows/virality-ecac-public-projection-governance.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'commerce/virality-music-ecac-candidate-controls-2026-08-24.mdx'
+      - 'developers/manifests/virality-music-ecac-public-projection.2026-08-24.v1.json'
+      - 'changelog/virality-music-ecac-private-redacted-release-2026-08-24.mdx'
+      - 'docs.json'
+      - '.github/workflows/virality-ecac-public-projection-governance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-public-projection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Validate aggregate truth and redaction boundary
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          projection_path = Path('developers/manifests/virality-music-ecac-public-projection.2026-08-24.v1.json')
+          projection = json.loads(projection_path.read_text(encoding='utf-8'))
+
+          assert projection['visibility'] == 'PUBLIC_SAFE'
+          assert projection['implementation_state'] == 'PRIVATE_VALIDATED_NOT_DEPLOYED'
+          assert projection['economic_state'] == 'HOLD'
+          assert projection['maintenance_state'] == 'PAUSED_FOR_TARGETED_MAINTENANCE'
+          assert projection['catalog'] == {
+              'records_assessed': 389,
+              'structurally_review_ready': 321,
+              'repair_required': 66,
+              'deny_or_retired': 2,
+          }
+          assert sum([
+              projection['catalog']['structurally_review_ready'],
+              projection['catalog']['repair_required'],
+              projection['catalog']['deny_or_retired'],
+          ]) == projection['catalog']['records_assessed']
+          assert projection['supplied_sources'] == {'reviewed': 16, 'available': 0, 'hold': 16}
+          assert all(value == 0 for value in projection['selector_effects'].values())
+          assert projection['public_surfaces'] == {'api_added': False, 'mcp_tool_added': False}
+          assert projection['credits'] == {
+              'crown_credits_per_virality_credit': 25,
+              'historical_balance_rewrite': False,
+          }
+
+          scanned = '\n'.join([
+              projection_path.read_text(encoding='utf-8'),
+              Path('commerce/virality-music-ecac-candidate-controls-2026-08-24.mdx').read_text(encoding='utf-8'),
+              Path('changelog/virality-music-ecac-private-redacted-release-2026-08-24.mdx').read_text(encoding='utf-8'),
+          ])
+          assert not re.search(r'\b[0-9a-fA-F]{64}\b', scanned)
+          for forbidden in (
+              'ECAC_APPROVED',
+              'RIGHTS_GRANTED',
+              'CHECKOUT_ACTIVE',
+              'ENTITLEMENT_ACTIVE',
+              'PRODUCTION_ACTIVE',
+              'PUBLICATION_ACTIVE',
+          ):
+              assert forbidden not in scanned
+
+          print('PASS_VIRALITY_ECAC_PUBLIC_PROJECTION')
+          PY
