@@ -55,7 +55,7 @@ CrownThrive therefore emphasizes:
 
 For business, licensing, development, media, partnership, ecosystem, research, or institutional inquiries:
 
-**contact@crownthrive.com**  
+**contact@crownthrive.com**
 **https://crownthrive.com**
 
 ---

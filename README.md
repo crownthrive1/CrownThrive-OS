@@ -4,8 +4,8 @@
 
 This repository is the version-controlled public projection for **CrownThrive, LLC** and its Convergent Ecosystem. It documents how CrownThrive's doctrine, platforms, corridors, intellectual property, CHLOM, Cultural Imprint Engine, Thrive Flywheel, MM Suites, ThriveBase, ThriveEvergreen, media, commerce, education, support, data, APIs, MCP servers, automation, recovery, and selective future decentralization fit together without exposing the private institutional core.
 
-**Website:** https://crownthrive.com  
-**Contact:** contact@crownthrive.com  
+**Website:** https://crownthrive.com
+**Contact:** contact@crownthrive.com
 **Repository:** https://github.com/crownthrive1/CrownThrive-Support
 
 > **Public-safe rule:** documentation is evidence of an institutional record or design decision. It is not, by itself, proof that a runtime, legal status, commercial offer, provider integration, entitlement, registration, credential, or production capability is live.
@@ -22,7 +22,7 @@ These entry points are intentionally concise. The complete institutional taxonom
 
 ## 📍 Current snapshot
 
-**Snapshot date:** August 23, 2026  
+**Snapshot date:** August 23, 2026
 **Snapshot basis:** accepted `main` readback plus the current Phase 2.99 readiness record.
 
 | Dimension | Current public-safe state |
@@ -211,9 +211,9 @@ The quantity is adjustable at checkout. Support is voluntary and does **not** cr
 
 ## 🏛️ Ownership and contact
 
-**Institutional owner:** CrownThrive, LLC  
-**Founding Member:** Kavonte Jones Sr. — see [`ABOUT_ME.md`](ABOUT_ME.md)  
-**Contact:** contact@crownthrive.com  
+**Institutional owner:** CrownThrive, LLC
+**Founding Member:** Kavonte Jones Sr. — see [`ABOUT_ME.md`](ABOUT_ME.md)
+**Contact:** contact@crownthrive.com
 **Primary ecosystem:** https://crownthrive.com
 
 ---
