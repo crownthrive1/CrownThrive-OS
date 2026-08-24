@@ -1,0 +1,42 @@
+name: Framework Production Promotion Governance
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20260823235410_framework_production_promotion_and_cie_activation_v1.sql'
+      - 'developers/manifests/framework-production-promotion.v1.json'
+      - 'standards/framework-production-promotion-and-rollback.md'
+      - 'scripts/validate_framework_production_promotion.py'
+      - '.github/workflows/framework-production-promotion-governance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Validate production promotion authority locks
+        run: python3 scripts/validate_framework_production_promotion.py
+      - name: Reject secret shapes
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(supabase/migrations/20260823235410_framework_production_promotion_and_cie_activation_v1.sql developers/manifests/framework-production-promotion.v1.json standards/framework-production-promotion-and-rollback.md scripts/validate_framework_production_promotion.py)
+          if grep -nE '(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sb_secret_[A-Za-z0-9_-]{16,}|sk-[A-Za-z0-9]{20,}|BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY)' "${files[@]}"; then
+            echo 'credential-shaped material prohibited'; exit 1
+          fi
+      - name: Diff hygiene
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- .; then exit 1; fi
