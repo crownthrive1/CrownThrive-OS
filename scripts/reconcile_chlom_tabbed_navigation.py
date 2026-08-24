@@ -25,6 +25,16 @@ CHLOM_GROUPS = {"CHLOM"}
 DEV_GROUPS = {"Developer Platform"}
 SUPPORT_GROUPS = {"Support, Legal & Knowledge"}
 
+# Generated groups are removed before each coverage calculation and then rebuilt
+# deterministically. This keeps a second run byte-stable instead of treating the
+# first run's catch-up routes as part of the historical source tree.
+GENERATED_CATCHUP_GROUPS = {
+    "Recovered & Exact-Title CHLOM Corpus",
+    "Newly Institutionalized Developer Records",
+    "Newly Institutionalized Support & Licensing",
+    "Newly Institutionalized Records",
+}
+
 # Files that are intentionally not page routes.
 IGNORE_MDX_PREFIXES = ()
 
@@ -111,6 +121,22 @@ def dedupe_nested_pages(node: Any, seen: set[str]) -> Any:
     return node
 
 
+def remove_generated_catchups(tabs: list[dict[str, Any]]) -> None:
+    """Remove prior generated catch-up groups before recomputing coverage."""
+    for tab in tabs:
+        groups = tab.get("groups", [])
+        if not isinstance(groups, list):
+            raise SystemExit(f"Tab has invalid groups: {tab!r}")
+        tab["groups"] = [
+            group
+            for group in groups
+            if not (
+                isinstance(group, dict)
+                and group.get("group") in GENERATED_CATCHUP_GROUPS
+            )
+        ]
+
+
 def main() -> None:
     data = json.loads(DOCS.read_text(encoding="utf-8"))
     nav = data.get("navigation")
@@ -157,7 +183,11 @@ def main() -> None:
             tabs.append(tab_map[required])
         tab_map[required].setdefault("groups", [])
 
-    # Normalize duplicates already present in the historical tree.
+    # Remove generated groups from a prior run so catch-up membership is always
+    # recomputed from the same underlying historical/current navigation source.
+    remove_generated_catchups(tabs)
+
+    # Normalize duplicates already present in the historical/current tree.
     seen: set[str] = set()
     for tab in tabs:
         tab["groups"] = dedupe_nested_pages(tab.get("groups", []), seen)
@@ -172,10 +202,8 @@ def main() -> None:
         r for r in missing
         if not is_chlom_route(r) and not is_developer_route(r) and is_support_route(r)
     )
-    os_missing = sorted(
-        r for r in missing
-        if r not in set(chlom_missing) | set(dev_missing) | set(support_missing)
-    )
+    catchup_routes = set(chlom_missing) | set(dev_missing) | set(support_missing)
+    os_missing = sorted(r for r in missing if r not in catchup_routes)
 
     catchups = [
         (TAB_CHLOM, "Recovered & Exact-Title CHLOM Corpus", "file-lines", chlom_missing),
