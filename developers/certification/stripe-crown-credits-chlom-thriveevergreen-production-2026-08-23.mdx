@@ -1,0 +1,159 @@
+---
+title: Economic Convergence Production Certification — 2026-08-23
+description: Public-safe certification record for Stripe, Crown Credits, CHLOM Wallet, ThriveEvergreen, API/MCP production activation, and stablecoin provider readiness.
+---
+
+# Economic Convergence Production Certification — August 23, 2026
+
+This record captures the public-safe production state of CrownThrive's Stripe, Crown Credits, CHLOM Wallet, ThriveEvergreen, API, and MCP economic-control surfaces after governed convergence testing.
+
+## Certified production components
+
+| Component | Production state | Notes |
+| --- | --- | --- |
+| Stripe platform | ACTIVE | Live provider readback verified; charges/payouts enabled. |
+| Stripe Connect | ACTIVE | Live OAuth completed; Standard connected account read/write connection verified; charges/payouts/transfers active. |
+| Crown Credits | ACTIVE | Closed-loop internal store credit; five fixed live top-up offers active. |
+| Crown Credits reconciliation | ACTIVE | Provider readback reconciliation is authoritative; scheduled every ten minutes. |
+| CHLOM Wallet | ACTIVE | Non-custodial production evidence/settlement orchestration. |
+| Stripe stablecoin adapter | PRODUCTION / PROVIDER_ENABLEMENT_PENDING | Adapter is deployed and fail-closed because Stripe currently reports Crypto unavailable. |
+| ThriveEvergreen v2 | ACTIVE / production_write | Exact candidate decisions remain `ECAC | HOLD | DENY`; production status never bypasses candidate gates. |
+| Stripe production control API | ACTIVE | Version `1.0.0`; API version `2026-06-24.dahlia`. |
+| CrownThrive MCP exposure | ACTIVE | Stripe, Crown Credits, CHLOM Wallet, and ThriveEvergreen tool families exposed as production contracts. |
+
+## Crown Credits provider canary
+
+A live Stripe Checkout Session was successfully created against the governed $10 Crown Credits top-up Price and then intentionally expired without payment.
+
+The provider returned live dynamic payment methods including card, Link, ACH, Cash App, Klarna, Afterpay/Clearpay, Amazon Pay, Alipay, and WeChat Pay. No money moved during the canary.
+
+Stablecoin/Crypto was not returned as an available payment method.
+
+## Stablecoin provider canary
+
+A separate live Checkout request explicitly asked Stripe for the Crypto payment method. Stripe rejected the request because Crypto is not activated/available for the platform account.
+
+Independent Payment Method Configuration readback confirmed:
+
+- Platform Crypto `available=false`.
+- Connected Standard account Crypto `available=false`.
+- The connected account currently has a Crypto display preference enabled on at least one configuration, but provider availability remains false.
+
+The institutional state is therefore:
+
+`PROVIDER_ENABLEMENT_PENDING`
+
+No CrownThrive API, MCP, wallet, checkout, or agent may present stablecoin acceptance as active until Stripe provider readback reports the capability available.
+
+## Stablecoin-to-Crown-Credits architecture
+
+Stablecoin payment is a tender source, not the Crown Credits asset class.
+
+When Stripe stablecoin payments become available:
+
+1. Customer pays through Stripe's Crypto/stablecoin experience.
+2. Stripe handles token/network interaction and provider settlement.
+3. CrownThrive independently reads back the completed Checkout Session, PaymentIntent, Charge, amounts, currency, product/price identity, tax state, and idempotency state.
+4. Crown Credits are issued only after exact readback reconciliation.
+5. CHLOM Wallet appends stablecoin tender provenance and settlement evidence to its chain-hashed ledger.
+6. Crown Credits remain nontransferable, non-cash-redeemable, non-interest-bearing internal store credits and remain `crypto_asset=false`.
+7. CHLOM Wallet does not infer or claim custody of the payer's stablecoins.
+
+## CHLOM Wallet settlement bridge
+
+Verified Crown Credits settlement/reversal state is projected automatically to the CHLOM Wallet append-only ledger.
+
+The bridge distinguishes:
+
+- Fiat payment settlement.
+- Stablecoin payment settlement.
+- Fiat reversal/refund/dispute evidence.
+- Stablecoin reversal/refund evidence.
+
+Provider success never directly manufactures an entitlement, rights grant, public performance claim, economic settlement, or authority receipt.
+
+## Stripe webhook capacity
+
+Stripe rejected creation of an additional live event destination because the platform account is at its provider limit of 16 live webhook/event destinations.
+
+No existing endpoint was deleted merely to create capacity.
+
+Crown Credits production settlement therefore uses verified provider readback reconciliation as authoritative economic truth. Webhooks are an acceleration mechanism when available, not the authority that creates Crown Credits.
+
+## API production surfaces
+
+### Stripe
+
+Production control endpoint:
+
+`https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/stripe-production-control`
+
+Runtime digest:
+
+`3387a47e4174b27734508205cec9f60e5381145233812394ea7e61d9f0a74259`
+
+### Crown Credits
+
+`https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crown-credits-control`
+
+### CHLOM Wallet
+
+`https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-wallet-stripe-webhook`
+
+## MCP production contracts
+
+### Stripe
+
+- `stripe.platform.status`
+- `stripe.connect.account.status`
+- `stripe.crypto.status`
+- `stripe.product.read`
+- `stripe.price.read`
+- `stripe.checkout.session.read`
+- `stripe.payment_intent.read`
+
+### Crown Credits
+
+- `crown_credits.catalog.read`
+- `crown_credits.balance.read`
+- `crown_credits.topup.create`
+- `crown_credits.topup.reconcile`
+- `crown_credits.purchase`
+
+### CHLOM Wallet
+
+- `chlom_wallet.status`
+- `chlom_wallet.stablecoin.status`
+- `chlom_wallet.provider_receipts.read`
+
+### ThriveEvergreen
+
+- `thriveevergreen.status`
+- `thriveevergreen.publish.evaluate`
+- `thriveevergreen.publish.dispatch`
+
+## Agent E continuity reconciliation
+
+The API/MCP & Federation Specialist correctly failed closed when its configured Stripe credential alias appeared empty. The configured alias was legacy and no longer represented the production Stripe secret source.
+
+The canonical production alias was reconciled to the verified Vault source. Agent E remains enabled and fail-closed. The rule now fails closed against the canonical source rather than an obsolete alias.
+
+The scheduled credential-continuity function was run after the correction and returned the Stripe credential as `verified_primary_only` while Stripe remained `write_verified` with the founder-authorized `-1` unlimited CrownThrive-local request ceiling.
+
+This preserves safety behavior while preventing false production quarantine caused by legacy naming drift.
+
+## Production governance
+
+Production does not mean unrestricted execution.
+
+- ThriveEvergreen remains exact-ECAC gated.
+- D3 authority remains human-reserved.
+- No self-approval.
+- No silent deletion of institutional history.
+- No autonomous production rights grant.
+- No raw provider secret return.
+- No provider success → entitlement inference.
+- No stablecoin tender → CHLOM custody inference.
+- No stablecoin tender → crypto Crown Credits inference.
+
+The operational objective is production execution inside signed authority with exact readback, append-only evidence, compensation/reversal handling, and fail-closed provider capability boundaries.
