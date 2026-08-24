@@ -1,0 +1,77 @@
+---
+title: "2026-08-23 — ThriveBase Small + 8 GB Capacity Reconciliation"
+sidebarTitle: "ThriveBase Small + 8 GB"
+description: "Records the founder-authorized ThriveBase current-state correction to Supabase Pro, Small compute, intentional 8 GB database disk, current provider limits, and canonical CrownThrive-local request-budget semantics."
+icon: "database"
+keywords: ["ThriveBase", "Supabase", "Small", "8 GB", "Founder Override", "capacity", "limits", "request budget"]
+---
+
+# 2026-08-23 — ThriveBase Small \+ 8 GB Capacity Reconciliation
+
+## Decision
+
+Record the current ThriveBase provider state as **Supabase Pro \+ Small compute \+ intentionally provisioned 8 GB Postgres database disk** and supersede the stale current-state projection that still described Micro compute and a 2 GB provisioned disk.
+
+The 8 GB expansion was intentionally performed under Founder authority. It is therefore a capacity upgrade, not an unexplained provider incident.
+
+## Verified readback
+
+The post-reconciliation native readback returned:
+
+- project state: active / healthy;
+- database transaction mode: read/write;
+- compute evidence: Small;
+- direct Postgres max connections: 90;
+- provisioned database disk: 8 GB;
+- current database payload: approximately 696 MB;
+- 8 GB disk utilization: approximately 8.5%;
+- Small recommended database-size utilization: approximately 1.4%;
+- current diagnostic: `GREEN`;
+- current recommendations: none.
+
+The existing diagnostic engine already supported the Small compute profile. Once the provider snapshot was corrected, the same diagnostic automatically changed its recommended database-size ceiling from the stale Micro 10 GB comparison to the Small 50 GB comparison.
+
+## Request-budget correction
+
+The active ThriveBase request-budget policy is now version 7 and uses the canonical CrownThrive-local semantics:
+
+```text
+-1   = unlimited CrownThrive-local monthly ceiling
+0    = exactly zero requests
+N>0  = exactly N requests per month
+null = unresolved / fail closed
+```
+
+Provider-native throttles, quotas, billing, Spend Cap behavior, fair-use rules and security/governance gates remain independent and can be stricter.
+
+## Current public-safe provider limits
+
+The reconciled Pro/Small baseline includes:
+
+- 8 GB included database disk per project;
+- 100 GB included object Storage;
+- 250 GB uncached egress and 250 GB cached egress;
+- 100,000 monthly active users;
+- 100,000 monthly active third-party users;
+- 50 monthly active SSO users;
+- 2,000,000 Edge Function invocations;
+- 5,000,000 Realtime messages;
+- 500 Realtime peak connections;
+- Small compute: 2 GB memory, 90 direct database connections, 400 pooler clients, 5 replication slots and 5 WAL senders;
+- current Spend Cap posture: enabled.
+
+## Evidence and preservation
+
+The previous Micro and 2 GB provider rows were not deleted. They remain historical evidence with their current-authority flag removed. A new authoritative provider snapshot and DAIL event record the current Small/8 GB state.
+
+No provider resize was performed by the reconciliation code itself. The code only reflected the provider change already made under Founder authority, refreshed current projections, corrected the active request-budget policy and verified readback.
+
+## Naming
+
+Canonical human-facing spelling is **ThriveBase**. Legacy physical identifiers such as `thivebase_control` and the compatibility service key `thivebase` remain preserved where changing them would risk runtime breakage.
+
+## Current disposition
+
+**CURRENT / VERIFIED / GREEN** for capacity-state reconciliation.
+
+This status does not grant destructive optimization authority, D3 automation, provider-write inheritance, billing authority, sovereign-vote effect, or Phase 3 advancement.

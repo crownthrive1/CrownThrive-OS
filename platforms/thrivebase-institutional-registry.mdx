@@ -1,0 +1,118 @@
+---
+title: "ThriveBase Institutional Registry"
+sidebarTitle: "ThriveBase"
+description: "Current public-safe institutional state for ThriveBase on Supabase, including the founder-authorized 8 GB database disk, Small compute profile, provider quotas, Spend Cap posture, and CrownThrive-local request-budget semantics."
+icon: "database"
+keywords: ["ThriveBase", "Supabase", "Pro", "Small compute", "8 GB disk", "capacity", "limits", "request budgets", "Spend Cap"]
+---
+
+# ThriveBase Institutional Registry
+
+ThriveBase is CrownThrive's institutional state and control-plane system. Supabase is the current replaceable infrastructure provider; provider capability or billing state does not redefine the ThriveBase institutional identity.
+
+## Current verified capacity state
+
+As of **August 23, 2026**, the current public-safe state is:
+
+| Dimension | Current state |
+| --- | --- |
+| Provider plan | Supabase Pro |
+| Project state | Active / healthy |
+| Compute | **Small** |
+| Compute memory | 2 GB |
+| Recommended database size for Small | 50 GB |
+| Direct Postgres max connections | 90 |
+| Connection pooler max clients | 400 |
+| Max replication slots | 5 |
+| Max WAL senders | 5 |
+| Provisioned Postgres database disk | **8 GB** |
+| Database disk authority | **Founder-authorized intentional expansion** |
+| Current database payload at reconciliation | approximately 696 MB |
+| Database / 8 GB disk utilization at reconciliation | approximately 8.5% |
+| Database / Small recommended size utilization | approximately 1.4% |
+| Cost-control posture | Spend Cap enabled |
+| Database transaction mode | Read/write |
+
+<Note>
+  The **8 GB value is the provisioned Postgres database disk**, not the Supabase Storage bucket quota. Supabase Pro currently includes **100 GB of object Storage** at the organization level before overage treatment.
+</Note>
+
+The earlier Micro/2 GB capacity projection is retained only as historical evidence. It is not current ThriveBase capacity state.
+
+## Current provider quotas and limits
+
+Current Supabase Pro allowances relevant to ThriveBase include:
+
+| Usage item | Included provider allowance |
+| --- | --: |
+| Database disk per project | 8 GB |
+| Object Storage | 100 GB |
+| Uncached egress | 250 GB |
+| Cached egress | 250 GB |
+| Monthly active users | 100,000 |
+| Monthly active third-party users | 100,000 |
+| Monthly active SSO users | 50 |
+| Edge Function invocations | 2,000,000 |
+| Realtime messages | 5,000,000 |
+| Realtime peak connections | 500 |
+
+Provider quotas are provider facts, not CrownThrive execution authority. Provider throttles, abuse controls, billing rules, disk-modification limits, fair-use rules, and product terms continue to apply independently.
+
+### Disk behavior
+
+For paid Supabase plans, database disks may auto-scale as utilization approaches the provider threshold. Provider documentation currently describes a resize at 90% allocated disk usage, normally increasing the disk by 50%, subject to provider modification limits. CrownThrive does not interpret auto-scaling capability as authorization for unrestricted cost growth.
+
+Because Spend Cap is enabled, covered over-quota usage can be restricted rather than silently converted into unlimited provider overage. Compute and certain explicitly provisioned add-ons remain outside Spend Cap treatment and must be monitored separately.
+
+## CrownThrive-local request-budget semantics
+
+ThriveBase uses the canonical CrownThrive-local request-budget contract:
+
+- `-1` = **unlimited CrownThrive-local monthly request ceiling**;
+- `0` = **exactly zero requests permitted**;
+- positive integer `N` = **exactly `N` requests permitted per month**;
+- `null` = **unresolved / unknown and fail-closed**.
+
+The current ThriveBase local request-budget value is `-1`.
+
+<Warning>
+  `-1` does **not** mean Supabase is unlimited, free, unmetered, or exempt from provider quotas. CrownThrive-local request ceilings and provider-native quotas are separate controls; the strictest applicable provider, security, governance, billing, or authority boundary still applies.
+</Warning>
+
+## Capacity interpretation
+
+Current capacity is **GREEN**. The founder-authorized 8 GB disk expansion resolves the prior 2 GB capacity projection as historical state rather than an active incident. The current Small compute profile also changes the applicable recommended database-size comparison from the prior Micro 10 GB recommendation to the current Small 50 GB recommendation.
+
+The optimizer should therefore use this baseline for future capacity analysis:
+
+```yaml
+platform: ThriveBase
+provider: Supabase
+plan: Pro
+compute: Small
+compute_memory_gb: 2
+database_disk_gb: 8
+compute_recommended_database_gb: 50
+max_db_connections: 90
+pooler_max_clients: 400
+spend_cap_enabled: true
+local_monthly_request_limit: -1
+local_request_semantics:
+  -1: unlimited_local_ceiling
+  0: exactly_zero
+  positive: literal_monthly_ceiling
+  null: unresolved_fail_closed
+capacity_state: GREEN
+```
+
+## Governance and evidence boundary
+
+The capacity change was made by the Founder at the provider level and is reflected here as current state. This documentation update does not itself perform a provider resize, alter billing, change credentials, expose restricted account evidence, enable D3 automation, create a sovereign vote, or grant the ThriveBase Optimizer destructive authority.
+
+Historical provider snapshots remain preserved. Current-state projections supersede stale values without erasing prior evidence.
+
+## Legacy physical identifiers
+
+Deployed physical identifiers beginning with `thivebase_control` or the compatibility service key `thivebase` remain preserved until a separately governed migration changes them. They are legacy machine identifiers and must not be reused as the human-facing platform spelling.
+
+Canonical human-facing name: **ThriveBase**.
