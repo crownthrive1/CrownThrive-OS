@@ -90,6 +90,40 @@ The Framework Factory recognizes `ct.skill.gen7.thrivebase-account-optimizer` an
 
 The persistent schedule is also represented as `ct.automation.thrivebase-account-optimizer.hourly.v1`, bound to the real `pg_cron:job:53`. Its execution scope remains `OBSERVATION_ONLY`; the existence of the automation binding does not grant target-resource mutation authority.
 
+## Current capacity baseline — August 23, 2026
+
+The optimizer must use the following current provider baseline until newer provider/native evidence supersedes it:
+
+```yaml
+platform: ThriveBase
+provider: Supabase
+plan: Pro
+compute: Small
+compute_memory_gb: 2
+database_disk_gb: 8
+compute_recommended_database_gb: 50
+max_db_connections: 90
+pooler_max_clients: 400
+max_replication_slots: 5
+max_wal_senders: 5
+spend_cap_enabled: true
+local_monthly_request_limit: -1
+capacity_state: GREEN
+```
+
+The **8 GB Postgres database disk was intentionally provisioned under Founder authority**. The earlier Micro/2 GB projection is historical and must not be reused as current state. At reconciliation, the live database payload was approximately 696 MB, or about 8.5% of the 8 GB disk and about 1.4% of Small compute's current 50 GB recommended database-size reference.
+
+The 8 GB database disk is separate from Supabase object Storage. The current Pro provider allowance for object Storage is 100 GB. Provider-native limits, billing, throttles, Spend Cap behavior and fair-use controls remain distinct from CrownThrive-local request-budget semantics.
+
+Canonical local request semantics remain:
+
+- `-1` = unlimited CrownThrive-local monthly request ceiling;
+- `0` = exactly zero requests permitted;
+- positive integer `N` = exactly `N` requests permitted per month;
+- `null` = unresolved / unknown and fail-closed.
+
+See [ThriveBase Institutional Registry](/platforms/thrivebase-institutional-registry) and [2026-08-23 — ThriveBase Small \+ 8 GB Capacity Reconciliation](/changelog/2026-08-23-thrivebase-small-8gb-capacity-reconciliation).
+
 ## Prime directive
 
 Continuously improve the efficiency, organization, performance, reliability, utilization, interoperability, cost-efficiency, maintainability, observability, security posture, scalability and operational quality of authorized CrownThrive infrastructure while preserving institutional memory.
