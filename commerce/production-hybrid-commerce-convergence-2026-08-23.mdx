@@ -1,14 +1,14 @@
 ---
 title: "Production Hybrid Commerce Convergence — 2026-08-23"
-description: "Production architecture and machine-readback status for Virality Music, Crown Credits, Stripe, Stripe Connect, CHLOM Wallet, Trust Wallet Agent Kit, Changelly, and ThriveEvergreen."
+description: "Production architecture and machine-readback status for Virality Music, Crown Credits, Stripe, Stripe Connect, CHLOM Wallet, Trust Wallet Agent Kit, the managed Agent Wallet, Changelly, and ThriveEvergreen."
 sidebarTitle: "Hybrid Commerce Production"
 icon: "circle-nodes"
-keywords: ["Virality Music", "Crown Credits", "Virality Credits", "Stripe", "Stripe Connect", "stablecoin", "Trust Wallet Agent Kit", "Changelly", "CHLOM Wallet", "ThriveEvergreen"]
+keywords: ["Virality Music", "Crown Credits", "Virality Credits", "Stripe", "Stripe Connect", "stablecoin", "Trust Wallet Agent Kit", "Agent Wallet", "Base", "USDC", "Changelly", "CHLOM Wallet", "ThriveEvergreen"]
 ---
 
 # Production hybrid-commerce convergence
 
-This record captures the public-safe production architecture established on August 23, 2026 for CrownThrive's hybrid commerce system, with Virality Music as the first integrated production surface.
+This record captures the public-safe production architecture established beginning August 23, 2026 for CrownThrive's hybrid commerce system, with Virality Music as the first integrated production surface. It is a living current-state record: later certified production changes supersede earlier capability snapshots while the historical evidence remains preserved in changelogs and certification records.
 
 Production state is recorded per capability. A component can be deployed and production-safe while a specific provider capability remains pending. Provider configuration, provider success, or a public product card does not manufacture CrownThrive economic authority.
 
@@ -23,9 +23,10 @@ Production state is recorded per capability. A component can be deployed and pro
 | Stripe Direct | **ACTIVE / production** | First-party Checkout and Crown Credits funding. |
 | Stripe Connect | **ACTIVE / production** | Connected-account commerce capability remains separate from first-party Crown Credits. |
 | Stripe stablecoin/Crypto | **Dashboard enabled — provider propagation pending** | Founder-attested enabled/on; fresh live automatic-payment Checkout still did not offer Crypto. Automated readback reconciliation is scheduled. |
-| CHLOM Wallet | **ACTIVE / production / non-custodial** | Economic evidence, provider provenance, policy, rights, and settlement lineage; no inferred token custody. |
-| Trust Wallet Agent Kit hosted API | **ACTIVE / production / write verified** | HMAC-authenticated market data, multichain domains, providers, and swap quotes. |
-| Trust Wallet signing/broadcast | **HOLD: wallet path pending** | Requires a durable local Agent Wallet or WalletConnect user-approval path. No private key is stored in the CHLOM system wallet. |
+| CHLOM Wallet | **ACTIVE / production** | Economic evidence, provider provenance, policy, rights, settlement lineage and execution-mode authority. |
+| Trust Wallet Agent Kit hosted API | **ACTIVE / production / write verified** | HMAC-authenticated market data, multichain domains, providers and swap quotes. |
+| CHLOM Managed Agent Wallet | **ACTIVE / production / verified** | CrownThrive-managed encrypted-keystore wallet on Base; signing canary PASS; `money_movement_authorized=true`; unattended ceiling `0`. |
+| WalletConnect / MetaMask | **Production contracts / frontend-gated** | Human-approved wallet execution lanes remain separate from autonomous Agent Wallet custody. |
 | Changelly widget | **ACTIVE / production configured** | Merchant widget/on-ramp presentation may be used where approved. |
 | Changelly v2 authenticated API | **HOLD: RSA private key missing** | API key alone cannot produce the required RSA-SHA256 request signature. |
 | ThriveEvergreen v2 | **ACTIVE / `production_write`** | Exact `ECAC | HOLD | DENY` economic authority; production never bypasses exact candidate gates. |
@@ -41,15 +42,17 @@ flowchart LR
   CC --> Stripe[Stripe Direct]
   Stripe --> Readback[Provider readback reconciliation]
   Readback --> CC
-  Readback --> Wallet[CHLOM Wallet evidence]
+  Readback --> Evidence[CHLOM Wallet evidence]
   VM --> Connect[Stripe Connect]
   VM --> TW[Trust Wallet Agent Kit]
+  TW --> Quote[Multichain market / route / quote intelligence]
+  VM --> Meta[MetaMask / WalletConnect]
   VM --> Changelly[Changelly on-ramp / widget]
-  TW --> Quote[Multichain price / holdings / route intelligence]
-  Changelly --> FiatCrypto[Fiat / crypto acquisition corridor]
-  CC --> TE[ThriveEvergreen]
+  Evidence --> TE[ThriveEvergreen]
+  CC --> TE
   Connect --> TE
-  Wallet --> TE
+  TE --> Agent[CHLOM Managed Agent Wallet]
+  Agent --> Base[Base / native USDC]
   TE -->|ECAC only| Commerce[Entitlement / license / governed fulfillment]
 ```
 
@@ -106,38 +109,34 @@ Current effective state:
 PROVIDER_PROPAGATION_PENDING
 ```
 
-A scheduled no-charge reconciliation canary runs every six hours. It may promote the effective adapter to `AVAILABLE` only when live Checkout readback actually offers Crypto.
+A scheduled no-charge reconciliation canary runs every six hours. It may promote the effective adapter only when live Checkout readback actually offers Crypto.
 
 This prevents configuration intent from being misreported as customer-effective provider capability.
 
 ## CHLOM Wallet role
 
-CHLOM Wallet is production-active and non-custodial.
-
-Its commerce function is to preserve:
+CHLOM Wallet is production-active as CrownThrive's institutional wallet/economic evidence layer. It preserves:
 
 - provider receipt provenance;
 - settlement and reversal evidence;
 - asset/value classification;
 - rights and entitlement lineage;
 - policy decisions;
+- wallet execution-mode state;
 - exact-version relationships;
 - append-only integrity evidence.
 
-CHLOM Wallet does not infer that it owns or controls customer cryptocurrency merely because a provider processes a stablecoin payment.
+CHLOM Wallet does not infer customer-token custody merely because a payment provider processes a stablecoin payment. The separately bound **CHLOM Managed Agent Wallet** is an institutional execution account and has its own custody and execution policy.
 
 ## Trust Wallet Agent Kit
 
-The Trust Wallet Agent Kit hosted API is production-wired through a CrownThrive server-side HMAC gateway. The credential values remain private and are never returned by the public control plane.
+Trust Wallet Agent Kit remains production-wired through a CrownThrive server-side HMAC gateway for multichain intelligence and routing. Credential values remain private and are never returned by the public control plane.
 
-Verified canaries include:
+Verified provider canaries include:
 
 - authenticated live token-price request;
 - live routing/domain inventory with **32 current provider-routing domains**;
-- live BNB-to-USDT quote with multiple provider routes, fees, price impact, and expiry;
-- no signing or broadcast during certification.
-
-The production adapter can support the broader Trust Wallet API/Agent Kit chain universe. Current live routing-domain evidence and the full documented chain catalog are distinct measures and must not be collapsed into one count.
+- live BNB-to-USDT quote with multiple provider routes, fees, price impact and expiry.
 
 ### Production MCP surfaces
 
@@ -150,16 +149,60 @@ The production adapter can support the broader Trust Wallet API/Agent Kit chain 
 
 `trustwallet.swap.step.build` may build transaction material but cannot itself authorize signature or broadcast.
 
-### Signing boundary
+## CHLOM Managed Agent Wallet
 
-The CHLOM system wallet currently has no bound on-chain wallet account.
+The earlier local-runner plan has been superseded as the primary production custody path by a CrownThrive-managed encrypted-keystore wallet.
 
-Transaction execution requires one of these governed paths:
+Canonical identity:
 
-1. **WalletConnect** — a user-controlled wallet approves the requested transaction; or
-2. **Durable Trust Wallet Agent Wallet** — a persistent trusted runner stores the encrypted local Agent Wallet and applies CrownThrive policy before signing.
+```text
+runner      ct.runner.chlom-agent-wallet.base-usdc.v1
+address     0x7bc35BEab3bd346590fA6f68C218ccf249759Ab0
+network     Base Mainnet
+chain_id    8453
+asset       native USDC
+USDC        0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+health      PASS
+```
 
-A transient Edge Function is not used as a private-key wallet.
+Certification states:
+
+```text
+wallet_creation_performed        true
+durable_runner_bound             true
+private_material_vaulted         true
+raw_private_key_persisted        false
+mnemonic_persisted               false
+private_material_returned        false
+money_movement_authorized        true
+max_unattended_value_minor       0
+```
+
+The wallet passed Base chain-ID, native-USDC contract, no-value signing and signature-recovery canaries. Its encrypted Ethereum V3 keystore and decryption credential are separately vaulted.
+
+### Authorization is not execution
+
+The current acceptance snapshot deliberately distinguishes capability from transaction truth:
+
+```text
+snapshot_state                    AUTHORIZED_CONFIGURED_NOT_EXECUTED
+money_movement_authorized         true
+money_movement_execution_count    0
+max_unattended_value_minor        0
+candidate_decision                HOLD
+checkout_state                    HOLD
+agent_wallet_state                active
+```
+
+A production-authorized wallet therefore does **not** imply that any transaction has been performed.
+
+Positive unattended autonomous transfers remain blocked while the ceiling is `0`. Production broadcast additionally requires a governed production-grade Base RPC/provider or another independently certified broadcast path, plus exact ECAC, simulation, readback and rollback/compensation controls.
+
+## WalletConnect and MetaMask
+
+WalletConnect and MetaMask Embedded Wallets remain separate human-sovereignty lanes. User confirmation is required for those transaction paths; the managed Agent Wallet does not turn them into autonomous execution mechanisms.
+
+MetaMask funding and frontend effectiveness remain separately gated by provider entitlement, frontend injection and readback.
 
 ## Changelly
 
@@ -176,13 +219,13 @@ v2 signed API: HOLD_MISSING_RSA_PRIVATE_KEY
 
 ## ThriveEvergreen economic authority
 
-ThriveEvergreen is in production-write mode with production effects enabled.
+ThriveEvergreen v2 is in `production_write` mode with production effects enabled and `publication_activation_state=ECAC`.
 
 Constitutional rule:
 
 > ThriveEvergreen may optimize within authority. It may never manufacture authority.
 
-The runtime still evaluates exact product/candidate gates. Production deployment is not a blanket `ECAC`.
+The production economic-execution capability includes `money_movement_authorized=true`, but every concrete economic effect remains exact-action gated. Generalized external dispatch remains separately disabled until its exact mutation contract is independently certified.
 
 Provider success cannot directly create:
 
@@ -202,15 +245,15 @@ The current public Virality Music site is healthy and provider-connected. Produc
 - public product routes return successfully;
 - the current site carries its existing governed product catalog;
 - credit-purchase UI posts to `/api/checkout` with an idempotency key;
-- unauthenticated checkout correctly returns a sign-in boundary rather than attempting a purchase;
+- unauthenticated checkout rejects unauthorized purchase attempts rather than moving value;
 - account access uses Sign in with ChatGPT;
-- the public catalog is preserved while the institutional feed remains empty.
+- the public catalog is preserved while institutional projections are reconciled independently.
 
 The backend hybrid-commerce service is therefore production-active without destructively replacing the existing site catalog.
 
 ### Native Sites mutation remains held
 
-The existing Sites source-bootstrap lane still carries the prior controlled HOLD associated with concurrent provider state and a dirty/stale checkout. The provider write adapter is not certified for autonomous native-site source mutation.
+The existing Sites source-bootstrap lane remains independently gated. The provider write adapter is not yet certified for autonomous native-site source mutation.
 
 Therefore:
 
@@ -221,7 +264,7 @@ remote commerce binding: ACTIVE
 native Sites source mutation: HOLD
 ```
 
-No documentation or control-plane record should claim that the public frontend has been rewritten by this convergence run until exact provider write/readback/rollback certification exists.
+No documentation or control-plane record should claim the public frontend was rewritten until exact provider write/readback/rollback certification exists.
 
 ## Virality commerce production API/MCP
 
@@ -250,20 +293,22 @@ Conversion is arithmetic only and does not mutate balances.
 | Schedule | Purpose |
 | --- | --- |
 | Every 10 minutes | Reconcile Crown Credits Stripe settlement/readback. |
-| Every 6 hours | Re-run the no-charge Stripe stablecoin Checkout capability canary and update effective provider state. |
+| Every 6 hours | Re-run Stripe stablecoin Checkout capability reconciliation. |
+| Hourly at minute 47 | Snapshot commerce authorization vs. actual execution state. |
 
-Trust Wallet's provider Free-tier request rate is separately respected at one authenticated request per second. CrownThrive's `-1` local request-budget value means unlimited local ceiling; it never overrides provider quotas, billing limits, or throttles.
+Trust Wallet's provider Free-tier request rate is separately respected at one authenticated request per second. CrownThrive's `-1` local request-budget value means unlimited local ceiling; it never overrides provider quotas, billing limits or throttles.
 
 ## Security and custody boundaries
 
 - Provider credentials are vaulted and never published in this documentation.
 - No raw secret return is permitted from production control APIs.
-- Trust Wallet signing is not enabled without a governed wallet path.
-- Changelly v2 signing is not enabled without the matching RSA private key.
+- Managed Agent Wallet private material is encrypted and vaulted; raw private key and mnemonic are not persisted or returned.
+- `money_movement_authorized=true` is never interpreted as proof of a performed transaction.
+- Positive autonomous Agent Wallet value movement remains blocked at unattended ceiling `0` until separately certified.
+- Changelly v2 signing is not enabled without its matching RSA private key.
 - Crown Credits remain closed-loop and non-crypto.
 - Virality Credits remain a presentation denomination, not a second source of economic truth.
 - Stripe stablecoin Dashboard enablement and live Checkout availability are tracked separately.
-- CHLOM Wallet remains non-custodial.
 - ThriveEvergreen remains the economic activation authority.
 - Sites-native mutation remains independently gated.
 
@@ -278,11 +323,13 @@ Virality Music experience
 + Stripe Direct
 + Stripe Connect
 + Stripe stablecoin tender when effective provider readback passes
-+ Trust Wallet multichain intelligence and governed wallet execution path
++ Trust Wallet multichain intelligence and routing
++ CHLOM Managed Agent Wallet on Base/native USDC
++ WalletConnect + MetaMask human-approved lanes
 + Changelly acquisition/on-ramp corridor
 + CHLOM Wallet provenance and settlement evidence
 + ThriveEvergreen ECAC/HOLD/DENY authority
 = CrownThrive hybrid commerce fabric
 ```
 
-The remaining work is provider/wallet/site capability completion, not a redesign of the economic architecture.
+The remaining work is capability certification and frontend/provider completion, not a redesign of the economic architecture.
