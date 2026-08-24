@@ -1,0 +1,143 @@
+---
+title: "Phase 2.99 Blocker Closure Reconciliation — 2026-08-19"
+sidebarTitle: "2.99 Blocker Closure"
+description: "Current evidence-controlled reconciliation for Partnero, Stripe, Adserver.Online, Collab Portal, Locticians and Reward Loyalty v5 preparation after founder authorization."
+icon: "shield-check"
+---
+
+# Phase 2.99 Blocker Closure Reconciliation — 2026-08-19
+
+## Authority and boundary
+
+This record captures founder decisions and current provider/runtime evidence without promoting Phase 3 or exposing credential material.
+
+```yaml
+current_phase: 2
+current_subphase: 2.99
+canonical_main_baseline: 1054e79226338809a5a91211c2271c19ff96b362
+phase_3_entry: blocked_pending_phase_2_99_hard_exit
+hard_exit_baseline: 2_pass_6_blocking_categories
+secret_store_policy: supabase_vault_mandatory
+raw_secrets_in_repository: false
+```
+
+Founder authorization on 2026-08-19 establishes that Partnero, Stripe and Adserver.Online credentials must use Supabase Vault as the primary runtime secret store with separate primary and recovery references. This authorization establishes the storage policy and alias requirements; it does **not** manufacture secret presence where the connected secret-write path cannot safely bind the raw value.
+
+## Credential-continuity disposition
+
+| Service | Institutional role | Primary/recovery aliases | Current binding state | Result |
+| --- | --- | --- | --- | --- |
+| Partnero | Crown Affiliates / Crown Ambassadors attribution provider | registered | raw value not safely bindable through current connector | policy pass; binding blocked |
+| Stripe | payments/event provider | registered for restricted server key and institutional webhook secret | raw values not safely bindable through current connector | policy pass; binding blocked |
+| Adserver.Online | AdLuxe delivery/reporting provider | registered | provider account/API credential not yet verified | policy pass; binding blocked |
+| Locticians / Brilliant Directories | directory provider | primary + recovery present | verified dual reference | pass |
+| Collab Portal | controlled internal collaboration provider | primary + recovery present for main secret | verified dual reference | pass |
+
+No credential, token, signing secret or credential fingerprint belongs in GitHub, Mintlify, email, screenshots, generated artifacts or public examples.
+
+## Collab Portal webhook reconciliation
+
+Founder-supplied UI evidence already establishes provider-side webhook configuration. Two endpoint families are visibly configured:
+
+- **Projects:** Project Created, Project Updated and Project Deleted.
+- **Billing:** Subscription Created, Subscription Canceled, Subscription Expired and Subscription Unpaid.
+
+This closes the question of whether webhook endpoints/events were configured. It does **not** close delivery integrity. The hardened CrownThrive receiver path, strict event/UID checks, local duplicate suppression and bounded request handling pass, but the most recent reversible Project Updated probe did not produce a live callback at the configured Projects receiver.
+
+Therefore:
+
+```yaml
+webhook_ui_configuration: passed
+webhook_receiver_local_contract: passed
+webhook_sender_delivery_integrity: blocked
+realtime_event_driven_sync: closed
+```
+
+The remaining Collab requirement is provider delivery evidence, not another request for the same configuration screenshots.
+
+## Locticians / Brilliant Directories permission reconciliation
+
+The existing Locticians API key is server-side in Supabase Vault. Authenticated `GET /api/v2/token/verify` returned HTTP 200 while `GET /api/v2/site_info/get` returned HTTP 403.
+
+Official Brilliant Directories API documentation classifies `site_info` under **Advanced API Endpoints → Website Configuration** and states that Advanced endpoints require the Advanced API permission on the API key. The Site Info endpoint itself is read-only and takes no parameters beyond authentication.
+
+The reconciled root cause is therefore a key permission issue, not a missing API, invalid credential or unknown endpoint.
+
+Required provider-admin step:
+
+1. Open the existing Locticians API key in Brilliant Directories Developer Hub.
+2. Enable the Advanced API permission that covers **Site Info**.
+3. Do not enable Sensitive endpoints merely to make the test pass.
+4. Preserve CrownThrive provider writes as closed.
+5. Rerun `GET /api/v2/site_info/get` through the server-side read-only adapter.
+6. Mark the gate passed only on HTTP 200 application/json and bounded response validation.
+
+## CrownRewards / Reward Loyalty v5 preparation authorization
+
+Founder explicitly authorizes the **full migration-readiness package** now while preserving production v4. Purchase and production cutover remain separate decisions.
+
+Current state:
+
+```yaml
+platform: CrownRewards / My CrownRewards
+engine: Reward Loyalty
+current_crownthrive_install: v4
+current_v4_preservation: passed
+v5_preparation_authorized: true
+v5_purchase_authorized: false
+v5_production_cutover_authorized: false
+v5_production_deployed: false
+```
+
+Official Reward Loyalty 5.x evidence requires PHP 8.4.1+ and production HTTPS, recommends testing updates in a test/staging environment with database backup and restore proof, and documents a machine-to-machine Agent API using `X-Agent-Key` plus role/scoped tool discovery. The provider's `/tools` endpoint can emit OpenAI, Anthropic, MCP or generic tool definitions; provider-native capability never expands CHLOM authority automatically.
+
+The governed migration sequence is:
+
+```text
+preserve v4 production
+→ inventory current host/runtime/customizations/integrations
+→ full application + database + upload/config backup
+→ restore proof
+→ private staging hostname
+→ PHP 8.4.1+ and extension compatibility
+→ deploy v5 staging package
+→ migrate/reconcile members, partners, programs, rules, balances and files
+→ functional/security/privacy regression tests
+→ Agent API feature disabled initially
+→ create least-privilege staging key
+→ /health read certification
+→ OpenAPI and tool-discovery certification
+→ bounded REST/Agent read certification
+→ rate/idempotency/audit/reconciliation tests
+→ rollback drill
+→ separate purchase/cutover authorization
+→ production migration
+→ post-cutover reconciliation and monitoring
+```
+
+See `/runbooks/reward-loyalty-v5-migration-readiness` for the executable preparation checklist.
+
+## Partnero / AdLuxe separation remains mandatory
+
+- Partnero belongs to **Crown Affiliates / Crown Ambassadors**.
+- Adserver.Online is the replaceable delivery/reporting provider beneath **AdLuxe Network**.
+- Reward Loyalty is the self-hosted engine beneath **CrownRewards / My Crown Rewards**.
+
+Events may cross the CrownThrive operating spine, but identity, economics, provider credentials, authority and ledgers remain separate.
+
+## Current hard-exit context
+
+Canonical Phase 2.99 hard-exit baseline remains **2 PASS / 6 blocking categories**. The two passed categories are repository/security-governance canonicalization and integration-control RLS security disposition. The remaining canonical categories are:
+
+1. macro 68/82/85/74 current certification;
+2. Help Center 795 terminal disposition + P0/P1 closure;
+3. unresolved external state + explicit-deferral closure;
+4. Collab Portal seven-predicate certification;
+5. restricted-sources/continuity/recovery final adversarial audit;
+6. final exact-commit schema/infrastructure/source snapshot + Phase 3 packet.
+
+This reconciliation narrows specific provider blockers but does not independently flip any of those six top-level categories to PASS.
+
+## Next decision checkpoint
+
+After this patch is validated, the founder should be asked whether CrownThrive may run a **bounded Phase 2.99 closure campaign** under a precise authority matrix rather than a vague blanket instruction. That question must distinguish autonomous D0-D2 remediation from provider-admin actions, secret entry, paid purchases, legal acceptance, destructive mutations and Phase-3 promotion.

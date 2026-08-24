@@ -1,0 +1,77 @@
+---
+title: "Phase 2.99 — Provider Blocker Closure Reconciliation"
+sidebarTitle: "2.99 Provider Blocker Patch"
+description: "Reconciles founder authorization, existing screenshots, official provider documentation and live THIVEBASE state for current Phase 2.99 provider blockers."
+icon: "code-merge"
+---
+
+# Phase 2.99 Provider Blocker Closure Reconciliation
+
+**Date:** 2026-08-19  
+**Baseline:** `main@1054e79226338809a5a91211c2271c19ff96b362`  
+**Documentation impact:** `docs_updated`  
+**Phase advancement:** none
+
+This bounded patch performs the requested reconciliation before asking for any broader Phase 2.99 closure authority.
+
+## Changes recorded
+
+- Adopted Supabase Vault as the mandatory runtime secret store for Partnero, Stripe and Adserver.Online with explicit primary/recovery reference requirements.
+- Preserved credential binding as blocked where the current connector cannot safely write secret literals; no raw credential was copied into the repository.
+- Reused the already-supplied Collab Portal screenshots instead of requesting them again. Provider-side Projects and Billing webhook configuration is now an explicit PASS; live sender/delivery integrity remains blocked because the controlled Project Updated probe produced no callback.
+- Reconciled the Locticians `site_info` HTTP 403 against current official Brilliant Directories documentation: `site_info` is an Advanced API endpoint, so the existing key requires the corresponding Advanced permission. The credential itself remains verified and server-side.
+- Recorded founder authorization for the complete Reward Loyalty v5 preparation program while preserving v4 production and keeping purchase/cutover separately controlled.
+- Added the Reward Loyalty v5 migration-readiness runbook and machine reconciliation manifest.
+- Preserved the canonical hard-exit conclusion at 2 PASS / 6 blocking categories. This patch narrows provider-specific blockers but does not invent a new top-level PASS.
+
+## Live THIVEBASE reconciliation
+
+The matching `integration_control` records were updated with public-safe evidence only:
+
+- `locticians.site_info_advanced_api_permission = blocked` with exact provider-admin remediation;
+- `collab_portal.webhook_ui_configuration = passed`;
+- `collab_portal.webhook_sender_delivery_integrity = blocked` with configuration-vs-delivery separation;
+- `crownrewards.v5_preparation_authorized = passed`;
+- `reward_loyalty.v5_preparation_authorized = passed`;
+- Partnero/Stripe/Adserver credential dual-reference policy gates = passed, while actual value binding remains independently blocked.
+
+## Bounded runtime self-heal completed
+
+This reconciliation also closed technical issues that did not require a provider secret, purchase or production cutover.
+
+### Reward Loyalty preparation control plane
+
+`reward-loyalty-api-control` was upgraded to **v2**. It remains preparation-only and performs no Reward Loyalty provider dispatch. The v2 runtime now:
+
+- requires Supabase JWT authentication plus explicit founder/admin/service-role authorization;
+- requires `application/json`;
+- streams inbound request bodies with a hard **32 KiB** ceiling before JSON parsing;
+- exposes only sanitized `health` and `capabilities` preparation actions;
+- preserves v4 production, v5 Agent/REST/MCP disabled and provider writes closed.
+
+The THIVEBASE gates `control_plane_admin_authorization` and `control_plane_request_body_bounding` are now PASS for `reward_loyalty`.
+
+### Partnero control plane and webhook receiver
+
+`partnero-api-control` was upgraded to **v2**. The v2 read-only runtime now:
+
+- preserves JWT + founder/admin authorization;
+- streams inbound control requests with a **32 KiB** pre-parse ceiling;
+- enforces provider response `Content-Length` when available and also streams responses with a hard **512 KiB** ceiling before decode/parse;
+- retains the bounded provider timeout, JSON enforcement, response hashing/redaction and provider-write prohibition.
+
+`partnero-webhook-receiver` was upgraded to **v2**. It now requires JSON and streams the raw webhook body with a hard **64 KiB** limit before HMAC-SHA256 verification and parsing. It still fails closed with HTTP 503 until the Partnero webhook signing secret is safely bound in Vault.
+
+The corresponding request/response/webhook body-bounding gates are now PASS. Credential binding, live read certification, attribution wiring, transaction tracking, signed webhook certification and external MCP conformance remain separately open/blocked.
+
+## Security boundaries
+
+- No secret, token, webhook signing secret or fingerprint is stored in this patch.
+- Provider writes remain closed unless already bounded/certified for a specific historical test.
+- Reward Loyalty v5 Agent API remains disabled until staging/read certification and least-privilege key gates pass.
+- Collab event-driven sync remains closed until a live provider callback proves sender delivery behavior.
+- Locticians Sensitive API permissions remain closed.
+
+## Follow-on
+
+After CI/governance review, use the new current snapshot to ask the founder a precise closure-campaign authorization question that identifies which D0-D2 actions may proceed automatically and which classes must always stop for explicit approval.
