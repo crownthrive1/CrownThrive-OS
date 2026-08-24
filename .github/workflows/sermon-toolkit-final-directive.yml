@@ -1,0 +1,162 @@
+name: Sermon Toolkit Final Directive
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review, converted_to_draft]
+    paths:
+      - "developers/manifests/sermon-toolkit-final-directive-control-plane.v1.json"
+      - "developers/schemas/sermon-toolkit-final-directive-control-plane.v1.schema.json"
+      - "scripts/validate_sermon_toolkit_final_directive.py"
+      - "automation/sermon-toolkit-final-directive-control-plane.mdx"
+      - "changelog/phase-2-99-sermon-toolkit-final-directive-control-plane.mdx"
+      - ".github/workflows/sermon-toolkit-final-directive.yml"
+  push:
+    branches:
+      - main
+      - "admin-mcp/**"
+    paths:
+      - "developers/manifests/sermon-toolkit-final-directive-control-plane.v1.json"
+      - "developers/schemas/sermon-toolkit-final-directive-control-plane.v1.schema.json"
+      - "scripts/validate_sermon_toolkit_final_directive.py"
+      - "automation/sermon-toolkit-final-directive-control-plane.mdx"
+      - "changelog/phase-2-99-sermon-toolkit-final-directive-control-plane.mdx"
+      - ".github/workflows/sermon-toolkit-final-directive.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: sermon-toolkit-final-directive-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate fail-closed directive
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile validator
+        run: python -m py_compile scripts/validate_sermon_toolkit_final_directive.py
+
+      - name: Run fail-closed self-test
+        run: |
+          python scripts/validate_sermon_toolkit_final_directive.py \
+            --schema developers/schemas/sermon-toolkit-final-directive-control-plane.v1.schema.json \
+            --self-test \
+            developers/manifests/sermon-toolkit-final-directive-control-plane.v1.json
+
+      - name: Validate manifest against bundled schema and invariants
+        run: |
+          python scripts/validate_sermon_toolkit_final_directive.py \
+            --schema developers/schemas/sermon-toolkit-final-directive-control-plane.v1.schema.json \
+            developers/manifests/sermon-toolkit-final-directive-control-plane.v1.json
+
+      - name: Enforce PR 158 collision-governor dependency
+        if: github.event_name == 'pull_request'
+        env:
+          CT_API_URL: ${{ github.api_url }}
+          CT_REPOSITORY: ${{ github.repository }}
+          CT_CURRENT_PR: ${{ github.event.pull_request.number }}
+          CT_CURRENT_DRAFT: ${{ github.event.pull_request.draft }}
+          CT_PR_ACTION: ${{ github.event.action }}
+          CT_DEPENDENCY_PR: "158"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+
+          api_url = os.environ["CT_API_URL"].rstrip("/")
+          repository = os.environ["CT_REPOSITORY"]
+          current_pr = int(os.environ["CT_CURRENT_PR"])
+          current_draft = os.environ["CT_CURRENT_DRAFT"].lower() == "true"
+          action = os.environ["CT_PR_ACTION"]
+          dependency_pr = int(os.environ["CT_DEPENDENCY_PR"])
+          token = os.environ.get("GH_TOKEN")
+          if not token:
+              raise SystemExit(
+                  "PR dependency check failed closed: GitHub token unavailable"
+              )
+
+          request = urllib.request.Request(
+              f"{api_url}/repos/{repository}/pulls/{dependency_pr}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {token}",
+                  "User-Agent": "crownthrive-sermon-toolkit-governance",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  dependency = json.load(response)
+          except (OSError, urllib.error.HTTPError, json.JSONDecodeError) as exc:
+              raise SystemExit(
+                  f"PR dependency check failed closed: unable to verify "
+                  f"PR #{dependency_pr}: {exc}"
+              ) from exc
+
+          if dependency.get("merged_at") is not None:
+              print(
+                  f"PR #{dependency_pr} is merged; promotion dependency satisfied."
+              )
+              sys.exit(0)
+
+          if current_pr != 166:
+              raise SystemExit(
+                  f"PR dependency check failed: before PR #{dependency_pr} "
+                  "merges, only draft PR #166 may carry this control plane."
+              )
+          if action == "ready_for_review" or not current_draft:
+              raise SystemExit(
+                  f"PR dependency check failed: PR #166 must remain draft "
+                  f"until PR #{dependency_pr} is merged."
+              )
+
+          print(
+              f"PR #166 remains draft; PR #{dependency_pr} is not merged, "
+              "so promotion and merge remain blocked."
+          )
+          PY
+
+      - name: Re-run documentation governance
+        run: python scripts/validate_docs.py
+
+      - name: Check whitespace and conflict markers
+        env:
+          CT_EVENT_NAME: ${{ github.event_name }}
+          CT_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CT_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CT_PUSH_BEFORE: ${{ github.event.before }}
+          CT_CURRENT_SHA: ${{ github.sha }}
+        run: |
+          if [ "$CT_EVENT_NAME" = "pull_request" ]; then
+            git diff --check "$CT_PR_BASE_SHA...$CT_PR_HEAD_SHA"
+          elif [ -n "$CT_PUSH_BEFORE" ] && ! printf '%s' "$CT_PUSH_BEFORE" | grep -Eq '^0+$'; then
+            git diff --check "$CT_PUSH_BEFORE" "$CT_CURRENT_SHA"
+          elif git rev-parse --verify "$CT_CURRENT_SHA^" >/dev/null 2>&1; then
+            git diff --check "$CT_CURRENT_SHA^" "$CT_CURRENT_SHA"
+          else
+            EMPTY_TREE=$(git hash-object -t tree /dev/null)
+            git diff --check "$EMPTY_TREE" "$CT_CURRENT_SHA"
+          fi
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
