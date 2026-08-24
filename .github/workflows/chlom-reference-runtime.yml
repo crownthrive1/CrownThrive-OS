@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "reference/chlom_runtime/**"
+      - "contracts/chlom/kernel/**"
       - "developers/manifests/chlom-build-cells.v1.json"
       - "developers/manifests/chlom-upstream-components.v1.json"
       - "scripts/validate_chlom_build_program.py"
@@ -16,6 +17,7 @@ on:
       - "admin-mcp/phase-2-99-chlom-builder-cells-reference-kernel"
     paths:
       - "reference/chlom_runtime/**"
+      - "contracts/chlom/kernel/**"
       - "developers/manifests/chlom-build-cells.v1.json"
       - "developers/manifests/chlom-upstream-components.v1.json"
       - "scripts/validate_chlom_build_program.py"
@@ -48,10 +50,13 @@ jobs:
         run: |
           python -m py_compile reference/chlom_runtime/*.py
           python -m py_compile reference/chlom_runtime/tests/*.py
+          python -m py_compile contracts/chlom/kernel/test_kernel_contract.py
           python -m py_compile scripts/validate_chlom_build_program.py
           python -m py_compile scripts/generate_chlom_living_status.py
       - name: Run CHLOM reference-runtime unit tests
         run: python -m unittest reference.chlom_runtime.tests.test_runtime
+      - name: Run Cell 01 kernel contract tests
+        run: python contracts/chlom/kernel/test_kernel_contract.py
       - name: Validate CHLOM builder program
         run: python scripts/validate_chlom_build_program.py
       - name: Generate living CHLOM status

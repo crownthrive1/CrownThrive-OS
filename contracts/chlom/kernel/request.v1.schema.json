@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:crownthrive:chlom:kernel:request:v1",
+  "title": "CHLOM Kernel Request Contract v1",
+  "description": "Phase 2.99 provider-independent semantic-oracle request contract. Request role/approval/evidence fields are caller claims only; strict-v1 authority is supplied out-of-band by a verified authority context and cannot be self-asserted by the request.",
+  "type": "object",
+  "required": [
+    "contract_id",
+    "contract_version",
+    "request_id",
+    "correlation_id",
+    "idempotency_key",
+    "action",
+    "actor",
+    "resource",
+    "context",
+    "authority_evidence",
+    "approval_evidence",
+    "docs_impact"
+  ],
+  "properties": {
+    "contract_id": {"const": "ct.contract.chlom.kernel.request.v1"},
+    "contract_version": {"const": "1.0.0"},
+    "request_id": {"type": "string", "minLength": 1},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "action": {"type": "string", "minLength": 1},
+    "actor": {
+      "type": "object",
+      "required": ["actor_id", "organization_id", "authenticated"],
+      "properties": {
+        "actor_id": {"type": "string", "minLength": 1},
+        "organization_id": {"type": "string", "minLength": 1},
+        "authenticated": {"type": "boolean"},
+        "roles": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true,
+          "description": "Caller-asserted role claims only. The strict-v1 oracle evaluates authority-sensitive rules against separately verified roles, not this array."
+        }
+      },
+      "additionalProperties": true
+    },
+    "resource": {
+      "type": "object",
+      "required": ["resource_id", "resource_type", "organization_id", "version"],
+      "properties": {
+        "resource_id": {"type": "string", "minLength": 1},
+        "resource_type": {"type": "string", "minLength": 1},
+        "organization_id": {"type": "string", "minLength": 1},
+        "version": {"type": "integer", "minimum": 0},
+        "classification": {"type": "string"},
+        "status": {"type": "string"},
+        "hold_state": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "context": {
+      "type": "object",
+      "required": ["environment", "purpose", "risk_class", "execution_mode", "expected_resource_version"],
+      "properties": {
+        "environment": {"type": "string", "minLength": 1},
+        "purpose": {"type": "string", "minLength": 1},
+        "risk_class": {"enum": ["D0", "D1", "D2", "D3"]},
+        "execution_mode": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Only decision_only is executable by the Phase 2.99 reference kernel. Other values fail closed at semantic evaluation."
+        },
+        "expected_resource_version": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "authority_evidence": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "description": "Caller-provided evidence references/claims. Free-form or non-governed values are persisted only as opaque SHA-256 evidence digests, never verbatim; this field does not create authority."
+    },
+    "approval_evidence": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "description": "Caller-provided approval claims only. Strict-v1 required approvals are satisfied only by separately verified authority context."
+    },
+    "docs_impact": {
+      "type": "object",
+      "required": ["outcome", "reason"],
+      "properties": {
+        "outcome": {"enum": ["docs_updated", "docs_no_change", "docs_delta_opened"]},
+        "reason": {"type": "string", "minLength": 1},
+        "affected_article_ids": {"type": "array", "items": {"type": "string"}},
+        "affected_changelog_ids": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

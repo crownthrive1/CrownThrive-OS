@@ -1,0 +1,94 @@
+{
+  "fixture_version": "1.1.0",
+  "fixture_id": "ct.fixture.chlom.kernel.conformance.v1",
+  "state": "phase_2_99_prototype",
+  "semantic_oracle": "reference/chlom_runtime/engine.py",
+  "base_request": {
+    "contract_id": "ct.contract.chlom.kernel.request.v1",
+    "contract_version": "1.0.0",
+    "request_id": "ct.request.kernel-conformance.001",
+    "correlation_id": "ct.correlation.kernel-conformance.001",
+    "idempotency_key": "ct.idempotency.kernel-conformance.001",
+    "action": "read",
+    "actor": {
+      "actor_id": "ct.actor.test",
+      "organization_id": "ct.org.crownthrive-llc",
+      "authenticated": true,
+      "roles": ["documentation_steward"]
+    },
+    "resource": {
+      "resource_id": "ct.resource.kernel-conformance",
+      "resource_type": "documentation",
+      "organization_id": "ct.org.crownthrive-llc",
+      "classification": "public",
+      "status": "current",
+      "hold_state": "none",
+      "version": 3
+    },
+    "context": {
+      "environment": "test",
+      "purpose": "support",
+      "risk_class": "D1",
+      "execution_mode": "decision_only",
+      "expected_resource_version": 3
+    },
+    "authority_evidence": [],
+    "approval_evidence": [],
+    "docs_impact": {
+      "outcome": "docs_no_change",
+      "reason": "kernel conformance fixture"
+    }
+  },
+  "cases": [
+    {
+      "case_id": "ct.case.kernel.valid-public-read",
+      "expected_effect": "allow"
+    },
+    {
+      "case_id": "ct.case.kernel.missing-contract-identity",
+      "remove": ["contract_id", "contract_version"],
+      "expected_error": "contract_id and contract_version are required for untrusted requests"
+    },
+    {
+      "case_id": "ct.case.kernel.missing-idempotency",
+      "remove": ["idempotency_key"],
+      "expected_error": "idempotency_key is required"
+    },
+    {
+      "case_id": "ct.case.kernel.cross-org-deny",
+      "set": {"resource.organization_id": "ct.org.other"},
+      "expected_effect": "deny",
+      "expected_reason": "cross_organization_access_not_authorized"
+    },
+    {
+      "case_id": "ct.case.kernel.provider-mutation-deny",
+      "set": {"context.execution_mode": "provider_write"},
+      "expected_effect": "deny",
+      "expected_reason": "reference_kernel_provider_mutation_prohibited"
+    },
+    {
+      "case_id": "ct.case.kernel.version-conflict-hold",
+      "set": {"context.expected_resource_version": 2},
+      "expected_effect": "hold",
+      "expected_reason": "resource_version_conflict"
+    },
+    {
+      "case_id": "ct.case.kernel.d3-hold",
+      "set": {"action": "draft_docs", "context.risk_class": "D3"},
+      "expected_effect": "hold",
+      "expected_reason": "d3_reserved_authority"
+    },
+    {
+      "case_id": "ct.case.kernel.idempotent-retry",
+      "mode": "retry_same",
+      "expected_effect": "allow",
+      "expected_ledger_events": 1
+    },
+    {
+      "case_id": "ct.case.kernel.idempotency-conflict",
+      "mode": "reuse_key_with_patch",
+      "conflicting_set": {"action": "unknown_action"},
+      "expected_error": "idempotency_key_reused_with_different_payload"
+    }
+  ]
+}
