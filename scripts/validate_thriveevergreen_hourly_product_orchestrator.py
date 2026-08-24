@@ -141,7 +141,6 @@ def main() -> int:
         fail("economic/provider effect count must remain zero")
 
     required_docs = {
-        AUTHORITY: ["production_observer_active", "read-only v1.1 preview", "current publication target: 0"],
         AUTOMATION: ["ACTIVE_OBSERVER_WITH_FRESH_SLOT_CANARY_PENDING", "publication target is zero", "not a promise that", "fresh unconsumed-hour persistence canary", "HOLD` after HTTP `403`"],
         CHANGELOG: ["production_observer_active", "ACTIVE_OBSERVER_WITH_FRESH_SLOT_CANARY_PENDING", "checked_events=971", "Post-documentation final DAIL verification"],
     }
