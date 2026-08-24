@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -8,6 +9,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave5 as wave5
+
+WAVE_SHA = "0c7359b03dbf17f539adf055a3ad620243a7a3ef604ef864aaf6654f04cff9a8"
+VAULT_SHA = "614439bca7459554c8ecc629e40a0bd3bbb3ec803e31d1b04a361e25dae7a368"
+PACKAGE_ID = "ct.framework-package.documentation-reconciliation-continuity.sprint-11-substantive-wave5.v1"
+VAULT_ALIAS = "ct_framework_documentation_reconciliation_continuity_sprint_11_substantive_wave5_v1"
+
+
+def load_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
 
 result = wave5.build()
 policy = result["policy"]
@@ -67,6 +78,8 @@ if result["selected_state_counts"] != {"io_surface_and_machine_contract_reconcil
     errors.append("selected state counts drift")
 if result["selected_anchor_counts"] != {"/technology/crownthrive-io-surface-machine-contract-reconciliation": 1}:
     errors.append("selected anchor counts drift")
+if result["wave_sha256"] != WAVE_SHA:
+    errors.append(f"Wave 5 digest drift: {result['wave_sha256']}")
 
 selected = result["selected_records"]
 if len(selected) == 1:
@@ -129,12 +142,67 @@ if result["guardrails"]["phase_11_20_state"] != "reserved_definition_required":
 if result["guardrails"]["canonical_brand"] != "CrownThrive":
     errors.append("canonical brand drift")
 
+pass_a = load_json(ROOT / "data/documentation/sprint-11-pass-a-receipt.v1.json")
+gap = load_json(ROOT / "data/documentation/substantive-rebuild-wave-5-gap-closure.v1.json")
+pass_b = load_json(ROOT / "data/documentation/sprint-11-pass-b-receipt.v1.json")
+package = load_json(ROOT / "frameworks/documentation-reconciliation-continuity/sprint-11-substantive-wave5-package.v1.json")
+
+if pass_a["primary_interface_lane"]["p0_candidate_count"] != 5 or pass_a["primary_interface_lane"]["selected_count"] != 0:
+    errors.append("Pass A interface zero-admission receipt drift")
+if pass_a["classification_collision_inspection"]["p0_candidate_count"] != 35:
+    errors.append("Pass A AI collision count drift")
+if pass_a["bounded_pivot_diagnosis"]["selected_pivot_inventory_id"] != "HC-0076":
+    errors.append("Pass A pivot identity drift")
+if gap["wave_sha256"] != WAVE_SHA:
+    errors.append("gap-closure wave digest drift")
+if gap["result"]["wave_5_machine_qualified"] != 1 or gap["result"]["cumulative_machine_qualified_p0"] != 58:
+    errors.append("gap-closure counts drift")
+if pass_b["wave_sha256"] != WAVE_SHA:
+    errors.append("Pass B wave digest drift")
+if pass_b["vault_closure_sha256"] != VAULT_SHA:
+    errors.append("Pass B Vault closure digest drift")
+if pass_b["vault_binding_alias"] != VAULT_ALIAS or pass_b["vault_binding_state"] != "bound":
+    errors.append("Pass B Vault binding drift")
+if pass_b["framework_factory"]["parent_certification_state"] != "pending" or pass_b["framework_factory"]["activation_allowed"] is not False:
+    errors.append("Pass B framework authority drift")
+if package["package_id"] != PACKAGE_ID:
+    errors.append("Sprint 11 package ID drift")
+if package["wave_sha256"] != WAVE_SHA or package["vault_closure_sha256"] != VAULT_SHA:
+    errors.append("Sprint 11 package digest drift")
+if package["vault"]["binding_alias"] != VAULT_ALIAS or package["vault"]["binding_state"] != "bound":
+    errors.append("Sprint 11 package Vault binding drift")
+if package["qualification"]["terminal_disposition_accepted"] is not False:
+    errors.append("Sprint 11 package terminal disposition drift")
+if package["authority"]["operationally_enabled"] is not False or package["authority"]["public_activation_allowed"] is not False:
+    errors.append("Sprint 11 package activation drift")
+
 for path in [
     ROOT / "chlom/interface-surface-reconciliation-contract.mdx",
     ROOT / "technology/crownthrive-io-surface-machine-contract-reconciliation.mdx",
+    ROOT / "knowledge/documentation-substantive-rebuild-wave-5.mdx",
+    ROOT / "changelog/docs-substantive-rebuild-sprint-11-wave-5-2026-08-24.mdx",
 ]:
     if not path.is_file():
-        errors.append(f"missing Sprint 11 successor: {path.relative_to(ROOT)}")
+        errors.append(f"missing Sprint 11 artifact: {path.relative_to(ROOT)}")
+
+public_register = (ROOT / "knowledge/documentation-substantive-rebuild-wave-5.mdx").read_text(encoding="utf-8")
+gap_register = (ROOT / "knowledge/documentation-gap-article-rebuild-register.mdx").read_text(encoding="utf-8")
+census = (ROOT / "knowledge/documentation-rebuild-coverage-census.mdx").read_text(encoding="utf-8")
+for marker in [
+    "primary_interface_p0_candidates: 5",
+    "primary_interface_machine_qualified: 0",
+    "wave_5_machine_qualified: 1",
+    "cumulative_machine_qualified_p0: 58",
+    "p0_outside_waves_1_2_3_4_5: 391",
+    WAVE_SHA,
+]:
+    if marker not in public_register:
+        errors.append(f"public Wave 5 register missing marker: {marker}")
+if "/knowledge/documentation-substantive-rebuild-wave-5" not in gap_register:
+    errors.append("gap register does not link Wave 5 public register")
+for marker in ["p0_substantive_current_successor_machine_qualified: 58", "p0_pending_substantive_or_specialist_resolution: 391"]:
+    if marker not in census:
+        errors.append(f"coverage census missing marker: {marker}")
 
 if errors:
     print("FAIL_SPRINT_11_SUBSTANTIVE_WAVE5")
@@ -156,6 +224,7 @@ print("selected_section_counts=" + str(result["selected_section_counts"]))
 print("selected_state_counts=" + str(result["selected_state_counts"]))
 print("selected_anchor_counts=" + str(result["selected_anchor_counts"]))
 print("wave_sha256=" + result["wave_sha256"])
+print("vault_closure_sha256=" + VAULT_SHA)
 print("terminal_disposition_accepted=false")
 print("parent_certification_required=true")
 print("phase_3_entry=blocked_pending_phase_2_99_hard_exit")
