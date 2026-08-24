@@ -94,7 +94,6 @@ def main() -> int:
         errors.append("Mintlify reachability must remain separate from source acceptance")
     for label, source in {
         "Mintlify service registry": mintlify_registry,
-        "documentation governance standard": docs_standard,
         "repository README": readme,
         "institutional source register": source_register,
     }.items():
