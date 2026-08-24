@@ -6,12 +6,19 @@ on:
       - 'commercial/chlom-protocol/**'
       - 'developers/manifests/chlom-pentafabric.v1.json'
       - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/manifests/chlom-api-mcp-surface-candidates.v1.json'
+      - 'developers/manifests/chlom-pentafabric-asset-classes.v1.json'
+      - 'developers/manifests/chlom-commercial-package-candidates.v1.json'
+      - 'developers/manifests/chlom-mesh-failover.v1.json'
+      - 'developers/manifests/chlom-maintenance-projection-gate.v1.json'
       - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-vault-boundary.contract.v1.json'
       - 'developers/contracts/chlom-continuous-build.contract.v1.json'
       - 'frameworks/chlom-pentafabric-metaprotocol.mdx'
       - 'automation/chlom-continuous-research-commercialization.mdx'
       - 'technology/chlom-website-mesh-and-failover.mdx'
       - 'skills/frameworks/chlom-pentafabric/SKILL.md'
+      - 'scripts/validate_chlom_commercial_projection.py'
       - '.github/workflows/chlom-pentafabric-continuity.yml'
   push:
     branches: [main]
@@ -19,12 +26,19 @@ on:
       - 'commercial/chlom-protocol/**'
       - 'developers/manifests/chlom-pentafabric.v1.json'
       - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/manifests/chlom-api-mcp-surface-candidates.v1.json'
+      - 'developers/manifests/chlom-pentafabric-asset-classes.v1.json'
+      - 'developers/manifests/chlom-commercial-package-candidates.v1.json'
+      - 'developers/manifests/chlom-mesh-failover.v1.json'
+      - 'developers/manifests/chlom-maintenance-projection-gate.v1.json'
       - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-vault-boundary.contract.v1.json'
       - 'developers/contracts/chlom-continuous-build.contract.v1.json'
       - 'frameworks/chlom-pentafabric-metaprotocol.mdx'
       - 'automation/chlom-continuous-research-commercialization.mdx'
       - 'technology/chlom-website-mesh-and-failover.mdx'
       - 'skills/frameworks/chlom-pentafabric/SKILL.md'
+      - 'scripts/validate_chlom_commercial_projection.py'
       - '.github/workflows/chlom-pentafabric-continuity.yml'
   schedule:
     - cron: '17 * * * *'
@@ -53,48 +67,32 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Validate five-layer architecture and bounded agents
+      - name: Validate Pentafabric, agents, vault, machine, mesh, packaging and projection
         run: |
           set -euo pipefail
-          python - <<'PY'
+          python -m py_compile scripts/validate_chlom_commercial_projection.py
+          python scripts/validate_chlom_commercial_projection.py --write --check-dist
+
+      - name: Summarize governed state
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json
           from pathlib import Path
-
           root = Path('.')
-          pentafabric = json.loads((root/'developers/manifests/chlom-pentafabric.v1.json').read_text())
-          agents = json.loads((root/'developers/manifests/chlom-agent-factory-candidates.v1.json').read_text())
-          machine = json.loads((root/'developers/contracts/chlom-machine-access.contract.v1.json').read_text())
-          continuous = json.loads((root/'developers/contracts/chlom-continuous-build.contract.v1.json').read_text())
-
-          assert pentafabric['canonical_name'] == 'CrownThrive Pentafabric'
-          assert pentafabric['layer_count'] == 5
-          assert [x['layer'] for x in pentafabric['layers']] == [1,2,3,4,5]
-          assert pentafabric['canonical_terms']['DAIL'] == 'Decentralized Autonomous Information Ledger'
-          assert pentafabric['canonical_terms']['DLA'] == 'Dynamic Licensing Asset'
-          assert pentafabric['repository_family']['both_public'] is True
-          assert pentafabric['repository_family']['restricted_state_in_public_git'] is False
-
-          ids = {a['agent_id'] for a in agents['agents']}
-          required = {
-              'ct.agent.chlom-rd-researcher',
-              'ct.agent.chlom-rights-identity-steward',
-              'ct.agent.chlom-compliance-oracle',
-              'ct.agent.chlom-docs-projection-steward',
-              'ct.agent.chlom-commercial-packager',
-              'ct.agent.chlom-mesh-reliability',
-          }
-          assert required <= ids
-          assert agents['factory_binding']['direct_main_write'] is False
-          assert agents['factory_binding']['self_certification'] is False
-          assert machine['default_state'] == 'DENY_UNLESS_EXPLICITLY_AUTHORIZED'
-          assert machine['authority_rules']['provider_success_is_institutional_truth'] is False
-          assert continuous['economic_boundary']['activation_authority'] == 'ThriveEvergreen / ECAC'
-          assert continuous['projection']['child_pull_request_required'] is True
-          print('PASS_CHLOM_PENTAFABRIC')
+          p = json.loads((root/'developers/manifests/chlom-pentafabric.v1.json').read_text())
+          m = json.loads((root/'developers/manifests/chlom-maintenance-projection-gate.v1.json').read_text())
+          a = json.loads((root/'developers/manifests/chlom-api-mcp-surface-candidates.v1.json').read_text())
+          v = json.loads((root/'developers/contracts/chlom-vault-boundary.contract.v1.json').read_text())
+          c = json.loads((root/'developers/manifests/chlom-commercial-package-candidates.v1.json').read_text())
+          print('## CHLOM Pentafabric continuity')
+          print()
+          print(f"- Architecture: {p['display_name']} ({p['layer_count']} layers)")
+          print(f"- Maintenance: {m['state']}")
+          print(f"- API/MCP candidates: {a['state']}")
+          print(f"- Vault binding: {v['runtime_binding_state']}")
+          print(f"- Commercial packages: {c['state']}")
+          print('- Scheduled run is validation/observation only; it does not release maintenance or activate external commerce.')
           PY
-
-      - name: Validate managed commercial projection
-        run: python scripts/validate_chlom_commercial_projection.py
 
   observe-public-mesh:
     runs-on: ubuntu-latest
