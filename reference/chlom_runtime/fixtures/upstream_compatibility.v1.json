@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0",
+  "fixture_id": "ct.fixture.chlom.upstream-compatibility.v1",
+  "phase": "2.99",
+  "state": "fixture_defined_not_executed_against_upstream",
+  "cell_id": "ct.chlom.cell.oss",
+  "issue": 77,
+  "source_manifest": "developers/manifests/chlom-upstream-components.v1.json",
+  "authority_model": "crownthrive_contract_oracle_provider_replaceable",
+  "rules": {
+    "no_upstream_source_or_package_required_to_validate_fixture": true,
+    "provider_output_never_becomes_institutional_authority": true,
+    "unknown_or_unavailable_provider_state_fails_closed": true,
+    "restricted_evidence_body_must_not_be_required": true,
+    "stable_crownthrive_ids_survive_provider_replacement": true,
+    "execution_requires_separate_adoption_gate": true
+  },
+  "candidates": [
+    {
+      "component_id": "ct.upstream.opa",
+      "adapter_role": "policy_decision_backend",
+      "execution_state": "not_executed",
+      "required_cases": [
+        "deny_precedence_over_allow",
+        "hold_precedence_over_allow",
+        "d3_never_autonomously_allows",
+        "stale_or_superseded_policy_version_rejected",
+        "unknown_condition_fails_closed",
+        "decision_correlation_and_dail_reference_preserved"
+      ],
+      "acceptance": "OPA adapter result must be semantically equivalent to the native CHLOM policy oracle for the governed cases; mismatch blocks adoption."
+    },
+    {
+      "component_id": "ct.upstream.openfga",
+      "adapter_role": "relationship_authorization_backend",
+      "execution_state": "not_executed",
+      "required_cases": [
+        "cross_tenant_relationship_denied",
+        "delegation_expiry_denied",
+        "delegation_revocation_denied",
+        "provider_tuple_does_not_create_crownthrive_authority",
+        "stable_actor_ids_survive_backend_replacement",
+        "relationship_export_and_reimport_preserves_governed_meaning"
+      ],
+      "acceptance": "OpenFGA may answer relationship queries only behind CrownThrive authority contracts; tuple state cannot become the authority root."
+    },
+    {
+      "component_id": "ct.upstream.cedar",
+      "adapter_role": "formal_policy_compatibility_backend",
+      "execution_state": "not_executed",
+      "required_cases": [
+        "deny_semantics_match_chlom_oracle",
+        "chlom_hold_never_maps_to_autonomous_allow",
+        "unknown_state_fails_closed",
+        "policy_version_and_effective_period_enforced",
+        "d3_never_autonomously_allows",
+        "restricted_evidence_referenced_not_embedded"
+      ],
+      "acceptance": "Cedar is a compatibility target only; any semantic disagreement with CHLOM remains a governed mismatch rather than a second policy authority."
+    },
+    {
+      "component_id": "ct.upstream.temporal",
+      "adapter_role": "durable_workflow_backend",
+      "execution_state": "not_executed",
+      "required_cases": [
+        "correlation_id_preserved_across_retry",
+        "idempotent_replay_does_not_duplicate_effect",
+        "hold_state_survives_retry_and_restart",
+        "remedy_or_correction_preserves_prior_history",
+        "workflow_backend_cannot_override_policy_decision",
+        "export_and_restore_preserves_reconstruction_metadata"
+      ],
+      "acceptance": "Temporal may provide durable orchestration only after CHLOM event contracts stabilize; workflow state cannot replace policy, evidence, rights, or authority state."
+    }
+  ],
+  "promotion_gate": {
+    "current_decision": "hold_evaluation_only",
+    "before_execution": [
+      "exact_candidate_version_or_commit_still_matches_intake",
+      "legal_regulatory_endorsement",
+      "security_endorsement",
+      "ip_rights_licensing_endorsement",
+      "dependency_sbom_and_vulnerability_review",
+      "privacy_data_flow_review",
+      "isolated_test_environment",
+      "no_restricted_evidence_body_in_fixture_inputs"
+    ],
+    "before_adoption": [
+      "all_required_cases_executed",
+      "no_unresolved_semantic_mismatch",
+      "rollback_and_provider_exit_proven",
+      "docs_impact_resolved",
+      "ct_adr_gov_011_authority_satisfied"
+    ]
+  }
+}
