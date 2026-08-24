@@ -1,0 +1,119 @@
+---
+title: "ALG-014 — DAIL Append Procedure"
+sidebarTitle: "ALG-014 DAIL Append"
+description: "Standalone CHLOM append-only event procedure for validated schema, actor identity, tenant scope, stable IDs, persistence and authorized projections in the Decentralized Autonomous Information Ledger."
+icon: "timeline"
+keywords: ["CHLOM ALG-014", "DAIL append", "Decentralized Autonomous Information Ledger", "append only", "event sourcing"]
+---
+
+# ALG-014 — DAIL Append Procedure
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-014
+name: DAIL Append Procedure
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: DAIL current architecture; historical DAL evidence lineage
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-014 defines the canonical append operation for the **Decentralized Autonomous Information Ledger (DAIL)**. Its goal is to create durable, traceable institutional events without allowing later corrections to erase the original record.
+
+## Core invariants
+
+```text
+append != mutable overwrite
+provider log != canonical DAIL event
+anchor != factual truth
+```
+
+DAIL records institutional observations, decisions, actions, evidence references and corrections according to source authority and classification.
+
+## Inputs
+
+```yaml
+event:
+  event_type
+  subject_refs[]
+  actor_id
+  tenant_id
+  occurred_at
+  observed_at
+  payload
+  evidence_refs[]
+  policy_or_authority_refs[]
+  classification
+  schema_version
+  idempotency_ref
+```
+
+## Procedure
+
+```text
+function append_event(event):
+    validate_schema(event)
+    validate_actor_identity(event.actor)
+    validate_tenant_scope(event)
+    assign_stable_event_id(event)
+    persist_append_only(event)
+    project_authorized_views(event)
+    return receipt
+```
+
+## Schema validation
+
+Event schemas are versioned. Unknown required fields, unsupported versions or invalid enumerations must fail rather than be silently dropped. Schema evolution must preserve the ability to read historical events.
+
+## Actor validation
+
+The event records who or what produced the observation/action. Actor identity can represent a human, agent, service, provider adapter or governed system, but the identity must be resolvable and scoped. An actor identity does not imply authority; authority references are separate.
+
+## Tenant and object scope
+
+Multi-tenant isolation is mandatory. Subject/object references must not permit one tenant to append state into another tenant's ledger namespace without explicit cross-tenant authority.
+
+## Stable event identity
+
+Each event receives a stable ID independent of presentation-layer URLs or provider identifiers. External IDs are aliases attached to the event where appropriate.
+
+## Persistence
+
+The event body or its protected representation is stored append-only under the adopted custody model. Sensitive material may be stored in restricted evidence custody with the DAIL event containing a digest/reference rather than the confidential body.
+
+## Authorized projections
+
+DAIL can project different views for public, member, operator, auditor, founder or restricted roles. Projection must never mutate the canonical event. Public-safe views are derived from classification and disclosure policy.
+
+## Receipt
+
+```yaml
+DAIL_event_id:
+schema_version:
+digest:
+accepted_at:
+actor_ref:
+tenant_ref:
+projection_refs[]:
+idempotency_ref:
+```
+
+A receipt proves the append was accepted under the system's integrity rules; it does not prove every factual assertion inside the payload is true.
+
+## Failure states
+
+Invalid schema, unknown actor, tenant-scope violation, duplicate semantic side effect, restricted-data placement violation, unavailable durable storage or failed integrity calculation must prevent a false-success response.
+
+## Security
+
+Protect against event injection, alias collision, timestamp confusion, cross-tenant leakage, log forgery, restricted-data exposure and accidental mutable storage paths.
+
+## Tests
+
+Test valid append, schema mismatch, old schema readback, unknown actor, wrong tenant, duplicate idempotency reference, restricted payload projection, persistence failure, event digest verification and append followed by correction.
+
+## Versioning
+
+DAIL schema, integrity and projection policies are versioned independently. The expansion **Decentralized Autonomous Information Ledger** is current canon; historical DAL meanings remain lineage records only.

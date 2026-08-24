@@ -1,0 +1,474 @@
+---
+title: "CHLOM Rules Registry"
+sidebarTitle: "Rules Registry"
+description: "Standalone Phase 3 CHLOM Rules Registry contract for source-authorized, versioned, effective-dated, testable policy rules, rule packs, precedence, applicability, change control and runtime projection into dS-CaaS/ACE."
+icon: "list-check"
+keywords: ["CHLOM Rules Registry", "rules registry", "Compliance Packs", "policy", "ACE", "dS-CaaS", "Phase 3"]
+---
+
+# CHLOM Rules Registry
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.service.rules-registry
+canonical_name: CHLOM Rules Registry
+artifact_class: versioned_policy_rule_registry_service
+source_status:
+  - explicitly named in Phase 3 service contract
+  - supported by Compliance Pack and Policy Engine architecture
+  - mapped from historical Compliance Rules / Policy Pallet lineage
+current_mapping:
+  - P-02 Governance & Compliance
+  - Compliance Pack Registry
+  - Policy Engine / DSL Compiler
+  - ACE
+  - dS-CaaS
+  - Parameter & Config Service
+  - DAIL
+production_state: implementation_specific_evidence_required
+```
+
+## Purpose
+
+The Rules Registry is CHLOM's governed inventory for **what rules exist, where they came from, when they apply, which version is current, how they interact and what runtime projection is allowed**.
+
+```text
+SOURCE AUTHORITY
+   |
+policy / contract / rule text
+   |
+   v
+NORMALIZED RULE CANDIDATE
+   |
+VALIDATE / TEST / REVIEW
+   |
+   v
+RULES REGISTRY
+   |
+ +-----------+-------------+
+ |                         |
+Compliance Packs       runtime projections
+ |                         |
+ +-----------+-------------+
+             |
+       ACE / dS-CaaS / services
+             |
+            DAIL
+```
+
+## Why it is separate from Policy Engine
+
+```text
+Rules Registry = canonical rule inventory/version/source/effective state
+Policy Engine = compiles/evaluates applicable rules
+```
+
+A runtime engine or provider configuration must never become the only place the rule meaning exists.
+
+## Non-purpose
+
+The Rules Registry does not:
+
+- invent policy authority;
+- turn configuration into policy merely because it is stored;
+- let a provider rule replace CrownThrive policy;
+- allow AI to silently rewrite or activate rules;
+- make historical CHLOM rules current automatically;
+- publish secret thresholds because a public rule record exists;
+- resolve legal/professional ambiguity without the required authority;
+- allow a repair agent to edit governance merely to make a failed test pass.
+
+## Rule record
+
+```yaml
+rule_id: stable institutional id
+canonical_name: string
+rule_family: compliance|rights|identity|economic|security|operational|privacy|other
+version: exact
+source_authority_refs: []
+source_document_refs: []
+source_text_or_clause_ref: optional/restricted
+jurisdiction_refs: []
+sector_refs: []
+tenant_or_org_scope: optional
+asset_or_object_scope: []
+action_scope: []
+condition_or_expression_ref: structured
+required_evidence_refs: []
+effect: continue|PASS_fragment|HOLD|DENY|other_governed_effect
+precedence_ref: required when overlaps possible
+override_profile_ref: optional
+human_or_professional_review_ref: optional
+effective_from: timestamp
+effective_until: optional
+status: draft|review|approved|active|held|superseded|retired
+classification: public|internal|restricted
+created_at: timestamp
+updated_at: timestamp
+```
+
+## Source authority
+
+A rule must preserve why it has authority. Possible sources include:
+
+- law/regulation;
+- contract/agreement;
+- institutional policy;
+- governance decision;
+- founder adjudication;
+- professional/legal interpretation where required;
+- security standard;
+- provider requirement used only within provider scope;
+- technical invariant.
+
+```text
+rule stored != rule authoritative
+```
+
+## Historical/current separation
+
+Historical CHLOM papers contain many rules, percentages, thresholds and runtime assumptions. Every recovered item must classify as one of:
+
+```text
+historical research
+historical adopted-at-source-time
+current candidate
+current adopted
+superseded
+unresolved
+```
+
+A recovered historical parameter cannot become active merely through reconstruction.
+
+## Rule identity and versions
+
+```text
+RULE-X v1
+ -> superseded by v2
+ -> historical decisions retain v1
+```
+
+Material semantic change requires a new rule version. Editorial metadata changes follow a separate version/change discipline.
+
+## Effective time
+
+```text
+v1 active [T0,T1)
+v2 active [T1,...)
+```
+
+Evaluation resolves the rule version that applied to the governed event/action time according to the adopted temporal profile.
+
+## Applicability
+
+The registry can filter rules by:
+
+- action type;
+- actor/role;
+- tenant/organization;
+- jurisdiction;
+- sector;
+- asset or license class;
+- channel;
+- product/service;
+- risk class;
+- environment;
+- effective time.
+
+```text
+rule exists != rule applies everywhere
+```
+
+## Rule expression
+
+A registry rule can reference:
+
+- typed structured conditions;
+- a policy DSL expression;
+- schema validation;
+- formula/model references;
+- workflow gates;
+- external human/professional decision requirements.
+
+The canonical semantic rule must survive implementation-language changes.
+
+## Evidence requirement
+
+```yaml
+evidence_requirement_ref:
+  evidence_type: typed
+  source_profile_refs: []
+  freshness_profile_ref: optional
+  assurance_profile_ref: optional
+  failure_behavior: HOLD|DENY
+  privacy_profile_ref: optional
+```
+
+Missing mandatory evidence never silently evaluates as PASS.
+
+## Precedence
+
+Multiple rules can apply simultaneously. Precedence is explicit rather than dependent on load order.
+
+Potential dimensions include:
+
+- higher legal/constitutional authority;
+- more specific source scope;
+- current amendment/version;
+- contract-specific restriction;
+- tenant/local rule that may tighten but cannot improperly relax higher authority;
+- emergency controls within pre-authorized scope.
+
+Unresolved conflict -> HOLD.
+
+## Compliance Pack relationship
+
+A Compliance Pack is a curated/versioned set of registry rules plus applicability, evidence and precedence metadata.
+
+```text
+Rules Registry
+  -> selected compatible rule versions
+  -> Compliance Pack
+  -> Policy Engine / ACE
+```
+
+The same rule can be referenced by more than one pack if source scope and versioning allow it.
+
+## Parameter/config relationship
+
+Some governed rules project values into runtime configuration.
+
+```text
+source-authorized rule
+ -> registry record
+ -> parameter/config projection
+```
+
+The projected configuration value is never the source authority.
+
+## Policy Engine relationship
+
+The Policy Engine retrieves effective/applicable rule versions, validates and compiles them, and evaluates them against context/evidence. Compiled caches are disposable projections; the registry remains the semantic inventory.
+
+## dS-CaaS relationship
+
+dS-CaaS consumes the Rules Registry and Policy Engine for eligibility, permission gating, drift detection and bounded repair.
+
+Self-healing cannot alter the registry to make the original failure disappear unless a separately authorized policy-change process legitimately adopts a new rule version.
+
+## Approval Service relationship
+
+Material rule creation, activation, supersession or emergency change may require an approval profile. The registry records the approved decision; it does not self-approve its own governance changes.
+
+## Change workflow
+
+```text
+NEW SOURCE / CHANGE REQUEST
+        |
+        v
+RULE CANDIDATE
+        |
+source + schema validation
+        |
+tests / simulation / impact analysis
+        |
+approval / professional review if required
+        |
+        v
+ACTIVE VERSION
+        |
+monitoring / drift / feedback
+        |
+supersede / hold / retire / correct
+```
+
+## Policy simulation
+
+Candidate rules can be tested against synthetic or historical fixtures to estimate:
+
+- affected actions;
+- PASS/HOLD/DENY distribution;
+- contradictions;
+- performance/latency;
+- rights/economic impacts;
+- migration impact;
+- false-positive/false-negative behavior when such labels are valid.
+
+Simulation does not activate the rule.
+
+## Rule conflict object
+
+```yaml
+rule_conflict_id: stable id
+rule_refs: []
+conflict_type: authority|scope|precedence|semantic|effective_time|implementation
+subject_scope: structured
+status: open|review|resolved|superseded
+resolution_ref: optional
+DAIL_event_ref: optional
+```
+
+Conflicts remain visible until an authorized resolution is recorded.
+
+## Override boundary
+
+A rule can reference an override profile only if its source permits override. Hard blocks can remain non-overrideable or reserved to a higher source authority.
+
+```text
+override != delete rule
+```
+
+The original rule, evidence and blocked condition remain in lineage.
+
+## Runtime projection
+
+```yaml
+runtime_projection_id: stable id
+rule_ref: exact version
+engine_or_service_ref: consumer
+compiled_artifact_ref: optional
+parameter_projection_refs: []
+activated_at: timestamp
+verified_readback_ref: optional
+status: candidate|active|held|superseded
+```
+
+Runtime projection state is separate from canonical rule state.
+
+## Provider rules
+
+Provider policies and limits can be recorded as source-scoped operational rules when they affect CrownThrive execution.
+
+```text
+provider requirement
+  != CrownThrive-wide governance authority
+```
+
+Provider rules remain bounded to the provider/dependency context unless another authoritative source adopts the same requirement.
+
+## Public/private projection
+
+Public rule records may expose:
+
+- canonical title;
+- safe source/authority citation;
+- scope;
+- effect class;
+- effective period;
+- version/status.
+
+Restricted companions can contain exact anti-fraud thresholds, private contract clauses, security controls, sensitive professional interpretations and provider-specific logic.
+
+## API families
+
+Possible operations include:
+
+```text
+create rule candidate
+read rule/version
+search applicable rules
+resolve effective version
+validate candidate
+run tests/simulation
+submit approval
+activate version
+hold/supersede/retire
+query conflicts
+export runtime projection
+```
+
+Writes remain authority-gated.
+
+## DAIL events
+
+```text
+ct.rules.rule.candidate.created.v1
+ct.rules.rule.validated.v1
+ct.rules.rule.tested.v1
+ct.rules.rule.approved.v1
+ct.rules.rule.activated.v1
+ct.rules.rule.held.v1
+ct.rules.rule.conflict.detected.v1
+ct.rules.rule.superseded.v1
+ct.rules.rule.retired.v1
+ct.rules.rule.runtime_projection.verified.v1
+```
+
+## Failure modes
+
+- source authority missing -> no activation;
+- expression/schema invalid -> reject candidate;
+- effective time ambiguous -> HOLD;
+- rule conflict unresolved -> HOLD affected evaluation;
+- approval missing -> candidate remains inactive;
+- provider runtime differs -> drift/reconciliation;
+- historical rule accidentally activated -> governance defect;
+- secret threshold exposed publicly -> security/privacy incident;
+- self-healing changes policy without authority -> reject/incident.
+
+## Threat model
+
+- unauthorized rule injection;
+- hidden rule deletion;
+- precedence manipulation;
+- provider-policy laundering;
+- stale rule cache;
+- fail-open missing rule;
+- secret threshold disclosure;
+- cross-tenant rule leakage;
+- source citation spoofing;
+- policy change disguised as configuration repair.
+
+## Test vectors
+
+1. valid source + approved rule -> active version;
+2. historical threshold without current adoption -> remains historical/inactive;
+3. conflicting active rules -> HOLD until resolved;
+4. rule v2 effective tomorrow -> v1 remains current today;
+5. provider config differs -> registry rule unchanged, drift recorded;
+6. AI proposes a rule -> candidate only, no self-activation;
+7. lower authority attempts override of hard block -> rejected;
+8. secret fraud threshold -> public projection contains safe reference only;
+9. compiled artifact stale -> projection held/rebuilt;
+10. correction -> new version/supersession, historical decisions remain reproducible.
+
+## Observability
+
+Track:
+
+- rules by status/family/version;
+- activation/change frequency;
+- conflicts;
+- rule-to-Compliance-Pack references;
+- runtime projection drift;
+- stale caches/projections;
+- test/simulation failures;
+- unauthorized change attempts;
+- historical/current misclassification;
+- public/private disclosure incidents.
+
+## Restricted companion
+
+Private custody may include raw contracts, regulatory/professional sources, anti-abuse thresholds, provider-specific enforcement logic, security exceptions, unpublished candidate rules and impact simulations.
+
+## Invariants
+
+```text
+Rules Registry != Policy Engine
+rule stored != rule authoritative
+historical rule != current rule automatically
+config != policy authority
+provider rule != CrownThrive-wide authority
+conflict != arbitrary winner
+self-healing != permission to rewrite policy
+correction/supersession != erasure
+```
+
+## Versioning
+
+Registry schema and individual rules are versioned independently. Historical rule meaning/source remains reconstructable after supersession.
+
+## Status
+
+`Phase_3_service_contract + current_governed_design`. Production enforcement requires implementation, persistence, integration, tests, security and readback evidence.

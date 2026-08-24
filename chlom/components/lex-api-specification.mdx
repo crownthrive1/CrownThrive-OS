@@ -1,0 +1,214 @@
+---
+title: "LEX API Specification — Public-Safe Interface Contract"
+sidebarTitle: "LEX API Specification"
+description: "Individual CHLOM article for the recovered LEX API specification asset, preserving title-level provenance while defining a current provider-neutral interface contract over DLA, listings, offers, transactions, entitlements, settlement and remedies."
+icon: "code"
+keywords: ["CHLOM LEX API", "LEX API specification", "DLA API", "license marketplace API", "provider neutral"]
+---
+
+# LEX API Specification — Public-Safe Interface Contract
+
+## Institutional identity
+
+```yaml
+component_id: CT-CHLOM-LEX-API-001
+name: LEX API Specification
+source_status: recovered_named_document_or_component
+source_body_status: not_located_as_distinct_body
+classification: title_level_recovery_plus_current_engineering_contract
+current_production_status: not_proven
+version: 1.0.0
+```
+
+## Source boundary
+
+The CHLOM Full Component and Pallet Atlas explicitly lists **LEX API specification** as a distinct recovered asset. A standalone historical source body containing exact routes, methods, payloads or error codes has not been located in the currently reconciled corpus.
+
+This article therefore preserves the recovered asset identity and defines a **current public-safe API contract** from already institutionalized DLA, LEX, DAIL, policy, evidence and economic schemas. It does not claim the paths below were the original historical API.
+
+## API purpose
+
+The LEX API exposes provider-neutral licensing-exchange capabilities to CrownThrive platforms and approved partners while preserving CHLOM's rights-before-commerce and authority-before-execution rules.
+
+The API should let callers:
+
+- resolve eligible marketplace listings;
+- inspect public-safe DLA/license state;
+- create governed listing candidates;
+- initiate offer/acquisition candidates;
+- submit agreement acceptance evidence;
+- query transaction state;
+- inspect entitlement state;
+- attach provider payment/escrow evidence through approved adapters;
+- inspect settlement/reconciliation state;
+- initiate or inspect disputes/remedies where permitted;
+- obtain DAIL/correlation receipts.
+
+## Interface namespaces
+
+The current engineering contract uses conceptual namespaces rather than claiming exact historical HTTP paths:
+
+```text
+lex.listings
+lex.discovery
+lex.offers
+lex.transactions
+lex.agreements
+lex.entitlements
+lex.settlement
+lex.cases
+lex.events
+```
+
+A REST, GraphQL, MCP or internal SDK surface can map to these capabilities without changing institutional semantics.
+
+## Listing operations
+
+Candidate operations include:
+
+```text
+create_listing_candidate
+get_listing
+search_listings
+update_listing_candidate
+submit_listing_for_eligibility
+hold_listing
+retire_listing
+```
+
+`create_listing_candidate` does not publish a listing. It creates a candidate bound to an asset/DLA version and routes through eligibility/authority checks.
+
+## Discovery operations
+
+Discovery responses contain only approved projection fields. Search filters can include asset/category, offered right, channel, territory, term, licensor/brand, economic form, availability and other public-safe metadata.
+
+Search/index state remains a projection and can be rebuilt from canonical records.
+
+## Offer and transaction operations
+
+```text
+create_offer_candidate
+accept_offer_candidate
+get_transaction
+cancel_transaction_candidate
+submit_required_evidence
+```
+
+Offer acceptance never skips licensee eligibility, exact-agreement version, payment/economic prerequisites or entitlement creation.
+
+## Agreement and entitlement operations
+
+Agreement operations reference the exact terms/version accepted and assent evidence. Entitlement operations query or create only through governed transaction/DLA workflows.
+
+```text
+agreement accepted != entitlement active
+```
+
+## Settlement operations
+
+Provider/payment evidence should enter through adapter-normalized records. The API can expose:
+
+```text
+attach_payment_evidence
+get_expected_obligation
+get_reconciliation_status
+request_refund_or_adjustment_candidate
+```
+
+It must never convert provider success into final institutional settlement without ALG-010 reconciliation.
+
+## Identity, authorization and scopes
+
+API authentication identifies the calling client. Business authority is separately resolved per operation. Example scope families:
+
+```text
+lex:read
+lex:listings:write_candidate
+lex:offers:write_candidate
+lex:transactions:read
+lex:evidence:submit
+lex:settlement:read
+lex:cases:write_candidate
+```
+
+Exact production scopes require separate adoption. Possessing an API scope never creates underlying asset/licensing authority.
+
+## Idempotency
+
+Every side-effecting candidate/create/attach action should accept or derive a semantic idempotency reference. Duplicate transport cannot multiply listings, transactions, entitlements, refunds or economic effects.
+
+## Request identity
+
+Every request should carry/derive:
+
+```yaml
+request_id:
+correlation_id:
+tenant_id:
+client_id:
+actor_or_subject_ref:
+object_version_refs[]:
+idempotency_ref:
+```
+
+## Error/disposition model
+
+Public-safe result classes should distinguish:
+
+```text
+PASS_CANDIDATE
+HOLD
+DENY
+NOT_FOUND
+CONFLICT
+STALE_VERSION
+RATE_LIMITED
+UNAUTHORIZED_CLIENT
+FORBIDDEN_SCOPE
+DEPENDENCY_UNAVAILABLE
+VALIDATION_ERROR
+```
+
+HTTP/transport codes can map to these institutional result semantics. A `200` transport success does not mean a license action passed.
+
+## Versioning and optimistic concurrency
+
+Writes bind to exact object versions or hashes where material. A stale listing/DLA/agreement update returns a version conflict rather than silently overwriting a newer state.
+
+## Events and webhooks
+
+LEX events can include listing state change, transaction state change, entitlement activation/suspension, settlement reconciliation, refund/reversal and case/remedy events. Event payloads use stable IDs and schema versions; secret or restricted evidence is referenced, not embedded.
+
+## Privacy
+
+Public discovery never exposes confidential deal terms, unpublished masters, personal identity attributes, private evidence, payment credentials or proprietary risk logic. Partner/private API views remain audience- and object-scoped.
+
+## Provider neutrality
+
+Search, payment, escrow, messaging, storage and external marketplaces are adapters. Their IDs appear only as aliases/evidence. The LEX API contract stays stable when providers change.
+
+## Required conformance tests
+
+- listing candidate without rights;
+- stale DLA version;
+- cross-tenant listing read/write;
+- search projection redaction;
+- ineligible buyer;
+- duplicate offer/transaction request;
+- provider payment success with policy HOLD;
+- entitlement query after revocation;
+- refund/reversal;
+- rate-limit semantics;
+- schema-version incompatibility;
+- provider replacement.
+
+## Implementation boundary
+
+```text
+recovered LEX API title
+!= recovered historical API body
+!= deployed API
+!= production certification
+```
+
+When an OpenAPI/MCP implementation is created, it must bind to this institutional contract and receive its own version, tests, security review and release evidence.

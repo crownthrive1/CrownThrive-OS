@@ -1,0 +1,95 @@
+---
+title: "ALG-022 — Human Scribe / Verifier Assignment"
+sidebarTitle: "ALG-022 Reviewer Assignment"
+description: "Standalone CHLOM reviewer-assignment procedure balancing domain eligibility, conflicts, independence, workload and minimum reviewer capacity."
+icon: "user-check"
+keywords: ["CHLOM ALG-022", "Scribes", "verifiers", "reviewer assignment", "conflicts", "independence"]
+---
+
+# ALG-022 — Human Scribe / Verifier Assignment
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-022
+name: Human Scribe / Verifier Assignment
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: CHLOM Scribes; Cognitive Scribe Network; assurance network
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-022 selects human/domain reviewers for a CHLOM case, evidence package, audit, license review, policy review or other governed task. Selection is constrained by competence, scope, conflict rules and independence rather than simply assigning the next available user.
+
+## Inputs
+
+```yaml
+case_or_review_id:
+domain:
+required_skills[]:
+required_reviewer_count:
+independence_policy:
+conflict_context:
+reviewer_registry_snapshot:
+workload_snapshot:
+```
+
+## Procedure
+
+```text
+function assign_review(case):
+    candidates = eligible_reviewers(case.domain)
+    candidates = remove_conflicts(candidates, case)
+    candidates = enforce_independence(candidates)
+
+    if count(candidates) < required_reviewers:
+        return HOLD_CAPACITY
+
+    return select_by_skill_load_and_independence(candidates)
+```
+
+## Eligibility
+
+A reviewer must have active identity, role/credential, required domain capability, current training/certification where policy requires it, and authority to access the evidence classification. Being a founder or administrator does not automatically make someone technically qualified for every review domain.
+
+## Conflict removal
+
+Potential conflicts can include direct party involvement, economic interest, prior authorship under rules requiring independent review, reporting relationships, familial/personal conflicts where policy defines them, or participation in the decision being appealed.
+
+## Independence
+
+For multi-reviewer assignments, reviewers should not all resolve to the same independence group when policy requires corroboration. Organizational and provider relationships should be modeled explicitly rather than inferred solely from email domains.
+
+## Workload and skill balancing
+
+After hard eligibility constraints, assignment can consider current load, expected SLA, specialization and continuity. Load balancing may never override a conflict prohibition.
+
+## Output
+
+```yaml
+assignment_id:
+case_ref:
+assigned_reviewers[]:
+eligibility_refs[]:
+conflict_checks[]:
+independence_groups[]:
+assignment_reason:
+state: ASSIGNED|HOLD_CAPACITY
+```
+
+## Privacy and least privilege
+
+Assignment grants only the evidence access needed for the task and review period. Restricted evidence should not be copied into a general work queue.
+
+## DAIL evidence
+
+Record the candidate-selection snapshot or a public-safe digest, conflict/eligibility checks, assignments, recusals and replacements. Protected reviewer metadata can remain restricted while the existence of an independent review is auditable.
+
+## Tests
+
+Test enough reviewers, insufficient capacity, all candidates conflicted, reviewer credential expired, duplicate independence group, least-loaded reviewer, reassignment after recusal, access-class mismatch and malicious self-assignment attempt.
+
+## Versioning
+
+Changes to conflict, independence or priority semantics require a new algorithm version and review of active assignments where necessary.

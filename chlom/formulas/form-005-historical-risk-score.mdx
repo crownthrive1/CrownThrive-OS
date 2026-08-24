@@ -1,0 +1,84 @@
+---
+title: "FORM-005 — Historical Risk-Score Expression"
+sidebarTitle: "FORM-005 Risk Score"
+description: "Standalone recovered CHLOM historical AI-risk expression with feature-direction caveat and modern normalized candidate mapping."
+icon: "gauge"
+keywords: ["CHLOM FORM-005", "risk score", "AI compliance", "KYC", "peer risk", "historical model"]
+---
+
+# FORM-005 — Historical Risk-Score Expression
+
+## Formula identity
+
+```yaml
+formula_id: FORM-005
+classification: historical_source_formula_plus_derived_correction_model
+origin: CHLOM Genesis Volume
+adopted: false
+production_model: false
+```
+
+## Recovered historical expression
+
+```text
+risk_score = α * (transaction_amount / std_dev)
+           + β * peer_risk_avg
+           + γ * KYC_level
+```
+
+The source states that actual models would be more complex and likely machine-learned. This equation therefore illustrates feature combination rather than a production specification.
+
+## Feature interpretation
+
+- `transaction_amount / std_dev` is an anomaly/scale-like term, though the exact baseline and standard deviation are not fully specified by the expression alone;
+- `peer_risk_avg` captures contextual risk from a peer/reference group;
+- `KYC_level` represents identity verification state, but the source does not define whether larger values mean stronger verification or greater risk.
+
+## Directionality caveat
+
+If a higher KYC level represents **stronger verification**, a positive `+ γ*KYC_level` would increase risk and may be directionally counterintuitive. The institutional record must preserve that historical expression rather than silently change it, while explicitly refusing to treat the sign as a production rule.
+
+## Derived modern candidate
+
+A safer normalized reconstruction is:
+
+```text
+R = σ(
+      w1 * amount_zscore
+    + w2 * peer_risk
+    + w3 * anomaly_score
+    + w4 * sanctions_risk
+    - w5 * verified_identity_strength
+    + w6 * rights_uncertainty
+    + b0
+)
+```
+
+where `σ` is a bounded transform such as logistic. This is a **derived candidate**, not adopted CHLOM model logic.
+
+## Model governance
+
+Before any risk equation can be consequential, CHLOM requires explicit feature semantics, units, missing-value behavior, calibration data, approved weights/model version, uncertainty handling, performance evaluation, bias/fairness review where relevant, adversarial analysis and threshold governance.
+
+## Authority boundary
+
+Risk is evidence for decisioning, not a legal conclusion:
+
+```text
+risk score != violation
+risk score != authority
+```
+
+A high score can route to HOLD/review or a governed policy outcome; it does not independently revoke rights or execute penalties.
+
+## Test requirements
+
+Check feature directionality, scaling, outliers, missing values, standard-deviation near zero, peer-group leakage, protected/sensitive attributes, monotonic expectations, uncertainty and threshold behavior.
+
+## DAIL lineage
+
+Any model evaluation should reference model ID/version, feature snapshot, evidence inputs, result, uncertainty, threshold policy and final authority decision.
+
+## Versioning
+
+The recovered expression remains FORM-005 historical lineage. Derived and future production models must receive independent model IDs/versions.

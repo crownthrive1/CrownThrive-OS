@@ -1,0 +1,307 @@
+---
+title: "CHLOM – Clickable Prototype UI Structure"
+sidebarTitle: "Clickable Prototype Structure"
+description: "Recovered-title implementation article for CHLOM's clickable prototype structure, defining the role-aware navigation shell, task flows, route graph, component hierarchy, state transitions, receipts and prototype-to-production boundaries."
+icon: "sitemap"
+keywords: ["CHLOM clickable prototype", "UI structure", "navigation", "prototype", "route graph", "components"]
+---
+
+# CHLOM – Clickable Prototype UI Structure
+
+## Recovery status
+
+```yaml
+ui_asset_id: ct.chlom.ui.clickable-prototype.structure
+exact_recovered_title: "CHLOM – Clickable Prototype UI Structure"
+recovery_status: exact_title_recovered_related_architecture_available
+original_prototype_artifact: not_confirmed_recovered_for_this_article
+current_mapping: role_aware_CHLOM_application_shell
+```
+
+## Purpose
+
+This artifact defines the navigation and interaction skeleton that connects CHLOM's major user journeys into a testable prototype before implementation. It is not a claim that an original prototype file or production application has survived.
+
+The prototype must represent **institutional state and authority**, not just attractive navigation.
+
+```text
+IDENTITY / ROLE
+      |
+      v
+CHLOM APP SHELL
+      |
+      +--> Dashboard
+      +--> Rights / DLA
+      +--> LEX
+      +--> Evidence / DAIL
+      +--> Compliance / Cases
+      +--> Governance
+      +--> Settings / Integrations
+```
+
+## Route graph
+
+```text
+/
+├── dashboard
+├── rights
+│   ├── assets
+│   ├── dla
+│   ├── applications
+│   ├── transfers
+│   └── disputes
+├── lex
+│   ├── discover
+│   ├── listings
+│   ├── offers
+│   └── transactions
+├── evidence
+│   ├── attestations
+│   ├── ledger
+│   └── proofs
+├── compliance
+│   ├── decisions
+│   ├── holds
+│   ├── cases
+│   └── audits
+├── governance
+│   ├── proposals
+│   ├── decisions
+│   └── overrides
+└── settings
+    ├── identity
+    ├── organization
+    ├── integrations
+    └── api
+```
+
+This route graph is a current implementation reconstruction. Recovered source-specific route names should supersede/version it if later found.
+
+## Global shell ASCII
+
+```text
++--------------------------------------------------------------------------------+
+| CHLOM | Tenant/Org | Search | Decision/HOLD indicator | Actor | Help            |
++----------------------+---------------------------------------------------------+
+| Navigation           | Main route                                              |
+| Dashboard            |                                                         |
+| Rights & DLA         | +-----------------------------------------------------+ |
+| LEX                  | | Route header / status / primary action              | |
+| Evidence & DAIL      | +-----------------------------------------------------+ |
+| Compliance & Cases   | | Content / table / form / visualization             | |
+| Governance           | |                                                     | |
+| Settings             | +-----------------------------------------------------+ |
++----------------------+---------------------------------------------------------+
+| Environment / version | DAIL receipt status | Support / docs                  |
++--------------------------------------------------------------------------------+
+```
+
+## Role-aware navigation
+
+Navigation is filtered by role/capability for usability, but **server-side authority remains authoritative**.
+
+```text
+hidden route
+   !=
+security control
+```
+
+A user must not gain a restricted action by directly navigating to its URL.
+
+## Prototype personas
+
+Minimum test personas can include:
+
+- applicant/participant;
+- DLA holder;
+- issuer/licensing steward;
+- verifier/reviewer;
+- organization operator;
+- governance reviewer;
+- developer/integrator;
+- support/audit operator.
+
+Historical validator/DAO roles are represented only when testing historical/target workflows and labeled accordingly.
+
+## Dashboard entry
+
+The dashboard should expose:
+
+```text
+current role / organization
+open actions
+HOLDs requiring attention
+expiring credentials/DLAs
+recent decisions
+provider/system incidents relevant to actor
+recent DAIL receipts
+```
+
+It should not create a generic institutional `health score` unless a defined model exists.
+
+## Interaction conventions
+
+### Material action
+
+```text
+Open object
+  |
+Review canonical state
+  |
+Start action
+  |
+Validate / policy gate
+  |
+Confirm exact effect
+  |
+Submit
+  |
+Readback / pending
+  |
+Receipt / corrected state
+```
+
+### Non-material navigation
+
+Search/filter/view interactions can be faster but still respect data classification.
+
+## Component hierarchy
+
+Reusable shell components can include:
+
+```text
+AppShell
+GlobalSearch
+TenantSwitcher
+RoleContext
+DecisionBadge
+HoldBanner
+VersionBadge
+PrimaryAction
+DataTable
+EvidenceReference
+DAILReceipt
+ProviderReadbackStatus
+ConfirmationDialog
+ErrorSummary
+```
+
+These are implementation component candidates, not claims about original prototype component names.
+
+## Prototype state controls
+
+A clickable prototype should explicitly simulate:
+
+```text
+READY
+LOADING
+EMPTY
+HOLD
+DENIED
+ERROR
+STALE
+READ_ONLY
+PENDING_READBACK
+CONFIRMED
+```
+
+A prototype that only shows happy paths does not model CHLOM.
+
+## Scenario switcher
+
+For design/evaluation, a non-production prototype can provide a scenario selector:
+
+```text
+Scenario A — DLA issuance PASS
+Scenario B — missing rights evidence HOLD
+Scenario C — provider payment succeeds, transfer fails
+Scenario D — governance override
+Scenario E — revoked credential
+```
+
+This scenario control must never ship as a production bypass.
+
+## Navigation receipts
+
+After a material action, the prototype should route to a receipt/result screen rather than silently returning to a list.
+
+```text
+Action result: HOLD
+Decision ID: ...
+Policy version: ...
+Next step: ...
+[View evidence references]
+[Return to object]
+```
+
+## Global search
+
+Search indexes can include public/role-authorized objects:
+
+```text
+asset
+DLA
+case
+decision
+attestation
+proposal
+listing
+transaction
+```
+
+Search results must be authorization-filtered at query/data layer.
+
+## Notifications
+
+Notifications are event projections, not canonical state. Clicking one re-reads the target object.
+
+## Breadcrumbs / object identity
+
+Every deep route should expose stable object identity and version to reduce ambiguity:
+
+```text
+Rights > DLA > DLA-00123 > Version 4
+```
+
+## Prototype evaluation checklist
+
+A clickable prototype should prove that a user can understand:
+
+- where to find current state;
+- why something is HOLD/DENY;
+- which evidence/version governs a decision;
+- how to request review/remedy;
+- what will happen before a high-impact action;
+- whether a result is provider-pending or institutionally confirmed.
+
+## API/data simulation
+
+Prototype fixtures should use schemas consistent with planned/current domain models. Fixtures are labeled synthetic and never confused with live records.
+
+## Accessibility
+
+Prototype testing includes keyboard path, focus behavior, screen-reader labels, state announcements, responsive navigation and high-impact confirmation comprehension.
+
+## Current mapping
+
+This artifact acts as the **integration UX shell** for the individual CHLOM screen specifications. Production implementation should compose shared components rather than clone isolated historical screens.
+
+## Restricted companion
+
+Can hold internal prototype routes for security/admin/reviewer views, protected synthetic threat scenarios, unreleased provider topology and private design-system decisions.
+
+## Invariants
+
+```text
+clickable prototype != production
+hidden nav item != authorization
+synthetic fixture != live evidence
+notification != current state
+happy-path prototype != CHLOM completeness
+provider pending != confirmed
+reconstructed route graph != recovered original prototype automatically
+```
+
+## Known unknowns
+
+The original clickable prototype file/visual has not been confirmed recovered for this article. This is a source-grounded reconstruction intended to preserve the exact recovered asset title and make it buildable.

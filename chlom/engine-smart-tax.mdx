@@ -1,0 +1,279 @@
+---
+title: "Smart Tax Engine — Historical Research & Professional-Gated Mapping"
+sidebarTitle: "Smart Tax Engine"
+description: "Standalone CHLOM Smart Tax article preserving jurisdiction detection, accrual, withholding, remittance scheduling and statements while requiring current tax/legal/accounting authority before any operational tax treatment."
+icon: "receipt"
+keywords: ["CHLOM Smart Tax", "STE", "tax accrual", "withholding", "remittance", "jurisdiction", "P-11"]
+---
+
+# Smart Tax Engine — Historical Research & Professional-Gated Mapping
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.engine.smart-tax
+historical_name: Smart Tax Engine
+historical_short_name: STE
+recovered_article: CHLOM Smart Tax Engine (STE) Whitepaper
+artifact_class: historical_tax_compliance_research_engine
+recovery_state: reconstructed_from_recovered_title_and_related_sources
+current_mapping:
+  - P-11 tax/withholding evidence and calculation candidates
+  - Tax Accrual & Withholding Pallet lineage
+  - professional-gated financial operations
+production_state: historical_research_not_tax_advice_or_live_tax_engine
+professional_gate: required
+```
+
+## Source basis
+
+The lost Help Center names `Smart Tax in CHLOM: Architecture & Implementation Guide` and the `CHLOM Smart Tax Engine (STE) Whitepaper`. The component description covers jurisdiction detection, accruals, withholding, remittance scheduling and exportable statements. Historical Smart Treasury/Yield concepts also contemplate reserving/earning toward recurring tax obligations.
+
+This article preserves the architecture but does not create tax advice, tax rates or filing obligations.
+
+## Purpose
+
+```text
+ECONOMIC EVENT / OBLIGATION
+          |
+          v
+JURISDICTION / TAX PROFILE RESOLUTION
+          |
+          v
+SOURCE-AUTHORIZED TAX RULES
+          |
+          v
+CALCULATION / ACCRUAL CANDIDATE
+          |
+PROFESSIONAL / POLICY VALIDATION
+          |
+          v
+WITHHOLD / RESERVE / SCHEDULE
+          |
+PROVIDER / FILING / REMITTANCE EVIDENCE
+          |
+          v
+RECONCILE / STATEMENT / DAIL
+```
+
+## Non-purpose
+
+Smart Tax does not:
+
+- make CHLOM a tax authority;
+- infer tax rates from historical examples;
+- replace a tax professional/accounting system;
+- determine residency/nexus from weak signals;
+- file/remit without explicit authority;
+- treat provider tax estimates as institutional truth;
+- activate historical yield-to-pay-tax designs automatically.
+
+## Tax profile
+
+```yaml
+tax_profile_id: stable ID
+entity_or_person_ref: subject
+jurisdiction_refs: evidence-backed
+entity/tax_classification_refs: professional/source-backed
+effective_period: explicit
+professional_review_ref: optional|required
+source_rule_pack_ref: required for calculation
+status: candidate|reviewed|active|held|superseded
+classification: restricted
+```
+
+## Tax rule source
+
+Every operational rule must carry:
+
+- jurisdiction;
+- authority/source;
+- rule type;
+- effective period;
+- tax base definition;
+- rate/formula or professional-system reference;
+- exceptions/thresholds;
+- filing/remittance cadence;
+- currency/rounding treatment;
+- professional review requirement.
+
+A generic model formula cannot substitute for the source rule.
+
+## Tax event
+
+```yaml
+tax_event_id: stable ID
+source_event_ref: sale|royalty|fee|payroll|other
+subject_ref: taxpayer/entity
+amount: typed
+currency: explicit
+event_date: timestamp/date
+jurisdiction_context_ref: required
+category/classification_ref: professional/accounting classification
+status: candidate|classified|held|accrued|reconciled
+```
+
+## Calculation object
+
+```yaml
+tax_calculation_id: stable ID
+tax_event_refs: list
+tax_profile_ref: exact version
+rule_refs: exact versions
+basis_amount: typed
+rate_or_formula_ref: source/professional reference
+calculated_amount: typed
+rounding_rule: explicit
+created_at: timestamp
+review_state: unreviewed|reviewed|held|corrected
+```
+
+## Accrual versus payment
+
+```text
+CALCULATED TAX
+  !=
+ACCRUED LIABILITY
+  !=
+WITHHELD/RESERVED AMOUNT
+  !=
+REMITTED AMOUNT
+  !=
+FILED/ACCEPTED RETURN
+```
+
+Each state has distinct evidence.
+
+## Withholding/reserve
+
+If authorized, the system can mark or reserve an amount against a liability. It must not silently remove funds from another party's entitlement without valid authority.
+
+```text
+gross obligation
+ -> authorized withholding
+ -> net payable
+ + tax reserve/liability record
+```
+
+## Jurisdiction detection
+
+Jurisdiction can depend on facts such as entity formation, residence, place of service/sale, customer location, nexus or other legally defined criteria. Automated signals can propose candidates, but ambiguous/high-impact classification should route to professional review.
+
+```text
+IP/device location != legal tax jurisdiction automatically
+```
+
+## Remittance scheduling
+
+```yaml
+remittance_schedule_id: stable ID
+liability_ref: required
+jurisdiction_ref: required
+due_date: authoritative/professional source
+provider_or_filing_ref: optional
+approval_profile_ref: required
+status: scheduled|held|submitted|confirmed|reconciled|late|corrected
+```
+
+A scheduler can remind/prepare; it does not create filing authority.
+
+## Statement/export
+
+Public-safe/internal statements should clearly mark:
+
+- period;
+- subject/entity;
+- source transactions;
+- classification/rule versions;
+- calculated/accrued/withheld/remitted distinctions;
+- reconciliation status;
+- professional review status.
+
+## Historical Smart Yield relationship
+
+Historical concepts suggested allocating funds to yield strategies so earnings could offset taxes/insurance. Current boundary:
+
+```text
+tax obligation != investment strategy
+```
+
+Any investment/yield behavior requires separate Smart Treasury/DeFi/Yield authority and cannot delay/jeopardize tax obligations.
+
+## Corrections
+
+Tax classifications/rates can be corrected. Corrections should create explicit adjustment entries rather than mutating prior statements invisibly.
+
+## DAIL events
+
+```text
+ct.tax.event.recorded.v1
+ct.tax.profile.reviewed.v1
+ct.tax.calculation.created.v1
+ct.tax.accrual.recorded.v1
+ct.tax.withholding.recorded.v1
+ct.tax.remittance.scheduled.v1
+ct.tax.remittance.submitted.v1
+ct.tax.remittance.reconciled.v1
+ct.tax.adjustment.recorded.v1
+```
+
+## Failure modes
+
+- jurisdiction unresolved -\> HOLD;
+- rule source missing/stale -\> HOLD;
+- professional review required but missing -\> HOLD;
+- currency mismatch -\> convert using adopted evidence or reject;
+- provider estimate differs from professional/canonical rule -\> reconcile/escalate;
+- remittance provider fails -\> liability remains open;
+- duplicate event -\> idempotent protection;
+- correction after filing -\> adjustment/amended-process path.
+
+## Threat model
+
+- wrong jurisdiction;
+- stale rates/rules;
+- provider estimate promoted as tax advice;
+- manipulation of tax basis;
+- unauthorized withholding;
+- duplicate remittance;
+- missed due date;
+- currency/rounding errors;
+- exposure of sensitive tax data;
+- investment/yield logic compromising required liability reserves.
+
+## Test vectors
+
+1. source-backed rule \+ reviewed tax profile -\> calculation candidate;
+2. unknown jurisdiction -\> HOLD;
+3. provider tax estimate only -\> not canonical tax conclusion;
+4. duplicate transaction -\> no duplicate accrual;
+5. authorized withholding -\> separate withheld/liability records;
+6. remittance fails -\> liability remains unsettled;
+7. rule effective date changes -\> exact version per period;
+8. historical tax formula/example -\> not current rate;
+9. correction -\> explicit adjustment;
+10. public projection -\> no private taxpayer identifiers/details.
+
+## Current mapping
+
+Current CHLOM can use tax-event records, professional-reviewed rule packs, P-11 accrual/withholding objects, scheduler reminders and reconciliation. Actual tax calculation, filing and remittance must remain under appropriate professional/legal/accounting authority.
+
+## Restricted companion
+
+Contains taxpayer/entity data, jurisdictions, tax classifications, private transactions, rates/rules where restricted, professional advice, filing/remittance records, provider accounts and correction evidence.
+
+## Invariants
+
+```text
+tax estimate != tax liability automatically
+calculation != filing
+withholding != remittance
+provider estimate != professional conclusion
+location signal != legal jurisdiction
+historical Smart Tax != current tax service
+AI recommendation != tax advice/filing authority
+```
+
+## Status
+
+`historical_preserved + professional_gated_current_mapping`; no tax advice, filing service or current tax rate is asserted.

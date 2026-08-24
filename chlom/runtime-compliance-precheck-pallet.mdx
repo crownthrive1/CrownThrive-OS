@@ -1,0 +1,283 @@
+---
+title: "Compliance Pre-check Pallet — Historical Runtime Record"
+sidebarTitle: "Compliance Pre-check Pallet"
+description: "Standalone reconstruction of CHLOM's historical Compliance Pre-check Pallet, the protocol-level circuit breaker that evaluates identity, policy, risk, license and proof prerequisites before sensitive execution."
+icon: "shield-check"
+keywords: ["CHLOM Compliance Pre-check Pallet", "pre-check", "circuit breaker", "ACE", "policy", "runtime gating"]
+---
+
+# Compliance Pre-check Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.compliance-precheck
+historical_name: Compliance Pre-check Pallet
+artifact_class: historical_runtime_pallet
+source_lineage:
+  - AI-Driven Decentralized Compliance and Licensing Whitepaper
+  - Building and Understanding the CHLOM Metaprotocol
+  - Technical Blueprint runtime-check architecture
+recovery_state: source_grounded_reconstruction
+current_mapping:
+  - ACE policy-evaluation gateway
+  - P-02 Governance & Compliance
+  - action authorization middleware
+production_state: historical_runtime_not_claimed_live
+```
+
+## Source basis
+
+Recovered historical sources describe a dedicated runtime **Compliance Pre-check Pallet** that intercepts sensitive transactions before execution. Examples ask whether parties are verified, whether amounts are within permitted limits and whether the required rules are satisfied. If the pre-check fails, the action is rejected/held and logged rather than executing first and attempting cleanup later.
+
+This is one of CHLOM's core architectural ideas: **authorization and compliance checks occur before side effects whenever technically possible**.
+
+## Purpose
+
+```text
+ACTION REQUEST
+      |
+      v
+CLASSIFY ACTION / SIDE EFFECT
+      |
+      v
+RESOLVE ACTOR + ROLE + AUTHORITY
+      |
+      v
+RESOLVE POLICY / DLA / EVIDENCE / RISK / PROOF
+      |
+      v
+PRE-CHECK DECISION
+   /     |      \
+ PASS   HOLD    DENY
+  |      |       |
+EXEC   WAIT    STOP
+  |
+READBACK / DAIL
+```
+
+## Non-purpose
+
+The pre-check does not:
+
+- invent legal rules;
+- replace source-authorized policy;
+- make AI scores sovereign truth;
+- guarantee a later provider action will succeed;
+- erase the need for post-execution reconciliation;
+- imply that historical on-chain interception is current production architecture.
+
+## Action classification
+
+Every request entering the pre-check should have a typed action envelope:
+
+```yaml
+action_id: stable/idempotent ID
+action_type: canonical action
+actor_ref: stable institutional actor
+subject_refs: affected objects
+requested_side_effect_class: read|reversible_write|economic|rights|security|professional
+tenant_or_org_scope: required
+policy_scope: required
+request_time: timestamp
+context_ref: evidence/context bundle
+```
+
+High-impact actions should have more stringent evidence/authority requirements than simple reads.
+
+## Gate families
+
+The pallet can orchestrate gates rather than own every rule.
+
+### Identity gate
+
+- actor resolved;
+- credentials current where required;
+- role/delegation current;
+- subject identity correctly bound.
+
+### Rights/DLA gate
+
+- source rights established;
+- DLA current;
+- requested action within allowed rights;
+- transfer/sublicense/usage constraints satisfied.
+
+### Policy gate
+
+- applicable Compliance Pack/policy version resolved;
+- required rules evaluable;
+- no unresolved policy conflict.
+
+### Risk/evidence gate
+
+- required evidence fresh;
+- risk result within adopted action rule;
+- unresolved or low-confidence data routes to HOLD rather than fabricated certainty.
+
+### ZK/proof gate
+
+- circuit/verifier version allowed;
+- proof valid/current;
+- revocation/freshness constraints satisfied.
+
+### Temporal gate
+
+- review windows/timelocks expired as required;
+- scheduled action still eligible at execution time.
+
+### Economic gate
+
+- economic activation/authority valid;
+- price/schedule current;
+- duplicate/idempotency protections satisfied.
+
+## Three-valued decision algebra
+
+```text
+PASS = all mandatory gates satisfied
+DENY = one or more authoritative prohibitions/failures
+HOLD = decision cannot safely complete because required state is unresolved, stale, contradictory or pending
+```
+
+A HOLD must not be coerced to PASS merely to preserve availability.
+
+## Decision object
+
+```yaml
+precheck_decision_id: stable ID
+action_ref: required
+result: PASS|HOLD|DENY
+policy_version_refs: list
+evidence_snapshot_ref: required
+authority_snapshot_ref: required
+reason_codes: public-safe normalized classes
+restricted_reason_refs: optional
+expires_at: optional
+issued_at: timestamp
+decision_engine_version: version
+```
+
+## Execution-time validity
+
+A prior PASS may expire. Before a delayed or queued action executes, critical state should be revalidated according to policy.
+
+```text
+PASS at T0
+   + rights/policy/identity may change
+   -> execution at T1 requires freshness/revalidation
+```
+
+## Provider boundary
+
+A successful pre-check authorizes CHLOM to attempt an action; it does not guarantee provider execution.
+
+```text
+PRECHECK PASS
+  -> provider call
+  -> provider response
+  -> readback
+  -> reconciliation
+```
+
+Provider error should be recorded as execution failure, not retroactively described as a compliance DENY unless policy says so.
+
+## Public-safe pseudocode
+
+```text
+precheck(action):
+  actor = resolve_actor(action.actor_ref)
+  if actor unresolved: HOLD
+
+  authority = resolve_authority(actor, action)
+  if authority invalid: DENY
+  if authority unresolved: HOLD
+
+  policy = resolve_policy(action)
+  if policy unresolved: HOLD
+
+  rights = resolve_rights_if_required(action)
+  if rights conflict: HOLD
+  if rights prohibit: DENY
+
+  evidence = collect_required_evidence(action, policy)
+  if evidence stale/unavailable: HOLD
+
+  result = evaluate_rules(policy, actor, rights, evidence, action)
+  append_decision_receipt(result)
+  return result
+```
+
+## Failure modes
+
+- policy version unavailable -\> HOLD;
+- actor unknown -\> HOLD;
+- actor lacks authority -\> DENY;
+- contradictory rights evidence -\> HOLD;
+- sanctions/risk feed stale -\> HOLD according to policy;
+- valid ZK proof but wrong action scope -\> DENY/HOLD as appropriate;
+- provider unavailable after PASS -\> execution failure/retry, not new authorization;
+- action changed after PASS -\> old PASS invalid for changed semantic action.
+
+## DAIL events
+
+```text
+ct.precheck.requested.v1
+ct.precheck.passed.v1
+ct.precheck.held.v1
+ct.precheck.denied.v1
+ct.precheck.expired.v1
+ct.precheck.revalidated.v1
+ct.precheck.execution.failed.v1
+```
+
+## Threat model
+
+- bypass route around pre-check;
+- stale cached PASS;
+- rule omission;
+- tenant-context confusion;
+- action-type confusion;
+- privilege escalation;
+- hidden provider write before authorization;
+- AI score treated as deterministic rule;
+- fail-open on dependency outage;
+- duplicated economic action.
+
+## Test vectors
+
+1. all mandatory gates pass -\> PASS;
+2. missing required evidence -\> HOLD;
+3. explicit prohibited counterparty/action -\> DENY;
+4. policy service outage -\> HOLD/fail closed;
+5. actor role exists but delegation expired -\> DENY/HOLD per policy, never PASS;
+6. valid proof for another subject/action -\> reject;
+7. prior PASS replayed after DLA revoked -\> revalidation prevents execution;
+8. provider write attempted before PASS -\> architecture violation;
+9. duplicate economic request -\> idempotent result;
+10. tenant A context cannot satisfy tenant B request.
+
+## Current mapping
+
+Modern CHLOM maps the historical pallet to shared authorization/compliance middleware in front of side-effecting services. ACE and the Policy Engine provide rule evaluation; identity, DLA, Oracle, ZK, economic and temporal services provide domain evidence. DAIL records the decision lineage.
+
+## Restricted companion
+
+May contain exact anti-abuse rules, fraud thresholds, hidden deny conditions, provider routing, sensitive reason codes, security test vectors and internal bypass-detection logic.
+
+## Invariants
+
+```text
+request != authorization
+PASS != provider success
+provider success != institutional settlement
+risk score != violation
+valid proof != action authority
+stale PASS != current PASS
+HOLD must not silently become PASS
+no side effect should bypass required pre-check
+```
+
+## Status
+
+`historical_preserved + source_grounded_reconstruction`. The architectural contract remains current and important even though the historical Substrate pallet itself is not claimed deployed.

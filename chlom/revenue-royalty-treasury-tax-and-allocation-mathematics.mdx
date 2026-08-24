@@ -1,0 +1,700 @@
+---
+title: "Revenue, Royalty, Treasury, Tax and Allocation Mathematics"
+sidebarTitle: "Revenue & Treasury Math"
+description: "Governed quantitative reference for CHLOM gross/net economics, basis-point splits, royalties, reserves, taxes, commissions, settlement reconciliation, corrections and rounding."
+icon: "calculator"
+keywords: ["CHLOM revenue math", "royalty calculations", "basis points", "treasury allocation", "tax accrual", "settlement", "reconciliation", "rounding"]
+---
+
+# Revenue, Royalty, Treasury, Tax and Allocation Mathematics
+
+CHLOM's Revenue function requires a strict separation between **economic calculation**, **obligation**, **provider execution**, and **institutional settlement**.
+
+This page defines the calculation layer. It does not create any current tax rate, royalty rate, payout promise, investment authority or legal accounting treatment.
+
+## Core separation
+
+```text
+ECONOMIC EVENT
+     |
+     v
+APPLICABLE SCHEDULE
+     |
+     v
+CALCULATION
+     |
+     v
+OBLIGATION / ALLOCATION
+     |
+     v
+AUTHORIZATION
+     |
+     v
+PROVIDER EXECUTION
+     |
+     v
+PROVIDER EVIDENCE
+     |
+     v
+RECONCILIATION
+     |
+     v
+INSTITUTIONAL SETTLEMENT
+     |
+     v
+DAIL
+```
+
+## 1. Gross receipt
+
+Let:
+
+```text
+G = gross receipt recognized for calculation
+```
+
+`G` must be tied to a defined event and currency/unit.
+
+Provider-reported gross and institutionally recognized gross may differ until reconciled.
+
+## 2. Approved deductions
+
+Candidate components:
+
+```text
+R = approved refunds / reversals
+T = approved tax / withholding amount
+F = approved provider/payment fees
+V = approved reserve/holdback
+D = other contractually authorized deductions
+```
+
+Then:
+
+```text
+N = G - R - T - F - V - D
+```
+
+where `N` is net distributable.
+
+Every deduction must have a schedule/policy/legal basis.
+
+## 3. Basis-point allocation
+
+For share `bps_i`:
+
+```text
+share_i = N * bps_i / 10,000
+```
+
+Constraint:
+
+```text
+0 <= bps_i <= 10,000
+```
+
+If fully allocated:
+
+```text
+Σ bps_i = 10,000
+```
+
+If reserve/unassigned balance is allowed:
+
+```text
+Σ bps_i <= 10,000
+unallocated_bps = 10,000 - Σ bps_i
+```
+
+## 4. Percentage conversion
+
+```text
+1% = 100 bps
+0.01% = 1 bp
+100% = 10,000 bps
+```
+
+Never treat `10` as both `10%` and `10 bps`.
+
+## 5. Multi-tier split
+
+If a recipient group receives group weight `g` and internal participant weight `p_i`:
+
+```text
+group_pool = N * g
+participant_i = group_pool * p_i
+```
+
+with:
+
+```text
+Σ p_i = 1
+```
+
+This is useful for creator collectives, partner pools or hierarchical split agreements.
+
+## 6. Royalty basis
+
+Define the royalty base explicitly:
+
+```text
+B_royalty = gross | net | unit_count | usage_measure | contract_specific
+```
+
+Then:
+
+```text
+royalty = B_royalty * royalty_rate
+```
+
+A percentage without a defined base is incomplete.
+
+## 7. Per-unit royalty
+
+```text
+royalty = eligible_units * rate_per_unit
+```
+
+Examples of units may include licensed uses, transactions, impressions, streams or bookings—but only where an adopted agreement defines the unit.
+
+## 8. Tiered royalty
+
+Candidate piecewise model:
+
+```text
+royalty(q) =
+  r1*q                              if q <= q1
+  r1*q1 + r2*(q-q1)                if q1 < q <= q2
+  r1*q1 + r2*(q2-q1) + r3*(q-q2)  if q > q2
+```
+
+This is a generic mathematical pattern, not a current CHLOM rate schedule.
+
+## 9. Minimum guarantee
+
+If a contract establishes minimum guarantee `M`:
+
+```text
+payable = max(calculated_royalty, M)
+```
+
+But the trigger period and recoupment treatment must be defined separately.
+
+## 10. Cap
+
+```text
+payable = min(calculated_amount, cap)
+```
+
+## 11. Floor and cap
+
+```text
+payable = min(max(calculated_amount, floor), cap)
+```
+
+## 12. Recoupment
+
+For outstanding recoupable advance `A_t`:
+
+```text
+recoupment_t = min(eligible_recoupment_t, A_t)
+A_(t+1) = A_t - recoupment_t
+```
+
+Only contractual recoupment terms can define `eligible_recoupment_t`.
+
+## 13. Commission
+
+```text
+commission = commission_base * commission_rate
+```
+
+Separate:
+
+```text
+affiliate commission
+sales commission
+agent fee
+platform fee
+licensor royalty
+```
+
+They are different obligation classes even if the formula looks identical.
+
+## 14. Cascading allocation
+
+A dangerous pattern is calculating later percentages after earlier deductions without naming the base.
+
+Use explicit stages:
+
+```text
+G
+- authorized deductions
+= N1
+
+commission = N1 * c
+N2 = N1 - commission
+
+royalty = N2 * r
+```
+
+or explicitly state that royalty is based on gross if that is the agreement.
+
+## 15. Parallel allocation
+
+If all shares are calculated on the same base:
+
+```text
+share_A = N * a
+share_B = N * b
+share_C = N * c
+```
+
+Then check:
+
+```text
+a + b + c <= 1
+```
+
+## 16. Treasury intake
+
+Treasury-recognized inflow may be modeled as:
+
+```text
+I = approved_protocol_fees
+  + approved_service_fees
+  + approved_penalties
+  + approved_grants
+  + approved_other_inflows
+```
+
+Do not count transfers between institutional accounts as new income unless accounting policy says so.
+
+## 17. Treasury allocation vector
+
+Let:
+
+```text
+w = [w_ops, w_reserve, w_growth, w_incentive, w_other]
+```
+
+with:
+
+```text
+Σw = 1
+```
+
+Then:
+
+```text
+A = I * w
+```
+
+vector-wise.
+
+## 18. Reserve target
+
+```text
+reserve_gap = max(0, target_reserve - current_reserve)
+reserve_funding = min(reserve_policy_amount, reserve_gap)
+```
+
+Overflow must have an explicit destination.
+
+## 19. Reserve ratio
+
+```text
+reserve_ratio = liquid_reserve / modeled_covered_exposure
+```
+
+This is a management metric, not an insurance solvency conclusion.
+
+## 20. Tax accrual
+
+Generic:
+
+```text
+tax_accrual = taxable_base * adopted_tax_rate
+```
+
+But:
+
+```text
+source paper tax example != actual tax liability
+```
+
+Jurisdiction, nexus, classification, exemptions, deductions and professional review determine real treatment.
+
+## 21. Withholding
+
+```text
+withholding = withholding_base * withholding_rate
+net_payment = gross_payable - withholding
+```
+
+Only an adopted legally supported schedule may provide the rate.
+
+## 22. Historical Smart Tax concept
+
+Historical CHLOM explores automatic micro-tax or fee collection.
+
+The Grand Prospectus gives examples such as a `1% protocol fee`; those examples remain historical illustrations.
+
+General form:
+
+```text
+smart_fee = eligible_transaction_base * fee_rate
+```
+
+## 23. Insurance/protection micro-fee
+
+Historical Genesis illustration:
+
+```text
+protection_contribution = trade_value * 0.0001
+```
+
+for a `0.01%` example.
+
+No present insurance product is implied.
+
+## 24. Escrow balance
+
+```text
+escrow_balance_next = escrow_balance
+                    + deposits
+                    - authorized_releases
+                    - approved_refunds
+```
+
+Invariant:
+
+```text
+escrow_balance >= 0
+```
+
+## 25. Conditional release
+
+```text
+release_allowed =
+    payment_confirmed
+AND agreement_effective
+AND DLA_active
+AND entitlement_conditions_met
+AND no_hold
+AND no_dispute_block
+```
+
+Then:
+
+```text
+if release_allowed:
+    release(amount)
+else:
+    retain / refund / HOLD according to policy
+```
+
+## 26. Settlement reconciliation
+
+Let:
+
+```text
+P = provider-reported settled amount
+C = CHLOM calculated expected settlement
+```
+
+Difference:
+
+```text
+variance = P - C
+```
+
+Normalized variance:
+
+```text
+variance_pct = variance / max(|C|, epsilon)
+```
+
+A nonzero variance routes through reconciliation, not silent adjustment.
+
+## 27. Reconciliation states
+
+```text
+variance == 0                -> MATCH
+small variance within policy -> REVIEW / ROUNDING
+material unexplained variance -> HOLD
+known duplicate/error         -> CORRECTION / REVERSAL
+```
+
+## 28. Reversal
+
+Do not delete the original settlement.
+
+```text
+original_amount = X
+reversal_amount = -X
+net_effect = 0
+```
+
+A partial correction:
+
+```text
+net_effect = X + correction_delta
+```
+
+Both events remain in DAIL.
+
+## 29. Chargeback
+
+A chargeback may create:
+
+```text
+chargeback_obligation
++ fee_obligation
++ allocation_reversal
++ entitlement_review
+```
+
+depending on policy.
+
+A provider chargeback does not automatically prove underlying rights failure.
+
+## 30. Currency conversion
+
+For amount `A_base` and adopted rate `fx`:
+
+```text
+A_quote = A_base * fx
+```
+
+The rate record must include:
+
+- provider/source;
+- observed time;
+- pair;
+- direction;
+- freshness;
+- spread/fee treatment;
+- rounding.
+
+## 31. Multi-currency reconciliation
+
+```text
+institutional_value = provider_amount * accepted_fx_rate
+```
+
+Do not compare currencies without conversion to a common unit and timestamp context.
+
+## 32. Rounding
+
+For currency minor units:
+
+```text
+rounded_i = round(raw_i, precision, rounding_mode)
+```
+
+Rounding residue:
+
+```text
+residue = N - Σ rounded_i
+```
+
+The residue must be deterministically assigned.
+
+Candidate rules:
+
+```text
+largest_remainder
+fixed_reserve_recipient
+last_recipient_by_stable_order
+```
+
+The chosen rule must be explicit and versioned.
+
+## 33. Largest-remainder allocation
+
+For integer minor-unit allocation:
+
+1. compute exact raw shares;
+2. floor each share;
+3. calculate remaining units;
+4. allocate remaining units to largest fractional remainders with stable tie-breaking.
+
+This prevents money disappearing through rounding.
+
+## 34. Idempotent payment allocation
+
+```text
+allocation(event_id) executes once per semantic event
+```
+
+Repeated webhooks must resolve to the same allocation record rather than duplicate payouts.
+
+## 35. Revenue recognition separation
+
+```text
+cash received != earned revenue
+invoice issued != cash received
+entitlement issued != revenue recognized
+provider settled != institutional reconciliation complete
+```
+
+Accounting treatment must remain separately governed.
+
+## 36. Deferred/held amount
+
+```text
+available_to_settle = calculated_obligation - holds - unresolved_disputes
+```
+
+A hold is an explicit state, not missing money.
+
+## 37. Time-weighted allocation
+
+If an entitlement is effective for only part of a period and the agreement permits proration:
+
+```text
+proration_factor = eligible_time / full_period_time
+prorated_amount = full_period_amount * proration_factor
+```
+
+Time basis must be specified: calendar days, seconds, billing days, etc.
+
+## 38. Usage-weighted allocation
+
+```text
+share_i = pool * usage_i / Σ usage_j
+```
+
+Only use where usage is the contractual allocation basis.
+
+## 39. Attribution-weighted allocation
+
+For evidence-backed attribution scores `a_i`:
+
+```text
+share_i = pool * a_i / Σa_j
+```
+
+Attribution scores must be auditable and cannot exceed rights/economic scope.
+
+## 40. Waterfall model
+
+A generic waterfall:
+
+```text
+GROSS
+  |
+  v
+MANDATORY REVERSALS / REFUNDS
+  |
+  v
+AUTHORIZED TAX / WITHHOLDING
+  |
+  v
+CONTRACTUAL DIRECT COSTS
+  |
+  v
+MINIMUM GUARANTEES / SENIOR OBLIGATIONS
+  |
+  v
+ROYALTY / COMMISSION POOLS
+  |
+  v
+TREASURY / RESERVE
+  |
+  v
+RESIDUAL
+```
+
+Each layer requires contractual or policy authority.
+
+## 41. Economic schedule schema
+
+```yaml
+schedule_id:
+version:
+effective_from:
+effective_to:
+currency:
+gross_basis:
+deductions:
+recipients:
+  - recipient_id:
+    obligation_type:
+    basis_points:
+    priority:
+    cap:
+    floor:
+rounding_policy:
+reserve_rules:
+reversal_rules:
+tax_handling_ref:
+authority_ref:
+```
+
+## 42. Calculation receipt
+
+```yaml
+calculation_id:
+trigger_event_id:
+schedule_id:
+schedule_version:
+gross:
+deductions:
+net_distributable:
+allocations:
+rounding_residue:
+holds:
+expected_settlement:
+provider_evidence_refs:
+reconciliation_state:
+DAIL_ref:
+```
+
+## 43. Economic conservation invariant
+
+For a closed allocation event:
+
+```text
+gross = deductions + allocations + holds + residue
+```
+
+with signed corrections handled explicitly.
+
+No unexplained value may disappear.
+
+## 44. Rights/economics invariant
+
+```text
+payment cannot expand rights
+allocation cannot create ownership
+settlement cannot retroactively authorize an unlicensed use
+```
+
+## 45. Provider-independence invariant
+
+```text
+Stripe amount
+PayPal amount
+bank amount
+crypto settlement amount
+```
+
+are provider observations. CHLOM's stable economic schedule remains independent of provider object IDs.
+
+## Final model
+
+```text
+RIGHTS
+ + ECONOMIC SCHEDULE
+ + EVENT EVIDENCE
+ + CALCULATION
+ + AUTHORIZATION
+ + PROVIDER EXECUTION
+ + RECONCILIATION
+ + CORRECTION HISTORY
+ = GOVERNED ECONOMIC STATE
+```
+
+The math is deterministic only after the institutional inputs are valid.

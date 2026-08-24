@@ -1,0 +1,411 @@
+---
+title: "DREP — Dispute Resolution Engine & Protocol"
+sidebarTitle: "DREP — Dispute Resolution"
+description: "Standalone comprehensive CHLOM engine article for the recovered Dispute Resolution Engine & Protocol: intake, evidence, reviewer/arbitrator assignment, holds, rulings, remedies, appeals and DAIL-backed precedent lineage."
+icon: "gavel"
+keywords: ["CHLOM DREP", "Dispute Resolution Engine", "disputes", "arbitration", "appeals", "remedies", "DAIL"]
+---
+
+# DREP — Dispute Resolution Engine & Protocol
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.drep
+canonical_name: Dispute Resolution Engine & Protocol
+canonical_acronym: DREP
+artifact_class: engine_protocol
+recovered_titles:
+  - Dispute Resolution Engine & Protocol (DREP) Whitepaper
+  - dispute / arbitration / case module lineage
+source_lineage:
+  - recovered Help Center paper/engine estate
+  - Case Management Pallet
+  - Dispute & Arbitration Pallet
+  - historical DAL adjudication lineage
+current_mapping:
+  - P-02 Governance & Compliance
+  - case/dispute/remedy service
+status: recovered_concept_with_current_semantic_mapping
+legal_arbitration_status: not_implied_by_engine
+```
+
+## Purpose
+
+DREP is CHLOM's dedicated engine/protocol for **structured disputes that cannot be resolved safely as ordinary transaction rules**. It coordinates intake, evidence preservation, interim holds, reviewer/arbitrator assignment, deliberation, rulings, remedies, appeals, enforcement handoffs and precedent/correction lineage.
+
+```text
+DISPUTE / CLAIM / APPEAL
+          |
+          v
+INTAKE + JURISDICTION/SCOPE
+          |
+          v
+CASE + EVIDENCE VAULT
+          |
+          v
+INTERIM HOLD? -------- yes ---> bounded pause/HOLD
+          |
+          v
+REVIEWER / ARBITRATOR SELECTION
+          |
+          v
+REVIEW / DELIBERATION / HEARING
+          |
+          v
+RULING
+          |
+   +------+-------+
+   |              |
+ REMEDY         APPEAL
+   |              |
+   +------+-------+
+          |
+ENFORCEMENT / RESTORATION / CORRECTION
+          |
+          v
+DAIL + PRECEDENT / LINEAGE
+```
+
+## Internal dispute versus legal arbitration
+
+DREP's historical protocol language includes arbitration, but current institutional documentation must keep two scopes distinct:
+
+```text
+CHLOM internal dispute resolution
+      !=
+legally binding arbitration
+```
+
+Binding legal arbitration requires the actual agreement, governing law, arbitrator authority and procedure that create that effect.
+
+## Intake
+
+A dispute intake should identify:
+
+- claimant(s);
+- respondent(s);
+- subject asset/license/transaction/provider/decision;
+- dispute class;
+- relevant agreements/policies;
+- requested remedy;
+- supporting evidence;
+- confidentiality;
+- urgency/interim-hold request.
+
+## Dispute object
+
+```yaml
+dispute_id: stable ID
+case_ref: stable case ID
+claimant_refs: []
+respondent_refs: []
+subject_refs: []
+dispute_type: rights|license|commerce|settlement|governance|provider|identity|other
+agreement_refs: []
+policy_refs: []
+opened_at: timestamp
+status: intake|screening|accepted|held|review|decision_pending|decided|appealed|closed
+confidentiality: public|internal|restricted
+```
+
+## Scope / jurisdiction screening
+
+DREP should determine whether CHLOM has authority to decide the issue, can only provide an internal remedy, or must refer/coordinate with another process.
+
+```text
+DREP authority covers requested issue?
+    no -> REFER / HOLD / limited internal action
+    yes
+      |
+      v
+continue case
+```
+
+Examples requiring external authority can include courts, regulators, payment-network dispute systems, legally binding arbitration or licensed-professional determinations.
+
+## Evidence
+
+DREP uses Evidence Vault/DAIL rather than attaching every private source to public case records.
+
+Evidence can include:
+
+- agreements;
+- rights/DLA records;
+- provider/payment receipts;
+- DAIL event history;
+- attestations;
+- communications;
+- identity/credential evidence;
+- oracle/external records;
+- audit findings;
+- expert/professional reports.
+
+## Evidence challenge
+
+```text
+EVIDENCE E
+  |
+challenge / contradiction
+  |
+review provenance / integrity / relevance
+  |
+accepted | qualified | rejected | unresolved
+```
+
+A challenge does not delete original evidence.
+
+## Reviewer / arbitrator assignment
+
+Selection should consider:
+
+- current authority;
+- conflict of interest;
+- domain competence;
+- confidentiality/access;
+- required professional qualification;
+- independence/rotation rules;
+- quorum/number of reviewers if applicable.
+
+## Scribe/verifier assistance
+
+Scribes/verifiers can help organize/verify evidence while final decision authority remains with the assigned decision maker(s).
+
+```text
+scribe / verifier
+   -> evidence assistance
+   !=
+final ruling authority automatically
+```
+
+## Interim HOLD
+
+DREP can request/activate a bounded interim hold when authority supports it.
+
+Possible scopes:
+
+- DLA/license transfer;
+- LEX listing;
+- entitlement;
+- settlement/payout;
+- provider/issuer role;
+- public claim;
+- disputed asset use.
+
+The hold scope must be no broader than necessary/authorized.
+
+## Deliberation
+
+A decision packet should freeze a reproducible snapshot:
+
+```text
+case/dispute version
+policy/agreement versions
+evidence set
+reviewer set
+time/as-of
+requested remedies
+```
+
+New evidence after the snapshot can create a supplement/reopen/appeal path rather than silent mutation.
+
+## Ruling
+
+```yaml
+ruling_id: stable ID
+dispute_ref: required
+decision_maker_refs: []
+authority_ref: required
+ruling_type: affirm|deny_claim|modify|restore|suspend|revoke|refund_handoff|other
+reason_codes: []
+reasoning_ref: protected/public as appropriate
+evidence_refs: []
+issued_at: timestamp
+effective_at: timestamp
+review_or_appeal_ref: optional
+```
+
+## Remedy engine handoffs
+
+DREP may instruct/authorize domain remedies but does not directly own all domain state.
+
+```text
+rights remedy -> P-03
+commerce/refund -> P-06
+settlement/clawback -> P-11
+identity/role -> P-01/P-02
+provider operations -> P-10/integration owner
+public claims -> relevant pallet + P-10 docs
+```
+
+## Appeal
+
+```text
+RULING R1
+   |
+appeal filed within applicable rule
+   |
+new reviewer/process + existing/new evidence
+   |
+RULING R2
+   |
+AFFIRM | MODIFY | REVERSE | REMAND
+```
+
+R1 remains in DAIL lineage.
+
+## Precedent / reusable decisions
+
+Where policy permits, a public-safe precedent can summarize a decision pattern without exposing private case facts.
+
+```yaml
+precedent_id: stable ID
+source_ruling_ref: restricted
+issue_class: controlled
+public_principle: safe statement
+scope: explicit
+status: active|superseded|withdrawn
+```
+
+DREP precedent is institutional guidance, not judicial precedent beyond CHLOM's authority.
+
+## Historical DAL relationship
+
+Historical **Decentralized Adjudication Layer** concepts are represented by DREP/case/remedy functionality in the current architecture, while current DAIL remains the evidence/information ledger.
+
+```text
+DAIL = records/evidence lineage
+DREP = dispute/adjudication process
+```
+
+## Provider dispute relationship
+
+Provider disputes/chargebacks/appeals remain separate processes.
+
+```text
+provider ruling
+   -> evidence / provider-side effect
+   !=
+complete CHLOM institutional ruling
+```
+
+DREP reconciles affected local state according to current authority.
+
+## AI boundary
+
+AI may:
+
+- classify dispute type;
+- summarize evidence;
+- detect contradictions;
+- generate chronology;
+- retrieve relevant policy/precedent;
+- draft questions/recommendations.
+
+AI does not self-issue a reserved legal/professional ruling.
+
+## Current events
+
+```text
+ct.drep.dispute.filed.v1
+ct.drep.dispute.accepted.v1
+ct.drep.evidence.challenged.v1
+ct.drep.reviewer.assigned.v1
+ct.drep.hold.activated.v1
+ct.drep.ruling.issued.v1
+ct.drep.remedy.dispatched.v1
+ct.drep.appeal.filed.v1
+ct.drep.appeal.decided.v1
+ct.drep.case.closed.v1
+ct.drep.precedent.published.v1
+```
+
+## Algorithms/IP
+
+Potential protected DREP assets:
+
+- conflict-of-interest matching;
+- reviewer assignment;
+- evidence chronology/relevance ranking;
+- precedent retrieval;
+- dispute similarity clustering;
+- remedy impact mapping;
+- private-evidence redaction/public-projection algorithms.
+
+## Failure modes
+
+### No authority for requested remedy
+
+DREP limits/refers the case rather than manufacturing power.
+
+### Reviewer conflict discovered late
+
+Record conflict, replace/review affected work under policy, preserve lineage.
+
+### Provider chargeback reverses funds during rights dispute
+
+Record provider action, reconcile P-06/P-11, continue rights adjudication if still material.
+
+### New source proves prior ruling relied on false evidence
+
+Use correction/reopen/appeal/adjudication; do not rewrite R1 invisibly.
+
+### Automated system tries to execute irreversible remedy before appeal window
+
+Use timelock/HOLD where applicable; current policy governs timing.
+
+## Security/privacy
+
+Disputes can contain sensitive identity, legal, financial, security and proprietary evidence. Public case projections must minimize data and avoid prejudicial/unverified statements.
+
+## Public / restricted twin
+
+Public-safe:
+
+- procedure;
+- status semantics;
+- published precedent;
+- approved ruling summaries;
+- appeal/remedy architecture.
+
+Restricted:
+
+- evidence;
+- party identities where private;
+- legal/professional analysis;
+- settlement terms;
+- security incidents;
+- deliberation;
+- protected reviewer-selection/evidence algorithms.
+
+## Metrics
+
+Potential metrics:
+
+- cases by status/type;
+- median/percentile case age by class;
+- HOLD duration;
+- appeal rate;
+- ruling modification/reversal rate;
+- unresolved evidence conflicts;
+- remedy execution age;
+- provider/institution disagreement cases;
+- conflict-of-interest reassignments.
+
+## Invariants
+
+```text
+dispute filed != wrongdoing proven
+DREP != court/regulator
+internal arbitration != legal arbitration automatically
+AI analysis != ruling
+interim hold != final remedy
+provider ruling != institutional ruling
+appeal != erasure
+precedent != authority beyond scope
+DAIL != adjudicator
+```
+
+## Status
+
+DREP remains a standalone CHLOM engine/protocol and is mapped to current P-02 case/dispute/remedy services with P-10 Evidence Vault/DAIL support.

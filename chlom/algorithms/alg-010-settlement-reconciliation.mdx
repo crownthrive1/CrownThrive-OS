@@ -1,0 +1,118 @@
+---
+title: "ALG-010 — Settlement Reconciliation"
+sidebarTitle: "ALG-010 Settlement Reconciliation"
+description: "Standalone CHLOM reconciliation algorithm comparing expected obligations with normalized provider settlement evidence, duplicates, reversals and mismatches."
+icon: "money-bill-transfer"
+keywords: ["CHLOM ALG-010", "settlement reconciliation", "provider evidence", "mismatch", "reversal"]
+---
+
+# ALG-010 — Settlement Reconciliation
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-010
+name: Settlement Reconciliation
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Smart Treasury; LEX settlement; P-11 reconciliation
+version: 1.0.0
+current_authority: specification_only
+```
+
+Settlement Reconciliation compares CHLOM's expected economic obligations with evidence from payment, payout, banking, marketplace or other execution providers. The provider is treated as an execution system, not the source of institutional economic truth.
+
+## Inputs
+
+```yaml
+expected_record:
+  obligation_id
+  amount
+  currency
+  recipient_or_destination
+  due_or_effective_time
+  provider_aliases[]
+provider_event:
+  provider
+  provider_event_id
+  amount
+  currency
+  status
+  object_aliases[]
+  occurred_at
+  reversal_or_refund_refs[]
+```
+
+## Procedure
+
+```text
+function reconcile_settlement(expected, provider):
+    normalized_provider = normalize(provider)
+    variance = normalized_provider.amount - expected.amount
+
+    if same_semantic_event_already_settled(provider):
+        return DUPLICATE
+
+    if variance == 0 and identifiers_match:
+        return MATCH
+
+    if within_rounding_policy(variance):
+        return REVIEW_ROUNDING
+
+    if provider_event_reversed:
+        return REVERSAL_REQUIRED
+
+    return HOLD_MISMATCH
+```
+
+## Matching dimensions
+
+Matching should include semantic event identity, obligation/reference IDs, amount, currency, destination, expected execution class, relevant date window and provider status. A same-amount transfer to the wrong recipient is not a match.
+
+## Typed outcomes
+
+- `MATCH`: evidence and obligation reconcile.
+- `DUPLICATE`: already reconciled semantic event.
+- `REVIEW_ROUNDING`: variance falls within an adopted deterministic rounding policy but requires classification according to the schedule.
+- `REVERSAL_REQUIRED`: provider execution was reversed/refunded and CHLOM obligations must be corrected through an explicit compensating path.
+- `HOLD_MISMATCH`: material mismatch requires investigation.
+- `PENDING`: provider state is not final where the provider contract distinguishes pending from settled.
+
+## Mismatch handling
+
+A mismatch must not be hidden by changing the expected record to equal the provider. Investigate whether the source is an incorrect obligation, provider fee treatment, currency conversion, duplicate, partial settlement, payout aggregation, provider error or legitimate correction.
+
+## Provider normalization
+
+Each provider adapter converts native statuses and identifiers into stable CHLOM settlement semantics. Normalization versions are recorded so historic reconciliation can be reproduced.
+
+## Output
+
+```yaml
+reconciliation_id:
+expected_ref:
+provider_event_ref:
+outcome:
+variance:
+variance_reason:
+normalized_status:
+reason_codes[]:
+requires_action:
+DAIL_refs[]:
+```
+
+## DAIL and correction
+
+Reconciliation is append-only. If a later provider event changes a prior result, append a reversal/correction and recompute effective settlement. Keep the original provider observation and decision lineage.
+
+## Security properties
+
+Prevent provider-event replay, alias collision, cross-account matching, currency confusion, partial-settlement misclassification and spoofed external events.
+
+## Tests
+
+Test exact match, wrong amount, wrong currency, wrong recipient, duplicate, pending-to-settled progression, refund, partial refund, provider fee difference, rounding difference, batch payout and event arriving before the expected obligation record.
+
+## Versioning
+
+Adapter and reconciliation changes require regression against captured provider fixtures and previously reconciled cases.

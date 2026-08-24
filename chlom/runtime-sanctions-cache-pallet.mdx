@@ -1,0 +1,260 @@
+---
+title: "Sanctions Cache Pallet — Historical Runtime Record"
+sidebarTitle: "Sanctions Cache Pallet"
+description: "Standalone reconstruction of CHLOM's recovered Sanctions Cache Pallet (SCP) for fast identifier-level screening state, source/freshness controls, safe cache semantics and current policy/oracle mapping."
+icon: "shield"
+keywords: ["CHLOM Sanctions Cache Pallet", "SCP", "sanctions", "cache", "freshness", "screening", "oracle"]
+---
+
+# Sanctions Cache Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.sanctions-cache
+historical_name: Sanctions Cache Pallet
+historical_short_name: SCP
+recovered_article: CHLOM Sanctions Cache Pallet (SCP) Whitepaper
+artifact_class: historical_runtime_pallet
+recovery_state: reconstructed_from_recovered_title_and_related_sources
+current_mapping:
+  - Oracle Hub / external evidence
+  - P-02 policy evaluation
+  - identity/entity resolution
+  - temporal freshness controls
+production_state: historical_runtime_not_current_screening_certification
+```
+
+## Source basis
+
+The recovered Help Center explicitly defines the Sanctions Cache Pallet as **fast, cache-based sanction flags keyed to identifiers for pre-check gating** and names a dedicated SCP whitepaper. Historical Technical Blueprint material also describes sanctions/AML lists arriving through oracles for transaction eligibility checks.
+
+The precise original SCP body and private matching logic are not confirmed recovered. This public article therefore preserves the architecture without exposing or inventing sensitive matching thresholds.
+
+## Purpose
+
+Sanctions screening can require external lists and entity-resolution work that should not be repeated synchronously for every operation. SCP modeled a fast, freshness-aware projection of screening state.
+
+```text
+AUTHORITATIVE / APPROVED SOURCES
+        |
+        v
+ORACLE / INGESTION
+        |
+NORMALIZE + ENTITY/IDENTIFIER RESOLUTION
+        |
+        v
+SANCTIONS SCREENING RESULT
+        |
+        v
+CACHE WITH SOURCE + VERSION + EXPIRY
+        |
+        v
+PRE-CHECK CONSUMER
+        |
+PASS / HOLD / DENY UNDER POLICY
+```
+
+## Non-purpose
+
+The cache is not:
+
+- the authoritative sanctions source itself;
+- a universal legal conclusion;
+- a substitute for human/professional review where required;
+- a place to expose raw sensitive/watchlist matching details publicly;
+- proof that a current production sanctions provider is integrated;
+- a permanent adverse label.
+
+## Cache entry
+
+```yaml
+screening_cache_id: stable ID
+subject_ref: institutional identity/entity/pseudonymous ref
+identifier_ref: protected/tokenized reference where possible
+source_profile_ref: adopted source set
+source_version_refs: list
+screening_policy_ref: exact policy/version
+result: clear|potential_match|confirmed_match|unresolved|error
+reason_class: safe normalized class
+confidence_class: optional/restricted
+observed_at: timestamp
+valid_until: timestamp
+review_ref: optional
+status: active|superseded|revoked
+classification: restricted by default
+```
+
+## Three-valued operational logic
+
+For public-safe architecture, the useful control model is:
+
+```text
+CLEAR + FRESH + SOURCE CURRENT -> may allow policy evaluation to continue
+POTENTIAL / UNRESOLVED / STALE -> HOLD
+CONFIRMED + POLICY PROHIBITS -> DENY
+```
+
+No hidden match-score threshold is published here.
+
+## Freshness
+
+Sanctions state is temporal.
+
+```text
+now <= valid_until
+```
+
+is necessary but not sufficient. The underlying source profile must also remain valid/current.
+
+A cache entry should be invalidated or reevaluated when:
+
+- source list version changes;
+- identity/entity aliases change materially;
+- screening policy changes;
+- prior match is corrected;
+- source/provider is withdrawn;
+- confidence/matching pipeline is updated.
+
+## Identifier handling
+
+Public/runtime APIs should minimize exposure of raw sensitive identifiers. The system can use stable subject IDs and protected lookup tokens/hashes where appropriate, with raw evidence retained only in restricted custody.
+
+Hashing alone is not automatically privacy-safe for low-entropy identifiers; the implementation must use an approved privacy/security design.
+
+## Entity resolution boundary
+
+```text
+name similarity != identity
+identifier collision != confirmed match
+provider candidate != institutional confirmed match
+```
+
+A potential match should route to HOLD/review rather than become an unreviewed adverse fact.
+
+## Source profiles
+
+A source profile may define:
+
+- issuing/authoritative organization;
+- provider/feed alias;
+- jurisdiction/scope;
+- update cadence;
+- data schema/version;
+- signature/integrity method;
+- freshness tolerance;
+- failure behavior;
+- professional/legal review requirements.
+
+## Pre-check integration
+
+```text
+ACTION REQUEST
+   |
+IDENTITY/ENTITY RESOLUTION
+   |
+SANCTIONS CACHE LOOKUP
+   |
+  +-- fresh clear ----> continue remaining policy gates
+  +-- stale/error ----> HOLD refresh
+  +-- potential ------> HOLD review
+  +-- confirmed ------> policy-specific DENY/HOLD
+```
+
+SCP contributes evidence to a larger decision. It does not replace ACE/Policy authority.
+
+## Source outage behavior
+
+A sanctions provider outage should not automatically convert the last-known state into indefinitely current truth.
+
+Policy must define:
+
+- maximum acceptable age;
+- whether stale clear results become HOLD;
+- whether confirmed restrictions remain sticky pending correction;
+- retry/escalation behavior.
+
+## Corrections and false positives
+
+A correction should create new screening lineage:
+
+```text
+potential/confirmed match v1
+   -> review/correction evidence
+   -> result v2
+```
+
+The original event remains in restricted audit history; public-facing state reflects current authorized result.
+
+## DAIL events
+
+```text
+ct.sanctions.source.updated.v1
+ct.sanctions.screening.requested.v1
+ct.sanctions.screening.completed.v1
+ct.sanctions.screening.held.v1
+ct.sanctions.cache.refreshed.v1
+ct.sanctions.cache.expired.v1
+ct.sanctions.match.reviewed.v1
+ct.sanctions.result.corrected.v1
+```
+
+## Threat model
+
+- stale clear cache;
+- malicious/misconfigured source;
+- false positive or false negative;
+- identifier collision;
+- cache poisoning;
+- tenant cross-contamination;
+- privacy leakage;
+- timing side channels;
+- hidden provider failure;
+- manual override without authority/evidence;
+- unbounded negative-list retention.
+
+## Test vectors
+
+1. fresh clear \+ current source -\> continue policy chain;
+2. clear but expired -\> HOLD refresh;
+3. potential match -\> HOLD review;
+4. confirmed match \+ prohibited action -\> deny under applicable policy;
+5. unknown source version -\> HOLD;
+6. source outage beyond freshness -\> HOLD;
+7. false-positive correction -\> superseding result, original retained in restricted audit;
+8. same display name, distinct identity -\> no automatic match;
+9. cross-tenant lookup -\> isolation enforced;
+10. raw screening evidence requested from public API -\> denied/redacted.
+
+## Current mapping
+
+Modern CHLOM can implement SCP as a protected screening cache/service backed by Oracle Hub, identity resolution, policy evaluation, temporal controls, DAIL and review workflows. It need not be a blockchain pallet.
+
+## Restricted companion
+
+Restricted custody is especially important here and may include:
+
+- exact source/provider configuration;
+- match algorithms;
+- thresholds/weights;
+- raw identifiers;
+- private sanctions records;
+- false-positive evidence;
+- review identities;
+- exploit/abuse test cases.
+
+## Invariants
+
+```text
+cache != source authority
+name match != identity match
+potential match != confirmed violation
+stale clear != current clear
+provider result != institutional/legal conclusion automatically
+screening result != universal action authority
+correction != erasure
+```
+
+## Status
+
+`historical_preserved + reconstructed_source_grounded`. The component is institutionally preserved with a current protected-service mapping; no current provider integration or legal-screening certification is asserted.

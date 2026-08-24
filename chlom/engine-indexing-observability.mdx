@@ -1,0 +1,313 @@
+---
+title: "CHLOM Indexing & Observability Engine"
+sidebarTitle: "Indexing & Observability Engine"
+description: "Standalone CHLOM engine article for event indexing, searchable projections, service health, metrics, traces, alerts, explorer data, privacy tiers, stale-state detection and canonical-state boundaries."
+icon: "radar"
+keywords: ["CHLOM Indexing Observability Engine", "indexer", "metrics", "alerts", "DAIL", "explorer", "service health"]
+---
+
+# CHLOM Indexing & Observability Engine
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.indexing-observability
+canonical_name: Indexing & Observability Engine
+artifact_class: engine
+source_lineage:
+  - recovered CHLOM component/engine estate
+  - Grand Prospectus observability/indexing architecture
+  - current DAIL / Explorer reconstruction
+current_mapping:
+  - P-10 Operations & Institutional Memory
+  - DAIL index / search
+  - service health / metrics / alerting
+status: reconstructed_source_grounded
+production_state: implementation_evidence_required_per_backend
+```
+
+## Purpose
+
+This engine converts event/evidence/service state into searchable and monitorable projections without turning indexes, metrics or dashboards into canonical business truth.
+
+```text
+DOMAIN EVENTS / DAIL / SERVICE TELEMETRY
+                |
+                v
+NORMALIZE / CLASSIFY
+                |
+       +--------+--------+
+       |                 |
+     INDEX            OBSERVABILITY
+       |                 |
+ search/explorer     metrics/logs/traces
+       |                 |
+       +--------+--------+
+                |
+        ALERTS / DASHBOARDS
+```
+
+## Two data planes
+
+```text
+BUSINESS/EVIDENCE PLANE
+  DAIL/domain events, canonical object state, correction lineage
+
+TELEMETRY PLANE
+  logs, metrics, traces, health signals
+```
+
+They can correlate but are not interchangeable.
+
+## Index projection
+
+```yaml
+index_record:
+  object_or_event_ref: stable ID
+  projection_version: string
+  indexed_at: timestamp
+  source_version_ref: required
+  searchable_fields: policy-filtered
+  classification: public|internal|restricted
+  stale_after: optional
+```
+
+## Canonical boundary
+
+```text
+index result != canonical current state
+```
+
+Material actions re-read the domain service. The index exists for discovery, filtering and analysis.
+
+## Search families
+
+- DLA/license search;
+- asset/right search;
+- case/dispute search;
+- event/DAIL search;
+- attestation/proof search;
+- proposal/decision search;
+- provider/integration search;
+- source/document/component search;
+- public Compliance Explorer projections.
+
+## Privacy-tier indexes
+
+```text
+PUBLIC INDEX
+  public-safe projections only
+
+ROLE/INTERNAL INDEX
+  authorized operational metadata
+
+RESTRICTED INDEX
+  minimal searchable metadata with access-controlled content retrieval
+```
+
+Restricted content should not leak through counts, autocomplete or snippets.
+
+## Event indexing
+
+```text
+event arrives
+  |
+schema/version recognized?
+  no -> quarantine/HOLD
+  yes
+  |
+classification + subject aliases
+  |
+index update
+  |
+projection readback / lag metric
+```
+
+## Rebuildability
+
+An index should be rebuildable from canonical records/events where architecture supports it.
+
+```text
+canonical history
+   |
+replay / rebuild
+   |
+new index version
+```
+
+This reduces dependence on a single search vendor.
+
+## Observability signals
+
+```text
+service availability
+latency
+error rate
+queue depth
+workflow age
+provider readback lag
+index lag
+policy-evaluation latency
+DAIL write/readback health
+webhook delivery failure
+reconciliation mismatch age
+```
+
+Metric definitions require exact numerators/denominators/time windows.
+
+## Logs
+
+Logs are diagnostic data, not automatically institutional evidence. Material security/business events can be normalized into DAIL separately.
+
+## Traces
+
+Traces correlate cross-service execution:
+
+```text
+request R
+  |
+identity -> policy -> rights -> provider -> readback -> DAIL
+```
+
+Trace IDs can assist incident/debugging without becoming public object IDs.
+
+## Alerts
+
+```text
+signal / condition
+   |
+threshold/rule version
+   |
+alert candidate
+   |
+dedupe/suppress/correlate
+   |
+route to actor/workflow
+```
+
+Alerting does not create authority to execute arbitrary remediation.
+
+## Alert classes
+
+- service outage;
+- provider mismatch;
+- stale evidence;
+- failed workflow;
+- DAIL/index lag;
+- policy/config drift;
+- expiring critical credential/license;
+- security anomaly;
+- settlement mismatch;
+- public-doc/link failure.
+
+Protected thresholds remain restricted.
+
+## Service-health model
+
+```yaml
+health_record:
+  service_ref: stable ID
+  state: healthy|degraded|unavailable|unknown
+  observed_at: timestamp
+  evidence_refs: []
+  source: monitor/provider/readback
+```
+
+Service health does not equal compliance status.
+
+## Staleness
+
+```text
+projection_age = now - source_version_time
+```
+
+The applicable stale threshold is projection/domain specific. A stale projection can be visibly marked and excluded from material actions.
+
+## Provider mismatch detection
+
+```text
+expected canonical state
+       vs
+provider-observed state
+       |
+       v
+mismatch record
+       |
+severity / affected actions / owner
+```
+
+This is a critical cross-platform CHLOM pattern.
+
+## Compliance Explorer
+
+The engine supports public-safe views such as:
+
+- public DLA verification;
+- attestation state;
+- governance decisions;
+- proof anchors;
+- public component/version status.
+
+Public explorer does not expose the restricted estate.
+
+## Events
+
+```text
+ct.index.projection.updated.v1
+ct.index.projection.stale.v1
+ct.index.rebuild.started.v1
+ct.index.rebuild.completed.v1
+ct.observability.health.changed.v1
+ct.observability.alert.created.v1
+ct.observability.provider_mismatch.detected.v1
+ct.observability.alert.resolved.v1
+```
+
+## Failure modes
+
+### Search vendor unavailable
+
+Canonical services remain authoritative; fail search/discovery gracefully or use certified fallback if available.
+
+### Index says ACTIVE, canonical DLA is REVOKED
+
+Display canonical state on detail/material action; mark index mismatch/stale and repair projection.
+
+### Metrics pipeline drops data
+
+Mark period/metric incomplete; do not claim availability/SLA total as definitive.
+
+### Alert storm
+
+Deduplicate/correlate under protected rules while preserving underlying event evidence.
+
+## Security/privacy
+
+- redact secrets/tokens from logs;
+- classification-aware indexing;
+- tenant separation;
+- restricted-search authorization;
+- export controls;
+- retention policies;
+- prevent enumeration leaks;
+- protect incident/security telemetry.
+
+## Restricted companion
+
+Contains thresholds, alert routing, incident telemetry, security logs, provider topology, anti-abuse rules and private index schemas.
+
+## Invariants
+
+```text
+index != canonical truth
+metric != business fact without definition
+alert != authority
+service health != compliance status
+public explorer != full DAIL
+log line != institutional evidence automatically
+provider mismatch != provider wins
+```
+
+## Status
+
+The Indexing & Observability Engine is a first-class CHLOM engine mapped to P-10, DAIL search/projections, service telemetry and public/private explorer surfaces.

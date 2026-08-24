@@ -1,0 +1,119 @@
+---
+title: "ALG-012 — Attestation Verification"
+sidebarTitle: "ALG-012 Attestation Verification"
+description: "Standalone CHLOM verification procedure for signed attestations, issuer authority, subject binding, revocation, expiry, evidence integrity and freshness."
+icon: "stamp"
+keywords: ["CHLOM ALG-012", "attestation verification", "issuer authority", "revocation", "evidence digest"]
+---
+
+# ALG-012 — Attestation Verification
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-012
+name: Attestation Verification
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: historical Attestations Pallet; DAIL; Evidence Vault; ZK/credential lineage
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-012 determines whether an attestation is usable as CHLOM evidence for a given policy context. A cryptographically valid signature is necessary when required, but it is not sufficient: the issuer must be authorized, the subject must match, the attestation must remain current, and its evidence binding must be intact.
+
+## Inputs
+
+```yaml
+attestation:
+  attestation_id
+  type
+  issuer_id
+  subject_id
+  claims
+  evidence_digest
+  issued_at
+  expires_at
+  signature_or_proof
+  schema_version
+policy_context:
+issuer_registry_version:
+revocation_state:
+```
+
+## Procedure
+
+```text
+function verify_attestation(attestation, policy):
+    require signature_valid(attestation)
+    require issuer_authorized(attestation.issuer, attestation.type)
+    require subject_matches(attestation.subject)
+    require not_revoked(attestation)
+    require not_expired(attestation)
+    require evidence_digest_valid(attestation)
+
+    if freshness_required and stale(attestation):
+        return HOLD
+
+    return PASS
+```
+
+## Verification dimensions
+
+### Authenticity
+
+Validate the signature/proof against the key or credential that was valid for the issuer at issuance time, subject to the adopted key-rotation policy.
+
+### Issuer authority
+
+The issuer registry must show that the issuer was authorized for the attestation type and relevant scope. A valid signature from an unauthorized issuer is not sufficient.
+
+### Subject binding
+
+The attestation must unambiguously refer to the intended person, organization, asset, event, license, provider or other governed object. Alias resolution must not permit cross-tenant identity collision.
+
+### Revocation and expiry
+
+Check explicit revocation, replacement/supersession and expiration. Historical validity does not imply current usability.
+
+### Evidence integrity
+
+Where the attestation binds to underlying evidence, the digest or proof reference must match the evidence object or current evidence projection allowed by policy.
+
+### Freshness
+
+Some attestations remain valid until expiry; others require a shorter policy freshness window. A still-unexpired attestation can therefore be HOLD if a more recent observation is mandatory.
+
+## Output
+
+```yaml
+verification_id:
+attestation_ref:
+disposition: PASS|HOLD|DENY
+issuer_authority_ref:
+subject_binding_ref:
+revocation_checked_at:
+freshness_state:
+reason_codes[]:
+algorithm_version:
+```
+
+## Failure semantics
+
+Invalid signature, revoked attestation or confirmed subject mismatch normally DENY its use. Unavailable revocation service, stale but refreshable evidence or unresolved issuer-currentness should HOLD when the policy requires certainty.
+
+## Privacy
+
+Do not expose restricted underlying evidence merely to prove an attestation was checked. Public projections should disclose only the minimum permitted claim, verification result, source class and non-sensitive lineage.
+
+## DAIL evidence
+
+Record the verification result, source registry version, revocation check, freshness decision and evidence references. Never mutate the original attestation to represent a later revocation.
+
+## Tests
+
+Test valid attestation, invalid signature, wrong subject, unauthorized issuer, expired, revoked, replaced, stale, digest mismatch, key rotation, compromised-key revocation, cross-tenant alias collision and unavailable revocation source.
+
+## Versioning
+
+Changes to issuer authorization, key-history treatment, revocation or freshness semantics require a new version and compatibility review.

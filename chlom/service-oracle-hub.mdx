@@ -1,0 +1,244 @@
+---
+title: "CHLOM Oracle Hub"
+sidebarTitle: "Oracle Hub"
+description: "Standalone CHLOM service article for external-data source registration, signed observations, freshness, corroboration, conflict handling, source assurance and current Oracle Lattice integration."
+icon: "tower-broadcast"
+keywords: ["CHLOM Oracle Hub", "Oracle Lattice", "external evidence", "freshness", "quorum", "source registry"]
+---
+
+# CHLOM Oracle Hub
+
+## Canonical record
+
+```yaml
+service_id: ct.chlom.service.oracle-hub
+canonical_name: Oracle Hub
+artifact_class: external_evidence_service
+source_lineage:
+  - recovered CHLOM component/engine estate
+  - Oracle Pallet
+  - Oracle & Scribe Network lineage
+  - Genesis Oracle Lattice
+current_mapping:
+  - P-02 Governance & Compliance
+  - external evidence / Oracle Lattice
+status: reconstructed_source_grounded
+production_sources: individually_evidenced
+```
+
+## Purpose
+
+Oracle Hub is the service boundary between **external observations** and CHLOM's governed decisions. It registers sources, ingests signed/authenticated observations, normalizes them, enforces freshness/provenance rules, detects conflicts, performs allowed aggregation/corroboration and exposes evidence to ACE/domain services.
+
+```text
+EXTERNAL SOURCE A ----+
+EXTERNAL SOURCE B ----+--> ORACLE HUB --> normalized observations
+EXTERNAL SOURCE C ----+         |
+                               freshness
+                               provenance
+                               conflict
+                               quorum/corroboration
+                                  |
+                                  v
+                         ACE / domain consumers
+```
+
+## Source registry
+
+```yaml
+source_id: stable ID
+source_type: regulatory|sanctions|identity|market|provider|oracle|human_scribe|other
+operator_ref: identity/org/provider
+approved_observation_types: []
+authentication_ref: protected/public metadata
+freshness_policy_ref: required
+assurance_state: candidate|approved|probation|suspended|revoked
+provider_aliases: []
+```
+
+Source approval is scope-specific.
+
+## Observation envelope
+
+```yaml
+observation_id: stable ID
+source_ref: required
+subject_ref: canonical ID or mapped alias
+observation_type: controlled
+value: structured/ref
+unit: optional
+observed_at: timestamp
+received_at: timestamp
+expires_at: nullable
+signature_or_receipt_ref: optional/required by source type
+status: candidate|accepted|held|rejected|superseded
+```
+
+## Freshness
+
+A generic freshness test:
+
+```text
+age = now - observed_at
+usable = age <= max_age(policy, observation_type)
+```
+
+The actual max-age is policy/source specific and may be restricted.
+
+## Corroboration
+
+Different source types require different aggregation methods.
+
+### Numeric
+
+Possible public-safe algorithms:
+
+```text
+median(x_1..x_n)
+weighted_mean = sum(w_i*x_i)/sum(w_i)
+```
+
+No production weights are set by this article.
+
+### Categorical/claim evidence
+
+Use source identity, independence, agreement/conflict and policy-specific confidence rather than meaningless arithmetic averaging.
+
+## Source independence
+
+Multiple feeds from one upstream origin are not automatically independent sources.
+
+```text
+3 API vendors all reselling Source X
+   !=
+3 independent corroborations
+```
+
+Source-lineage metadata should record common upstream dependencies where known.
+
+## Conflict state
+
+```text
+source A -> X
+source B -> not-X
+source C -> unavailable
+      |
+      v
+CONFLICT
+      |
+HOLD / additional source / human review according to policy
+```
+
+## Human Scribe relationship
+
+Scribes can contribute structured human-attested observations when their role/authority and evidence scope are defined. Oracle Hub records them as source observations, not superior truth.
+
+## AI relationship
+
+AIE/model outputs can be source inputs to Oracle Hub or consume Oracle Hub evidence depending on architecture. Their model/version/provenance remain explicit.
+
+## Sanctions-cache relationship
+
+Oracle Hub ingests accepted source snapshots; Sanctions Cache provides fast time-bounded current datasets to policy evaluation.
+
+## Provider adapter model
+
+```text
+stable source ID
+   |
+   +--> provider adapter A
+   +--> provider adapter B
+```
+
+Provider migration should not rewrite the semantic source identity when the underlying source remains the same.
+
+## Observation correction
+
+```text
+observation O1
+  |
+source correction / new observation
+  |
+O2 supersedes O1 for current state
+```
+
+O1 remains in DAIL/source history.
+
+## API contract families
+
+Potential interfaces:
+
+- register/update source;
+- ingest observation;
+- query latest accepted observation;
+- query observation history;
+- compute/corroborate aggregate;
+- report conflict;
+- suspend source;
+- expose public-safe observation proof.
+
+## Events
+
+```text
+ct.oracle.source.registered.v1
+ct.oracle.source.suspended.v1
+ct.oracle.observation.received.v1
+ct.oracle.observation.accepted.v1
+ct.oracle.observation.stale.v1
+ct.oracle.conflict.detected.v1
+ct.oracle.aggregate.updated.v1
+```
+
+## Failure modes
+
+### All sources unavailable
+
+Return unknown/HOLD where current external evidence is mandatory; never default to clear.
+
+### Source clock invalid
+
+Quarantine/HOLD observation until time semantics are resolved.
+
+### Provider changes units/schema
+
+Hold normalization/aggregate until adapter/schema migration is validated.
+
+### Source later retracts observation
+
+Record correction/supersession and propagate dependent review where material.
+
+### One high-weight source compromised
+
+Suspend source, recalculate affected aggregates, open incident/correction path.
+
+## Security threats
+
+- source spoofing;
+- credential compromise;
+- data poisoning;
+- Sybil/common-upstream sources;
+- stale replay;
+- unit manipulation;
+- source censorship;
+- provider lock-in;
+- hidden manual edits.
+
+## Restricted companion
+
+Contains source credentials, trust weights, provider contracts/topology, protected aggregation thresholds, anti-manipulation logic, incident evidence and private feeds.
+
+## Invariants
+
+```text
+oracle source != truth
+approved source != every observation accepted
+fresh != correct automatically
+corroboration != authority
+provider feed != canonical state
+multiple vendors != multiple independent sources automatically
+AI source != decision authority
+```
+
+## Status
+
+Oracle Hub is a current CHLOM external-evidence service specification and the cloud/provider-neutral mapping of the historical Oracle Pallet/Oracle Lattice architecture.

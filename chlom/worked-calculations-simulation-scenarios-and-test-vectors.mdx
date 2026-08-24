@@ -1,0 +1,884 @@
+---
+title: "CHLOM Worked Calculations, Simulation Scenarios and Test Vectors"
+sidebarTitle: "Worked Calculations"
+description: "Worked numerical examples for CHLOM tokenomics research, basis-point splits, royalties, treasury allocation, quorum, risk, oracle aggregation, SLA, timelocks, reserve math and reconciliation test vectors."
+icon: "calculator"
+keywords: ["CHLOM calculations", "worked examples", "simulation", "test vectors", "royalty split example", "quorum example", "risk score example", "staking APY", "treasury allocation"]
+---
+
+# CHLOM Worked Calculations, Simulation Scenarios and Test Vectors
+
+This page turns CHLOM formulas into **worked examples** that can be used for documentation, test fixtures and simulation.
+
+Every number below is illustrative unless explicitly identified as source-derived historical research. None is a current price, tax rate, royalty schedule, token parameter, investment promise or legal rule.
+
+## Test-vector format
+
+```yaml
+vector_id:
+classification: historical_source_example|derived_test_vector
+inputs:
+formula:
+expected_result:
+rounding:
+authority_effect: none
+notes:
+```
+
+---
+
+## TV-001 — Historical net supply balance
+
+Source-derived Genesis example.
+
+### Inputs
+
+```text
+S = 1,000,000,000 CHLOM
+i = 5% = 0.05
+b = 0.001 CHLOM / transaction
+N = 50,000,000,000 transactions/year
+```
+
+### Calculation
+
+```text
+issuance = iS
+         = 0.05 * 1,000,000,000
+         = 50,000,000
+
+burn = bN
+     = 0.001 * 50,000,000,000
+     = 50,000,000
+
+ΔS = issuance - burn
+   = 0
+```
+
+### Expected result
+
+```text
+S_next = 1,000,000,000
+```
+
+Historical equilibrium illustration only.
+
+---
+
+## TV-002 — Historical deflation scenario
+
+Source-derived narrative example.
+
+### Inputs
+
+```text
+S = 1,000,000,000
+i = 0.05
+b = 0.1
+N = 1,000,000,000
+```
+
+### Calculation
+
+```text
+issuance = 50,000,000
+burn = 100,000,000
+ΔS = -50,000,000
+```
+
+### Expected result
+
+```text
+S_next = 950,000,000
+net change relative to starting supply = -5%
+```
+
+---
+
+## TV-003 — Historical staking APY
+
+Source-derived Genesis example.
+
+```text
+reward_pool = 200,000,000
+release_years = 4
+annual_rewards = 50,000,000
+average_staked = 500,000,000
+
+APY = 50,000,000 / 500,000,000
+    = 0.10
+    = 10%
+```
+
+Historical research only.
+
+---
+
+## TV-004 — Staking participation sensitivity
+
+Derived simulation.
+
+Hold annual rewards at `50,000,000`.
+
+| Average staked | Nominal APY |
+| --: | --: |
+| 250,000,000 | 20% |
+| 500,000,000 | 10% |
+| 750,000,000 | 6.6667% |
+| 1,000,000,000 | 5% |
+
+This illustrates the source observation that fixed reward flow creates higher nominal yield when less supply is staked.
+
+---
+
+## TV-005 — Slash calculation
+
+Derived from historical slash concept.
+
+```text
+stake = 100,000 units
+slash_rate = 4% = 0.04
+
+slash_amount = 100,000 * 0.04
+             = 4,000
+
+stake_after = 96,000
+```
+
+No current CHLOM slash rule is established.
+
+---
+
+## TV-006 — Governance quorum pass
+
+Historical-style parameters.
+
+### Inputs
+
+```text
+total eligible weight = 1,000,000
+participating weight = 250,000
+yes = 160,000
+no = 90,000
+required quorum = 15%
+required approval = >50%
+```
+
+### Calculation
+
+```text
+quorum = 250,000 / 1,000,000
+       = 25%
+
+approval = 160,000 / 250,000
+         = 64%
+```
+
+### Result
+
+```text
+quorum condition: satisfied
+approval condition: satisfied
+```
+
+This does **not** prove authority to implement the proposal.
+
+---
+
+## TV-007 — Governance quorum fail
+
+```text
+total eligible = 1,000,000
+participating = 100,000
+quorum = 10%
+required = 15%
+```
+
+Even if every participant votes yes:
+
+```text
+approval = 100%
+quorum = FAIL
+proposal = not passed under this illustrative rule
+```
+
+---
+
+## TV-008 — Supermajority
+
+```text
+yes = 660
+no = 340
+approval = 66%
+required = 2/3 ≈ 66.6667%
+```
+
+Result:
+
+```text
+FAIL supermajority threshold
+```
+
+A common implementation defect is rounding `66%` up to two-thirds. Do not do that unless the rule explicitly defines rounding.
+
+---
+
+## TV-009 — Basis-point split
+
+Derived current test vector.
+
+### Inputs
+
+```text
+net distributable = $10,000.00
+Creator A = 4,500 bps
+Creator B = 2,500 bps
+Platform = 1,500 bps
+Reserve = 1,500 bps
+```
+
+Check:
+
+```text
+4,500 + 2,500 + 1,500 + 1,500 = 10,000 bps
+```
+
+Allocations:
+
+```text
+Creator A = 10,000 * 4,500/10,000 = $4,500
+Creator B = 10,000 * 2,500/10,000 = $2,500
+Platform  = 10,000 * 1,500/10,000 = $1,500
+Reserve   = 10,000 * 1,500/10,000 = $1,500
+```
+
+Conservation:
+
+```text
+$4,500 + $2,500 + $1,500 + $1,500 = $10,000
+```
+
+---
+
+## TV-010 — Gross-to-net waterfall
+
+Illustrative.
+
+```text
+gross = $12,500.00
+refunds = $500.00
+approved provider fees = $350.00
+approved reserve = $650.00
+approved withholding = $1,000.00
+```
+
+```text
+net = 12,500 - 500 - 350 - 650 - 1,000
+    = $10,000.00
+```
+
+Then apply TV-009 if its schedule is the adopted one.
+
+---
+
+## TV-011 — Invalid basis-point schedule
+
+```text
+A = 5,000 bps
+B = 4,000 bps
+C = 2,000 bps
+
+Σ = 11,000 bps
+```
+
+Result:
+
+```text
+DENY / configuration error
+```
+
+The system must not normalize an over-allocated contractual schedule silently.
+
+---
+
+## TV-012 — Partial allocation with reserve
+
+```text
+A = 4,000
+B = 3,000
+C = 1,500
+Σ = 8,500
+```
+
+If policy allows remainder to reserve:
+
+```text
+reserve = 10,000 - 8,500
+        = 1,500 bps
+```
+
+If policy requires explicit named shares, result should be HOLD instead of inventing reserve behavior.
+
+---
+
+## TV-013 — Rounding residue
+
+Assume `$100.00` = `10,000` cents split equally among 3 recipients.
+
+Raw:
+
+```text
+10,000 / 3 = 3,333.333...
+```
+
+Floor allocation:
+
+```text
+3,333 + 3,333 + 3,333 = 9,999 cents
+residue = 1 cent
+```
+
+Largest-remainder with stable tie-break:
+
+```text
+Recipient A = 3,334
+Recipient B = 3,333
+Recipient C = 3,333
+```
+
+Total:
+
+```text
+10,000 cents = $100.00
+```
+
+---
+
+## TV-014 — Royalty on gross
+
+Illustrative.
+
+```text
+gross eligible revenue = $50,000
+royalty rate = 8%
+royalty = $4,000
+```
+
+This is only valid if the contract defines **gross** as the royalty base.
+
+---
+
+## TV-015 — Royalty on net
+
+```text
+gross = $50,000
+approved deductions = $10,000
+net basis = $40,000
+royalty rate = 8%
+royalty = $3,200
+```
+
+Same percentage, different base, different result.
+
+---
+
+## TV-016 — Minimum guarantee
+
+```text
+calculated royalty = $7,500
+minimum guarantee = $10,000
+
+payable = max(7,500, 10,000)
+        = $10,000
+```
+
+Only if the agreement establishes that guarantee for the relevant period.
+
+---
+
+## TV-017 — Cap
+
+```text
+calculated = $27,000
+cap = $20,000
+payable = $20,000
+```
+
+---
+
+## TV-018 — Recoupment
+
+```text
+outstanding advance = $15,000
+period royalty before recoupment = $8,000
+eligible recoupment = $8,000
+
+advance after = $7,000
+current cash payable after full recoupment = $0
+```
+
+If contract allows only 50% recoupment per period:
+
+```text
+eligible recoupment = $4,000
+advance after = $11,000
+cash payable = $4,000
+```
+
+---
+
+## TV-019 — Treasury allocation
+
+Illustrative vector:
+
+```text
+inflow = $100,000
+operations = 35%
+reserve = 30%
+growth = 20%
+incentive = 15%
+```
+
+```text
+operations = $35,000
+reserve = $30,000
+growth = $20,000
+incentive = $15,000
+```
+
+Total = `$100,000`.
+
+No current CHLOM treasury schedule is established by this example.
+
+---
+
+## TV-020 — Reserve target overflow
+
+```text
+reserve target = $500,000
+reserve balance = $490,000
+policy reserve allocation = $30,000
+```
+
+```text
+reserve_gap = $10,000
+reserve contribution = min(30,000, 10,000) = $10,000
+overflow = $20,000
+```
+
+Overflow needs explicit policy routing.
+
+---
+
+## TV-021 — Historical protection-pool micro-fee
+
+Genesis-style historical example:
+
+```text
+trade value = $250,000
+rate = 0.01% = 0.0001
+
+contribution = 250,000 * 0.0001
+             = $25
+```
+
+Historical conceptual insurance/protection research only.
+
+---
+
+## TV-022 — Historical 20% fee burn
+
+```text
+transaction fee = 10 CHLOM
+burn fraction = 20% = 0.20
+
+burn = 2 CHLOM
+remaining fee = 8 CHLOM
+```
+
+Historical tokenomics illustration only.
+
+---
+
+## TV-023 — Historical risk-score arithmetic
+
+Use the source-style expression:
+
+```text
+R = α*(amount/std_dev) + β*peer_risk + γ*KYC_level
+```
+
+Illustrative inputs:
+
+```text
+α = 0.4
+β = 0.3
+γ = 0.3
+amount/std_dev = 2.0
+peer_risk = 0.6
+KYC_level = 1.0
+```
+
+```text
+R = 0.4*2.0 + 0.3*0.6 + 0.3*1.0
+  = 0.8 + 0.18 + 0.30
+  = 1.28
+```
+
+This demonstrates why raw source formulas require clear normalization and feature semantics before production. A score over `1` may be fine for an unbounded score but not if consumers incorrectly assume probability.
+
+---
+
+## TV-024 — Logistic risk conversion
+
+Derived example:
+
+```text
+z = 1.28
+R = 1 / (1 + e^-1.28)
+  ≈ 0.782
+```
+
+Interpreted only as a model output under a defined calibration—not a legal probability.
+
+---
+
+## TV-025 — Risk threshold HOLD
+
+Illustrative policy:
+
+```text
+hold threshold = 0.60
+deny threshold = 0.85
+score = 0.782
+uncertainty acceptable
+```
+
+Result:
+
+```text
+HOLD / review
+```
+
+---
+
+## TV-026 — Uncertainty forces HOLD
+
+```text
+risk score = 0.20
+max uncertainty = 0.15
+observed uncertainty = 0.40
+```
+
+Even with low point risk:
+
+```text
+HOLD
+```
+
+because confidence is insufficient.
+
+---
+
+## TV-027 — Oracle median
+
+```text
+observations = [99.8, 100.1, 100.0, 100.2, 140.0]
+```
+
+Sorted:
+
+```text
+[99.8, 100.0, 100.1, 100.2, 140.0]
+```
+
+Median:
+
+```text
+100.1
+```
+
+One extreme outlier does not dominate the result.
+
+---
+
+## TV-028 — Weighted oracle support
+
+Boolean claim weights:
+
+```text
+A supports, weight 0.9
+B supports, weight 0.8
+C rejects, weight 0.5
+```
+
+```text
+support weight = 1.7
+total = 2.2
+support ratio = 1.7 / 2.2 ≈ 77.27%
+```
+
+If required threshold is `80%`, result is not enough even though 2 of 3 sources support.
+
+---
+
+## TV-029 — Freshness
+
+```text
+observed_at = 09:00
+now = 11:30
+TTL = 2 hours
+age = 2.5 hours
+```
+
+Result:
+
+```text
+STALE -> HOLD / REVERIFY
+```
+
+---
+
+## TV-030 — SLA availability
+
+```text
+measurement period = 30 days = 43,200 minutes
+unplanned downtime = 60 minutes
+
+availability = 1 - 60/43,200
+             ≈ 0.9986111
+             ≈ 99.8611%
+```
+
+This does not imply an SLA promise unless adopted.
+
+---
+
+## TV-031 — Timelock revalidation
+
+```text
+approved at: day 1 12:00
+not_before: day 3 12:00
+execution attempted: day 3 12:05
+```
+
+Time condition passes.
+
+But if required credential expired on day 2:
+
+```text
+execution = HOLD
+```
+
+The schedule did not freeze eligibility.
+
+---
+
+## TV-032 — Rights subset valid
+
+```text
+parent rights = {stream, download, promo_clip}
+child requested = {stream, promo_clip}
+```
+
+```text
+child ⊆ parent -> PASS candidate
+```
+
+---
+
+## TV-033 — Rights subset invalid
+
+```text
+parent = {stream, download}
+child = {stream, derivative_film_use}
+```
+
+`derivative_film_use` is absent from parent.
+
+```text
+DENY
+```
+
+unless a different valid source right authorizes it.
+
+---
+
+## TV-034 — Settlement exact match
+
+```text
+expected = $9,650.00
+provider normalized = $9,650.00
+variance = $0
+```
+
+Result:
+
+```text
+MATCH
+```
+
+subject to identity/event match.
+
+---
+
+## TV-035 — Settlement mismatch
+
+```text
+expected = $9,650.00
+provider = $9,500.00
+variance = -$150.00
+variance_pct = -150 / 9,650 ≈ -1.5544%
+```
+
+Result:
+
+```text
+HOLD_MISMATCH
+```
+
+unless an authorized deduction explains it.
+
+---
+
+## TV-036 — Idempotent duplicate webhook
+
+```text
+semantic event key = pay_123:settled
+first delivery -> creates one settlement candidate
+second delivery -> returns existing result
+third delivery -> returns existing result
+```
+
+Invariant:
+
+```text
+side_effect_count = 1
+```
+
+---
+
+## TV-037 — Reconstruction coverage
+
+Illustrative program metric only.
+
+If substantive bodies = `150` of `795` recovered titles:
+
+```text
+150 / 795 ≈ 18.8679%
+```
+
+This must be labeled **body reconstruction rate**, not total recovery or production completeness.
+
+---
+
+## TV-038 — Multi-metric recovery dashboard
+
+Candidate metrics:
+
+```text
+titles recovered = 795 / 795 = 100%
+source bodies recovered = X / 795
+substantive bodies reconstructed = Y / 795
+implementation mappings = Z / 795
+production-certified articles = P / 795
+```
+
+These denominators must remain distinct.
+
+---
+
+## TV-039 — Economic conservation with hold
+
+```text
+gross = $1,000
+deductions = $100
+allocations = $750
+hold = $150
+residue = $0
+```
+
+Check:
+
+```text
+100 + 750 + 150 = 1,000
+```
+
+PASS conservation.
+
+---
+
+## TV-040 — Economic conservation failure
+
+```text
+gross = $1,000
+deductions = $100
+allocations = $740
+hold = $150
+```
+
+Total accounted:
+
+```text
+$990
+```
+
+Unexplained:
+
+```text
+$10
+```
+
+Result:
+
+```text
+DENY / calculation defect
+```
+
+unless `$10` is explicitly modeled residue.
+
+## Test vector registry schema
+
+```yaml
+vector_id: ct.chlom.test-vector.<domain>.<n>
+formula_id:
+algorithm_id:
+classification:
+inputs:
+units:
+expected_intermediate:
+expected_output:
+expected_disposition:
+rounding:
+source_ref:
+notes:
+```
+
+## Regression principle
+
+Once a vector tests an adopted invariant, later changes should not alter its expected outcome without a documented version change.
+
+```text
+old vector changes result
+      |
+      v
+is behavior intentionally changed?
+  |                    |
+ NO                   YES
+  |                    |
+  v                    v
+REGRESSION        NEW VERSION + ADR
+```
+
+## Final rule
+
+Worked examples exist to expose assumptions.
+
+```text
+FORMULA + NUMBERS + EXPECTED RESULT
+             |
+             v
+        TESTABLE CLAIM
+```
+
+That is far more useful than leaving CHLOM mathematics buried in narrative prose.

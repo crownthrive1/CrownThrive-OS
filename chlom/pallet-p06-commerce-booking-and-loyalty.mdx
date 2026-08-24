@@ -1,0 +1,599 @@
+---
+title: "P-06 Commerce, Booking & Loyalty Pallet"
+sidebarTitle: "P-06 Commerce, Booking & Loyalty"
+description: "Comprehensive current CHLOM capability-pallet contract for ThriveSeat, ThriveKiosk, Melanin Magic commerce, CrownRewards and payments across catalog, offers, bookings, orders, loyalty, entitlements and economic activation."
+icon: "cart-shopping"
+keywords: ["CHLOM P-06", "Commerce Booking Loyalty", "ThriveSeat", "ThriveKiosk", "Melanin Magic", "CrownRewards", "payments", "ThriveEvergreen"]
+---
+
+# P-06 Commerce, Booking & Loyalty Pallet
+
+## Canonical record
+
+```yaml
+pallet_id: P-06
+canonical_name: Commerce, Booking & Loyalty
+namespace: current_capability_pallet
+source_priority: Pilot
+source_components:
+  - ThriveSeat
+  - ThriveKiosk
+  - Melanin Magic commerce
+  - CrownRewards
+  - payments
+current_status: reconstructed_source_grounded
+production_status: platform_specific_and_not_implied_by_pallet_priority
+public_projection: public_safe
+restricted_companion_required: true
+```
+
+## Purpose
+
+P-06 is CHLOM's current capability container for **commercial objects and customer-facing economic workflows**: products, SKUs, offers, storefronts, orders, subscriptions, bookings, loyalty, rewards, payment evidence, fulfillment and entitlements.
+
+It is not the authority to manufacture prices, rights or payouts. Current CrownThrive economic activation is governed through ThriveEvergreen where applicable, with CHLOM rights/policy/evidence controls surrounding execution.
+
+```text
+ASSET / SERVICE / CAPABILITY
+          |
+          v
+RIGHTS + POLICY + COMMERCIAL OBJECT
+          |
+          v
+SKU / OFFER / PRICE / BOOKING RULE
+          |
+          v
+ECAC | HOLD | DENY
+          |
+          v
+ORDER / BOOKING / SUBSCRIPTION
+          |
+          v
+PAYMENT PROVIDER
+          |
+          v
+FULFILLMENT / ENTITLEMENT
+          |
+          v
+RECONCILIATION + DAIL
+```
+
+## Six Functions mapping
+
+| Function | P-06 responsibility |
+| --- | --- |
+| Rights | Check that the commercial object can be sold/booked/redeemed and that resulting entitlement is valid |
+| Rules | Offer, inventory, booking, subscription, refund, reward and fulfillment rules |
+| Roles | Customer, merchant, operator, service provider, staff, partner, fulfiller |
+| Revenue | Orders, bookings, payments, credits, fees and commercial activation evidence |
+| Records | SKU, offer, order, booking, payment, loyalty, fulfillment and entitlement records |
+| Remedies | Refund, cancellation, reschedule, reversal, credit correction, dispute and compensation |
+
+## Source-component interpretation
+
+### ThriveSeat
+
+ThriveSeat contributes booking/service management: service listings, staff/resource calendars, appointments, check-in and booking state. P-06 governs shared booking semantics without claiming every provider capability is currently integrated.
+
+### ThriveKiosk
+
+ThriveKiosk contributes local/in-person discovery, check-in, commerce or activation surfaces where configured. Kiosk identity/place relationships can depend on P-09.
+
+### Melanin Magic commerce
+
+Melanin Magic contributes product catalog, wholesale/retail/professional commerce use cases. Product/provider catalogs are mapped into canonical commercial objects rather than treated as the CHLOM source of rights/economic truth.
+
+### CrownRewards
+
+CrownRewards contributes loyalty points, tiers, rewards, redemption, referrals and partner/member relationships. Reward balances and redemption rights must be evidence-backed and versioned.
+
+### Payments
+
+Payment processors are replaceable execution providers. A payment-provider success response is payment evidence—not the complete institutional order, entitlement, settlement or earnings state.
+
+## ThriveEvergreen binding
+
+ThriveEvergreen is CrownThrive's cross-pallet Commerce & Economic Activation Authority. P-06 uses its commercial authorization rather than creating parallel economic authority.
+
+```text
+P-03 RIGHTS
+   |
+P-02 POLICY
+   |
+P-06 COMMERCIAL CANDIDATE
+   |
+   v
+THRIVEEVERGREEN
+   |
+ECAC | HOLD | DENY
+   |
+   v
+P-06 EXECUTION
+   |
+   v
+P-11 RECONCILIATION / SETTLEMENT
+```
+
+A certified economic action remains bounded to the exact ECAC/object/version/scope.
+
+## Canonical commercial objects
+
+P-06 distinguishes the following objects:
+
+```text
+PRODUCT / SERVICE
+SKU
+OFFER
+PRICE VERSION
+INVENTORY / CAPACITY
+CART / QUOTE
+ORDER
+SUBSCRIPTION
+BOOKING
+PAYMENT ATTEMPT
+PAYMENT EVIDENCE
+FULFILLMENT
+ENTITLEMENT
+LOYALTY ACCOUNT
+POINTS / CREDITS LEDGER
+REWARD
+REFUND / REVERSAL
+```
+
+These objects may be related but are not interchangeable.
+
+## Product and SKU
+
+```yaml
+product_id: stable ID
+name: canonical name
+product_type: physical|digital|service|license|membership|booking|other
+rights_ref: optional/required by type
+status: draft|active|held|retired
+```
+
+```yaml
+sku: CrownThrive-issued stable SKU
+product_id: parent object
+variant_attributes: {}
+fulfillment_type: physical|digital|service|entitlement|mixed
+status: candidate|active|retired
+provider_aliases: []
+```
+
+ThriveEvergreen is the exclusive current CrownThrive SKU issuer. Provider/store/payment IDs are aliases; retired SKUs are not reused.
+
+## Offer
+
+An offer binds a commercial presentation to exact terms.
+
+```yaml
+offer_id: stable ID
+sku_refs: []
+price_version_ref: required
+eligibility_ref: optional
+channel_refs: []
+start_at: nullable
+end_at: nullable
+terms_ref: required when applicable
+status: draft|candidate|active|paused|expired|retired
+```
+
+## Price version
+
+```yaml
+price_version_id: stable ID
+currency: ISO currency or governed credits unit
+amount_minor: integer
+valid_from: timestamp
+valid_until: nullable
+tax_behavior_ref: reference
+fee_schedule_ref: optional
+```
+
+Historical source prices do not become current price versions by reconstruction.
+
+## Order lifecycle
+
+```text
+DRAFT
+  |
+PENDING_ELIGIBILITY
+  |
+AUTHORIZED
+  |
+PAYMENT_PENDING
+  |
+  +--> PAYMENT_FAILED
+  +--> PAYMENT_AUTHORIZED
+            |
+            v
+      FULFILLMENT_PENDING
+            |
+       +----+----+
+       |         |
+    FULFILLED   HELD/FAILED
+       |
+       v
+  COMPLETED
+       |
+       +--> REFUND / RETURN / DISPUTE / REVERSAL
+```
+
+Order status is institutional state, not a direct copy of provider status.
+
+## Booking model
+
+A booking reserves a time/resource/service right.
+
+```yaml
+booking_id: stable ID
+service_ref: required
+customer_ref: P-01 identity
+provider_or_operator_ref: identity/org
+resource_refs: []
+start_at: timestamp
+end_at: timestamp
+capacity_units: integer
+price_or_offer_ref: optional
+status: requested|held|confirmed|checked_in|completed|cancelled|no_show|disputed
+```
+
+### Booking invariant
+
+```text
+PAYMENT != BOOKING CONFIRMATION
+BOOKING CONFIRMATION != SERVICE COMPLETION
+```
+
+Both may be related through policy, but evidence must remain distinct.
+
+## Capacity and inventory
+
+P-06 must prevent overselling where a capacity constraint is authoritative.
+
+```text
+available = capacity - committed - governed_holds
+```
+
+The exact concurrency/locking algorithm can be provider-specific but the institutional result must be idempotent and reconciled.
+
+## Subscription model
+
+```yaml
+subscription_id: stable ID
+subject_ref: customer/org
+plan_or_offer_ref: required
+start_at: timestamp
+renewal_rule_ref: required
+current_period: defined
+provider_aliases: []
+status: trial|active|past_due|held|cancelled|expired
+entitlement_refs: []
+```
+
+Provider billing status and institutional entitlement status are related but separate.
+
+## Payment model
+
+```yaml
+payment_attempt_id: stable ID
+order_or_booking_ref: required
+provider_ref: adapter
+provider_payment_id: alias
+amount_minor: integer
+currency: string
+status: initiated|authorized|captured|failed|refunded|reversed|disputed|unknown
+provider_evidence_ref: required when available
+```
+
+### Payment invariant
+
+```text
+provider payment success
+          !=
+order fulfilled
+          !=
+entitlement active
+          !=
+settlement complete
+          !=
+earnings final
+```
+
+## Fulfillment
+
+Fulfillment evidence varies by product type.
+
+### Digital
+
+- entitlement created;
+- controlled download/access object;
+- delivery receipt;
+- access expiration/limits if governed.
+
+### Physical
+
+- fulfillment order;
+- carrier/provider evidence;
+- delivery/return state.
+
+### Service/booking
+
+- confirmed appointment;
+- check-in;
+- completion/cancellation evidence.
+
+### License
+
+- P-03 DLA/agreement/entitlement activation.
+
+## Entitlement relationship
+
+P-06 can trigger entitlement candidates; P-03 remains authoritative where the entitlement is licensing/rights based.
+
+```text
+ORDER + PAYMENT + POLICY
+         |
+         v
+ENTITLEMENT CANDIDATE
+         |
+     rights check if required
+         |
+         v
+ACTIVE ENTITLEMENT
+```
+
+## Loyalty model
+
+Loyalty is a governed ledger of earned/redeemed units, not an editable balance field.
+
+```text
+EARN EVENT
+   |
+   v
+POINTS/CREDIT ENTRY (+)
+   |
+   v
+BALANCE PROJECTION
+   |
+REDEEM REQUEST
+   |
+ELIGIBILITY
+   |
+POINTS/CREDIT ENTRY (-)
+   |
+REWARD / BENEFIT
+```
+
+### Loyalty ledger entry
+
+```yaml
+ledger_entry_id: stable ID
+member_ref: identity
+program_ref: required
+rule_version_ref: required
+amount: signed integer
+unit: governed point/credit unit
+reason_ref: order|booking|referral|manual_authorized|correction
+status: posted|held|reversed|expired
+```
+
+## Reward redemption
+
+A redemption requires sufficient current balance and rule eligibility. A successful QR scan or provider interaction does not independently finalize redemption if institutional readback fails.
+
+## Refunds and reversals
+
+Refunds are separate transactions linked to original payments/orders.
+
+```text
+REFUND REQUEST
+     |
+POLICY / AUTHORITY
+     |
+PROVIDER EXECUTION
+     |
+PROVIDER RECEIPT
+     |
+ORDER / ENTITLEMENT / LOYALTY RECONCILIATION
+     |
+DAIL
+```
+
+A reversal may require compensation across multiple dependent states rather than destructive rollback.
+
+## Commerce event families
+
+```text
+ct.commerce.product.registered.v1
+ct.commerce.sku.issued.v1
+ct.commerce.offer.activated.v1
+ct.commerce.price.versioned.v1
+ct.order.created.v1
+ct.order.authorized.v1
+ct.payment.observed.v1
+ct.payment.reconciled.v1
+ct.fulfillment.completed.v1
+ct.entitlement.activated.v1
+ct.booking.requested.v1
+ct.booking.confirmed.v1
+ct.booking.completed.v1
+ct.subscription.renewed.v1
+ct.loyalty.entry.posted.v1
+ct.reward.redeemed.v1
+ct.refund.completed.v1
+ct.commerce.compensation.executed.v1
+```
+
+## Cross-pallet topology
+
+```text
+P-01 identity --------------+
+P-02 policy ----------------+--> P-06 Commerce
+P-03 rights ----------------+        |
+P-04 media/product assets --+        +--> P-11 settlement
+P-09 place/resources -------+        +--> P-05 growth
+                             
+ThriveEvergreen / ECAC ------> economic activation gate
+```
+
+## Provider independence
+
+Commerce storefronts, booking systems, payment processors and loyalty software are adapters.
+
+```text
+CANONICAL ORDER
+   |
+   +--> Storefront adapter
+   +--> Payment adapter
+   +--> Booking adapter
+   +--> Fulfillment adapter
+   +--> Loyalty adapter
+```
+
+Provider replacement should not require new institutional identities for orders, SKUs or entitlements.
+
+## Operating procedures
+
+### Product/SKU onboarding
+
+1. establish product/service asset;
+2. verify rights/authority where required;
+3. assign canonical product ID;
+4. issue CrownThrive SKU;
+5. define fulfillment type;
+6. create governed offer/price candidate;
+7. obtain ECAC/economic activation where applicable;
+8. project to storefront/provider;
+9. read back;
+10. emit evidence.
+
+### Booking flow
+
+1. resolve service/resource/capacity;
+2. resolve customer/provider identity;
+3. calculate eligibility;
+4. create hold/request;
+5. execute payment if required;
+6. confirm capacity and booking atomically/idempotently;
+7. notify parties;
+8. read back and record evidence.
+
+### Loyalty earn
+
+1. receive reconciled qualifying event;
+2. resolve exact program/rule version;
+3. compute candidate units;
+4. run duplicate/fraud controls;
+5. post immutable ledger entry;
+6. update balance projection;
+7. emit evidence.
+
+### Refund
+
+1. resolve original order/payment;
+2. validate refund authority/policy;
+3. execute provider action;
+4. read back;
+5. reconcile order, entitlement, loyalty and settlement;
+6. emit correction/compensation evidence.
+
+## Failure modes
+
+### Duplicate payment webhook
+
+**Response:** idempotency prevents duplicate institutional payment state.
+
+### Booking provider confirms after capacity lost
+
+**Response:** HOLD/reconcile; compensate rather than silently overbook.
+
+### Payment captured, digital entitlement failed
+
+**Response:** retry/repair entitlement within authority or refund/compensate; do not call order fulfilled.
+
+### Reward rule changed after earning event
+
+**Response:** evaluate historical earning under the effective rule version unless a separately adopted correction applies.
+
+### Retired SKU reused by provider
+
+**Response:** provider ID must map to new/current canonical SKU; retired CrownThrive SKU remains retired.
+
+### Subscription provider active, institutional entitlement revoked
+
+**Response:** resolve cause and reconcile; provider billing state does not override rights/policy.
+
+## Metrics
+
+Potential metrics after exact definitions:
+
+- active SKUs/offers;
+- order conversion by defined funnel;
+- payment reconciliation age;
+- fulfillment failure rate;
+- booking confirmation latency;
+- capacity conflict incidents;
+- subscription/provider mismatch count;
+- loyalty ledger corrections;
+- redemption failure rate;
+- refund/reversal age;
+- entitlement activation latency;
+- ECAC HOLD/DENY rate;
+- provider-exit readiness.
+
+## Restricted companion
+
+May contain:
+
+- confidential product economics;
+- unpublished offers/pricing;
+- wholesale/partner terms;
+- fraud rules/thresholds;
+- private customer/order data;
+- payment-provider configuration references;
+- protected loyalty-abuse algorithms;
+- private inventory/capacity rules;
+- chargeback/dispute procedures;
+- exploit-sensitive refund controls.
+
+Raw secrets remain in the approved secret store.
+
+## Release gates
+
+```text
+[ ] CrownThrive SKU identity stable
+[ ] offer/price versioning tested
+[ ] ECAC/HOLD/DENY gate verified where applicable
+[ ] payment idempotency/readback tested
+[ ] booking capacity concurrency tested
+[ ] fulfillment/entitlement reconciliation tested
+[ ] subscription cancellation/renewal tested
+[ ] loyalty immutable-entry model tested
+[ ] refund/reversal compensation tested
+[ ] provider exit/export tested
+[ ] DAIL evidence verified
+[ ] restricted/public split reviewed
+```
+
+## Invariants
+
+```text
+product != SKU
+SKU != offer
+offer != price
+order != payment
+payment != fulfillment
+payment != entitlement
+booking != service completion
+provider status != institutional status
+points balance != source ledger
+refund != deletion
+ECAC != unlimited economic authority
+historical price != current price
+```
+
+## Current implementation effect
+
+P-06 is a **Pilot** pallet in the July 2026 Technical Build Pack. ThriveSeat, ThriveKiosk, Melanin Magic commerce, CrownRewards and payment-provider surfaces retain separate current-state evidence; this pallet defines the shared contract they converge toward.

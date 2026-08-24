@@ -1,0 +1,297 @@
+---
+title: "CHLOM Identity Registry Service"
+sidebarTitle: "Identity Registry Service"
+description: "Standalone CHLOM service article for provider-independent identity, organization, alias, credential, role and recovery bindings with stable IDs, currentness, public/private projections and P-01/DAIL integration."
+icon: "address-card"
+keywords: ["CHLOM Identity Registry", "identity service", "stable identity", "aliases", "credentials", "P-01", "DAIL"]
+---
+
+# CHLOM Identity Registry Service
+
+## Canonical record
+
+```yaml
+service_id: ct.chlom.service.identity-registry
+canonical_name: Identity Registry Service
+artifact_class: core_service
+source_lineage:
+  - recovered CHLOM component atlas
+  - DID / Fingerprint / credential architecture
+  - July 2026 Technical Build Pack
+current_mapping:
+  - P-01 Identity & Access
+status: current_semantic_service_specification
+production_state: implementation_evidence_required
+```
+
+## Purpose
+
+The Identity Registry Service is the provider-independent source for stable CHLOM actor and organization identities. It resolves who/what an actor is institutionally, which provider aliases belong to that identity, which credentials/verifications are current, which roles/delegations apply, and which public-safe identity projection may be exposed.
+
+```text
+PERSON / ORG / AGENT / SERVICE
+          |
+          v
+STABLE CHLOM IDENTITY ID
+          |
+ +--------+--------+--------+
+ |                 |        |
+provider aliases  credentials roles/delegations
+ |                 |        |
+ +--------+--------+--------+
+          |
+       current state
+          |
+        P-01 / DAIL
+```
+
+## Identity classes
+
+```text
+person
+organization
+agent
+service account
+provider/system identity
+public pseudonym / verification alias
+```
+
+Each class has different evidence and lifecycle expectations.
+
+## Core identity record
+
+```yaml
+identity_id: ct.identity.<stable>
+identity_class: person|organization|agent|service
+canonical_status: candidate|active|held|suspended|retired
+created_at: timestamp
+current_version: integer
+classification: internal|restricted|public_projection_available
+```
+
+Raw sensitive identity evidence is not stored in public fields.
+
+## Organization record
+
+```yaml
+organization_id: ct.org.<stable>
+legal_or_operating_name: protected/public as appropriate
+status: candidate|active|held|retired
+parent_or_affiliation_refs: []
+provider_aliases: []
+verification_refs: []
+```
+
+Organization identity does not infer legal formation/status beyond verified evidence.
+
+## Alias binding
+
+Provider usernames, wallet addresses, DIDs, email identities and partner IDs are aliases.
+
+```yaml
+alias_id: stable ID
+identity_ref: required
+provider_or_namespace: required
+alias_type: username|account_id|did|wallet|email|external_id|other
+alias_value_or_digest: protected/public according to class
+verified_at: nullable
+status: candidate|bound|held|revoked|superseded
+```
+
+## Alias invariant
+
+```text
+provider alias != canonical identity
+```
+
+One canonical identity can have many aliases; one alias cannot be silently bound to two conflicting identities.
+
+## Credential bindings
+
+The registry references credentials rather than duplicating their full lifecycle state.
+
+```text
+identity ID
+  |
+  +--> credential C1
+  +--> verification assertion V1
+  +--> public badge/projection B1
+```
+
+Credential validity is resolved from the credential registry/source at decision time.
+
+## Role relationship
+
+Roles/delegations can reference identity IDs:
+
+```text
+identity
+  |
+role assignment
+  |
+delegation / authority ceiling
+```
+
+Identity existence does not imply any role.
+
+## Agent identities
+
+Agents receive stable identities distinct from their principal.
+
+```text
+principal identity
+     |
+delegation
+     |
+agent identity
+```
+
+An agent can be revoked/retired without changing the principal identity.
+
+## Identity currentness
+
+A current identity lookup can return:
+
+```text
+ACTIVE
+HOLD — identity conflict/recovery
+SUSPENDED
+RETIRED
+UNKNOWN
+```
+
+Unknown/unresolved states fail closed for actions requiring resolved identity.
+
+## Recovery
+
+```text
+control compromise / access loss
+        |
+recovery evidence + authority
+        |
+new control/alias binding
+        |
+old compromised alias retired
+        |
+roles/delegations re-evaluated
+        |
+DAIL correction/receipt
+```
+
+Recovery preserves identity continuity but does not restore unrelated revoked credentials or authority automatically.
+
+## Fingerprint relationship
+
+Protected Fingerprint signals can support identity binding/anti-fraud without becoming the public identity ID.
+
+```text
+private signals -> verification assertion -> identity binding
+```
+
+## DID relationship
+
+A DID can be an optional alias/public cryptographic representation. CHLOM does not require DID deployment for stable identity semantics.
+
+## Public projection
+
+A public identity projection can expose only approved fields:
+
+```text
+public name / alias
+public identity ID or verification URL
+approved credentials/badges
+organization role if public
+status of defined public assertions
+```
+
+It never exposes raw evidence, private aliases, recovery state details or secrets.
+
+## Provider reconciliation
+
+```text
+provider account identity
+     |
+readback
+     |
+expected alias binding?
+  yes -> current
+  no  -> mismatch / HOLD / review
+```
+
+Provider account state is evidence, not final canonical identity.
+
+## API contract families
+
+Potential current interfaces:
+
+```text
+resolve identity
+resolve organization
+list effective aliases
+bind/revoke alias
+resolve public projection
+resolve role/delegation references
+start/complete governed recovery
+```
+
+Exact deployed endpoints require implementation evidence.
+
+## Events
+
+```text
+ct.identity.created.v1
+ct.identity.status.changed.v1
+ct.identity.alias.bound.v1
+ct.identity.alias.revoked.v1
+ct.identity.recovery.started.v1
+ct.identity.recovery.completed.v1
+ct.identity.public_projection.updated.v1
+```
+
+## Failure modes
+
+### Duplicate canonical identities discovered
+
+HOLD material writes, preserve both source histories, adjudicate/merge via explicit identity-reconciliation procedure.
+
+### Provider alias reassigned externally
+
+Do not silently transfer institutional identity; require new evidence/binding review.
+
+### Credential revoked
+
+Identity can remain active while dependent eligibility changes.
+
+### Organization provider record deleted
+
+Canonical organization record remains, provider alias becomes unavailable/retired after readback.
+
+## Security/privacy
+
+- tenant isolation;
+- least-privilege evidence access;
+- no raw secrets/private keys;
+- identity-document minimization;
+- alias enumeration controls;
+- recovery anti-takeover controls;
+- audit/DAIL for material changes.
+
+## Restricted companion
+
+Contains private alias mappings, identity evidence, anti-fraud signals, recovery procedures, provider-account crosswalks and security findings. Secret values stay in secret storage.
+
+## Invariants
+
+```text
+identity != role
+identity != credential
+alias != identity
+DID != identity evidence itself
+provider account != canonical identity
+recovery != restoration of all authority
+public projection != private identity record
+```
+
+## Status
+
+The Identity Registry Service is a current CHLOM semantic/service specification under P-01. Production claims require verified code/deployment/readback evidence.

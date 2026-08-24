@@ -1,0 +1,289 @@
+---
+title: "CHLOM Parameter & Config Service"
+sidebarTitle: "Parameter & Config Service"
+description: "Standalone CHLOM service article for governed versioned configuration, effective periods, public/restricted parameters, validation, rollout, rollback, environment projection and DAIL evidence."
+icon: "sliders"
+keywords: ["CHLOM Parameter Config Service", "configuration", "parameters", "versioning", "rollback", "P-02"]
+---
+
+# CHLOM Parameter & Config Service
+
+## Canonical record
+
+```yaml
+service_id: ct.chlom.service.parameter-config
+canonical_name: Parameter & Config Service
+artifact_class: configuration_service
+source_lineage:
+  - historical Parameter/Runtime Config Pallet
+  - July 2026 Technical Build Pack
+  - current service/config governance
+current_mapping:
+  - P-02 Governance & Compliance
+  - shared service configuration
+status: current_semantic_service_specification
+production_state: environment_specific_evidence_required
+```
+
+## Purpose
+
+The Parameter & Config Service is CHLOM's versioned source for non-secret operational parameters and references to protected configuration. It ensures that policy-governed values, service parameters, limits, feature states and integration configuration are typed, validated, effective-dated, reviewable and reproducible.
+
+```text
+SOURCE AUTHORITY / POLICY
+          |
+          v
+PARAMETER DEFINITION
+          |
+          v
+CANDIDATE VALUE / VERSION
+          |
+VALIDATE / APPROVE / TEST
+          |
+          v
+ACTIVATE FOR ENVIRONMENT/SCOPE
+          |
+          v
+READBACK / DAIL
+```
+
+## Configuration classes
+
+```text
+PUBLIC SEMANTIC PARAMETER
+INTERNAL OPERATIONAL PARAMETER
+RESTRICTED THRESHOLD / CALIBRATION
+SECRET REFERENCE
+FEATURE / CAPABILITY STATE
+PROVIDER ADAPTER CONFIG REFERENCE
+```
+
+Secret values themselves remain in the approved secret store.
+
+## Parameter definition
+
+```yaml
+parameter_id: stable ID
+namespace: service/pallet/domain
+name: canonical
+value_type: integer|decimal|string|boolean|duration|enum|json|reference
+unit: optional
+allowed_range_or_schema_ref: required
+classification: public|internal|restricted|secret_reference
+default_behavior_ref: explicit
+failure_behavior_ref: explicit
+```
+
+## Parameter value/version
+
+```yaml
+parameter_value_id: stable ID
+parameter_ref: required
+value_or_protected_ref: structured
+version: string
+scope: environment|tenant|organization|service|global
+effective_from: timestamp
+effective_until: nullable
+source_authority_ref: required
+status: candidate|approved|active|superseded|rolled_back|retired
+```
+
+## Scope
+
+A parameter can be scoped. Global values are not assumed when a tenant/service-specific value exists.
+
+```text
+global
+  -> environment
+      -> tenant/org
+          -> service/pallet
+```
+
+Precedence must be explicit in the definition; no implicit last-write-wins.
+
+## Validation
+
+Before activation:
+
+- type/schema valid;
+- units valid;
+- allowed range/domain;
+- dependencies resolve;
+- policy/source authority valid;
+- security classification respected;
+- compatibility tests pass;
+- required reviewer/approval complete;
+- rollback path exists for material change.
+
+## Effective periods
+
+```text
+v1 active until T1
+v2 active from T1
+```
+
+Historical events reference the effective config version so decisions remain reproducible.
+
+## Feature/capability state
+
+A feature state can be modeled explicitly:
+
+```text
+DISABLED
+CONTROLLED_TEST
+STAGED
+ACTIVE
+HELD
+RETIRED
+```
+
+A feature flag is not authority to use a capability outside current governance/policy.
+
+## Request-budget semantics
+
+For CrownThrive-local monthly request ceilings:
+
+```text
+-1   = unlimited CrownThrive-local ceiling
+0    = exactly zero requests permitted
+N>0  = exactly N requests permitted
+null = unresolved/unknown -> fail closed
+```
+
+Provider quotas, contractual entitlements, throttles and billing remain independently authoritative.
+
+## Deployment
+
+```text
+candidate config
+  |
+validation/test
+  |
+approval
+  |
+activate in target scope
+  |
+service/provider readback
+  |
+certify current version
+```
+
+## Rollout
+
+Material changes can use staged rollout:
+
+```text
+CONTROLLED_TEST -> partial scope -> broader scope -> full target
+```
+
+At each stage, monitoring/evidence can HOLD promotion.
+
+## Rollback
+
+Rollback is a new governed state transition. It does not delete the failed/retired version.
+
+```text
+v5 active -> issue detected -> rollback to compatible v4 semantics
+```
+
+The service records why/when/how.
+
+## Secret references
+
+```yaml
+secret_ref: vault://stable-reference
+```
+
+Public/internal docs can state that a secret exists and which logical purpose it serves without exposing value.
+
+## Provider config
+
+Provider settings are projected from canonical intent when possible. Provider state is read back and mismatch recorded.
+
+```text
+canonical intended config
+      |
+provider adapter write
+      |
+provider readback
+      |
+match / mismatch
+```
+
+## API contract families
+
+- resolve effective parameter;
+- list parameter versions;
+- propose new value;
+- validate candidate;
+- approve/activate;
+- rollback/supersede;
+- resolve secret reference metadata;
+- compare expected/provider configuration.
+
+## Events
+
+```text
+ct.config.definition.created.v1
+ct.config.value.proposed.v1
+ct.config.value.approved.v1
+ct.config.value.activated.v1
+ct.config.value.superseded.v1
+ct.config.rollback.executed.v1
+ct.config.provider_mismatch.detected.v1
+```
+
+## Failure modes
+
+### `null` critical parameter
+
+Fail closed/HOLD according to parameter definition; do not reinterpret as `0` or unlimited.
+
+### Unit mismatch
+
+Reject candidate and require correction.
+
+### Provider refuses requested configuration
+
+Keep canonical requested/authorized state distinct from provider-observed state; HOLD dependent capability where needed.
+
+### Config changes after a decision
+
+Historical decision remains tied to old effective version; new decisions use current version.
+
+### Rollback target incompatible
+
+HOLD and route migration/recovery rather than force a structurally invalid rollback.
+
+## Security threats
+
+- unauthorized config change;
+- secret leakage;
+- environment drift;
+- hidden defaults;
+- dangerous `null` handling;
+- provider overwrite;
+- rollback to vulnerable state;
+- cross-tenant bleed;
+- unreviewed feature activation.
+
+## Restricted companion
+
+Contains protected thresholds, anti-abuse limits, model calibration, provider configuration details, secret-reference mappings, rollout topology and failure-injection tests.
+
+## Invariants
+
+```text
+config != policy authority
+feature enabled != action authorized
+secret reference != secret value
+null != unlimited
+0 != unlimited
+provider setting != canonical setting automatically
+rollback != erasure
+historical config != current config
+```
+
+## Status
+
+The Parameter & Config Service is a current CHLOM specification and cloud-service mapping of the historical runtime-configuration pallet, with exact production state verified per environment.

@@ -1,0 +1,320 @@
+---
+title: "Compliance Case Engine"
+sidebarTitle: "Compliance Case Engine"
+description: "Standalone CHLOM engine article for investigation lifecycle, evidence intake, assignments, SLAs, holds, reversible actions, appeals, remedies and DAIL-backed case history."
+icon: "folder-open"
+keywords: ["CHLOM Compliance Case Engine", "case engine", "investigation", "appeal", "evidence", "HOLD", "remedies"]
+---
+
+# Compliance Case Engine
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.engine.compliance-case
+canonical_name: Compliance Case Engine
+artifact_class: engine
+source_lineage:
+  - recovered Help Center component catalog
+  - case/dispute/remedy architecture
+  - DREP/DAP lineage
+  - Grand Prospectus audit/arbitration/case management
+recovery_state: reconstructed_source_grounded
+current_mapping:
+  - P-02 Governance & Compliance
+  - Records + Remedies functions
+  - Evidence Vault + DAIL
+production_state: implementation_evidence_required
+```
+
+## Source basis
+
+The recovered Help Center describes the **Compliance Case Engine** as an investigation lifecycle of `open → investigate → appeal → resolve` with evidence archives, SLAs and reversible actions. It is distinct from the historical Case Management Pallet, which stores case records/states, and DREP/DAP, which focus on disputes/arbitration.
+
+## Purpose
+
+The engine orchestrates compliance/institutional cases that require more than a single synchronous decision.
+
+```text
+SIGNAL / REPORT / HOLD / AUDIT FINDING
+                |
+                v
+             CASE OPEN
+                |
+        SCOPE + AUTHORITY + SLA
+                |
+                v
+            INVESTIGATE
+        /       |        \
+   evidence   review    actions
+        \       |        /
+                v
+          FINDING / DECISION
+                |
+      +---------+---------+
+      |                   |
+   REMEDY               APPEAL
+      |                   |
+      +---------+---------+
+                v
+        RESOLVE / MONITOR
+                |
+               DAIL
+```
+
+## Case classes
+
+Public-safe classes can include:
+
+- compliance review;
+- rights/ownership conflict;
+- credential/identity review;
+- license/DLA suspension or renewal issue;
+- provider mismatch;
+- audit finding;
+- economic reconciliation dispute;
+- security/abuse incident;
+- governance/process exception;
+- data/provenance correction.
+
+A case class determines its authority, evidence, SLA and remedy profile.
+
+## Case object
+
+```yaml
+case_id: stable ID
+case_type: typed
+subjects: object/actor references
+opened_from: event/finding/request
+opened_at: timestamp
+case_owner_role: role reference
+reviewer_refs: assignments
+policy_version_refs: list
+priority: typed
+sla_profile_ref: optional
+status: open|investigating|held|decision_pending|remedy|appeal|monitoring|resolved|superseded
+classification: internal|restricted|public_safe_projection
+```
+
+## Case state machine
+
+```text
+OPEN
+  |
+TRIAGE
+  |
+  +-- invalid/out-of-scope -> CLOSE WITH REASON
+  |
+INVESTIGATING
+  |
+  +-- missing critical evidence -> HELD
+  |                                 |
+  |<---------- evidence ------------+
+  |
+DECISION_PENDING
+  |
+DECIDED
+  |\
+  | \ appeal -> APPEAL
+  |             |
+  |<-- remand --+
+  |
+REMEDY / MONITOR
+  |
+RESOLVED
+```
+
+## Triage
+
+Triage determines:
+
+- whether a case should exist;
+- duplicate/correlation handling;
+- severity/priority;
+- appropriate owner/reviewer;
+- initial holds needed for safety;
+- evidence preservation requirements;
+- external professional/legal/security routing.
+
+Triage must not convert allegations into findings.
+
+## Evidence model
+
+All substantive findings should reference evidence objects rather than copied narrative alone.
+
+```yaml
+case_evidence_link_id: stable ID
+case_ref: required
+evidence_ref: Evidence Vault/source reference
+purpose: allegation|support|rebuttal|context|expert_opinion|provider_evidence
+submitted_by: actor/system
+state: candidate|accepted|challenged|excluded|superseded
+```
+
+## Assignments and conflicts
+
+Assignment requires current role/delegation and conflict checks. High-impact cases may require multiple reviewers or a professional lane.
+
+```text
+case owner != final decision authority automatically
+review assignment != authority expansion
+```
+
+## Temporary/reversible actions
+
+The engine can orchestrate temporary safeguards when pre-authorized:
+
+- HOLD a transaction/listing/license;
+- pause a capability;
+- require re-verification;
+- prevent provider retries;
+- preserve disputed funds/state where authority exists.
+
+Temporary action must have scope, reason, expiry/review, rollback/restoration path and DAIL evidence.
+
+## SLA model
+
+```yaml
+sla_profile_id: stable ID
+ack_target: duration
+triage_target: duration
+review_target: duration
+appeal_window: duration
+remedy_target: optional
+pause_clock_rules: explicit
+```
+
+A breached SLA is an operational finding, not automatic proof that the case merits a particular outcome.
+
+## Findings
+
+```yaml
+finding_id: stable ID
+case_ref: required
+finding_type: substantiated|unsubstantiated|inconclusive|procedural|technical|other
+fact_refs: evidence-backed
+policy_refs: exact versions
+issued_by: authorized actor/body
+issued_at: timestamp
+confidence_or_uncertainty: optional and scoped
+```
+
+## Decision/remedy separation
+
+```text
+finding != remedy
+remedy candidate != authorized remedy
+```
+
+The engine routes a remedy to the correct authority/executor.
+
+## Appeals
+
+Appeal creates a new review stage with preserved prior decision and evidence lineage. Appeal grounds, deadline and reviewer independence follow the adopted profile.
+
+## Provider evidence
+
+A provider flag, suspension, chargeback, content removal or account state may open a case but is not automatically the institutional finding.
+
+## Automation and AI
+
+AI can:
+
+- cluster related evidence;
+- summarize timelines;
+- flag missing documents;
+- suggest case class/priority;
+- identify policy references;
+- surface contradictions.
+
+AI must not make reserved D3/professional/legal conclusions without the required human/professional gate.
+
+## Events
+
+```text
+ct.case.opened.v1
+ct.case.triaged.v1
+ct.case.assigned.v1
+ct.case.evidence.linked.v1
+ct.case.held.v1
+ct.case.hold.released.v1
+ct.case.finding.issued.v1
+ct.case.decision.issued.v1
+ct.case.remedy.requested.v1
+ct.case.appeal.opened.v1
+ct.case.resolved.v1
+ct.case.superseded.v1
+ct.case.sla.breached.v1
+```
+
+## Failure modes
+
+- duplicate case -\> correlate/merge reference without deleting originals;
+- wrong authority -\> hold/reassign;
+- evidence inaccessible/corrupt -\> HOLD and preservation response;
+- reviewer conflict -\> recuse/reassign;
+- SLA missed -\> escalate operationally;
+- provider state changes during case -\> record new evidence, don't rewrite history;
+- remedy fails at provider -\> case remains unresolved/remedy-pending;
+- appeal deadline ambiguity -\> HOLD/adjudicate rather than silently deny.
+
+## Threat model
+
+- retaliatory/fraudulent case creation;
+- evidence deletion/tampering;
+- biased reviewer;
+- secret adverse action;
+- case-status manipulation;
+- leaking restricted case data;
+- SLA gaming;
+- AI hallucination promoted as finding;
+- provider result substituted for investigation;
+- closing case before remedy readback.
+
+## Test vectors
+
+1. valid report -\> case created with source linkage;
+2. duplicate signal -\> correlated, no duplicate irreversible action;
+3. allegation only -\> no finding yet;
+4. missing critical evidence -\> HOLD;
+5. conflicted reviewer -\> recusal;
+6. temporary hold expires without extension -\> review/release according to policy;
+7. finding \+ unauthorized remedy -\> remedy not executed;
+8. appeal -\> old decision retained, new review path;
+9. provider remedy fails -\> case remains open/pending;
+10. restricted case -\> public projection reveals only permitted status.
+
+## ASCII operating surface
+
+```text
++--------------------------------------------------------------+
+| CASE # / TYPE / STATUS / SLA                                 |
++----------------------+---------------------------------------+
+| Subjects             | Evidence timeline                     |
+| Roles & authority    | Findings / decisions                  |
+| Current HOLDs        | Remedies / provider execution         |
+| Related cases        | Appeal / review history               |
++----------------------+---------------------------------------+
+| DAIL receipts | audit export | restricted evidence links     |
++--------------------------------------------------------------+
+```
+
+## Restricted companion
+
+Private case evidence, reviewer identities where protected, legal/professional material, abuse/fraud signals, raw provider payloads, security logs, private settlements and privileged/internal deliberation stay in restricted custody.
+
+## Invariants
+
+```text
+case != finding
+allegation != fact
+finding != remedy
+HOLD != guilt
+provider action != institutional conclusion
+automation != reserved decision authority
+resolved case != erased history
+```
+
+## Status
+
+`current_semantic_engine_specification`, grounded in recovered CHLOM case architecture. Exact production implementation remains environment/evidence specific.

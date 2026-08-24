@@ -1,0 +1,67 @@
+---
+title: "FORM-032 — Rounding Discipline"
+sidebarTitle: "FORM-032 Rounding Discipline"
+description: "Standalone CHLOM quantitative rule requiring deterministic rounding mode, precision, order and residue destination for economic and finite-precision calculations."
+icon: "calculator"
+keywords: ["CHLOM FORM-032", "rounding", "HALF EVEN", "residue", "economic calculations"]
+---
+
+# FORM-032 — Rounding Discipline
+
+## Formula identity
+
+```yaml
+formula_id: FORM-032
+classification: quantitative_safety_invariant
+origin: CHLOM royalty, treasury and settlement lineage
+adopted_as_documentation_contract: yes
+protected_companion: VAULT-IP-004
+```
+
+FORM-032 requires every finite-precision consequential calculation to define how non-representable values are rounded and where any aggregate residue goes.
+
+## Required policy fields
+
+```yaml
+rounding_mode: HALF_EVEN|HALF_UP|FLOOR|CEILING|domain_specific
+precision: currency_minor_units|token_precision|explicit_decimal_places
+application_order:
+tie_break_rule:
+residue_destination:
+```
+
+## Determinism
+
+The same input snapshot, formula version and rounding policy must produce the same result across supported implementations. Floating-point platform behavior should not decide who receives money or rights.
+
+## Per-line versus aggregate rounding
+
+Rounding each allocation independently and rounding only the aggregate can produce different results. The policy must define the order and conservation handling.
+
+## Residue
+
+Any rounding residue is an explicit economic amount. It needs a deterministic destination such as a designated reserve or recipient according to the adopted schedule. Residue must not disappear into implementation drift.
+
+## Public/private boundary
+
+The restricted Gold Paper contains more specific splitter residual mechanics and formal bounds. Those protected details are stored in the private vault. This page publishes the safe invariant that rounding and residue treatment are deterministic and auditable.
+
+## Currency/token precision
+
+Use the precision of the governed settlement unit. A currency with two minor decimals and a token with higher precision require different quantization rules. Conversion should occur before or after rounding only as explicitly specified.
+
+## Negative adjustments
+
+Refunds/reversals can create negative allocation adjustments. Rounding semantics for negative values must be tested because language/library functions can differ.
+
+## Tests
+
+Test half ties, very small amounts, many-recipient splits, negative adjustments, zero, maximum supported amount, differing currency precision, repeated batching and conservation after rounding.
+
+## DAIL evidence
+
+Calculation records should retain rounding policy/version, pre-round values where permitted, rounded outputs and residue.
+
+## Versioning
+
+Changing rounding mode, precision or residue destination is a material economic change and requires a new schedule/policy version.

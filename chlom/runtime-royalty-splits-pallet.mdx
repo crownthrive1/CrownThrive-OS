@@ -1,0 +1,356 @@
+---
+title: "Royalty & Splits Pallet — Historical Runtime Record"
+sidebarTitle: "Royalty & Splits Pallet"
+description: "Standalone reconstruction of the recovered CHLOM Royalty & Splits Pallet (RSP-X) for versioned allocation trees, basis-point conservation, rounding, accruals, corrections and settlement evidence."
+icon: "chart-pie"
+keywords: ["CHLOM RSP-X", "Royalty Splits Pallet", "royalties", "splits", "basis points", "rounding", "settlement"]
+---
+
+# Royalty & Splits Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.royalty-splits
+historical_name: Royalty & Splits Pallet
+historical_short_name: RSP-X
+recovered_article: CHLOM Royalty & Splits Pallet (RSP-X) Whitepaper
+artifact_class: historical_runtime_pallet
+recovery_state: reconstructed_from_recovered_title_and_related_sources
+current_mapping:
+  - P-11 Capital, Revenue & Settlement
+  - economic schedule registry
+  - allocation engine
+  - reconciliation/settlement service
+production_state: historical_design_not_current_schedule
+```
+
+## Source basis
+
+The lost Help Center explicitly distinguishes the **Royalty & Splits Pallet (RSP-X)** from the **Royalty Streaming Pallet (RSP)** and from the **Royalty Streaming Engine (RSE)**. Historical CHLOM sources also contain payout-tree and Fingerprint-ID routing examples. Current CHLOM doctrine separates calculation, allocation, obligation, execution evidence and institutional settlement.
+
+This article therefore defines RSP-X as the **static/versioned allocation-rule and split-calculation module**, while RSP/RSE cover time/event streaming behavior.
+
+## Historical purpose
+
+```text
+ECONOMIC TRIGGER
+      |
+      v
+ELIGIBLE ECONOMIC BASIS
+      |
+      v
+RSP-X SCHEDULE VERSION
+      |
+      v
+ALLOCATION TREE / DAG
+      |
+      +--> participant obligation
+      +--> royalty obligation
+      +--> fee obligation
+      +--> reserve/fund obligation
+      |
+      v
+ROUNDING + CONSERVATION
+      |
+      v
+ALLOCATION PLAN
+      |
+      v
+EXECUTION / RECONCILIATION
+```
+
+## Non-purpose
+
+RSP-X does not:
+
+- manufacture ownership or royalty rights;
+- make a historical percentage current;
+- authorize payment merely by calculating it;
+- replace tax/legal/professional review;
+- equate provider payout with institutional settlement;
+- imply live crypto streaming or token distribution.
+
+## Schedule model
+
+```yaml
+schedule_id: stable ID
+schedule_version: semantic version
+subject_scope: asset|license|offer|agreement|program
+basis_type: gross|net|defined_custom_basis
+basis_definition_ref: required
+currency_or_unit: typed
+allocations:
+  - recipient_ref: stable party/role/obligation ID
+    allocation_type: royalty|commission|fee|reserve|fund|other
+    bps_or_formula_ref: value/reference
+    priority: optional
+    floor: optional
+    cap: optional
+    recoupment_ref: optional
+rounding_rule: explicit
+remainder_rule: explicit
+effective_from: timestamp
+effective_until: optional
+authority_ref: adopted economic authority
+status: draft|approved|active|superseded|retired
+```
+
+## Basis-point mathematics
+
+For a simple basis-point schedule:
+
+```text
+D = 10,000
+share_i = floor(B * bps_i / D)
+```
+
+where `B` is the adopted allocation basis.
+
+Conservation requires the schedule and remainder rule to account for the full intended basis:
+
+```text
+Σ allocated + remainder = distributable basis
+```
+
+The public article does not invent current rates.
+
+## Allocation graph
+
+Complex agreements may require hierarchical allocation:
+
+```text
+                BASIS
+                  |
+        +---------+---------+
+        |         |         |
+      PARTY A   POOL B     FEE C
+                  |
+           +------+------+
+           |             |
+        PARTY D        PARTY E
+```
+
+The graph must be acyclic for deterministic settlement unless a separately validated iterative model is explicitly adopted.
+
+## Rights-before-revenue boundary
+
+Every economic entitlement must trace to an adopted right, agreement, policy or authority object.
+
+```text
+SOURCE RIGHTS / AGREEMENT
+          |
+          v
+ECONOMIC SCHEDULE
+          |
+          v
+ALLOCATION
+```
+
+A split line without a valid authority/right reference is `HOLD`, not a payable obligation.
+
+## Fingerprint / identity routing lineage
+
+Historical Technical Blueprint pseudocode used Fingerprint IDs to resolve registered recipient wallets/roles for revenue splits. The modern mapping should resolve stable institutional party IDs first and treat provider wallet/account IDs as replaceable aliases.
+
+```text
+stable party ID
+  -> economic entitlement
+  -> provider destination alias
+```
+
+Provider destination changes must not change the underlying entitlement identity.
+
+## Floors, caps and recoupment
+
+If an adopted schedule includes floors/caps/recoupment, they require explicit ordering.
+
+Example model:
+
+```text
+raw_share
+ -> apply recoupment rule
+ -> apply floor/cap as contract defines
+ -> round deterministically
+ -> create obligation
+```
+
+No generic ordering is assumed across all contracts.
+
+## Corrections
+
+A corrected schedule should never silently mutate an already-settled historical period.
+
+```text
+schedule v1 effective [T0,T1)
+schedule v2 effective [T1,...)
+```
+
+If an error is found for v1:
+
+```text
+original obligation
+ -> correction/reversal obligation
+ -> reconciled corrected balance
+```
+
+## Allocation versus settlement
+
+```text
+CALCULATION
+   !=
+ALLOCATION PLAN
+   !=
+OBLIGATION
+   !=
+PROVIDER EXECUTION
+   !=
+SETTLEMENT
+```
+
+Each state should have separate IDs/evidence.
+
+## Idempotency
+
+An economic trigger must have a stable identity so replay cannot duplicate obligations.
+
+```yaml
+trigger_id: stable event/business ID
+schedule_version: exact
+calculation_id: deterministic or unique
+idempotency_key: required
+```
+
+## Remainders and carry buckets
+
+If integer/currency rounding leaves a remainder, the adopted schedule must specify:
+
+- deterministic assignment;
+- carry-forward bucket;
+- retained reserve;
+- largest-remainder method;
+- another explicit method.
+
+The system must never silently lose or create value due to rounding.
+
+## Multi-currency behavior
+
+Currency conversion must be modeled separately from allocation:
+
+```text
+source amount/currency
+ -> adopted FX evidence + timestamp
+ -> converted basis
+ -> allocation
+```
+
+FX evidence must include source/freshness and correction behavior.
+
+## DAIL events
+
+```text
+ct.economic.schedule.created.v1
+ct.economic.schedule.approved.v1
+ct.economic.schedule.activated.v1
+ct.economic.allocation.calculated.v1
+ct.economic.obligation.created.v1
+ct.economic.obligation.corrected.v1
+ct.economic.schedule.superseded.v1
+ct.economic.rounding.remainder.recorded.v1
+```
+
+## Failure states
+
+### Schedule missing
+
+`HOLD_ECONOMIC_SCHEDULE_MISSING`
+
+### Schedule not authorized
+
+`DENY_SCHEDULE_UNAUTHORIZED`
+
+### Basis unresolved
+
+`HOLD_BASIS_UNRESOLVED`
+
+### Split conservation failure
+
+`DENY_CONSERVATION_FAILURE`
+
+### Recipient identity unresolved
+
+`HOLD_RECIPIENT_UNRESOLVED`
+
+### Provider destination unavailable
+
+Obligation may remain valid while execution is held.
+
+### Duplicate trigger
+
+Return/reuse prior calculation; do not create another obligation.
+
+## Security and abuse threats
+
+- unauthorized schedule edits;
+- hidden split insertion;
+- recipient alias substitution;
+- replay/double obligation;
+- currency/decimal mismatch;
+- rounding exploitation;
+- stale FX evidence;
+- provider payout interpreted as settlement without reconciliation;
+- historical example percentages accidentally activated.
+
+## Test vectors
+
+1. schedule bps sum valid -\> deterministic allocation;
+2. schedule exceeds authorized basis -\> reject;
+3. rounding remainder -\> deterministic adopted remainder handling;
+4. duplicate trigger -\> no duplicate obligation;
+5. recipient destination changes -\> entitlement unchanged;
+6. schedule version transition -\> correct effective-period resolution;
+7. historical schedule correction -\> compensating record, no erasure;
+8. provider execution fails -\> obligation remains unsettled;
+9. missing rights/agreement authority -\> HOLD;
+10. currency mismatch -\> explicit conversion or reject.
+
+## Current mapping
+
+Modern CHLOM maps RSP-X to:
+
+```text
+Economic Schedule Registry
+        |
+Allocation Calculator
+        |
+Obligation Ledger
+        |
+Execution Adapters
+        |
+Reconciliation / Settlement
+        |
+DAIL
+```
+
+ThriveEvergreen/current economic authority controls commercial activation; historical token assumptions do not.
+
+## Restricted companion
+
+May contain non-public royalty rates, contractual schedules, pricing, commissions, reserve policy, tax-sensitive terms, provider payout destinations, private counterparties and dispute corrections.
+
+## Invariants
+
+```text
+split != right
+calculation != authorization
+allocation != payment
+payment != settlement
+historical rate != current rate
+provider destination != recipient identity
+rounding must conserve intended basis
+schedule change != retroactive silent rewrite
+```
+
+## Status
+
+`historical_preserved + reconstructed_source_grounded`. RSP-X is institutionalized as distinct from RSP/RSE and mapped to current economic schedule/reconciliation services without activating historical rates.

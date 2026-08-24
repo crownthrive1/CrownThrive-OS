@@ -1,0 +1,193 @@
+---
+title: "Object Store Architecture — CHLOM Evidence & Binary Asset Contract"
+sidebarTitle: "Object Store Architecture"
+description: "Individual CHLOM storage article for protected evidence bodies, media, artifacts, exports, immutable source copies, signed delivery objects, versioning, retention and database/DAIL references in provider-neutral object storage."
+icon: "box-archive"
+keywords: ["CHLOM object storage", "evidence vault", "binary assets", "R2", "S3", "protected files", "storage"]
+---
+
+# Object Store Architecture — CHLOM Evidence & Binary Asset Contract
+
+## Institutional identity
+
+```yaml
+component_id: CT-CHLOM-STORAGE-OBJ-001
+name: Object Store Architecture
+source_status: recovered_grouped_storage_component
+source_lineage: component atlas storage architecture; Evidence Vault; private vault; media/evidence delivery architecture
+source_body_status: distinct_object_store_body_not_located
+classification: source_grounded_current_storage_contract
+version: 1.0.0
+```
+
+## Source boundary
+
+The recovered CHLOM storage-architecture line names **database/object store/IPFS/Arweave research**. This page institutionalizes the **object store** as its own component. It is not tied to one provider; S3-compatible, R2-style or other object stores can implement the contract if they satisfy the required custody and integrity behaviors.
+
+## Purpose
+
+Object storage holds large or binary materials that should not be embedded in database rows or copied across DAIL events:
+
+- source papers and recovery masters;
+- protected/private evidence bodies;
+- images, audio, video and creative masters;
+- generated reports/exports;
+- signed/downloadable products;
+- archive bundles and release artifacts;
+- model/circuit artifacts where classification permits;
+- backup/export objects;
+- public derivative assets;
+- encrypted private vault objects.
+
+The canonical institutional database stores stable object/evidence references and metadata; the object store holds the bytes.
+
+## Object identity
+
+```yaml
+object_id:
+tenant_id:
+object_class:
+content_type:
+logical_asset_or_evidence_ref:
+provider_object_alias:
+version:
+digest_algorithm:
+digest_value:
+size:
+classification:
+created_at:
+retention_policy_ref:
+encryption_or_protection_class:
+current_state:
+```
+
+The provider bucket/key is an alias and can change without changing the stable CHLOM object ID.
+
+## Immutable source copies
+
+Recovered source papers, executed evidence, signed artifacts and other source-of-record binaries should be stored as immutable/versioned objects when correction history matters.
+
+A corrected file creates a new object/version plus provenance/supersession rather than silently replacing the bytes behind the same institutional source identity.
+
+## Public versus private objects
+
+Object storage is separated by audience/classification:
+
+```text
+PUBLIC DERIVATIVES
+INTERNAL OPERATIONAL
+RESTRICTED EVIDENCE
+TRADE-SECRET / PRIVATE VAULT
+DELIVERY / ENTITLEMENT OBJECTS
+BACKUP / RECOVERY
+```
+
+A public URL should never be the only access-control mechanism for restricted evidence.
+
+## Database / DAIL relationship
+
+The database/evidence registry stores metadata and stable reference. DAIL events reference the evidence/object record and optional digest, not the entire binary object.
+
+```text
+DAIL / CASE / DLA / CALCULATION
+        |
+        v
+EVIDENCE / OBJECT REFERENCE
+        |
+        v
+OBJECT STORE BYTES
+```
+
+## Digest and integrity
+
+Content digests can detect byte changes and bind public/private derivatives to source versions. A digest proves integrity of the compared object, not factual truth.
+
+When files are transformed—for example a redacted public PDF derived from a restricted original—the derivative receives its own object ID/digest and provenance binding.
+
+## Encryption and keys
+
+Use provider/storage encryption and stronger application/envelope protection where classification requires it. Encryption keys/secret material belong in governed key/secret custody rather than object metadata or filenames.
+
+## Access control
+
+Access policies should evaluate tenant, role, purpose, object classification and current entitlement/evidence assignment. Public objects can use public projection paths; restricted objects use authenticated/authorized retrieval.
+
+## Expiring delivery
+
+For licensed downloads or private distribution, use bounded delivery tokens/URLs or equivalent mechanisms whose expiry and download/use limits align with the canonical entitlement. Delivery-link expiry is not the same as license expiry; both must be represented separately.
+
+## Versioning
+
+Object versions can represent:
+
+- source revision;
+- transformed/redacted derivative;
+- updated product/media master;
+- re-exported report;
+- corrected evidence;
+- encrypted rewrap/rekey representation;
+- retention/archive transition.
+
+Provenance records show relationships rather than overloading filenames.
+
+## Lifecycle
+
+```text
+INGESTED
+ -> INTEGRITY_VERIFIED
+ -> CLASSIFIED
+ -> AVAILABLE_TO_AUTHORIZED_VIEWERS
+ -> SUPERSEDED / ARCHIVED / RETAINED
+ -> DELETED only when governing retention permits
+```
+
+Some institutional/audit evidence may require long-term retention even after active use ends. Retention policy, not convenience, determines deletion eligibility.
+
+## Derived projections
+
+Public versions, thumbnails, streaming renditions or preview extracts are derived objects. They reference the protected master but can have different classification/retention/cache rules.
+
+## Large media
+
+Video/audio/image masters can use object storage plus CDN/streaming adapters. Media-provider asset IDs remain aliases. Rights/DLA state controls whether a rendition may be projected/delivered; the object store does not decide licensing.
+
+## Evidence access logging
+
+Sensitive object reads, exports or shares can generate access/audit events according to policy. Logging should record object/evidence IDs and safe metadata without copying protected contents into logs.
+
+## Backup/replication
+
+Critical object classes can use provider replication, offline/exported backup or another continuity strategy. Restore exercises must verify bytes/digests and the database/reference relationships, not only bucket existence.
+
+## Provider migration
+
+Migration sequence:
+
+```text
+inventory stable object IDs
+export/copy bytes
+verify digests
+map new provider aliases
+update storage adapter
+validate access/projection/delivery
+retain old readback until reconciliation complete
+retire old provider path
+```
+
+Stable evidence/object IDs do not change simply because the physical provider changes.
+
+## Failure handling
+
+Design for missing object, digest mismatch, wrong classification, expired delivery, orphaned database reference, provider outage, incomplete migration, access-policy mismatch and derivative pointing to a superseded master.
+
+## Tests
+
+Test restricted/public separation, digest verification, immutable source versioning, redacted derivative provenance, expired delivery URL, entitlement revoked before delivery, object/provider migration, orphan detection, restore and large-media rendition rights HOLD.
+
+## Current status
+
+This is the provider-neutral object-store contract. Exact buckets/providers and secret/access configuration remain restricted implementation evidence.
+
+## Versioning
+
+Object metadata schema, custody classes, provider adapters and retention policies are independently versioned. Each object version remains tied to its original digest/provenance.

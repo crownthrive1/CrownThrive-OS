@@ -1,0 +1,141 @@
+---
+title: "ALG-003 — DLA Activation Procedure"
+sidebarTitle: "ALG-003 DLA Activation"
+description: "Standalone CHLOM procedure for activating a Dynamic Licensing Asset only after source-rights, issuer authority, licensee eligibility, policy and approval gates are satisfied."
+icon: "file-signature"
+keywords: ["CHLOM ALG-003", "DLA activation", "Dynamic Licensing Asset", "rights", "license eligibility"]
+---
+
+# ALG-003 — DLA Activation Procedure
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-003
+name: DLA Activation Procedure
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_lineage:
+  historical: Decentralized Licensing Authority issuance logic
+  current: Dynamic Licensing Asset activation
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-003 defines the governed sequence required before a CHLOM **Dynamic Licensing Asset (DLA)** becomes active. It preserves the historical Decentralized Licensing Authority issuance concept while applying the current rights-before-license model.
+
+## Core rule
+
+A DLA is not created merely because a form is complete, a payment succeeded, an AI model recommends approval, or a provider issued an identifier. Activation requires valid underlying rights and authority.
+
+```text
+no source rights -> no valid DLA
+no issuer authority -> no valid DLA
+unknown required fact -> HOLD
+```
+
+## Inputs
+
+```yaml
+candidate_id:
+asset_id:
+requested_scope:
+issuer_id:
+licensee_id:
+term:
+territory:
+channels_or_uses[]:
+transferability:
+sublicensing:
+economic_schedule_ref:
+policy_pack_refs[]:
+credential_refs[]:
+approval_requirements[]:
+evidence_refs[]:
+```
+
+## Public-safe procedure
+
+```text
+function activate_dla(candidate):
+    rights = resolve_rights(candidate.asset, candidate.requested_scope)
+    if rights == DENY:
+        return DENY
+    if rights == UNKNOWN:
+        return HOLD
+
+    issuer = verify_issuer_authority(candidate.issuer, rights)
+    if issuer != PASS:
+        return issuer
+
+    licensee = evaluate_licensee_eligibility(candidate.licensee)
+    if licensee != PASS:
+        return licensee
+
+    policy = evaluate_license_policy(candidate)
+    if policy != PASS:
+        return policy
+
+    approvals = collect_required_approvals(candidate)
+    if approvals.incomplete:
+        return HOLD
+
+    dla = create_versioned_permission_package(candidate)
+    append_dail_event("DLA_ACTIVATED", dla)
+    return PASS
+```
+
+## Rights resolution
+
+Rights resolution must trace the candidate scope to source-right records and any parent agreements. Requested rights must be an allowed subset of controlled rights. A license cannot manufacture a territory, medium, duration, exclusivity, derivative right, or transfer power absent from the source chain.
+
+## Issuer authority
+
+The issuer must have authority over the exact rights being granted. Corporate role, creator identity, possession of a provider account, or historical ownership evidence may be inputs but are not automatically sufficient. Conflicting rights claims should HOLD pending resolution.
+
+## Licensee eligibility
+
+Eligibility may include identity/organization verification, required credentials, jurisdiction, sanctions checks, contract capacity, policy-specific prerequisites and risk gates. Eligibility must be evaluated under the currently applicable policy version.
+
+## Activation object
+
+A successful DLA activation should produce a versioned permission package containing:
+
+```yaml
+dla_id:
+version:
+asset_id:
+source_right_refs[]:
+issuer_id:
+licensee_id:
+rights_scope:
+term:
+territory:
+channels_or_uses[]:
+transferability:
+sublicensing_rules:
+economic_schedule_ref:
+policy_versions[]:
+approval_refs[]:
+evidence_refs[]:
+status: ACTIVE
+activated_at:
+```
+
+Provider IDs may be stored as aliases; they are not the canonical identity of the DLA.
+
+## Failure and HOLD states
+
+Use `DENY` for confirmed lack of rights, prohibited scope, revoked issuer authority, ineligible licensee, or hard policy prohibition. Use `HOLD` for unresolved source-rights conflicts, stale credentials, missing approvals, uncertain jurisdiction, incomplete evidence or unavailable mandatory verification.
+
+## Side effects
+
+Activation is consequential. The write must be idempotent and must append a DAIL event. Any external provider registration occurs after or as a bounded execution step tied to the canonical DLA record, with reconciliation back to CHLOM.
+
+## Tests
+
+Test valid activation; missing source right; requested scope exceeds source; issuer has partial authority; expired credential; unresolved sanctions data; approval missing; duplicate request; provider success before CHLOM activation; revoked parent right; and subsequent correction/revocation.
+
+## Versioning
+
+Amendments create a new DLA version or explicit lifecycle event. The historical activated version remains auditable. Corrections do not silently rewrite the original permission package.

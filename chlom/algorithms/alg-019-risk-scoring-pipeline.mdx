@@ -1,0 +1,113 @@
+---
+title: "ALG-019 — Risk Scoring Pipeline"
+sidebarTitle: "ALG-019 Risk Pipeline"
+description: "Standalone CHLOM risk pipeline from evidence and validated features through model output, uncertainty, explanations, policy thresholds and a separate authority gate."
+icon: "gauge"
+keywords: ["CHLOM ALG-019", "risk scoring", "AIE", "ACE", "uncertainty", "model governance"]
+---
+
+# ALG-019 — Risk Scoring Pipeline
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-019
+name: Risk Scoring Pipeline
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: historical AIE/ACE; current Anomaly Intelligence; Risk Scoring Engine
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-019 describes the governed path from evidence to a risk output. It preserves historical CHLOM AI-risk concepts while enforcing modern separation between probabilistic model output, policy disposition and authority.
+
+## Pipeline
+
+```text
+raw evidence/events
+        |
+        v
+feature extraction
+        |
+        v
+feature validation
+        |
+        v
+approved risk model
+        |
+        v
+score + uncertainty + explanations
+        |
+        v
+policy thresholds / hard rules
+        |
+        v
+PASS/HOLD/DENY candidate
+        |
+        v
+authority gate
+```
+
+## Inputs
+
+```yaml
+subject_or_event_ref:
+evidence_snapshot_refs[]:
+feature_schema_version:
+model_id:
+model_version:
+policy_threshold_version:
+```
+
+## Evidence and features
+
+Feature extraction must retain provenance: each consequential feature should be traceable to evidence or an explicitly derived computation. Missing values, imputation, normalization and categorical encodings must be specified by model version rather than hidden inside ad hoc model code.
+
+## Feature validation
+
+Validate units, ranges, timestamp currentness, tenant/subject binding, protected-data handling and known impossible combinations. An invalid feature vector should HOLD or fail model evaluation, not silently become zero-risk.
+
+## Model execution
+
+The model returns a normalized or otherwise well-defined risk output plus uncertainty/confidence information and public-safe reason/explanation codes where feasible. Historical source equations are preserved as research; production features and weights require an approved model registry entry.
+
+## Policy evaluation
+
+Risk scores do not directly execute actions. Policy interprets them alongside deterministic rules. For example, a hard prohibited condition can DENY regardless of a low probabilistic score, while high uncertainty can HOLD even if the point estimate is low.
+
+## Output
+
+```yaml
+risk_assessment_id:
+subject_ref:
+model_ref:
+feature_snapshot_ref:
+score:
+score_scale:
+uncertainty:
+reason_codes[]:
+policy_candidate:
+calculated_at:
+valid_until:
+```
+
+## Human and authority boundary
+
+High-consequence uses can require human review. An AI model is not a regulator, founder, contract owner or legal authority. The final execution path must pass ALG-002.
+
+## Model governance
+
+Each model requires purpose, training/evaluation provenance where applicable, feature definitions, performance metrics, subgroup/fairness analysis where relevant, security/adversarial analysis, threshold ownership, drift monitoring, rollback and DAIL evidence.
+
+## Failure states
+
+Missing mandatory features, stale evidence, unsupported model version, model service failure, uncertainty beyond policy, model drift HOLD, feature-schema mismatch or evidence-classification violation.
+
+## Tests
+
+Test normal evaluation, missing feature, out-of-range feature, stale evidence, model unavailable, high uncertainty, hard-rule override, model version change, contradictory evidence and bias/drift escalation fixtures.
+
+## Versioning
+
+Model versions, feature schemas and policy thresholds are separate versioned objects. A new model does not automatically inherit authorization from an older model.

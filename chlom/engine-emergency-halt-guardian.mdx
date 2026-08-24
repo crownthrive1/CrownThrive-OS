@@ -1,0 +1,224 @@
+---
+title: "Emergency Halt / Guardian Engine"
+sidebarTitle: "Emergency Halt / Guardian"
+description: "Standalone CHLOM engine article for emergency circuit-breaking, bounded guardian authority, scope-specific pause, restoration, compensation and incident evidence across pallets and providers."
+icon: "shield-exclamation"
+keywords: ["CHLOM Emergency Halt", "Guardian Engine", "pause", "circuit breaker", "incident", "HOLD", "restoration"]
+---
+
+# Emergency Halt / Guardian Engine
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.emergency-halt-guardian
+canonical_name: Emergency Halt / Guardian Engine
+artifact_class: safety_engine
+source_lineage:
+  - recovered Help Center engine estate
+  - Pause / Guardianship Pallet
+  - governance and incident-response architecture
+current_mapping:
+  - P-02 Governance & Compliance
+  - P-10 Operations & Institutional Memory
+status: reconstructed_source_grounded
+```
+
+## Purpose
+
+The Emergency Halt / Guardian Engine is CHLOM's **bounded circuit breaker**. It lets authorized guardians stop a dangerous or unresolved operation quickly without granting permanent or universal administrative power.
+
+```text
+NORMAL OPERATION
+      |
+critical trigger / credible evidence
+      |
+      v
+HALT REQUEST
+      |
+guardian + scope + authority
+      |
+      v
+PAUSE / HOLD
+      |
+containment / investigation / remediation
+      |
+      v
+RESTORE | NARROW | REVOKE | COMPENSATE
+      |
+      v
+DAIL
+```
+
+## Halt object
+
+```yaml
+halt_id: stable ID
+scope_ref: institution|pallet|service|tenant|asset|capability|provider
+trigger_class: security|rights|economic|policy|provider|safety|other
+opened_by_ref: guardian/authority
+authority_ref: required
+evidence_refs: []
+opened_at: timestamp
+review_at: nullable
+expires_at: nullable
+status: candidate|active|partially_lifted|lifted|superseded|converted
+```
+
+## Guardian object
+
+```yaml
+guardian_assignment_id: stable ID
+guardian_ref: P-01 identity
+allowed_scopes: []
+allowed_actions: []
+authority_ceiling: required
+effective_from: timestamp
+expires_at: nullable
+status: active|suspended|revoked|expired
+```
+
+A guardian is not a general administrator.
+
+## Trigger sources
+
+Potential trigger classes include:
+
+- confirmed/credible credential compromise;
+- critical policy mismatch;
+- stale sanctions/oracle evidence where current evidence is mandatory;
+- rights/license dispute requiring temporary containment;
+- duplicate/unauthorized economic execution;
+- provider breach/outage producing unsafe state;
+- bridge/proof integrity issue;
+- model/automation runaway;
+- public/private data leak;
+- governance/runtime exploit.
+
+Protected thresholds/detection logic remain restricted.
+
+## Scope minimization
+
+```text
+pause only the smallest scope that safely contains the risk
+```
+
+If one asset is disputed, institution-wide halt is not justified unless evidence/policy supports broader scope.
+
+## HOLD relationship
+
+`HOLD` is the decision state; `halt/pause` is an operational control.
+
+```text
+HOLD can trigger PAUSE
+PAUSE can remain while HOLD is reviewed
+```
+
+## Provider propagation
+
+A local halt must be propagated to relevant providers and read back where side effects exist.
+
+```text
+INSTITUTIONAL HALT
+   |
+   +--> provider pause/disable
+   +--> queue suppression
+   +--> storefront/listing hold
+   +--> payout hold
+   +--> access restriction
+   |
+readback / mismatch
+```
+
+Provider success does not mean every dependent surface is contained; reconciliation remains necessary.
+
+## Restoration
+
+Restoration requires evidence, authority and exact scope.
+
+```text
+halted
+  |
+remediation evidence
+  |
+revalidation
+  |
+restore? -- no --> remain held
+  |
+ yes
+  v
+lift exact scope
+  |
+provider readback + DAIL
+```
+
+## Compensation
+
+If a halt interrupted a partially executed workflow, restoration may require compensation rather than naive rollback:
+
+- refund;
+- entitlement restoration;
+- reschedule;
+- reversal/clawback;
+- provider reconciliation;
+- corrected public status;
+- re-issued license/action.
+
+## Current events
+
+```text
+ct.guardian.halt.requested.v1
+ct.guardian.halt.activated.v1
+ct.guardian.halt.propagated.v1
+ct.guardian.halt.scope.changed.v1
+ct.guardian.halt.lifted.v1
+ct.guardian.halt.compensation.required.v1
+```
+
+## Failure modes
+
+### Guardian authority expired
+
+DENY new halt/lift action; emergency alternative requires separately valid authority.
+
+### Provider refuses pause
+
+Keep institutional state halted, escalate provider incident, use alternate containment/exit path where available.
+
+### Halt remains past review/expiry
+
+Escalate stale halt; do not silently keep indefinite emergency power.
+
+### Restore provider before institutional review
+
+Provider state becomes mismatch; institutional halt remains until authorized lift/readback.
+
+## Security threats
+
+- stolen guardian credential;
+- abuse/censorship through overbroad pause;
+- hidden permanent emergency authority;
+- provider bypass;
+- unauthorized lift;
+- race between execution and halt;
+- incomplete propagation.
+
+## Restricted companion
+
+Contains exact guardian identities/scopes where sensitive, emergency routes, provider kill-switch procedures, exploit triggers, red-team evidence and incident topology. Raw secrets remain in secret storage.
+
+## Invariants
+
+```text
+guardian != universal admin
+halt != revocation
+halt != deletion
+HOLD != DENY
+restoration != erasure
+provider pause != full institutional containment automatically
+emergency authority != permanent authority
+```
+
+## Status
+
+The engine is preserved as first-class CHLOM safety IP and mapped to current P-02/P-10 incident, HOLD, pause, restoration and compensation workflows.

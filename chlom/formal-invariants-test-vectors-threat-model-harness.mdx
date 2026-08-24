@@ -1,0 +1,587 @@
+---
+title: "Formal Invariants, Test Vectors and Threat-Model Harness"
+sidebarTitle: "Invariants & Test Vectors"
+description: "Comprehensive CHLOM assurance contract for invariants, state machines, adversarial test vectors, replay/failure injection, formal verification targets and threat-model evidence."
+icon: "shield"
+keywords: ["CHLOM invariants", "test vectors", "formal verification", "threat model", "state machine", "adversarial testing", "conformance"]
+---
+
+# Formal Invariants, Test Vectors and Threat-Model Harness
+
+CHLOM's historical papers include formal models, state-machine research, threat models, security appendices and developer test-kit concepts. Current CHLOM should preserve those ideas as executable assurance contracts: define what **must always be true**, then prove or test that implementations cannot violate it silently.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_source_grounded_plus_current_assurance_mapping
+source_families:
+  - Grand Prospectus appendices D/E
+  - Genesis formal/protocol architecture
+  - Technical Blueprint state and security design
+  - current documentation/security/governance validators
+current_mapping:
+  - invariant registry
+  - deterministic validators
+  - property tests
+  - adversarial test vectors
+  - simulator traces
+  - formal verification targets
+  - threat-model evidence
+founder_adjudication: open_after_publication
+```
+
+## Invariant versus policy
+
+An invariant is stronger than an ordinary preference.
+
+```text
+POLICY
+  defines allowed behavior under a versioned rule
+
+INVARIANT
+  defines a condition that must never be violated
+  across all valid executions in its scope
+```
+
+Examples:
+
+```text
+child_rights <= parent_rights
+DENY cannot be upgraded by AI confidence
+revoked credential cannot authorize new action
+payment success cannot create entitlement without governing authorization
+correction cannot erase prior DAIL history
+```
+
+## Invariant registry
+
+```yaml
+invariant_id: CT-INV-RIGHTS-001
+name: child_rights_conservation
+domain: rights_and_licensing
+statement: child grants may not exceed parent/source authority
+severity: critical
+scope:
+  - DLA creation
+  - sublicensing
+  - transfer
+machine_check_ref: validator-id
+formal_model_ref: optional
+failure_disposition: DENY
+owner_role: rights-governance
+version: 1.0.0
+```
+
+## Core invariant families
+
+### Identity
+
+```text
+identity != credential
+credential != role
+role != delegation
+delegation != approval
+approval != execution
+```
+
+### Rights
+
+```text
+child_rights <= parent_rights <= source_rights
+revoked_rights -> no new entitlement
+expired_parent -> no new child license
+```
+
+### Policy
+
+```text
+hard_DENY > HOLD > PASS
+missing_required_evidence -> not PASS
+policy_version_required_for_consequential_decision
+```
+
+### Evidence
+
+```text
+provider_evidence != institutional_truth
+anchor != factual_correctness
+revocation != deletion
+public_projection <= source_visibility
+```
+
+### Economics
+
+```text
+calculation != authorization
+provider_payment != institutional_settlement
+refund/reversal preserves original transaction history
+```
+
+### AI
+
+```text
+AI_recommendation != authority
+model_confidence cannot override hard block
+candidate model in shadow mode has no side effects
+```
+
+### Interoperability
+
+```text
+remote_message != local_authority
+bridge_success != rights_transfer unless local rules pass
+replay must not duplicate side effects
+```
+
+## State-machine assurance
+
+Every consequential object should have a state machine.
+
+Example DLA:
+
+```text
+CANDIDATE
+   |
+   v
+RIGHTS_REVIEW
+   |
+   +--> DENIED
+   |
+   v
+POLICY_REVIEW
+   |
+   +--> HOLD
+   |
+   v
+APPROVED
+   |
+   v
+ACTIVE
+   |
++--+-----+---------+
+|        |         |
+v        v         v
+EXPIRED SUSPENDED REVOKED
+          |
+          v
+        RESTORED (only if authorized)
+```
+
+Tests should reject transitions not present in the state machine.
+
+## Transition receipt
+
+```yaml
+transition_id: stable-id
+object_ref: stable-object
+from_state: state
+to_state: state
+trigger_ref: event/decision
+policy_ref: version
+evidence_refs: []
+approval_refs: []
+executed_at: timestamp
+DAIL_event_ref: event-id
+```
+
+## Test vector anatomy
+
+A test vector should include:
+
+```yaml
+vector_id: CT-TV-DLA-004
+title: parent revoked before child activation
+initial_state:
+  parent_status: revoked
+  child_status: approved
+input:
+  action: activate_child
+expected:
+  disposition: DENY
+  reason_codes:
+    - PARENT_RIGHTS_INACTIVE
+  emitted_events:
+    - child_activation_denied
+invariants:
+  - CT-INV-RIGHTS-001
+```
+
+## Positive, negative and ambiguous tests
+
+Do not test only success.
+
+```text
+POSITIVE
+known-valid input -> PASS
+
+NEGATIVE
+known-invalid input -> DENY
+
+AMBIGUOUS
+missing/conflicting input -> HOLD
+```
+
+A system without HOLD test vectors tends to force uncertainty into false success or false denial.
+
+## Boundary tests
+
+Critical boundary cases include:
+
+- exactly-at-threshold amounts;
+- one second before/after expiration;
+- first/last permitted use;
+- maximum delegation ceiling;
+- empty/null/unresolved fields;
+- zero versus negative/unlimited budget semantics where applicable;
+- parent rights equal to child rights;
+- overlapping territory edges;
+- same event replayed twice.
+
+## Property-based tests
+
+Property tests generate many input combinations while checking invariants.
+
+Example:
+
+```text
+for any parent license P
+and any proposed child C:
+
+if C.rights not subset of P.rights
+then activate(C) must never PASS
+```
+
+## Metamorphic tests
+
+A metamorphic test checks that irrelevant changes do not change the result.
+
+Example:
+
+```text
+changing display name
+must not change licensing authority
+
+changing provider transaction ID
+must not change institutional allocation
+```
+
+## Replay tests
+
+DAIL and event-driven workflows require deterministic replay.
+
+```text
+EVENT LOG
+ E1
+ E2
+ E3
+ ...
+ EN
+  |
+  v
+REPLAY ENGINE
+  |
+  v
+EXPECTED CURRENT STATE
+```
+
+Replay should produce the same effective state for the same accepted event/version set.
+
+## Correction replay
+
+```text
+E1 license active
+E2 payment observed
+E3 entitlement issued
+E4 correction: payment duplicated
+E5 entitlement corrected
+```
+
+A replay must preserve E1-E5 history while resolving the corrected current state.
+
+## Failure injection
+
+The harness should inject failures such as:
+
+```text
+provider timeout
+DB unavailable
+object store unavailable
+oracle stale
+model unavailable
+clock skew
+reviewer unavailable
+webhook duplicate
+partial settlement
+signature invalid
+key rotated
+schema version mismatch
+network partition
+```
+
+The expected result should specify whether the system fails closed, retries, compensates or enters degraded mode.
+
+## Compensation testing
+
+For non-atomic multi-provider workflows:
+
+```text
+STEP A succeeds
+STEP B succeeds
+STEP C fails
+      |
+      v
+COMPENSATION PLAN
+  reverse B if reversible
+  mark A partial
+  create case/hold
+  preserve provider evidence
+  emit DAIL events
+```
+
+A compensation path must itself be tested.
+
+## Security threat-model categories
+
+### Spoofing / identity
+
+- impersonated actor;
+- forged credential;
+- stolen key;
+- session fixation;
+- cross-tenant identity collision.
+
+### Tampering
+
+- modified evidence;
+- rewritten event;
+- altered policy pack;
+- webhook payload mutation;
+- provider response substitution.
+
+### Repudiation
+
+- actor denies approval;
+- provider denies event;
+- reviewer disputes submission;
+- missing timestamp/correlation.
+
+### Information disclosure
+
+- public mirror leaks private evidence;
+- cross-tenant data exposure;
+- log contains secrets;
+- ZK/public proof metadata reveals too much.
+
+### Denial of service
+
+- provider quota exhaustion;
+- event storm;
+- proof-verification flood;
+- deliberately expensive query;
+- reviewer queue saturation.
+
+### Elevation of privilege
+
+- agent self-expands role;
+- reviewer approves own conflict;
+- provider admin becomes institutional governor;
+- HOLD converted to PASS by unsupported fallback.
+
+## Abuse-case diagrams
+
+```text
+ATTACKER
+   |
+forged provider callback
+   |
+   v
+signature verification
+   |
+ +--+--+
+ |     |
+FAIL  PASS
+ |     |
+DENY  continue institutional reconciliation
+```
+
+```text
+MODEL OUTPUT = PASS
+        |
+        v
+hard policy says DENY
+        |
+        v
+       DENY
+```
+
+## Formal verification targets
+
+Not every subsystem warrants formal proof. High-value targets include:
+
+- rights subset/conservation;
+- state transition legality;
+- no self-approval;
+- timelock invariants;
+- escrow release conditions;
+- split/allocation conservation;
+- event-chain integrity;
+- replay/idempotency;
+- authority-ceiling enforcement.
+
+## TLA\+/state-model lineage
+
+Historical CHLOM materials reference formal-model research. Current practice can model small critical state machines in TLA\+, Alloy or another suitable formal method.
+
+The goal is not to formalize the entire organization. The goal is to prove the highest-risk invariants where ordinary tests are insufficient.
+
+## Economic conservation test
+
+```text
+gross amount
+   = allocated recipients
+   + reserve/fees where authorized
+   + explicit remainder
+```
+
+No money should disappear through rounding or duplicate routing.
+
+## Authority-ceiling test
+
+```text
+actor authority = D1
+requested action = D3
+
+expected -> DENY / human escalation
+```
+
+A delegated agent cannot create a higher delegation simply by invoking another service.
+
+## Evidence freshness test
+
+```text
+required evidence expires at T
+execution occurs T + 1 second
+
+expected -> HOLD/DENY according to policy
+```
+
+## Public projection test
+
+Test that restricted fields never appear in:
+
+- public APIs;
+- Mintlify pages;
+- public explorer;
+- logs;
+- webhooks intended for public consumers;
+- search indexes.
+
+## Schema fuzzing
+
+Fuzz tests should include:
+
+- unexpected fields;
+- huge strings;
+- invalid Unicode;
+- nulls;
+- wrong enum values;
+- numeric overflow;
+- duplicate IDs;
+- malformed timestamps;
+- nested payload bombs.
+
+Validation errors should be deterministic.
+
+## Regression corpus
+
+Every real defect should become a regression vector.
+
+```text
+incident / bug
+    |
+    v
+minimal reproducible case
+    |
+    v
+permanent test vector
+```
+
+This converts failures into durable institutional memory.
+
+## Golden corpus
+
+A golden corpus should contain approved examples of:
+
+- DLA objects;
+- policy packs;
+- DAIL events;
+- audit receipts;
+- entitlement flows;
+- settlement corrections;
+- case outcomes;
+- public projections.
+
+Changes to golden outputs should require explicit review because they often reveal semantic drift.
+
+## Conformance evidence
+
+A conformance run should record:
+
+```yaml
+suite_id: CT-CONFORMANCE-v1
+implementation_ref: service/version
+commit_or_build_ref: exact-version
+executed_at: timestamp
+vectors_total: 250
+passed: 250
+failed: 0
+skipped: 0
+artifact_digest: sha256:...
+limitations: []
+DAIL_event_ref: event-id
+```
+
+## CI is evidence, not authority
+
+```text
+CI PASS
+  -> evidence that automated checks passed
+  -> not automatic production approval
+```
+
+Governance, environment, authority and deployment evidence remain separate.
+
+## Required Wave-level validation
+
+Each reconstruction/build wave should validate:
+
+1. body integrity;
+2. source/current distinction;
+3. terminology consistency;
+4. navigation consistency;
+5. no secret exposure;
+6. deterministic docs validation;
+7. security governance;
+8. exact-head merge governance;
+9. continuity/supersession state.
+
+## Core invariants
+
+```text
+unreachable state transition -> reject
+replay -> no duplicate side effect
+compensation -> preserves history
+failed test -> no self-certified PASS
+formal proof scope <= claimed scope
+CI green != production authority
+```
+
+## Current implementation boundary
+
+Invariant registries, state-machine validators, property tests, replay harnesses and threat-model test kits are immediately compatible with the current cloud-first architecture. Formal verification can be added selectively to critical contracts without requiring a dedicated blockchain.
+
+## Founder adjudication
+
+`open_after_publication`
+
+A later founder decision may designate constitutional invariants, mandatory formal-proof targets, conformance-suite naming, severity classes or exact production-gate requirements. Historical formal-model source lineage remains preserved.

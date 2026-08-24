@@ -1,0 +1,111 @@
+---
+title: "ALG-032 — Release Certification"
+sidebarTitle: "ALG-032 Release Certification"
+description: "Standalone CHLOM documentation/software release-certification procedure requiring governance, continuity, security, merge-gate and body-integrity evidence before a packet is certifiable."
+icon: "badge-check"
+keywords: ["CHLOM ALG-032", "release certification", "governance CI", "continuity", "security", "merge gate"]
+---
+
+# ALG-032 — Release Certification
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-032
+name: Release Certification
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: CHLOM reconstruction release gates; governance CI; evidence-driven deployment
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-032 defines the minimum evidence gates required before a CHLOM documentation or implementation head can be called a **certifiable packet**. It deliberately separates technical readiness from authority to merge, deploy or activate production.
+
+## Core invariant
+
+```text
+CERTIFIABLE_PACKET != authority to merge
+CERTIFIABLE_PACKET != production activation
+```
+
+## Inputs
+
+```yaml
+head_sha_or_release_id:
+required_gate_versions:
+artifact_manifest:
+source_lineage_manifest:
+security_evidence:
+continuity_evidence:
+body_integrity_evidence:
+governed_merge_policy:
+```
+
+## Procedure
+
+```text
+function certify_release(head_sha):
+    require docs_governance(head_sha) == PASS
+    require continuity(head_sha) == PASS
+    require security(head_sha) == PASS
+    require governed_merge_gate(head_sha) == PASS
+    require body_integrity(head_sha) == PASS
+
+    return CERTIFIABLE_PACKET
+```
+
+## Gate meanings
+
+### Documentation governance
+
+Checks controlled terminology, source authority, public/private boundaries, navigation/schema requirements, no unsupported current-state claims and required adjudication references.
+
+### Continuity
+
+Checks that prior knowledge/assets were not silently deleted or orphaned, redirects/aliases exist where required, recovery registers remain consistent and append-only lineage is preserved.
+
+### Security
+
+Checks secret exposure, restricted content, dangerous configuration, dependency/security requirements and other release-specific controls.
+
+### Governed merge gate
+
+Confirms required approvals/checks for the exact head/version. A green technical test cannot substitute for a required human or governance approval.
+
+### Body integrity
+
+Verifies that article/source bodies actually exist and are substantive where claimed, links/manifests resolve, generated files correspond to source data and no placeholder has been mislabeled complete.
+
+## Output
+
+```yaml
+certification_packet_id:
+head_sha_or_release_id:
+gate_results[]:
+artifact_manifest_ref:
+evidence_refs[]:
+status: CERTIFIABLE_PACKET|HOLD|DENY
+certified_at:
+algorithm_version:
+```
+
+## HOLD behavior
+
+Any unresolved required gate should HOLD. The release record should state the exact failing gate and evidence, not collapse everything into a vague 'CI failed'.
+
+## Re-run behavior
+
+Certification is bound to the exact head/release digest. A subsequent commit or mutation invalidates the earlier packet for the new head and requires re-evaluation.
+
+## DAIL evidence
+
+Append gate results, exact head hash, tool/check versions, approvals and final packet state. If an earlier certification is later invalidated by newly discovered evidence, append the invalidation and corrective release lineage.
+
+## Tests
+
+Test all gates pass, each gate failing independently, approval for wrong head, body placeholder, secret leak, continuity deletion, rerun same head, new commit after certification and rollback release.
+
+## Versioning
+
+Gate composition and certification policy are versioned. A release states which certification contract it satisfied.
