@@ -1,0 +1,245 @@
+---
+title: "TLaaS (LEX) — License Registry Smart Contract: ERC‑721/1155 Implementation Guide"
+sidebarTitle: "TLaaS LEX Registry Contract"
+description: "Exact-title forensic reconstruction of the historical ERC-721/1155 license-registry implementation guide, preserving tokenized-license research while making canonical Dynamic Licensing Asset state provider- and token-standard-neutral."
+icon: "file-code"
+keywords: ["TLaaS LEX ERC-721", "ERC-1155", "license registry", "Dynamic Licensing Asset", "tokenized licensing"]
+---
+
+# TLaaS (LEX) — License Registry Smart Contract: ERC‑721/1155 Implementation Guide
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.tlaas-lex-license-registry-erc721-1155
+exact_recovered_title: TLaaS (LEX) — License Registry Smart Contract: ERC‑721/1155 Implementation Guide
+artifact_class: historical_implementation_guide
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+historical_technology_lineage:
+  - NFT license representations
+  - SBT/non-transferable credential research
+  - ERC-721/1155 implementation research
+current_canonical_object: Dynamic Licensing Asset
+current_token_requirement: optional_adapter_only
+production_contract_claim: none
+```
+
+## Recovery boundary
+
+The exact Help Center title is recovered. No authenticated historical Solidity source, ABI, address, network or bytecode is recovered from this title. Related CHLOM sources describe license NFTs/SBTs, smart-contract registries, issuance, transfer restrictions, revocation and LEX exchange. This record reconstructs the architectural contract only.
+
+## Core correction
+
+```text
+CANONICAL DLA
+   != ERC-721 token
+   != ERC-1155 token
+```
+
+ERC standards can represent selected license state, but they cannot establish source rights or issuer authority by themselves.
+
+## When ERC-721 fits the historical design
+
+A unique non-fungible representation may be appropriate where one token maps to one unique license instance or title-like object.
+
+```text
+DLA-123 <-> tokenId 987
+```
+
+The binding remains an adapter relationship.
+
+## When ERC-1155 fits the historical design
+
+A multi-token representation may be useful for license classes, seats, editions, bundles or multiple token types under one contract, subject to rights semantics.
+
+```text
+one token standard supports many ids
+   != rights are fungible automatically
+```
+
+The legal/licensing meaning comes from the DLA and source agreement, not the token standard.
+
+## Registry responsibilities
+
+A historical/current-safe registry adapter can support:
+
+- canonical DLA reference;
+- token/representation ID;
+- issuer/steward reference;
+- holder/provider address alias;
+- representation class;
+- current representation state;
+- metadata/proof reference;
+- transfer restriction flags derived from canonical terms;
+- revocation/hold projection;
+- version/migration history.
+
+## Suggested adapter record
+
+```yaml
+license_representation:
+  binding_id: stable institutional id
+  canonical_dla_ref: required
+  provider_ref: chain/provider adapter
+  standard: ERC721|ERC1155|other
+  contract_ref: opaque/provider-specific
+  token_id: opaque/provider-specific
+  represented_dla_version: exact
+  holder_provider_alias: optional
+  metadata_digest_ref: required where used
+  state: candidate|active|held|migrated|retired|burned
+  created_at: timestamp
+  supersedes: optional
+```
+
+## Mint/issuance sequence
+
+```text
+source rights resolved
+ -> issuer authority resolved
+ -> policy/approval PASS
+ -> canonical DLA active
+ -> representation requested
+ -> contract/provider mint
+ -> binding readback
+ -> DAIL receipt
+```
+
+A mint failure does not erase an already valid canonical DLA; the representation enters retry/HOLD according to profile.
+
+A mint success without canonical DLA activation does not produce a valid institutional license.
+
+## Transfer hooks
+
+Historical LEX research expects smart contracts to prevent disallowed transfers. Current-safe enforcement checks canonical terms before permitting the provider transfer.
+
+```text
+transfer requested
+ -> DLA active?
+ -> transferable?
+ -> actor authorized?
+ -> recipient eligible?
+ -> territory/term valid?
+ -> required approval PASS?
+ -> provider transfer
+ -> canonical transfer reconciliation
+```
+
+## Non-transferable credentials
+
+Historical SBT concepts can be represented through non-transferability rules or other credential adapters. The registry must not assume every credential is transferable merely because the underlying token standard supports transfer.
+
+## Revocation and suspension
+
+A provider representation may be frozen, burned or marked invalid depending on adapter capabilities, but canonical lifecycle state remains authoritative.
+
+```text
+DLA revoked
+ -> provider adapter propagation
+ -> readback
+ -> discrepancy HOLD if propagation fails
+```
+
+## Metadata architecture
+
+Avoid putting confidential rights contracts, personal data or provider secrets directly in public token metadata.
+
+```yaml
+public_metadata:
+  canonical_dla_ref: safe id
+  license_class: safe
+  status_projection: safe
+  public_rights_summary: safe
+  metadata_version: exact
+  integrity_digest: safe
+```
+
+Restricted terms remain in governed storage with safe references/proofs.
+
+## Upgrade/migration
+
+A token contract can be replaced without changing the identity of the canonical DLA.
+
+```text
+old representation
+ -> migrate / retire
+ -> new representation
+canonical DLA identity preserved
+```
+
+Provider migration must preserve chain-of-title and event evidence.
+
+## Reentrancy/authorization/security considerations
+
+A real implementation requires audited controls for:
+
+- privileged mint/revoke roles;
+- authorization separation;
+- reentrancy where payment/transfer hooks exist;
+- upgrade authority;
+- metadata integrity;
+- replay/idempotency;
+- denial-of-service behavior;
+- pause/guardian scope;
+- chain finality/reorg handling;
+- bridge/cross-chain claims;
+- key custody.
+
+Exact production code and thresholds remain restricted/capability-specific.
+
+## LEX relationship
+
+```text
+DLA eligible
+ -> representation available (optional)
+ -> LEX listing eligible
+ -> transaction
+ -> canonical transfer/sublicense
+ -> representation update
+```
+
+LEX does not require ERC-721/1155 if another provider-neutral representation is used.
+
+## Historical code boundary
+
+The title says “Implementation Guide,” but the lost code is not recovered. This article does not fabricate Solidity functions, inheritance trees, contract addresses or deployment scripts.
+
+## DAIL events
+
+```text
+ct.dla.representation.requested.v1
+ct.dla.representation.minted.v1
+ct.dla.representation.bound.v1
+ct.dla.representation.transfer_observed.v1
+ct.dla.representation.mismatch_detected.v1
+ct.dla.representation.migrated.v1
+ct.dla.representation.retired.v1
+```
+
+## Failure modes
+
+- token minted before rights approval -> invalid representation / HOLD;
+- provider holder differs from canonical holder -> reconciliation HOLD;
+- transfer succeeds where DLA forbids transfer -> incident/correction path;
+- metadata digest mismatch -> HOLD;
+- provider contract inaccessible -> canonical DLA remains, adapter degraded;
+- burn occurs without canonical revocation -> do not infer license revocation automatically.
+
+## Restricted companion
+
+Private custody may include historical Solidity, ABI, contract addresses, deployment keys, audit reports, exploit mitigations, admin role topology, partner chain mappings and unreleased metadata schemas.
+
+## Invariants
+
+```text
+ERC token != source right
+ERC token != canonical DLA
+wallet control != issuer authority
+provider transfer != institutional transfer automatically
+historical implementation title != recovered production code
+```
+
+## Status
+
+`TITLE_RECOVERED + RECONSTRUCTED + EXACT_CODE_NOT_RECOVERED + PRODUCTION_CONTRACT_NOT_CLAIMED`.
