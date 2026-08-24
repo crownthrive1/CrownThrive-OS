@@ -1,0 +1,211 @@
+---
+title: "Decentralized Licensing Authority (DLA) — Smart Contract Architecture Spec (Phase 0 — High-Level)"
+sidebarTitle: "Historical DLA Contract Architecture"
+description: "Exact-title forensic reconstruction of the historical DLA smart-contract architecture, grounded in recovered CHLOM contract factory, registry, license lifecycle, override and compliance-hook source descriptions without publishing protected implementation details."
+icon: "code"
+keywords: ["DLA smart contract architecture", "historical DLA", "license registry", "CHLOM smart contracts", "Phase 0"]
+---
+
+# Decentralized Licensing Authority (DLA) — Smart Contract Architecture Spec (Phase 0 — High-Level)
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.historical-dla-smart-contract-architecture-phase0
+exact_recovered_title: Decentralized Licensing Authority (DLA) — Smart Contract Architecture Spec (Phase 0 — High-Level)
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+related_pseudocode_source_recovered: true
+historical_DLA: Decentralized Licensing Authority
+current_DLA: Dynamic Licensing Asset
+implementation_status: historical_target_architecture_not_production_proof
+```
+
+## Source-grounded architecture
+
+Recovered related sources describe a historical DLA implemented through smart contracts/pallets with functions for issuance, registry/state, lifecycle enforcement and governed override. The Grand Prospectus also describes a possible contract factory, registry mapping license IDs to owner identities, standard license templates and upgradeable logic.
+
+## Historical contract decomposition
+
+```text
+                +----------------------+
+                |  License Factory     |
+                +----------+-----------+
+                           |
+                           v
++-------------+   +----------------------+   +----------------+
+| Identity /  |-->| License Registry     |<--| Policy / AI /  |
+| Fingerprint |   | + lifecycle state    |   | Oracle checks  |
++-------------+   +----------+-----------+   +----------------+
+                           |
+              +------------+------------+
+              |                         |
+              v                         v
+       Transfer/Sublicense        Override/Remedy
+          enforcement                actions
+              |                         |
+              +------------+------------+
+                           |
+                           v
+                      event/audit
+```
+
+This is a reconstruction of documented functions, not an exact lost diagram.
+
+## Historical contract responsibilities
+
+### License factory / creation
+
+Create a license instance/record from approved type, subject, terms and authority.
+
+### Registry
+
+Maintain canonical mapping among license ID, holder/identity, status, metadata and history.
+
+### Eligibility gate
+
+Evaluate prerequisites before mint/activation or route to an authorized external decision source.
+
+### Lifecycle controller
+
+Manage activation, amendment, renewal, suspension, revocation and expiry.
+
+### Transfer/sublicense controller
+
+Block transfers that violate non-transferability, eligibility or source constraints.
+
+### Override/remedy path
+
+Recovered Technical Blueprint pseudocode describes an `overrideLicenseStatus`-style action restricted to authorized override authority and emitting an immutable event. That source pattern is historical illustrative pseudocode, not current production code.
+
+## Reconstructed interface semantics
+
+```text
+createCandidate(...)
+evaluateCandidate(...)
+issue(...)
+verify(...)
+amend(...)
+renew(...)
+requestTransfer(...)
+approveTransfer(...)
+suspend(...)
+reactivate(...)
+revoke(...)
+expire(...)
+```
+
+These names are normalized semantic operations, not authenticated historical function signatures.
+
+## Current architecture correction
+
+Historical smart-contract responsibilities now map to separate governed components:
+
+```text
+Licensing Stewardship / Issuer Authority
+            |
+ Dynamic Licensing Asset
+            |
+ +----------+------------+----------------+
+ |          |            |                |
+Rules    Approval     lifecycle        evidence
+Registry Service      services           |
+ |          |            |               DAIL
+ +----------+------------+
+            |
+        LEX / entitlement
+```
+
+## Authorization rule
+
+No write method may rely on “contract owner” or admin key alone as proof of institutional authority.
+
+```text
+cryptographic_control != rights_backed_authority
+```
+
+Current authorization must resolve both identity and action-specific authority.
+
+## State transition invariant
+
+```text
+transition allowed
+IFF
+current state permits transition
+AND actor/service has authority
+AND required policy/evidence gates pass
+AND version/precondition is current
+```
+
+## Transfer invariant
+
+```text
+transfer_scope <= active_DLA_transferability
+recipient_eligibility == PASS
+source_rights_current == true
+```
+
+If any mandatory state is unresolved, disposition is HOLD/deny rather than implied approval.
+
+## Event requirements
+
+Material calls should emit or persist an institutional event envelope containing:
+
+```yaml
+event:
+  event_id: stable/idempotent
+  entity_ref: DLA/license
+  prior_state: explicit
+  next_state: explicit
+  actor_ref: authenticated identity/service
+  authority_ref: required
+  reason_codes: []
+  policy_version_refs: []
+  evidence_refs: []
+  occurred_at: timestamp
+```
+
+Current durable event history routes to DAIL rather than any historical DAL acronym.
+
+## Upgradeability boundary
+
+Historical sources discuss upgradeable smart-contract/runtime logic. Current-safe requirements are:
+
+- version every behavioral change;
+- preserve migration/rollback evidence;
+- do not silently mutate active rights;
+- require governed approval for authority-affecting changes;
+- preserve old decision interpretation for historical audit.
+
+## Security properties
+
+Public architecture requires:
+
+- least privilege;
+- reentrancy/state-transition safety where contract environments apply;
+- replay protection;
+- idempotency for external callbacks;
+- explicit pause/remedy scope;
+- key rotation/revocation;
+- deterministic policy versioning;
+- evidence/audit logging.
+
+Exact security thresholds, keys and implementation internals remain restricted.
+
+## Current canonical links
+
+- [Dynamic Licensing Asset](/chlom/systems/dynamic-licensing-asset)
+- [Licensing Stewardship / Issuer Authority](/chlom/systems/licensing-stewardship-issuer-authority)
+- [Rules Registry](/chlom/systems/rules-registry)
+- [Approval Service](/chlom/systems/approval-service)
+- [Runtime DLA Pallet](/chlom/runtime-dla-pallet)
+- [Smart Contract Template Research](/chlom/runtime/smart-contract-template-library-research)
+- [DAIL](/chlom/systems/dail-decentralized-autonomous-information-ledger)
+
+## Protected companion class
+
+Restricted materials include unreleased source code, private contract addresses, deployment keys, upgrade keys, authority matrices, exact thresholds, exploit analyses and private test vectors.
+
+## Status
+
+`TITLE_RECOVERED + RELATED_PSEUDOCODE_RECOVERED + ARCHITECTURE_RECONSTRUCTED + EXACT_BODY_NOT_LOCATED`
