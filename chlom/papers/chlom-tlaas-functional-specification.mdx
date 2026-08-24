@@ -1,0 +1,289 @@
+---
+title: "CHLOM – TLaaS Functional Specification"
+sidebarTitle: "TLaaS Functional Specification"
+description: "Exact-title forensic reconstruction of the historical CHLOM TLaaS functional specification, defining source-grounded licensing-service behaviors, current provider-neutral corrections, and explicit separation from Trust Layer as a Service."
+icon: "list-check"
+keywords: ["CHLOM TLaaS Functional Specification", "Tokenized Licensing", "licensing service", "DLA", "LEX"]
+---
+
+# CHLOM – TLaaS Functional Specification
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.tlaas-functional-specification
+exact_recovered_title: CHLOM – TLaaS Functional Specification
+artifact_class: historical_functional_specification
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+primary_related_source_lineage: Tokenized Licensing as a Service
+separate_source_lineage: Trust Layer as a Service
+historical_DLA: Decentralized Licensing Authority
+current_DLA: Dynamic Licensing Asset
+production_claim: none
+```
+
+## Functional objective
+
+The recovered source family supports a TLaaS service that external applications can call to request, verify and manage licensing state while CHLOM handles identity, compliance, rights/lifecycle logic and downstream exchange or settlement integrations.
+
+## Functional boundary
+
+```text
+TLaaS receives a request
+    |
+resolves identity / tenant
+    |
+resolves source rights + issuer authority
+    |
+resolves applicable policy/evidence
+    |
+PASS / HOLD / DENY
+    |
+creates or changes canonical DLA state if authorized
+    |
+optionally binds provider/token representation
+    |
+records event/evidence
+```
+
+## FR-001 — Tenant and actor resolution
+
+Every request must identify the partner/tenant and the actor/service identity responsible for the operation.
+
+```text
+authentication != licensing authority
+```
+
+## FR-002 — Operation typing
+
+Material operations are explicitly typed, such as:
+
+- create candidate;
+- verify eligibility;
+- issue;
+- read/verify;
+- renew;
+- amend;
+- request transfer;
+- request sublicense;
+- suspend;
+- revoke;
+- terminate;
+- bind/migrate provider representation.
+
+## FR-003 — Rights resolution
+
+No issuance or transfer may proceed until the system can resolve the relevant source-rights scope.
+
+```text
+requested permissions <= licensable source permissions
+```
+
+## FR-004 — Issuer authority resolution
+
+The service must determine whether the actor or represented organization has authority to perform the requested licensing action.
+
+```text
+can issue != can revoke automatically
+can renew != can approve transfer automatically
+```
+
+## FR-005 — Identity and credential validation
+
+Where the license profile requires it, the system validates subject/holder identity and credential predicates without unnecessarily publishing sensitive source data.
+
+## FR-006 — Policy selection
+
+The service resolves all applicable policy/compliance packs by license class, jurisdiction/territory, use, participant role and current version.
+
+## FR-007 — Evidence freshness
+
+Evidence-sensitive actions must fail closed or HOLD when required evidence is stale, missing or contradictory.
+
+## FR-008 — Three-valued disposition
+
+```yaml
+disposition: PASS|HOLD|DENY
+```
+
+- `PASS` means prerequisites satisfied within existing authority.
+- `HOLD` means unresolved; no state-changing success is inferred.
+- `DENY` means current rules prohibit the action.
+
+## FR-009 — Canonical DLA creation
+
+A successful issuance produces or activates a canonical Dynamic Licensing Asset representing the permission package.
+
+## FR-010 — Provider/token representation
+
+A blockchain token or provider object may be created only as a representation binding.
+
+```text
+provider write success != canonical issuance success
+```
+
+## FR-011 — License verification
+
+A verification request can return a scoped result covering:
+
+- current state;
+- relevant permissions;
+- term/currentness;
+- holder/subject binding where appropriate;
+- transferability/sublicensing predicates;
+- safe policy/evidence references.
+
+## FR-012 — Renewal
+
+Renewal re-evaluates required currentness conditions rather than blindly extending an old state.
+
+## FR-013 — Amendment/versioning
+
+Material term changes create explicit version/supersession history.
+
+```text
+silent mutation prohibited
+```
+
+## FR-014 — Suspension/revocation
+
+Restriction/remedy actions require an authorized basis and preserve the prior state.
+
+## FR-015 — LEX eligibility
+
+An active DLA is not automatically marketable. LEX listing requires transfer/sublicense permission plus marketplace eligibility.
+
+## FR-016 — Economic schedule binding
+
+Fees, royalties, taxes, commissions or other value routing are bound through versioned adopted economic schedules.
+
+Historical token examples are not current policy.
+
+## FR-017 — Entitlement handoff
+
+A licensing decision may create or update an entitlement only after the agreement/action-specific conditions are satisfied.
+
+```text
+payment != entitlement automatically
+DLA != entitlement automatically
+```
+
+## FR-018 — Event/evidence recording
+
+Material state changes emit durable institutional events and safe evidence references to DAIL.
+
+## FR-019 — Idempotency
+
+State-changing API/service requests require an idempotency strategy so retry cannot mint/create duplicate canonical licenses.
+
+## FR-020 — Compensation/reconciliation
+
+When an external provider action succeeds but institutional state fails, the system must reconcile or compensate instead of declaring full success.
+
+## Functional request envelope
+
+```yaml
+request_id: stable
+partner_ref: required
+actor_ref: required
+operation: typed
+asset_ref: optional|required
+source_rights_refs: []
+issuer_authority_ref: optional|required
+dla_ref: optional
+license_profile_ref: versioned
+policy_profile_refs: []
+evidence_refs: []
+provider_adapter_ref: optional
+idempotency_key: required for material writes
+requested_at: timestamp
+```
+
+## Functional result envelope
+
+```yaml
+result_id: stable
+request_ref: required
+disposition: PASS|HOLD|DENY|COMPLETED|FAILED
+canonical_dla_ref: optional
+provider_representation_refs: []
+policy_versions: []
+evidence_refs: []
+reason_codes: []
+dail_receipt_ref: optional
+completed_at: optional
+```
+
+## Current service topology
+
+```text
+API / MCP / SDK / UI
+        |
+Gateway / Tenant Guard
+        |
+Rights + Authority Resolver
+        |
+Rules Registry / Approval Service
+        |
+Dynamic Licensing Asset Service
+        |
+ +------+-----------------+
+ |                        |
+Entitlement            optional LEX
+ |                        |
+ +-----------+------------+
+             |
+Economic Reconciliation
+             |
+            DAIL
+```
+
+## Relationship to Trust Layer as a Service
+
+A TLaaS licensing request may call trust-layer verification for identity, credential, proof or attestation checks, but the two services remain distinct.
+
+## Nonfunctional requirements
+
+- provider-neutral canonical state;
+- auditability;
+- role/tenant isolation;
+- deterministic versioning;
+- privacy by design;
+- explicit currentness;
+- retry safety;
+- observability;
+- safe rollback/compensation;
+- no self-escalation by AI/agents/providers.
+
+## Test vectors
+
+1. valid rights + authority + policy -> issuance PASS;
+2. valid identity but no issuer authority -> DENY/HOLD;
+3. stale credential -> HOLD;
+4. duplicate issue request -> one canonical DLA;
+5. token/provider write fails after DLA activation -> provider state held/retry, canonical state preserved;
+6. provider token exists without canonical DLA -> not an institutional license;
+7. non-transferable DLA submitted to LEX -> DENY;
+8. renewal after source rights expiry -> DENY/HOLD;
+9. policy version conflict -> HOLD;
+10. Trust Layer API result -> evidence input only, not licensing authority.
+
+## Restricted companion
+
+Private custody may include the original exact specification if recovered, detailed API schemas, contract code, provider integration configuration, proprietary policy/eligibility algorithms, economic schedules, security thresholds and test fixtures.
+
+## Invariants
+
+```text
+rights before license
+authority before write
+HOLD is not PASS
+provider token != canonical DLA
+Tokenized Licensing TLaaS != Trust Layer TLaaS
+historical specification != production certification
+```
+
+## Status
+
+`TITLE_RECOVERED + RECONSTRUCTED + exact_body_not_located`.
