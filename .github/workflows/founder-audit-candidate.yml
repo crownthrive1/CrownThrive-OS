@@ -1,0 +1,33 @@
+name: Founder Audit Candidate Guard
+
+on:
+  pull_request:
+    paths:
+      - "governance/founder-audit-program.mdx"
+      - "standards/institutional-incubator-operating-standard.mdx"
+      - "developers/manifests/founder-audit-program.v1.json"
+      - "data/founder_audit_snapshot.example.json"
+      - "scripts/founder_audit_guard.py"
+      - "scripts/detect_branch_pr_sprawl.py"
+      - ".github/workflows/founder-audit-candidate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+      - name: Validate candidate manifest remains fail-closed
+        run: python scripts/founder_audit_guard.py
+      - name: Compile candidate scripts
+        run: python -m py_compile scripts/founder_audit_guard.py scripts/detect_branch_pr_sprawl.py
+      - name: Produce read-only sprawl report
+        run: python scripts/detect_branch_pr_sprawl.py data/founder_audit_snapshot.example.json
