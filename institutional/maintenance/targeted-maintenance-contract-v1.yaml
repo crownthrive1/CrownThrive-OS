@@ -1,0 +1,123 @@
+contract_id: ct.contract.maintenance.targeted-quiescence.v1
+version: 1.0.0
+status: active_controlled_maintenance
+maintenance_event_id: ct.maintenance.2026-08-24.targeted-quiescence.v1
+founder_directive_id: ct.founder.directive.2026-08-24.targeted-maintenance.v1
+organization: CrownThrive, LLC
+founder: Kavonte Jones Sr.
+
+purpose: >-
+  Create a recoverable quiescent window before convergence or broad production
+  mutation so background schedulers cannot move institutional state underneath
+  backup, hash, manifest, restore-path, and scheduler-reconciliation evidence.
+
+principles:
+  - backup_before_mutation
+  - preserve_history
+  - read_only_is_allowed_during_maintenance
+  - mutation_fails_closed_unless_explicitly_allowlisted
+  - maintenance_does_not_manufacture_underlying_authority
+  - d3_is_human_reserved
+  - elapsed_time_never_releases_maintenance
+  - staged_reactivation_is_mandatory
+  - duplicate_schedulers_are_not_restored
+  - vault_values_never_enter_plaintext_drive_or_public_source
+
+coordinator:
+  agent_id: ct.maintenance.coordinator.sol
+  role: temporary_bounded_maintenance_coordinator
+  universal_super_agent: false
+  authority_expansion: false
+  d3: false
+  allowed_scope:
+    - discover_topology
+    - capture_recovery_state
+    - hash_and_manifest
+    - drive_readback
+    - restore_path_validation
+    - scheduler_reconciliation
+    - maintenance_contract_maintenance
+    - staged_reactivation_orchestration
+    - dail_evidence
+
+maintenance_preflight:
+  database_function: chlom_runtime.maintenance_preflight_v1
+  rules:
+    d3_requested: HOLD_D3_HUMAN_RESERVED
+    no_open_maintenance_event: PASS_NOT_IN_MAINTENANCE
+    read_only: PASS_READ_ONLY
+    allowlisted_actor_and_capability: PASS_MAINTENANCE_SCOPE
+    other_mutation: HOLD_PAUSED_FOR_TARGETED_MAINTENANCE
+
+release_gate:
+  database_function: chlom_runtime.maintenance_release_ready_v1
+  required_state: BACKUP_GATE=PASS_RECOVERABLE
+  required_gates:
+    - quiescence
+    - backup_manifest
+    - drive_readback
+    - restore_path
+    - scheduler_reconciliation
+    - maintenance_control_assets
+    - dail_integrity
+    - high_consequence_unknowns
+
+reactivation_waves:
+  0:
+    name: maintenance_core
+    description: backup, recovery, and bounded maintenance coordination only
+  1:
+    name: observation_and_continuity
+    description: health, continuity, credential-custody, and bounded control-plane observation
+  2:
+    name: independent_verifiers
+    description: independent evidence, security, domain, webhook, and gate review
+  3:
+    name: bounded_builders_and_executors
+    description: governed D0-D2 builders and integration executors
+  4:
+    name: documentation_and_site_projection
+    description: documentation, homepage, canon, and site reconciliation automation
+  5:
+    name: commercial_and_outbound
+    description: release, sales, outreach, commerce, publishing, and other customer-facing mutation
+
+scheduler_consolidation:
+  rule: >-
+    Before restoring an external schedule, compare it against certified
+    ThriveBase/pg_cron/event scheduling. If cadence, authority, data access,
+    evidence, rollback, and failure-domain parity are satisfied internally,
+    preserve the external task disabled as RETIRED_SCHEDULING_SCAFFOLDING.
+  blind_mass_reenable: false
+
+secrets:
+  custody_plane: Vault
+  drive_plaintext_secret_export: false
+  public_repository_secret_export: false
+  allowed_public_fields:
+    - secret_alias
+    - secret_id
+    - fingerprint
+    - provider
+    - purpose
+    - custody_state
+    - rotation_metadata
+    - restore_requirements
+  ciphertext_only_in_drive: true
+
+status_semantics:
+  paused: PAUSED_FOR_TARGETED_MAINTENANCE
+  not_equivalent_to:
+    - failed
+    - unhealthy
+    - retired
+    - unauthorized
+    - deleted
+    - superseded
+    - founder_action_required
+
+closeout:
+  database_function: chlom_runtime.maintenance_close_v1
+  require_all_release_gates_pass: true
+  append_dail: true
+  founder_action_default: NONE
