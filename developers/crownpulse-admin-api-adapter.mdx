@@ -1,0 +1,69 @@
+---
+title: "CrownPulse Admin API Adapter"
+sidebarTitle: "CrownPulse Admin API"
+description: "Privileged CrownPulse Admin REST API contract with fail-closed credential, read and D2/D3 mutation controls."
+icon: "user-shield"
+keywords: ["CrownPulse", "Admin API", "AltumCode", "Bearer API"]
+---
+
+# CrownPulse Admin API Adapter
+
+<Warning>
+  The CrownPulse Admin API credential is privileged runtime-only material and is never published, committed or logged.
+</Warning>
+
+## Current state
+
+```yaml
+platform_id: ct.platform.crownpulse
+service_id: crownpulse_admin
+base_url: https://crownpulse.com/admin-api
+docs_url: https://crownpulse.com/admin/api-documentation
+authentication: Bearer API key
+credential_ref: vault:crownpulse_admin_api_key
+credential_binding: blocked_pending_approved_secret_write
+adapter: crownpulse-admin-api-control@1
+adapter_scaffold: passed
+provider_dispatch: disabled
+authenticated_admin_read: open
+privileged_mutations: closed
+provider_lineage: AltumCode
+update_available_observed: v61.0.0
+highest_known_version: v61.0.0
+target_version: v61.0.0
+installed_version: unverified
+upgrade_intent: update_to_highest_known
+upgrade_status: staged_pending_preflight
+compatibility_status: unverified
+backup_checkpoint: pending
+rollback_plan: pending
+support_status_observed: expired
+```
+
+## Supplied Admin API operations
+
+- **Users:** retrieve all/one, create, update, delete, generate one-time login code.
+- **Plans:** retrieve all/one.
+- **Payments:** retrieve all/one.
+- **Domains:** retrieve all/one, update, delete.
+
+Other Admin UI modules are UI observations only unless an API operation is separately evidenced.
+
+## Risk boundary
+
+User reads are D1; plans/domains reads are D0; payment reads are D1. User/domain mutations are D2. One-time login generation is D3. All are disabled; D2/D3 actions require explicit governed approval.
+
+The `v61.0.0` notice is an available-update observation, not installed-version proof. Under the standing highest-known-version rule, `v61.0.0` is nevertheless the **documented and staged upgrade target now**. CrownThrive intends to update CrownPulse to that highest known version. Production mutation remains fail-closed until the current installed version, migrations/customizations, runtime requirements, license/support prerequisites, backup checkpoint, compatibility validation and rollback path are verified.
+
+## Credential blocker
+
+The founder supplied the current key, but the connected secure-write layer rejected direct Vault insertion before persistence. Planned aliases are `crownpulse_admin_api_key` and `crownpulse_admin_api_key_recovery`. Do not bypass this control by encoding or committing the key.
+
+## Machine contracts
+
+THIVEBASE contains fourteen disabled Admin API MCP contracts; six consequential contracts require human approval. Exact path/method/body schemas remain to be extracted before any read can be certified.
+
+## Page changelog
+
+- **2026-08-20 v1.1:** staged highest-known CrownPulse version `v61.0.0` as the governed upgrade target while preserving `installed_version: unverified` and fail-closed preflight requirements.
+- **2026-08-19 v1.0:** added privileged API resources, fail-closed adapter/credential state, D0–D3 operation boundaries, AltumCode lineage and update/support observations.
