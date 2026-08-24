@@ -1,0 +1,195 @@
+---
+title: "Developer Guide — DLA Smart Contract API Reference (Phase 0 — Extremely High-Level)"
+sidebarTitle: "Historical DLA API Reference"
+description: "Exact-title reconstruction of the historical DLA smart-contract API reference as a semantic interface contract, without inventing lost endpoints or publishing protected implementation details."
+icon: "code"
+keywords: ["DLA Smart Contract API Reference", "DLA developer guide", "CHLOM API", "license lifecycle"]
+---
+
+# Developer Guide — DLA Smart Contract API Reference (Phase 0 — Extremely High-Level)
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.devguide-dla-smart-contract-api-phase0
+exact_recovered_title: Developer Guide — DLA Smart Contract API Reference (Phase 0 — Extremely High-Level)
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+historical_DLA: Decentralized Licensing Authority
+current_DLA: Dynamic Licensing Asset
+endpoint_names_recovered: false
+```
+
+## Recovery constraint
+
+The historical title proves an API-reference article existed. No authenticated lost endpoint list or ABI is available from this title alone. Therefore this record preserves **operation classes and contract semantics**, not fabricated function names, selectors, addresses or chain IDs.
+
+## Source-supported operation families
+
+Recovered CHLOM source bodies support lifecycle operations equivalent to:
+
+```text
+APPLICATION / CANDIDATE CREATION
+ELIGIBILITY / COMPLIANCE CHECK
+ISSUANCE / ACTIVATION
+STATUS VERIFICATION
+RENEWAL / AMENDMENT
+TRANSFER / SUBLICENSE CHECK
+SUSPENSION / REACTIVATION
+REVOCATION / TERMINATION
+AUDIT / EVENT READBACK
+```
+
+## Current semantic interface
+
+```yaml
+license_service_operations:
+  create_candidate:
+    writes_state: true
+    authority_required: issuer_or_delegated_candidate_authority
+  evaluate_candidate:
+    writes_state: decision_or_review_state
+    authority_required: approval_profile
+  activate:
+    writes_state: true
+    authority_required: issue
+  verify:
+    writes_state: false
+    authority_required: read_scope
+  amend:
+    writes_state: true
+    authority_required: amend
+  renew:
+    writes_state: true
+    authority_required: renew
+  request_transfer:
+    writes_state: candidate
+    authority_required: holder_and_profile_specific
+  approve_transfer:
+    writes_state: true
+    authority_required: transfer_approve
+  suspend:
+    writes_state: true
+    authority_required: suspend
+  revoke:
+    writes_state: true
+    authority_required: revoke
+```
+
+This is a current-safe abstraction, not recovered ABI.
+
+## Request envelope
+
+```yaml
+request:
+  request_id: stable/idempotent
+  actor_ref: authenticated institutional identity
+  action: explicit operation
+  subject_ref: holder/applicant where relevant
+  asset_or_dla_ref: target
+  expected_version: required_for_mutation
+  authority_ref: required_for_privileged_mutation
+  evidence_refs: []
+  policy_context: explicit
+  payload: operation-specific
+```
+
+## Response envelope
+
+```yaml
+response:
+  request_id: echo
+  disposition: pass|hold|deny|error
+  entity_ref: optional
+  version: optional
+  status: optional
+  reason_codes: []
+  evidence_refs: []
+  dail_event_ref: optional|required_for_material_state_change
+```
+
+## Idempotency
+
+Retries must not create duplicate licenses or duplicate state transitions.
+
+```text
+same idempotency key + same canonical request
+=> same institutional result or safe replay response
+```
+
+## Optimistic version control
+
+State-changing operations should reject stale writes when the target version has changed since the client read it.
+
+```text
+expected_version == current_version
+```
+
+unless an explicit migration/merge contract says otherwise.
+
+## Authorization
+
+Historical `onlyOwner`-style implementation patterns are insufficient as institutional authority by themselves.
+
+```text
+key/control authentication
+AND action-specific issuer/governance authority
+AND source-rights ceiling
+```
+
+must be resolved for privileged licensing changes.
+
+## Verify/read semantics
+
+A license verification response should distinguish object existence from usability:
+
+```text
+exists?
+active?
+current term?
+requested use in scope?
+holder eligible?
+required policies/evidence current?
+```
+
+## Error classes
+
+Recommended semantic error families:
+
+- `IDENTITY_UNRESOLVED`
+- `AUTHORITY_MISSING`
+- `RIGHTS_SCOPE_EXCEEDED`
+- `DLA_NOT_ACTIVE`
+- `VERSION_CONFLICT`
+- `POLICY_HOLD`
+- `POLICY_DENY`
+- `EVIDENCE_STALE`
+- `TRANSFER_NOT_ALLOWED`
+- `SUBLICENSE_NOT_ALLOWED`
+- `DEPENDENCY_UNAVAILABLE`
+
+Names are current reconstruction conventions, not recovered exact codes.
+
+## Event contract
+
+Every successful material mutation should generate a DAIL-linked institutional event containing the prior/new version or state, actor, authority, evidence and reason.
+
+## Current mapping
+
+- [Dynamic Licensing Asset](/chlom/systems/dynamic-licensing-asset)
+- [Licensing Stewardship / Issuer Authority](/chlom/systems/licensing-stewardship-issuer-authority)
+- [REST API Interface Contract](/chlom/developer/rest-api-interface-contract)
+- [JSON-RPC Interface Contract](/chlom/developer/json-rpc-interface-contract)
+- [Webhooks Contract](/chlom/developer/webhooks-events-delivery-contract)
+
+## Restricted companion class
+
+Actual ABIs, contract addresses, deployment keys, private endpoint credentials, rate limits, internal error telemetry and unreleased source code remain restricted.
+
+## Nonclaims
+
+No endpoint, contract address, ABI, network or public RPC is claimed live by this reconstruction.
+
+## Status
+
+`TITLE_RECOVERED + API_SEMANTICS_RECONSTRUCTED + ENDPOINTS_NOT_INVENTED + EXACT_BODY_NOT_LOCATED`
