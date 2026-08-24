@@ -1,0 +1,44 @@
+name: Sprint 12 AI Collision Overlay Writer
+
+on:
+  push:
+    branches:
+      - docs-sprint-12-ai-collision-hygiene-cie-wave6-20260824
+    paths:
+      - 'data/documentation/substantive-rebuild-wave-6-policy.v1.json'
+      - 'scripts/inspect_sprint_12_ai_collision_hygiene.py'
+      - 'scripts/build_substantive_rebuild_wave6.py'
+      - 'doctrine/cie-framework-reconciliation-contract.mdx'
+      - '.github/workflows/sprint12-ai-collision-overlay-writer.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize-overlay:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Build classification overlay and Wave 6 diagnostic
+        run: |
+          python scripts/inspect_sprint_12_ai_collision_hygiene.py --output data/documentation/sprint-12-ai-collision-reclassification-overlay.v1.json
+          python scripts/build_substantive_rebuild_wave6.py --summary-only
+      - name: Commit generated overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add data/documentation/sprint-12-ai-collision-reclassification-overlay.v1.json
+          if git diff --cached --quiet; then
+            echo 'Overlay already materialized.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-documentation-bot'
+          git config user.email '109931778+mintlify[bot]@users.noreply.github.com'
+          git commit -m 'Materialize Sprint 12 AI collision reclassification overlay'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
