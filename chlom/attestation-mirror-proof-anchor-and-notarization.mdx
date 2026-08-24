@@ -1,0 +1,461 @@
+---
+title: "Attestations, Mirror, Proof Anchors and Notarization"
+sidebarTitle: "Attestations & Anchors"
+description: "Comprehensive CHLOM reconstruction of attestations, proof verification, DAIL evidence lineage, Attestation Mirror, Merkle anchoring, notarization, freshness, revocation and privacy-aware public projection."
+icon: "stamp"
+keywords: ["CHLOM attestations", "Attestation Mirror", "Merkle anchor", "notarization", "DAIL", "proof anchor", "evidence", "credential"]
+---
+
+# Attestations, Mirror, Proof Anchors and Notarization
+
+Attestations are CHLOM's structured statements of fact, verification, standing or outcome. Historical sources describe them as the bridge between off-chain reality and enforceable protocol state; current CHLOM maps that function into a provider-independent evidence and DAIL architecture.
+
+The key distinction is simple:
+
+```text
+observation
+   != attestation
+   != verified attestation
+   != current eligibility
+   != authority to act
+```
+
+An attestation can support a decision. It does not manufacture the underlying fact, professional authority, ownership right or legal conclusion.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_source_grounded
+source_families:
+  - Genesis Volume data/proof/attestation architecture
+  - Technical Blueprint ZK and evidence architecture
+  - Founders Handbook DAIL, Attestation Mirror and Sanctions Cache
+  - recovered Attestations Pallet / Merkle Anchor & Notarization module lineage
+current_mapping:
+  - Evidence Service
+  - Attestation Service
+  - DAIL Event Service
+  - Credential/Eligibility Service
+  - Public Projection / Attestation Mirror
+  - optional cryptographic anchor adapter
+historical_design_equals_production: false
+founder_adjudication: open_after_publication
+```
+
+## What an attestation is
+
+A CHLOM attestation is an attributable claim such as:
+
+- a license was verified;
+- training was completed;
+- a compliance check passed;
+- a document was reviewed;
+- a policy requirement was satisfied;
+- a committee or authorized reviewer issued a ruling;
+- a royalty or revenue-share obligation was acknowledged;
+- a dispute was resolved;
+- a safety or brand standard was confirmed;
+- an external oracle supplied a dated observation;
+- a ZK proof satisfied a specific predicate;
+- an audit completed with a defined outcome.
+
+Every attestation should answer **who said what, about whom or what, under which authority, using which evidence, when, for how long, and how it can be corrected or revoked**.
+
+## Canonical attestation envelope
+
+```yaml
+attestation_id: stable-id
+subject_id: stable-subject
+claim_type: controlled-vocabulary
+claim_value: structured-value
+issuer_id: stable-issuer
+issuer_authority_ref: authority-record
+source_evidence_refs:
+  - evidence-id
+policy_or_requirement_ref: rule-version
+observed_at: timestamp
+issued_at: timestamp
+effective_from: timestamp
+expires_at: timestamp-or-null
+freshness_class: class
+confidence_or_quality: optional
+verification_method: method-id
+proof_ref: optional-proof-id
+status: active|superseded|revoked|expired|disputed|held
+privacy_class: public|internal|restricted|sealed
+correction_of: optional-attestation-id
+DAIL_event_ref: event-id
+```
+
+The exact implementation schema may evolve, but these semantics should remain stable.
+
+## End-to-end attestation flow
+
+```text
+OFF-CHAIN OR INTERNAL EVENT
+           |
+           v
++-------------------------+
+| Evidence is generated   |
+| document / API / sensor |
+| human review / ZK proof |
++------------+------------+
+             |
+             v
++-------------------------+
+| Source + authority check|
++------------+------------+
+             |
+       +-----+------+
+       |            |
+     FAIL         PASS
+       |            |
+       v            v
+     DENY     Create attestation
+                    |
+                    v
+           +----------------+
+           | Verify proof / |
+           | evidence digest|
+           +-------+--------+
+                   |
+             +-----+-----+
+             |           |
+           HOLD        ACCEPT
+             |           |
+             v           v
+       review queue   DAIL event
+                         |
+                         v
+            eligibility / DLA / case
+                         |
+                         v
+              optional public mirror
+```
+
+## Genesis-era proof flow
+
+The Genesis architecture describes a recurring pattern:
+
+```text
+Data generation
+      |
+      v
+Proof / attestation creation
+      |
+      v
+Historical DAL submission
+      |
+      v
+ZKX or other verification
+      |
+      v
+DLA / policy enforcement hook
+      |
+      v
+Reusable credential / standing
+```
+
+Current terminology changes the storage and authority model but preserves the invariant: **proof must be verified before it is consumed, and later consumers must still check freshness and current status**.
+
+## DAIL relationship
+
+Current DAIL is the event/evidence/correction spine. An attestation should generate or reference a DAIL event rather than silently mutating standing.
+
+```text
+attestation issued
+      |
+      +--> DAIL: issued
+      |
+      +--> credential / eligibility projection
+      |
+      +--> optional public projection
+
+attestation revoked
+      |
+      +--> DAIL: revoked
+      |
+      +--> invalidate dependent eligibility
+      |
+      +--> trigger downstream review / hold
+```
+
+DAIL preserves **history**; the attestation service resolves **current effective state**.
+
+## Freshness is part of truth
+
+A once-valid attestation may become unusable because:
+
+- it expired;
+- the issuer lost authority;
+- the source evidence was corrected;
+- a credential was revoked;
+- the governing rule changed;
+- a sanctions or regulatory feed became stale;
+- the subject changed state;
+- a later attestation superseded it.
+
+Therefore:
+
+```text
+verified once != valid forever
+```
+
+A consumer should check:
+
+```text
+issuer authority
++ status
++ effective period
++ freshness
++ governing rule version
++ subject identity
++ proof integrity
+= eligible evidence candidate
+```
+
+## Attestation Mirror
+
+The Founders Handbook describes an **Attestation Mirror** as a public or corridor-specific reflection of selected non-sensitive governance evidence.
+
+The mirror is a projection, not the ledger itself.
+
+```text
+            PRIVATE / RESTRICTED CUSTODY
+                     |
+                     v
+                DAIL + Evidence
+                     |
+             projection policy
+                     |
+          +----------+----------+
+          |                     |
+          v                     v
+ INTERNAL VERIFIED VIEW    PUBLIC MIRROR
+ full authorized context   minimum safe facts
+```
+
+Possible public-safe mirror fields include:
+
+- verified-license status;
+- training achievement;
+- approved/certified standing;
+- badge or program completion;
+- effective date and expiry;
+- verification issuer class;
+- public evidence digest or verification reference.
+
+The mirror must not expose restricted documents, personal identifiers, private dispute evidence, credentials, secrets, internal risk scores or protected implementation details.
+
+## Mirror truth rules
+
+```text
+mirror record exists
+   -> must resolve to canonical source record
+
+canonical record revoked
+   -> mirror must update or withdraw
+
+mirror unavailable
+   -> canonical evidence remains authoritative
+
+mirror stale
+   -> HOLD public verification claim
+```
+
+A cached public badge is never stronger than the current institutional source record.
+
+## Merkle anchoring and notarization
+
+Recovered module lineage includes **Merkle Anchor & Notarization**. Current CHLOM can use this as an optional integrity layer.
+
+A practical pattern is:
+
+```text
+Evidence records E1 E2 E3 ... En
+        |
+        v
+Canonical digests
+        |
+        v
+Merkle tree
+        |
+        v
+Root R
+        |
+        +--> internal signed checkpoint
+        |
+        +--> external timestamp/notary
+        |
+        +--> optional blockchain anchor
+```
+
+The anchor proves that a commitment existed at or before a point in time. It does **not** prove that every committed statement was legally or factually correct.
+
+## Proof verification versus attestation authority
+
+```text
+cryptographic proof valid
+         |
+         v
+mathematical statement verified
+         |
+         X  does not automatically imply
+         v
+issuer authorized / source current / policy satisfied
+```
+
+For example, a valid proof that a credential is present still requires the credential to be current, issued by an acceptable authority and relevant to the decision being made.
+
+## Attestation dependency graph
+
+An attestation may depend on other records:
+
+```text
+Identity verification
+       |
+       +--> professional credential
+       |        |
+       |        +--> role eligibility
+       |                 |
+       |                 +--> DLA approval
+       |
+       +--> KYC eligibility
+                |
+                +--> regulated transaction
+```
+
+If an upstream attestation is revoked, dependent current-state projections must be re-evaluated.
+
+## Revocation and supersession
+
+Revocation is not deletion.
+
+```text
+A1 active
+  |
+  +--> correction discovered
+          |
+          v
+      A2 correction
+          |
+          +--> A1 = superseded/revoked
+          +--> DAIL correction event
+          +--> dependent state re-evaluated
+```
+
+Historical evidence remains queryable under the appropriate access policy.
+
+## Negative evidence and sanctions
+
+Positive attestations are not the only governance memory. The Sanctions Cache lineage records restrictions, suspensions and other negative standing.
+
+Attestation and sanctions logic must coexist without collapsing into one boolean reputation score.
+
+```text
+positive evidence  ----+
+                       |
+negative restrictions -+--> eligibility engine
+                       |
+open cases / holds -----+
+```
+
+A high number of positive attestations cannot override a hard sanction, revoked license or authority block.
+
+## Reputation graph boundary
+
+Historical sources describe attestations as building a factual reputation graph. Current CHLOM should distinguish:
+
+- evidence-backed standing;
+- verified achievements;
+- role/credential history;
+- sanctions/restrictions;
+- community reviews or opinions;
+- algorithmic risk scores.
+
+These classes should not be blended into an opaque universal score.
+
+## Multi-tenant and cross-corridor use
+
+An attestation may be:
+
+- institution-wide;
+- corridor-specific;
+- platform-specific;
+- organization-specific;
+- jurisdiction-specific;
+- role-specific.
+
+Scope must be explicit. A Suite Pro safety certification, for example, does not automatically establish authority in finance, healthcare, legal services or another unrelated domain.
+
+## Failure states
+
+| Failure | Required disposition |
+| --- | --- |
+| source unavailable | HOLD |
+| issuer not authorized | DENY |
+| evidence digest mismatch | DENY |
+| proof invalid | DENY |
+| proof valid but policy relevance unresolved | HOLD |
+| evidence stale | HOLD |
+| contradictory attestations | HOLD / case |
+| credential revoked | DENY dependent eligibility |
+| public mirror stale | withdraw or mark stale |
+| anchor unavailable | continue if anchor optional; HOLD only if required by policy |
+
+## API behavior
+
+A future attestation API should support at least:
+
+```text
+POST /v1/attestations
+GET  /v1/attestations/{id}
+POST /v1/attestations/{id}/verify
+POST /v1/attestations/{id}/revoke
+POST /v1/attestations/{id}/supersede
+GET  /v1/subjects/{id}/attestations
+GET  /v1/public/attestations/{public_ref}
+POST /v1/anchors/checkpoints
+GET  /v1/anchors/{id}/proof
+```
+
+These routes are architectural contracts, not claims that every endpoint is currently deployed.
+
+## Required test cases
+
+1. valid attestation from authorized issuer;
+2. expired attestation;
+3. revoked issuer authority;
+4. valid ZK proof tied to stale credential;
+5. conflicting attestations;
+6. supersession chain;
+7. public mirror redaction;
+8. Merkle proof inclusion verification;
+9. optional anchor provider outage;
+10. dependent DLA eligibility invalidation after revocation;
+11. cross-tenant attestation misuse attempt;
+12. replayed attestation submission.
+
+## Core invariants
+
+```text
+attestation != underlying evidence
+attestation != credential
+attestation != role
+attestation != delegation
+attestation != final authority
+anchor != factual correctness
+public mirror != canonical ledger
+revocation != deletion
+verified once != valid forever
+```
+
+## Current implementation boundary
+
+Current CHLOM can implement attestations, evidence references, DAIL events, public projections and cryptographic digests using conventional cloud infrastructure. Public-chain anchoring, ZK proof systems or decentralized verifier networks remain adapters/advanced targets unless separately evidenced as production.
+
+## Founder adjudication
+
+`open_after_publication`
+
+A later founder decision may refine attestation classes, public mirror policy, notarization providers, anchoring cadence, verifier requirements, reputation semantics or public badge vocabulary. Corrections must preserve source-era and prior-effective meaning.

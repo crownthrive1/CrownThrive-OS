@@ -1,0 +1,75 @@
+---
+title: "FORM-006 — Risk Disposition Mathematics"
+sidebarTitle: "FORM-006 Risk Disposition"
+description: "Standalone CHLOM piecewise decision model mapping hard rules, evidence state, uncertainty and risk thresholds to DENY, HOLD or PASS-candidate."
+icon: "function"
+keywords: ["CHLOM FORM-006", "risk disposition", "piecewise", "PASS HOLD DENY", "threshold"]
+---
+
+# FORM-006 — Risk Disposition Mathematics
+
+## Formula identity
+
+```yaml
+formula_id: FORM-006
+classification: derived_model
+origin: reconstruction of CHLOM risk/policy requirements
+adopted: false
+related_algorithm: ALG-020
+```
+
+## Piecewise decision model
+
+For risk score `R`, uncertainty `U`, hold threshold `h`, deny threshold `d`, hard-block predicate `B`, and missing-required-evidence predicate `M`:
+
+```text
+Disposition(R,U) =
+  DENY            if B = true
+  HOLD            if M = true
+  HOLD            if U > U_max
+  DENY            if R >= d
+  HOLD            if h <= R < d
+  PASS_CANDIDATE  if R < h
+```
+
+with the normal increasing-risk constraint:
+
+```text
+h <= d
+```
+
+## Purpose
+
+The model separates deterministic hard policy conditions and evidence sufficiency from probabilistic scoring. It prevents a low risk score from overriding a confirmed prohibition or missing mandatory proof.
+
+## Assumptions
+
+`R` must have a documented scale and direction. If a model uses higher-is-safer scoring, the inequalities must be redefined rather than blindly reused. `U` must also have explicit semantics and scale.
+
+## PASS-candidate boundary
+
+The mathematical output is not final execution authority. A PASS candidate continues to the authority-aware gateway.
+
+```text
+PASS_CANDIDATE + no authority = no execution
+```
+
+## Threshold governance
+
+`h`, `d`, and `U_max` are policy parameters. They require source authority, versioning, calibration/evaluation and change control. Documentation does not set their production values.
+
+## Edge cases
+
+A model result exactly equal to `d` is DENY under this formulation; exactly equal to `h` is HOLD. If a policy wants different inclusivity, it must define and version it explicitly.
+
+## Tests
+
+Test every interval and boundary, hard-block precedence, missing-evidence precedence, uncertainty precedence, invalid `h>d`, NaN/missing scores and unsupported score scale.
+
+## DAIL record
+
+A governed calculation records model version, score, uncertainty, threshold version, evidence state, hard-block state, disposition and subsequent authority decision.
+
+## Versioning
+
+This formula is a derived engineering model. Any adopted policy version should reference a specific formula/algorithm version rather than copying thresholds into undocumented code.

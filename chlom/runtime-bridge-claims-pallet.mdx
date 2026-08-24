@@ -1,0 +1,365 @@
+---
+title: "Bridge / Claims Pallet — Historical Runtime Record"
+sidebarTitle: "Bridge / Claims Pallet"
+description: "Standalone reconstruction of the recovered CHLOM Bridge/Claims Pallet (BCP) for portable minimal claims, proof references, finality, replay protection and local-policy acceptance across systems."
+icon: "bridge"
+keywords: ["CHLOM Bridge Claims Pallet", "BCP", "bridge claims", "interoperability", "replay protection", "proof portability"]
+---
+
+# Bridge / Claims Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.bridge-claims
+historical_name: Bridge / Claims Pallet
+historical_short_name: BCP
+recovered_article: CHLOM Bridge/Claims Pallet (BCP) Whitepaper
+artifact_class: historical_runtime_pallet
+recovery_state: reconstructed_from_recovered_title_and_related_sources
+current_mapping:
+  - bridge/claims adapter service
+  - DAIL proof/evidence references
+  - identity and DLA portability
+  - local authorization gateway
+production_state: historical_design_not_production_evidence
+restricted_companion_class: historical_runtime_pallets_and_modules
+```
+
+## Source basis
+
+The lost Help Center explicitly names a **Bridge/Claims Pallet** and a separate `CHLOM™ Bridge/Claims Pallet (BCP) Whitepaper`. The recovered component description characterizes it as a mechanism for **minimal state claims and attestation references enabling cross-chain recognition**. Related CHLOM papers describe bridges and cross-chain messaging that can carry asset, identity and compliance assurances between ecosystems.
+
+The exact original BCP article body has not been confirmed recovered in full. This article therefore reconstructs the pallet conservatively from the exact title, component description, the Technical Blueprint, Building and Understanding the CHLOM Metaprotocol, Bridge/Attestation Mirror lineage and current interoperability doctrine.
+
+## Historical purpose
+
+BCP was intended to move **claims about state**, not blindly replicate all underlying private state.
+
+Examples of claim classes described or implied by the recovered architecture include:
+
+- identity/credential validity;
+- license existence/status;
+- compliance attestation references;
+- proof-validity references;
+- revocation/suspension flags;
+- settlement or event receipts;
+- remote asset/license identifiers;
+- remote governance or authority references.
+
+```text
+REMOTE SYSTEM
+    |
+    | state / attestation / proof
+    v
+BRIDGE ADAPTER
+    |
+    v
+BCP CLAIM ENVELOPE
+    |
+VERIFY ORIGIN + FINALITY + REPLAY
+    |
+    v
+LOCAL POLICY / AUTHORITY CHECK
+    |
+ PASS / HOLD / DENY
+    |
+    v
+LOCAL PROJECTION + DAIL RECEIPT
+```
+
+## What BCP is not
+
+BCP is not:
+
+- proof that a remote system is trustworthy merely because it signed a message;
+- automatic local authorization;
+- an entitlement generator;
+- a rights-manufacturing mechanism;
+- a reason to expose raw private evidence across domains;
+- evidence that any historical cross-chain bridge is currently deployed.
+
+## Claim envelope
+
+A reconstructed public-safe envelope is:
+
+```yaml
+claim_id: stable identifier
+claim_type: credential|license|attestation|proof|status|settlement|other
+source_system_id: stable source identity
+source_object_id: stable remote object identity
+subject_id: stable/pseudonymous subject reference
+asserted_state: typed minimal claim
+source_event_ref: optional
+proof_ref: digest/proof reference
+source_finality_ref: optional
+issued_at: timestamp
+expires_at: optional
+nonce: replay-safe nonce
+schema_version: version
+signature_set_ref: signature/authority reference
+classification: public|internal|restricted
+```
+
+The local system should store only the minimum claim/proof material required for its purpose.
+
+## Origin validation
+
+A bridge claim must resolve to a registered origin configuration:
+
+```text
+source_system_id
++ accepted trust profile
++ accepted schema/version
++ recognized signer/validator set
++ finality policy
++ revocation/freshness policy
+```
+
+Unknown origin or unresolved signer state is `HOLD`, not implicit acceptance.
+
+## Finality
+
+Historical chain-based designs may use block/finality proofs. A modern provider-neutral adapter can instead use an adopted finality/evidence contract appropriate to the source system.
+
+```text
+observed remote event
+      !=
+final remote event
+      !=
+locally accepted claim
+```
+
+## Replay protection
+
+At minimum:
+
+```text
+unique claim_id
++ source_system_id
++ nonce/event identity
++ idempotency record
+```
+
+A duplicate/replayed envelope must not create a second license, entitlement, payment or irreversible action.
+
+## Freshness and expiry
+
+Claims whose meaning can change require freshness.
+
+Examples:
+
+- credential validity;
+- sanctions/compliance status;
+- license active/revoked state;
+- authority membership;
+- financial eligibility.
+
+```text
+if now > expires_at:
+    HOLD or refresh
+```
+
+No generic freshness window is invented here; it belongs to the applicable policy/claim profile.
+
+## Revocation
+
+A remote claim can later become revoked, superseded or corrected. Local state must preserve the earlier import and apply a new correction/revocation event rather than erasing history.
+
+```text
+CLAIM ACCEPTED v1
+      |
+remote revocation/correction
+      v
+REVALIDATE
+      |
+local dependency analysis
+      v
+HOLD / revoke projection / remedy
+      |
+DAIL correction lineage
+```
+
+## Local authority boundary
+
+A valid bridge proof establishes only that the remote source asserted/proved something under its own rules.
+
+Local use still requires:
+
+1. recognized source profile;
+2. acceptable evidence/finality;
+3. current schema;
+4. applicable local policy;
+5. actor/role authority;
+6. rights/entitlement constraints;
+7. current revocation/freshness state.
+
+## Identity portability
+
+BCP may carry a reference to a DID, verifiable credential, Fingerprint-derived pseudonymous identifier or remote account alias. It should avoid copying raw biometric/private identity evidence.
+
+```text
+REMOTE IDENTITY
+    |
+portable proof/credential ref
+    v
+LOCAL IDENTITY RESOLUTION
+    |
+link / alias / HOLD
+```
+
+## DLA/license portability
+
+For licenses:
+
+```yaml
+remote_license_id: source-scoped ID
+rights_scope_digest: digest/reference
+issuer_ref: source issuer
+status: source-observed state
+validity_window: source validity
+transferability_ref: optional
+proof_ref: evidence
+```
+
+A remote license record does not automatically become a local Dynamic Licensing Asset. Local rights-before-license validation remains mandatory.
+
+## Settlement claims
+
+A remote `paid`, `settled` or `fulfilled` claim is evidence for reconciliation, not sovereign economic truth.
+
+```text
+remote payment success
+      !=
+local entitlement
+      !=
+institutional settlement
+```
+
+## Failure states
+
+### Unknown source
+
+`HOLD_SOURCE_UNREGISTERED`
+
+### Unsupported schema
+
+`HOLD_SCHEMA_UNSUPPORTED`
+
+### Invalid signature/proof
+
+`DENY_PROOF_INVALID`
+
+### Insufficient finality
+
+`HOLD_FINALITY_PENDING`
+
+### Replay
+
+`DENY_REPLAY`
+
+### Expired/stale claim
+
+`HOLD_REFRESH_REQUIRED`
+
+### Local policy conflict
+
+`HOLD_LOCAL_POLICY`
+
+### Rights conflict
+
+`HOLD_RIGHTS_CONFLICT`
+
+## DAIL events
+
+```text
+ct.bridge.claim.received.v1
+ct.bridge.claim.verified.v1
+ct.bridge.claim.held.v1
+ct.bridge.claim.rejected.v1
+ct.bridge.claim.accepted.v1
+ct.bridge.claim.revoked.v1
+ct.bridge.claim.superseded.v1
+ct.bridge.claim.replayed.v1
+```
+
+## Security threats
+
+- forged remote signer;
+- compromised bridge operator;
+- replay/double mint;
+- false finality;
+- stale credential/license status;
+- schema confusion;
+- cross-domain identifier collision;
+- data overexposure;
+- privilege escalation through imported claims;
+- bridge insolvency/economic assumptions presented as rights;
+- failure to propagate revocation.
+
+## Test vectors
+
+A conformance suite should include:
+
+1. known source \+ valid proof \+ locally permissible claim -\> PASS;
+2. known source \+ invalid signature -\> DENY;
+3. unknown source -\> HOLD;
+4. duplicate nonce -\> DENY replay;
+5. valid remote claim but disallowed local policy -\> HOLD/DENY per policy;
+6. expired credential claim -\> HOLD refresh;
+7. remote license later revoked -\> local dependent state reevaluated;
+8. same identifier from two unlinked origins -\> no silent identity merge;
+9. remote payment claim -\> reconciliation only, no automatic entitlement;
+10. restricted evidence -\> no public raw-data projection.
+
+## Current cloud/API mapping
+
+The modern CHLOM equivalent is not required to be a blockchain pallet. It can be implemented as:
+
+```text
+bridge adapter registry
++ signed message/claim ingress
++ proof/finality verifier
++ identity/object alias resolver
++ local policy/authority gateway
++ idempotency/replay store
++ DAIL event writer
++ revocation/reconciliation worker
+```
+
+## Restricted companion
+
+The private companion may include:
+
+- exact trusted-source configurations;
+- signer/validator topology;
+- bridge credentials/endpoints;
+- security thresholds;
+- private replay/incident evidence;
+- exploit tests;
+- partner/protocol terms;
+- non-public cross-system mappings.
+
+No secret values belong in the public article.
+
+## Invariants
+
+```text
+remote claim != local authority
+valid proof != local permission
+remote license != local DLA automatically
+remote payment != local settlement
+bridge success != rights transfer unless rights permit
+identifier match != identity merge without evidence
+replay != new state
+revocation must propagate to dependent projections
+private evidence must not cross classification boundary by default
+```
+
+## Version and correction behavior
+
+New recovered BCP source material should create a dated article revision with explicit source additions. It must not silently replace this reconstruction. If original BCP semantics differ, preserve both the reconstructed version and recovered source-era version, then issue a current mapping/adjudication.
+
+## Status
+
+`historical_preserved + reconstructed_source_grounded`. The historical pallet is valuable CHLOM IP and architecture lineage; no current cross-chain production deployment is claimed by this article.

@@ -1,0 +1,298 @@
+---
+title: "Wireframe: CHLOM Dashboard (Landing Page)"
+sidebarTitle: "Dashboard Landing Wireframe"
+description: "Recovered-title implementation article for the CHLOM landing dashboard, with role-aware work queues, HOLDs, expiring rights/credentials, decisions, provider health and DAIL receipts without inventing a universal trust score."
+icon: "gauge"
+keywords: ["CHLOM dashboard wireframe", "landing page", "work queue", "HOLD", "DAIL", "role-aware"]
+---
+
+# Wireframe: CHLOM Dashboard (Landing Page)
+
+## Recovery status
+
+```yaml
+ui_asset_id: ct.chlom.ui.dashboard.landing
+exact_recovered_title: "Wireframe: CHLOM Dashboard (Landing Page)"
+recovery_status: exact_title_recovered_related_architecture_available
+original_visual_body: not_confirmed_recovered_for_this_article
+current_mapping: role_aware_CHLOM_home
+```
+
+## Purpose
+
+The CHLOM Dashboard is the user's entry point into current institutional state. It should answer **what requires attention, which rights/credentials/decisions are current, what is on HOLD, and whether provider/integration state has drifted** without inventing a single opaque compliance or trust score.
+
+```text
+ACTOR + ROLE + ORG
+       |
+       v
+CURRENT TASK / RISK / RIGHTS STATE
+       |
++------+-------+-------+-------+
+|              |               |
+Actions      HOLDs          Expiring
+|              |               |
++--------------+---------------+
+               |
+         Recent receipts
+```
+
+## ASCII wireframe
+
+```text
++--------------------------------------------------------------------------------+
+| CHLOM | Org/Tenant | Search | Notifications | Actor                             |
++----------------------+---------------------------------------------------------+
+| Navigation           | GOOD MORNING / CURRENT CONTEXT                          |
+| Dashboard            | Role: ...     Current as of: ...                        |
+| Rights & DLA         |                                                         |
+| LEX                  | +---------------+ +---------------+ +----------------+ |
+| Evidence             | | Action items  | | HOLDs         | | Expiring       | |
+| Compliance           | +---------------+ +---------------+ +----------------+ |
+| Governance           |                                                         |
+| Settings             | MY CURRENT OBJECTS / WORK QUEUE                         |
+|                      | ------------------------------------------------------- |
+|                      | Recent decisions / provider mismatches / DAIL receipts  |
++----------------------+---------------------------------------------------------+
+| System status | Policy snapshot | Help / Support                               |
++--------------------------------------------------------------------------------+
+```
+
+## Role-aware cards
+
+Dashboard cards vary by authorized role.
+
+### Participant/holder
+
+- active DLAs/entitlements;
+- credential expirations;
+- open verification requests;
+- transfer/renewal requests;
+- cases/disputes involving the actor;
+- recent decisions/receipts.
+
+### Issuer/steward
+
+- DLA candidates awaiting action;
+- expiring issued licenses;
+- rights-evidence conflicts;
+- pending renewals/transfers;
+- issuer/provider mismatch;
+- open cases.
+
+### Reviewer/operator
+
+- review queue;
+- unresolved HOLDs;
+- stale evidence;
+- audit findings;
+- provider drift/incidents;
+- expiring approvals.
+
+### Governance
+
+- proposals requiring action;
+- timelocks;
+- overrides requiring review;
+- expiring delegations;
+- unresolved conflicts.
+
+## Action items
+
+Each action item should contain:
+
+```text
+object ID
+action type
+safe reason/context
+due/expiry if applicable
+current state
+required role
+link to source task screen
+```
+
+Action count definitions must be stable and documented.
+
+## HOLD card
+
+```text
+HOLDs requiring attention: N
+Oldest HOLD: ...
+Top reason classes:
+- evidence missing
+- current policy conflict
+- rights dispute
+- provider mismatch
+- human review pending
+```
+
+Do not include protected fraud-rule labels where they would reveal defenses.
+
+## Expiring card
+
+Can aggregate:
+
+- credentials;
+- DLAs;
+- approvals/delegations;
+- provider certifications;
+- attestations;
+- policy/service versions requiring migration.
+
+Buckets are presentation only unless policy defines them.
+
+## Current-state freshness
+
+The dashboard displays `as_of`/refresh status for high-impact summaries.
+
+```text
+Current as of 11:20 AM
+Identity: fresh
+Rights: fresh
+Provider X: delayed readback
+```
+
+A stale subsystem should not be rendered as green/current.
+
+## Recent decisions
+
+Rows:
+
+```text
+Decision ID
+Object
+Result: PASS/HOLD/DENY
+Reason class
+Time
+Policy version
+[Open receipt]
+```
+
+## Provider mismatch panel
+
+```text
+Provider / integration
+Canonical state
+Provider-observed state
+Age
+Impact class
+Status: reconciling / held / resolved
+```
+
+This panel makes CHLOM's provider-evidence rule visible operationally.
+
+## DAIL receipts
+
+Recent material events can show:
+
+```text
+receipt ID
+event type
+subject
+actor
+status
+time
+```
+
+The dashboard is a projection; the detail page provides full role-authorized history.
+
+## System status
+
+System health is distinct from compliance state.
+
+```text
+Service health: degraded
+Policy decision: not necessarily DENY
+```
+
+Provider/API outages should not masquerade as user violations.
+
+## Empty states
+
+### New user
+
+Show setup/verification steps appropriate to role rather than zero-filled enterprise cards.
+
+### No HOLDs
+
+`No current HOLDs visible to this role`—do not claim institution-wide absence.
+
+### No recent decisions
+
+Explain the time/filter scope.
+
+## Loading/error
+
+Cards load independently so one provider/service failure does not blank the whole dashboard. A failed card shows `Unavailable / stale` and last successful as-of time where safe.
+
+## Global search
+
+Search returns only objects the actor can access. Detail routes re-read canonical state.
+
+## Notifications
+
+Notifications are event projections. Dashboard action counts should derive from canonical queues, not unread-notification count.
+
+## Metrics boundary
+
+Dashboard summaries may display counts/trends only with exact definitions. Do not create:
+
+- universal compliance score;
+- universal trust score;
+- unverified economic totals;
+- provider-only performance claims presented as canonical.
+
+## Data dependencies
+
+- P-01 identity/roles;
+- P-02 decisions/HOLDs;
+- P-03 rights/DLAs;
+- Evidence Vault/DAIL;
+- case/governance queues;
+- provider/integration health;
+- P-11 economic state only where role/coverage permits.
+
+## Events
+
+Dashboard views are analytics/projection events; material events originate from domain actions. Optional safe UX events can include:
+
+```text
+ct.ui.dashboard.opened.v1
+ct.ui.action_item.opened.v1
+```
+
+They do not become institutional evidence by default.
+
+## Accessibility
+
+- meaningful page heading/current context;
+- card status labels text-based;
+- keyboard jump links;
+- accessible tables/lists;
+- async card updates announced selectively;
+- responsive logical reading order;
+- charts have numeric/text alternatives.
+
+## Responsive behavior
+
+Desktop: cards \+ work table. Mobile: prioritized stacked cards, with HOLD/action items before lower-priority analytics.
+
+## Restricted companion
+
+Can hold security operations cards, protected risk queues, private financial summaries, incident details, provider internals and admin-only action panels.
+
+## Invariants
+
+```text
+dashboard count != universal institution count unless scoped
+no visible HOLD != no HOLD anywhere
+provider health != compliance state
+notification count != canonical work queue
+stale card != current state
+role-hidden data != nonexistent data
+reconstructed layout != recovered original visual
+```
+
+## Known unknowns
+
+The original visual layout has not been confirmed recovered. This implementation article is grounded in the exact title and CHLOM role/state architecture.

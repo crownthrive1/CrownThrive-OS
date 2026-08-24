@@ -1,0 +1,286 @@
+---
+title: "Treasury Pallet — Historical Runtime Record"
+sidebarTitle: "Treasury Pallet"
+description: "Standalone reconstruction of CHLOM's historical Treasury Pallet for governed fee intake, proposals, authorized disbursements, balances, audit events and current P-11 treasury-control mapping."
+icon: "landmark"
+keywords: ["CHLOM Treasury Pallet", "treasury", "fee intake", "disbursement", "budget", "P-11", "governance"]
+---
+
+# Treasury Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.treasury
+historical_name: Treasury Pallet
+artifact_class: historical_runtime_pallet
+source_lineage:
+  - Substrate Treasury lineage in Technical Blueprint
+  - Genesis economic mechanics
+  - Smart Treasury research
+  - Help Center Treasury Pallet description
+recovery_state: reconstructed_source_grounded
+current_mapping:
+  - P-11 Capital, Revenue & Settlement
+  - Smart Treasury control plane
+  - budget/allocation authority
+  - provider execution + reconciliation
+production_state: historical_runtime_not_current_money_movement_authority
+```
+
+## Source basis
+
+The recovered Help Center defines the Treasury Pallet as **fee intake, proposals, disbursements and on-chain accounting for transparent budget management**. Historical papers then extend that baseline into Smart Treasury, reserve rules, automated routing and later investment/yield research.
+
+The Treasury Pallet should therefore remain separate from:
+
+- Treasury Routing Pallet — how approved value is allocated/routed;
+- Fee Router Pallet — fee-specific splitting;
+- Smart Treasury Engine — higher-level policy/orchestration;
+- historical Smart DeFi/Capital/Yield — experimental optimization layers.
+
+## Historical purpose
+
+```text
+AUTHORIZED INFLOW
+      |
+      v
+TREASURY ACCOUNTING
+      |
+      +--> available balance
+      +--> reserved balance
+      +--> committed obligations
+      |
+SPEND / BUDGET PROPOSAL
+      |
+AUTHORITY + POLICY + BUDGET CHECK
+      |
+ PASS / HOLD / DENY
+      |
+      v
+DISBURSEMENT INSTRUCTION
+      |
+EXECUTION ADAPTER
+      |
+READBACK / RECONCILE
+      |
+      v
+DAIL / AUDIT
+```
+
+## Non-purpose
+
+The pallet does not:
+
+- authorize spending merely because funds exist;
+- allow AI to move money without adopted authority;
+- create investment products;
+- make historical token treasury policy current;
+- substitute a provider wallet/bank balance for canonical treasury accounting;
+- override tax, rights, legal or contract constraints.
+
+## Treasury account object
+
+```yaml
+treasury_id: stable ID
+entity_or_program_ref: owner/controller
+currency_or_unit: typed
+accounting_basis_ref: required
+provider_account_aliases: optional
+classification: internal|restricted
+status: active|held|closed
+```
+
+## Balance model
+
+At minimum distinguish:
+
+```text
+observed_provider_balance
+canonical_book_balance
+reserved_amount
+committed_obligations
+available_to_authorize
+unreconciled_amount
+```
+
+These may differ temporarily and should never be silently collapsed.
+
+## Inflows
+
+An inflow must have:
+
+- source/transaction evidence;
+- amount/currency;
+- purpose/classification;
+- applicable restrictions;
+- reconciliation status;
+- DAIL receipt.
+
+Provider success is evidence, not final classification.
+
+## Spend proposal
+
+```yaml
+spend_request_id: stable ID
+treasury_ref: required
+purpose: typed
+amount: decimal
+currency: ISO/typed
+budget_ref: optional|required by policy
+recipient_ref: stable institutional party
+provider_destination_alias: optional
+contract_or_obligation_ref: optional
+policy_ref: required
+authority_ref: required
+status: draft|review|held|approved|denied|executing|settled|reversed
+```
+
+## Authorization checks
+
+Before disbursement:
+
+1. treasury/object current;
+2. authority valid;
+3. budget/category available;
+4. obligation/right basis valid;
+5. currency/unit correct;
+6. reserve/minimum controls satisfied;
+7. recipient identity resolved;
+8. provider destination current;
+9. sanctions/risk/professional checks if applicable;
+10. timelocks/approvals satisfied;
+11. idempotency key unused.
+
+## Accounting equation
+
+A simplified internal consistency relationship is:
+
+```text
+book_balance
+= prior_book_balance
++ reconciled_inflows
+- reconciled_outflows
++ corrections
+```
+
+`available_to_authorize` may be lower because reserves and commitments are excluded.
+
+## Reserve model
+
+```text
+available = max(0, book_balance - reserved - committed - other_locked)
+```
+
+Exact reserve formulas are policy/version controlled and may be restricted.
+
+## Disbursement lifecycle
+
+```text
+REQUEST
+  |
+REVIEW
+  |
+APPROVED
+  |
+EXECUTING
+  |
+  +-- provider failed --> HOLD / retry / compensate
+  |
+PROVIDER SUCCESS
+  |
+RECONCILE
+  |
+SETTLED
+```
+
+## Treasury proposals and governance
+
+Historical DAO-era designs used treasury proposals/votes. Current CHLOM can bind a spend request to any authorized governance/approval mechanism without requiring token voting.
+
+## Smart Treasury relationship
+
+```text
+Treasury Pallet = canonical treasury state + base controls
+Treasury Routing = allocation/routing instructions
+Smart Treasury Engine = policy/orchestration/recommendations
+provider/bank/wallet = execution adapter
+```
+
+AI may recommend; it does not manufacture authority.
+
+## Events
+
+```text
+ct.treasury.inflow.observed.v1
+ct.treasury.inflow.reconciled.v1
+ct.treasury.spend.requested.v1
+ct.treasury.spend.held.v1
+ct.treasury.spend.approved.v1
+ct.treasury.disbursement.submitted.v1
+ct.treasury.disbursement.confirmed.v1
+ct.treasury.disbursement.reconciled.v1
+ct.treasury.correction.recorded.v1
+```
+
+## Failure modes
+
+- insufficient available balance -\> HOLD/DENY;
+- provider balance mismatch -\> reconcile/HOLD;
+- unauthorized recipient -\> DENY;
+- budget expired -\> HOLD;
+- duplicate payment instruction -\> idempotent refusal/reuse;
+- provider success but wrong amount -\> correction/recovery;
+- stale FX -\> HOLD or refresh;
+- reserve breach -\> DENY/HOLD;
+- current legal/professional requirement unresolved -\> HOLD.
+
+## Threat model
+
+- unauthorized spend;
+- provider destination substitution;
+- balance spoofing;
+- double disbursement;
+- rounding/currency errors;
+- hidden reserve release;
+- AI automation overreach;
+- stale authority;
+- unrecorded manual provider movement;
+- provider evidence incorrectly treated as institutional settlement.
+
+## Tests
+
+1. approved spend within available budget -\> execute/reconcile;
+2. duplicate idempotency key -\> no second payment;
+3. provider outage -\> hold/retry;
+4. provider reports amount mismatch -\> unreconciled state;
+5. reserve constraint violated -\> reject/hold;
+6. recipient alias changes -\> stable party identity remains;
+7. AI suggestion without approval -\> cannot execute;
+8. historic token treasury proposal -\> not current authority;
+9. correction -\> separate correction event;
+10. settlement requires provider readback \+ institutional reconciliation.
+
+## Current mapping
+
+Modern CHLOM maps Treasury Pallet semantics to an institutional treasury ledger/control service inside P-11, connected to ThriveEvergreen economic authority, payments/providers, budgets, reconciliation, audit and DAIL.
+
+## Restricted companion
+
+Contains private balances, bank/wallet/provider aliases, budgets, reserve targets, approval matrices, transaction evidence, treasury strategies, tax-sensitive records and protected economic parameters.
+
+## Invariants
+
+```text
+balance != spend authority
+provider balance != canonical book balance
+approval != provider execution
+provider success != settlement
+AI recommendation != money movement authority
+reserve policy change != silent retroactive release
+historical token treasury != current treasury rail
+```
+
+## Status
+
+`historical_preserved + reconstructed_source_grounded`. The base Treasury Pallet is institutionalized separately from routing and Smart Treasury orchestration; current production state remains evidence-specific.

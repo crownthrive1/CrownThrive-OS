@@ -1,0 +1,227 @@
+---
+title: "Risk / Scoring Pallet — Historical Runtime Record"
+sidebarTitle: "Risk / Scoring Pallet"
+description: "Individual reconstruction of CHLOM's historical Risk/Scoring Pallet for normalized risk state, thresholds and transaction/entity controls, mapped to current AIE/ACE risk intelligence and P-02 policy evaluation."
+icon: "gauge-high"
+keywords: ["CHLOM Risk Scoring Pallet", "risk score", "AIE", "ACE", "thresholds", "anomaly", "P-02"]
+---
+
+# Risk / Scoring Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.risk-scoring
+namespace: historical_runtime_pallet
+recovered_title: Risk/Scoring Pallet
+recovered_help_center_description: stores or resolves risk scores used by compliance and transaction gating
+source_recovery: substantive_title_plus_AI/risk_architecture
+current_mapping:
+  - AIE risk intelligence
+  - ACE policy/compliance evaluation
+  - P-02 Governance & Compliance
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Risk/Scoring Pallet was the runtime-facing location for normalized risk information used by CHLOM's compliance gates. Off-chain AI/oracle components could produce risk evidence and the runtime could use approved risk state when deciding whether a transaction/action was acceptable.
+
+```text
+OBSERVATIONS / AI / ORACLE DATA
+             |
+             v
+        RISK MODEL
+             |
+             v
+      RISK SCORE / BAND
+             |
+             v
+  HISTORICAL RISK PALLET
+             |
+             v
+ POLICY / COMPLIANCE PRE-CHECK
+```
+
+## Risk is evidence, not verdict
+
+```text
+risk score
+   !=
+violation
+   !=
+authority to punish
+```
+
+Risk can influence policy evaluation, escalation or HOLD behavior; it cannot manufacture prohibited facts.
+
+## Reconstructed score record
+
+```yaml
+risk_record_id: stable ID
+subject_ref: entity|transaction|asset|provider|other
+model_or_rule_ref: required
+model_version: string
+score: normalized or model-specific value
+band: optional
+input_evidence_refs: []
+calculated_at: timestamp
+expires_at: nullable
+status: current|stale|superseded|disputed
+```
+
+Exact historical storage names/scales are not recovered and are not invented.
+
+## Historical quantitative lineage
+
+Recovered CHLOM material includes example risk formulas such as weighted combinations of amount deviation, peer risk and KYC/verification level. Those examples are historical modeling lineage—not current production calibration.
+
+A generic current-safe form is:
+
+```text
+risk = f(versioned_inputs, model_version)
+```
+
+The protected definition of `f`, thresholds and calibration belongs in the restricted model registry when proprietary.
+
+## Freshness
+
+Risk is time-dependent.
+
+```text
+current? -> usable according to policy
+stale?   -> HOLD/recalculate where required
+unknown? -> HOLD/deny according to operation
+```
+
+A cached low-risk score cannot override a new sanctions, identity, rights or security state.
+
+## Risk bands
+
+If used, risk bands must be versioned policy/model outputs.
+
+```text
+LOW
+MEDIUM
+HIGH
+CRITICAL
+```
+
+No public threshold values are institutionalized by this page.
+
+## Current AIE mapping
+
+AIE is the current/historical intelligence lineage for anomaly/risk signals. Risk computation belongs in the intelligence layer; policy consequences belong in ACE/P-02.
+
+```text
+AIE / analytics
+     |
+ risk evidence
+     |
+     v
+P-02 / ACE policy
+     |
+PASS | HOLD | DENY / REVIEW
+```
+
+## Model governance
+
+A risk model requires:
+
+- model ID/version;
+- documented inputs;
+- training/evaluation provenance where applicable;
+- bias/risk assessment;
+- threshold/config version;
+- authorized deployment state;
+- monitoring/drift;
+- rollback;
+- human-review triggers.
+
+## Historical operation families
+
+- write/update risk record from authorized source;
+- query risk;
+- check risk threshold/band;
+- invalidate/stale a record;
+- use risk in compliance pre-check.
+
+Exact historical extrinsic names are not recovered.
+
+## Current events
+
+```text
+ct.risk.score.calculated.v1
+ct.risk.score.updated.v1
+ct.risk.score.stale.v1
+ct.risk.anomaly.observed.v1
+ct.risk.review.requested.v1
+ct.risk.model.version.changed.v1
+```
+
+## Human review
+
+High uncertainty or protected decision classes can route to human review.
+
+```text
+risk high / uncertainty high
+        |
+        v
+HOLD
+        |
+review evidence
+        |
+new decision under authority
+```
+
+The reviewer decides under current policy; the score itself is not a final adjudication.
+
+## Security / abuse risks
+
+- score manipulation;
+- poisoned input data;
+- model drift;
+- threshold leakage/gaming;
+- discriminatory proxy features;
+- stale score replay;
+- provider/oracle spoofing;
+- self-reinforcing false positives;
+- model version mismatch.
+
+Protected thresholds, feature logic and anti-evasion rules remain restricted.
+
+## Public / restricted split
+
+Public-safe:
+
+- model governance architecture;
+- risk-evidence semantics;
+- freshness/versioning;
+- current mapping.
+
+Restricted:
+
+- model weights;
+- feature engineering;
+- thresholds;
+- training/eval data;
+- adversarial tests;
+- provider/oracle detail;
+- fraud-detection rules.
+
+## Invariants
+
+```text
+risk score != violation
+risk score != legal conclusion
+model output != authority
+stale risk != current evidence
+higher score != automatic punishment
+AIE recommendation != ACE/P-02 decision
+historical risk formula != current production model
+runtime pallet recovered != deployed runtime
+```
+
+## Status
+
+The Risk/Scoring Pallet is preserved as a standalone historical runtime component and mapped to current AIE/ACE/P-02 risk-intelligence and policy-evaluation services.

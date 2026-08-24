@@ -1,0 +1,101 @@
+---
+title: "ALG-017 — Policy-Pack Stacking"
+sidebarTitle: "ALG-017 Policy Stacking"
+description: "Standalone CHLOM procedure for resolving applicable Compliance Packs by precedence and version and combining their dispositions without weakening restrictive controls."
+icon: "layer-group"
+keywords: ["CHLOM ALG-017", "Compliance Packs", "policy stacking", "precedence", "PASS HOLD DENY"]
+---
+
+# ALG-017 — Policy-Pack Stacking
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-017
+name: Policy-Pack Stacking
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Grand Prospectus Compliance Pack Registry; Policy Engine; ACE
+version: 1.0.0
+current_authority: specification_only
+```
+
+CHLOM applies modular Compliance Packs to a transaction, license, actor, asset, jurisdiction or workflow. ALG-017 determines which packs apply, which versions control, how precedence is resolved and how results combine without one permissive pack silently cancelling a more restrictive mandatory control.
+
+## Inputs
+
+```yaml
+context:
+  tenant
+  actor
+  action
+  object
+  jurisdiction
+  industry
+  effective_time
+  channel
+registered_packs[]:
+policy_precedence_rules:
+```
+
+## Procedure
+
+```text
+function resolve_policy_stack(context):
+    packs = applicable_packs(context)
+    packs = sort_by_precedence_and_version(packs)
+
+    result = PASS
+    for pack in packs:
+        result = max_restrictive(result, evaluate(pack, context))
+
+        if result == DENY and pack.hard_block:
+            return DENY
+
+    return result
+```
+
+## Applicability
+
+A pack must explicitly define its applicability dimensions. A financial KYC pack should not be applied to unrelated media content merely because both live under CHLOM. Conversely, a jurisdiction-specific pack cannot be ignored simply because a general global pack exists.
+
+## Version resolution
+
+The effective version is selected using the pack's activation/effective dates and any grandfathering or migration rule. Historical transactions retain the version actually used; current evaluations use the currently effective version unless an authorized exception states otherwise.
+
+## Precedence
+
+Precedence must be deterministic. Possible sources include law/regulatory constraints, contract-specific terms, platform policy, tenant policy and optional guidance. The actual hierarchy must be adopted and versioned rather than inferred ad hoc by an AI model.
+
+## Combination semantics
+
+The default public-safe contract is most-restrictive combination for mandatory controls. A specific pack can define compositional semantics, but it cannot silently weaken a higher-authority rule.
+
+## Output
+
+```yaml
+policy_stack_id:
+applicable_pack_refs[]:
+precedence_order[]:
+pack_results[]:
+final_disposition:
+conflicts[]:
+version_resolution:
+reason_codes[]:
+```
+
+## Conflict handling
+
+If two applicable high-authority packs conflict and precedence cannot resolve them, return HOLD and route to authorized review. Do not choose based on which pack was loaded first.
+
+## DAIL evidence
+
+Record applicable pack IDs/versions, applicability facts, precedence rules, individual results, final result and conflicts. This makes historic compliance decisions reproducible.
+
+## Tests
+
+Test one pack, multiple compatible packs, hard-block deny, one hold, jurisdiction-specific override, version change, conflicting equal-authority packs, expired pack, draft/unapproved pack and missing applicability data.
+
+## Versioning
+
+A change in precedence or composition semantics requires a new algorithm version and regression against historical decision fixtures.

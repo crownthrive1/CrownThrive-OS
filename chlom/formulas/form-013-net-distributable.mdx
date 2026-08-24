@@ -1,0 +1,82 @@
+---
+title: "FORM-013 — Net Distributable Calculation"
+sidebarTitle: "FORM-013 Net Distributable"
+description: "Standalone CHLOM gross-to-net economic basis calculation separating approved refunds, taxes, provider fees and contractual reserves from distributable value."
+icon: "calculator"
+keywords: ["CHLOM FORM-013", "net distributable", "gross receipt", "provider fees", "reserves"]
+---
+
+# FORM-013 — Net Distributable Calculation
+
+## Formula identity
+
+```yaml
+formula_id: FORM-013
+classification: derived_model
+origin: Smart Treasury, royalty and settlement requirements
+adopted_deduction_policy: false
+```
+
+## Expression
+
+Let:
+
+```text
+gross_receipt = G
+approved_refunds = R
+approved_taxes_or_withholding = T
+provider_fees = F
+contractual_reserve = V
+```
+
+Then a candidate net-distributable model is:
+
+```text
+D_net = G - R - T - F - V
+```
+
+## Critical authority rule
+
+The existence of a provider charge, tax estimate, reserve preference or refund request does not automatically make it an approved deduction. Every subtraction must resolve to the contract, policy, law/professional determination, or other authority governing that economic event.
+
+## Gross definition
+
+`G` must specify whether it is authorized amount, captured amount, settled amount, invoice amount, provider-reported gross, or another basis. These are not interchangeable.
+
+## Refunds
+
+Only approved and semantically linked refunds/reversals should reduce the relevant distribution basis. A refund from a prior period may require a compensating adjustment rather than rewriting the original distribution.
+
+## Taxes and withholding
+
+`T` is an abstraction. Applicable tax calculation, collection, remittance and legal treatment require jurisdiction-specific authority and professional/legal configuration where appropriate. FORM-013 does not determine tax liability.
+
+## Provider fees
+
+Provider evidence may show actual execution fees. The economic schedule decides whether those fees reduce the distributable basis, are absorbed by a platform, passed through, capped, or treated differently.
+
+## Contractual reserve
+
+`V` represents only a reserve explicitly authorized for the event/schedule. Reserve release later creates its own economic event or state transition.
+
+## Non-negativity
+
+If policy does not allow negative distributable balances for the event class:
+
+```text
+D_net >= 0
+```
+
+Otherwise, negative values must represent typed obligations/recoupments rather than accidental arithmetic underflow.
+
+## Calculation record
+
+Store all components, evidence refs, authority refs, currency/unit, schedule version, rounding and resulting `D_net`.
+
+## Tests
+
+Test no deductions, each deduction individually, all deductions, deductions exceeding gross, prior-period refund, provider-fee disagreement, reserve release and multi-currency input rejection without conversion.
+
+## Versioning
+
+The formula can remain stable while deduction policies change. Every economic result must therefore bind both FORM-013 and the applicable schedule/policy versions.

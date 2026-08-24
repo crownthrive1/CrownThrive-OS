@@ -1,0 +1,150 @@
+---
+title: "GraphQL — CHLOM Query & Mutation Contract"
+sidebarTitle: "GraphQL"
+description: "Individual CHLOM developer article for governed GraphQL queries, typed projections, relationship traversal and explicit candidate mutations without bypassing tenant, privacy, policy or authority boundaries."
+icon: "code"
+keywords: ["CHLOM GraphQL", "developer API", "query", "mutation", "DLA", "DAIL", "typed API"]
+---
+
+# GraphQL — CHLOM Query & Mutation Contract
+
+## Institutional identity
+
+```yaml
+interface_id: CT-CHLOM-GQL-001
+name: GraphQL
+source_status: explicitly_recovered_developer_interface_family
+source_lineage: recovered Help Center/developer toolkit; SDK/API Gateway; API federation
+classification: source_grounded_current_interface_contract
+exact_production_schema: not_defined_by_this_article
+version: 1.0.0
+```
+
+## Purpose
+
+GraphQL is a recovered CHLOM developer-interface family useful when a client needs a typed graph of related institutional objects and carefully bounded field selection. Its flexibility must not weaken CHLOM's tenant isolation, evidence privacy, stable IDs or action-specific authority.
+
+## Appropriate use
+
+GraphQL is most useful for read-heavy relationship traversal such as:
+
+- asset -\> source rights -\> DLA versions;
+- DLA -\> issuer/licensee -\> entitlement;
+- case -\> evidence references -\> review history;
+- transaction -\> agreement -\> payment evidence -\> settlement;
+- identity -\> public credentials -\> attestations;
+- platform -\> adapters -\> capability/health projections.
+
+It should not be chosen merely because a generic graph API is fashionable; REST or events can be more appropriate for simpler contracts.
+
+## Schema discipline
+
+GraphQL types map to stable institutional schemas rather than database tables. A type can be a public-safe projection of a richer restricted object.
+
+```graphql
+# conceptual only; not asserted production schema
+Asset
+DynamicLicensingAsset
+EvidenceReference
+DAILEvent
+PolicyResult
+Entitlement
+EconomicStatement
+Case
+```
+
+The literal schema is implementation evidence and must be generated/registered separately.
+
+## Field-level privacy
+
+GraphQL's field selection cannot authorize a field. Resolvers enforce tenant, object, role/purpose and data-classification policy independently of what the client requests.
+
+Restricted fields should not exist in a general public schema if their mere names/shape create unnecessary disclosure; role-specific schemas/projections can be used where appropriate.
+
+## Relationship traversal
+
+Every edge in the graph has explicit semantics. A client being able to traverse from an asset to a license does not prove ownership or authority; the relationship type and current lifecycle state remain part of the returned object.
+
+## Query complexity
+
+Flexible nested queries can create excessive work. Define depth, cost, pagination, list-size and resolver limits appropriate to the environment. High-cost analytical queries can route to specialized read models rather than overloading canonical transactional services.
+
+## Pagination
+
+Use cursor-based or another deterministic pagination method for large relationship sets. Pagination should preserve authorization rules and stable ordering/version context.
+
+## Caching and currentness
+
+Resolver/data-loader caching must respect evidence and policy freshness. A revoked DLA/credential should not remain visible as current because a shared cache outlived the allowed TTL.
+
+## Mutations
+
+GraphQL mutations should represent explicit institutional candidate actions rather than generic object patches.
+
+Conceptual mutation classes:
+
+```text
+createDlaCandidate
+submitListingCandidate
+submitEvidenceReference
+requestRenewalCandidate
+openCaseCandidate
+```
+
+These names are illustrative, not current schema claims.
+
+A mutation response can be `HOLD` or `DENY`; transport success is not execution authority.
+
+## Mutation snapshot binding
+
+Consequential mutations bind to exact object versions/action parameters. If the DLA/listing/agreement changed since the client loaded it, the mutation returns a conflict/HOLD instead of overwriting current state.
+
+## Idempotency
+
+Mutations with side-effect potential accept or derive semantic idempotency identities. Retrying a mutation cannot duplicate entitlements, payments, licenses or remedies.
+
+## Subscriptions
+
+GraphQL subscriptions can project event changes where useful, but they are an event-delivery adapter, not canonical DAIL history. Authorization is re-evaluated for subscription creation and, where needed, for delivered events.
+
+## Error model
+
+GraphQL errors should distinguish schema/validation errors from institutional result states. Avoid exposing internal stack traces or restricted evidence through resolver error details.
+
+## Authentication and scopes
+
+Authentication identifies the client/user. API scopes determine allowed query/mutation families. Business authority is separately evaluated for consequential mutations.
+
+## Provider neutrality
+
+GraphQL resolves canonical CHLOM objects. Provider-native data is normalized through adapters before entering the schema. External IDs remain aliases.
+
+## Federation
+
+If multiple CrownThrive services contribute to a federated graph, stable ownership of fields/types and version contracts are explicit. Federation must not allow one service to expose another domain's restricted fields or invent canonical relationships.
+
+## Observability
+
+Track operation name/hash, client, tenant, cost/depth, latency, result class, resolver/provider failures and correlation/DAIL references while minimizing sensitive query variable logging.
+
+## Conformance tests
+
+- public query versus restricted field;
+- cross-tenant object query;
+- nested rights/DLA traversal;
+- pagination;
+- complexity/depth bound;
+- stale-cache revocation;
+- candidate mutation with policy HOLD;
+- duplicate mutation retry;
+- stale object version;
+- subscription after entitlement revocation;
+- provider alias normalized to stable ID.
+
+## Current status
+
+GraphQL is an explicitly recovered CHLOM interface family and a selective current tool where query flexibility is useful. Exact production schema/resolvers require implementation evidence.
+
+## Versioning
+
+Schema versions, deprecations, resolver implementations and underlying object schemas are independently versioned. Breaking semantic changes require migration rather than silent resolver behavior changes.

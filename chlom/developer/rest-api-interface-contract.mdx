@@ -1,0 +1,182 @@
+---
+title: "REST API — CHLOM Interface Contract"
+sidebarTitle: "REST API"
+description: "Individual CHLOM developer article for resource-oriented REST interfaces over identity, rights, DLA, DAIL, policy, evidence, economics and cases with versioning, scopes, idempotency, pagination and authority separation."
+icon: "code"
+keywords: ["CHLOM REST API", "developer API", "OpenAPI", "DLA API", "DAIL API", "REST"]
+---
+
+# REST API — CHLOM Interface Contract
+
+## Institutional identity
+
+```yaml
+interface_id: CT-CHLOM-REST-001
+name: REST API
+source_status: explicitly_recovered_developer_interface_family
+source_lineage: recovered Help Center/developer toolkit; SDK/API Gateway; current API-first Build Pack
+classification: source_grounded_current_interface_contract
+exact_production_routes: not_defined_by_this_article
+version: 1.0.0
+```
+
+## Purpose
+
+REST is one recovered CHLOM developer-interface family for exposing stable institutional resources and candidate actions through ordinary HTTP semantics. The interface must preserve CHLOM's domain contracts rather than turning database tables or provider APIs into the public architecture.
+
+## Resource families
+
+A current REST surface can expose versioned resource families such as:
+
+```text
+identities
+credentials / attestations
+assets / rights
+DLAs / entitlements
+LEX listings / transactions
+evidence / DAIL events
+policies / controls
+calculations / economic schedules / settlements
+cases / reviews / remedies
+clients / adapters / health
+```
+
+These are conceptual resource families. Exact production URL paths require a separate OpenAPI/implementation manifest.
+
+## Resource identity
+
+Routes use stable CHLOM IDs where possible. Provider-native IDs can be query aliases or nested metadata but do not become the canonical path identity.
+
+```text
+GET institutional_resource/{stable_id}
+```
+
+is the architectural pattern; no literal route is asserted here.
+
+## Read versus action semantics
+
+Consequential behavior should not be hidden inside arbitrary partial updates. Distinguish ordinary record reads from governed actions:
+
+```text
+READ RESOURCE
+LIST / SEARCH PROJECTION
+CREATE CANDIDATE
+SUBMIT ACTION CANDIDATE
+EXECUTE AUTHORIZED ACTION
+```
+
+A REST endpoint being technically callable does not mean the client has authority for the requested institutional effect.
+
+## Versioning
+
+Use explicit API/schema versioning and compatibility policy. Breaking semantic changes should not silently alter an existing route's meaning.
+
+Every response that carries versioned institutional state should expose or allow resolution of the relevant object/schema version.
+
+## Authentication and scopes
+
+Client authentication identifies the caller. Scopes constrain which operations the client may request. Institutional authority is evaluated separately for consequential actions.
+
+```text
+client authenticated
++ API scope permits operation
++ tenant/object access valid
++ policy/evidence/authority pass
+= executable candidate
+```
+
+## Tenant and object isolation
+
+Every request resolves tenant and object scope server-side. A caller cannot obtain another tenant's record merely by guessing a stable ID or provider alias.
+
+## Idempotency
+
+Create/action endpoints whose repetition could multiply state accept/derive semantic idempotency identity. Duplicate retries return the original result or a duplicate receipt rather than creating repeated licenses, entitlements or economic effects.
+
+## Optimistic concurrency
+
+Updates/actions against versioned objects bind to the current version/hash where material. If state changed after the client read it, return a typed stale-version conflict rather than overwriting newer state.
+
+## Pagination
+
+Large lists use deterministic pagination/cursors. Pagination is a read concern; it must not change the underlying query policy or cause a consumer to miss corrections because an index silently reordered state.
+
+## Filtering and search
+
+Filtering is allowed over approved projection fields. Restricted/internal fields are not exposed merely because a generic filter parameter exists. Search indexes remain derived views, not canonical rights/evidence stores.
+
+## Response envelope
+
+A provider-neutral response can include:
+
+```yaml
+request_id:
+correlation_id:
+resource_or_action_ref:
+object_version:
+result_state:
+data_or_projection:
+reason_codes[]:
+next_cursor:
+DAIL_or_evidence_ref:
+```
+
+## Disposition semantics
+
+REST transport codes should map to institutional outcomes without conflating them. A successful HTTP response can still contain a business `HOLD` or non-executable candidate state.
+
+Useful normalized result classes include:
+
+`PASS_CANDIDATE`, `HOLD`, `DENY`, `NOT_FOUND`, `CONFLICT`, `STALE_VERSION`, `VALIDATION_ERROR`, `RATE_LIMITED`, `DEPENDENCY_UNAVAILABLE`, `PRIVACY_RESTRICTION`.
+
+## Error safety
+
+Responses should not leak secrets, private evidence bodies, hidden identity attributes, provider credentials or trade-secret rule internals through stack traces or verbose error fields.
+
+## DAIL and evidence
+
+Reads do not automatically create DAIL noise. Consequential decisions/actions create or reference institutional receipts. Request/correlation IDs link REST operations to DAIL/evidence and provider-execution records.
+
+## OpenAPI relationship
+
+A future/current OpenAPI document is the machine-readable REST implementation manifest. It should identify operation IDs, request/response schemas, auth/scopes, side-effect class, version and error/disposition semantics.
+
+This article is the institutional contract; OpenAPI is its implementation projection.
+
+## Rate limits
+
+API rate limits and request budgets are explicit per client/tenant/operation class. CrownThrive-local ceiling semantics remain separately documented and cannot be confused with provider-native limits.
+
+## Caching
+
+Caches may be used only when currentness requirements allow them. Revocation, rights, sanctions or other time-sensitive state must not remain falsely active because a generic HTTP cache outlived the evidence TTL.
+
+## Webhook/event complement
+
+REST supports request/response access; webhooks/events provide asynchronous change delivery. Clients should not poll aggressively for events that a governed event subscription can provide, but webhook delivery is not canonical state by itself.
+
+## Security/privacy requirements
+
+Use secure transport, scoped client auth, tenant/object checks, schema validation, request-size limits, safe logging, secret redaction and action-specific authority gates. Protected evidence is returned only through explicitly authorized projections/download mechanisms.
+
+## Conformance tests
+
+- read allowed resource;
+- read forbidden tenant resource;
+- stale version update;
+- duplicate candidate create;
+- rights/policy HOLD returned without side effect;
+- rate-limit response;
+- restricted field omitted from projection;
+- pagination consistency;
+- provider alias resolution;
+- REST success followed by provider reconciliation mismatch;
+- OpenAPI/schema version mismatch.
+
+## Current status
+
+REST is a recovered and current-appropriate CHLOM interface family. Exact production endpoints must be proven by implementation/OpenAPI evidence rather than inferred from this architecture article.
+
+## Versioning
+
+REST contract, OpenAPI manifest, object schemas and implementation releases are independently versioned. Deprecated routes retain migration/continuity documentation.

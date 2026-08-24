@@ -1,0 +1,95 @@
+---
+title: "ALG-024 — Continuous Audit Scheduler"
+sidebarTitle: "ALG-024 Audit Scheduler"
+description: "Standalone CHLOM procedure for selecting due or risk-triggered governed objects, collecting evidence, evaluating controls, routing findings and appending audit receipts."
+icon: "clipboard-check"
+keywords: ["CHLOM ALG-024", "continuous audit", "scheduler", "assurance", "DAIL audit"]
+---
+
+# ALG-024 — Continuous Audit Scheduler
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-024
+name: Continuous Audit Scheduler
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: continuous audit; SLA/timelock; audit and certification lineage
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-024 turns CHLOM audit from an occasional document exercise into a governed recurring process. It identifies objects due for review or triggered by risk/events, creates an auditable scope, gathers required evidence, evaluates controls and routes findings without claiming that automation itself constitutes independent certification.
+
+## Audit population
+
+Governed objects can include licenses, policies, provider integrations, models, rights records, economic schedules, agents, credentials, tenants, campaigns, settlements, APIs, security controls and other assets with defined assurance obligations.
+
+## Inputs
+
+```yaml
+audit_population_snapshot:
+audit_policies:
+  cadence
+  risk_triggers
+  evidence_requirements
+  reviewer_requirements
+  SLA
+current_time:
+recent_DAIL_events:
+```
+
+## Procedure
+
+```text
+for governed_object in audit_population:
+    if due(governed_object) or risk_triggered(governed_object):
+        audit = create_audit(governed_object)
+        collect_required_evidence(audit)
+        evaluate_controls(audit)
+        route_findings(audit)
+        append_dail_receipt(audit)
+```
+
+## Due calculation
+
+Cadence is policy-specific. The scheduler must distinguish `last_completed_audit`, `last_attempt`, and `last evidence refresh`; a failed audit attempt must not reset the compliance clock as if the audit passed.
+
+## Risk/event triggers
+
+Examples include material policy changes, model drift, provider failure, security incidents, rights disputes, overdue reconciliation, repeated HOLDs, credential revocation or major architecture change. Trigger lists must be versioned and not inferred solely from generic anomaly scores.
+
+## Audit creation
+
+Each audit gets a stable ID, scope, object snapshot, applicable controls, evidence checklist, reviewer/assurance requirements and deadline. The object may continue operating, operate under HOLD restrictions, or be paused according to policy while review is pending.
+
+## Evidence collection
+
+Evidence is referenced by stable custody/DAIL IDs, not copied indiscriminately into audit pages. Missing mandatory evidence is itself a finding or HOLD state.
+
+## Findings and closure
+
+Control results route to findings, remediation tasks, case management or certification packages. Closure requires the adopted review/authority conditions; simply running the scheduler is not a PASS.
+
+## Output
+
+```yaml
+audit_id:
+object_ref:
+trigger: SCHEDULED|RISK|EVENT|MANUAL
+scope_version:
+control_results[]:
+findings[]:
+review_state:
+closure_state:
+DAIL_refs[]:
+```
+
+## Tests
+
+Test scheduled due, not due, risk-triggered, duplicate scheduler run, failed evidence collection, missed SLA, policy cadence update, object retired mid-audit, emergency pause and audit reopened after new evidence.
+
+## Versioning
+
+Scheduler rules and audit-control packs are versioned. Historical audits retain the scope and policy version under which they were performed.

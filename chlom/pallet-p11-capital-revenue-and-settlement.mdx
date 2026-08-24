@@ -1,0 +1,630 @@
+---
+title: "P-11 Capital, Revenue & Settlement Pallet"
+sidebarTitle: "P-11 Capital, Revenue & Settlement"
+description: "Comprehensive current CHLOM capability-pallet contract for ThriveFund, fee routing, commissions, royalties, clawbacks, obligations, provider execution, reconciliation, settlement and financial reporting."
+icon: "money-bill-transfer"
+keywords: ["CHLOM P-11", "Capital Revenue Settlement", "ThriveFund", "fees", "commissions", "royalties", "clawbacks", "settlement", "reconciliation"]
+---
+
+# P-11 Capital, Revenue & Settlement Pallet
+
+## Canonical record
+
+```yaml
+pallet_id: P-11
+canonical_name: Capital, Revenue & Settlement
+namespace: current_capability_pallet
+source_priority: Later pilot
+source_components:
+  - ThriveFund
+  - fee routing
+  - commissions
+  - royalties
+  - clawbacks
+  - finance reporting
+current_status: reconstructed_source_grounded
+production_status: economic_surface_specific_not_implied_by_pallet_priority
+public_projection: public_safe
+restricted_companion_required: true
+```
+
+## Purpose
+
+P-11 is CHLOM's current capability container for **economic calculation, obligations, allocations, commissions, royalties, authorized provider execution, reversals/clawbacks, reconciliation, settlement state and financial reporting**.
+
+It enforces the distinction between a commercial event and final institutional economic truth.
+
+```text
+QUALIFYING EVENT
+      |
+      v
+ECONOMIC SCHEDULE / RULE VERSION
+      |
+      v
+CALCULATION
+      |
+      v
+ALLOCATION PLAN / OBLIGATIONS
+      |
+      v
+AUTHORIZATION
+      |
+      v
+PROVIDER EXECUTION
+      |
+      v
+PROVIDER RECEIPTS
+      |
+      v
+INSTITUTIONAL RECONCILIATION
+      |
+      v
+SETTLED / HELD / CORRECTED / REVERSED
+      |
+      v
+DAIL + REPORTING
+```
+
+## Six Functions mapping
+
+| Function | P-11 responsibility |
+| --- | --- |
+| Rights | Ensure economic claims derive from valid rights/agreements/entitlements |
+| Rules | Fee, royalty, commission, allocation, reserve, clawback and settlement rules |
+| Roles | Earner, payee, payer, approver, treasury steward, partner, licensor, reviewer |
+| Revenue | Primary pallet responsibility: obligations, allocation, execution and settlement |
+| Records | Schedules, calculations, obligations, provider receipts, statements, corrections |
+| Remedies | Hold, reverse, claw back, compensate, correct, dispute and reconcile |
+
+## Source-component interpretation
+
+### ThriveFund
+
+ThriveFund contributes governed fund/grant/capital-allocation concepts. Current institutional documentation must not infer nonprofit status, investment-product status, securities treatment or guaranteed returns from the name or historical source material. Every live capital action requires its own authority/legal/economic basis.
+
+### Fee routing
+
+Fee routing converts an authorized fee schedule into explicit obligations/allocations. It never creates a fee merely because a historical paper proposed one.
+
+### Commissions
+
+Commission obligations derive from current agreements/program rules and verified qualifying events.
+
+### Royalties
+
+Royalty obligations derive from verified rights, agreements and current schedule versions. Historical rates are lineage, not active schedules.
+
+### Clawbacks
+
+Clawbacks/reversals are explicit corrective economic events; they do not erase the original obligation or provider transaction.
+
+### Finance reporting
+
+Reporting is a projection of reconciled economic records with defined cutoffs/as-of dates. Provider dashboards and bank/payment processor reports are evidence sources, not the only canonical ledger.
+
+## Economic authority relationship
+
+P-11 does not self-authorize commerce or pricing. Current CrownThrive commerce/economic activation can require ThriveEvergreen/ECAC.
+
+```text
+P-03 RIGHTS
+    |
+P-02 POLICY
+    |
+P-06 COMMERCIAL OBJECT
+    |
+    v
+THRIVEEVERGREEN / ECAC
+    |
+    v
+QUALIFYING ECONOMIC EVENT
+    |
+    v
+P-11 CALCULATION / OBLIGATION / SETTLEMENT
+```
+
+The ECAC is an activation envelope, not a universal authorization for any later economic action.
+
+## Core economic objects
+
+```text
+SCHEDULE
+CALCULATION
+ALLOCATION PLAN
+OBLIGATION
+ACCRUAL
+AUTHORIZATION
+EXECUTION INSTRUCTION
+PROVIDER RECEIPT
+RECONCILIATION
+SETTLEMENT
+STATEMENT
+REVERSAL
+CLAWBACK
+CORRECTION
+RESERVE / BUDGET RECORD
+GRANT / FUNDING RECORD
+```
+
+## Schedule model
+
+An economic schedule is a versioned rule set.
+
+```yaml
+schedule_id: stable ID
+schedule_type: fee|royalty|commission|allocation|reserve|other
+source_authority_ref: required
+agreement_or_policy_refs: []
+version: string
+effective_from: timestamp
+effective_until: nullable
+currency_or_unit_scope: []
+status: draft|adopted|effective|superseded|retired
+```
+
+Rates/percentages live in the exact authorized schedule—not in generic pallet prose.
+
+## Calculation record
+
+```yaml
+calculation_id: stable ID
+trigger_event_ref: required
+schedule_ref: exact version
+basis_amount_minor: integer
+currency: string
+input_evidence_refs: []
+calculation_version: string
+result_digest_or_allocations_ref: required
+status: candidate|validated|held|superseded
+```
+
+## Deterministic allocation
+
+For basis-point schedules, a public-safe reference model is:
+
+```text
+allocation_i = floor(B * bps_i / 10,000)
+```
+
+where `B` is the governed basis amount in minor units. Remainder handling must be deterministic and versioned.
+
+This formula is a calculation pattern; it does not define any current percentage.
+
+## Conservation invariant
+
+For a closed allocation plan:
+
+```text
+sum(allocations) + remainder = governed_basis
+```
+
+If fees/taxes/reserves are outside the basis, the schedule must define that explicitly. P-11 must not silently mix gross and net bases.
+
+## Gross/net waterfall
+
+```text
+GROSS QUALIFYING AMOUNT
+          |
+          +--> authorized adjustments / refunds
+          |
+          v
+GOVERNED BASIS
+          |
+          +--> fee obligations
+          +--> royalty obligations
+          +--> commission obligations
+          +--> reserve / other authorized allocations
+          |
+          v
+NET / RESIDUAL according to schedule
+```
+
+Each step needs a versioned basis definition.
+
+## Obligation model
+
+```yaml
+obligation_id: stable ID
+calculation_ref: required
+obligation_type: royalty|commission|fee|refund|grant|other
+payer_ref: identity/org/accounting entity
+payee_ref: identity/org/accounting entity
+amount_minor: integer
+currency: string
+due_at: nullable
+status: candidate|accrued|authorized|held|executed|settled|reversed|written_off
+```
+
+An obligation can exist before provider execution.
+
+## Provider execution
+
+P-11 can send an authorized instruction to a replaceable provider.
+
+```text
+AUTHORIZED OBLIGATION
+      |
+      v
+EXECUTION INSTRUCTION + IDEMPOTENCY
+      |
+      v
+PAYMENT / BANK / PROVIDER
+      |
+      v
+RECEIPT / STATUS
+      |
+      v
+RECONCILIATION
+```
+
+Provider success is evidence, not final settlement by itself.
+
+## Settlement model
+
+Settlement means institutional reconciliation determined that the obligation and execution evidence satisfy the applicable contract/policy state.
+
+```yaml
+settlement_id: stable ID
+obligation_ref: required
+provider_receipt_refs: []
+reconciliation_ref: required
+settled_amount_minor: integer
+currency: string
+settled_at: timestamp
+status: settled|partial|held|corrected|reversed
+```
+
+## Reconciliation equation
+
+A basic variance model is:
+
+```text
+variance = expected_obligation - reconciled_provider_amount
+```
+
+Interpretation requires sign convention, currency and timing definitions. `variance = 0` does not prove the underlying rights/policy were valid; it proves only amount agreement under the reconciliation scope.
+
+## Commission model
+
+Commission calculation requires:
+
+- current program/agreement;
+- qualifying event definition;
+- attribution rule/version;
+- eligible participant;
+- governed basis;
+- current commission schedule;
+- reversal/refund rules;
+- settlement evidence.
+
+```text
+referral click != qualifying conversion
+qualifying conversion != final commission
+final commission != provider payout
+provider payout != settled commission until reconciled
+```
+
+## Royalty model
+
+Royalty calculation begins with P-03 rights/agreement state.
+
+```text
+RIGHTS / AGREEMENT
+      |
+QUALIFYING USE / SALE / LICENSE EVENT
+      |
+ROYALTY SCHEDULE VERSION
+      |
+CALCULATION
+      |
+OBLIGATIONS
+      |
+EXECUTION + RECONCILIATION
+```
+
+P-11 cannot expand the license scope to create a royalty event.
+
+## Clawback / reversal
+
+A clawback is a new corrective obligation/event linked to the original economic record.
+
+```text
+ORIGINAL SETTLEMENT
+       |
+REVERSAL TRIGGER / EVIDENCE
+       |
+POLICY / AGREEMENT AUTHORITY
+       |
+CORRECTIVE CALCULATION
+       |
+CLAWBACK / OFFSET / REFUND
+       |
+RECONCILIATION
+```
+
+The original remains in history.
+
+## Refund relationship
+
+P-06 typically governs order/refund customer-state; P-11 reconciles resulting economic obligations.
+
+```text
+P-06 REFUND COMPLETED
+        |
+        v
+P-11 ECONOMIC REVERSAL / ADJUSTMENT
+        |
+        +--> commissions
+        +--> royalties
+        +--> fees
+        +--> reporting
+```
+
+## Tax/withholding boundary
+
+P-11 may model tax/withholding fields when supported by adopted rules and professional/legal review. It must not invent jurisdictional tax rates or represent a generic calculation as tax advice.
+
+```yaml
+tax_or_withholding_record:
+  jurisdiction_ref: required
+  rule_version_ref: required
+  basis_ref: required
+  amount_minor: computed under authorized rule
+  status: accrued|held|remitted|corrected|unknown
+```
+
+Historical Smart Tax automation remains source/research lineage unless separately validated.
+
+## ThriveFund / grants
+
+A funding/grant object can be modeled as:
+
+```yaml
+funding_id: stable ID
+program_ref: required
+recipient_ref: identity/org
+award_or_allocation_ref: required
+purpose: explicit
+conditions_refs: []
+approval_ref: required
+disbursement_refs: []
+status: candidate|approved|held|disbursed|completed|revoked|closed
+```
+
+The record does not imply equity, security, charitable deduction or regulated-investment status unless verified separately.
+
+## Reserve/budget model
+
+```text
+AUTHORIZED BUDGET
+     |
+COMMITTED OBLIGATIONS
+     |
+EXECUTED SPEND
+     |
+REMAINING AVAILABILITY
+```
+
+Budget availability is distinct from cash/bank balance and from legal authority to spend.
+
+## Finance reporting
+
+Reports should state:
+
+- reporting period;
+- `as_of` timestamp;
+- source coverage;
+- currency basis;
+- reconciled/unreconciled treatment;
+- pending/held treatment;
+- transfer/intercompany treatment;
+- schedule versions;
+- correction state.
+
+A report must not call an incomplete/partially synced period definitive.
+
+## DAIL economic event families
+
+```text
+ct.economic.schedule.adopted.v1
+ct.economic.calculation.created.v1
+ct.economic.obligation.accrued.v1
+ct.economic.obligation.authorized.v1
+ct.economic.execution.requested.v1
+ct.economic.provider.receipt.observed.v1
+ct.economic.reconciliation.completed.v1
+ct.economic.settlement.completed.v1
+ct.economic.settlement.held.v1
+ct.economic.reversal.created.v1
+ct.economic.clawback.created.v1
+ct.economic.statement.generated.v1
+ct.fund.allocation.approved.v1
+```
+
+## Historical economic lineage
+
+Historical CHLOM papers include:
+
+- Smart Treasury;
+- fee routing;
+- royalty streaming;
+- staking/slashing;
+- Smart Tax;
+- Smart Capital;
+- Smart Yield/Farming;
+- token-based treasury/economic structures.
+
+P-11 preserves the concepts and formulas but current execution is cloud/provider/accounting-first unless separately activated and evidenced.
+
+## Cross-pallet topology
+
+```text
+P-02 Governance --------+
+P-03 Rights ------------+
+P-05 Attribution -------+--> P-11 Economics
+P-06 Commerce ----------+        |
+P-08 Programs ----------+        +--> reporting / DAIL
+P-12 Impact evidence ---+
+
+ThriveEvergreen --------> economic activation authority
+```
+
+## Operating procedures
+
+### Schedule adoption
+
+1. identify source authority/agreement;
+2. define basis, units, rates/rules, rounding;
+3. define effective period;
+4. create test vectors;
+5. legal/economic review where required;
+6. adopt exact version;
+7. publish public-safe semantics if allowed;
+8. store restricted commercial details appropriately;
+9. emit DAIL event.
+
+### Obligation generation
+
+1. receive qualifying event;
+2. resolve rights/agreement/attribution;
+3. select exact schedule version;
+4. compute deterministic candidate;
+5. validate conservation/limits;
+6. create obligation(s);
+7. route approval/execution.
+
+### Provider payout/execution
+
+1. resolve authorized obligation;
+2. bind idempotency key;
+3. execute through certified provider;
+4. record provider receipt;
+5. read back status;
+6. reconcile amount/currency/counterparty/time;
+7. mark settled/partial/held;
+8. emit evidence.
+
+### Reversal/clawback
+
+1. preserve original obligation/settlement;
+2. capture reversal trigger;
+3. evaluate current/historical agreement rule;
+4. calculate corrective amount;
+5. authorize remedy;
+6. execute or offset;
+7. reconcile;
+8. update reporting and DAIL.
+
+### Period close/report
+
+1. freeze `as_of` boundary;
+2. collect relevant reconciled records;
+3. identify pending/unreconciled items;
+4. apply correction versions;
+5. generate statements/projections;
+6. approve/public-project appropriate figures;
+7. preserve reproducible report inputs.
+
+## Failure modes
+
+### Provider payout succeeds twice
+
+**Response:** idempotency and obligation reconciliation identify duplicate execution; create corrective action without deleting original receipts.
+
+### Rights revoked after sale but before payout
+
+**Response:** policy/agreement determines hold/remedy; do not automatically pay solely because provider captured funds.
+
+### Commission attribution changes after settlement
+
+**Response:** historical settlement remains tied to original version unless a governed correction/reversal applies.
+
+### Currency mismatch
+
+**Response:** HOLD reconciliation until governed FX/source and currency identities are resolved.
+
+### Partial provider data
+
+**Response:** report as partial/unreconciled through exact `as_of`; do not claim definitive total.
+
+### Historical royalty percentage found in old paper
+
+**Response:** preserve as historical source rate; do not activate.
+
+### Tax rule unresolved
+
+**Response:** HOLD tax-sensitive automation and route professional/legal review; do not guess.
+
+## Metrics
+
+Potential metrics with definitions:
+
+- accrued obligations by state;
+- settlement reconciliation age;
+- provider mismatch amount/count;
+- duplicate execution incidents;
+- reversal/clawback rate;
+- commission/royalty correction rate;
+- unallocated remainder counts;
+- schedule-version drift;
+- held economic volume;
+- period reporting completeness;
+- provider-exit readiness;
+- grant/fund disbursement condition completion.
+
+## Restricted companion
+
+May contain:
+
+- current private fee/commission/royalty schedules;
+- confidential partner economics;
+- unreleased funding terms;
+- private forecasts/budgets;
+- tax/withholding analyses;
+- bank/payment-provider mappings;
+- anti-fraud thresholds;
+- protected treasury/risk algorithms;
+- private reconciliation exceptions;
+- financial statements not cleared for public release.
+
+Raw credentials/accounts/secrets remain in approved secret storage.
+
+## Release gates
+
+```text
+[ ] rights/agreement basis required for rights-linked economics
+[ ] exact schedule versioning tested
+[ ] basis/gross/net definitions explicit
+[ ] deterministic rounding/conservation tests pass
+[ ] idempotent provider execution tested
+[ ] provider readback/reconciliation tested
+[ ] reversal/clawback path tested
+[ ] currency/FX handling governed
+[ ] reporting as-of/coverage semantics defined
+[ ] tax/professional boundaries enforced
+[ ] ThriveEvergreen/ECAC handoff verified where applicable
+[ ] DAIL evidence verified
+[ ] public/restricted split reviewed
+```
+
+## Invariants
+
+```text
+commercial event != obligation
+obligation != payout
+payout != settlement
+provider receipt != institutional truth
+rights event != economic authority
+economic engine != rights authority
+historical rate != current schedule
+budget != cash balance
+cash balance != spending authority
+refund != deletion
+clawback != historical erasure
+calculation != authorization
+AI optimization != money-movement authority
+```
+
+## Current implementation effect
+
+P-11 is a **Later pilot** pallet in the July 2026 Technical Build Pack. Its architecture defines current economic semantics while ThriveFund, fee/commission/royalty programs, providers and historical Smart Treasury/DeFi/Tax/Capital/Yield concepts remain individually evidenced and governed.
