@@ -1,0 +1,360 @@
+---
+title: "CHLOM SDK & API Gateway"
+sidebarTitle: "SDK & API Gateway"
+description: "Standalone CHLOM developer-service article for REST/GraphQL/webhooks/MCP access, stable schemas, authentication, authorization, idempotency, budgets, sandboxing, side-effect classes, versioning and provider-neutral adapters."
+icon: "code"
+keywords: ["CHLOM SDK", "API Gateway", "REST", "GraphQL", "webhooks", "MCP", "idempotency", "developer"]
+---
+
+# CHLOM SDK & API Gateway
+
+## Canonical record
+
+```yaml
+service_id: ct.chlom.service.sdk-api-gateway
+canonical_name: SDK & API Gateway
+artifact_class: developer_platform_service
+source_lineage:
+  - recovered CHLOM Developer Blackpaper / implementation guides
+  - component atlas / Phase 3 service contract
+  - July 2026 Technical Build Pack
+current_mapping:
+  - P-10 developer/integration surface
+  - P-01/P-02 auth and policy
+status: current_semantic_service_specification
+production_endpoints: individually_evidenced
+```
+
+## Purpose
+
+The SDK & API Gateway gives authorized applications, providers, agents and developers a stable way to consume CHLOM capabilities without coupling to internal databases or provider-specific implementations.
+
+```text
+CLIENT / AGENT / PARTNER
+       |
+       v
+AUTHENTICATION
+       |
+AUTHORIZATION / PURPOSE / BUDGET
+       |
+       v
+API GATEWAY
+       |
+ +-----+------+-------+
+ |            |       |
+REST/GraphQL  MCP   webhooks/events
+ |            |       |
+ +-----+------+-------+
+       |
+DOMAIN SERVICES / PROVIDER ADAPTERS
+       |
+READBACK / DAIL
+```
+
+## Gateway is not authority
+
+```text
+valid API credential
+   !=
+permission for every endpoint/action
+```
+
+P-01/P-02/domain policy resolves actual capability.
+
+## Interface families
+
+```text
+REST
+GraphQL where useful
+MCP/tool interfaces
+webhooks/events
+SDKs (JavaScript/TypeScript, Python, other justified languages)
+async job/status APIs
+public verification endpoints
+sandbox/test endpoints
+```
+
+Historical JSON-RPC/chain-native interfaces remain optional adapter lineage.
+
+## Authentication
+
+Possible mechanisms:
+
+- OAuth/OIDC;
+- service credentials;
+- signed requests;
+- short-lived tokens;
+- API keys for limited use;
+- mTLS/specialized provider auth where required.
+
+Raw credentials remain in secret storage.
+
+## Authorization
+
+Every material API request evaluates:
+
+```text
+caller identity
+organization/tenant
+capability
+object scope
+purpose
+role/delegation
+authority ceiling
+policy
+budget/rate limits
+```
+
+## Endpoint record
+
+```yaml
+endpoint_id: stable ID
+method_and_path_or_tool: canonical
+capability_ref: required
+input_schema_ref: required
+output_schema_ref: required
+side_effect_class: read|write|rights|economic|security|governance|external
+auth_requirements_ref: required
+idempotency_required: boolean
+version: string
+status: sandbox|controlled_test|active|deprecated|retired
+```
+
+## Side-effect classes
+
+High-impact APIs require stronger confirmation/authority/readback than reads.
+
+```text
+READ
+LOW-RISK WRITE
+RIGHTS
+ECONOMIC
+GOVERNANCE
+SECURITY/ACCESS
+EXTERNAL PROVIDER SIDE EFFECT
+```
+
+## Idempotency
+
+Material create/execute operations should accept or generate stable idempotency keys.
+
+```text
+same logical request + same idempotency key
+   -> one material side effect
+```
+
+The exact key-retention period is endpoint/provider specific.
+
+## Correlation / trace
+
+Requests can carry a correlation ID so the resulting service/provider/DAIL events can be traced end to end.
+
+## Versioning
+
+```text
+schema/API v1
+  |
+breaking semantic change
+  |
+v2
+```
+
+Deprecated versions get explicit retirement/migration windows where possible.
+
+## Error model
+
+Errors should distinguish:
+
+```text
+400 validation
+401 authentication
+403 authorization / explicit deny
+409 version/idempotency/state conflict
+423/defined HOLD representation
+429 throttle/quota
+5xx service/provider failure
+```
+
+Exact HTTP code conventions are implementation choices, but HOLD must not be confused with ordinary technical failure.
+
+## PASS/HOLD/DENY response
+
+Material policy-gated APIs can return structured decision state:
+
+```yaml
+decision:
+  result: PASS|HOLD|DENY
+  decision_id: stable ID
+  reason_codes: []
+  requirements: []
+  valid_until: nullable
+```
+
+## Request-budget semantics
+
+CrownThrive-local ceilings use:
+
+```text
+-1 = unlimited local monthly ceiling
+0 = zero requests
+N > 0 = exact N monthly requests
+null = unresolved/unknown -> fail closed
+```
+
+Provider limits remain separate.
+
+## Sandbox
+
+Sandbox/test environment should:
+
+- use synthetic/non-production data;
+- clearly label simulated provider behavior;
+- expose deterministic fixtures;
+- support failure injection;
+- prevent live economic/rights side effects;
+- use separate credentials/keys.
+
+## MCP / tool surface
+
+MCP tools should declare:
+
+- name/description;
+- input schema;
+- side-effect class;
+- authority requirements;
+- output schema;
+- idempotency/readback behavior;
+- human confirmation requirements if applicable.
+
+Agent use of MCP does not expand the agent's delegation.
+
+## Webhooks
+
+Webhook contract includes:
+
+```text
+event type/version
+event ID
+occurred time
+signature/authentication
+subject/correlation
+retry semantics
+idempotency
+classification
+```
+
+Consumers verify signature and deduplicate.
+
+## Provider adapters
+
+```text
+stable CHLOM API
+    |
+provider adapter
+    |
+provider API
+```
+
+Provider migration should not require changing public CHLOM object identity/semantics.
+
+## Readback
+
+For provider writes:
+
+```text
+API accepted
+  |
+provider executed
+  |
+readback
+  |
+institutional reconcile
+  |
+confirmed result
+```
+
+## SDK behavior
+
+SDKs should wrap transport, schemas, retries and safe helpers—not hide material policy/decision states.
+
+A helper that automatically retries a payment/license action must preserve idempotency.
+
+## OpenAPI/schema manifests
+
+The developer estate should maintain machine-readable manifests for:
+
+- public APIs;
+- webhooks;
+- MCP tools;
+- schemas;
+- error/decision envelopes;
+- authentication requirements.
+
+## Events
+
+```text
+ct.api.request.authorized.v1
+ct.api.request.held.v1
+ct.api.request.denied.v1
+ct.api.provider_mismatch.v1
+ct.api.version.deprecated.v1
+ct.webhook.delivery.failed.v1
+```
+
+High-volume ordinary reads need not all become DAIL material events.
+
+## Failure modes
+
+### Provider API returns 200 but readback differs
+
+Return/record pending/mismatch, not institutional success.
+
+### API schema version unknown
+
+Reject or negotiate explicitly; do not guess fields.
+
+### Client retries after timeout
+
+Idempotency prevents duplicate side effect.
+
+### Rate budget null
+
+Fail closed rather than treat as unlimited.
+
+### MCP tool visible to agent but delegation lacks action
+
+DENY at authority gate.
+
+## Security
+
+- credential scoping/rotation;
+- schema validation;
+- tenant isolation;
+- SSRF/injection defenses;
+- replay/webhook protection;
+- rate limiting;
+- authorization on every object;
+- secret redaction;
+- audit of high-impact actions;
+- provider exit/fallback.
+
+## Restricted companion
+
+Contains unreleased APIs/tools, provider mappings, auth topology, threat models, quotas/thresholds, security tests and private integration schemas. Secret values remain in secret storage.
+
+## Invariants
+
+```text
+API key != unlimited authority
+API success != institutional PASS
+SDK helper != policy bypass
+MCP tool visibility != delegation
+provider API != canonical identity
+retry != duplicate side effect
+sandbox != production
+schema-valid != semantically authorized
+```
+
+## Status
+
+The SDK & API Gateway is a first-class CHLOM developer-service specification. Every production endpoint/tool/provider adapter must carry exact current implementation and security evidence.

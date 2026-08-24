@@ -1,0 +1,455 @@
+---
+title: "SCHEMA-004 — Economic Schedule / Allocation Contract"
+sidebarTitle: "SCHEMA-004 Economic Schedule"
+description: "Canonical CHLOM machine schema for versioned gross/net basis, recipients, basis points, deductions, reserves, rounding, effective time, authority and settlement relationships."
+icon: "chart-pie"
+keywords: ["CHLOM schema", "economic schedule", "royalty", "basis points", "allocation", "settlement"]
+---
+
+# SCHEMA-004 — Economic Schedule / Allocation Contract
+
+## Canonical record
+
+```yaml
+schema_id: ct.chlom.schema.schema-004
+canonical_name: Economic Schedule / Allocation Contract
+artifact_class: machine_schema_contract
+lineage:
+  - Royalty & Splits Pallet
+  - P-11 Capital, Revenue & Settlement
+  - Smart Treasury / Fee Router / Treasury Routing lineage
+  - ThriveEvergreen economic activation
+status: public_safe_schema_contract
+restricted_companion: 04_Restricted_Algorithms_Formulas_Threat_Models_and_Trade_Secrets
+```
+
+## Purpose
+
+SCHEMA-004 defines the machine-readable object that tells CHLOM **how an adopted economic basis is allocated into obligations**. It keeps schedule definition separate from payment execution and settlement.
+
+```text
+RIGHT / AGREEMENT / ECONOMIC AUTHORITY
+            |
+            v
+     ECONOMIC SCHEDULE
+            |
+       basis + rules
+            |
+            v
+   ALLOCATION CALCULATION
+            |
+            v
+       OBLIGATIONS
+            |
+    provider execution
+            |
+            v
+      RECONCILIATION
+```
+
+## Core boundary
+
+```text
+rights != economic schedule
+schedule != calculation result
+calculation != obligation authority automatically
+obligation != provider payment
+provider payment != settlement
+```
+
+## Top-level schedule
+
+```yaml
+economic_schedule_id: stable institutional id
+canonical_name: string
+version: semantic_or_governed_version
+status: draft|review|approved|active|held|superseded|retired
+subject_scope:
+  asset_refs: []
+  DLA_refs: []
+  agreement_refs: []
+  product_offer_refs: []
+  program_refs: []
+economic_authority_refs: []
+source_rights_refs: []
+basis: structured
+allocations: []
+deductions: []
+reserves: []
+recoupment_profiles: []
+rounding_profile: structured
+remainder_profile: structured
+currency_profile: structured
+effective_from: timestamp
+effective_until: optional
+supersedes: []
+superseded_by: optional
+classification: public|internal|restricted
+schema_version: ct.chlom.schema.schema-004/v1
+```
+
+## Basis definition
+
+The basis answers: **what amount is being split?**
+
+```yaml
+basis:
+  basis_type: gross|net|defined_custom_basis
+  source_event_types: []
+  included_amount_classes: []
+  excluded_amount_classes: []
+  deduction_order_ref: optional
+  currency: explicit_or_event_bound
+  tax_treatment_ref: optional
+  definition_ref: source agreement/policy
+```
+
+`net` is invalid unless the deduction definition/order is explicit.
+
+## Allocation line
+
+```yaml
+allocation_id: stable within schedule version
+recipient_ref: stable institutional party/role/obligation destination
+allocation_type: royalty|commission|fee|reserve|fund|recoupment|other
+calculation_method: basis_points|fixed_amount|formula_ref|remainder|other
+basis_points: optional integer
+fixed_amount: optional typed money
+formula_ref: optional
+priority_or_stage: explicit if waterfall
+floor: optional
+cap: optional
+conditions: []
+source_authority_ref: required
+status: active|held|deprecated
+```
+
+Provider wallet/bank/store IDs are aliases linked to `recipient_ref`; they are not the recipient's canonical identity.
+
+## Basis points
+
+For a line using basis points:
+
+```text
+D = 10,000
+raw_share_i = B * bps_i / D
+```
+
+where `B` is the applicable basis in the currency's minor-unit discipline.
+
+The allocation engine applies the adopted rounding profile before creating obligations.
+
+## Deductions
+
+```yaml
+deduction:
+  deduction_id: stable id
+  deduction_type: tax|refund|chargeback|provider_fee|approved_cost|other
+  source_ref: required
+  method: actual_amount|formula_ref|schedule_ref
+  order: explicit
+  eligibility_condition: optional
+  cap_or_limit: optional
+```
+
+A deduction cannot be inserted merely because a provider charged something; its economic treatment must be authorized/classified.
+
+## Reserves
+
+```yaml
+reserve:
+  reserve_id: stable id
+  purpose: tax|refund|risk|operations|other
+  method: basis_points|fixed|formula_ref
+  rule_ref: required
+  release_condition_ref: required
+  custodian_or_treasury_ref: stable id
+```
+
+Reserve creation is not the same as expense recognition or payment.
+
+## Waterfalls
+
+For staged economics:
+
+```text
+GROSS BASIS
+   |
+allowed deductions
+   |
+NET DISTRIBUTABLE
+   |
+stage 1 obligations / recoupment
+   |
+remaining basis
+   |
+stage 2 royalties / commissions
+   |
+remainder rule
+```
+
+The exact order comes from the adopted agreement/schedule.
+
+## Recoupment
+
+```yaml
+recoupment_profile:
+  recoupment_id: stable id
+  beneficiary_ref: required
+  recoverable_balance_ref: canonical balance/obligation
+  recovery_source: defined revenue stream
+  recovery_rate_or_formula_ref: explicit
+  cap: optional
+  start/end_conditions: explicit
+```
+
+No recoupment logic may intercept unrelated revenue streams.
+
+## Floors and caps
+
+Floors/caps require explicit semantics:
+
+- per event;
+- per period;
+- cumulative lifetime;
+- recipient-specific;
+- schedule-wide.
+
+Ambiguous floor/cap meaning is a schema or source interpretation HOLD.
+
+## Rounding profile
+
+```yaml
+rounding_profile:
+  arithmetic_domain: integer_minor_units|fixed_decimal
+  mode: floor|half_up|half_even|largest_remainder|other_reviewed
+  precision: explicit
+  deterministic_tie_breaker_ref: required if needed
+```
+
+Floating-point binary arithmetic should not be used where it can violate economic conservation.
+
+## Remainder profile
+
+```yaml
+remainder_profile:
+  method: assign_to_recipient|carry_forward|treasury_reserve|largest_remainder|other
+  target_ref: optional
+  audit_required: true
+```
+
+No value may silently disappear due to rounding.
+
+## Conservation
+
+For a fully distributable basis:
+
+```text
+Σ(final_allocations) + explicit_remainder = distributable_basis
+```
+
+If the schedule intentionally leaves value undistributed, the retained/reserved amount must be explicit.
+
+## Currency profile
+
+```yaml
+currency_profile:
+  source_currency: event_bound|fixed
+  settlement_currency: same|specified
+  fx_required: boolean
+  fx_source_profile_ref: optional
+  fx_freshness_ref: optional
+  rounding_minor_units: explicit
+```
+
+FX conversion is a distinct evidenced step and should retain source/time/rate references.
+
+## Effective time
+
+```text
+schedule v1 [T0,T1)
+schedule v2 [T1,...)
+```
+
+Historical events resolve to the schedule version that governed their source transaction/obligation according to adopted policy.
+
+## Example public-safe schedule
+
+```yaml
+economic_schedule_id: ct.example.schedule.demo
+canonical_name: Example Demo Allocation
+version: 1.0.0
+status: active
+economic_authority_refs:
+  - agreement://example-v1
+basis:
+  basis_type: gross
+  currency: USD
+allocations:
+  - allocation_id: creator
+    recipient_ref: party://creator-demo
+    allocation_type: royalty
+    calculation_method: basis_points
+    basis_points: 7500
+    source_authority_ref: agreement://example-v1
+  - allocation_id: operator
+    recipient_ref: party://operator-demo
+    allocation_type: fee
+    calculation_method: basis_points
+    basis_points: 2500
+    source_authority_ref: agreement://example-v1
+rounding_profile:
+  arithmetic_domain: integer_minor_units
+  mode: largest_remainder
+  precision: currency_minor_unit
+remainder_profile:
+  method: largest_remainder
+effective_from: "2026-01-01T00:00:00Z"
+schema_version: ct.chlom.schema.schema-004/v1
+```
+
+This is structural demonstration only, not a CrownThrive royalty or fee schedule.
+
+## Allocation calculation result
+
+The schedule points to a separate calculation-result record:
+
+```yaml
+calculation_id: stable id
+schedule_ref: exact version
+source_event_refs: []
+basis_amount: typed
+allocation_results: []
+deductions_applied: []
+reserves_applied: []
+remainder: typed
+conservation_check: pass|fail
+calculated_at: timestamp
+algorithm_version_ref: required
+```
+
+`SCHEMA-007` can carry the governed calculation result.
+
+## Obligation relationship
+
+An allocation result can create obligations only when the source event, schedule and economic authority are valid/current for that event.
+
+```yaml
+obligation_ref:
+  obligation_id: stable id
+  recipient_ref: canonical
+  amount: typed
+  currency: explicit
+  basis_calculation_ref: required
+  source_right_or_agreement_ref: required
+  status: accrued|authorized|submitted|settled|reversed|held
+```
+
+## Provider execution aliases
+
+```yaml
+execution_destination:
+  recipient_ref: canonical institutional party
+  provider_ref: replaceable adapter
+  provider_account_alias: restricted
+  verified_at: timestamp
+```
+
+Changing provider destination must not change the underlying economic recipient.
+
+## Refunds/reversals/corrections
+
+Do not rewrite original settled records.
+
+```text
+original obligation/payment
+   -> refund/reversal/correction event
+   -> compensating obligation
+   -> reconciliation
+```
+
+## Validation rules
+
+1. stable schedule ID/version;
+2. source economic authority exists;
+3. subject scope explicit;
+4. basis definition complete;
+5. allocation methods type-valid;
+6. basis points within valid range when used;
+7. referenced formulas/schedules resolve;
+8. rounding/remainder behavior deterministic;
+9. effective period coherent;
+10. no secret provider credentials in public schema;
+11. conservation test defined;
+12. supersession lineage resolvable.
+
+## Failure modes
+
+- economic authority missing -> schedule cannot activate;
+- gross/net basis ambiguous -> HOLD;
+- recipients unresolved -> HOLD;
+- allocation exceeds authorized rights/schedule -> DENY;
+- rounding conservation fails -> calculation invalid;
+- FX source stale -> HOLD conversion-dependent result;
+- provider account missing -> obligation may remain valid but execution held;
+- schedule conflict for same exact scope/time -> HOLD/adjudicate.
+
+## DAIL events
+
+```text
+ct.economic.schedule.created.v1
+ct.economic.schedule.validated.v1
+ct.economic.schedule.approved.v1
+ct.economic.schedule.activated.v1
+ct.economic.schedule.superseded.v1
+ct.economic.allocation.calculated.v1
+ct.economic.conservation.failed.v1
+ct.economic.obligation.created.v1
+ct.economic.obligation.corrected.v1
+```
+
+## Threat model
+
+- hidden split insertion;
+- basis manipulation;
+- recipient substitution;
+- rounding exploitation;
+- unauthorized deduction;
+- stale FX;
+- provider destination takeover;
+- duplicate obligations;
+- retroactive schedule rewrite;
+- historical example percentages promoted to current terms.
+
+## Test vectors
+
+1. valid 10,000-bps schedule -> deterministic conserved allocation;
+2. bps total exceeds authorized distributable scope -> invalid;
+3. rounding remainder -> handled per profile;
+4. unresolved recipient -> HOLD;
+5. provider account changes -> canonical recipient unchanged;
+6. schedule v2 activates at T1 -> pre-T1 event still resolves to proper v1 semantics;
+7. refund -> compensating record, not deletion;
+8. FX source expired -> HOLD;
+9. duplicate source event -> idempotency prevents duplicate obligation;
+10. public example values -> never treated as adopted schedule.
+
+## Restricted companion
+
+Private custody may contain actual royalty/commission/fee schedules, contracts, prices, tax treatment, provider destinations, reserve targets, negotiated terms and sensitive counterparties.
+
+## Invariants
+
+```text
+rights != split percentage
+schedule != payment
+provider destination != recipient identity
+rounding must be deterministic
+conservation must be testable
+historical percentage != current schedule
+correction != erasure
+```
+
+## Status
+
+`reconstructed_source_grounded + canonical_machine_schema_contract`. Actual CrownThrive economic schedules remain versioned under their own authority and confidentiality.

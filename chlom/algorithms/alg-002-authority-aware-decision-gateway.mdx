@@ -1,0 +1,459 @@
+---
+title: "ALG-002 — Authority-Aware Decision Gateway"
+sidebarTitle: "ALG-002 Authority Gateway"
+description: "Standalone CHLOM algorithm specification separating policy recommendations from institutional authority, required approvals, freshness and execution permission."
+icon: "shield-check"
+keywords: ["CHLOM ALG-002", "authority gateway", "approvals", "AI authority", "decision execution"]
+---
+
+# ALG-002 — Authority-Aware Decision Gateway
+
+## Canonical record
+
+```yaml
+algorithm_id: ct.chlom.algorithm.alg-002
+canonical_name: Authority-Aware Decision Gateway
+artifact_class: decision_control_algorithm
+lineage:
+  - CHLOM Six Functions
+  - ACE / Compliance Pre-check architecture
+  - P-02 Governance & Compliance
+  - founder/reserved-authority doctrine
+  - human-agent hybrid authority controls
+status: public_safe_algorithm_contract
+implementation_state: implementation_specific_evidence_required
+restricted_companion: 04_Restricted_Algorithms_Formulas_Threat_Models_and_Trade_Secrets
+```
+
+## Purpose
+
+ALG-002 prevents a technically valid recommendation, model output, provider response or signed instruction from becoming an institutional action unless the actor and action are inside current authority.
+
+```text
+PROPOSED DECISION / ACTION
+          |
+          v
+  RESOLVE ACTOR / AGENT
+          |
+          v
+  RESOLVE ACTION CLASS
+          |
+          v
+ AUTHORITY + DELEGATION
+          |
+    POLICY / EVIDENCE
+          |
+    FRESHNESS / SCOPE
+          |
+          v
++---------+---------+
+|         |         |
+PASS     HOLD      DENY
+|         |         |
+EXEC     WAIT      STOP
+|                   
+READBACK + DAIL
+```
+
+The gateway is an **authority boundary**, not a generic risk score.
+
+## Core invariant
+
+```text
+capability != authority
+recommendation != authorization
+signature != institutional authority
+provider success != permission
+```
+
+A model, agent or operator may be capable of performing an action and still be unauthorized to do it.
+
+## Input envelope
+
+```yaml
+decision_request_id: stable id
+actor_ref: human|agent|service identity
+action_type: canonical semantic action
+subject_refs: affected objects
+requested_scope: tenant|organization|asset|license|economic|system
+side_effect_class: read|reversible_write|rights|economic|security|professional|irreversible
+requested_at: timestamp
+policy_context_ref: optional
+source_evidence_refs: list
+delegation_ref: optional
+approval_refs: list
+idempotency_key: required for material side effects
+```
+
+Raw provider endpoint/method names are not sufficient. The request must resolve to a **semantic action class**.
+
+## Authority sources
+
+Authority can originate from an adopted institutional source such as:
+
+- founder/reserved authority;
+- charter/governance profile;
+- role assignment;
+- bounded delegation;
+- contract/agreement;
+- policy/Compliance Pack;
+- professional/license requirement;
+- economic activation authority;
+- incident/emergency pre-delegation.
+
+The exact precedence and scope are versioned governance data, not hard-coded folklore.
+
+## Authority snapshot
+
+```yaml
+authority_snapshot_id: stable id
+actor_ref: required
+role_refs: list
+delegation_refs: list
+reserved_authority_refs: list
+applicable_scope: structured
+action_ceiling: structured
+valid_from: timestamp
+valid_until: optional
+source_authority_refs: list
+status: current|held|expired|revoked
+snapshot_at: timestamp
+```
+
+Historical execution receipts retain the exact authority snapshot or references needed for reconstruction.
+
+## Decision outcomes
+
+### PASS
+
+All mandatory authority, policy, evidence and freshness requirements are satisfied for the exact semantic action and target.
+
+### HOLD
+
+The system cannot safely resolve authority because required information is missing, stale, contradictory, awaiting approval or outside a deterministic automated lane.
+
+### DENY
+
+An authoritative rule establishes that the actor/action is not allowed.
+
+```text
+unknown != PASS
+unresolved != DENY automatically
+HOLD is a first-class safety state
+```
+
+## Authority resolution procedure
+
+```text
+resolve actor identity
+  -> resolve role memberships
+  -> resolve active delegation(s)
+  -> resolve reserved/constitutional authority
+  -> intersect with requested action/scope
+  -> remove expired/revoked/conflicted grants
+  -> evaluate required approval gates
+  -> evaluate policy/evidence freshness
+  -> return PASS/HOLD/DENY + reason classes
+```
+
+## Public-safe pseudocode
+
+```text
+function authority_gateway(request):
+    actor = identity.resolve(request.actor_ref)
+    if actor is unresolved:
+        return HOLD("ACTOR_UNRESOLVED")
+
+    action = classify_semantic_action(request)
+    if action is unresolved:
+        return HOLD("ACTION_CLASS_UNRESOLVED")
+
+    authority = resolve_current_authority(actor, action, request.requested_scope)
+    if authority is explicitly prohibited:
+        return DENY("AUTHORITY_PROHIBITED")
+    if authority is unresolved or stale:
+        return HOLD("AUTHORITY_UNRESOLVED")
+
+    approvals = resolve_required_approvals(action, authority, request)
+    if approvals.missing:
+        return HOLD("APPROVAL_PENDING")
+    if approvals.denied:
+        return DENY("APPROVAL_DENIED")
+
+    policy = evaluate_required_policy_and_evidence(request, action)
+    if policy == HOLD:
+        return HOLD("POLICY_OR_EVIDENCE_UNRESOLVED")
+    if policy == DENY:
+        return DENY("POLICY_PROHIBITION")
+
+    if not idempotency_safe(request):
+        return HOLD_OR_REUSE_PRIOR_RESULT()
+
+    return PASS(authority_snapshot, approval_snapshot, policy_snapshot)
+```
+
+## Authority intersection
+
+For a requested permission set `Q` and authorized permission set `A`:
+
+```text
+Q_allowed only if Q ⊆ A
+```
+
+For nested/scoped authority:
+
+```text
+requested_scope ⊆ delegated_scope ⊆ source_authority_scope
+```
+
+This is a conceptual invariant; concrete role/action schemas define the actual set dimensions.
+
+## Delegation
+
+A delegation must include:
+
+```yaml
+delegation_id: stable id
+principal_ref: grantor
+delegate_ref: grantee
+action_scope: exact
+object_scope: exact
+tenant_or_org_scope: exact
+valid_from: timestamp
+valid_until: optional
+conditions: structured
+revocation_ref: optional
+source_authority_ref: required
+status: active|held|expired|revoked
+```
+
+A delegate cannot subdelegate unless source authority explicitly permits it.
+
+## Agent authority
+
+Agents are identities with bounded tool/action profiles.
+
+```text
+agent can call tool
+   !=
+agent authorized for every tool action
+```
+
+The gateway evaluates the **requested side effect**, not merely whether the tool is connected.
+
+## AI/model boundary
+
+A model may recommend `approve`, `deny`, `pay`, `revoke`, `publish` or `escalate`. That output is an input to the gateway.
+
+```text
+AI recommendation
+      |
+      v
+AUTHORITY GATE
+      |
+required human/professional/reserved approval if applicable
+```
+
+Model confidence never substitutes for institutional authority.
+
+## Professional decisions
+
+Actions requiring a licensed professional, legal determination or other protected human authority remain HOLD until the required current professional authority is present.
+
+## Economic actions
+
+Money movement requires both economic authority and exact schedule/object validity.
+
+```text
+calculation PASS
+   !=
+economic authorization
+   !=
+provider execution
+   !=
+settlement
+```
+
+## Rights actions
+
+Issuance, transfer, sublicensing, revocation and entitlement changes require rights/DLA authority in addition to actor authorization.
+
+## Emergency authority
+
+Emergency authority must be pre-defined, bounded and time-limited. It should include:
+
+- triggering condition;
+- permitted action classes;
+- object/tenant scope;
+- minimum approvals;
+- expiration/sunset;
+- rollback/restoration path;
+- required post-action review.
+
+Emergency authority cannot silently become permanent authority.
+
+## Execution envelope
+
+A PASS result for a material action should generate:
+
+```yaml
+execution_authorization_id: stable id
+decision_request_ref: required
+action_type: exact
+subject_refs: exact
+authority_snapshot_ref: required
+approval_snapshot_refs: list
+policy_snapshot_refs: list
+valid_until: optional
+idempotency_key: required
+rollback_or_compensation_ref: when applicable
+issued_at: timestamp
+```
+
+The executor must reject semantically changed actions that attempt to reuse the old envelope.
+
+## Execution-time revalidation
+
+Queued/timelocked actions can become stale.
+
+```text
+PASS at T0
+    |
+role revoked / DLA changes / policy changes
+    v
+execution at T1
+    -> revalidate required current state
+```
+
+A prior PASS is not an eternal permission token.
+
+## Readback
+
+After execution:
+
+```text
+provider/API response
+      |
+      v
+read canonical/provider state
+      |
+match / mismatch / unknown
+      |
+      v
+DAIL receipt + reconciliation/remedy
+```
+
+The gateway must not mark an action complete from request acceptance alone.
+
+## Reason classes
+
+Public-safe reason classes can include:
+
+```text
+ACTOR_UNRESOLVED
+ACTION_CLASS_UNRESOLVED
+AUTHORITY_UNRESOLVED
+AUTHORITY_EXPIRED
+AUTHORITY_REVOKED
+SCOPE_EXCEEDED
+APPROVAL_PENDING
+APPROVAL_DENIED
+POLICY_UNRESOLVED
+EVIDENCE_STALE
+RIGHTS_CONFLICT
+PROFESSIONAL_GATE_REQUIRED
+ECONOMIC_GATE_REQUIRED
+IDEMPOTENCY_CONFLICT
+```
+
+Sensitive fraud/security reason internals stay restricted.
+
+## DAIL events
+
+```text
+ct.authority.requested.v1
+ct.authority.passed.v1
+ct.authority.held.v1
+ct.authority.denied.v1
+ct.authority.execution.authorized.v1
+ct.authority.execution.submitted.v1
+ct.authority.execution.readback.v1
+ct.authority.execution.mismatch.v1
+ct.authority.authorization.expired.v1
+```
+
+## Failure modes
+
+- identity service unavailable -> HOLD;
+- delegation missing -> HOLD/DENY according to authoritative state;
+- role expired -> DENY/HOLD, never silent PASS;
+- approval snapshot stale -> revalidate;
+- target object/version changed -> HOLD/re-authorize;
+- provider call succeeds but readback mismatches -> unresolved/remedy path;
+- duplicate idempotency key -> return prior semantic result or HOLD conflict;
+- authority sources conflict -> HOLD and adjudicate.
+
+## Threat model
+
+- privilege escalation;
+- forged delegation;
+- stale role cache;
+- self-approval;
+- authority laundering through an agent/service account;
+- semantic-action confusion;
+- replay of old authorization;
+- target substitution after approval;
+- provider-side bypass;
+- AI recommendation presented as final authority;
+- emergency-authority persistence.
+
+## Test vectors
+
+1. active role + valid delegation + required policy evidence -> PASS;
+2. connected tool but no action authority -> DENY/HOLD;
+3. expired delegation -> no PASS;
+4. approval pending -> HOLD;
+5. request changes target after approval -> authorization invalid;
+6. economic action with valid formula but no economic authority -> HOLD;
+7. AI recommends revoke but human/reserved gate required -> HOLD;
+8. provider returns success but readback fails -> unresolved, not complete;
+9. duplicate idempotency key for same semantic action -> reuse prior result;
+10. duplicate key with different semantic action -> conflict/HOLD.
+
+## Observability
+
+Track:
+
+- PASS/HOLD/DENY by action class;
+- HOLD age/reason class;
+- expired/revoked authority attempts;
+- approval latency;
+- authorization-to-execution latency;
+- readback mismatch rate;
+- agent/tool denied-action rate;
+- emergency authorization count and sunset compliance.
+
+## Restricted companion
+
+Private custody may contain exact role matrices, founder/reserved authority maps, emergency profiles, sensitive tool scopes, secret provider mappings, protected fraud/security gates and privileged decision evidence.
+
+## Invariants
+
+```text
+capability != authority
+role != delegation
+delegation cannot exceed source authority
+approval != execution
+execution != verified completion
+provider success != institutional truth
+AI recommendation != authority
+HOLD must not silently become PASS
+```
+
+## Versioning
+
+Material changes to action classes, authority precedence, delegation semantics or approval profiles create a new algorithm/version record. Historic decisions retain their exact version references.
+
+## Status
+
+`reconstructed_source_grounded + public_safe_algorithm_contract`. Protected authority matrices and implementation details remain Vault-bound.

@@ -1,0 +1,90 @@
+---
+title: "FORM-030 — Governed Calculation Record Schema"
+sidebarTitle: "FORM-030 Calculation Record"
+description: "Standalone CHLOM calculation-record contract binding formula version, inputs, evidence, units, rounding, authority context, review state and DAIL receipt."
+icon: "table"
+keywords: ["CHLOM FORM-030", "calculation schema", "formula version", "DAIL", "rounding"]
+---
+
+# FORM-030 — Governed Calculation Record Schema
+
+## Formula identity
+
+```yaml
+formula_id: FORM-030
+classification: quantitative_record_schema
+origin: CHLOM model governance and calculation lineage requirements
+adopted_as_documentation_contract: yes
+```
+
+FORM-030 is not an arithmetic equation. It is the minimum institutional record needed for a machine-significant CHLOM calculation to be reproducible, reviewable and governable.
+
+## Canonical schema
+
+```yaml
+calculation_id:
+formula_id:
+formula_version:
+inputs:
+input_evidence_refs:
+units:
+rounding_policy:
+result:
+result_unit:
+executed_by:
+calculated_at:
+policy_version:
+authority_context:
+review_state:
+DAIL_event_ref:
+```
+
+## Required semantics
+
+### calculation\_id
+
+Stable unique ID for this execution/result, not the formula definition itself.
+
+### formula\_id and formula\_version
+
+Bind the calculation to the exact mathematical contract used. Human-readable formula names are not sufficient for machine replay.
+
+### inputs and evidence
+
+Store normalized inputs plus evidence references showing where consequential values came from. Sensitive evidence can remain in protected custody with only a reference/digest in the calculation record.
+
+### units
+
+Every numeric input/result must have explicit units or a declared dimensionless type. Percent and basis points are distinct units.
+
+### rounding policy
+
+Economic and finite-precision calculations require deterministic rounding mode and precision.
+
+### executed\_by
+
+Identify the human, agent, service or job that performed the calculation. This is not the same as approval authority.
+
+### policy and authority context
+
+A calculation may be mathematically correct but not applicable to the decision. Bind the policy/economic schedule and authority context that makes the result institutionally meaningful.
+
+### review state
+
+Typical values may include `UNREVIEWED`, `MACHINE_VERIFIED`, `HUMAN_REVIEWED`, `APPROVED_FOR_USE`, `SUPERSEDED`, with exact meanings governed by schema/policy.
+
+## Immutability/correction
+
+If an input or formula was wrong, append a corrected calculation referencing the earlier one. Do not silently change the historical result.
+
+## Tests
+
+Reject missing formula version, unitless consequential inputs, unresolved evidence refs, unsupported rounding policy, duplicate calculation IDs and cross-tenant evidence leakage.
+
+## DAIL
+
+The calculation record either is a DAIL event/projection or is referenced from one. Its digest should be reproducible where classification permits.
+
+## Versioning
+
+Schema evolution follows backward-compatible or explicitly migrated versions; old calculation records remain readable.

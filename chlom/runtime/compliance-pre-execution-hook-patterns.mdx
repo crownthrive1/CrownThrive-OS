@@ -1,0 +1,158 @@
+---
+title: "Compliance Pre-Execution Hooks — Runtime Component Contract"
+sidebarTitle: "Pre-Execution Hooks"
+description: "Individual CHLOM runtime article for compliance pre-execution hook patterns that gate proposed state changes on rights, policy, evidence, authority, proof and currentness before a contract or runtime executes."
+icon: "shield-check"
+keywords: ["CHLOM compliance hook", "pre-execution", "runtime hook", "policy gate", "DLA", "authority"]
+---
+
+# Compliance Pre-Execution Hooks — Runtime Component Contract
+
+## Institutional identity
+
+```yaml
+component_id: CT-CHLOM-PREEXEC-001
+name: Compliance Pre-Execution Hooks
+source_status: recovered_named_component
+source_lineage: component atlas; Compliance Pre-check Pallet; ACE/Policy Engine; DLA; runtime research
+classification: source_grounded_current_runtime_pattern
+version: 1.0.0
+```
+
+## Purpose
+
+Compliance Pre-Execution Hooks are reusable guard points that evaluate a proposed runtime/contract/action **before** a consequential state transition is committed.
+
+They institutionalize the CHLOM rule that policy, rights and authority belong in the execution path rather than being a dashboard checked after the action has already occurred.
+
+## Core invariant
+
+```text
+proposed action
+ -> pre-execution controls
+ -> PASS candidate / HOLD / DENY
+ -> execute only if all required gates pass
+```
+
+A provider, contract or runtime must not execute first and ask CHLOM for forgiveness afterward when the action class requires pre-authorization.
+
+## Relationship to Compliance Pre-check Pallet
+
+The existing historical Compliance Pre-check Pallet captures runtime preflight lineage. This article isolates the **hook pattern** as a reusable component that can be implemented in cloud services, APIs, smart contracts, runtimes, transaction routers or bridge adapters.
+
+The hook is therefore an integration contract, not a duplicate pallet.
+
+## Hook invocation envelope
+
+```yaml
+hook_request_id:
+tenant_id:
+action_type:
+actor_ref:
+object_refs[]:
+object_versions[]:
+requested_scope:
+proposed_state_delta_ref:
+policy_context_ref:
+evidence_refs[]:
+authority_context_ref:
+proof_refs[]:
+economic_schedule_ref:
+reference_time:
+idempotency_ref:
+```
+
+The proposed state delta should be reviewable/hashable so approval cannot be reused for a materially different action.
+
+## Required control families
+
+Depending on action type, a pre-execution hook can evaluate:
+
+- identity/client authentication;
+- role/delegation and exact authority;
+- source rights and DLA validity;
+- licensee/recipient eligibility;
+- Compliance Pack stack;
+- deterministic hard rules;
+- risk/model output and uncertainty;
+- evidence freshness;
+- credential/proof usability;
+- sanctions or external source checks where applicable;
+- economic prerequisites;
+- timelock/effective window;
+- emergency/guardian state;
+- capacity/usage constraints;
+- replay/idempotency.
+
+Only action-applicable controls are invoked, but required controls cannot be silently omitted.
+
+## Hook result
+
+```yaml
+hook_result_id:
+disposition: PASS_CANDIDATE|HOLD|DENY
+control_results[]:
+policy_versions[]:
+evidence_snapshot_refs[]:
+authority_resolution_ref:
+reason_codes[]:
+valid_until:
+action_snapshot_digest:
+DAIL_or_audit_ref:
+```
+
+A `PASS_CANDIDATE` still requires the executing system to confirm the result applies to the exact pending state transition.
+
+## Cloud/API integration
+
+A service can call the hook before writing a database state transition or invoking an external provider. The service should include the returned result/version/digest in its execution receipt.
+
+## Smart-contract/runtime integration
+
+A native pallet or contract can implement equivalent guard logic directly, call a deterministic policy module, verify a signed/attested policy result, or use another approved pattern consistent with its trust model.
+
+Nondeterministic external API calls generally require off-chain/oracle evidence rather than direct deterministic runtime execution.
+
+## Bridge/remote action integration
+
+Remote claims/messages are first normalized. The pre-execution hook evaluates local rights/policy/authority before a bridged message can create a local entitlement, settlement or state change.
+
+## Economic integration
+
+A payment or settlement action can require current entitlement/obligation/schedule and approval state before routing funds. Provider availability does not bypass a failed hook.
+
+## Time-of-check / time-of-use
+
+Hooks must account for state changes between approval and execution. For delayed/timelocked or high-consequence actions, re-run/revalidate critical controls immediately before side effect.
+
+```text
+old PASS + changed material state = re-evaluate
+```
+
+## Fail-closed behavior
+
+A required evaluator outage, stale mandatory evidence, unresolved rights conflict, unknown authority or unsupported policy version returns HOLD/DENY according to the governing policy. The hook cannot default to PASS because a dependency is inconveniently unavailable.
+
+## Performance
+
+Pre-execution controls should define latency/SLA budgets and caching/currentness rules. Caching is allowed only when the evidence/policy contract permits reuse. A stale cache must never masquerade as a current authorization.
+
+## Privacy
+
+The hook consumes evidence refs/safe derived inputs rather than requiring raw protected evidence in every execution service. Results expose only reason codes and fields appropriate to the caller/audience.
+
+## Observability
+
+Track hook latency, disposition, invoked controls, stale/failed dependencies, action type, policy/model versions and downstream execution correlation. High-volume diagnostics can remain operational; consequential decisions remain attributable through DAIL/audit evidence.
+
+## Tests
+
+Test valid action, missing authority, rights overscope, stale credential, proof retired, policy hard DENY, dependency outage, cached result past TTL, object version changes after PASS, timelocked revalidation, emergency HOLD and duplicate execution attempt.
+
+## Current status
+
+The pre-execution-hook pattern is a current reusable engineering contract grounded in historical CHLOM runtime research. Specific code integrations require implementation and release evidence.
+
+## Versioning
+
+Hook schema, action contracts, policy packs and runtime integrations are independently versioned. Every consequential execution records the hook/result version used.

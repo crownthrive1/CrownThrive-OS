@@ -1,0 +1,122 @@
+---
+title: "ALG-007 — LEX Transaction State Machine"
+sidebarTitle: "ALG-007 LEX Transaction"
+description: "Standalone CHLOM state-machine specification for governed LEX transactions from candidate rights checks through agreement, payment evidence, entitlement and reconciliation."
+icon: "timeline"
+keywords: ["CHLOM ALG-007", "LEX transaction", "state machine", "payment evidence", "settlement reconciliation"]
+---
+
+# ALG-007 — LEX Transaction State Machine
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-007
+name: LEX Transaction State Machine
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: CHLOM LEX historical concept; modern rights-before-commerce mapping
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-007 defines the lifecycle of a CHLOM LEX transaction. It prevents a purchase button, provider payment event, or license-transfer request from skipping the rights, eligibility, agreement, entitlement and reconciliation stages that make the exchange governed.
+
+## Canonical state progression
+
+```text
+CANDIDATE
+   |
+   v
+RIGHTS_CHECK
+   |
+   +--> DENY
+   |
+   v
+ELIGIBILITY
+   |
+   +--> HOLD
+   |
+   v
+AGREEMENT_ACCEPTED
+   |
+   v
+PAYMENT_PENDING
+   |
+   v
+PAYMENT_EVIDENCE
+   |
+   v
+ENTITLEMENT_CHECK
+   |
+   +--> HOLD / REFUND PATH
+   |
+   v
+FULFILLED
+   |
+   v
+SETTLEMENT_RECONCILED
+```
+
+## State meanings
+
+**CANDIDATE** is a transaction request with no commercial or rights effect. **RIGHTS\_CHECK** resolves whether the seller/licensor controls the offered scope. **ELIGIBILITY** verifies buyer/licensee conditions. **AGREEMENT\_ACCEPTED** records acceptance of the exact versioned terms. **PAYMENT\_PENDING** means a payment obligation exists but no canonical payment evidence is yet reconciled. **PAYMENT\_EVIDENCE** means an external or internal rail reported an event. **ENTITLEMENT\_CHECK** verifies that payment plus rights plus policy still permit fulfillment. **FULFILLED** records delivery/permission activation. **SETTLEMENT\_RECONCILED** confirms economic records match provider execution and obligations.
+
+## Transition rules
+
+Transitions require explicit guards. No provider webhook may jump directly from `CANDIDATE` to `FULFILLED`. A payment success event is evidence, not rights truth.
+
+```text
+payment == evidence of provider execution
+payment != license authority
+```
+
+A rights revocation between agreement and fulfillment must stop the transaction or route it through governed compensation/refund logic.
+
+## Required transaction object
+
+```yaml
+transaction_id:
+listing_id:
+asset_id:
+dla_id:
+rights_snapshot_ref:
+buyer_id:
+seller_id:
+agreement_version:
+economic_schedule_version:
+policy_versions[]:
+state:
+state_version:
+provider_aliases[]:
+idempotency_key:
+DAIL_refs[]:
+```
+
+## HOLD behavior
+
+A HOLD preserves the transaction and the reason for non-progression. It may require refreshed evidence, human review, additional approval, payment reconciliation, corrected identity, or a refund/compensation path. HOLD is not failure by default and is not silently converted to PASS after a timeout.
+
+## DENY behavior
+
+DENY terminates the requested transaction version when a hard rule or rights condition prohibits it. A materially changed request should receive a new transaction/request version rather than mutate the denied snapshot into a different transaction.
+
+## Fulfillment and entitlement
+
+Fulfillment should occur only after entitlement conditions are satisfied. The system must create an entitlement or DLA lifecycle record that can be independently read back. Delivery of a file or provider-side access does not by itself prove that the canonical entitlement was created.
+
+## Reconciliation
+
+Settlement reconciliation compares expected obligations with actual rail/provider evidence. Mismatch, duplicate events, reversals, refunds, disputes and rounding variance must be typed states, not hidden by overwriting the expected amount.
+
+## DAIL evidence
+
+Every consequential transition should be append-only with actor/service identity, prior state, new state, trigger event, evidence refs, rule versions and idempotency reference.
+
+## Tests
+
+Test the happy path plus denied rights, held eligibility, agreement version drift, payment duplicate, payment success after rights revocation, entitlement creation failure, provider reversal, refund, duplicate fulfillment request and reconciliation mismatch.
+
+## Versioning
+
+State names, legal meanings, guard conditions and compensation behavior are part of the algorithm contract. A change requires a new version and state-migration plan.

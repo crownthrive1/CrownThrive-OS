@@ -1,0 +1,475 @@
+---
+title: "FORM-034 — Governed Calculation Composition"
+sidebarTitle: "FORM-034 Governed Calculation"
+description: "Standalone CHLOM composition rule defining the evidence, version, unit, authority, result, review and DAIL elements required before a formula becomes an institutional calculation."
+icon: "function"
+keywords: ["CHLOM FORM-034", "governed calculation", "formula evidence", "authority", "DAIL"]
+---
+
+# FORM-034 — Governed Calculation Composition
+
+## Formula identity
+
+```yaml
+formula_id: FORM-034
+asset_id: ct.chlom.formula.form-034
+canonical_name: Governed Calculation Composition
+classification: institutional_composition_invariant
+origin:
+  - CHLOM mathematical-model governance
+  - DAIL evidence/reproducibility architecture
+  - economic/risk/SLA calculation requirements
+adopted_as_documentation_contract: true
+formula_version: 1.0
+```
+
+## Purpose
+
+FORM-034 defines the minimum composition required before a numerical/model output can be treated as a **governed institutional calculation** rather than a draft, simulation or unexplained number.
+
+```text
+FORMULA
+ + INPUT EVIDENCE
+ + VERSION
+ + UNITS / BASIS
+ + AUTHORITY
+ + ROUNDING / PARAMETERS
+ + RESULT
+ + REVIEW STATE
+ + DAIL / LINEAGE RECEIPT
+ = GOVERNED CALCULATION
+```
+
+This is a governance composition invariant, not ordinary arithmetic.
+
+## Why it exists
+
+A number can be mathematically correct and still be institutionally unusable because:
+
+- the input source is stale or unverified;
+- the wrong formula version was used;
+- units were mixed;
+- a historical rate was treated as current;
+- the actor lacked authority;
+- the calculation was only a simulation;
+- rounding was undefined;
+- a required professional/human review never occurred;
+- the result cannot be reproduced.
+
+FORM-034 forces those dependencies into the calculation record.
+
+## Composition terms
+
+Let a governed calculation record be represented conceptually as:
+
+```text
+G = C(F, E, V, U, A, P, R, H, L)
+```
+
+where:
+
+```text
+F = formula/model identity
+E = input evidence set
+V = formula/input/policy/schedule versions
+U = units and calculation basis
+A = authority context
+P = parameters/rounding/precision
+R = calculated result
+H = human/professional/review state where required
+L = lineage/DAIL receipt
+```
+
+The expression does not imply numeric addition; it describes required composition.
+
+## Governed calculation predicate
+
+```text
+Governed(G) =
+    formula_resolved(F)
+AND evidence_sufficient(E)
+AND versions_resolved(V)
+AND units_valid(U)
+AND authority_valid(A)
+AND parameters_defined(P)
+AND result_reproducible(R)
+AND review_satisfied(H)
+AND lineage_recorded(L)
+```
+
+If a mandatory predicate is unresolved:
+
+```text
+result_state = HOLD / draft / simulation
+```
+
+rather than a falsely governed result.
+
+## Formula reference
+
+```yaml
+formula_ref:
+  formula_id: stable CHLOM formula/model id
+  formula_version: exact
+  classification: historical_source|derived_model|adopted_rule|production_formula
+  implementation_ref: optional
+```
+
+A formula title alone is insufficient; exact semantics/version matter.
+
+## Input evidence
+
+```yaml
+input:
+  input_id: stable within calculation
+  name: canonical variable/input
+  value: typed
+  unit: explicit
+  evidence_ref: source/provider/ledger/document reference
+  observed_at: optional
+  freshness_profile_ref: optional
+  classification: public|internal|restricted
+```
+
+Derived inputs should reference the calculation that produced them rather than appearing as unexplained constants.
+
+## Version set
+
+A governed calculation can depend on several versions at once:
+
+```yaml
+versions:
+  formula_version: exact
+  policy_pack_versions: []
+  economic_schedule_versions: []
+  model_versions: []
+  source_schema_versions: []
+  config_parameter_versions: []
+  fx_or_oracle_source_versions: []
+```
+
+Historical reconstruction must preserve the exact version set that produced the result.
+
+## Units and basis
+
+Units must be explicit and dimensionally compatible.
+
+Examples:
+
+```text
+USD cents != USD dollars
+seconds != milliseconds
+basis points != percent
+ratio != percentage display
+GB != GiB
+```
+
+For economic calculations, the basis must also be defined:
+
+```text
+gross receipt
+net distributable
+royalty basis
+eligible reserve
+```
+
+A unit-correct calculation can still be wrong if the basis is wrong.
+
+## Authority context
+
+The authority field answers **why this calculation is permitted to control or support an institutional outcome**.
+
+```yaml
+authority:
+  source_authority_refs: []
+  actor_or_service_ref: required
+  role_or_delegation_refs: []
+  decision_scope: calculation_only|advisory|obligation_candidate|other
+  valid_at: timestamp
+```
+
+Important distinction:
+
+```text
+calculation authority != execution authority
+```
+
+A system may be authorized to calculate a royalty or tax estimate while not being authorized to move money or file/remit anything.
+
+## Parameters and rounding
+
+```yaml
+parameters:
+  named_values: []
+  parameter_version_refs: []
+  arithmetic_domain: integer|decimal|rational|other
+  precision: explicit
+  rounding_mode: explicit
+  remainder_rule_ref: optional
+```
+
+Protected thresholds can be referenced through restricted parameter IDs rather than disclosed publicly.
+
+## Result object
+
+```yaml
+calculation_result_id: stable id
+calculation_type: typed
+formula_ref: exact
+inputs: []
+versions: structured
+units_and_basis: structured
+authority_ref: required
+parameters: structured
+result:
+  value: typed
+  unit: explicit
+  confidence_or_uncertainty: optional and defined
+  disposition: draft|simulation|candidate|reviewed|governed|held|superseded
+calculated_by: actor/service/version
+calculated_at: timestamp
+review_state: structured
+DAIL_receipt_ref: optional|required by workflow
+supersedes: optional
+```
+
+## Review state
+
+```yaml
+review_state:
+  required: boolean
+  review_type: human|professional|governance|technical|none
+  reviewer_refs: []
+  completed_at: optional
+  result: pending|accepted|held|rejected|corrected
+```
+
+A mandatory review cannot be inferred from the existence of an automated result.
+
+## DAIL/lineage receipt
+
+A material governed calculation should be reconstructable through its event lineage.
+
+```text
+input evidence
+  -> calculation request
+  -> formula/version resolution
+  -> result
+  -> review/approval if required
+  -> correction/supersession if later changed
+```
+
+DAIL need not expose restricted input values publicly; it can store safe references/digests.
+
+## Simulation versus governed result
+
+```text
+same formula + hypothetical inputs
+   -> simulation
+
+same formula + verified inputs + authority + required review + lineage
+   -> governed calculation
+```
+
+Simulation outputs must be labeled as such so test vectors and scenario modeling never become live financial/compliance facts.
+
+## Worked example — economic allocation candidate
+
+Suppose an adopted schedule uses FORM-012 and a verified distributable basis of `$100.00`.
+
+A calculation can be mathematically performed immediately, but FORM-034 asks:
+
+```text
+Was $100.00 sourced from reconciled evidence?
+Which FORM-012 version?
+Which schedule version?
+Are amounts dollars or cents?
+What rounding profile?
+Who/what is authorized to calculate?
+Is review required?
+Was a DAIL receipt created?
+```
+
+Until mandatory elements are satisfied, the output remains a candidate/simulation rather than an institutionally governed obligation.
+
+## Worked example — SLA calculation
+
+FORM-020 can produce `99.9%` from a time window and downtime inputs. FORM-034 requires the exact measurement profile, source telemetry, period, units, exclusions, formula version and review/certification state before using the number in an institutional SLA report.
+
+## Worked example — risk score
+
+A risk model can produce `0.72`. FORM-034 requires model/version, features/evidence, normalization, units/range, current model approval and decision authority. The score remains an intelligence artifact; it does not itself establish a violation.
+
+## Derived calculation chains
+
+A calculation may consume earlier governed calculations:
+
+```text
+CALC-A -> derived input -> CALC-B -> derived input -> CALC-C
+```
+
+Each dependency must preserve references and versions so CALC-C can be reproduced and corrected if CALC-A changes.
+
+## Correction propagation
+
+If an input/evidence source is corrected:
+
+```text
+input E1 corrected
+   -> identify dependent calculations
+   -> recalculate where required
+   -> issue CALC v2
+   -> supersede/correct downstream obligations or decisions
+```
+
+Do not mutate historic result bytes to make the original computation appear different.
+
+## Determinism
+
+For deterministic formulas, identical governed inputs/versions/parameters should reproduce identical results.
+
+```text
+same F,E,V,U,A,P
+   -> same R
+```
+
+If a model is stochastic, the record must capture enough execution context—such as model version, seed if applicable, provider snapshot or probability output semantics—to satisfy its reproducibility policy.
+
+## Idempotency
+
+A material calculation triggered by a business event should have a stable semantic identity to prevent duplicate obligation creation.
+
+```yaml
+calculation_request_key:
+  business_event_ref: stable
+  formula_or_schedule_version: exact
+  calculation_purpose: exact
+```
+
+Repeated requests can return the prior governed result unless source/version semantics changed.
+
+## Confidence/uncertainty
+
+Confidence values are themselves defined metrics. Never attach an unexplained `confidence: 0.9` to a calculation.
+
+The record must state what confidence means, how it was produced and whether it affects disposition.
+
+## Public/private boundary
+
+A public governed result can disclose:
+
+- formula ID/version;
+- safe basis definition;
+- result;
+- public evidence/authority references;
+- status/time.
+
+Restricted custody may retain:
+
+- private input values;
+- contracts;
+- protected thresholds;
+- tax/financial records;
+- model features/weights;
+- raw provider payloads;
+- trade-secret algorithms.
+
+## Validation rules
+
+A governed calculation should fail completeness validation when:
+
+1. formula/version missing;
+2. required evidence absent;
+3. units/basis unresolved;
+4. source authority missing;
+5. required parameters/rounding missing;
+6. result type/unit invalid;
+7. mandatory review incomplete;
+8. lineage/receipt required but absent;
+9. referenced versions cannot be reproduced;
+10. confidentiality policy is violated.
+
+## DAIL events
+
+```text
+ct.calculation.requested.v1
+ct.calculation.completed.v1
+ct.calculation.held.v1
+ct.calculation.reviewed.v1
+ct.calculation.governed.v1
+ct.calculation.rejected.v1
+ct.calculation.corrected.v1
+ct.calculation.superseded.v1
+ct.calculation.dependency.invalidated.v1
+```
+
+## Failure modes
+
+- stale evidence -> HOLD;
+- missing formula version -> invalid;
+- unit mismatch -> invalid/HOLD;
+- unauthorized actor/service -> calculation may be technically possible but not governed;
+- rounding undefined -> incomplete;
+- review missing -> pending/HOLD;
+- DAIL append fails where mandatory -> result not fully governed;
+- dependency corrected -> dependent result requires review/recalculation;
+- implementation result differs from reference formula -> test/reconciliation failure.
+
+## Threat model
+
+- hidden historical parameter activation;
+- unit/basis substitution;
+- stale evidence;
+- unauthorized formula version;
+- reviewer bypass;
+- rounding manipulation;
+- model confidence laundering;
+- result mutation after publication;
+- public leakage of protected inputs;
+- calculation result used as execution authority.
+
+## Test vectors
+
+1. complete formula/evidence/version/unit/authority/review/DAIL -> governed;
+2. formula + hypothetical input only -> simulation;
+3. correct math + stale evidence -> HOLD;
+4. dollars supplied to cents input -> unit failure;
+5. historical royalty rate without current schedule authority -> not governed current result;
+6. mandatory professional review pending -> HOLD;
+7. DAIL append required but failed -> incomplete governed lifecycle;
+8. corrected evidence -> new result/supersession;
+9. repeated identical business request -> prior idempotent calculation reused;
+10. public projection excludes restricted evidence while preserving safe references.
+
+## Observability
+
+Track:
+
+- governed vs simulation calculation counts;
+- missing-evidence/unit/version defects;
+- correction/recalculation rate;
+- review latency;
+- deterministic reproduction failures;
+- implementation/reference mismatches;
+- DAIL append failures;
+- public/private boundary incidents.
+
+## Invariants
+
+```text
+formula != governed calculation
+governed calculation != execution authority
+mathematical correctness != source correctness
+confidence != authority
+simulation != institutional fact
+correction != erasure
+units/basis/version must remain reproducible
+```
+
+## Versioning
+
+Changing mandatory composition fields or the definition of `Governed(G)` creates a new FORM-034 version. Individual formulas/schedules/models maintain their own versions independently.
+
+## Status
+
+`institutional_composition_invariant + adopted_documentation_contract`. It governs documentation/record completeness; production enforcement requires implementation evidence.

@@ -1,0 +1,323 @@
+---
+title: "Compliance-as-a-Service — CaaS Service Record"
+sidebarTitle: "Compliance-as-a-Service"
+description: "Standalone CHLOM CaaS article defining provider-neutral compliance-policy evaluation, evidence intake, decision receipts, case/escalation and API/MCP service boundaries without confusing compliance automation with legal authority."
+icon: "shield-check"
+keywords: ["CaaS", "Compliance as a Service", "CHLOM compliance", "ACE", "policy engine", "API", "MCP"]
+---
+
+# Compliance-as-a-Service — CaaS Service Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.service.caas
+canonical_name: Compliance-as-a-Service
+canonical_short_name: CaaS
+artifact_class: compliance_policy_evaluation_service
+source_status: recovered_CHLOM_service_lineage
+current_mapping:
+  - P-02 Governance & Compliance
+  - Compliance Pack Registry
+  - Policy Engine / DSL Compiler
+  - ACE
+  - evidence/oracle services
+  - cases/remedies
+  - DAIL
+provider_neutral: true
+production_state: service_capability_specific_evidence_required
+```
+
+## Purpose
+
+CaaS exposes CHLOM's compliance/policy capabilities as a reusable service for CrownThrive platforms or external integrations.
+
+```text
+PLATFORM / WORKFLOW / API CLIENT
+              |
+              v
+          CaaS REQUEST
+              |
+ +------------+-------------+
+ |                          |
+context/evidence         policy scope
+ |                          |
+ +------------+-------------+
+              |
+        ACE / Policy Engine
+              |
+        PASS / HOLD / DENY
+              |
+      receipt / case / DAIL
+```
+
+## What CaaS is not
+
+CaaS does not:
+
+- make CHLOM a government regulator;
+- provide universal legal advice;
+- certify every jurisdiction automatically;
+- let AI replace required professionals;
+- convert a provider KYC/sanctions result into final institutional truth;
+- guarantee a transaction is legally compliant merely because a policy engine returns PASS;
+- grant authority to change policy through an API call.
+
+## Service request
+
+```yaml
+caas_request_id: stable id
+client_or_partner_ref: registered integration
+requester_ref: human|agent|service identity
+purpose: explicit
+action_type: canonical semantic action
+subject_refs: []
+tenant_or_org_scope: explicit
+jurisdiction_context_refs: []
+policy_profile_refs: []
+evidence_refs: []
+requested_at: timestamp
+idempotency_key: optional|required for side-effecting workflow
+```
+
+## Decision result
+
+```yaml
+caas_result_id: stable id
+request_ref: required
+result: PASS|HOLD|DENY
+applicable_policy_pack_versions: []
+evidence_snapshot_refs: []
+authority_snapshot_refs: []
+reason_codes: public-safe normalized classes
+restricted_reason_refs: []
+issued_at: timestamp
+valid_until: optional
+ACE_or_engine_version: exact
+DAIL_receipt_ref: optional|required by profile
+```
+
+## Three-valued logic
+
+```text
+PASS = mandatory evaluated controls satisfied
+HOLD = required state/evidence/authority unresolved, stale or contradictory
+DENY = authoritative prohibition/failure established
+```
+
+CaaS must not convert dependency outages or uncertainty into PASS.
+
+## Policy resolution
+
+The service resolves applicable Compliance Packs/rules from:
+
+- action type;
+- asset/object class;
+- jurisdiction;
+- tenant/organization;
+- role/credential class;
+- provider/sector context;
+- effective time.
+
+Policy stacking and precedence remain versioned and auditable.
+
+## Evidence intake
+
+CaaS can consume:
+
+- identity/credential evidence;
+- DLA/rights state;
+- Oracle Hub observations;
+- sanctions/risk results;
+- attestations;
+- ZK proof results;
+- provider readback;
+- professional review;
+- source documents.
+
+Evidence type and freshness are policy-defined.
+
+## Source authority
+
+A machine-readable rule must still point to an adopted source.
+
+```text
+configuration value != policy authority
+model output != rule authority
+```
+
+CaaS evaluates policy; it does not invent it.
+
+## Human/professional gate
+
+Some actions can be fully machine-evaluated. Others require human or licensed/professional review.
+
+```text
+machine pre-check PASS
+  + professional review required
+  -> HOLD until professional decision
+```
+
+The service should make this boundary explicit.
+
+## Case/escalation relationship
+
+A HOLD or contested DENY can create/attach to a case when policy requires investigation, appeal, evidence review or remedy.
+
+```text
+CaaS decision
+  -> case candidate
+  -> evidence/reviewer workflow
+  -> new/corrected decision
+```
+
+CaaS does not silently mutate the original result.
+
+## API surface
+
+Possible operations:
+
+```text
+POST evaluate action/context
+GET result/receipt
+GET applicable policy versions
+POST evidence reference
+POST human-review result (authorized)
+GET currentness/expiry
+POST re-evaluate
+GET safe reason/explanation
+```
+
+Administrative policy changes belong to separate governance-authorized APIs.
+
+## MCP surface
+
+An MCP/agent tool can expose bounded operations such as:
+
+- check whether a proposed action can proceed;
+- retrieve required evidence list;
+- explain HOLD reason class;
+- request a recheck after evidence update;
+- open a governed review case.
+
+Tool access itself does not confer action authority.
+
+## Privacy
+
+CaaS should receive the minimum data required for the predicate. Where possible use:
+
+- safe evidence refs;
+- selective disclosure;
+- ZK proof;
+- pseudonymous subject bindings;
+- redacted provider data.
+
+Public results should not expose private compliance evidence.
+
+## Idempotency and currentness
+
+Evaluation requests can be idempotent for the same semantic action/context snapshot. A prior PASS can expire when evidence, policy or authority changes.
+
+```text
+PASS at T0 != perpetual authorization
+```
+
+Execution-time revalidation can be required.
+
+## Provider integrations
+
+Provider APIs can supply evidence but remain replaceable adapters.
+
+```text
+provider result
+ -> normalize/reconcile
+ -> CaaS evidence
+```
+
+A provider's own `approved` state is not automatically CHLOM PASS.
+
+## Explainability
+
+A result should expose safe reason codes and policy references sufficient for review without revealing protected anti-abuse thresholds.
+
+```text
+public reason: EVIDENCE_STALE
+restricted reason: exact provider/rule details
+```
+
+## DAIL events
+
+```text
+ct.caas.requested.v1
+ct.caas.policy.resolved.v1
+ct.caas.evidence.collected.v1
+ct.caas.passed.v1
+ct.caas.held.v1
+ct.caas.denied.v1
+ct.caas.result.expired.v1
+ct.caas.recheck.completed.v1
+ct.caas.case.opened.v1
+ct.caas.result.corrected.v1
+```
+
+## Failure modes
+
+- no applicable policy/source authority -\> HOLD;
+- evidence missing/stale -\> HOLD;
+- explicit prohibition -\> DENY;
+- policy conflict -\> HOLD;
+- provider unavailable -\> HOLD/fallback according to policy;
+- professional review missing -\> HOLD;
+- request changes after PASS -\> old result invalid;
+- tenant/scope mismatch -\> reject;
+- result cache stale -\> re-evaluate.
+
+## Threat model
+
+- policy injection;
+- fail-open dependency handling;
+- data leakage;
+- partner privilege escalation;
+- stale PASS replay;
+- AI/model authority laundering;
+- provider result overclaim;
+- hidden rule change;
+- cross-tenant evidence leakage;
+- explanation leaking anti-fraud controls.
+
+## Test vectors
+
+1. valid current evidence \+ applicable policy satisfied -\> PASS;
+2. missing mandatory evidence -\> HOLD;
+3. explicit prohibited condition -\> DENY;
+4. provider outage -\> no automatic PASS;
+5. prior PASS after credential revocation -\> revalidation fails;
+6. agent calls CaaS but lacks action authority -\> CaaS result does not grant execution;
+7. policy conflict -\> HOLD;
+8. required professional review pending -\> HOLD;
+9. restricted evidence -\> safe result projection only;
+10. correction -\> new result with supersession lineage.
+
+## Restricted companion
+
+Private custody may contain proprietary compliance rules, anti-fraud thresholds, provider evidence, legal/professional interpretations, partner configs, raw identity/financial data and security tests.
+
+## Invariants
+
+```text
+CaaS = Compliance-as-a-Service
+CaaS result != legal advice/certification automatically
+PASS != provider execution
+provider result != institutional truth
+AI recommendation != compliance authority
+HOLD must not silently become PASS
+policy source/effective version must remain traceable
+```
+
+## Versioning
+
+CaaS API/result schemas, policy-engine versions and individual Compliance Packs are versioned independently. Historical service variants remain preserved.
+
+## Status
+
+`current_semantic_service_record`. Concrete production endpoints/integrations require specific deployment, security and readback evidence.

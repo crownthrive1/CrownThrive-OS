@@ -1,0 +1,268 @@
+---
+title: "Royalty Streaming Engine (RSE)"
+sidebarTitle: "Royalty Streaming Engine"
+description: "Standalone CHLOM engine article for event/time-driven royalty accrual, schedules, claimable balances, batching, provider execution, corrections and P-11 reconciliation, preserving historical streaming design without implying a live token payout rail."
+icon: "water"
+keywords: ["CHLOM Royalty Streaming Engine", "RSE", "royalty accrual", "streaming", "P-11", "settlement"]
+---
+
+# Royalty Streaming Engine (RSE)
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.royalty-streaming
+canonical_name: Royalty Streaming Engine
+canonical_acronym: RSE
+artifact_class: economic_engine
+recovered_titles:
+  - Royalty Streaming Engine (RSE) Whitepaper
+  - Royalty Streaming Pallet (RSP) lineage
+source_lineage:
+  - recovered Help Center paper/engine estate
+  - Royalty & Splits / ADE / Treasury architecture
+current_mapping:
+  - P-11 Capital, Revenue & Settlement
+status: historical_engine_with_current_semantic_mapping
+live_token_streaming: not_implied
+```
+
+## Purpose
+
+RSE models royalty obligations that accrue over **events or time** and converts them into claimable/payable obligations according to exact rights/agreement/schedule versions.
+
+```text
+QUALIFYING RIGHTS-BASED EVENT
+          |
+          v
+ROYALTY SCHEDULE VERSION
+          |
+          v
+RSE ACCRUAL
+          |
+          +--> beneficiary balances/obligations
+          +--> HOLD/dispute state
+          |
+          v
+BATCH / DISTRIBUTION AUTHORIZATION
+          |
+          v
+PROVIDER EXECUTION
+          |
+          v
+P-11 RECONCILIATION / SETTLEMENT
+```
+
+## Rights prerequisite
+
+```text
+royalty event requires valid rights/agreement basis
+```
+
+RSE cannot manufacture a beneficiary/right because a usage/payment event exists.
+
+## Stream definition
+
+```yaml
+stream_id: stable ID
+asset_or_license_ref: required
+agreement_ref: required
+schedule_ref: exact version
+beneficiary_rules_ref: required
+trigger_mode: event|time|hybrid
+start_at: timestamp
+end_at: nullable
+status: candidate|active|paused|held|completed|terminated
+```
+
+## Event-driven accrual
+
+```text
+accrual_total = Σ royalty(event_i, schedule_i)
+```
+
+Each event retains its qualifying evidence and schedule version.
+
+## Time-driven accrual
+
+A generic model:
+
+```text
+accrued(t) = ∫ rate(τ) dτ over authorized interval
+```
+
+The actual rate function/units are schedule-specific and not set here.
+
+## Accrual entry
+
+```yaml
+accrual_id: stable ID
+stream_ref: required
+trigger_event_ref: optional for time accrual
+period_ref: optional
+basis_amount_or_units: structured
+schedule_ref: exact version
+beneficiary_allocations_ref: required
+amount_minor: integer or obligations ref
+currency: defined
+status: accrued|held|corrected|reversed|settled
+```
+
+## Claimable versus payable
+
+```text
+accrued
+  -> eligible/claimable
+  -> authorized payable
+  -> provider executed
+  -> reconciled/settled
+```
+
+These are distinct states.
+
+## Micro-accrual batching
+
+Current payment providers may not support efficient real-time micro-transfers. RSE can ledger small accruals and batch settlement under an approved threshold/schedule.
+
+```text
+streaming accounting != continuous provider payment
+```
+
+Batch/minimum thresholds are restricted/current economic configuration.
+
+## Beneficiary changes
+
+If rights/agreements change:
+
+```text
+old events -> old effective beneficiary/schedule version
+new events -> new version
+```
+
+Do not retroactively redirect settled royalties unless a governed correction/remedy requires it.
+
+## Dispute/HOLD
+
+Rights, attribution or payment disputes can pause distribution while accrual treatment follows agreement/policy.
+
+```text
+stream ACTIVE
+  |
+dispute opens
+  |
+HOLD distribution / possibly accrual depending rule
+  |
+decision
+  |
+resume / correct / terminate
+```
+
+## Attribution relationship
+
+ADE can provide attribution evidence. RSE applies royalty schedule only after validating eligible rightsholder/beneficiary scope.
+
+## RSP / RSP-X relationship
+
+```text
+RSP  = Royalty Streaming Pallet
+RSP-X = Royalty & Splits Pallet
+RSE  = Royalty Streaming Engine
+```
+
+These historical artifacts are related but remain separately registered.
+
+## P-11 mapping
+
+RSE produces economic obligations/accruals; P-11 owns authorization, provider execution, reconciliation and final settlement semantics.
+
+## Corrections
+
+```text
+accrual A1
+  |
+new evidence/error
+  |
+correction C1
+  |
+A2 / reversal / offset
+```
+
+A1 remains in lineage.
+
+## API contract families
+
+- create/activate stream;
+- post qualifying event;
+- calculate accrual;
+- query claimable/payable state;
+- pause/resume/terminate;
+- create batch/distribution candidate;
+- post correction/reversal;
+- reconcile settlement.
+
+## Events
+
+```text
+ct.rse.stream.created.v1
+ct.rse.stream.activated.v1
+ct.rse.accrual.posted.v1
+ct.rse.stream.held.v1
+ct.rse.distribution.batch.created.v1
+ct.rse.distribution.authorized.v1
+ct.rse.correction.posted.v1
+ct.rse.stream.closed.v1
+```
+
+## Algorithms/IP
+
+Potential protected assets:
+
+- accrual aggregation;
+- minimum/batching optimization;
+- event deduplication;
+- beneficiary-resolution logic;
+- recoupment/waterfall logic where agreements authorize;
+- correction propagation.
+
+Public article does not disclose private rates or partner terms.
+
+## Failure modes
+
+### Duplicate usage event
+
+Idempotency prevents duplicate accrual.
+
+### Rights revoked after accrual but before payout
+
+Agreement/policy governs HOLD/correction; do not automatically pay or erase.
+
+### Provider minimum exceeds claimable amount
+
+Remain accrued/claimable or batch per schedule; do not call settled.
+
+### Currency/provider mismatch
+
+HOLD distribution until reconciled.
+
+### Historical rate discovered in old paper
+
+Record historical lineage only, not current schedule.
+
+## Restricted companion
+
+Contains current royalty schedules, beneficiary mappings, private agreements, batching thresholds, provider economics, protected algorithms and reconciliation exceptions.
+
+## Invariants
+
+```text
+accrual != payout
+payout != settlement
+streaming != live token stream
+attribution != royalty entitlement by itself
+historical rate != current schedule
+correction != deletion
+```
+
+## Status
+
+RSE remains a standalone CHLOM economic engine/IP asset mapped to current P-11 accrual, obligation and settlement services.

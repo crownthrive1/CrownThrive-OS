@@ -1,0 +1,367 @@
+---
+title: "Compliance Packs — Registry, Policy Engine and Rule Stacking"
+sidebarTitle: "Compliance Packs"
+description: "Comprehensive reconstruction of CHLOM Compliance Packs, registry/versioning, policy stacking, applicability, overrides, regulatory updates and current compliance-as-code mapping."
+icon: "layer-group"
+keywords: ["Compliance Pack", "policy registry", "compliance as code", "CHLOM rules", "policy engine", "rule stacking", "overrides"]
+---
+
+# Compliance Packs — Registry, Policy Engine and Rule Stacking
+
+The **Compliance Pack** is one of CHLOM's clearest historical mechanisms for turning legal, regulatory, contractual and institutional requirements into modular machine-evaluable policy. The Grand Prospectus describes Compliance Packs as versioned bundles of rules, checklists or smart-contract conditions that can be assigned to transactions, licenses, entities and industry workflows.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_source_grounded
+historical_name: Compliance Pack
+historical_storage: on-chain registry concept
+current_mapping: versioned_policy_bundle_and_compliance_as_code
+production_claim_from_history: false
+founder_adjudication: open_after_publication
+```
+
+## Source-grounded historical definition
+
+Historical CHLOM examples include conceptual packs for:
+
+- GDPR/data privacy;
+- intellectual-property licensing;
+- AML/KYC;
+- anti-fraud controls;
+- license transfers;
+- jurisdiction-specific legal requirements;
+- industry-specific standards such as cosmetology requirements.
+
+Each pack is described as having a unique ID, version, purpose, issuer/approver, version history and content-integrity reference. The historical design allows multiple packs to apply to the same transaction or license.
+
+## Current interpretation
+
+Current CHLOM can preserve the Compliance Pack idea without requiring the policy body to live on a blockchain. The durable institutional object is a **versioned policy bundle** whose source, authority, scope and effective period are explicit.
+
+```text
++-------------------------+
+| Legal / Regulatory      |
+| Contract / Institution  |
+| Standard / Founder Rule |
++------------+------------+
+             |
+             v
++------------+------------+
+| Policy Authoring /      |
+| Interpretation          |
++------------+------------+
+             |
+             v
++------------+------------+
+| Compliance Pack         |
+| stable ID + version     |
++------------+------------+
+             |
+             v
++------------+------------+
+| Policy Registry         |
+| effective periods      |
++------------+------------+
+             |
+             v
++------------+------------+
+| Applicability Resolver  |
++------------+------------+
+             |
+             v
++------------+------------+
+| Rule Evaluation         |
++------------+------------+
+             |
+       PASS / HOLD / DENY
+             |
+             v
++------------+------------+
+| DAIL Decision Receipt   |
++-------------------------+
+```
+
+## Canonical pack envelope
+
+A machine-readable Compliance Pack should be able to identify at least:
+
+```yaml
+pack_id: ct.policy.pack.example
+version: 1.0.0
+name: Example Policy Pack
+purpose: why_this_pack_exists
+issuer_authority: stable_authority_id
+source_authorities:
+  - source_reference
+jurisdictions:
+  - scope
+industries:
+  - scope
+subjects:
+  - actor_or_asset_classes
+effective_from: timestamp
+effective_until: null
+supersedes: null
+rules:
+  - rule_id
+  - condition
+  - effect
+  - severity
+  - evidence_requirements
+override_policy: explicit
+appeal_policy: explicit
+confidentiality: public_or_restricted
+status: draft_review_active_suspended_retired
+```
+
+Historical source schemas use simple condition/action constructs. Current implementation may use a richer rules DSL, JSON policy, SQL/RLS predicates, code-backed evaluators or other engines as long as the institutional meaning remains portable.
+
+## Rule stacking
+
+Historical CHLOM explicitly contemplates multiple packs applying at once.
+
+```text
+                    TRANSACTION / ACTION
+                           |
+              +------------+------------+
+              |                         |
+              v                         v
+      +---------------+         +---------------+
+      | IP License    |         | AML / KYC     |
+      | Pack          |         | Pack          |
+      +-------+-------+         +-------+-------+
+              |                         |
+              +------------+------------+
+                           |
+              +------------+------------+
+              |                         |
+              v                         v
+      +---------------+         +---------------+
+      | Jurisdiction  |         | Platform /    |
+      | Pack          |         | Contract Pack |
+      +-------+-------+         +-------+-------+
+              |                         |
+              +------------+------------+
+                           |
+                           v
+                   COMBINED DECISION
+```
+
+The safe default is conjunctive for hard requirements: if any applicable hard rule resolves DENY, the action cannot be promoted merely because other packs pass.
+
+## Applicability resolution
+
+Before rules are evaluated, CHLOM must decide which packs actually apply.
+
+Applicability may depend on:
+
+- actor/organization type;
+- asset/license class;
+- jurisdiction or territory;
+- transaction amount or economic class;
+- platform/corridor;
+- data classification;
+- professional/regulated activity;
+- contract version;
+- effective date;
+- risk tier;
+- participant credentials;
+- delivery or fulfillment context.
+
+```text
+input context
+    |
+    v
+pack candidates
+    |
+    v
+scope / effective-date filter
+    |
+    v
+required evidence resolved?
+    |
+ +--+------------------+
+ |                     |
+YES                   NO
+ |                     |
+ v                     v
+evaluate             HOLD
+```
+
+## Decision algebra
+
+A useful institutional decision model is:
+
+```text
+PASS = all mandatory conditions satisfied
+HOLD = required evidence/authority/dependency unresolved
+DENY = an applicable hard rule blocks the action
+```
+
+A model confidence score, provider success response or human preference cannot silently convert DENY into PASS.
+
+## Override architecture
+
+Historical sources describe packs that can define override conditions. Current CHLOM requires an override to be an explicit governed event, not a hidden exception.
+
+```text
+rule result = DENY or HOLD
+        |
+        v
+is override permitted by this pack?
+        |
+   +----+----+
+   |         |
+  NO        YES
+   |         |
+   v         v
+final      authority check
+DENY/HOLD    |
+             v
+      reason + scope + expiry
+             |
+             v
+      bounded override event
+             |
+             v
+            DAIL
+```
+
+An override cannot manufacture authority outside the pack's own override policy or the institution's reserved authority model.
+
+## Regulatory-change lifecycle
+
+The historical Oracle/Policy concept anticipates regulatory-feed oracles identifying possible rule changes. Current CHLOM should treat such feeds as **change evidence**, not automatic law rewriting.
+
+```text
+external change detected
+        |
+        v
+source authenticity / authority review
+        |
+        v
+policy delta drafted
+        |
+        v
+legal / specialist / institutional review
+        |
+        v
+new pack version approved
+        |
+        v
+future effective date
+        |
+        v
+old version remains historical
+```
+
+## Pack versioning and immutability
+
+A policy pack should never be silently edited after it has governed a consequential action. New meaning requires a new version/effective period.
+
+```text
+Pack v1.0 ---- active Jan 1 -> Mar 31
+     |
+     +---- decision receipts retain v1.0
+     |
+Pack v1.1 ---- active Apr 1 -> ...
+```
+
+This lets auditors reconstruct what rule was actually in force when an action occurred.
+
+## Evidence requirements
+
+Rules may require evidence such as a current credential, rights package, sanctions result, payment receipt, approved agreement, professional review, geographic fact or other observation.
+
+A Compliance Pack should distinguish:
+
+```text
+rule definition
+   != evidence source
+   != evidence freshness
+   != evidence quality
+   != institutional decision
+```
+
+## Policy conflict resolution
+
+Two applicable packs may conflict. CHLOM should not resolve contradictions by arbitrary load order.
+
+Potential resolution metadata includes:
+
+- authority rank;
+- jurisdiction specificity;
+- contractual precedence;
+- effective date;
+- explicit supersession;
+- more-restrictive hard floor;
+- founder/board/professional adjudication where reserved.
+
+Unresolved policy conflict resolves HOLD.
+
+## Compliance Pack versus Compliance Pack Registry
+
+```text
+Compliance Pack = one versioned bundle of rules
+Policy Registry  = institutional catalog of packs and versions
+Policy Engine    = evaluator
+Decision Gateway = authority-aware result handler
+DAIL             = evidence + decision lineage
+```
+
+These should remain distinct components.
+
+## Public/private boundary
+
+A public-safe pack may disclose purpose, scope and high-level requirements. Restricted policy logic, fraud thresholds, security detection rules, personal-data criteria or protected CrownThrive IP may be represented only by stable IDs/hashes in public documentation.
+
+## Current implementation mapping
+
+Historical Compliance Packs decompose into:
+
+- Policy Registry;
+- Rules/Policy Service;
+- Applicability Resolver;
+- Evidence Resolver;
+- Decision Gateway;
+- Approval/Override Service;
+- DAIL decision receipts;
+- source/authority registry;
+- test/evaluation suite;
+- future optional smart-contract/on-chain policy adapter.
+
+## Required tests
+
+A production-grade pack should have tests for:
+
+- positive/negative/hold paths;
+- boundary values;
+- missing evidence;
+- stale credentials;
+- jurisdiction conflicts;
+- pack stacking;
+- override denial and approval;
+- version-transition behavior;
+- rollback/correction;
+- confidentiality leakage;
+- provider failure.
+
+## Failure conditions
+
+Fail closed or HOLD when:
+
+- pack version cannot be resolved;
+- source authority is unknown;
+- current effective period is ambiguous;
+- required evidence is unavailable;
+- two hard policies conflict;
+- an override is requested without eligible authority;
+- a retired/superseded pack is presented as current;
+- the evaluator cannot prove which rules executed.
+
+## Founder adjudication
+
+`open_after_publication`
+
+The Founder may later adjudicate pack taxonomy, precedence, public naming, authority hierarchy or exact machine schema. Historical Compliance Pack architecture remains preserved, while current policy meaning changes prospectively through versioned records.

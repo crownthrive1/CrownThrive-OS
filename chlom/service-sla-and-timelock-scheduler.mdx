@@ -1,0 +1,230 @@
+---
+title: "CHLOM SLA & Timelock Scheduler"
+sidebarTitle: "SLA & Timelock Scheduler"
+description: "Standalone CHLOM service article for scheduled reviews/actions, grace periods, SLAs, timelocks, recurring compliance work, execution-time revalidation, idempotency and delayed-action evidence."
+icon: "clock"
+keywords: ["CHLOM SLA Scheduler", "Timelock Scheduler", "STSP", "scheduler", "SLA", "revalidation", "timelock"]
+---
+
+# CHLOM SLA & Timelock Scheduler
+
+## Canonical record
+
+```yaml
+service_id: ct.chlom.service.sla-timelock-scheduler
+canonical_name: SLA & Timelock Scheduler
+artifact_class: temporal_control_service
+source_lineage:
+  - historical Scheduler/Timelock Pallet
+  - SLA Metrics Pallet
+  - STSP Whitepaper title lineage
+  - current temporal-control architecture
+current_mapping:
+  - P-02 Governance & Compliance
+  - P-10 Operations & Institutional Memory
+status: current_semantic_service_specification
+```
+
+## Purpose
+
+The scheduler coordinates time-bounded CHLOM work: timelocked governance/enactment, review deadlines, evidence refresh, credential/license expiry, SLA measurement periods, recurring audits, provider checks and deferred side effects.
+
+```text
+SCHEDULED INTENT
+      |
+      v
+WAIT / CLOCK / RECURRENCE
+      |
+      v
+DUE
+      |
+REVALIDATE CURRENT POLICY + AUTHORITY + OBJECT STATE
+      |
+PASS | HOLD | DENY
+      |
+EXECUTE / RESCHEDULE / CANCEL
+      |
+READBACK / DAIL
+```
+
+## Core invariant
+
+```text
+scheduled != still eligible at execution time
+```
+
+The service never treats the fact that something was scheduled as proof that it may still execute.
+
+## Schedule object
+
+```yaml
+schedule_id: stable ID
+schedule_type: once|recurring|deadline|timelock|refresh
+subject_ref: object/workflow/action
+requested_action_ref: optional
+authority_ref: required for side-effect schedules
+rule_or_policy_refs: []
+start_at: timestamp
+next_due_at: timestamp
+recurrence_ref: optional
+expires_at: nullable
+status: pending|ready|held|executed|cancelled|expired|superseded
+```
+
+## Clock semantics
+
+Every schedule uses an explicit clock basis/timezone where local civil time matters. UTC timestamps can be canonical internally while preserving human-local schedule meaning.
+
+```text
+"daily at 9 AM Eastern"
+   !=
+"every 24 hours from last run"
+```
+
+## Timelock
+
+A timelock enforces minimum delay before an otherwise approved action may execute.
+
+```text
+approved at T0
+execution permitted no earlier than T0 + delay
+```
+
+Even after delay expires, revalidation still occurs.
+
+## Deadline/SLA
+
+A deadline can create an obligation/measurement point without automatically executing a remedy.
+
+```text
+due missed -> SLA/breach candidate -> evidence/review/remedy policy
+```
+
+## Recurring reviews
+
+Examples:
+
+- credential currentness;
+- provider certification/readback;
+- policy/source refresh;
+- documentation link checks;
+- evidence retention/review;
+- DLA expiration/renewal notices;
+- audit cycles;
+- security/key rotation reminders;
+- sanctions-cache refresh.
+
+## Execution-time revalidation
+
+For a side-effect schedule, resolve:
+
+```text
+actor/delegation current?
+object/version current?
+policy current?
+evidence fresh?
+no guardian/case HOLD?
+budget/economic authority current?
+not already executed?
+```
+
+## Idempotent job claim
+
+Concurrent workers must not cause duplicate execution.
+
+```text
+claim(schedule_run_id) atomically
+   |
+only one worker executes material side effect
+```
+
+## Missed runs
+
+The scheduler defines per-job catch-up behavior:
+
+```text
+SKIP
+RUN ONCE NOW
+RUN EACH MISSED OCCURRENCE
+HOLD FOR REVIEW
+```
+
+High-impact actions should not automatically replay many missed side effects unless the contract explicitly says so.
+
+## Recurrence versioning
+
+Changing recurrence creates a new schedule version/effective rule. Historical run times remain attributed to the previous version.
+
+## Cancellation
+
+Cancellation requires authority where the scheduled action is governance/economic/security material. Cancellation is recorded rather than deletion.
+
+## Provider jobs
+
+Some work executes through provider schedulers. CHLOM stores the institutional schedule and provider alias/readback.
+
+```text
+institutional schedule
+   |
+provider schedule alias
+   |
+provider run evidence
+   |
+reconciliation
+```
+
+## Events
+
+```text
+ct.schedule.created.v1
+ct.schedule.run.ready.v1
+ct.schedule.run.held.v1
+ct.schedule.run.executed.v1
+ct.schedule.run.missed.v1
+ct.schedule.cancelled.v1
+ct.timelock.started.v1
+ct.timelock.expired.v1
+ct.sla.deadline.missed.v1
+```
+
+## Failure modes
+
+### Worker down at due time
+
+Record missed/delayed run and apply job-specific catch-up policy; do not backdate execution.
+
+### Policy changed before due time
+
+Revalidate and HOLD/DENY as current policy requires.
+
+### Duplicate provider webhook after scheduled action
+
+Use execution/idempotency identity to avoid duplicate business effect.
+
+### Timezone rule changes
+
+Preserve original schedule semantics and recalculate future occurrence under versioned timezone rules as applicable.
+
+### Schedule owner/delegation revoked
+
+HOLD/cancel side-effect execution unless another current authority takes ownership.
+
+## Restricted companion
+
+Contains sensitive schedule timing, security rotations, treasury/action schedules, provider job IDs, retry/backoff thresholds and incident automation.
+
+## Invariants
+
+```text
+scheduled != authorized forever
+due != execute blindly
+timelock expired != PASS
+missed run != executed on time
+provider schedule != canonical schedule
+retry != duplicate side effect
+cancelled != deleted
+```
+
+## Status
+
+The SLA & Timelock Scheduler is a current CHLOM temporal-control specification and cloud-service mapping of the historical STSP/Scheduler lineage.

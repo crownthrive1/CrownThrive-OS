@@ -1,0 +1,284 @@
+---
+title: "RBAC / Permissions Pallet — Historical Runtime Record"
+sidebarTitle: "RBAC / Permissions Pallet"
+description: "Individual source-grounded reconstruction of CHLOM's historical RBAC/Permissions Pallet, its role/capability boundaries, runtime authorization model, current P-01/P-02 mapping and fail-closed semantics."
+icon: "user-shield"
+keywords: ["CHLOM RBAC", "Permissions Pallet", "runtime pallet", "roles", "capabilities", "authorization"]
+---
+
+# RBAC / Permissions Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.rbac-permissions
+namespace: historical_runtime_pallet
+recovered_title: RBAC/Permissions Pallet
+recovered_help_center_description: role-based permissions and capability scoping for sensitive extrinsics and module boundaries
+source_recovery: substantive_title_and_architecture_lineage
+current_mapping:
+  - P-01 Identity & Access
+  - P-02 Governance & Compliance
+current_runtime_deployment: not_established_by_source_recovery
+```
+
+## Historical purpose
+
+The RBAC/Permissions Pallet was designed as a runtime authorization primitive: sensitive protocol calls would not rely solely on possession of an account/key but would require an appropriate role/capability at the relevant module boundary.
+
+```text
+CALLER
+  |
+  v
+IDENTITY / ACCOUNT
+  |
+  v
+ROLE MEMBERSHIP
+  |
+  v
+CAPABILITY SCOPE
+  |
+  v
+PALLET / EXTRINSIC BOUNDARY
+  |
+ALLOW | REJECT
+```
+
+## Core historical concepts
+
+The source inventory supports these concepts:
+
+- role-based access;
+- capability scoping;
+- sensitive operation boundaries;
+- runtime/pallet authorization;
+- relationship to issuer, validator, council and other privileged roles.
+
+Exact Rust storage names/extrinsic signatures are not recovered in the title inventory and are therefore not invented here.
+
+## Reconstructed state model
+
+```yaml
+role:
+  role_id: stable historical/current mapping ID
+  capabilities: []
+  scope: global|module|object|tenant
+  status: active|suspended|retired
+
+assignment:
+  subject_ref: identity/account
+  role_ref: required
+  effective_from: time
+  effective_until: nullable
+  status: active|revoked|expired
+```
+
+This is a current reconstruction of the source intent, not recovered literal Substrate storage code.
+
+## Capability principle
+
+A role name should resolve to explicit capabilities.
+
+```text
+"admin"
+   !=
+unbounded protocol authority
+```
+
+A safe capability model asks:
+
+```text
+who
+may perform what operation
+on which object/module
+under which scope
+for what time period
+```
+
+## Historical runtime operations
+
+Source-supported operation families include:
+
+- assign role;
+- revoke role;
+- check capability before sensitive extrinsic;
+- limit module access;
+- scope privileged actions.
+
+The exact call names remain source-not-located.
+
+## Historical event intent
+
+Likely event intentions, reconstructed from requirements:
+
+```text
+role assigned
+role revoked
+permission denied
+role/capability configuration updated
+```
+
+Current canonical events should use explicit `ct.*` contracts rather than pretending these historical event names were exact chain events.
+
+## Current mapping
+
+### P-01 Identity & Access
+
+P-01 owns actor identity, roles, delegations and access decisions.
+
+### P-02 Governance & Compliance
+
+P-02 owns policy/authority conditions that determine whether a capability should be permitted.
+
+```text
+Historical RBAC Pallet
+        |
+        v
+P-01 role + delegation registry
+        +
+P-02 policy/authority gate
+        |
+        v
+service/API authorization
+```
+
+## Delegation improvement
+
+Current CHLOM extends basic RBAC with explicit delegation and authority ceilings.
+
+```text
+ROLE
+  |
+DELEGATION
+  |
+AUTHORITY CEILING
+  |
+OBJECT / TENANT SCOPE
+  |
+TIME WINDOW
+```
+
+This avoids treating inherited role membership as unlimited authority.
+
+## Agent boundary
+
+Agents are separate institutional subjects. An agent inherits only explicitly delegated capabilities.
+
+```text
+principal capability set = C_p
+agent delegated set = C_a
+
+required invariant:
+C_a subseteq C_p
+```
+
+An agent cannot grant itself capabilities outside the principal/delegator's valid scope.
+
+## Fail-closed behavior
+
+```text
+role missing -> DENY
+capability unknown -> DENY/HOLD
+scope unresolved -> HOLD
+assignment expired -> DENY
+conflicting authority -> HOLD
+```
+
+## Security concerns
+
+Historical/current threats include:
+
+- privilege escalation;
+- stale assignments;
+- role explosion;
+- overly broad admin roles;
+- provider role drift;
+- confused-deputy behavior;
+- agent self-escalation;
+- missing tenant isolation;
+- emergency roles with no expiry.
+
+Protected detection/response thresholds belong in restricted documentation.
+
+## DAIL evidence
+
+Material role/delegation changes should create current DAIL evidence containing:
+
+```text
+subject
+role/capability
+scope
+prior state
+new state
+authority source
+effective period
+actor approving the change
+correction/supersession link
+```
+
+## Public API/service mapping
+
+Possible current capability interfaces include:
+
+```text
+resolve actor roles
+resolve capability
+create authorized delegation
+revoke delegation
+check access decision
+list effective scopes
+```
+
+Actual deployed endpoints require independent implementation evidence.
+
+## Versioning
+
+Role/capability definitions are versioned. Historical actions remain evaluated against the effective authority/policy state at the time of action where applicable.
+
+## Failure example
+
+```text
+Provider says user = admin
+Institutional assignment = revoked
+        |
+        v
+DENY current sensitive action
+record provider mismatch
+```
+
+Provider roles are aliases/evidence, not sovereign institutional authority.
+
+## Public / restricted split
+
+Public-safe:
+
+- role/capability architecture;
+- scope/delegation principles;
+- fail-closed semantics;
+- current mapping.
+
+Restricted:
+
+- actual privileged-role membership;
+- emergency-access procedures;
+- sensitive capability maps;
+- exploit/abuse controls;
+- provider-role mappings;
+- protected authorization tests.
+
+## Invariants
+
+```text
+identity != permission
+role != unlimited authority
+provider admin != institutional admin
+capability != delegation
+agent capability <= delegated capability
+expired assignment != current access
+unknown scope != PASS
+historical runtime design != deployed pallet
+```
+
+## Status
+
+The RBAC/Permissions Pallet is **historical architecture/IP with a current semantic mapping to P-01/P-02**. This article does not claim a Substrate pallet is deployed today.

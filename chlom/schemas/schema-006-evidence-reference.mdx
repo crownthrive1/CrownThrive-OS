@@ -1,0 +1,100 @@
+---
+title: "SCHEMA-006 — Evidence Reference / Custody Record"
+sidebarTitle: "SCHEMA-006 Evidence Reference"
+description: "Canonical CHLOM machine schema for stable evidence identity, source, custody, digest, classification, observation time, currentness, supersession and authorized access projection."
+icon: "paperclip"
+keywords: ["CHLOM schema", "evidence reference", "custody", "digest", "provenance"]
+---
+
+# SCHEMA-006 — Evidence Reference / Custody Record
+
+## Schema identity
+
+```yaml
+schema_id: SCHEMA-006
+name: Evidence Reference / Custody Record
+classification: reconstructed_machine_contract
+version: 1.0.0
+related_workflow: WF-002; WF-006
+```
+
+## Purpose
+
+SCHEMA-006 defines the stable metadata record by which CHLOM decisions reference evidence without copying protected source bodies into every policy result, case, DAIL event or dashboard.
+
+## Core record
+
+```yaml
+evidence_id: string
+version: string
+tenant_id: string
+evidence_type: string
+title_or_public_label: string|null
+source_ref: stable_ref|null
+source_class: string
+custody_ref: stable_ref
+custody_class: public|internal|restricted|trade_secret|secret_store_reference
+content_digest:
+  algorithm: string|null
+  value: string|null
+observed_at: timestamp|null
+created_at: timestamp|null
+received_at: timestamp|null
+recorded_at: timestamp
+freshness_policy_ref: stable_ref|null
+currentness_state: CURRENT|STALE|UNKNOWN|NOT_APPLICABLE
+integrity_state: VERIFIED|UNVERIFIED|MISMATCH|UNKNOWN
+supersedes: stable_ref|null
+revocation_or_withdrawal_state: ACTIVE|WITHDRAWN|REVOKED|SUPERSEDED|UNKNOWN
+related_object_refs: [stable_ref]
+access_policy_ref: stable_ref
+public_projection_ref: stable_ref|null
+DAIL_refs: [stable_ref]
+```
+
+## Custody separation
+
+The evidence record is metadata plus references. The source bytes/content may live in Drive/vault, repository, database, provider archive or other governed custody. Sensitive content is not duplicated merely for convenience.
+
+## Source semantics
+
+`source_ref` and `source_class` identify where the evidence came from and what kind of source it is. Source existence is not the same as source applicability or authority for every claim; policy/reviewer logic handles that separately.
+
+## Digest semantics
+
+When a digest is present, it identifies the exact evidence representation it was computed over. A hash mismatch is an integrity HOLD. A matching digest proves byte/object integrity under the hash assumption, not factual accuracy.
+
+## Time semantics
+
+Observation time, creation time, receipt time and institutional recording time are distinct. Missing source timestamps remain unknown rather than being replaced with upload/recording time.
+
+## Freshness and lifecycle
+
+Evidence can be current, stale, superseded, withdrawn or revoked. The old evidence record remains in lineage; current decisions reference the effective evidence version/state.
+
+## Access policy
+
+Every evidence reference binds to an access policy/purpose scope. Public projections expose only approved metadata/content. Restricted filenames, personal information or vault paths may be replaced by opaque labels/IDs.
+
+## Public projection
+
+A safe public projection can state that evidence exists, its general source class, verification/currentness state and digest/receipt where permitted without exposing the underlying body.
+
+## Validation rules
+
+- stable ID/version/tenant;
+- custody reference resolves;
+- classification matches custody/access policy;
+- digest algorithm/value pair coherent;
+- timestamps use explicit normalized format;
+- supersession references resolve;
+- no raw secret is embedded;
+- public projection never exceeds source classification.
+
+## Tests
+
+Test public evidence, restricted evidence, missing observation time, stale evidence, digest mismatch, supersession, withdrawn source, inaccessible custody object, cross-tenant reference and public redaction.
+
+## Versioning
+
+Metadata corrections and replacement evidence create new versions/events. Historical evidence IDs remain traceable to the decisions that used them.

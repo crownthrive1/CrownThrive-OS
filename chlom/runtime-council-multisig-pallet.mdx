@@ -1,0 +1,304 @@
+---
+title: "Council / Multisig Pallet — Historical Runtime Record"
+sidebarTitle: "Council / Multisig Pallet"
+description: "Standalone reconstruction of CHLOM's recovered Council/Multisig runtime design for bounded collective authority, threshold approvals, emergency action, conflicts, timelocks, sunset and current governance mapping."
+icon: "users"
+keywords: ["CHLOM Council Pallet", "Multisig Pallet", "council", "threshold signatures", "governance", "emergency authority"]
+---
+
+# Council / Multisig Pallet — Historical Runtime Record
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.runtime.council-multisig
+historical_name: Council / Multisig Pallet
+artifact_class: historical_runtime_pallet
+source_lineage:
+  - recovered Help Center component catalog
+  - CHLOM Technical Blueprint governance pallets
+  - Genesis governance hierarchy
+  - Grand Prospectus governance templates
+recovery_state: reconstructed_source_grounded
+current_mapping:
+  - P-02 Governance & Compliance
+  - bounded approval/quorum service
+  - reserved-authority and emergency review
+production_state: historical_runtime_not_claimed_live
+```
+
+## Historical purpose
+
+Historical CHLOM architecture used a Council/Multisig layer to allow a curated set of authorized participants to approve high-impact actions, fast-track emergencies, provide specialized governance and require threshold signatures rather than unilateral control.
+
+```text
+PROPOSED ACTION
+      |
+      v
+AUTHORITY / SCOPE CHECK
+      |
+      v
+ELIGIBLE COUNCIL SET
+      |
+CONFLICT / RECUSAL FILTER
+      |
+      v
+THRESHOLD / QUORUM
+      |
+PASS / HOLD / DENY
+      |
+TIMelock / sunset / execution gate
+      |
+      v
+DAIL RECEIPT
+```
+
+## Non-purpose
+
+This pallet is not evidence of a live DAO/council today. It also does not authorize:
+
+- unlimited founder/council power;
+- self-expanding membership;
+- bypass of rights, legal/professional or economic controls;
+- secret permanent emergency action;
+- one multisig key acting as proof of institutional authority by itself.
+
+## Council profile
+
+```yaml
+council_id: stable ID
+name: canonical
+scope: governance domains/actions
+member_role_requirements: explicit
+quorum_rule_ref: required
+approval_rule_ref: required
+recusal_rule_ref: required
+timelock_rule_ref: optional
+emergency_rule_ref: optional
+term_or_expiry: optional
+status: draft|active|held|retired
+version: string
+```
+
+## Membership
+
+Membership is a governed assignment, not possession of a wallet/key alone.
+
+```yaml
+membership_id: stable ID
+council_ref: required
+actor_ref: institutional identity
+role_ref: required
+signing_key_ref: optional alias
+term_start: timestamp
+term_end: optional
+conflict_disclosure_ref: optional
+status: active|recused|suspended|expired|revoked
+```
+
+A key rotation must not create a new institutional member.
+
+## Proposal/approval object
+
+```yaml
+approval_request_id: stable ID
+action_ref: exact action/object/version
+requested_authority: scope
+required_rule_ref: quorum/threshold profile
+eligible_member_snapshot_ref: immutable snapshot
+opened_at: timestamp
+closes_at: optional
+status: open|held|approved|denied|expired|executed|cancelled
+```
+
+## Vote/signature semantics
+
+Historical chain designs may bind votes to cryptographic signatures. Current CHLOM should separate:
+
+```text
+institutional vote/approval
+       |
+       +--> actor identity
+       +--> authority/delegation
+       +--> decision intent
+       +--> cryptographic signature evidence
+```
+
+A cryptographic signature validates control of a key; it does not independently establish the signer's institutional authority.
+
+## Quorum and threshold math
+
+Let:
+
+```text
+E = eligible non-recused decision weight
+P = participating decision weight
+Y = approving weight
+```
+
+Then a rule may specify:
+
+```text
+quorum_ratio = P / E
+approval_ratio = Y / P
+```
+
+Actual thresholds are versioned policy parameters. Historical examples must not be silently adopted.
+
+## Conflict and recusal
+
+Before counting an approval:
+
+```text
+member active?
+authority valid?
+conflict disclosed/resolved?
+recusal required?
+proposal version current?
+```
+
+Recused members should be handled according to the adopted quorum rule; no universal denominator adjustment is invented here.
+
+## Emergency actions
+
+Historical sources contemplated fast council intervention. The current model requires emergency authority to be:
+
+- explicitly pre-authorized;
+- narrow in object/action scope;
+- time-boxed;
+- independently evidenced;
+- reversible or compensable where possible;
+- automatically reviewed/sunset;
+- recorded in DAIL.
+
+```text
+EMERGENCY CONDITION
+       |
+       v
+PRE-AUTHORIZED EMERGENCY PROFILE?
+       |
+       +-- no --> HOLD / escalate
+       |
+       v
+THRESHOLD APPROVAL
+       |
+       v
+TEMPORARY ACTION
+       |
+AUTO-SUNSET / REVIEW
+```
+
+## Timelocks
+
+Approved high-impact actions may still require a timelock. At execution time, the system must revalidate:
+
+- proposal still current;
+- approvals not revoked/expired where policy requires;
+- target object unchanged or compatible;
+- no superseding hold;
+- execution authority current.
+
+## Multisig execution
+
+A provider/native multisig can execute a bounded instruction after CHLOM authorization. It is an execution adapter, not the canonical policy engine.
+
+```text
+CHLOM APPROVAL
+   -> execution envelope
+   -> multisig/provider signatures
+   -> provider execution
+   -> readback
+   -> DAIL
+```
+
+## Failure modes
+
+### Insufficient quorum
+
+`HOLD_QUORUM_NOT_MET`
+
+### Threshold not met
+
+`DENY_NOT_APPROVED` or remain open according to rule.
+
+### Member authority expired
+
+Vote excluded or proposal held according to policy.
+
+### Conflict discovered after vote
+
+Recalculate validity under adopted rules; preserve original receipt and issue correction.
+
+### Key compromised
+
+Suspend key/member signing ability, preserve prior decisions, rotate/revoke key and reevaluate pending actions.
+
+### Target changed during timelock
+
+HOLD and require re-approval if semantic target/version changed.
+
+## Events
+
+```text
+ct.council.created.v1
+ct.council.member.added.v1
+ct.council.member.recused.v1
+ct.council.member.revoked.v1
+ct.council.approval.opened.v1
+ct.council.vote.recorded.v1
+ct.council.quorum.met.v1
+ct.council.approval.passed.v1
+ct.council.approval.denied.v1
+ct.council.action.executed.v1
+ct.council.emergency.sunset.v1
+```
+
+## Threat model
+
+- compromised signer;
+- collusion;
+- hidden member substitution;
+- stale authority snapshot;
+- quorum gaming;
+- conflict concealment;
+- emergency-power permanence;
+- vote replay across proposal versions;
+- provider multisig state diverging from institutional membership;
+- self-approval of authority expansion.
+
+## Test vectors
+
+1. threshold \+ quorum satisfied -\> approved;
+2. threshold satisfied but quorum not met -\> HOLD;
+3. recused member attempts vote -\> rejected/excluded;
+4. expired membership -\> vote invalid;
+5. proposal body changes -\> old signatures not reusable;
+6. compromised key revoked -\> pending execution held;
+7. emergency action expires -\> automatic sunset/review;
+8. provider multisig execution fails -\> canonical approval remains but action unsettled;
+9. membership/key rotation -\> stable institutional identity retained;
+10. authority expansion proposed by same body -\> requires separately authorized constitutional/reserved path.
+
+## Current mapping
+
+Modern CHLOM maps this pallet to governance/approval services, CrownThrive identity/delegation, signing/HSM/KMS, scheduler/timelock controls and DAIL. It may use provider multisig technology when appropriate without making that provider the governance source of truth.
+
+## Restricted companion
+
+May retain private member rosters, conflict disclosures, signing topology, key aliases, emergency contacts, protected quorum exceptions, incident evidence and unpublished proposals.
+
+## Invariants
+
+```text
+key possession != institutional authority
+council membership != universal authority
+quorum != substantive correctness
+approval != execution
+execution != settlement
+emergency authority must sunset or be reauthorized
+self-approval cannot manufacture expanded authority
+```
+
+## Status
+
+`historical_preserved + reconstructed_source_grounded`. The Council/Multisig Pallet remains valuable governance architecture; no live historical council/DAO runtime is asserted.

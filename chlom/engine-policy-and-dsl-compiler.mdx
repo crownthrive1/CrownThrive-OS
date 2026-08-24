@@ -1,0 +1,323 @@
+---
+title: "CHLOM Policy Engine & Policy DSL Compiler"
+sidebarTitle: "Policy Engine & DSL Compiler"
+description: "Standalone CHLOM engine article for source-authorized policy compilation, typed rule schemas, deterministic evaluation, precedence, tests, explainability, versioning, sandbox simulation and fail-closed deployment."
+icon: "code"
+keywords: ["CHLOM Policy Engine", "Policy DSL Compiler", "compliance as code", "rules", "precedence", "PASS HOLD DENY"]
+---
+
+# CHLOM Policy Engine & Policy DSL Compiler
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.policy-dsl
+canonical_name: Policy Engine & Policy DSL Compiler
+artifact_class: policy_engine
+source_lineage:
+  - historical Policy Pallet
+  - Compliance Pack Registry
+  - recovered CHLOM component atlas
+  - July 2026 Technical Build Pack
+current_mapping:
+  - P-02 Governance & Compliance
+  - ACE deterministic rule execution
+status: current_semantic_engine_specification
+production_state: implementation_evidence_required
+```
+
+## Purpose
+
+This engine transforms adopted policy into typed, versioned machine-evaluable rules and executes those rules reproducibly. It must preserve the chain from **source authority → human policy meaning → machine representation → tests → deployed rule version**.
+
+```text
+SOURCE AUTHORITY / POLICY TEXT
+          |
+          v
+NORMALIZED POLICY MODEL
+          |
+          v
+POLICY DSL / RULE AST
+          |
+     COMPILER / VALIDATOR
+          |
+          v
+EXECUTABLE RULE PACKAGE
+          |
+          v
+TEST / SIMULATION / APPROVAL
+          |
+          v
+POLICY ENGINE
+          |
+     PASS | HOLD | DENY inputs
+```
+
+## Compiler does not create authority
+
+```text
+compiles successfully
+   !=
+policy adopted
+```
+
+A compiled candidate remains non-authoritative until its source and governance state permit activation.
+
+## Policy source record
+
+```yaml
+policy_source_id: stable ID
+source_type: founder_adjudication|adopted_policy|agreement|regulatory_source|other
+authority_ref: required
+source_digest_or_ref: required
+version: string
+effective_from: timestamp
+effective_until: nullable
+status: draft|adopted|superseded|retired
+```
+
+## Rule package
+
+```yaml
+rule_package_id: stable ID
+policy_source_refs: []
+compiler_version: string
+dsl_version: string
+rule_ids: []
+schema_refs: []
+test_suite_ref: required
+compiled_digest: required
+status: candidate|validated|approved|active|held|superseded
+```
+
+## Rule structure
+
+A public-safe conceptual rule:
+
+```text
+RULE <id>
+APPLIES WHEN <typed predicate>
+REQUIRES <evidence / conditions>
+IF <condition>
+THEN PASS | HOLD | DENY | emit requirement
+REASON <safe code>
+```
+
+Exact DSL syntax is implementation/IP-specific.
+
+## Three-valued logic
+
+CHLOM's current policy model explicitly distinguishes unknown/unresolved from false.
+
+```text
+TRUE
+FALSE
+UNKNOWN
+```
+
+For mandatory positive requirements:
+
+```text
+TRUE    -> satisfied
+FALSE   -> DENY or defined failure
+UNKNOWN -> HOLD
+```
+
+This prevents missing evidence from being interpreted as safe.
+
+## Rule applicability
+
+Applicability can depend on:
+
+- tenant/org;
+- action/capability;
+- actor/role;
+- asset/DLA class;
+- jurisdiction;
+- purpose;
+- provider/channel;
+- time/effective period;
+- agreement/program;
+- feature/service maturity.
+
+## Precedence
+
+Overlapping rules require explicit precedence/combination semantics.
+
+```text
+constitutional / reserved rules
+    > adopted institutional rules
+        > corridor/cross-pallet rules
+            > pallet/service rules
+                > tenant/program rules
+```
+
+This is a conceptual layering model; exact precedence is adopted/versioned in the registry. Ambiguous conflicts yield HOLD.
+
+## Mandatory-gate composition
+
+```text
+if any mandatory result == DENY:
+    DENY
+else if any mandatory result == HOLD:
+    HOLD
+else:
+    PASS
+```
+
+Advisory/risk signals can add review requirements but cannot silently erase a mandatory DENY.
+
+## Compiler validation
+
+Compiler/static checks can include:
+
+- undefined field/reference;
+- invalid type/unit;
+- unreachable rule;
+- circular dependency;
+- contradictory mandatory outcomes;
+- missing reason code;
+- missing effective/version metadata;
+- unbounded override path;
+- unknown schema version;
+- secret/protected value incorrectly embedded.
+
+## Test vectors
+
+Every candidate package should include positive, negative and unresolved cases:
+
+```yaml
+test_vector:
+  inputs: ...
+  expected_result: PASS|HOLD|DENY
+  expected_reason_codes: []
+```
+
+Protected anti-fraud cases remain restricted.
+
+## Regression testing
+
+A policy update is compared against a regression corpus:
+
+```text
+old package P1
+new package P2
+historical/synthetic cases
+      |
+diff decisions / reason codes
+      |
+review unexpected changes
+```
+
+## Simulation
+
+Simulation can estimate impact on historical/synthetic events without creating live decisions.
+
+```text
+simulation != policy activation
+```
+
+## Explanation
+
+Each evaluation returns safe structured reasoning:
+
+```yaml
+evaluation_id: stable ID
+rule_package_ref: exact version
+applicable_rule_refs: []
+inputs_or_evidence_refs: []
+result: PASS|HOLD|DENY
+reason_codes: []
+requirements: []
+```
+
+Protected thresholds/features need not be exposed to the requester.
+
+## Hot reload / deployment
+
+A new policy package is activated only after:
+
+- authority/adoption verified;
+- compile/static checks pass;
+- test suite passes;
+- compatibility/migration reviewed;
+- security review where needed;
+- exact version deployed;
+- service readback confirms active version;
+- DAIL event recorded.
+
+## Rollback
+
+Rollback creates a new current deployment state referencing a prior validated package. Historical decisions remain tied to the package originally used.
+
+## API contract families
+
+- resolve applicable policy package;
+- evaluate policy;
+- compile candidate;
+- validate/static analyze;
+- run test suite;
+- simulate candidate;
+- activate/hold/supersede package;
+- explain decision;
+- compare versions.
+
+## Events
+
+```text
+ct.policy.source.adopted.v1
+ct.policy.compile.completed.v1
+ct.policy.validation.failed.v1
+ct.policy.package.approved.v1
+ct.policy.package.activated.v1
+ct.policy.evaluation.completed.v1
+ct.policy.conflict.detected.v1
+ct.policy.package.rolled_back.v1
+```
+
+## Failure modes
+
+### Source policy ambiguous
+
+Do not encode a guessed interpretation; HOLD/adjudicate source meaning.
+
+### Compiler accepts contradictory rules
+
+Static/semantic validation failure; package cannot activate.
+
+### Deployed version differs from approved digest
+
+Security/governance HOLD; restore certified version and investigate.
+
+### Policy provider/service cache stale
+
+Canonical active package version controls; consumers re-read/retry or HOLD.
+
+### Missing required evidence field
+
+Return HOLD/requirement rather than default false/clear.
+
+## Security/IP
+
+Protected assets can include DSL grammar extensions, compiler optimizations, anti-evasion rule patterns, static-analysis algorithms and protected rule packages. Public docs expose semantics/schema, not exploitable controls.
+
+## Restricted companion
+
+Contains confidential rules, thresholds, DSL compiler internals, legal/contract mappings, anti-fraud policies, red-team tests and deployment topology.
+
+## Invariants
+
+```text
+compiled != adopted
+policy engine != policy authority
+UNKNOWN != FALSE
+missing evidence != PASS
+simulation != activation
+provider cache != canonical policy
+rollback != historical rewrite
+rule explanation != protected rule disclosure
+```
+
+## Status
+
+The Policy Engine & DSL Compiler is a core current CHLOM engine specification under P-02 and ACE. Exact code/deployment versions must be separately evidenced.

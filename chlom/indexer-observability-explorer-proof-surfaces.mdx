@@ -1,0 +1,340 @@
+---
+title: "Indexer, Observability, Explorer and Proof Surfaces"
+sidebarTitle: "Observability & Indexing"
+description: "Comprehensive CHLOM reconstruction of indexing, observability, dashboards, alerts, archives, public compliance explorers, privacy tiers and audit/proof surfaces."
+icon: "radar"
+keywords: ["CHLOM observability", "indexer", "compliance explorer", "monitoring", "alerts", "archives", "proof surfaces", "network health"]
+---
+
+# Indexer, Observability, Explorer and Proof Surfaces
+
+The Grand Prospectus dedicates a major architecture area to **Observability & Indexing**. It describes network-health metrics, dashboards, public transparency tools, searchable indexes, historical archives, real-time alerts and privacy-aware views. This material is particularly useful for the modern cloud-first CHLOM build because observability and indexing are required whether the underlying execution layer is centralized, decentralized or hybrid.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_source_grounded
+historical_family: Observability_and_Indexing
+current_mapping: telemetry_index_search_explorer_audit_read_models
+public_explorer: target_unless_current_route_evidenced
+founder_adjudication: open_after_publication
+```
+
+## Why indexing and observability are different
+
+```text
+INDEXING      = make institutional records queryable
+OBSERVABILITY = understand system behavior and health
+EXPLORER      = expose selected records to users/public
+AUDIT SURFACE = prove what happened and under which rule
+```
+
+They may share data pipelines but have different access, retention and truth requirements.
+
+## Full topology
+
+```text
++-------------------------------+
+| Source Systems                |
+| APIs / services / DAIL / DBs  |
++---------------+---------------+
+                |
+                v
++---------------+---------------+
+| Event / Telemetry Collection  |
++---------------+---------------+
+                |
+        +-------+-------+
+        |               |
+        v               v
++-------+-------+ +-----+----------+
+| Metrics / Logs| | Institutional |
+| / Traces      | | Event Stream  |
++-------+-------+ +-----+----------+
+        |               |
+        v               v
++-------+---------------+----------+
+| Normalization + Classification   |
++----------------+-----------------+
+                 |
+       +---------+---------+
+       |                   |
+       v                   v
++------+--------+   +------+--------+
+| Search Index |   | Observability |
+| / Read Models|   | Store         |
++------+--------+   +------+--------+
+       |                   |
+  +----+----+         +----+----+
+  |         |         |         |
+  v         v         v         v
+Explorer  API      Alerts   Health Dashboards
+  |
+  v
+Public / Member / Admin projections
+```
+
+## Indexing scope
+
+Historical sources describe indexing not only transactions but identity records, license text/metadata, policy packs, governance records and other protocol state.
+
+Modern CHLOM indexes may support queries such as:
+
+- active licenses of a given class/territory;
+- current Compliance Packs by domain;
+- actions affecting a specific stable ID;
+- asset/license usage history;
+- open disputes/holds;
+- governance/decision status;
+- source/evidence relationships;
+- current versus historical platform state.
+
+## Index versus canonical truth
+
+An index is a **read model**, not the canonical authority.
+
+```text
+canonical records / DAIL
+         |
+         v
+index projection
+         |
+         v
+query result
+```
+
+If an index becomes stale or corrupt, the canonical record must still be recoverable and the index rebuildable.
+
+## Index freshness
+
+```text
+canonical event N
+      |
+      v
+index consumer
+      |
+      v
+read model at offset N?
+   +--+--+
+   |     |
+ yes    no
+   |     |
+   v     v
+fresh  stale / catching up
+```
+
+Consequential decisions should not rely on a stale search index when the authoritative service can provide current state.
+
+## Observability signals
+
+Historical sources mention metrics such as transaction latency, validator uptime/responsiveness and compliance events. Modern CHLOM observability expands across:
+
+- API latency/error rate;
+- queue depth;
+- policy decision rates;
+- HOLD/DENY frequency;
+- provider failures;
+- evidence freshness;
+- DAIL append/read lag;
+- agent/tool failure rates;
+- authorization denials;
+- payment/webhook reconciliation lag;
+- backup/recovery health;
+- deployment/version drift;
+- security signals;
+- documentation freshness/validator state.
+
+## Health model
+
+```text
+SIGNALS
+  |
+  +--> availability
+  +--> correctness
+  +--> freshness
+  +--> security
+  +--> continuity
+  +--> provider health
+  |
+  v
+HEALTH EVALUATOR
+  |
+  +--> HEALTHY
+  +--> DEGRADED
+  +--> HOLD
+  +--> INCIDENT
+```
+
+A service can be technically `up` while institutionally degraded—for example, an identity provider may respond but its data may be stale.
+
+## Alerting
+
+```text
+metric / event / anomaly
+         |
+         v
+threshold or policy
+         |
+    +----+----+
+    |         |
+  normal    alert
+              |
+              v
+        route by severity
+              |
+      +-------+-------+
+      |               |
+   automated       human
+   safe action     escalation
+      |               |
+      +-------+-------+
+              v
+            DAIL
+```
+
+Alerts are observations. They do not by themselves authorize destructive or high-impact actions.
+
+## Public Compliance Explorer
+
+The Grand Prospectus proposes public transparency tooling similar to a blockchain explorer but with compliance context.
+
+A modern public-safe explorer might expose selected data such as:
+
+- public license status;
+- public asset/provenance references;
+- public policy versions;
+- public-safe DAIL receipts/digests;
+- public status/incident summaries;
+- public governance decisions;
+- cryptographic anchor references.
+
+It must not expose restricted evidence, secrets, raw personal data or sealed disputes.
+
+## Layered access model
+
+```text
++------------------------------+
+| PUBLIC                       |
+| public-safe IDs/status/proofs|
++------------------------------+
+| MEMBER / SUBJECT             |
+| own records + licensed data  |
++------------------------------+
+| OPERATOR / REVIEWER          |
+| authorized operational view  |
++------------------------------+
+| RESTRICTED / PROFESSIONAL    |
+| privileged evidence          |
++------------------------------+
+```
+
+The same indexed object may have different projections for different roles.
+
+## Search privacy
+
+A record being searchable internally does not mean it is publicly discoverable.
+
+```text
+canonical record
+    |
+    +--> public index projection
+    +--> subject-private projection
+    +--> restricted review projection
+```
+
+Sensitive fields should be excluded before indexing into public/searchable surfaces rather than relying only on front-end hiding.
+
+## Archives and historical retrieval
+
+The Grand Prospectus emphasizes long-term archives so an organization can later reconstruct old compliance/license state.
+
+```text
+HOT INDEX
+ recent / active records
+       |
+       v
+WARM ARCHIVE
+ historical searchable data
+       |
+       v
+COLD / PROTECTED ARCHIVE
+ long-term evidence
+       |
+       v
+integrity verification against canonical digests
+```
+
+Retention must follow applicable legal, contractual and institutional rules; not every event should be retained identically forever.
+
+## Audit surface
+
+An audit query should be able to answer:
+
+```text
+WHAT happened?
+WHO/WHAT initiated it?
+UNDER WHICH authority?
+USING WHICH evidence?
+WHICH policy/version applied?
+WHAT provider executed it?
+WHAT was the result?
+WAS it later corrected/reversed?
+```
+
+That is stronger than a conventional application log.
+
+## Proof surfaces
+
+A proof surface exposes evidence that a statement is true without necessarily exposing the evidence body.
+
+Possible outputs include:
+
+- signed receipts;
+- DAIL event digests;
+- Merkle proofs;
+- provider attestations;
+- ZK proofs;
+- current-state certificates;
+- exported audit packets.
+
+The proof format must state exactly what it proves and what it does not.
+
+## AI and analytics
+
+Historical material expects observability data to feed risk/anomaly analysis and trend reporting. Current CHLOM can use AI for summaries, anomaly detection or advisory insights, but model output is not final institutional authority.
+
+## Failure conditions
+
+HOLD, degrade or flag when:
+
+- index lag exceeds the allowed threshold;
+- telemetry disappears unexpectedly;
+- public/private classification cannot be resolved;
+- a query result conflicts with canonical state;
+- retention/archive integrity cannot be verified;
+- a dashboard reports provider metrics without institutional reconciliation;
+- alert routing fails for a consequential incident;
+- a proof surface exposes more data than its authorization permits.
+
+## Current implementation mapping
+
+Historical observability/indexing decomposes into:
+
+- DAIL/Event Stream;
+- Search/Index Service;
+- Read-Model Projectors;
+- Telemetry/Metrics/Logs/Traces;
+- Health Evaluator;
+- Alert Router;
+- Public Compliance Explorer;
+- Member/Admin dashboards;
+- Audit Export Service;
+- Archive/Retention layer;
+- privacy-aware projection controls;
+- CrownLytics/CrownPulse integrations where appropriate without collapsing platform identities.
+
+## Founder adjudication
+
+`open_after_publication`
+
+The Founder may later adjudicate public explorer scope, retention classes, platform integration, dashboard naming or proof-surface publication. Historical observability architecture remains preserved while current data-governance controls remain authoritative.

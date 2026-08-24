@@ -1,0 +1,277 @@
+---
+title: "Case Management Pallet — Historical Runtime Record"
+sidebarTitle: "Case Management Pallet"
+description: "Individual reconstruction of CHLOM's historical Case Management Pallet for evidence-backed compliance/dispute cases, statuses, holds, reviewer assignments, dispositions and appeals, mapped to current remedies workflows."
+icon: "folder-open"
+keywords: ["CHLOM Case Management Pallet", "cases", "disputes", "holds", "appeals", "evidence", "remedies"]
+---
+
+# Case Management Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.case-management
+namespace: historical_runtime_pallet
+recovered_title: Case Management Pallet
+recovered_help_center_description: lifecycle/state for compliance and dispute cases with evidence, reviewers, holds and dispositions
+source_recovery: substantive_title_plus_case/remedy_architecture
+current_mapping:
+  - P-02 Governance & Compliance
+  - case/dispute/remedy service
+  - P-10 institutional evidence/support
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Case Management Pallet gave CHLOM a protocol-level object for matters that could not be resolved as an immediate binary transaction check: disputes, suspected violations, appeals, evidence conflicts, revocation reviews and other adjudication workflows.
+
+```text
+TRIGGER / COMPLAINT / CONFLICT
+          |
+          v
+        CASE
+          |
+      EVIDENCE
+          |
+   REVIEW / HOLD
+          |
+      DISPOSITION
+          |
+   REMEDY / APPEAL
+          |
+       CLOSURE
+```
+
+## Case versus event
+
+A case is a persistent process object. An event is evidence/state transition within the case.
+
+```text
+case opened
+case evidence added
+case hold activated
+case disposition issued
+case appealed
+case closed
+```
+
+all remain in lineage.
+
+## Reconstructed case object
+
+```yaml
+case_id: stable ID
+case_type: compliance|rights|license|payment|provider|governance|security|other
+subject_refs: []
+opened_by_ref: actor/system
+opened_at: timestamp
+policy_or_agreement_refs: []
+evidence_refs: []
+assigned_reviewer_refs: []
+status: intake|open|investigating|held|decision_pending|resolved|appealed|closed
+confidentiality: public|internal|restricted
+```
+
+Exact historical storage names are not recovered.
+
+## Case lifecycle
+
+```text
+INTAKE
+  |
+OPEN
+  |
+EVIDENCE COLLECTION
+  |
+  +--> HOLD / SUSPENSION when authorized
+  |
+REVIEW
+  |
+DECISION_PENDING
+  |
+DISPOSITION
+  |
+  +--> REMEDIATION / RESTORATION / REVOCATION
+  +--> APPEAL
+  |
+CLOSED
+```
+
+## Evidence preservation
+
+Evidence is append-only/correctable in lineage.
+
+```text
+original evidence
+    |
+correction / challenge
+    |
+review finding
+```
+
+A case must not delete inconvenient evidence to produce a clean narrative.
+
+## Reviewer assignment
+
+Reviewers require:
+
+- identity;
+- role/authority;
+- scope/domain competence where required;
+- conflict-of-interest handling;
+- assignment effective period;
+- evidence access appropriate to classification.
+
+## HOLD relationship
+
+A case can activate a bounded hold on an asset/license/account/action when current authority permits.
+
+```text
+case open
+   !=
+automatic system-wide suspension
+```
+
+Hold scope must be explicit.
+
+## Disposition
+
+```yaml
+disposition_id: stable ID
+case_ref: required
+decision_maker_refs: []
+authority_ref: required
+result: no_action|warning|remediate|restore|suspend|revoke|deny|other
+reason_codes: []
+evidence_refs: []
+decided_at: timestamp
+appealable: boolean
+```
+
+The exact vocabulary can vary by case type.
+
+## Appeal
+
+Appeal creates a new review path linked to the prior decision.
+
+```text
+ORIGINAL DISPOSITION
+        |
+      APPEAL
+        |
+NEW REVIEW / EVIDENCE
+        |
+AFFIRM | MODIFY | REVERSE | REMAND
+```
+
+The original disposition remains in history.
+
+## Historical DAL adjudication lineage
+
+Historical DAL meanings include **Decentralized Adjudication Layer**. Current CHLOM maps adjudication semantics into cases/reviews/remedies while DAIL remains the evidence/information ledger.
+
+```text
+DAIL = evidence/records
+CASE/REMEDY service = adjudication process
+```
+
+## Cross-module relationships
+
+Cases can affect:
+
+- DLA/license state;
+- LEX listing/transfer;
+- identity/role access;
+- provider/registry status;
+- settlement/payment holds;
+- oracle/verifier status;
+- governance proposals;
+- public claims.
+
+## Historical operation families
+
+- open case;
+- attach evidence;
+- assign reviewer;
+- change case status;
+- apply hold;
+- issue disposition;
+- appeal;
+- close case.
+
+Exact historical extrinsic names are not recovered.
+
+## Current event mapping
+
+```text
+ct.case.opened.v1
+ct.case.evidence.added.v1
+ct.case.reviewer.assigned.v1
+ct.case.hold.activated.v1
+ct.case.disposition.issued.v1
+ct.case.appeal.filed.v1
+ct.case.appeal.decided.v1
+ct.case.closed.v1
+```
+
+## Due-process / authority boundary
+
+CHLOM case workflows organize institutional decisions. They do not replace courts, regulators, arbitrators, licensed professionals or statutory procedures when those bodies have legal authority.
+
+## Failure cases
+
+### Provider suspends account before institutional review
+
+Record provider action as evidence; reconcile its effect without treating provider decision as institution-wide adjudication.
+
+### Reviewer conflict identified mid-case
+
+Reassign/handle according to policy; preserve prior activity and conflict evidence.
+
+### Case closed, new material evidence appears
+
+Reopen/new linked case or correction path under policy; do not rewrite closed history.
+
+### Appeal filed after remedy already executed
+
+Policy determines hold/restoration/compensation; appeal does not automatically erase executed state.
+
+## Security/privacy
+
+Case records can contain sensitive legal, identity, financial, security and personnel information. Public pages expose only authorized dispositions/summaries when appropriate.
+
+## Public / restricted split
+
+Public-safe:
+
+- case architecture;
+- published precedents/decisions where approved;
+- appeal/remedy semantics.
+
+Restricted:
+
+- evidence;
+- parties' private data;
+- deliberation;
+- security/legal material;
+- professional reviews;
+- confidential settlement terms.
+
+## Invariants
+
+```text
+case opened != guilt/violation
+provider action != institutional adjudication
+HOLD != final disposition
+appeal != erasure
+disposition != legal judgment beyond authority
+case closed != evidence deleted
+DAIL != adjudicator
+historical case pallet != current chain deployment
+```
+
+## Status
+
+The Case Management Pallet is preserved as historical CHLOM runtime/remedy architecture and maps to the current P-02 case, hold, review, appeal and remedy service with P-10/DAIL evidence custody.

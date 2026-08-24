@@ -1,0 +1,113 @@
+---
+title: "ALG-011 — Oracle Aggregation"
+sidebarTitle: "ALG-011 Oracle Aggregation"
+description: "Standalone CHLOM algorithm for aggregating authorized, fresh and independent external observations while holding on insufficient corroboration or material contradiction."
+icon: "tower-broadcast"
+keywords: ["CHLOM ALG-011", "oracle aggregation", "weighted median", "source quorum", "freshness"]
+---
+
+# ALG-011 — Oracle Aggregation
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-011
+name: Oracle Aggregation
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Oracle Lattice; Oracle Hub; historical oracle quorum research
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-011 turns multiple external observations into a bounded CHLOM evidence result. The algorithm is designed to avoid blind dependence on one external source and to distinguish corroboration from truth or institutional authority.
+
+## Core rules
+
+```text
+one provider != universal truth
+multiple agreeing sources != automatic authority
+stale source != current evidence
+```
+
+## Inputs
+
+```yaml
+claim_or_metric_id:
+observations[]:
+  source_id
+  source_authority_class
+  value_or_claim
+  observed_at
+  signed_at
+  reliability_state
+  independence_group
+  evidence_digest
+policy:
+  required_source_count
+  freshness_window
+  contradiction_threshold
+  aggregation_method
+```
+
+## Public-safe procedure
+
+```text
+function aggregate_numeric_oracles(observations):
+    valid = filter_authorized_fresh_sources(observations)
+
+    if independent_source_count(valid) < required_count:
+        return HOLD
+
+    if contradiction_exceeds_threshold(valid):
+        return HOLD
+
+    return weighted_median(valid)
+```
+
+For non-numeric claims, use typed corroboration rules rather than forcing every assertion into a number.
+
+## Source eligibility
+
+A source must be registered for the relevant claim domain, authentic, within freshness requirements, and not revoked or suspended. Independence must be considered: five API endpoints owned by the same upstream dataset should not automatically count as five independent sources.
+
+## Contradiction handling
+
+Material disagreement is evidence in its own right. The algorithm should preserve each source observation and surface contradiction rather than average away a regulatory, identity or safety conflict.
+
+## Weighting
+
+Historical CHLOM research discusses source reputation and multi-source medians. Any current weighting function must be versioned and governed. Public-safe abstractions may incorporate authority, reliability and freshness, but exact production weights are configuration, not documentation defaults.
+
+## Output
+
+```yaml
+aggregation_id:
+claim_ref:
+result_state: PASS_CANDIDATE|HOLD|NO_RESULT
+aggregated_value_or_claim:
+source_refs[]:
+independent_source_count:
+contradictions[]:
+freshness_summary:
+aggregation_method:
+algorithm_version:
+```
+
+The result is evidence for policy evaluation; it does not itself authorize execution.
+
+## DAIL evidence
+
+Preserve each accepted/rejected observation reference, source registry version, freshness decision, aggregation parameters, contradiction state and result. Later source correction appends new evidence rather than rewriting historical observations.
+
+## Abuse resistance
+
+Controls should address correlated sources, Sybil oracle registration, stale-cache reuse, timestamp manipulation, cherry-picked source subsets, replay and source compromise.
+
+## Tests
+
+Test enough independent sources, insufficient quorum, one stale source, all stale, outlier, split contradiction, duplicate upstream source, revoked source, source identity spoof, numeric median and boolean/attestation corroboration.
+
+## Versioning
+
+Changes to source independence, aggregation, weighting or contradiction rules require a new algorithm version and replay against captured evidence fixtures.

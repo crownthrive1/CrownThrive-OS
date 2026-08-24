@@ -1,0 +1,438 @@
+---
+title: "CHLOM Approval Service"
+sidebarTitle: "Approval Service"
+description: "Standalone Phase 3 CHLOM Approval Service contract for authority-aware approval requests, reviewer eligibility, quorum, HOLD/DENY/PASS outcomes, timelocks, execution envelopes, readback and DAIL evidence."
+icon: "circle-check"
+keywords: ["CHLOM Approval Service", "approvals", "authority", "quorum", "HOLD", "DAIL", "Phase 3"]
+---
+
+# CHLOM Approval Service
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.service.approval
+canonical_name: CHLOM Approval Service
+artifact_class: governed_approval_and_authorization_service
+source_status:
+  - explicitly named in Phase 3 service contract
+  - required by dS-CaaS runtime mapping
+  - supported by governance/council/authority architecture
+current_mapping:
+  - P-02 Governance & Compliance
+  - Authority-Aware Decision Gateway
+  - Council/Multisig
+  - Technical Committee
+  - founder/reserved authority
+  - economic/rights/security/professional approval profiles
+  - DAIL
+production_state: implementation_specific_evidence_required
+```
+
+## Purpose
+
+The Approval Service turns **a request for institutional permission** into a durable, versioned decision object backed by current identity, authority, policy, evidence and reviewer/quorum state.
+
+```text
+ACTION / CHANGE / REQUEST
+          |
+          v
+     APPROVAL REQUEST
+          |
+ resolve authority profile
+          |
+ eligible reviewer set
+          |
+ conflict / recusal
+          |
+ evidence / policy
+          |
+ vote / approval / review
+          |
+    PASS / HOLD / DENY
+          |
+   timelock if required
+          |
+   execution envelope
+          |
+ readback / DAIL receipt
+```
+
+## Why approval is a separate service
+
+Policy evaluation asks whether conditions are satisfied. Approval asks whether an authorized person, body or process has consented to the governed action.
+
+```text
+policy PASS
+   != approval complete
+```
+
+Some low-risk operations can be pre-delegated. High-consequence rights, economic, security, professional, release or founder-reserved actions may require explicit approval even after policy and evidence checks pass.
+
+## Non-purpose
+
+The Approval Service does not:
+
+- create authority from a UI click;
+- make every reviewer eligible for every decision;
+- allow a service account or agent to self-approve an authority expansion;
+- replace source rights or contracts;
+- replace required legal/professional qualifications;
+- let AI cast a human-required approval;
+- mark provider execution as approved merely because it succeeded;
+- allow stale approvals to remain valid after the target or authority changes;
+- erase the original condition that required an override or exception.
+
+## Approval request
+
+```yaml
+approval_request_id: stable id
+request_type: typed
+action_ref: canonical semantic action
+subject_refs: []
+requester_ref: human|agent|service identity
+tenant_or_org_scope: explicit
+required_approval_profile_ref: required
+authority_context_refs: []
+policy_result_refs: []
+evidence_refs: []
+change_or_execution_ref: exact target/version
+opened_at: timestamp
+expires_at: optional
+status: draft|open|held|approved|denied|expired|cancelled|executed|superseded
+version: exact
+```
+
+## Approval profile
+
+```yaml
+approval_profile_id: stable id
+applicable_action_classes: []
+eligible_role_refs: []
+eligible_named_authority_refs: []
+minimum_approvals: optional
+quorum_rule_ref: optional
+unanimity_required: optional
+independent_review_required: boolean
+conflict_check_required: boolean
+professional_requirement_refs: []
+founder_reserved_gate: optional
+technical_review_gate: optional
+economic_gate: optional
+rights_gate: optional
+security_gate: optional
+challenge_or_timelock_ref: optional
+validity_window: optional
+execution_revalidation_required: boolean
+```
+
+The profile is versioned governance data. UI state or provider account permissions do not define it.
+
+## Reviewer eligibility
+
+Before accepting an approval:
+
+```text
+reviewer identity current?
+reviewer role current?
+reviewer delegation current?
+reviewer authority covers action/scope?
+conflict/recusal clear?
+required professional qualification current?
+approval window open?
+```
+
+A signed statement by an ineligible reviewer is still evidence of a submitted action, but it is not a valid institutional approval.
+
+## Approval record
+
+```yaml
+approval_id: stable id
+request_ref: required
+reviewer_ref: institutional identity
+reviewer_authority_snapshot_ref: required
+decision: approve|deny|abstain|recuse|hold
+reason_codes: public-safe
+restricted_reason_refs: []
+evidence_refs: []
+signed_or_attested_ref: optional|required by profile
+submitted_at: timestamp
+status: valid|held|revoked|superseded
+```
+
+## Quorum
+
+A profile can use count- or weight-based quorum. Quorum mathematics belong to governed formula records.
+
+```text
+quorum met
+   != approval threshold met automatically
+```
+
+A workflow may independently require both minimum participation and a vote/approval threshold.
+
+## Independent review
+
+For high-consequence actions, the required gatekeeper should not be the proposer or executor where the profile demands independence.
+
+```text
+proposer != required independent gatekeeper
+executor != required independent certifier
+```
+
+Independence criteria must be explicit rather than inferred from job titles.
+
+## Founder/reserved authority
+
+Founder/reserved approval is modeled as an authority profile, not a magic delete button.
+
+A Founder Override record should preserve:
+
+- exact action and snapshot;
+- requested scope;
+- original blocking condition;
+- rationale/evidence;
+- whether that control is overrideable;
+- effective/expiry time;
+- rollback or compensation;
+- DAIL receipt.
+
+If current governance requires asking the Founder before deadlock override, the Approval Service must preserve that human gate.
+
+## Professional approvals
+
+Legal, tax, medical, accounting, regulated-industry or other professional decisions require the appropriate current professional authority when the workflow says so.
+
+```text
+AI recommendation
+   != licensed/professional approval
+```
+
+## Rights approvals
+
+Licensing actions can require combinations of:
+
+- rights holder/licensor;
+- Licensing Stewardship / Issuer Authority;
+- holder/licensee consent;
+- transfer or sublicense consent;
+- brand/canon/governance approval where applicable.
+
+The source rights/agreement controls the exact profile.
+
+## Economic approvals
+
+Money-moving actions can require:
+
+- a valid economic schedule;
+- treasury/budget authority;
+- payment or payout authorization;
+- reserve and reconciliation checks;
+- professional review when needed.
+
+```text
+approved calculation != approved payment
+payment submitted != settled
+```
+
+## Technical and release approvals
+
+Schema, infrastructure, security, deployment and production changes can require Technical Committee, security, SRE or release approvals before execution.
+
+Green tests do not replace the authority gate.
+
+## Emergency approvals
+
+Emergency profiles must be pre-defined and bounded:
+
+- triggering incident class;
+- permitted actions;
+- minimum approvers;
+- validity window;
+- expiration/sunset;
+- after-action review;
+- rollback/restoration.
+
+Emergency authority cannot silently become a permanent broad privilege.
+
+## Approval lifecycle
+
+```text
+DRAFT
+  |
+OPEN
+  |
+  +--> HOLD missing evidence/authority
+  |
+REVIEW / APPROVAL COLLECTION
+  |
+  +--> DENIED
+  |
+APPROVED
+  |
+TIMELOCK / CHALLENGE if required
+  |
+EXECUTION-TIME REVALIDATION
+  |
+EXECUTION AUTHORIZATION
+  |
+READBACK / CERTIFICATION
+```
+
+## Approval validity
+
+An approval can expire or become invalid if:
+
+- the target/version changes;
+- reviewer authority expires or is revoked;
+- policy changes materially;
+- required evidence becomes stale;
+- rights/DLA state changes;
+- a timelock surfaces a new HOLD;
+- execution scope differs from the approved scope.
+
+## Execution authorization envelope
+
+```yaml
+execution_authorization_id: stable id
+approval_request_ref: required
+approved_action_ref: exact
+subject_refs: exact
+authority_snapshot_refs: []
+approval_refs: []
+policy_evidence_snapshot_refs: []
+valid_from: timestamp
+valid_until: optional
+idempotency_key: required
+rollback_or_compensation_ref: optional|required
+status: authorized|expired|consumed|revoked|held
+```
+
+The executor must reject an authorization if the semantic action, subject or version no longer matches.
+
+## One-time versus reusable approvals
+
+An approval profile must explicitly say whether authorization is:
+
+- one-time;
+- valid for a time window;
+- reusable for a bounded action class;
+- limited by quantity, amount, environment or object scope.
+
+No approval becomes reusable just because it exists in storage.
+
+## API and MCP families
+
+Possible bounded operations include:
+
+```text
+create approval request
+read request and evidence requirements
+resolve required profile
+list eligible reviewers
+submit approve/deny/recusal/hold
+query quorum and threshold state
+revoke or expire approval
+issue execution authorization
+revalidate authorization
+record execution and readback
+```
+
+Agent/MCP access may create or route requests, but does not grant reviewer authority.
+
+## DAIL events
+
+```text
+ct.approval.request.created.v1
+ct.approval.request.opened.v1
+ct.approval.request.held.v1
+ct.approval.submitted.v1
+ct.approval.recused.v1
+ct.approval.quorum.met.v1
+ct.approval.request.approved.v1
+ct.approval.request.denied.v1
+ct.approval.authorization.issued.v1
+ct.approval.authorization.expired.v1
+ct.approval.authorization.revoked.v1
+ct.approval.execution.readback.v1
+ct.approval.execution.mismatch.v1
+```
+
+## Failure modes
+
+- approval profile unresolved -> HOLD;
+- reviewer ineligible -> approval rejected/invalid;
+- reviewer conflict -> recusal;
+- insufficient quorum -> remain open/HOLD;
+- target changes after approval -> reapproval required;
+- approval expires -> re-request/revalidate;
+- provider executes without authorization -> drift/security/case path;
+- execution differs from approved target -> mismatch/remedy;
+- AI attempts a human-required approval -> deny;
+- DAIL receipt cannot be written where mandatory -> approval lifecycle incomplete.
+
+## Threat model
+
+- self-approval;
+- reviewer impersonation;
+- stale authority;
+- replay of old approval;
+- target substitution;
+- hidden request mutation;
+- collusion and conflict concealment;
+- emergency-power persistence;
+- agent authority laundering;
+- provider execution ahead of approval;
+- approval UI showing success while canonical state remains HOLD.
+
+## Test vectors
+
+1. eligible reviewer + valid request -> approval accepted;
+2. expired delegation -> approval rejected;
+3. target changes after approval -> reapproval required;
+4. quorum not met -> no approved state;
+5. policy PASS but mandatory human approval absent -> HOLD;
+6. founder/reserved gate required -> agent cannot self-approve;
+7. technical review required but absent -> HOLD;
+8. provider executes unapproved action -> incident/reconciliation;
+9. authorization replay after expiry/consumption -> reject;
+10. readback mismatch -> action is not certified complete.
+
+## Observability
+
+Track:
+
+- approval requests by action class;
+- approve/HOLD/deny/expiry rates;
+- approval latency;
+- quorum failure;
+- recusal/conflict rate;
+- stale authorization attempts;
+- execution/readback mismatch;
+- emergency approvals and sunsets;
+- founder/reserved approval usage;
+- agent-generated versus human-submitted requests.
+
+## Restricted companion
+
+Private custody can contain reviewer identity and conflict records, founder/reserved rationale, legal/professional evidence, sensitive change sets, security approvals, private economic approvals and protected authority matrices.
+
+## Invariants
+
+```text
+policy PASS != approval complete
+approval != execution
+reviewer identity != reviewer authority
+signature != authority
+agent capability != reviewer authority
+Founder Override != erasure of original blocking condition
+execution success != verified completion until readback
+```
+
+## Versioning
+
+Approval profiles, request schemas and authority requirements are versioned. Historic approval decisions retain exact target, policy, evidence and reviewer-authority snapshots.
+
+## Status
+
+`Phase_3_service_contract + current_governed_design`. Production state requires implementation, security, persistence, readback and workflow certification.

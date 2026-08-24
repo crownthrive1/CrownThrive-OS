@@ -1,0 +1,92 @@
+---
+title: "ALG-026 — Timelocked Execution"
+sidebarTitle: "ALG-026 Timelocked Execution"
+description: "Standalone CHLOM execution procedure that revalidates approval, authority, evidence, holds and idempotency at the end of a governed delay before side effects occur."
+icon: "clock"
+keywords: ["CHLOM ALG-026", "timelock", "scheduled execution", "revalidation", "authority"]
+---
+
+# ALG-026 — Timelocked Execution
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-026
+name: Timelocked Execution
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: Scheduler/Timelock pallet lineage; governance; temporal controls
+version: 1.0.0
+current_authority: specification_only
+```
+
+A timelock separates approval from execution. ALG-026 requires CHLOM to revalidate the decision at execution time so an approval cannot remain blindly executable after its authority, evidence, rights or policy context has changed.
+
+## Inputs
+
+```yaml
+decision_ref:
+not_before:
+expires_at_if_any:
+approval_refs[]:
+authority_ref:
+evidence_refs[]:
+policy_versions[]:
+idempotency_key:
+current_time:
+```
+
+## Procedure
+
+```text
+function execute_scheduled(decision):
+    require now >= decision.not_before
+    require decision.approval_still_valid
+    require evidence_still_fresh
+    require authority_still_valid
+    require no_new_hold
+    require idempotency_not_consumed
+
+    execute()
+    append_dail_event()
+```
+
+## Revalidation
+
+At the execution boundary, re-check at least: approval revocation/expiry, actor/delegation validity, source rights, required credentials/evidence, current policy hard blocks, emergency holds, dependency health where required for safe execution and whether the semantic action already executed.
+
+## Not-before versus expiry
+
+`not_before` defines the earliest execution instant. A separate expiry can define the latest. An action that misses its valid window should HOLD or expire rather than execute late by default.
+
+## Mutated request protection
+
+The scheduled decision must bind to an action hash/version. If the underlying payload changes, it is a new request requiring fresh approval unless the governing authority explicitly authorized a permitted parameter range.
+
+## Output
+
+```yaml
+execution_receipt_id:
+decision_ref:
+revalidation_snapshot_ref:
+executed_at:
+result:
+side_effect_refs[]:
+idempotency_ref:
+```
+
+## Failure states
+
+Too early, expired, approval revoked, evidence stale, authority expired, new HOLD/incident, action version changed, dependency unsafe or idempotency already consumed.
+
+## DAIL evidence
+
+Append scheduling, approval, attempted execution, revalidation and final execution/failure as distinct events. The historical approval remains visible even if execution is later blocked.
+
+## Tests
+
+Test before not-before, exact boundary, after expiry, approval revoked during wait, evidence expiring during wait, authority revoked, new sanctions/rights hold, duplicate worker execution, changed payload and successful execution.
+
+## Versioning
+
+Timelock revalidation semantics are part of the safety contract and require versioned change control.

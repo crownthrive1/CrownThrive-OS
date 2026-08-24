@@ -1,0 +1,198 @@
+---
+title: "Treasury Routing Pallet — Historical Runtime Record"
+sidebarTitle: "Treasury Routing Pallet"
+description: "Individual reconstruction of CHLOM's historical Treasury Routing Pallet for deterministic flow of treasury value across reserves, programs and authorized destinations, mapped to current P-11 allocation routing."
+icon: "arrows-split-up-and-left"
+keywords: ["CHLOM Treasury Routing Pallet", "treasury routing", "reserves", "allocations", "P-11"]
+---
+
+# Treasury Routing Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.treasury-routing
+namespace: historical_runtime_pallet
+recovered_title: Treasury Routing Pallet
+source_recovery: title_plus_historical_smart_treasury/economic_architecture
+current_mapping:
+  - P-11 Capital, Revenue & Settlement
+  - treasury allocation/routing service
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Treasury Routing Pallet separated **where protocol-controlled value should go** from the Treasury Pallet's broader custody/governance role. It encoded authorized distribution paths among reserves, programs, incentives, fees and other destinations.
+
+```text
+TREASURY / QUALIFYING INFLOW
+          |
+          v
+ROUTING POLICY VERSION
+          |
+          v
+TREASURY ROUTING PALLET
+          |
+    +-----+-----+-----+
+    |           |     |
+ reserve     program  other authorized destination
+```
+
+## Routing is not authority
+
+A route configuration does not create the right to move value.
+
+```text
+route exists
+   !=
+spend authorized
+```
+
+Current P-11 requires economic authority, schedule version and provider/accounting reconciliation.
+
+## Reconstructed route object
+
+```yaml
+route_id: stable ID
+source_treasury_ref: required
+trigger_or_inflow_type: controlled
+route_policy_ref: required
+version: string
+destination_rules: []
+effective_from: timestamp
+effective_until: nullable
+status: draft|effective|superseded|retired
+```
+
+## Destination rule
+
+```yaml
+destination_ref: reserve|program|treasury_subaccount|beneficiary|provider|other
+allocation_rule_ref: amount|bps|formula
+condition_ref: optional
+priority: optional
+```
+
+No specific historical/current routing percentage is activated by this article.
+
+## Routing versus Fee Router
+
+```text
+Fee Router
+  routes a defined fee obligation
+
+Treasury Routing Pallet
+  routes treasury/inflow/budget value across governed treasury purposes
+```
+
+They can share allocation algorithms but are distinct historical modules.
+
+## Conservation
+
+For a closed route plan:
+
+```text
+sum(destination allocations) + remainder = governed routing basis
+```
+
+Rounding/remainder rules must be deterministic and versioned.
+
+## Current mapping
+
+```text
+Historical Treasury Routing Pallet
+       |
+       v
+P-11 Allocation Plan / Treasury Routing Service
+       |
+       +--> budget controls
+       +--> reserves
+       +--> obligations
+       +--> provider execution
+       +--> reconciliation
+```
+
+## Historical token lineage
+
+Historical routes could reference token burns, validator incentives, staking pools or DAO grants. Those remain historical architecture until separately adopted in a current legally/security-validated economic system.
+
+## Historical operation families
+
+- register/update treasury route;
+- compute route allocation;
+- create routed obligations/transfers;
+- supersede route version;
+- query route state.
+
+Exact historical extrinsic names are not recovered.
+
+## Current events
+
+```text
+ct.treasury.route.adopted.v1
+ct.treasury.route.calculated.v1
+ct.treasury.route.obligation.created.v1
+ct.treasury.route.corrected.v1
+ct.treasury.route.superseded.v1
+```
+
+## Failure cases
+
+### Destination invalid/revoked
+
+HOLD route execution and reconcile authority rather than selecting a fallback silently.
+
+### Route sum exceeds basis
+
+DENY/HOLD; do not create unsupported obligations.
+
+### Provider transfer partially succeeds
+
+Reconcile each destination independently and compensate/hold according to P-11 policy.
+
+### Historical incentive destination recovered
+
+Preserve lineage; do not create current payout destination.
+
+## Security threats
+
+- destination substitution;
+- unauthorized route update;
+- circular routing;
+- rounding extraction;
+- duplicate execution;
+- cross-currency ambiguity;
+- hidden fallback account.
+
+## Public / restricted split
+
+Public-safe:
+
+- route architecture;
+- public program allocation semantics where approved;
+- conservation/versioning principles.
+
+Restricted:
+
+- current routes/percentages;
+- private accounts/destinations;
+- budget/reserve targets;
+- provider/banking mapping;
+- protected anti-abuse controls.
+
+## Invariants
+
+```text
+route != authority
+routing != settlement
+configured destination != eligible destination forever
+historical incentive route != current obligation
+partial provider success != complete route
+correction != erasure
+historical pallet != current runtime deployment
+```
+
+## Status
+
+The Treasury Routing Pallet remains a standalone historical CHLOM economic module and maps to current P-11 treasury allocation/routing, obligation and reconciliation services.

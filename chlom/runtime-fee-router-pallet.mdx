@@ -1,0 +1,212 @@
+---
+title: "Fee Router Pallet — Historical Runtime Record"
+sidebarTitle: "Fee Router Pallet"
+description: "Individual reconstruction of CHLOM's historical Fee Router Pallet for protocol/service fee allocation across treasury, participants and other destinations, mapped to current P-11 fee schedules and reconciliation."
+icon: "route"
+keywords: ["CHLOM Fee Router Pallet", "fees", "treasury routing", "allocation", "P-11"]
+---
+
+# Fee Router Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.fee-router
+namespace: historical_runtime_pallet
+recovered_title: Fee Router Pallet
+recovered_help_center_description: routes protocol/service fees to configured treasury, participant, burn or other authorized destinations
+source_recovery: substantive_title_plus_treasury/economic_architecture
+current_mapping:
+  - P-11 Capital, Revenue & Settlement
+  - current fee schedule / allocation service
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Fee Router Pallet was designed to make fee distribution deterministic after a CHLOM transaction or protocol action produced a fee.
+
+```text
+QUALIFYING FEE EVENT
+      |
+      v
+FEE SCHEDULE / ROUTE VERSION
+      |
+      v
+FEE ROUTER
+      |
+ +----+----+----+
+ |         |    |
+treasury  party other authorized destination
+```
+
+Historical token/burn destinations remain source-era concepts; current routing must use current economic authority.
+
+## Fee existence comes before routing
+
+```text
+configured route
+   !=
+valid fee obligation
+```
+
+A fee must have an authorized current basis before routing occurs.
+
+## Reconstructed route record
+
+```yaml
+fee_route_id: stable ID
+fee_type: controlled vocabulary
+source_authority_ref: required
+schedule_version_ref: required
+basis_ref: required
+destination_rules: []
+effective_from: timestamp
+effective_until: nullable
+status: draft|effective|superseded|retired
+```
+
+## Destination rule
+
+```yaml
+destination_ref: treasury|beneficiary|reserve|provider|other
+share_or_formula_ref: required
+condition_ref: optional
+priority: optional
+```
+
+No current percentages or destinations are inferred from historical papers.
+
+## Routing lifecycle
+
+```text
+FEE CANDIDATE
+   |
+validate source / schedule
+   |
+calculate amount
+   |
+construct route plan
+   |
+validate conservation
+   |
+authorize obligations
+   |
+provider execution / ledger
+   |
+reconciliation
+```
+
+## Conservation
+
+For a closed route plan:
+
+```text
+sum(routed amounts) + governed remainder = fee basis
+```
+
+The schedule defines rounding/remainder semantics.
+
+## Current P-11 mapping
+
+```text
+Historical Fee Router
+       |
+       v
+P-11 fee schedule + allocation plan
+       |
+       v
+obligation ledger
+       |
+       v
+provider/accounting execution
+       |
+       v
+reconciliation / DAIL
+```
+
+## ThriveEvergreen relationship
+
+Current commercial activation may authorize the fee object/schedule through ThriveEvergreen/ECAC. Fee Router semantics do not bypass that authority.
+
+## Historical token/burn lineage
+
+Historical CHLOM tokenomics sometimes routed fees toward burn, staking/validator or token-treasury mechanisms. Those destinations are historical research unless current token infrastructure is separately activated and validated.
+
+## Historical operation families
+
+- register fee route;
+- calculate/route fee;
+- update route version;
+- query route/allocation;
+- correct/reverse routed obligation.
+
+Exact historical extrinsic names are not recovered.
+
+## Current events
+
+```text
+ct.fee.schedule.adopted.v1
+ct.fee.route.calculated.v1
+ct.fee.obligation.created.v1
+ct.fee.route.corrected.v1
+ct.fee.schedule.superseded.v1
+```
+
+## Failure cases
+
+### Route percentages do not conserve basis
+
+HOLD; do not silently create/destroy value.
+
+### Destination account/provider unavailable
+
+Hold obligation or route according to explicit fallback policy; do not redirect to an arbitrary account.
+
+### Historical burn route found
+
+Preserve historical record; do not activate without live token/economic authority.
+
+### Duplicate event
+
+Idempotency prevents duplicate fee obligations.
+
+## Security threats
+
+- destination substitution;
+- unauthorized schedule update;
+- rounding extraction;
+- duplicate routing;
+- hidden fallback destination;
+- provider/account alias drift.
+
+## Public / restricted split
+
+Public-safe:
+
+- route architecture;
+- public fee semantics where approved;
+- conservation principles.
+
+Restricted:
+
+- confidential fee rates;
+- private destinations/account mappings;
+- partner economics;
+- anti-fraud controls.
+
+## Invariants
+
+```text
+fee route != fee authority
+configured destination != valid payee automatically
+historical burn != current burn
+routing != settlement
+provider transfer != reconciliation
+correction != deletion
+historical pallet != current deployment
+```
+
+## Status
+
+The Fee Router Pallet is preserved as historical economic runtime IP and maps to P-11's current fee schedules, deterministic allocation, obligation and reconciliation services.

@@ -1,0 +1,55 @@
+---
+title: "UI-INT-005 — Rate-Limit / Usage Meter"
+sidebarTitle: "UI-INT-005 Usage Meter"
+description: "Reusable CHLOM component for request budget, quota, current usage, reset window and throttling state with explicit unlimited, zero and unknown semantics."
+icon: "gauge"
+keywords: ["CHLOM widget", "rate limit", "usage meter", "quota", "request budget"]
+---
+
+# UI-INT-005 — Rate-Limit / Usage Meter
+
+## Component identity
+
+```yaml
+surface_id: UI-INT-005
+component: Rate-Limit / Usage Meter
+classification: role_scoped_component_contract
+owner_capabilities: API Gateway; Providers; Observability
+```
+
+## Purpose
+
+This component shows current consumption against a defined request/usage budget and makes throttling or quota risk visible before integrations fail.
+
+## Data contract
+
+Meter ID, subject/client/provider, measurement window, used count/amount, allowed ceiling, remaining amount where known, reset/effective time, source observation time, throttle state, overage/spend-cap state and evidence/monitor ref.
+
+## Canonical CrownThrive request-budget semantics
+
+Where the CrownThrive request-ceiling convention applies:
+
+```text
+-1   = unlimited CrownThrive-local monthly ceiling
+0    = exactly zero requests permitted
+N>0  = exactly N requests permitted per month
+null = unresolved/unknown and must fail closed
+```
+
+Provider-native limits can use different schemas and must be normalized explicitly rather than silently mapped.
+
+## States
+
+`AVAILABLE`, `LOW_REMAINING`, `LIMIT_REACHED`, `UNLIMITED`, `ZERO_ALLOWED`, `UNKNOWN_HOLD`, `RATE_LIMITED`, `RESET_PENDING`, `ERROR`.
+
+## Semantics
+
+Usage meter state is operational capacity evidence, not permission to make a business action. `UNLIMITED` is explicit; `null` never renders as unlimited.
+
+## Tests
+
+Test -1, 0, positive limit, null, exact boundary, provider rate-limit response, stale usage, reset window and differing provider units.
+
+## Versioning
+
+Budget semantics and provider normalizers are versioned; historical usage snapshots retain the interpretation used.
