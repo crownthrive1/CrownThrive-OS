@@ -7,8 +7,14 @@ on:
       - 'developers/manifests/chlom-protocol-commercial-projection.v1.json'
       - 'developers/manifests/chlom-pentafabric.v1.json'
       - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/manifests/chlom-api-mcp-surface-candidates.v1.json'
+      - 'developers/manifests/chlom-pentafabric-asset-classes.v1.json'
+      - 'developers/manifests/chlom-commercial-package-candidates.v1.json'
+      - 'developers/manifests/chlom-mesh-failover.v1.json'
+      - 'developers/manifests/chlom-maintenance-projection-gate.v1.json'
       - 'developers/contracts/chlom-commercial-projection.contract.v1.json'
       - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-vault-boundary.contract.v1.json'
       - 'developers/contracts/chlom-continuous-build.contract.v1.json'
       - 'frameworks/chlom-commercial-projection-factory.mdx'
       - 'scripts/validate_chlom_commercial_projection.py'
@@ -21,8 +27,14 @@ on:
       - 'developers/manifests/chlom-protocol-commercial-projection.v1.json'
       - 'developers/manifests/chlom-pentafabric.v1.json'
       - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/manifests/chlom-api-mcp-surface-candidates.v1.json'
+      - 'developers/manifests/chlom-pentafabric-asset-classes.v1.json'
+      - 'developers/manifests/chlom-commercial-package-candidates.v1.json'
+      - 'developers/manifests/chlom-mesh-failover.v1.json'
+      - 'developers/manifests/chlom-maintenance-projection-gate.v1.json'
       - 'developers/contracts/chlom-commercial-projection.contract.v1.json'
       - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-vault-boundary.contract.v1.json'
       - 'developers/contracts/chlom-continuous-build.contract.v1.json'
       - 'frameworks/chlom-commercial-projection-factory.mdx'
       - 'scripts/validate_chlom_commercial_projection.py'
@@ -89,7 +101,7 @@ jobs:
           find dist/chlom-protocol -type f -print | sort >> "$GITHUB_STEP_SUMMARY"
 
   project-to-public-child:
-    name: Open governed child projection pull request
+    name: Governed child projection candidate
     needs: validate-and-build
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
@@ -106,19 +118,59 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Resolve bounded cross-repository authority
+      - name: Resolve maintenance and bounded cross-repository authority
         id: auth
         env:
           CHILD_TOKEN: ${{ secrets.CHLOM_PUBLIC_REPO_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: |
           set -euo pipefail
+          gate='developers/manifests/chlom-maintenance-projection-gate.v1.json'
+          readarray -t values < <(python - "$gate" "$EVENT_NAME" <<'PY'
+          import json, sys
+          gate = json.load(open(sys.argv[1], encoding='utf-8'))
+          event = sys.argv[2]
+          autonomous = bool(gate.get('autonomous_external_mutation_allowed'))
+          if event == 'schedule':
+              event_allowed = bool(gate.get('scheduled_child_projection_allowed'))
+          elif event == 'push':
+              event_allowed = bool(gate.get('automatic_child_projection_on_parent_push_allowed'))
+          else:
+              # Manual dispatch still requires maintenance release; it is not a bypass.
+              event_allowed = autonomous
+          print(gate.get('state', 'UNKNOWN'))
+          print('true' if autonomous else 'false')
+          print('true' if event_allowed else 'false')
+          PY
+          )
+
+          state="${values[0]:-UNKNOWN}"
+          autonomous="${values[1]:-false}"
+          event_allowed="${values[2]:-false}"
+          echo "maintenance_state=$state" >> "$GITHUB_OUTPUT"
+
+          if [ "$autonomous" != 'true' ] || [ "$event_allowed" != 'true' ]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo "PROJECTION_HOLD_MAINTENANCE state=$state event=$EVENT_NAME"
+            exit 0
+          fi
+
           if [ -z "${CHILD_TOKEN:-}" ]; then
             echo 'ready=false' >> "$GITHUB_OUTPUT"
             echo 'PUBLISH_HOLD_NO_CHLOM_PUBLIC_REPO_TOKEN'
           else
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Record governed hold
+        if: steps.auth.outputs.ready != 'true'
+        shell: bash
+        run: |
+          echo '## CHLOM child projection' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo "Child mutation held. Maintenance state: ${{ steps.auth.outputs.maintenance_state }}." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Validation and deterministic build preparation remain active; no external child mutation was attempted.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Materialize projection
         if: steps.auth.outputs.ready == 'true'
