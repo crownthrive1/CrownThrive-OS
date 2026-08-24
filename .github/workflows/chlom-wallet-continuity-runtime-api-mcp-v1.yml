@@ -1,0 +1,84 @@
+name: CHLOM Wallet Continuity Runtime API MCP v1
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/chlom-wallet-continuity/**'
+      - 'developers/reference/chlom-wallet/continuity/test-continuity-runtime-api-mcp-v1.mjs'
+      - 'developers/reference/chlom-wallet/continuity/sql/chlom-wallet-continuity-runtime-api-mcp-v1.sql'
+      - 'developers/chlom-wallet-continuity-runtime-api-mcp-v1.mdx'
+      - '.github/workflows/chlom-wallet-continuity-runtime-api-mcp-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-continuity-runtime-api-mcp-v1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify runtime
+        run: node --version
+      - name: Syntax check pure protocol contract
+        run: |
+          node --check supabase/functions/chlom-wallet-continuity/contract.mjs
+          node --check developers/reference/chlom-wallet/continuity/test-continuity-runtime-api-mcp-v1.mjs
+      - name: API MCP contract test
+        run: node developers/reference/chlom-wallet/continuity/test-continuity-runtime-api-mcp-v1.mjs
+      - name: Edge function authorization boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=supabase/functions/chlom-wallet-continuity/index.ts
+          grep -q "SUPABASE_SERVICE_ROLE_KEY" "$f"
+          grep -q "isServiceRoleRequest" "$f"
+          grep -q "forbidden_service_role_required" "$f"
+          grep -q "MCP-Protocol-Version" "$f"
+          grep -q "Mcp-Method" supabase/functions/chlom-wallet-continuity/contract.mjs
+          grep -q "Mcp-Name" supabase/functions/chlom-wallet-continuity/contract.mjs
+          if grep -nE 'Deno\.env\.get\([^)]*(STRIPE|PRIVATE_KEY|SECRET_KEY|PASSWORD)' "$f"; then
+            echo 'Unexpected provider credential dependency detected.'
+            exit 1
+          fi
+          echo PASS_CHLOM_WALLET_CONTINUITY_EDGE_AUTH_BOUNDARY_V1
+      - name: SQL runtime boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=developers/reference/chlom-wallet/continuity/sql/chlom-wallet-continuity-runtime-api-mcp-v1.sql
+          grep -q 'continuity_api_request_receipts_v1' "$f"
+          grep -q 'continuity_runtime_releases_v1' "$f"
+          grep -q 'continuity_runtime_canary_runs_v1' "$f"
+          grep -q 'security invoker' "$f"
+          grep -q 'revoke all on function' "$f"
+          grep -q 'grant execute on function' "$f"
+          grep -q 'automatic_destructive_action' "$f"
+          grep -q 'provider_write' "$f"
+          grep -q 'money_movement' "$f"
+          grep -q 'rights_grant' "$f"
+          grep -q 'chain_broadcast' "$f"
+          grep -q '2026-07-28' "$f"
+          echo PASS_CHLOM_WALLET_CONTINUITY_RUNTIME_SQL_BOUNDARY_V1
+      - name: No secret-shaped material
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE -- 'sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|whsec_[A-Za-z0-9]{16,}|sb_secret_[A-Za-z0-9._-]{16,}|-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' \
+            supabase/functions/chlom-wallet-continuity \
+            developers/reference/chlom-wallet/continuity/test-continuity-runtime-api-mcp-v1.mjs \
+            developers/reference/chlom-wallet/continuity/sql/chlom-wallet-continuity-runtime-api-mcp-v1.sql \
+            developers/chlom-wallet-continuity-runtime-api-mcp-v1.mdx; then
+            echo 'Potential secret-shaped material detected.'
+            exit 1
+          fi
+      - name: Record controlled-test boundary
+        run: |
+          echo 'Private API/MCP deployment does not manufacture CHLOM authority.'
+          echo 'No provider write, custody, money movement, Rights grant, chain broadcast, checkout, destructive recovery, merge authorization, or phase advancement is authorized.'
