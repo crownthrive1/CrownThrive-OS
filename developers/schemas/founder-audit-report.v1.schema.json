@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/founder-audit-report.v1.schema.json",
+  "title": "CrownThrive Founder Audit Report Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "report_id",
+    "run_id",
+    "proposal_sha256",
+    "status",
+    "canonicality",
+    "prepared_at",
+    "evidence_cutoff",
+    "classification",
+    "boundaries",
+    "findings",
+    "assignments",
+    "verification",
+    "delivery"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^CT-FO-RPT-[0-9]{4}-[0-9]{2}-[0-9]{2}-[A-Z0-9-]+$"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "proposal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "status": {
+      "enum": [
+        "SUCCESS",
+        "FAILURE",
+        "ACTION_NEEDED",
+        "NO_ACTION_NEEDED",
+        "BLOCKED"
+      ]
+    },
+    "canonicality": {
+      "const": "NON_CANONICAL_ADVISORY_DRAFT"
+    },
+    "prepared_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "evidence_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "classification": {
+      "enum": [
+        "Public",
+        "Community",
+        "Partner",
+        "Internal",
+        "Restricted",
+        "Evidence-Private",
+        "Strategic"
+      ]
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "macro",
+        "meso",
+        "micro",
+        "excluded"
+      ],
+      "properties": {
+        "macro": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "meso": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "micro": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "finding_id",
+          "claim",
+          "source_ids",
+          "snapshot_at",
+          "authority_tier",
+          "claim_kind",
+          "confidence",
+          "implementation_status",
+          "classification",
+          "owner"
+        ],
+        "properties": {
+          "finding_id": {
+            "type": "string"
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "snapshot_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "authority_tier": {
+            "enum": [
+              "T0",
+              "T1",
+              "T2",
+              "T3",
+              "T4"
+            ]
+          },
+          "claim_kind": {
+            "enum": [
+              "observed-system-state",
+              "controlling-directive",
+              "approved-decision",
+              "source-assertion",
+              "inference",
+              "unresolved-hypothesis"
+            ]
+          },
+          "confidence": {
+            "enum": [
+              "verified",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "implementation_status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "PARTIAL",
+              "NEED_TO_DO",
+              "GOVERNED_DEFERRED",
+              "UNKNOWN",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "classification": {
+            "enum": [
+              "Public",
+              "Community",
+              "Partner",
+              "Internal",
+              "Restricted",
+              "Evidence-Private",
+              "Strategic"
+            ]
+          },
+          "owner": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "assignments": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "agent_id",
+          "action",
+          "evidence_required",
+          "acceptance_test",
+          "response_state"
+        ],
+        "properties": {
+          "agent_id": {
+            "enum": [
+              "ct.relay.agent-a",
+              "ct.relay.agent-b",
+              "ct.relay.agent-c",
+              "ct.relay.agent-d",
+              "ct.relay.agent-s"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_required": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "acceptance_test": {
+            "type": "string",
+            "minLength": 1
+          },
+          "response_state": {
+            "enum": [
+              "PENDING",
+              "ACCEPTED",
+              "DISPUTED",
+              "DEFERRED",
+              "OUT_OF_SCOPE"
+            ]
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tests",
+        "untested_areas"
+      ],
+      "properties": {
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "result"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "result": {
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "NOT_RUN"
+                ]
+              }
+            }
+          }
+        },
+        "untested_areas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "google_doc",
+        "email",
+        "agent_acknowledgments"
+      ],
+      "properties": {
+        "google_doc": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "PENDING",
+                "DOC_CREATED",
+                "BLOCKED_CONNECTOR",
+                "FAILED"
+              ]
+            },
+            "provider_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "email": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "PENDING",
+                "EMAIL_SENT",
+                "BLOCKED_CONNECTOR",
+                "FAILED"
+              ]
+            },
+            "provider_receipt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "agent_acknowledgments": {
+          "type": "object",
+          "additionalProperties": {
+            "enum": [
+              "PENDING",
+              "ACCEPTED",
+              "DISPUTED",
+              "DEFERRED",
+              "OUT_OF_SCOPE"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

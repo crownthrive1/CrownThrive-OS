@@ -1,0 +1,64 @@
+name: Founder Strategy Orchestrator Candidate
+
+on:
+  pull_request:
+    paths:
+      - "automation/founder-strategy-orchestrator.mdx"
+      - "developers/manifests/founder-strategy-orchestrator.v1.json"
+      - "developers/schemas/founder-audit-report.v1.schema.json"
+      - "scripts/validate_founder_strategy_orchestrator.py"
+      - "changelog/phase-2-99-founder-strategy-orchestrator-candidate.md"
+      - ".github/workflows/founder-strategy-orchestrator-candidate.yml"
+  push:
+    branches:
+      - main
+      - "admin-mcp/**"
+    paths:
+      - "automation/founder-strategy-orchestrator.mdx"
+      - "developers/manifests/founder-strategy-orchestrator.v1.json"
+      - "developers/schemas/founder-audit-report.v1.schema.json"
+      - "scripts/validate_founder_strategy_orchestrator.py"
+      - "changelog/phase-2-99-founder-strategy-orchestrator-candidate.md"
+      - ".github/workflows/founder-strategy-orchestrator-candidate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: founder-strategy-orchestrator-candidate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-candidate:
+    name: Validate bounded Founder Strategy Orchestrator candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify validator syntax
+        run: |
+          python -m py_compile scripts/validate_founder_strategy_orchestrator.py
+          python -m py_compile scripts/validate_docs.py
+
+      - name: Validate candidate authority, activation, and reporting invariants
+        run: python scripts/validate_founder_strategy_orchestrator.py
+
+      - name: Validate institutional documentation
+        run: python scripts/validate_docs.py
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
