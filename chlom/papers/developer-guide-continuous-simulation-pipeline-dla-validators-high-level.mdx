@@ -1,0 +1,148 @@
+---
+title: "Developer Guide — Continuous Simulation Pipeline for DLA Validators (High-Level)"
+sidebarTitle: "DLA Continuous Simulation"
+description: "Exact-title reconstruction of the historical high-level continuous simulation pipeline for DLA validators, defining trigger, scenario, replay, invariant, drift and release-feedback stages without inventing lost infrastructure."
+icon: "rotate"
+keywords: ["Continuous Simulation Pipeline", "DLA validators", "CHLOM simulation", "continuous assurance", "drift"]
+---
+
+# Developer Guide — Continuous Simulation Pipeline for DLA Validators (High-Level)
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.devguide-dla-continuous-simulation-highlevel
+exact_recovered_title: Developer Guide — Continuous Simulation Pipeline for DLA Validators (High-Level)
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+sibling_title: Developer Guide — Continuous Simulation Pipeline for DLA Validators (Extremely High-Level)
+production_pipeline_claim: none
+```
+
+## Why this title is separate
+
+The historical Help Center preserves both a `High-Level` and an `Extremely High-Level` version. They remain separate records under the no-combination rule. This article carries the more operational high-level pipeline semantics; its sibling retains the executive/architectural abstraction.
+
+## Pipeline objective
+
+Continuously test new code, policy, model, validator/oracle configuration and recovered-state changes against known scenarios and invariants before those changes can influence governed licensing behavior.
+
+## Pipeline topology
+
+```text
+CHANGE / TIMER / INCIDENT / NEW EVIDENCE
+              |
+          trigger run
+              |
+      freeze exact inputs
+              |
+      select scenario packs
+              |
+   replay + fault injection
+              |
+    invariant evaluation
+              |
+ policy/model/validator metrics
+              |
+    compare prior baseline
+              |
+   PASS | WARN | BLOCK/HOLD
+              |
+ evidence packet + release feedback
+```
+
+## Trigger classes
+
+A simulation run may be triggered by:
+
+- code/runtime change;
+- policy pack update;
+- model update;
+- oracle/validator profile change;
+- bridge configuration change;
+- schema migration;
+- incident/correction;
+- scheduled drift assurance;
+- newly recovered historical requirement entering current implementation review.
+
+## Exact-input freeze
+
+Every run needs exact refs for:
+
+```yaml
+run_inputs:
+  code_commit: required
+  configuration_version: required
+  policy_versions: []
+  model_versions: []
+  scenario_pack_versions: []
+  oracle_profiles: []
+  validator_profiles: []
+  schema_versions: []
+  seed_or_randomness_ref: optional
+```
+
+Without reproducible inputs, a green simulation cannot be treated as durable evidence.
+
+## Scenario selection
+
+Run baseline happy paths, negative/authority tests, cross-layer failure injection, regression cases from prior incidents, edge cases and policy/model-specific test packs.
+
+## Differential comparison
+
+Compare the candidate against the last accepted baseline:
+
+```text
+which decisions changed?
+which invariants changed?
+which HOLD/DENY rates changed?
+which rights/authority paths changed?
+which evidence dependencies changed?
+```
+
+Any unexplained authority expansion is release-blocking.
+
+## Drift assurance
+
+Scheduled simulations can replay representative scenarios against current models/data providers to detect decision drift even when code has not changed.
+
+## Validator/oracle degradation tests
+
+Periodically simulate partial outage, stale observations, conflicting signers and compromised/ineligible members to verify quorum/HOLD behavior.
+
+## Result states
+
+```text
+PASS  = required invariants and acceptance criteria satisfied
+WARN  = non-blocking variance requiring evidence/review
+BLOCK/HOLD = material invariant, authority, security or unexplained behavior failure
+```
+
+## DAIL/evidence integration
+
+Material assurance runs should create or reference an institutional evidence record containing exact inputs, results, deviations and release linkage. Large raw test output may remain outside DAIL with integrity references.
+
+## No automatic promotion
+
+```text
+continuous simulation PASS
+        !=
+automatic production deployment
+```
+
+Release authority remains a separate governed gate.
+
+## Current links
+
+- [Multi-Layer Compliance Simulation Framework](/chlom/papers/developer-guide-multi-layer-compliance-simulation-framework-dla-validators)
+- [Formal Invariants Harness](/chlom/formal-invariants-test-vectors-threat-model-harness)
+- [Release Certification Algorithm](/chlom/algorithms/alg-032-release-certification)
+- [Drift Monitor](/chlom/engine-drift-monitor)
+
+## Nonclaims
+
+This record does not assert a current CI simulator, historical exact job schedule, validator cluster or recovered original pipeline implementation.
+
+## Status
+
+`TITLE_RECOVERED + CONTINUOUS_SIMULATION_PIPELINE_RECONSTRUCTED + SIBLING_PRESERVED + EXACT_BODY_NOT_LOCATED`
