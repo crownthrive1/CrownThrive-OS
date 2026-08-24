@@ -1,0 +1,65 @@
+---
+title: CHLOM Wallet Production Contract v1
+description: Production CHLOM Wallet evidence and settlement orchestration with Stripe stablecoin funding adapter.
+---
+
+# CHLOM Wallet Production Contract v1
+
+**Effective:** August 23, 2026  
+**Wallet:** `ct.wallet.system.chlom-wallet-os`  
+**Runtime:** Production / active  
+**Custody mode:** Non-custodial
+
+CHLOM Wallet is an institutional wallet/economic-evidence control plane. It records governed provider receipts, settlement provenance, value class, reversals, and chain-hashed ledger events. Production activation does **not** convert CHLOM Wallet into a custodian of customer cryptocurrency.
+
+## Stripe adapters
+
+Two Stripe funding classes are distinguished:
+
+- Fiat payment processing: `ct.adapter.stripe.wallet.v1`
+- Stablecoin payments: `ct.adapter.stripe.stablecoin-payments.v1`
+
+The stablecoin adapter is deployed in production and fails closed at the provider-enablement boundary.
+
+### Stablecoin tender model
+
+The adapter is modeled for Stripe-supported stablecoin payments including USDC, USDP, and USDG on provider-supported networks. Stripe handles customer-wallet interaction and provider settlement. CHLOM Wallet records the payment as evidence and does not claim custody of the customer token.
+
+When a verified Crown Credits top-up settles, the Crown Credits ledger automatically projects a secret-free settlement event into the CHLOM Wallet append-only evidence ledger. If the Stripe payment method is crypto, the event is tagged with the stablecoin adapter and stablecoin tender provenance.
+
+The projection never creates an entitlement, rights grant, public claim, or on-chain custody by inference.
+
+## Production settlement authority
+
+Production Stripe reconciliation is readback-authoritative. A provider callback or success status is evidence, not final economic truth.
+
+The system independently reads Stripe provider objects before recording a verified settlement. A live webhook may accelerate processing when a provider destination is available, but loss or absence of a dedicated destination does not weaken the readback verification rule.
+
+## Provider capability state
+
+The adapter may be `production` while the provider state is `provider_enablement_pending`. This distinction is mandatory.
+
+Current Stripe platform configuration is machine-read before use. If Stripe reports crypto unavailable, no Checkout flow may pretend crypto is enabled.
+
+## API and MCP surface
+
+Production status/API surface:
+
+`https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-wallet-stripe-webhook`
+
+Canonical MCP operations include:
+
+- `chlom_wallet.status`
+- `chlom_wallet.stablecoin.status`
+- `chlom_wallet.provider_receipts.read`
+
+## Hard boundaries
+
+- No secret material in responses.
+- No provider success → entitlement inference.
+- No provider success → rights grant.
+- No provider success → public performance claim.
+- No stablecoin tender → CHLOM custody inference.
+- No Crown Credits → crypto-asset inference.
+- No deletion of governed ledger history.
+- Provider reversals append compensating evidence; history is not silently rewritten.
