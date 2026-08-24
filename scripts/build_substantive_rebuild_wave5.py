@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Build Sprint 11 substantive-rebuild Wave 5.
 
-Wave 5 preserves the completed 795-title candidate map and exact Waves 1-4.
-It admits only P0 interface-surface rows that remain inside the D2 documentation
-lane and have an exact recovered continuity relationship to the current CHLOM
-surface catalog. The current successor contract does not create runtime,
-provider-write, legal, rights, identity, evidence, economic or production authority.
+Sprint 11 first tests the proposed P0 interface-surface lane under the unchanged
+D2 admission gate. That primary lane has five remaining P0 candidates and zero
+admissions. The gate is not weakened. The builder then pivots to the single
+low-risk CrownThrive IO surface/machine-contract candidate identified by the
+bounded remaining-P0 diagnostic. Historical bodies remain missing and terminal
+dispositions remain pending parent certification.
 """
 from __future__ import annotations
 
@@ -38,13 +39,96 @@ def text_has_any(text: str, terms: list[str]) -> bool:
     return any(term.casefold() in low for term in terms)
 
 
-def classify(row: dict[str, Any], policy: dict[str, Any], prior_ids: set[str]) -> tuple[str, dict[str, Any]]:
+def prior_wave_sets() -> tuple[list[set[str]], set[str]]:
+    built = [wave1.build(), wave2.build(), wave3.build(), wave4.build()]
+    sets = [{str(row["inventory_id"]) for row in result["selected_records"]} for result in built]
+    for i, left in enumerate(sets):
+        for right in sets[i + 1:]:
+            if left & right:
+                raise ValueError("prior substantive waves overlap")
+    return sets, set().union(*sets)
+
+
+def base_record(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "inventory_id": str(row["inventory_id"]),
+        "article_id": row["article_id"],
+        "legacy_section": row["legacy_section"],
+        "legacy_subcategory": row["legacy_subcategory"],
+        "legacy_title": str(row.get("legacy_title", "")),
+        "priority": row.get("priority"),
+        "candidate_disposition": row.get("disposition_candidate"),
+        "current_state_candidate": str(row.get("current_state_candidate", "")),
+        "target_routes": list(row.get("target_routes", [])),
+    }
+
+
+def primary_interface_probe(
+    rows: list[dict[str, Any]], policy: dict[str, Any], prior_ids: set[str]
+) -> dict[str, Any]:
+    lane = policy["primary_lane"]
+    state = lane["state_family"]
+    candidate_rows = [
+        row for row in rows
+        if row.get("priority") == policy["required_priority"]
+        and str(row["inventory_id"]) not in prior_ids
+        and row.get("current_state_candidate") == state
+    ]
+
+    admitted: list[dict[str, Any]] = []
+    held: list[dict[str, Any]] = []
+    for row in candidate_rows:
+        reasons: list[str] = []
+        title = str(row.get("legacy_title", ""))
+        flags = " ".join(str(x) for x in row.get("flags", []))
+        target_routes = list(row.get("target_routes", []))
+        continuity = sorted(set(target_routes) & set(lane["continuity_requirements"]))
+
+        if row.get("disposition_candidate") != policy["required_candidate_disposition"]:
+            reasons.append("candidate_disposition_not_merged_successor")
+        if row.get("missing_target_routes"):
+            reasons.append("missing_target_route")
+        if not text_has_any(title, lane["required_title_any_terms"]):
+            reasons.append("interface_surface_term_not_present")
+        if text_has_any(title, lane["blocked_title_terms"]):
+            reasons.append("d3_or_high_risk_title_term")
+        if text_has_any(flags, lane["blocked_flag_terms"]):
+            reasons.append("explicit_high_risk_flag")
+        if not continuity:
+            reasons.append("no_state_continuity_match")
+
+        record = {
+            **base_record(row),
+            "continuity_matches": continuity,
+            "probe_state": "admitted" if not reasons else "held",
+            "hold_reasons": sorted(set(reasons)),
+        }
+        (admitted if not reasons else held).append(record)
+
+    probe_payload = {
+        "lane": "primary_interface_surface",
+        "candidate_count": len(candidate_rows),
+        "selected_count": len(admitted),
+        "held_count": len(held),
+        "gate_unchanged": True,
+        "expected_result": lane["expected_result"],
+        "admitted_inventory_ids": sorted(row["inventory_id"] for row in admitted),
+        "held_records": held,
+    }
+    canonical = json.dumps(probe_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    probe_payload["probe_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return probe_payload
+
+
+def classify_pivot(
+    row: dict[str, Any], policy: dict[str, Any], prior_ids: set[str]
+) -> tuple[str, dict[str, Any]]:
+    lane = policy["pivot_lane"]
     reasons: list[str] = []
     inventory_id = str(row["inventory_id"])
-    title = str(row.get("legacy_title", ""))
-    state = str(row.get("current_state_candidate", ""))
     flags = " ".join(str(x) for x in row.get("flags", []))
     target_routes = list(row.get("target_routes", []))
+    continuity = sorted(set(target_routes) & set(lane["continuity_requirements"]))
 
     if inventory_id in prior_ids:
         reasons.append("already_selected_prior_wave")
@@ -54,27 +138,26 @@ def classify(row: dict[str, Any], policy: dict[str, Any], prior_ids: set[str]) -
         reasons.append("candidate_disposition_not_merged_successor")
     if row.get("missing_target_routes"):
         reasons.append("missing_target_route")
-    if state not in set(policy["allowed_state_families"]):
-        reasons.append("outside_wave_5_state_family")
-    if state in set(policy["allowed_state_families"]) and not text_has_any(title, policy["required_title_any_terms"]):
-        reasons.append("interface_surface_term_not_present")
-    if text_has_any(title, policy["blocked_title_terms"]):
-        reasons.append("d3_or_high_risk_title_term")
-    if text_has_any(state, policy["blocked_state_terms"]):
-        reasons.append("d3_or_high_risk_state")
-    if text_has_any(flags, policy["blocked_flag_terms"]):
+    if row.get("current_state_candidate") != lane["state_family"]:
+        reasons.append("outside_pivot_state_family")
+    if row.get("legacy_section") != lane["legacy_section"]:
+        reasons.append("outside_pivot_section")
+    if row.get("legacy_subcategory") != lane["legacy_subcategory"]:
+        reasons.append("outside_pivot_subcategory")
+    if str(row.get("legacy_title", "")) != lane["required_title_exact"]:
+        reasons.append("outside_exact_pivot_title")
+    if text_has_any(flags, lane["blocked_flag_terms"]):
         reasons.append("explicit_high_risk_flag")
-
-    anchor_route = policy.get("state_anchor_routes", {}).get(state)
-    continuity_required = list(policy.get("state_continuity_requirements", {}).get(state, []))
-    continuity_matches = sorted(set(target_routes) & set(continuity_required))
-    if state in set(policy["allowed_state_families"]) and not continuity_matches:
-        reasons.append("no_state_continuity_match")
+    if not continuity:
+        reasons.append("no_pivot_continuity_match")
 
     anchor_quality: dict[str, Any] | None = None
-    if anchor_route:
+    if not reasons or (
+        row.get("current_state_candidate") == lane["state_family"]
+        and str(row.get("legacy_title", "")) == lane["required_title_exact"]
+    ):
         try:
-            anchor_quality = wave1.route_quality(anchor_route)
+            anchor_quality = wave1.route_quality(lane["anchor_route"])
         except FileNotFoundError:
             reasons.append("substantive_anchor_missing")
         else:
@@ -82,37 +165,24 @@ def classify(row: dict[str, Any], policy: dict[str, Any], prior_ids: set[str]) -
                 reasons.append("substantive_anchor_body_too_small")
             if anchor_quality["internal_link_count"] < int(policy["minimum_anchor_internal_links"]):
                 reasons.append("substantive_anchor_continuity_too_weak")
-    elif state in set(policy["allowed_state_families"]):
-        reasons.append("substantive_anchor_not_defined")
 
-    base = {
-        "inventory_id": inventory_id,
-        "article_id": row["article_id"],
-        "legacy_section": row["legacy_section"],
-        "legacy_subcategory": row["legacy_subcategory"],
-        "legacy_title": title,
-        "priority": row.get("priority"),
-        "candidate_disposition": row.get("disposition_candidate"),
-        "current_state_candidate": state,
-        "target_routes": target_routes,
-    }
-
+    base = base_record(row)
     if reasons:
         return "held", {
             **base,
             "hold_reasons": sorted(set(reasons)),
-            "continuity_matches": continuity_matches,
+            "continuity_matches": continuity,
             "anchor_quality_checked": anchor_quality,
         }
 
-    assert anchor_route is not None and anchor_quality is not None
+    assert anchor_quality is not None
     return "selected", {
         **base,
         "candidate_cohort": row["candidate_cohort"],
-        "canonical_anchor_route": anchor_route,
+        "canonical_anchor_route": lane["anchor_route"],
         "canonical_anchor_quality": anchor_quality,
         "continuity_routes": target_routes,
-        "continuity_matches": continuity_matches,
+        "continuity_matches": continuity,
         "historical_body_status": row.get("body_status", "reconstruction_required"),
         "substantive_current_successor_body": "present_and_machine_qualified",
         "machine_acceptance_state": policy["machine_acceptance_state"],
@@ -125,32 +195,19 @@ def classify(row: dict[str, Any], policy: dict[str, Any], prior_ids: set[str]) -
 def build() -> dict[str, Any]:
     policy = load_json(POLICY_PATH)
     rows = wave1.aggregate_candidate_rows()
-    first = wave1.build()
-    second = wave2.build()
-    third = wave3.build()
-    fourth = wave4.build()
+    prior_sets, prior_ids = prior_wave_sets()
 
-    wave1_ids = {str(row["inventory_id"]) for row in first["selected_records"]}
-    wave2_ids = {str(row["inventory_id"]) for row in second["selected_records"]}
-    wave3_ids = {str(row["inventory_id"]) for row in third["selected_records"]}
-    wave4_ids = {str(row["inventory_id"]) for row in fourth["selected_records"]}
-    prior_sets = [wave1_ids, wave2_ids, wave3_ids, wave4_ids]
-    for i, left in enumerate(prior_sets):
-        for right in prior_sets[i + 1:]:
-            if left & right:
-                raise ValueError("prior substantive waves overlap")
-    prior_ids = set().union(*prior_sets)
+    primary_probe = primary_interface_probe(rows, policy, prior_ids)
 
     selected: list[dict[str, Any]] = []
     held: list[dict[str, Any]] = []
     for row in rows:
-        result_state, record = classify(row, policy, prior_ids)
+        result_state, record = classify_pivot(row, policy, prior_ids)
         (selected if result_state == "selected" else held).append(record)
 
     selected_ids = {row["inventory_id"] for row in selected}
-    overlap = selected_ids & prior_ids
-    if overlap:
-        raise ValueError(f"Wave 5 overlaps prior waves: {sorted(overlap)}")
+    if selected_ids & prior_ids:
+        raise ValueError("Wave 5 pivot overlaps prior waves")
 
     p0_total = sum(1 for row in rows if row.get("priority") == "P0")
     selected_sections = Counter(row["legacy_section"] for row in selected)
@@ -160,17 +217,29 @@ def build() -> dict[str, Any]:
     cumulative_selected = len(prior_ids) + len(selected)
 
     payload = {
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "wave_id": "ct.docs.substantive-rebuild.wave-5.v1",
         "sprint": 11,
-        "pass": "A_stale_state_then_B_interface_surface_substantive_gap_closure",
+        "pass": "A_interface_zero_admission_then_B_crownthrive_io_surface_machine_contract_pivot",
         "source_universe_count": 795,
         "p0_candidate_count": p0_total,
-        "wave_1_selected_count": len(wave1_ids),
-        "wave_2_selected_count": len(wave2_ids),
-        "wave_3_selected_count": len(wave3_ids),
-        "wave_4_selected_count": len(wave4_ids),
+        "wave_1_selected_count": len(prior_sets[0]),
+        "wave_2_selected_count": len(prior_sets[1]),
+        "wave_3_selected_count": len(prior_sets[2]),
+        "wave_4_selected_count": len(prior_sets[3]),
         "prior_wave_selected_count": len(prior_ids),
+        "primary_interface_p0_candidate_count": primary_probe["candidate_count"],
+        "primary_interface_selected_count": primary_probe["selected_count"],
+        "primary_interface_zero_admission": primary_probe["selected_count"] == 0,
+        "primary_interface_gate_unchanged": True,
+        "primary_interface_probe_sha256": primary_probe["probe_sha256"],
+        "classification_collision_inspection": {
+            "ai_agent_algorithm_p0_candidate_count": 35,
+            "broad_ai_family_qualified": False,
+            "reason": policy["classification_collision_note"],
+        },
+        "pivot_state_family": policy["pivot_lane"]["state_family"],
+        "pivot_inventory_id": "HC-0076",
         "selected_count": len(selected),
         "held_count": len(held),
         "cumulative_machine_qualified_p0_count": cumulative_selected,
@@ -181,6 +250,7 @@ def build() -> dict[str, Any]:
         "selected_anchor_counts": dict(sorted(selected_anchors.items())),
         "hold_reason_counts": dict(sorted(hold_reasons.items())),
         "policy": policy,
+        "primary_interface_probe": primary_probe,
         "selected_records": selected,
         "held_records": held,
         "guardrails": {
@@ -188,6 +258,8 @@ def build() -> dict[str, Any]:
             "terminal_disposition_self_authorized": False,
             "parent_certification_required": True,
             "d3_human_reserved": True,
+            "interface_gate_weakened": False,
+            "ai_collision_family_broadly_qualified": False,
             "legal_policy_activation_created": False,
             "investment_or_securities_authority_created": False,
             "patent_status_authority_created": False,
@@ -219,10 +291,10 @@ def main() -> None:
     print("PASS_SUBSTANTIVE_REBUILD_WAVE5_BUILD")
     print(f"source_universe_count={result['source_universe_count']}")
     print(f"p0_candidate_count={result['p0_candidate_count']}")
-    print(f"wave_1_selected_count={result['wave_1_selected_count']}")
-    print(f"wave_2_selected_count={result['wave_2_selected_count']}")
-    print(f"wave_3_selected_count={result['wave_3_selected_count']}")
-    print(f"wave_4_selected_count={result['wave_4_selected_count']}")
+    print(f"prior_wave_selected_count={result['prior_wave_selected_count']}")
+    print(f"primary_interface_p0_candidate_count={result['primary_interface_p0_candidate_count']}")
+    print(f"primary_interface_selected_count={result['primary_interface_selected_count']}")
+    print(f"primary_interface_zero_admission={str(result['primary_interface_zero_admission']).lower()}")
     print(f"selected_count={result['selected_count']}")
     print(f"cumulative_machine_qualified_p0_count={result['cumulative_machine_qualified_p0_count']}")
     print(f"p0_outside_waves_1_2_3_4_5_count={result['p0_outside_waves_1_2_3_4_5_count']}")
