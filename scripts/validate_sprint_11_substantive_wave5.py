@@ -20,6 +20,19 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def extract_yaml_int_marker(text: str, key: str) -> int | None:
+    prefix = f"{key}:"
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(prefix):
+            value = stripped.split(":", 1)[1].strip()
+            try:
+                return int(value)
+            except ValueError:
+                return None
+    return None
+
+
 result = wave5.build()
 policy = result["policy"]
 errors: list[str] = []
@@ -200,9 +213,21 @@ for marker in [
         errors.append(f"public Wave 5 register missing marker: {marker}")
 if "/knowledge/documentation-substantive-rebuild-wave-5" not in gap_register:
     errors.append("gap register does not link Wave 5 public register")
-for marker in ["p0_substantive_current_successor_machine_qualified: 58", "p0_pending_substantive_or_specialist_resolution: 391"]:
-    if marker not in census:
-        errors.append(f"coverage census missing marker: {marker}")
+
+current_qualified = extract_yaml_int_marker(census, "p0_substantive_current_successor_machine_qualified")
+current_pending = extract_yaml_int_marker(census, "p0_pending_substantive_or_specialist_resolution")
+if current_qualified is None or current_pending is None:
+    errors.append("coverage census missing current P0 qualification/pending markers")
+else:
+    if current_qualified < 58:
+        errors.append(f"coverage census regressed below Wave 5 qualified floor: {current_qualified}")
+    if current_pending > 391:
+        errors.append(f"coverage census regressed above Wave 5 pending ceiling: {current_pending}")
+    if current_qualified + current_pending != 449:
+        errors.append(
+            "coverage census P0 conservation mismatch: "
+            f"qualified={current_qualified} pending={current_pending} estate=449"
+        )
 
 if errors:
     print("FAIL_SPRINT_11_SUBSTANTIVE_WAVE5")
