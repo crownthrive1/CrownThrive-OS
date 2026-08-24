@@ -1,0 +1,65 @@
+name: Governed Site Auto-Publish
+
+on:
+  pull_request:
+    paths:
+      - 'commerce/governed-release-autopublish.mdx'
+      - 'automation/governed-release-autopublisher-agent.mdx'
+      - 'standards/governed-release-autopublish-phase-amendment.mdx'
+      - 'developers/manifests/governed-site-autopublish.v1.json'
+      - 'scripts/validate_governed_site_autopublish.py'
+      - 'changelog/phase-2-99-governed-site-autopublish.mdx'
+      - '.github/workflows/governed-site-autopublish.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'commerce/governed-release-autopublish.mdx'
+      - 'automation/governed-release-autopublisher-agent.mdx'
+      - 'standards/governed-release-autopublish-phase-amendment.mdx'
+      - 'developers/manifests/governed-site-autopublish.v1.json'
+      - 'scripts/validate_governed_site_autopublish.py'
+      - 'changelog/phase-2-99-governed-site-autopublish.mdx'
+      - '.github/workflows/governed-site-autopublish.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  governed-site-autopublish:
+    name: Validate governed site auto-publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Compile auto-publish validator
+        run: python -m py_compile scripts/validate_governed_site_autopublish.py
+
+      - name: Validate governed release auto-publish
+        run: python scripts/validate_governed_site_autopublish.py
+
+      - name: Validate institutional documentation
+        run: python scripts/validate_docs.py
+
+      - name: Reject packet conflict markers
+        shell: bash
+        run: |
+          if grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' \
+            commerce/governed-release-autopublish.mdx \
+            automation/governed-release-autopublisher-agent.mdx \
+            standards/governed-release-autopublish-phase-amendment.mdx \
+            developers/manifests/governed-site-autopublish.v1.json \
+            scripts/validate_governed_site_autopublish.py \
+            changelog/phase-2-99-governed-site-autopublish.mdx; then
+            echo 'Conflict markers detected.' >&2
+            exit 1
+          fi

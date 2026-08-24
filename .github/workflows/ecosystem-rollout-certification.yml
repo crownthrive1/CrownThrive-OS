@@ -1,0 +1,66 @@
+name: Ecosystem Rollout Certification
+
+on:
+  pull_request:
+    paths:
+      - 'technology/ecosystem-rollout-certification-and-credit-commerce.mdx'
+      - 'automation/ecosystem-rollout-certifier-agent.mdx'
+      - 'standards/ecosystem-rollout-certification-phase-amendment.mdx'
+      - 'developers/manifests/ecosystem-rollout-certification.v1.json'
+      - 'scripts/validate_ecosystem_rollout_certification.py'
+      - 'changelog/phase-2-99-ecosystem-rollout-credit-certification.mdx'
+      - '.github/workflows/ecosystem-rollout-certification.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'technology/ecosystem-rollout-certification-and-credit-commerce.mdx'
+      - 'automation/ecosystem-rollout-certifier-agent.mdx'
+      - 'standards/ecosystem-rollout-certification-phase-amendment.mdx'
+      - 'developers/manifests/ecosystem-rollout-certification.v1.json'
+      - 'scripts/validate_ecosystem_rollout_certification.py'
+      - 'changelog/phase-2-99-ecosystem-rollout-credit-certification.mdx'
+      - '.github/workflows/ecosystem-rollout-certification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ecosystem-rollout-certification:
+    name: Validate ecosystem rollout certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Compile rollout validator
+        run: python -m py_compile scripts/validate_ecosystem_rollout_certification.py
+
+      - name: Validate rollout and credit-commerce governance
+        run: python scripts/validate_ecosystem_rollout_certification.py
+
+      - name: Validate institutional documentation
+        run: python scripts/validate_docs.py
+
+      - name: Reject packet conflict markers
+        shell: bash
+        run: |
+          if grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' \
+            technology/ecosystem-rollout-certification-and-credit-commerce.mdx \
+            automation/ecosystem-rollout-certifier-agent.mdx \
+            standards/ecosystem-rollout-certification-phase-amendment.mdx \
+            developers/manifests/ecosystem-rollout-certification.v1.json \
+            scripts/validate_ecosystem_rollout_certification.py \
+            changelog/phase-2-99-ecosystem-rollout-credit-certification.mdx; then
+            echo 'Conflict markers detected.' >&2
+            exit 1
+          fi

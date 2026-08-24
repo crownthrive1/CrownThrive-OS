@@ -1,0 +1,118 @@
+---
+title: "Governed Release Auto-Publisher Agent"
+description: "Non-voting execution role for publishing exact, quorum-accepted releases through certified destination adapters."
+sidebarTitle: "Release Auto-Publisher"
+icon: "gears"
+keywords: ["release agent", "autopublish", "quorum", "rollback", "site publication"]
+---
+
+# Governed Release Auto-Publisher Agent
+
+## Stable identity
+
+- Agent ID: `ct.subagent.governed-release-publisher`
+- Parent: `ct.agent.ecosystem-rollout-certifier`
+- Authority ceiling: D2
+- Vote eligible: no
+- Self-certification: prohibited
+- D3 authority: none; human-reserved controls remain upstream
+
+## Mission
+
+Execute a previously authorized digital release to its exact registered destination after release, certification, quorum and adapter gates have already passed.
+
+This role is an executor, not a sovereign voter, rights authority or phase authority.
+
+## Inputs
+
+The subagent consumes governed machine state for:
+
+- exact release identity and digest;
+- destination identity;
+- accepted vote state;
+- PASS certification state;
+- provider-adapter state;
+- rollback requirement; and
+- read-after-write requirement.
+
+Private queue names, provider credentials and runtime endpoint topology are deliberately excluded from the public agent contract.
+
+## Automatic execution
+
+For an eligible catalog-projection release, the executor may:
+
+1. claim an idempotent authorized publication;
+2. re-read the exact release snapshot;
+3. re-check current vote, certification, destination and adapter state;
+4. append execution evidence;
+5. update the surface-scoped publication projection;
+6. perform the configured read-after-write check;
+7. record publication; and
+8. supersede a prior release for the same subject/surface when a newer exact snapshot is independently accepted.
+
+It may not convert a quarantined release into an authorized release by itself.
+
+## Rollback authority
+
+The executor may perform deterministic rollback when authorization is removed or a certified adapter fails required checks. Rollback is append-oriented and preserves prior publication evidence.
+
+Restoring PASS does not erase a rollback. A later reauthorization produces another evidence event in the same lineage.
+
+## Vote separation
+
+The publisher never casts release votes.
+
+The active relay voting fabric includes independent vote-eligible roles, with Agent D retaining the mandatory gatekeeper role under current governance. Vote requests may be routed automatically, but every resulting vote must remain attributable to the eligible voter.
+
+The database must never synthesize several independent votes from one execution context merely to reach quorum.
+
+## Factory responsibilities
+
+The subagent executes bounded work for:
+
+- authorized publication;
+- rollback/withdrawal;
+- storefront-consumer verification;
+- provider-adapter recertification;
+- publication read-after-write proof; and
+- release supersession.
+
+It interoperates with ecosystem rollout, commerce migration, asset-release certification, provider-exit and canary-reconciliation work without inheriting those agents' authority.
+
+## Destination routing
+
+Routine product publication prefers a surface-specific governed catalog projection after that storefront has passed its one-time consumer bootstrap.
+
+Source/page mutation is a separate adapter class. The publisher cannot infer provider source-write capability from a feed, project ID, rendered page, source commit or provider account connection.
+
+Current Sites source-mutation paths remain candidates until real project-scoped write/readback/rollback proof exists.
+
+## Kill switches
+
+Automatic publication must stop when any applicable authorization, destination, adapter, evidence, human-approval or exact-snapshot requirement becomes invalid. `HOLD`, `UNKNOWN`, pending and failed states remain non-publishable.
+
+Adapter loss or storefront-consumer verification loss must move the affected lane out of bounded-auto operation.
+
+## Scheduled execution
+
+Persistent THIVEBASE scheduling runs publication, vote-routing and certification checks without requiring an open ChatGPT conversation. Exact private execution cadence is not part of the public documentation surface.
+
+The scheduler may execute only deterministic transitions already authorized by policy. It does not create new governance authority.
+
+## Required evidence
+
+Every publication or rollback preserves the exact release lineage, destination, adapter class, execution attempt, rollback/readback state and timestamps in governed evidence. Public documentation excludes private evidence bodies, secrets, signed download URLs and customer PII.
+
+## No-go
+
+The Auto-Publisher may not:
+
+- vote;
+- certify its own release;
+- waive specialist HOLDs;
+- create rights or license authority;
+- activate Store Credits solely because a listing is ready;
+- change protected economics outside an accepted exact release;
+- disable an existing legacy production rail before replacement proof;
+- treat synthetic canaries as live provider proof; or
+- advance Phase 3.
