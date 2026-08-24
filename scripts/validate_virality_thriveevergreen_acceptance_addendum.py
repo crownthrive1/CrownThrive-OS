@@ -44,7 +44,7 @@ SUPPORT_CIE_ASSURANCE_MAIN_HEAD = "8f9b9c715bea21221f5952c3853df51efc62387f"
 SUPPORT_ECONOMIC_CONTROL_FORWARD_MAIN_HEAD = "e05400a55158818ffc4b7c70eeaf68211726615a"
 SUPPORT_AGENT_WALLET_PACKAGE_CERTIFICATION_HEAD = "1cac8cdb0b8da58ad7a01efaa972d589beac581e"
 SUPPORT_MANAGED_WALLET_CERTIFICATION_COMMIT = "8794b34ea5aa183b73bcb4960d21bd95c5d43b94"
-SUPPORT_LATEST_MAIN_HEAD = "2a0aacd7d326b6837b7ba1b85c4228550724d178"
+SUPPORT_LATEST_MAIN_HEAD = "249fc17ed632ced26ae6bb0a8d5b38bb7a5d0d27"
 SUPPORT_MANAGED_WALLET_ACCEPTANCE_COMMIT = "de917a8a7f11541722cbf6d2da8166ff648962a4"
 SUPPORT_MANAGED_WALLET_DOCUMENTATION_COMMIT = "e54b54267e25427d54642860a9dcbaeb50ae7bc1"
 SUPPORT_COLLISION_HEAD = "58ef7524bae7d2dfcea6573db500c6becd4ef8ff"
@@ -557,7 +557,7 @@ def validate() -> dict[str, Any]:
     require(binding.get("support_initial_base_head") == SUPPORT_INITIAL_BASE_HEAD, "Support initial base drift")
     require(binding.get("support_cie_assurance_main_head") == SUPPORT_CIE_ASSURANCE_MAIN_HEAD, "Support CIE-assurance main head drift")
     require(binding.get("support_latest_main_head_reconciled") == SUPPORT_LATEST_MAIN_HEAD, "Support latest main drift")
-    require(binding.get("support_reconciled_main_delta_state") == "RECONCILED_CIE_ASSURANCE_DOCS_WAVE5_ECONOMIC_CONTROL_AGENT_WALLET_PACKAGE_MANAGED_WALLET_ACCEPTANCE_SNAPSHOT_AND_MINTLIFY_NAVIGATION_NO_VM_ECONOMIC_EXECUTION", "Support current-main delta reconciliation drift")
+    require(binding.get("support_reconciled_main_delta_state") == "RECONCILED_CIE_ASSURANCE_DOCS_WAVE5_ECONOMIC_CONTROL_AGENT_WALLET_PACKAGE_MANAGED_WALLET_ACCEPTANCE_SNAPSHOT_MINTLIFY_AND_WAVE1_5_NAVIGATION_GOVERNANCE_NO_VM_ECONOMIC_EXECUTION", "Support current-main delta reconciliation drift")
     git_binding = subprocess.run(
         ["git", "merge-base", "--is-ancestor", SUPPORT_LATEST_MAIN_HEAD, "HEAD"],
         cwd=ROOT,
@@ -1118,7 +1118,7 @@ def validate() -> dict[str, Any]:
     require(github.get("pre_acceptance_parent_collision_rtc_state") == "FAIL_CLOSED" and github.get("pre_acceptance_parent_collision_rtc_blocker") == "COLLISION_RTC_GLOBAL_OPEN_PR_317_EXCEEDS_500_FILE_BOUND", "collision RTC blocker hidden")
     require(github.get("pre_acceptance_parent_candidate_contract_collision_tests") == "PASS", "candidate-contract collision tests hidden")
     require(github.get("pre_acceptance_parent_github_advanced_security_state") == "FAIL_UNRESOLVED", "Advanced Security failure hidden")
-    require(github.get("prior_published_acceptance_head") == "0e87c8c0d8bf5b7bc7e91a6ef81b845afe16dcc0" and github.get("prior_published_acceptance_head_workflow_runs") == github.get("prior_published_acceptance_head_workflow_successes") == 5, "prior published acceptance workflow readback drift")
+    require(github.get("prior_published_acceptance_head") == "ef53a97cdabd55783c12dbdc8951dec9688cd45a" and github.get("prior_published_acceptance_head_workflow_runs") == github.get("prior_published_acceptance_head_workflow_successes") == 5, "prior published acceptance workflow readback drift")
     require(github.get("merge_state") == "NOT_MERGED_REVIEW_REQUIRED", "unsafe merge state")
     require(github.get("main_branch_protected") is False, "GitHub protection evidence drift")
 
