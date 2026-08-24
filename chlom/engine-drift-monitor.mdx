@@ -1,0 +1,222 @@
+---
+title: "CHLOM Drift Monitor"
+sidebarTitle: "Drift Monitor"
+description: "Institutional CHLOM engine contract for detecting policy, model, evidence, provider and decision drift without granting autonomous authority or treating variance as proof of wrongdoing."
+icon: "wave-square"
+keywords: ["CHLOM drift monitor", "model drift", "policy drift", "evidence drift", "continuous assurance"]
+---
+
+# CHLOM Drift Monitor
+
+## Canonical record
+
+```yaml
+asset_id: ct.chlom.engine.drift-monitor
+canonical_name: CHLOM Drift Monitor
+artifact_class: assurance_monitor
+current_mapping:
+  - AIE / ACE risk intelligence
+  - continuous simulation
+  - model lifecycle
+  - policy versioning
+  - provider evidence
+  - DAIL
+production_state: capability_specific_evidence_required
+authority_effect: none_by_itself
+```
+
+## Purpose
+
+The Drift Monitor detects when observed CHLOM behavior, dependencies, evidence or model outputs depart materially from an accepted baseline.
+
+It answers:
+
+```text
+WHAT changed?
+WHEN did it change?
+WHICH subjects/actions may be affected?
+WHICH baseline or version was expected?
+IS the variance explainable and authorized?
+DOES it require review, HOLD, rollback or revalidation?
+```
+
+It does not decide source rights, create licensing authority, legislate policy or promote changes to production by itself.
+
+## Drift families
+
+### Model drift
+
+Changes in model output distribution, calibration, false-positive/false-negative behavior, feature relationships or domain performance.
+
+### Policy drift
+
+A rule or policy implementation behaves differently from the approved version, or applicable-version resolution changes unexpectedly.
+
+### Evidence drift
+
+Required evidence becomes stale, unavailable, contradictory or materially different from the evidence used for the prior decision.
+
+### Provider drift
+
+An external provider changes schema, API behavior, version, billing semantics, availability or returned state in a way that can affect institutional interpretation.
+
+### Decision drift
+
+The same governed scenario produces a materially different PASS/HOLD/DENY outcome without an explained and approved reason.
+
+### Authority drift
+
+Roles, scopes, delegations or effective permissions expand beyond the documented authority envelope.
+
+Authority drift is release-blocking until resolved.
+
+## Baseline object
+
+```yaml
+drift_baseline:
+  baseline_id: stable
+  subject_class: model|policy|provider|workflow|decision|authority
+  exact_version_refs: []
+  accepted_behavior_refs: []
+  scenario_pack_refs: []
+  accepted_at: timestamp
+  authority_ref: required
+  superseded_by: optional
+```
+
+## Observation object
+
+```yaml
+drift_observation:
+  observation_id: stable
+  baseline_ref: required
+  subject_ref: required
+  observed_version_refs: []
+  observed_at: timestamp
+  variance_metrics: structured
+  evidence_refs: []
+  severity: informational|review|material|critical
+  disposition: PASS|HOLD|DENY|REVIEW
+  authority_effect: none_by_itself
+```
+
+## Evaluation pattern
+
+```text
+CURRENT OBSERVATION
+        |
+resolve exact baseline
+        |
+normalize comparable inputs
+        |
+measure variance
+        |
+explain known authorized changes
+        |
+ +------+-------+
+ |              |
+explained      unexplained/material
+ |              |
+PASS/record    HOLD + review
+```
+
+## Continuous simulation relationship
+
+The Drift Monitor can trigger or consume continuous simulation runs. A scheduled replay of frozen scenarios can detect decision drift even if no code commit occurred.
+
+```text
+simulation result
+   -> baseline comparison
+   -> drift observation
+   -> evidence packet
+   -> governed release/review decision
+```
+
+Simulation PASS remains evidence, not deployment authority.
+
+## Model-lifecycle relationship
+
+A new model version must have a documented evaluation and adoption path. Drift can cause:
+
+- additional evaluation;
+- reduced authority/scope;
+- SAFE_HOLD for affected decisions where policy permits;
+- rollback to a known-good version;
+- re-evaluation of decisions made in an affected window.
+
+## Provider drift
+
+Provider success or schema change does not redefine CrownThrive institutional truth.
+
+```text
+provider state changed
+      !=
+canonical meaning changed automatically
+```
+
+Adapters should detect incompatible changes and fail closed or HOLD rather than silently reinterpret data.
+
+## Evidence currentness
+
+Evidence-sensitive decisions require an explicit observation time and freshness policy. Stale evidence can itself be a drift condition.
+
+## Correction propagation
+
+If drift is later confirmed to have contaminated prior material decisions:
+
+```text
+identify affected version/time window
+ -> enumerate affected decisions
+ -> re-evaluate under corrected state
+ -> append corrections/supersessions
+ -> preserve original history
+ -> record DAIL evidence
+```
+
+## DAIL event family
+
+```text
+ct.chlom.drift.baseline.accepted.v1
+ct.chlom.drift.observed.v1
+ct.chlom.drift.material_detected.v1
+ct.chlom.drift.review_opened.v1
+ct.chlom.drift.rollback_requested.v1
+ct.chlom.drift.correction_applied.v1
+ct.chlom.drift.baseline.superseded.v1
+```
+
+## Security and abuse resistance
+
+The engine must resist attempts to:
+
+- choose a convenient baseline after seeing results;
+- suppress material variance;
+- relabel an authority expansion as ordinary model drift;
+- train on contaminated outcomes without adjudicated correction;
+- let a provider-controlled metric become the sole institutional baseline;
+- auto-promote a new version merely because variance is low.
+
+## Current related records
+
+- [Model Drift Watch Algorithm](/chlom/algorithms/alg-021-model-drift-watch)
+- [AIE/ACE Risk Intelligence and Policy Simulation](/chlom/aie-ace-risk-intelligence-policy-simulation-model-governance)
+- [Continuous Audit and Assurance Packages](/chlom/continuous-audit-certification-assurance-packages)
+- [Release Certification Algorithm](/chlom/algorithms/alg-032-release-certification)
+
+## Invariants
+
+```text
+drift signal != authority
+variance != wrongdoing automatically
+simulation PASS != production authorization
+provider change != institutional truth change
+correction != erasure
+```
+
+## Restricted companion
+
+Protected thresholds, model metrics, datasets, provider-specific failure signatures, anti-evasion logic, security telemetry and private incident records remain restricted unless explicitly cleared.
+
+## Status
+
+`INSTITUTIONALIZED + CURRENT_CONTRACT + PRODUCTION_STATE_CAPABILITY_SPECIFIC`.
