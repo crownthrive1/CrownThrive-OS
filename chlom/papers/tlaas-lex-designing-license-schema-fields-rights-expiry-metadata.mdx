@@ -1,0 +1,280 @@
+---
+title: "TLaaS (LEX) — Designing a License Schema: Fields, Rights, Expiry & Metadata"
+sidebarTitle: "TLaaS LEX License Schema"
+description: "Exact-title forensic reconstruction of the historical TLaaS (LEX) license-schema paper, preserving fields, rights, expiry and metadata concepts while mapping them to current Dynamic Licensing Asset, rights-first and provider-neutral CHLOM contracts."
+icon: "table-list"
+keywords: ["TLaaS LEX license schema", "Dynamic Licensing Asset", "license metadata", "rights", "expiry"]
+---
+
+# TLaaS (LEX) — Designing a License Schema: Fields, Rights, Expiry & Metadata
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.tlaas-lex-license-schema
+exact_recovered_title: TLaaS (LEX) — Designing a License Schema: Fields, Rights, Expiry & Metadata
+artifact_class: historical_implementation_paper
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+source_basis:
+  - CHLOM Technical Blueprint
+  - Building and Understanding the CHLOM Metaprotocol
+  - CHLOM Grand Prospectus
+  - current DLA / rights graph institutional contracts
+historical_DLA: Decentralized Licensing Authority
+current_DLA: Dynamic Licensing Asset
+current_LEX: rights_first_planned_gated
+provider_neutral: true
+```
+
+## Recovery boundary
+
+The exact title is recovered from the lost Help Center census. The original body has not been authenticated. Related CHLOM source bodies explicitly describe license tokens carrying license type, issuer, validity period, terms, transfer restrictions, identity relationships and lifecycle state. This article reconstructs that schema problem without inventing the lost historical field names.
+
+## Schema principle
+
+A CHLOM license record must describe a **permission relationship**, not merely a token.
+
+```text
+WHO
+may do WHAT
+with WHICH RIGHT / ASSET
+WHERE
+WHEN
+through WHICH USE / CHANNEL
+subject to WHICH RESTRICTIONS
+under WHICH SOURCE AUTHORITY
+with WHICH ECONOMIC / REMEDY TERMS
+```
+
+## Rights-before-schema invariant
+
+A schema field cannot manufacture authority.
+
+```text
+DLA_RIGHTS <= ISSUER_AUTHORITY <= LICENSABLE_SOURCE_RIGHTS <= SOURCE_RIGHTS
+```
+
+Setting `transferable: true` in data is invalid if the governing source rights do not permit transfer.
+
+## Canonical current schema
+
+```yaml
+dla:
+  dla_id: stable institutional id
+  version: exact
+  canonical_name: human-readable label
+  asset_ref: canonical asset/right
+  source_rights_refs: []
+  issuer_authority_ref: required
+  holder_or_licensee_ref: optional until issuance
+  license_class_ref: versioned
+  permissions: []
+  restrictions: []
+  territory: structured
+  term:
+    starts_at: timestamp
+    ends_at: optional
+  channels: []
+  uses: []
+  exclusivity: structured
+  transferability: explicit
+  sublicensing: explicit
+  derivative_rights: explicit
+  usage_limits: optional
+  attribution_requirements: optional
+  compliance_policy_refs: []
+  economic_schedule_refs: []
+  evidence_refs: []
+  agreement_ref: optional|required by profile
+  entitlement_profile_ref: optional
+  remedy_profile_ref: required
+  status: candidate|review|active|held|suspended|expired|revoked|terminated|superseded
+  created_at: timestamp
+  updated_at: timestamp
+```
+
+This is a current institutional model, not a claim that the lost historical article used these exact property names.
+
+## Asset and rights references
+
+The schema should reference the canonical asset/right object and chain-of-title evidence rather than embedding unsupported ownership assertions.
+
+Potential source-right references include ownership, assignment, license, publisher/administrator appointment, employment/work-for-hire record, brand authorization or other source-specific evidence.
+
+## Permission model
+
+Permissions should be machine-readable and profile-specific. Examples can include:
+
+- reproduce;
+- distribute;
+- display;
+- perform;
+- stream/broadcast;
+- adapt/derive;
+- sublicense;
+- manufacture;
+- advertise/market;
+- use name/mark/likeness;
+- commercial, educational or internal use.
+
+No universal permission list is inferred from the historical title.
+
+## Restriction model
+
+Restrictions can include:
+
+- non-transferability;
+- no sublicensing;
+- territory limitations;
+- term limitations;
+- channel/platform limitations;
+- quantity or usage caps;
+- attribution requirements;
+- exclusivity;
+- brand/quality controls;
+- credential predicates;
+- reporting/audit duties.
+
+## Expiry and currentness
+
+A simple term predicate can be modeled as:
+
+```text
+starts_at <= now < ends_at
+```
+
+when an end timestamp exists, subject to suspension, termination, grace periods and agreement-specific rules.
+
+Expiry is not deletion. Historical license state remains auditable after expiration.
+
+## Versioning
+
+```text
+DLA-123 v1
+  -> permitted amendment / renewal
+DLA-123 v2
+```
+
+Material changes must be explicit. Silent mutation of active terms is prohibited.
+
+## Metadata classes
+
+Separate metadata into classes so public projections do not leak restricted information:
+
+```yaml
+metadata:
+  public:
+    title: safe
+    license_class: safe
+    status: safe
+    public_rights_summary: safe
+  restricted:
+    source_contract_refs: protected
+    private_rates: protected
+    personal_or_sensitive_evidence: protected
+    provider_credentials: prohibited_from_public_record
+```
+
+## LEX listing projection
+
+LEX should consume a listing-safe projection rather than the full source-rights record.
+
+```yaml
+lex_projection:
+  dla_ref: required
+  offerable_rights: subset
+  territory: subset
+  remaining_term: derived
+  transfer_or_sublicense_mode: explicit
+  counterparty_requirements: structured
+  economic_schedule_ref: versioned
+  evidence_currentness: safe status
+```
+
+## State separation
+
+```text
+DLA state
+ != LEX listing state
+ != payment state
+ != entitlement state
+ != settlement state
+```
+
+A single `status` field must not be overloaded to represent all of them.
+
+## Provider representation
+
+Historical sources use NFTs/SBTs as license representations. Current schema makes this an adapter binding:
+
+```yaml
+representation:
+  provider_or_chain_ref: adapter
+  representation_type: NFT|SBT|SFT|contract_record|database_record|other
+  provider_object_id: opaque alias
+  canonical_dla_ref: required
+  state: active|held|migrated|retired
+```
+
+## Fingerprint/DID references
+
+Identity references should point to institutional identity/DID/Fingerprint records; raw biometrics are not embedded in the public license schema.
+
+```text
+Fingerprint ID != raw biometric
+```
+
+## Economic metadata boundary
+
+The license can reference an economic schedule, but historical example rates or tokens are not current pricing.
+
+```text
+license permissions != economic schedule
+```
+
+## DAIL lifecycle events
+
+```text
+ct.dla.candidate.created.v1
+ct.dla.activated.v1
+ct.dla.amended.v1
+ct.dla.renewed.v1
+ct.dla.suspended.v1
+ct.dla.revoked.v1
+ct.dla.expired.v1
+ct.dla.superseded.v1
+```
+
+## Validation rules
+
+A schema validator should reject or HOLD:
+
+- missing source-right references when required;
+- rights exceeding issuer authority;
+- invalid term ordering;
+- incompatible exclusive overlaps;
+- transfer/sublicense flags exceeding source terms;
+- unresolved holder identity when the profile requires identity binding;
+- missing economic schedule where consideration is required;
+- stale required evidence;
+- provider representation without canonical DLA reference.
+
+## Restricted companion
+
+Protected custody may contain the original lost schema, legal clause templates, exact rights ontologies, private metadata fields, contract schemas, economic schedules, provider mappings and filing-sensitive design details.
+
+## Invariants
+
+```text
+schema != authority
+metadata != ownership proof
+token != right
+expiry != erasure
+provider representation != canonical DLA
+historical field example != current required field automatically
+```
+
+## Status
+
+`TITLE_RECOVERED + RECONSTRUCTED + EXACT_BODY_NOT_LOCATED`.
