@@ -1,75 +1,123 @@
-# CHLOM Commercial Product Surface
+# CHLOM Commercial Product & Service Surface
 
 ## Purpose
 
-The public CHLOM repository is the commercial product and integration surface for CrownThrive's governed CHLOM system. It gives developers, enterprises, partners and evaluators enough public-safe material to understand CHLOM's interfaces, verification model, registries and commercial deployment paths without publishing the protected implementation core.
+The public CHLOM repository is CrownThrive's commercial technical and integration surface for CHLOM. It is designed to educate, qualify, and convert developers, businesses, institutions, researchers, implementation partners, and ecosystem operators without exposing restricted implementation bodies.
 
-## Commercial capability classes
+CHLOM is positioned as a **metaprotocol**: a coordination layer for identity, ownership, licensing, policy, evidence, automation, remedies, and economic handoffs across heterogeneous systems.
+
+## CrownThrive Pentafabric alignment
+
+Commercial packaging can originate from any verified Pentafabric layer:
+
+1. **Identity & Imprint** — identity, DID, fingerprint, provenance, custody, ownership/authorship evidence, CIE context.
+2. **Rights & Conditions** — DLAs, licensing architecture, contracts, permissions, restrictions, eligibility, issuer authority, remedies.
+3. **Ledger & Assurance** — DAIL, evidence architecture, compliance oracles, audit, attestations, independent verification, correction systems.
+4. **Execution & Interoperability** — pallets, modules, frameworks, plugins, skills, APIs, MCPs, agents, portals, dashboards, integration adapters, website mesh.
+5. **Economy & Distribution** — ThriveEvergreen / ECAC, SKUs, access, pricing, entitlements, payments, royalties, commissions, partner distribution, enterprise licensing.
+
+## Access and license classes
 
 ### Public / Community
 
-Public-safe architecture, terminology, registry records, source lineage, verification research and selected schemas.
+Public-safe architecture, terminology, registry records, source lineage, verification research, selected schemas, correction paths, and evaluation material.
 
 ### Developer / Integration
 
-Developer-facing contracts, schemas, examples, validation tooling and integration guidance intended to make CHLOM-compatible applications easier to build.
+Developer-facing contracts, schemas, examples, validation tooling, SDK/interface patterns, API/MCP compatibility, sandbox or production machine access when separately authorized, and integration support.
 
 ### Business / Commercial
 
-Commercial rights to use approved CHLOM capabilities inside a business, product, service or licensed operating environment, subject to the applicable CrownThrive agreement and entitlements.
+Commercial rights to use approved CHLOM capabilities inside a business, product, service, licensing program, customer workflow, or managed operating environment under the applicable CrownThrive agreement.
 
 ### Enterprise / Institutional
 
-Governed deployment patterns for organizations that require stronger controls, environment separation, policy administration, evidence handling, support, auditability and institutional integration.
+Private or higher-assurance deployments, SSO/RBAC, policy administration, audit, evidence architecture, custom integration, migration, training, support, service levels, and negotiated rights.
 
 ### Ecosystem / Partner
 
-Approved partner and ecosystem integrations that can participate in governed licensing, policy, evidence, records, commercial routing or other CHLOM-compatible workflows.
+Approved CrownThrive and external partner integrations, channel relationships, implementation partners, approved resellers, and cross-platform interoperability.
+
+### Research / Education
+
+Expanded research, teaching, corpus, model, publication, or experimental rights beyond ordinary lawful public reference when separately licensed.
+
+### OEM / Embedded / White-label
+
+Embedding, redistribution, private-labeling, or sublicensing only when the controlling agreement expressly grants those rights.
 
 ## Monetizable product families
 
-The commercial architecture is designed to support, as separately activated and licensed:
+Subject to current rights, evidence, packaging, and economic activation, CHLOM can support:
 
-- CHLOM integration and developer services;
-- governed rights, rules, roles, revenue, records and remedies infrastructure;
-- Dynamic Licensing Assets and licensing lifecycle tooling;
+- CHLOM architecture and implementation services;
+- rights, rules, roles, revenue, records, and remedies infrastructure;
+- Dynamic Licensing Asset design and lifecycle tooling;
 - Licensing Stewardship / Issuer Authority workflows;
-- LEX licensing and brand exchange capabilities;
-- DAIL-compatible records, events and attestation interfaces;
-- policy/compliance packs and validation tooling;
-- commercial APIs, SDKs, MCP tools and adapters when explicitly activated;
-- private or managed enterprise deployments;
-- certification, integration support and implementation services;
-- CrownThrive ecosystem interoperability.
+- hybrid licensing systems bridging contracts, software controls, human approvals, and optional decentralized settlement;
+- LEX licensing/exchange capabilities where separately activated;
+- DAIL-compatible evidence, records, event, audit, and attestation architecture;
+- DID, Fingerprint, provenance, custody, and ownership-evidence systems;
+- policy and compliance packs;
+- compliance-oracle integration and condition evaluation;
+- public or private APIs, SDKs, MCP tools, agents, plugins, adapters, and integration services when explicitly activated;
+- pallet, module, framework, portal, dashboard, workflow, and wireframe packages;
+- private, managed, enterprise, institutional, OEM, or partner deployments;
+- migration, certification-support, verification, training, implementation, and operations services;
+- CrownThrive Pentafabric architecture services;
+- CrownThrive ecosystem and website-mesh interoperability.
 
-This list defines product families, not a claim that every surface is currently activated.
+The list defines commercial families and candidate offers. It does not assert that every capability is currently production-active.
+
+## From capability to money
+
+A capability moves toward monetization through a governed sequence:
+
+```text
+verified capability
+    ↓
+commercial package candidate
+    ↓
+license class + deliverables + dependencies
+    ↓
+CrownThrive SKU candidate
+    ↓
+ThriveEvergreen / ECAC
+    ↓
+current price + access + entitlement + provider mapping
+    ↓
+checkout / fulfillment / reconciliation when authorized
+```
+
+The Commercial Packager may prepare the candidate. It cannot activate economic state on its own.
 
 ## Economic truth
 
-A repository document cannot create an entitlement, price, checkout, settlement, royalty, payout, token or live production claim. Commercial economic state must resolve through CrownThrive's separately governed commercial systems and signed authority.
+A repository document, GitHub release, provider object, API response, payment webhook, model output, or deployment cannot independently create an entitlement, price, checkout, settlement, royalty, payout, token, license, ownership claim, or certification.
 
-Accordingly:
-
-- no price is inferred from a code example;
-- no API is public merely because an interface is documented;
-- no checkout is active merely because a commercial class exists;
-- no token or blockchain launch is implied by protocol research;
-- no license right exists unless granted by the applicable commercial agreement.
+Current economics resolve through CrownThrive's separately governed commercial state. Historical or experimental prices are not current merely because old material remains searchable.
 
 ## Public-safe source versus implementation core
 
-The commercial repository is intentionally inspectable but not an unrestricted source-code grant. Public schemas and interfaces establish interoperability. Protected algorithms, private economic logic, raw evidence, credentials, private operational records and restricted implementation knowledge remain outside the public projection.
+The public repository is inspectable, but public visibility is not an unrestricted source-code or commercial-use grant. Public schemas and interface contracts can support interoperability while protected algorithms, private prompts, private scoring, private economic logic, raw evidence, credentials, protected identities, and restricted implementation knowledge remain outside public projection.
 
 ## Product provenance
 
-Factory-managed files are generated from the CrownThrive parent and carry exact upstream provenance in `.crownthrive/upstream.json`. This lets an evaluator distinguish current CrownThrive-controlled product policy from historical or independently edited public material.
+Factory-managed files are projected from the canonical public-safe CrownThrive parent and carry exact upstream provenance in `.crownthrive/upstream.json`. That allows evaluators to distinguish current CrownThrive-controlled managed policy from historical or independently edited child material.
 
 ## Current naming contract
 
-DAIL means **Decentralized Autonomous Information Ledger**.
+- DAIL = **Decentralized Autonomous Information Ledger**.
+- DLA = **Dynamic Licensing Asset**.
+- Licensing authority and issuer governance = **Licensing Stewardship / Issuer Authority**.
 
-DLA means **Dynamic Licensing Asset**.
+Legacy documents may preserve earlier terminology as source history, but those historical terms do not override current canon.
 
-Licensing authority and issuer governance are expressed as **Licensing Stewardship / Issuer Authority**.
+## Start here
 
-Legacy documents may contain earlier terminology. Those documents remain useful historical evidence but do not override current canonical naming.
+- Licensing: [`LICENSING.md`](LICENSING.md)
+- Commercial rights: [`../COMMERCIAL-LICENSE.md`](../COMMERCIAL-LICENSE.md)
+- Machine access: [`../MACHINE-ACCESS-TERMS.md`](../MACHINE-ACCESS-TERMS.md)
+- Pentafabric architecture: [`architecture/PENTAFABRIC.md`](architecture/PENTAFABRIC.md)
+- Agents and factories: [`AGENTS-AND-FACTORIES.md`](AGENTS-AND-FACTORIES.md)
+- Support and partnerships: [`../SUPPORT.md`](../SUPPORT.md)
