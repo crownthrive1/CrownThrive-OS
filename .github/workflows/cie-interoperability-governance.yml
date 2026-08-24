@@ -1,0 +1,112 @@
+name: CIE Interoperability Parent Governance
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/cie-interoperability.v1.json"
+      - "developers/manifests/cie-interoperability-reanchor.v2.json"
+      - "developers/manifests/cie-navigation-patch.v1.json"
+      - "developers/templates/framework-child-interoperability-backlink.v1.json"
+      - "scripts/validate_cie_interoperability.py"
+      - "scripts/validate_cie_interoperability_reanchor.py"
+      - "automation/cie-interoperability-and-convergence-bridge.mdx"
+      - "changelog/phase-2-99-cie-interoperability.mdx"
+      - ".github/workflows/cie-interoperability-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cie-interoperability-parent-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate current-main CIE parent anchor
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile parent validators
+        run: |
+          python -m py_compile scripts/validate_cie_interoperability.py
+          python -m py_compile scripts/validate_cie_interoperability_reanchor.py
+
+      - name: Validate manifest and negative cases
+        run: python scripts/validate_cie_interoperability.py --self-test --json
+
+      - name: Validate current child re-anchor
+        run: python scripts/validate_cie_interoperability_reanchor.py
+
+      - name: Validate JSON contracts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in (
+              Path("developers/manifests/cie-interoperability.v1.json"),
+              Path("developers/manifests/cie-interoperability-reanchor.v2.json"),
+              Path("developers/manifests/cie-navigation-patch.v1.json"),
+              Path("developers/templates/framework-child-interoperability-backlink.v1.json"),
+          ):
+              value = json.loads(path.read_text(encoding="utf-8"))
+              assert isinstance(value, dict), path
+          PY
+
+      - name: Enforce PR-only no-OIDC authority
+        run: |
+          if grep -nE '^[[:space:]]+id-token:[[:space:]]+write([[:space:]]|$)' .github/workflows/cie-interoperability-governance.yml; then
+            echo "PR validation must not receive OIDC authority."
+            exit 1
+          fi
+          if grep -nE '^[[:space:]]+(contents|pull-requests|packages|actions):[[:space:]]+write([[:space:]]|$)' .github/workflows/cie-interoperability-governance.yml; then
+            echo "Write permission detected in parent validation workflow."
+            exit 1
+          fi
+
+      - name: Enforce public-safe projection
+        run: |
+          if grep -RInE '"(vote_eligible|checkout_enabled|customer_entitlement_active|operationally_enabled)"[[:space:]]*:[[:space:]]*true' \
+            developers/manifests/cie-interoperability.v1.json \
+            developers/manifests/cie-interoperability-reanchor.v2.json \
+            developers/templates/framework-child-interoperability-backlink.v1.json; then
+            echo "Fail-closed authority/commerce drift detected."
+            exit 1
+          fi
+          if grep -RInE 'gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sb_secret_[A-Za-z0-9_-]{16,}|sk-[A-Za-z0-9]{20,}' \
+            developers/manifests/cie-interoperability.v1.json \
+            developers/manifests/cie-interoperability-reanchor.v2.json \
+            automation/cie-interoperability-and-convergence-bridge.mdx \
+            changelog/phase-2-99-cie-interoperability.mdx; then
+            echo "Credential-shaped value detected."
+            exit 1
+          fi
+
+      - name: Check exact PR base freshness
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          EXPECTED_BASE: c7f14b73cff09f00a8f94f15a8587289de18ff7b
+          OBSERVED_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          test "$OBSERVED_BASE" = "$EXPECTED_BASE" || {
+            echo "HOLD_CURRENT_MAIN_DRIFT expected=$EXPECTED_BASE observed=$OBSERVED_BASE"
+            exit 1
+          }
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- .; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
