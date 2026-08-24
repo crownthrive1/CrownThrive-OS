@@ -5,7 +5,17 @@ on:
     paths:
       - 'commercial/chlom-protocol/**'
       - 'developers/manifests/chlom-protocol-commercial-projection.v1.json'
+      - 'developers/manifests/chlom-pentafabric.v1.json'
+      - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/manifests/chlom-api-mcp-surface-candidates.v1.json'
+      - 'developers/manifests/chlom-pentafabric-asset-classes.v1.json'
+      - 'developers/manifests/chlom-commercial-package-candidates.v1.json'
+      - 'developers/manifests/chlom-mesh-failover.v1.json'
+      - 'developers/manifests/chlom-maintenance-projection-gate.v1.json'
       - 'developers/contracts/chlom-commercial-projection.contract.v1.json'
+      - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-vault-boundary.contract.v1.json'
+      - 'developers/contracts/chlom-continuous-build.contract.v1.json'
       - 'frameworks/chlom-commercial-projection-factory.mdx'
       - 'scripts/validate_chlom_commercial_projection.py'
       - '.github/workflows/chlom-commercial-projection-governance.yml'
@@ -15,10 +25,22 @@ on:
     paths:
       - 'commercial/chlom-protocol/**'
       - 'developers/manifests/chlom-protocol-commercial-projection.v1.json'
+      - 'developers/manifests/chlom-pentafabric.v1.json'
+      - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/manifests/chlom-api-mcp-surface-candidates.v1.json'
+      - 'developers/manifests/chlom-pentafabric-asset-classes.v1.json'
+      - 'developers/manifests/chlom-commercial-package-candidates.v1.json'
+      - 'developers/manifests/chlom-mesh-failover.v1.json'
+      - 'developers/manifests/chlom-maintenance-projection-gate.v1.json'
       - 'developers/contracts/chlom-commercial-projection.contract.v1.json'
+      - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-vault-boundary.contract.v1.json'
+      - 'developers/contracts/chlom-continuous-build.contract.v1.json'
       - 'frameworks/chlom-commercial-projection-factory.mdx'
       - 'scripts/validate_chlom_commercial_projection.py'
       - '.github/workflows/chlom-commercial-projection-governance.yml'
+  schedule:
+    - cron: '23 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -51,7 +73,7 @@ jobs:
           python -m py_compile scripts/validate_chlom_commercial_projection.py
           python scripts/validate_chlom_commercial_projection.py
 
-      - name: Materialize exact parent snapshot
+      - name: Materialize exact deterministic parent snapshot
         run: |
           set -euo pipefail
           python scripts/validate_chlom_commercial_projection.py --write --check-dist
@@ -79,9 +101,9 @@ jobs:
           find dist/chlom-protocol -type f -print | sort >> "$GITHUB_STEP_SUMMARY"
 
   project-to-public-child:
-    name: Open governed child projection pull request
+    name: Governed child projection candidate
     needs: validate-and-build
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -96,19 +118,59 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Resolve bounded cross-repository authority
+      - name: Resolve maintenance and bounded cross-repository authority
         id: auth
         env:
           CHILD_TOKEN: ${{ secrets.CHLOM_PUBLIC_REPO_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: |
           set -euo pipefail
+          gate='developers/manifests/chlom-maintenance-projection-gate.v1.json'
+          readarray -t values < <(python - "$gate" "$EVENT_NAME" <<'PY'
+          import json, sys
+          gate = json.load(open(sys.argv[1], encoding='utf-8'))
+          event = sys.argv[2]
+          autonomous = bool(gate.get('autonomous_external_mutation_allowed'))
+          if event == 'schedule':
+              event_allowed = bool(gate.get('scheduled_child_projection_allowed'))
+          elif event == 'push':
+              event_allowed = bool(gate.get('automatic_child_projection_on_parent_push_allowed'))
+          else:
+              # Manual dispatch still requires maintenance release; it is not a bypass.
+              event_allowed = autonomous
+          print(gate.get('state', 'UNKNOWN'))
+          print('true' if autonomous else 'false')
+          print('true' if event_allowed else 'false')
+          PY
+          )
+
+          state="${values[0]:-UNKNOWN}"
+          autonomous="${values[1]:-false}"
+          event_allowed="${values[2]:-false}"
+          echo "maintenance_state=$state" >> "$GITHUB_OUTPUT"
+
+          if [ "$autonomous" != 'true' ] || [ "$event_allowed" != 'true' ]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo "PROJECTION_HOLD_MAINTENANCE state=$state event=$EVENT_NAME"
+            exit 0
+          fi
+
           if [ -z "${CHILD_TOKEN:-}" ]; then
             echo 'ready=false' >> "$GITHUB_OUTPUT"
             echo 'PUBLISH_HOLD_NO_CHLOM_PUBLIC_REPO_TOKEN'
           else
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Record governed hold
+        if: steps.auth.outputs.ready != 'true'
+        shell: bash
+        run: |
+          echo '## CHLOM child projection' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo "Child mutation held. Maintenance state: ${{ steps.auth.outputs.maintenance_state }}." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Validation and deterministic build preparation remain active; no external child mutation was attempted.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Materialize projection
         if: steps.auth.outputs.ready == 'true'
@@ -133,30 +195,24 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
 
-          git add -- \
-            README.md \
-            COMMERCIAL-LICENSE.md \
-            docs/COMMERCIAL.md \
-            docs/architecture/REPOSITORY_BOUNDARIES.md \
-            docs/architecture/COMMERCIAL_PROJECTION.md \
-            docs/architecture/DAIL_PUBLIC_CONTRACT.md \
-            .crownthrive/upstream.json
+          mapfile -t managed < <(python - "$GITHUB_WORKSPACE/developers/manifests/chlom-protocol-commercial-projection.v1.json" <<'PY'
+          import json, sys
+          manifest = json.load(open(sys.argv[1], encoding='utf-8'))
+          for path in manifest['projection']['managed_paths']:
+              print(path)
+          PY
+          )
 
+          git add -- "${managed[@]}"
           git diff --cached --check
+
           if git diff --cached --quiet; then
             echo 'No managed projection changes; child already matches parent.'
             exit 0
           fi
 
           staged="$(git diff --cached --name-only | sort)"
-          expected="$(printf '%s\n' \
-            .crownthrive/upstream.json \
-            COMMERCIAL-LICENSE.md \
-            README.md \
-            docs/COMMERCIAL.md \
-            docs/architecture/COMMERCIAL_PROJECTION.md \
-            docs/architecture/DAIL_PUBLIC_CONTRACT.md \
-            docs/architecture/REPOSITORY_BOUNDARIES.md | sort)"
+          expected="$(printf '%s\n' "${managed[@]}" | sort)"
           unexpected="$(comm -23 <(printf '%s\n' "$staged") <(printf '%s\n' "$expected"))"
           if [ -n "$unexpected" ]; then
             echo 'staged child paths escaped the governed managed-path allowlist'
@@ -164,7 +220,7 @@ jobs:
             exit 1
           fi
 
-          git commit -m "chlom: project CrownThrive commercial surface"
+          git commit -m "chlom: project CrownThrive commercial metaprotocol surface"
           git push origin "HEAD:$branch"
 
           existing="$(gh pr list --repo "$CHILD_REPO" --head "$branch" --base main --state open --json number --jq '.[0].number // empty')"
@@ -174,5 +230,5 @@ jobs:
               --base main \
               --head "$branch" \
               --title "AUTO — CHLOM commercial projection from CrownThrive parent" \
-              --body "Governed public-safe CHLOM commercial overlay from parent commit \`$PARENT_SHA\`. The candidate is allowlist-only and carries exact upstream provenance. It designates \`crownthrive/chlom-protocol\` as the public commercial child, canonicalizes DAIL = Decentralized Autonomous Information Ledger and DLA = Dynamic Licensing Asset, and does not assert live checkout, token, mainnet, public API, entitlement or price. This PR requires child-side validation before merge."
+              --body "Governed public-safe CHLOM commercial overlay from parent commit \`$PARENT_SHA\`. The candidate is allowlist-only, non-destructive toward unmanaged child paths, and carries exact upstream provenance. It includes the CrownThrive Pentafabric five-layer architecture, repository-family rights/licensing terms, machine-access terms, support and licensing funnel, bounded agent/factory documentation, and canonical DAIL/DLA terminology. It does not independently assert live checkout, token, mainnet, public API/MCP, entitlement, certification, ownership, or price. Child-side validation is required before merge."
           fi

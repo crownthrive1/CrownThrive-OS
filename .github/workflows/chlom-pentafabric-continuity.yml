@@ -1,0 +1,130 @@
+name: CHLOM Pentafabric Continuity
+
+on:
+  pull_request:
+    paths:
+      - 'commercial/chlom-protocol/**'
+      - 'developers/manifests/chlom-pentafabric.v1.json'
+      - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/manifests/chlom-api-mcp-surface-candidates.v1.json'
+      - 'developers/manifests/chlom-pentafabric-asset-classes.v1.json'
+      - 'developers/manifests/chlom-commercial-package-candidates.v1.json'
+      - 'developers/manifests/chlom-mesh-failover.v1.json'
+      - 'developers/manifests/chlom-maintenance-projection-gate.v1.json'
+      - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-vault-boundary.contract.v1.json'
+      - 'developers/contracts/chlom-continuous-build.contract.v1.json'
+      - 'frameworks/chlom-pentafabric-metaprotocol.mdx'
+      - 'automation/chlom-continuous-research-commercialization.mdx'
+      - 'technology/chlom-website-mesh-and-failover.mdx'
+      - 'skills/frameworks/chlom-pentafabric/SKILL.md'
+      - 'scripts/validate_chlom_commercial_projection.py'
+      - '.github/workflows/chlom-pentafabric-continuity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'commercial/chlom-protocol/**'
+      - 'developers/manifests/chlom-pentafabric.v1.json'
+      - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/manifests/chlom-api-mcp-surface-candidates.v1.json'
+      - 'developers/manifests/chlom-pentafabric-asset-classes.v1.json'
+      - 'developers/manifests/chlom-commercial-package-candidates.v1.json'
+      - 'developers/manifests/chlom-mesh-failover.v1.json'
+      - 'developers/manifests/chlom-maintenance-projection-gate.v1.json'
+      - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-vault-boundary.contract.v1.json'
+      - 'developers/contracts/chlom-continuous-build.contract.v1.json'
+      - 'frameworks/chlom-pentafabric-metaprotocol.mdx'
+      - 'automation/chlom-continuous-research-commercialization.mdx'
+      - 'technology/chlom-website-mesh-and-failover.mdx'
+      - 'skills/frameworks/chlom-pentafabric/SKILL.md'
+      - 'scripts/validate_chlom_commercial_projection.py'
+      - '.github/workflows/chlom-pentafabric-continuity.yml'
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-pentafabric-continuity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-pentafabric:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out CrownThrive Support
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Validate Pentafabric, agents, vault, machine, mesh, packaging and projection
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/validate_chlom_commercial_projection.py
+          python scripts/validate_chlom_commercial_projection.py --write --check-dist
+
+      - name: Summarize governed state
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          root = Path('.')
+          p = json.loads((root/'developers/manifests/chlom-pentafabric.v1.json').read_text())
+          m = json.loads((root/'developers/manifests/chlom-maintenance-projection-gate.v1.json').read_text())
+          a = json.loads((root/'developers/manifests/chlom-api-mcp-surface-candidates.v1.json').read_text())
+          v = json.loads((root/'developers/contracts/chlom-vault-boundary.contract.v1.json').read_text())
+          c = json.loads((root/'developers/manifests/chlom-commercial-package-candidates.v1.json').read_text())
+          print('## CHLOM Pentafabric continuity')
+          print()
+          print(f"- Architecture: {p['display_name']} ({p['layer_count']} layers)")
+          print(f"- Maintenance: {m['state']}")
+          print(f"- API/MCP candidates: {a['state']}")
+          print(f"- Vault binding: {v['runtime_binding_state']}")
+          print(f"- Commercial packages: {c['state']}")
+          print('- Scheduled run is validation/observation only; it does not release maintenance or activate external commerce.')
+          PY
+
+  observe-public-mesh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Observe redundant public discovery routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          routes=(
+            'https://crownthrive.com'
+            'https://crownthrivesupport.com'
+            'https://crownthrive.io'
+            'https://github.com/crownthrive/chlom-protocol'
+            'https://github.com/crownthrive1/CrownThrive-Support'
+          )
+          ok=0
+          echo '## CHLOM public mesh observation' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          for url in "${routes[@]}"; do
+            code="$(curl -L -sS -o /dev/null --max-time 15 -w '%{http_code}' "$url" || true)"
+            if [[ "$code" =~ ^[23][0-9][0-9]$ ]]; then
+              ok=$((ok+1))
+              state='REACHABLE'
+            else
+              state='UNREACHABLE_OR_DEGRADED'
+            fi
+            printf -- '- %s — %s — HTTP %s\n' "$url" "$state" "${code:-000}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo "Reachable routes: $ok/${#routes[@]}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$ok" -eq 0 ]; then
+            echo 'All public discovery routes failed.'
+            exit 1
+          fi
