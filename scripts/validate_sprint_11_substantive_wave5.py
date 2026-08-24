@@ -29,39 +29,81 @@ if result["prior_wave_selected_count"] != 57:
     errors.append("prior-wave cumulative count drift")
 if result["prior_wave_overlap_count"] != 0:
     errors.append("Wave 5 may not overlap prior waves")
-if not (0 < result["selected_count"] < result["p0_candidate_count"]):
-    errors.append("Wave 5 must select a bounded nonzero P0 subset")
+
+if result["primary_interface_p0_candidate_count"] != 5:
+    errors.append(f"expected 5 primary interface P0 candidates, found {result['primary_interface_p0_candidate_count']}")
+if result["primary_interface_selected_count"] != 0:
+    errors.append("primary interface lane must remain zero-admission under unchanged D2 gate")
+if result["primary_interface_zero_admission"] is not True:
+    errors.append("primary interface zero-admission receipt missing")
+if result["primary_interface_gate_unchanged"] is not True:
+    errors.append("primary interface gate may not be weakened")
+if result["primary_interface_probe"]["gate_unchanged"] is not True:
+    errors.append("primary interface probe must record unchanged gate")
+if result["primary_interface_probe"]["selected_count"] != 0:
+    errors.append("primary interface probe selected a record unexpectedly")
+
+collision = result["classification_collision_inspection"]
+if collision["ai_agent_algorithm_p0_candidate_count"] != 35:
+    errors.append("AI collision diagnostic count drift")
+if collision["broad_ai_family_qualified"] is not False:
+    errors.append("AI collision family may not be broadly qualified")
+
+if result["selected_count"] != 1:
+    errors.append(f"Wave 5 pivot must select exactly one bounded P0 identity, found {result['selected_count']}")
 if result["selected_count"] + result["held_count"] != 795:
     errors.append("selected + held must equal 795")
-if result["cumulative_machine_qualified_p0_count"] != 57 + result["selected_count"]:
-    errors.append("cumulative qualified count mismatch")
-if result["p0_outside_waves_1_2_3_4_5_count"] != 449 - result["cumulative_machine_qualified_p0_count"]:
-    errors.append("remaining P0 count mismatch")
+if result["cumulative_machine_qualified_p0_count"] != 58:
+    errors.append("cumulative qualified P0 count must be 58")
+if result["p0_outside_waves_1_2_3_4_5_count"] != 391:
+    errors.append("remaining P0 count must be 391")
+if result["pivot_inventory_id"] != "HC-0076":
+    errors.append("pivot inventory identity drift")
+if result["pivot_state_family"] != "io_surface_and_machine_contract_reconciliation":
+    errors.append("pivot state family drift")
+if result["selected_section_counts"] != {"Convergent Ecosystem": 1}:
+    errors.append("selected section counts drift")
+if result["selected_state_counts"] != {"io_surface_and_machine_contract_reconciliation": 1}:
+    errors.append("selected state counts drift")
+if result["selected_anchor_counts"] != {"/technology/crownthrive-io-surface-machine-contract-reconciliation": 1}:
+    errors.append("selected anchor counts drift")
 
-for row in result["selected_records"]:
+selected = result["selected_records"]
+if len(selected) == 1:
+    row = selected[0]
+    if row["inventory_id"] != "HC-0076":
+        errors.append("unexpected Wave 5 selected identity")
+    if row["legacy_section"] != "Convergent Ecosystem":
+        errors.append("Wave 5 selected identity must remain in Convergent Ecosystem")
+    if row["legacy_subcategory"] != "CrownThrive IO":
+        errors.append("Wave 5 selected identity must remain in CrownThrive IO")
+    if row["legacy_title"] != "CrownThrive IO BioLink Master Standard":
+        errors.append("Wave 5 selected title drift")
     if row["priority"] != "P0":
-        errors.append(f"non-P0 selected: {row['inventory_id']}")
+        errors.append("Wave 5 selected identity must be P0")
     if row["candidate_disposition"] != "merged_successor":
-        errors.append(f"non-merged-successor selected: {row['inventory_id']}")
-    if row["current_state_candidate"] != "interface_surface_reconciliation":
-        errors.append(f"state outside Wave 5: {row['inventory_id']}")
-    if row["canonical_anchor_route"] != "/chlom/interface-surface-reconciliation-contract":
-        errors.append(f"wrong anchor: {row['inventory_id']}")
+        errors.append("Wave 5 selected identity must be merged_successor")
+    if row["current_state_candidate"] != "io_surface_and_machine_contract_reconciliation":
+        errors.append("Wave 5 selected state drift")
+    if row["canonical_anchor_route"] != "/technology/crownthrive-io-surface-machine-contract-reconciliation":
+        errors.append("Wave 5 selected anchor drift")
     if not row["continuity_matches"]:
-        errors.append(f"missing source continuity: {row['inventory_id']}")
+        errors.append("Wave 5 selected identity lacks source continuity")
     q = row["canonical_anchor_quality"]
     if q["body_characters"] < policy["minimum_anchor_body_characters"]:
-        errors.append(f"anchor body too small: {row['inventory_id']}")
+        errors.append("Wave 5 pivot anchor body too small")
     if q["internal_link_count"] < policy["minimum_anchor_internal_links"]:
-        errors.append(f"anchor continuity too weak: {row['inventory_id']}")
+        errors.append("Wave 5 pivot anchor continuity too weak")
     if row["terminal_disposition_accepted"] is not False:
-        errors.append(f"terminal disposition self-authorized: {row['inventory_id']}")
+        errors.append("Wave 5 terminal disposition self-authorized")
     if row["parent_certification_required"] is not True:
-        errors.append(f"parent certification missing: {row['inventory_id']}")
+        errors.append("Wave 5 parent certification missing")
 
 for key in [
     "historical_body_recovery_claimed",
     "terminal_disposition_self_authorized",
+    "interface_gate_weakened",
+    "ai_collision_family_broadly_qualified",
     "legal_policy_activation_created",
     "investment_or_securities_authority_created",
     "patent_status_authority_created",
@@ -87,9 +129,12 @@ if result["guardrails"]["phase_11_20_state"] != "reserved_definition_required":
 if result["guardrails"]["canonical_brand"] != "CrownThrive":
     errors.append("canonical brand drift")
 
-anchor = ROOT / "chlom/interface-surface-reconciliation-contract.mdx"
-if not anchor.is_file():
-    errors.append("interface-surface successor contract missing")
+for path in [
+    ROOT / "chlom/interface-surface-reconciliation-contract.mdx",
+    ROOT / "technology/crownthrive-io-surface-machine-contract-reconciliation.mdx",
+]:
+    if not path.is_file():
+        errors.append(f"missing Sprint 11 successor: {path.relative_to(ROOT)}")
 
 if errors:
     print("FAIL_SPRINT_11_SUBSTANTIVE_WAVE5")
@@ -99,10 +144,11 @@ if errors:
 
 print("PASS_SPRINT_11_SUBSTANTIVE_WAVE5")
 print(f"p0_candidate_count={result['p0_candidate_count']}")
-print(f"wave_1_selected_count={result['wave_1_selected_count']}")
-print(f"wave_2_selected_count={result['wave_2_selected_count']}")
-print(f"wave_3_selected_count={result['wave_3_selected_count']}")
-print(f"wave_4_selected_count={result['wave_4_selected_count']}")
+print(f"prior_wave_selected_count={result['prior_wave_selected_count']}")
+print(f"primary_interface_p0_candidate_count={result['primary_interface_p0_candidate_count']}")
+print(f"primary_interface_selected_count={result['primary_interface_selected_count']}")
+print("primary_interface_gate_unchanged=true")
+print("ai_collision_family_broadly_qualified=false")
 print(f"selected_count={result['selected_count']}")
 print(f"cumulative_machine_qualified_p0_count={result['cumulative_machine_qualified_p0_count']}")
 print(f"p0_outside_waves_1_2_3_4_5_count={result['p0_outside_waves_1_2_3_4_5_count']}")
