@@ -65,13 +65,18 @@ jobs:
             exit 1
           fi
 
-      - name: Upload deterministic projection artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: chlom-commercial-projection-${{ github.sha }}
-          path: dist/chlom-protocol/
-          if-no-files-found: error
-          retention-days: 30
+      - name: Emit deterministic projection receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '## CHLOM commercial projection receipt' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat dist/chlom-protocol/.crownthrive/upstream.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Managed files:' >> "$GITHUB_STEP_SUMMARY"
+          find dist/chlom-protocol -type f -print | sort >> "$GITHUB_STEP_SUMMARY"
 
   project-to-public-child:
     name: Open governed child projection pull request
