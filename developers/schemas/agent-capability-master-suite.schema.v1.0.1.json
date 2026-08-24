@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/agent-capability-master-suite.v1.0.1.json",
+  "title": "CrownThrive Master Governed Agent Suite",
+  "schema_revision": "1.0.1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "suite_id",
+    "canonical_name",
+    "release_state",
+    "effective_date",
+    "source_ids",
+    "operating_contract",
+    "agents"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "suite_id": {"const": "ct.agent-suite.master.v1"},
+    "canonical_name": {"type": "string", "minLength": 4},
+    "release_state": {"enum": ["CONTROLLED_TEST", "HOLD", "SUPERSEDED"]},
+    "effective_date": {"type": "string", "format": "date"},
+    "source_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "operating_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "human_authority_reserved",
+        "vote_eligible",
+        "quorum_eligible",
+        "self_approval_forbidden",
+        "silent_delete_forbidden",
+        "append_only_correction_history",
+        "special_privileges_default",
+        "privilege_inheritance",
+        "credential_export_forbidden",
+        "public_publish_forbidden_without_receipt",
+        "live_finance_forbidden_without_receipt",
+        "framework_activation_forbidden_without_parent_certification",
+        "redundancy_rule"
+      ],
+      "properties": {
+        "human_authority_reserved": {"const": true},
+        "vote_eligible": {"const": false},
+        "quorum_eligible": {"const": false},
+        "self_approval_forbidden": {"const": true},
+        "silent_delete_forbidden": {"const": true},
+        "append_only_correction_history": {"const": true},
+        "special_privileges_default": {"const": "DENY"},
+        "privilege_inheritance": {"const": false},
+        "credential_export_forbidden": {"const": true},
+        "public_publish_forbidden_without_receipt": {"const": true},
+        "live_finance_forbidden_without_receipt": {"const": true},
+        "framework_activation_forbidden_without_parent_certification": {"const": true},
+        "redundancy_rule": {"type": "string", "minLength": 20}
+      }
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/agent"}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stringSet": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_id",
+        "canonical_name",
+        "family",
+        "mode",
+        "agent_class",
+        "autonomy_class",
+        "authority_ceiling",
+        "schedule_profile",
+        "mission",
+        "allowed",
+        "forbidden",
+        "parent_binding",
+        "identity_record",
+        "heartbeat_record",
+        "privilege_record",
+        "lifecycle_state"
+      ],
+      "properties": {
+        "agent_id": {"type": "string", "pattern": "^ct\\.(chlom|thrivealumni)\\.agent\\.[a-z0-9-]+$"},
+        "canonical_name": {"type": "string", "minLength": 4},
+        "family": {"enum": ["pricing", "integrity", "knowledge", "framework_factory", "security", "assurance", "growth", "thrivealumni"]},
+        "mode": {"enum": ["rigid", "fluid", "hybrid"]},
+        "agent_class": {"enum": ["researcher", "verifier", "security", "documentation", "planner", "builder", "formal_methods", "orchestrator", "dispute", "reviewer", "continuity"]},
+        "autonomy_class": {"enum": ["A0", "A1", "A2"]},
+        "authority_ceiling": {"enum": ["D0", "D1", "D2"]},
+        "schedule_profile": {"enum": ["hourly", "daily", "weekly", "monthly", "quarterly"]},
+        "mission": {"type": "string", "minLength": 20},
+        "allowed": {"$ref": "#/$defs/stringSet"},
+        "forbidden": {
+          "allOf": [
+            {"$ref": "#/$defs/stringSet"},
+            {"contains": {"const": "self_approve"}}
+          ]
+        },
+        "parent_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["parent_agent_id", "source_manifest_path", "state", "privilege_inheritance"],
+          "properties": {
+            "parent_agent_id": {"type": "string", "pattern": "^ct\\.(agent|subagent)\\.[a-z0-9.-]+$"},
+            "source_manifest_path": {"const": "developers/manifests/agent-federation-bindings.v1.json"},
+            "state": {"const": "REFERENCE_VALIDATED_CONTROLLED_TEST"},
+            "privilege_inheritance": {"const": false}
+          }
+        },
+        "identity_record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "did_state", "runtime_attestation_verified"],
+          "properties": {
+            "state": {"const": "CANDIDATE_UNATTESTED"},
+            "did_state": {"const": "CANDIDATE"},
+            "runtime_attestation_verified": {"const": false}
+          }
+        },
+        "heartbeat_record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "state", "last_verified_at"],
+          "properties": {
+            "required": {"const": true},
+            "state": {"const": "PENDING_FIRST_HEARTBEAT"},
+            "last_verified_at": {"type": ["string", "null"], "format": "date-time"}
+          }
+        },
+        "privilege_record": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "max_authority", "inheritance", "special_privileges", "expires_at", "break_glass_allowed"],
+          "properties": {
+            "state": {"const": "DENY_BY_DEFAULT"},
+            "max_authority": {"enum": ["D0", "D1", "D2"]},
+            "inheritance": {"const": false},
+            "special_privileges": {"const": "DENIED_PENDING_SEPARATE_RECEIPT"},
+            "expires_at": {"type": ["string", "null"], "format": "date-time"},
+            "break_glass_allowed": {"const": false}
+          }
+        },
+        "lifecycle_state": {"const": "REGISTERED_CONTROLLED_TEST"}
+      }
+    }
+  }
+}

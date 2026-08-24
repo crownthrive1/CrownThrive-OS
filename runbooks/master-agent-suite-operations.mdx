@@ -1,0 +1,71 @@
+---
+title: "Master Agent Suite Operations Runbook"
+description: "Validation, scheduling, custody, failure, and rollback procedure for the controlled-test suite."
+status: "CONTROLLED_TEST"
+version: "1.0.0"
+lastUpdated: "2026-08-21"
+---
+
+## Validate
+
+Run these checks from the repository root:
+
+```bash
+python scripts/validate_agent_capability_master_suite.py --validate --require-canonical-baseline
+python scripts/framework_compiler.py --self-test
+python scripts/supply_chain_integrity.py .github/workflows/agent-capability-master-suite-governance.yml
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+The suite validator reports only manifest and invariant status. It never proves runtime, governance, custody, publication, or commercial activation.
+
+## Compile a candidate
+
+```bash
+python scripts/framework_compiler.py \
+  --compile framework-candidates/thrivealumni-committee-support.v1.json \
+  --output evidence/compiled-thrivealumni-support.v1.json
+```
+
+The compiler refuses to overwrite prior evidence and rejects self-activation, D3, machine-vote, checkout, and commercial-enable flags.
+
+## Inspect an archive
+
+```bash
+python scripts/archive_integrity.py --strict-names package.zip
+```
+
+The verifier does not extract. It checks traversal, absolute paths, symlinks, encryption, duplicate or case-colliding names, Unicode portability, CRC, member limits, compression ratios, and SHA-256. A digest calculated from the same untrusted package proves consistency only; authenticity requires an expected manifest digest obtained through a separate trusted channel and supplied with `--trusted-manifest-sha256`.
+
+## Apply retroactive internal links
+
+First scan. Then obtain one detached, independently issued approval receipt for each edge plus its receipt digest and reviewer identity through a separate trusted control-plane channel. Never derive either trust anchor from the candidate manifest or receipt being checked:
+
+```bash
+python scripts/internal_linkage.py . --scan
+python scripts/internal_linkage.py . \
+  --apply-approved linkage/linkage-candidates.v1.json \
+  --trusted-receipt-sha256 "<OUT_OF_BAND_SHA256>" \
+  --authorized-reviewer-id "<OUT_OF_BAND_REVIEWER_ID>"
+```
+
+The applicator accepts one approved edge per transaction, requires a detached time-bounded receipt bound to both document digests, checks its exact bytes against the out-of-band digest, requires the reviewer in the out-of-band authorized set, rejects future-issued or overlong receipts, and atomically appends a marked byte block without changing the prior byte prefix. Missing trust anchors produce `HOLD` with zero writes.
+
+## Schedules
+
+The suite uses one read-only GitHub validation lane at minute 52 and eight logical subroutes inside one pre-existing governed ChatGPT parent task. The provider update is observed, but first subroute heartbeats remain pending. The routes are non-authoritative: they may inspect, draft, validate, and append approved evidence, but may not merge, deploy, publish, activate checkout, contact a prospect, or ratify governance.
+
+## Failure behavior
+
+On any authentication, source, validation, checksum, workflow, upload, or restore failure:
+
+1. stop the affected write path;
+2. preserve inputs and prior versions;
+3. append exact evidence and mark `HOLD`, `NEED_TO_DO`, or `FAILED`;
+4. do not claim completion;
+5. do not delete or silently normalize the conflict; and
+6. resume only with a scoped repair and independent verification.
+
+## Rollback
+
+Rollback is additive. Pause schedules, mark affected agents or packages `paused` or `superseded`, restore the last independently verified artifact from custody, and append a supersession record. Never erase the failed release or its evidence.

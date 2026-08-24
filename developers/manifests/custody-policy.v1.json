@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "policy_id": "ct.policy.dual-custody.v1",
+  "state": "POLICY_REQUIRED_NOT_FULLY_PROVEN",
+  "founder_rule": "Every material suite artifact requires two independent custody receipts before it can become release-eligible.",
+  "destinations": [
+    {
+      "store_class": "human_recovery_archive",
+      "role": "human_master_and_recovery_archive",
+      "required": true,
+      "current_candidate_receipt_state": "VERIFIED",
+      "secret_material_allowed": false
+    },
+    {
+      "store_class": "replaceable_private_object_store",
+      "role": "replaceable_machine_custody",
+      "required": true,
+      "current_candidate_receipt_state": "PLANNED_NOT_PRODUCED",
+      "artifact_bytes_required": true
+    },
+    {
+      "store_class": "secret_seal_store",
+      "role": "cryptographic_seal_material_only",
+      "required": true,
+      "artifact_bytes_allowed": false,
+      "current_candidate_seal_state": "RECORDED"
+    }
+  ],
+  "provider_bindings": "PRIVATE_CONTROL_PLANE_REFERENCE",
+  "promotion_condition": "human_recovery_receipt_verified AND private_object_receipt_verified AND checksums_match AND restore_test_passed",
+  "failure_behavior": "HOLD, append evidence, preserve local source, never claim complete"
+}

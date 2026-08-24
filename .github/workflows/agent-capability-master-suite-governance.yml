@@ -1,0 +1,135 @@
+name: Agent Capability Master Suite Governance
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/agent-capability-master-suite.v1.json"
+      - "developers/manifests/canonical-agent-reference-snapshot.v1.json"
+      - "developers/manifests/agent-skill-catalog.v1.json"
+      - "developers/manifests/custody-policy.v1.json"
+      - "developers/manifests/source-generation-quarantine.v1.json"
+      - "developers/manifests/pricing-policy-candidates.v1.json"
+      - "developers/schemas/agent-capability-master-suite.schema.json"
+      - "developers/schemas/agent-capability-master-suite.schema.v1.0.1.json"
+      - "governance/agent-suite-v1/**"
+      - "framework-candidates/**"
+      - "linkage/**"
+      - "scripts/agent_capability_master_suite.py"
+      - "scripts/validate_agent_capability_master_suite.py"
+      - "scripts/archive_integrity.py"
+      - "scripts/supply_chain_integrity.py"
+      - "scripts/internal_linkage.py"
+      - "scripts/framework_compiler.py"
+      - "tests/test_agent_capability_master_suite.py"
+      - ".github/workflows/agent-capability-master-suite-governance.yml"
+  push:
+    branches:
+      - main
+      - "admin-mcp/**"
+      - "codex/**"
+    paths:
+      - "developers/manifests/agent-capability-master-suite.v1.json"
+      - "developers/manifests/canonical-agent-reference-snapshot.v1.json"
+      - "developers/manifests/agent-skill-catalog.v1.json"
+      - "developers/manifests/custody-policy.v1.json"
+      - "developers/manifests/source-generation-quarantine.v1.json"
+      - "developers/manifests/pricing-policy-candidates.v1.json"
+      - "developers/schemas/agent-capability-master-suite.schema.json"
+      - "developers/schemas/agent-capability-master-suite.schema.v1.0.1.json"
+      - "governance/agent-suite-v1/**"
+      - "framework-candidates/**"
+      - "linkage/**"
+      - "scripts/agent_capability_master_suite.py"
+      - "scripts/validate_agent_capability_master_suite.py"
+      - "scripts/archive_integrity.py"
+      - "scripts/supply_chain_integrity.py"
+      - "scripts/internal_linkage.py"
+      - "scripts/framework_compiler.py"
+      - "tests/test_agent_capability_master_suite.py"
+      - ".github/workflows/agent-capability-master-suite-governance.yml"
+  schedule:
+    - cron: "52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-capability-master-suite-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-agent-capability-suite:
+    name: Validate Agent Capability Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile suite tooling
+        run: |
+          python -m py_compile scripts/agent_capability_master_suite.py
+          python -m py_compile scripts/archive_integrity.py
+          python -m py_compile scripts/supply_chain_integrity.py
+          python -m py_compile scripts/internal_linkage.py
+          python -m py_compile scripts/framework_compiler.py
+
+      - name: Validate governed manifests and invariants
+        run: python scripts/validate_agent_capability_master_suite.py --validate --require-canonical-baseline
+
+      - name: Verify framework compiler determinism
+        run: python scripts/framework_compiler.py --self-test
+
+      - name: Validate workflow supply-chain controls
+        run: python scripts/supply_chain_integrity.py .github/workflows/agent-capability-master-suite-governance.yml
+
+      - name: Validate declared linkage candidates
+        run: python scripts/internal_linkage.py . --validate-candidates linkage/linkage-candidates.v1.json
+
+      - name: Create and inspect public-safe suite archive
+        run: |
+          git archive --format=zip --output=/tmp/agent-capability-master-suite.zip HEAD \
+            .github/workflows/agent-capability-master-suite-governance.yml \
+            automation/agent-capability-master-suite.mdx \
+            changelog/phase-2-99-agent-capability-master-suite.mdx \
+            developers/agents/master-suite/README.mdx \
+            developers/manifests/agent-capability-master-suite.v1.json \
+            developers/manifests/agent-skill-catalog.v1.json \
+            developers/manifests/canonical-agent-reference-snapshot.v1.json \
+            developers/manifests/custody-policy.v1.json \
+            developers/manifests/pricing-policy-candidates.v1.json \
+            developers/manifests/source-generation-quarantine.v1.json \
+            developers/schemas/agent-capability-master-suite.schema.json \
+            developers/schemas/agent-capability-master-suite.schema.v1.0.1.json \
+            framework-candidates/thrivealumni-committee-support.v1.json \
+            governance/agent-suite-v1 \
+            governance/thrivealumni-agent-support.mdx \
+            linkage/linkage-candidates.v1.json \
+            runbooks/master-agent-suite-operations.mdx \
+            scripts/agent_capability_master_suite.py \
+            scripts/archive_integrity.py \
+            scripts/framework_compiler.py \
+            scripts/internal_linkage.py \
+            scripts/supply_chain_integrity.py \
+            scripts/validate_agent_capability_master_suite.py \
+            tests/test_agent_capability_master_suite.py
+          python scripts/archive_integrity.py --strict-names /tmp/agent-capability-master-suite.zip
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
