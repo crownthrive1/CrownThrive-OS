@@ -48,7 +48,7 @@ CrownThrive therefore emphasizes:
 - Developer Platform: [`developers/overview.mdx`](developers/overview.mdx)
 - Public Licensing & IP overview: [`support/licensing-and-ip-overview.mdx`](support/licensing-and-ip-overview.mdx)
 - Repository license: [`LICENSE`](LICENSE)
-- Contribution standards: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Contribution standards: [`CONTRIBUTING.md`](https://github.com/crownthrive1/crownthrive-support/blob/main/CONTRIBUTING.md)
 - Security reporting: [`SECURITY.md`](SECURITY.md)
 
 ## Build, partner, license, or collaborate
