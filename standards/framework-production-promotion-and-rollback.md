@@ -19,7 +19,11 @@ Do not invent a new package-state enum merely to label production.
 
 ## Authority
 
-Normal production promotion requires the package's real independent parent certifier, currently Agent D where specified. A Founder Override is an exception path only after all of the following are true:
+Normal production promotion requires the package's real independent parent certifier, currently Agent D where specified.
+
+### Deadlock-only Founder Override
+
+A Founder Override is an exception path only after all of the following are true:
 
 1. the exact packet technically passes;
 2. a real governance deadlock is evidenced;
@@ -30,6 +34,24 @@ Normal production promotion requires the package's real independent parent certi
 7. the human override verifier returns valid.
 
 Silence is never authority. Surrogate continuity may not production-activate a framework through this exception path.
+
+### Direct human Founder production authority
+
+`founder_direct` is separate from the deadlock exception. It exists only for an explicit human Founder instruction to activate the exact bounded production scope.
+
+It requires:
+
+- an immutable Founder Continuity request bound to the exact source/version/content snapshot;
+- `authority_class=D2` and `autonomy_class=A2`;
+- explicit human Founder approval with an authority evidence reference;
+- `surrogate_state=ineligible`;
+- request metadata `founder_direct=true`;
+- request metadata `direct_scope=CIE_GOVERNED_INTERNAL_PRODUCTION` for the CIE contract;
+- a tested rollback plan and rollback-ready state;
+- service-role-only execution;
+- protected chain-event re-verification of the same exact Founder request during algorithm invocation.
+
+Agents may prepare or execute the bounded operation after the exact human authorization is recorded. Agents may not create, infer, broaden, renew, or self-approve `founder_direct` authority. `founder_direct` never grants D3, voting, public activation, commerce, provider-write authority, rights, entitlement, settlement, or money movement.
 
 ## Guardian production boundary
 
@@ -52,7 +74,7 @@ Cultural Imprint Engine production is a governed internal runtime:
 - exact current Support↔CIE technical link;
 - stable identity `ct.platform.cie` resolved;
 - accepted public contract digest parity;
-- certification dimensions PASS or explicitly NOT_APPLICABLE to the headless internal runtime;
+- certification dimensions PASS or explicitly NOT_APPLICABLE to the headless internal runtime, or an exact human Founder production disposition scoped only to the outstanding lifecycle-release gate;
 - repository `linked_governed` after production authority;
 - package `maintained` and operational;
 - `ct.algorithm.cie.v1` invocation state `production_limited`;
@@ -60,6 +82,8 @@ Cultural Imprint Engine production is a governed internal runtime:
 - protected production canary must PASS without returning the private policy body;
 - API/MCP exposure is governed-internal only;
 - public activation and commerce remain false.
+
+The CIE algorithm may execute from child repository `ct.repo.cie` while its Framework Factory package is hosted by parent repository `ct.repo.crownthrive-support` only when the current exact parent/child technical-link receipt proves matching repository heads, Guardian verification, family verification, interoperability verification, and zero authority/activation/vote/self-activation effects.
 
 ThriveEvergreen remains the separate authority for pricing, checkout, Crown Credits/economic activation and entitlement.
 
