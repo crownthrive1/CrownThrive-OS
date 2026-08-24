@@ -22,7 +22,7 @@ Provider configuration is never treated as economic authority. Wallet or funding
 | Chain namespaces | EVM, Solana, Others |
 | Web SDK | `@web3auth/modal` v11 |
 | Embedded-wallet control endpoint | `https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/metamask-embedded-wallet-control` |
-| Control runtime | ACTIVE / version `1.0.1` |
+| Control runtime | ACTIVE / version `1.0.2` |
 
 The browser Client ID is intentionally frontend-usable. The project Client Secret is restricted server-side material and is never returned by CrownThrive APIs, documentation, browser configuration, or MCP responses.
 
@@ -49,7 +49,7 @@ The production-safe browser configuration is based on Sapphire Mainnet and Walle
 
 ```ts
 import { Web3Auth, WEB3AUTH_NETWORK, WALLET_CONNECTORS } from "@web3auth/modal";
-import { WALLET_SERVICES_PLUGIN, CONFIRMATION_STRATEGY } from "@web3auth/wallet-services-plugin";
+import { CONFIRMATION_STRATEGY } from "@web3auth/modal";
 
 const web3auth = new Web3Auth({
   clientId: META_MASK_EMBEDDED_WALLET_CLIENT_ID,
@@ -61,22 +61,21 @@ const web3auth = new Web3Auth({
       },
     },
   },
-});
-
-const walletServicesConfig = {
-  confirmationStrategy: CONFIRMATION_STRATEGY.MODAL,
-  enableKeyExport: false,
-  whiteLabel: {
-    showWidgetButton: true,
-    buttonPosition: "bottom-right",
-    hideTopup: false,
-    hideWalletConnect: false,
-    hideTransfers: false,
-    hideReceive: false,
-    hideSwap: false,
-    hideTokenDisplay: false,
+  walletServicesConfig: {
+    confirmationStrategy: CONFIRMATION_STRATEGY.MODAL,
+    enableKeyExport: false,
+    whiteLabel: {
+      showWidgetButton: true,
+      buttonPosition: "bottom-right",
+      hideTopup: false,
+      hideWalletConnect: false,
+      hideTransfers: false,
+      hideReceive: false,
+      hideSwap: false,
+      hideTokenDisplay: false,
+    },
   },
-};
+});
 ```
 
 The client secret is intentionally absent from browser code.
@@ -92,12 +91,17 @@ The funding corridor is configured for:
 - Wallet Services top-up UI;
 - external-wallet interoperability.
 
+The production funding-status action is implemented and canaried with HTTP 200.
+
 Current effective state:
 
 ```text
 configuration: READY
+funding status API: PASS HTTP 200
 production Wallet Services entitlement: PLAN_VERIFICATION_PENDING
+MetaMask origin allowlist: PENDING_DASHBOARD_ACTION
 frontend exposure on vm.crownthrive.com: PENDING_NATIVE_SITE_INJECTION
+customer-effective funding: false
 ```
 
 A configured funding UI is not an entitlement, deposit receipt, Crown Credits issuance event, or ThriveEvergreen approval.
@@ -123,7 +127,7 @@ Rules:
 - authority ceiling D2;
 - appropriate for customer/founder transactions where wallet sovereignty must remain with the human signer.
 
-The production control plane is active, but the actual request tool remains disabled until the MetaMask production origin is allowlisted and the VM frontend binding passes native Sites readback.
+The production control contract is active, but the actual request tool remains disabled until the MetaMask production origin is allowlisted and the VM frontend binding passes native Sites readback.
 
 ### Mode B — dedicated CHLOM Agent Wallet
 
@@ -150,6 +154,7 @@ runtime contract: PRODUCTION
 activation: CONFIGURED_PENDING_RUNNER
 wallet created: false
 persistent runner bound: false
+Agent Wallet evaluator MCP: STAGED
 autonomous money movement: DENY until exact execution gate passes
 ```
 
@@ -174,14 +179,17 @@ The verifier checks:
 3. JWT `aud` equals the ThriveBase MetaMask project Client ID;
 4. wallet public-key/address ownership claim for the requested authentication mode.
 
-Current provider JWKS canaries:
+Current provider/security canaries:
 
 ```text
 social JWKS: PASS HTTP 200
 external-wallet JWKS: PASS HTTP 200
+exact VM-origin CORS: PASS
 invalid-token negative canary: PASS — HTTP 401
 wrong-origin negative canary: PASS — HTTP 403
 ```
+
+The identity-verification MCP contract uses a closed least-data schema. The ID token remains an Authorization-header transport credential; the MCP input contains only verification mode and the claimed public wallet identifier.
 
 The endpoint exposes no raw secrets.
 
@@ -197,18 +205,30 @@ The exact-origin canary returned the expected `Access-Control-Allow-Origin` head
 
 ## API/MCP contracts
 
-Production-enabled contracts:
+Production-enabled read contracts:
 
 - `metamask.embedded.config.read`
 - `metamask.embedded.identity.verify`
 - `metamask.embedded.funding.status`
 - `chlom_wallet.execution_modes.status`
-- `chlom_wallet.agent_wallet.evaluate`
 
-Staged execution contracts:
+Staged execution/evaluation contracts:
 
 - `chlom_wallet.walletconnect.request` — requires human confirmation and frontend activation;
+- `chlom_wallet.agent_wallet.evaluate` — staged until a persistent Agent Wallet runner and its exact evaluator runtime are bound;
 - `chlom_wallet.agent_wallet.execute` — disabled until the persistent TWAK runner, encrypted Agent Wallet, transaction ceiling, rollback/compensation controls, and exact ECAC certification pass.
+
+## ThriveEvergreen v2 relationship
+
+The canonical VM-facing economic authority is now `thriveevergreen_autonomous_publisher_v2` through the exact production control endpoint:
+
+```text
+https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/thriveevergreen-production-control
+```
+
+The v2 engine reports `production_write`, `production_publisher_active`, production effects enabled, and `ECAC` publication activation. Its external generalized dispatch MCP remains separately disabled. Exact candidate evaluation is production-enabled and fail-closed.
+
+The current candidate gate canary returned `HOLD` with `money_movement_authorized=false` rather than manufacturing authority.
 
 ## Virality Music binding
 
@@ -220,6 +240,7 @@ MetaMask project configuration: ACTIVE / production control plane
 VM origin CORS: VERIFIED
 MetaMask dashboard origin allowlist: PENDING
 VM frontend injection: HOLD / native site write gate
+ThriveEvergreen v2 economic binding: ACTIVE
 ```
 
 The existing public Virality catalog and checkout are preserved; this wallet convergence does not overwrite them.
@@ -253,7 +274,8 @@ The existing public Virality catalog and checkout are preserved; this wallet con
 1. Bind a persistent trusted TWAK runner.
 2. Create the dedicated Agent Wallet locally on that runner.
 3. Register only public addresses/account IDs in CHLOM Wallet.
-4. Run holdings and transaction-build canaries.
-5. Prove unauthorized signing is denied.
-6. Certify asset/address allowlists, value ceilings, compensation/rollback, and exact ECAC policy.
-7. Promote signing/broadcast tools only after the full execution gate passes.
+4. Bind the exact policy evaluator runtime and promote `chlom_wallet.agent_wallet.evaluate` only after readback.
+5. Run holdings and transaction-build canaries.
+6. Prove unauthorized signing is denied.
+7. Certify asset/address allowlists, value ceilings, compensation/rollback, and exact ECAC policy.
+8. Promote signing/broadcast tools only after the full execution gate passes.
