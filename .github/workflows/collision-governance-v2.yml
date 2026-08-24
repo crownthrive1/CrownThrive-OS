@@ -1,0 +1,32 @@
+name: Collision Governance v2 — candidate contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review, closed]
+
+permissions: {}
+
+concurrency:
+  group: collision-governance-candidate-v2-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  untrusted-head-contract-tests:
+    name: Untrusted head — no-token contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Run deterministic and adversarial tests
+        shell: bash
+        run: python3 -m unittest discover -s tests -v
+      - name: Compile Python executables
+        shell: bash
+        run: python3 -m py_compile scripts/collision_rtc_v2.py scripts/governed_collision_agent_v2.py
+      - name: Validate public-safe contract
+        shell: bash
+        run: python3 scripts/validate_collision_governance_v2.py

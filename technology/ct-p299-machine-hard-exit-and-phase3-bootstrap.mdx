@@ -1,0 +1,109 @@
+---
+title: "CT-P299 Machine Hard Exit & Phase 3 Bootstrap"
+sidebarTitle: "Machine Hard Exit"
+description: "Fail-closed machine gate that converts Phase 2.99 evidence into a GO/HOLD/NO-GO decision and a separately read-back Phase 3 bootstrap."
+icon: "power-off"
+hidden: true
+noindex: true
+---
+
+# CT-P299 Machine Hard Exit & Phase 3 Bootstrap
+
+## Namespace cleanup
+
+The controlling roadmap is `CT-ADR-ROADMAP-010 / ten_phase_v1`: ten top-level institutional phases. Earlier five-phase plans remain historical planning evidence and are never silently renumbered or revived as current authority. Phase 2.99 remains a subphase of Phase 2, and the next top-level state is Phase 3 — **Executable Institutional Core**.
+
+This page resolves the architectural ambiguity without rewriting historical records.
+
+## Machine-led does not mean machine-sovereign
+
+The Phase 2.99 exit is evaluated by software, but software does not manufacture approval. The evaluator may calculate `GO`, `HOLD`, or `NO_GO`; it may not invent a missing source, vote, security disposition, recovery receipt, rights grant, founder decision, professional conclusion, or provider capability.
+
+`GO` means **eligible to execute the Phase 3 bootstrap contract**. It does not mean Phase 3 is active yet.
+
+## Hard-exit state machine
+
+```text
+CT-P299 HARD EXIT
+       |
+       +-- all blockers evaluated
+       +-- absolute no-go = 0
+       +-- exact source snapshot frozen
+       +-- exact Git SHA frozen
+       +-- exact THIVEBASE snapshot frozen
+       +-- docs baseline frozen
+       +-- authority/quorum verified
+       +-- backup/rollback receipt verified
+       |
+       v
+PHASE GATE DECISION
+       |
+       +-- Agent A synthesis
+       +-- independent audit
+       +-- security
+       +-- Agent D
+       +-- required sovereign governance
+       |
+       v
+ GO | HOLD | NO-GO
+       |
+       v
+CT-PHASE3-BOOTSTRAP-v1
+       |
+       +-- DAIL event
+       +-- THIVEBASE baseline
+       +-- Git tag/release
+       +-- Mintlify changelog
+       +-- rollback snapshot
+       +-- exact readback of every side effect
+       |
+       v
+PHASE 3.0 EXECUTABLE INSTITUTIONAL CORE
+```
+
+A bootstrap that partially succeeds is not Phase 3 activation. It remains `BOOTSTRAP_INCOMPLETE`, preserves all evidence, and requires correction, compensation, rollback, or retry under the recorded authority.
+
+## Live overrides
+
+A static ledger cannot overrule live provider evidence. In particular, the Phase 3 gate directly checks the effective GitHub `main` protection state. If `main` is not fail-closed with the designated governance status required before merge, `CT-P299-GATE-004` is a live **NO-GO** even if an older ledger snapshot records that gate as PASS.
+
+The same principle applies to THIVEBASE availability, credential/security drift, authority receipts, recovery evidence, ThriveEvergreen no-commerce-bypass controls, and any other absolute no-go predicate.
+
+## THIVEBASE snapshot
+
+GitHub Actions obtains a short-lived GitHub OIDC token with audience `ct-phase3-hard-exit`. The `ct-phase3-hard-exit-snapshot` THIVEBASE Edge Function verifies repository, owner, event, workflow and workflow-content identity before returning a sanitized read-only snapshot.
+
+The function currently includes the CHLOM Gen-6 aggregate snapshot and Commercial Release Factory aggregate snapshot. It performs no database mutation, commerce activation, money movement, vote, or phase transition.
+
+## Bootstrap commit boundary
+
+`CT-PHASE3-BOOTSTRAP-v1` is a multi-system commit contract. The machine may emit the bootstrap packet only after `GO`. Phase 3 becomes active only when DAIL, THIVEBASE, Git release/tag, Mintlify changelog and rollback snapshot effects all have exact readback.
+
+Until the THIVEBASE write/control channel is available for the required governed persistence, the system must remain `HOLD` or `NO-GO`; it may not fabricate the missing persistence receipt.
+
+## Perpetual Commerce Release Factory
+
+The Commercial Release Factory is perpetual in **candidate-processing capacity**, not perpetual in authority.
+
+```text
+discover changed/new commercial candidate
+  -> canonical identity/version/SKU input
+  -> build release package
+  -> run every applicable gate
+  -> ECAC | HOLD | DENY
+  -> independent acceptance when required
+  -> publish only when authorized
+  -> monitor
+  -> reconcile / correct / rollback / compensate
+  -> next version re-enters the gates
+```
+
+There is no permanent terminal product count. A prior product/version PASS never transfers automatically to a changed product/version. New inventory, changed rights, pricing, tax, fulfillment, accessibility, domain, payment, advertising, provider or policy evidence reopens the affected gates.
+
+Perpetual operation never grants self-approval, expands D-level authority, enables cash/credit checkout by itself, publishes automatically by default, bypasses ThriveEvergreen, or prevents authorized pause, quarantine or decommission.
+
+## Automation
+
+The machine gate runs on relevant pull requests, relevant pushes to `main`, an hourly schedule and explicit workflow dispatch. Ordinary scheduled runs only evaluate and freeze evidence. They do not activate Phase 3.
+
+An explicit bootstrap attempt uses `--require-go`. Any missing requirement exits fail-closed instead of manufacturing a transition.

@@ -1,0 +1,90 @@
+---
+title: "Collision Governance RTC v2"
+description: "Prevent, observe, repair, and react to work collisions with version-bound evidence and bounded authority."
+---
+
+> Status: **DRAFT / controlled test / HOLD for promotion.** This contract does not grant merge, sovereign, rights, commerce, credential, provider-write, or D3 authority.
+
+Collision Governance RTC v2 replaces the stale, detection-heavy proposal in PR #158. It uses the existing Architecture Refactor & Optimization Agent as its parent and the existing hourly CHLOM control cycle as its recovery cadence. It does not create a competing orchestrator or a second scheduler.
+
+## What changed
+
+The predecessor compared file names and proposed queue ordering. V2 introduces a two-sided control:
+
+1. **Prevent:** each material actor declares the exact paths, stable IDs, routes, runtime resources, schedules, rights or authority domains it will observe or mutate. The preflight compares those claims before promotion.
+2. **React:** every pull-request lifecycle event and main advance invalidates the old observation epoch, recomputes affected claims, releases expired ownership, rebinds reviews, or preserves a HOLD.
+
+The existing private CHLOM hourly cycle supplies recovery and drift detection. The GitHub workflows do not create a second scheduled slot; pull-request, main, and merge-queue events remain the primary reaction path, with manual trusted reconciliation available.
+
+## Machine states
+
+| State | Meaning | Automatic effect |
+|---|---|---|
+| `CLEAR` | No material overlap was observed in a complete, stable snapshot. | Report only. |
+| `ALLOW_AWARE` | A shared surface exists without a direct or semantic collision. | Awareness receipt; no serialization claim. |
+| `HOLD` | Direct, semantic, runtime, schedule, rights, source-generation, or incomplete-inspection risk exists. | Stop promotion; compile a repair/review proposal. |
+| `HUMAN_REVIEW_REQUIRED` | D3, constitutional, unknown authority, or consequential ownership is involved. | Preserve evidence and route to qualified humans/quorum. |
+| `DENY` | The intent or event contract is invalid. | Fail closed; no write. |
+
+CI success is operational evidence only. It is not governance acceptance, ownership, certification, or merge authority.
+
+## Collision classes
+
+| Code | Collision | Default disposition |
+|---|---|---|
+| `CT-COLL-0` | No overlap | `CLEAR` |
+| `CT-COLL-1` | Shared surface or awareness-only overlap | `ALLOW_AWARE` |
+| `CT-COLL-2` | Same path or ordered sequence | `HOLD_AND_SERIALIZE` |
+| `CT-COLL-3` | Same stable ID, route, rights/authority claim, or conflicting source generation | `HOLD_AND_STEWARD_REVIEW` |
+| `CT-COLL-4` | Same runtime resource, provider reference, or schedule mutation | `HOLD_AND_EXCLUSIVE_FENCED_OWNER` |
+| `CT-COLL-5` | Constitutional or D3 overlap | `HUMAN_REVIEW_REQUIRED` |
+
+A branch name, label, or claimed stack never downgrades CT-COLL-2 or above. A filename containing words such as “vault” or “credential” does not invent runtime authority; elevated semantics require a structured claim or governed parser result.
+
+## Intent and snapshot binding
+
+Every v2 intent binds:
+
+- repository and target;
+- actor agent and run instance;
+- base and head commit SHAs;
+- executable, configuration, and policy SHA-256 digests;
+- structured claims and access modes;
+- correlation ID and a stable intent fingerprint.
+
+The GitHub observer reads main at the start and end of evaluation and re-reads the candidate head. If either moves, the result is `HOLD / snapshot_changed_during_evaluation`. Unreadable or truncated semantic material is `HOLD / semantic_inspection_incomplete`.
+
+## Runtime coordination
+
+RTC means **runtime coordination and continuous collision awareness**. It is an internal service-only control plane, not a public Realtime channel.
+
+Each material domain has at most one active lease. A lease includes its owner, exact intent, expected main/head SHAs, TTL, and a monotonically increasing fencing token. A restarted or delayed worker cannot continue with an older fence. Acquisition, renewal, release, expiry, and rejection produce idempotent, causally linked, append-only events and a DAIL receipt.
+
+A heartbeat proves only observed liveness within a bounded time window. UUID, DID candidate, fingerprint, or heartbeat do not create authority, quorum eligibility, certification, or legal identity.
+
+## Repair boundary
+
+The repair state machine is:
+
+`DETECTED → HELD → PLANNED → LEASED → APPLYING → VERIFYING → REPAIRED`
+
+Failure goes to `ROLLED_BACK`, then a maximum of three bounded attempts, then `DEAD_LETTER`. Every transition checks the current main SHA, target head SHA, live lease, and fencing token.
+
+Automatic work is limited to D0/D1 reversible coordination and metadata:
+
+- awareness receipts;
+- expired-lease release;
+- bounded retry scheduling and dead-letter transition;
+- dependency, split-scope, supersession, or review-rebind proposals.
+
+The agent never automatically merges, force-pushes, deletes, changes a provider, moves money, rotates credentials, decides rights/ownership, expands authority, approves itself, or performs D3 work. Those conditions remain HOLD or human review.
+
+## Trust boundary
+
+Pull-request head code runs deterministic tests with no token and no persisted checkout credentials. It is physically isolated in a pull-request-only workflow. Live GitHub observation runs from a separate trusted workflow and only from the trusted base or main revision with read-only repository permissions. The trusted observer never checks out or executes candidate code.
+
+Runtime records are service-only, protected by forced row-level security, guarded functions, exact version preconditions, append-only event receipts, and DAIL linkage. Public documentation contains no secret, private fingerprint, credential, key, protected evidence, or vault locator.
+
+## Evidence limitation
+
+The recovered v1 corpus is useful reconstruction evidence but does not certify a working RTC agent. The supplied validation report and checksum file describe a detached v2 generation and cannot certify the v1 package or this executable. Complete generation-bound artifacts and independent exact-head review remain required before acceptance.

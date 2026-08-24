@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0.0",
+  "contract_pack_id": "ct.contract-pack.thriveevergreen-production-fabric.v1",
+  "contracts": {
+    "candidate": {
+      "required": ["candidate_id","subject_ref","exact_version_ref","content_sha256","rights_state","channel","currency"],
+      "properties": {
+        "candidate_id": "uuid",
+        "subject_ref": "stable_id",
+        "exact_version_ref": "string",
+        "content_sha256": "sha256",
+        "rights_state": "PASS|HOLD|DENY",
+        "cie_state": "PASS|HOLD|NOT_APPLICABLE",
+        "channel": "string",
+        "currency": "iso4217",
+        "provider_aliases": "object",
+        "requested_effects": "array"
+      },
+      "additional_properties": false
+    },
+    "ecac_evaluation": {
+      "input": ["candidate_id","exact_version_ref","evidence_refs"],
+      "output": ["decision","blockers","gate_digest","money_movement_authorized","provider_write_authorized","rights_grant_authorized"],
+      "decision_values": ["ECAC_CANDIDATE","HOLD","DENY"],
+      "invariants": [
+        "self_approval=false",
+        "D3_human_reserved=true",
+        "provider_success_does_not_manufacture_authority=true",
+        "ai_final_authority=false"
+      ]
+    },
+    "sku_proposal": {
+      "input": ["brand","class","asset","variant","license","version"],
+      "output": ["sku_candidate","sku_key_sha256"],
+      "format": "CT-[BRAND]-[CLASS]-[ASSET]-[VARIANT]-[LICENSE]-[VERSION]",
+      "authority_note": "Algorithm proposes deterministic SKU material; ThriveEvergreen remains exclusive institutional SKU issuer."
+    },
+    "price_envelope": {
+      "input": ["currency","cost_minor","provider_fee_minor","fulfillment_minor","support_minor","risk_minor","royalty_minor","commission_minor","tax_handling","target_margin_bps","strategic_premium_bps"],
+      "output": ["floor_minor","sustainable_minor","target_minor","premium_minor","promotion_floor_minor","walkaway_minor","inputs_sha256"],
+      "invariants": ["all_minor_values_nonnegative","target_gte_sustainable_gte_floor","promotion_floor_gte_walkaway"]
+    },
+    "provider_readback": {
+      "input": ["provider","provider_object_id","provider_state","amount_minor","currency","provider_evidence_sha256","observed_at"],
+      "output": ["reconciled_state","mismatch_codes","institutional_effect_allowed"],
+      "institutional_effect_allowed_default": false
+    },
+    "entitlement": {
+      "states": ["PENDING","ACTIVE","SUSPENDED","REVOKED","REFUNDED","DISPUTED","EXPIRED"],
+      "input": ["prior_state","qualifying_event","license_state","payment_state","refund_state","dispute_state"],
+      "output": ["next_state","reason_codes"]
+    },
+    "settlement": {
+      "input": ["order_ref","gross_minor","tax_minor","refund_minor","provider_fee_minor","royalty_minor","commission_minor","allocation_rules"],
+      "output": ["net_platform_minor","allocation_lines","reconciliation_delta_minor","state"],
+      "state_values": ["PASS","HOLD","CORRECT","COMPENSATE"]
+    },
+    "rollback_compensation": {
+      "input": ["effect_type","provider_reversible","institutional_reversible","adverse_evidence_refs"],
+      "output": ["action","steps","requires_human","append_only_receipt_required"],
+      "actions": ["NOOP","ROLLBACK","COMPENSATE","QUARANTINE","ESCALATE"]
+    },
+    "automation": {
+      "invariants": [
+        "idempotency_required_for_mutation",
+        "read_after_write_required",
+        "rollback_or_compensation_required",
+        "exact_candidate_gate_required",
+        "second_read_before_apply_required",
+        "no_recursive_agent_spawn",
+        "no_silent_delete",
+        "append_only_adverse_evidence"
+      ]
+    },
+    "ml_advisory": {
+      "input": ["governed_feature_vector","feature_schema_version","observation_window"],
+      "output": ["score","confidence","explanations","model_digest"],
+      "authority": "advisory_only",
+      "prohibited_effects": ["ECAC","rights_grant","price_publication","money_movement","provider_write","payout","entitlement_activation"]
+    },
+    "virality_projection": {
+      "input": ["canonical_product","canonical_offer","crown_credit_price","virality_credit_bridge","rail_status","wallet_status","rights_state","ecac_state"],
+      "output": ["public_safe_product_projection","checkout_rail_options","hold_reasons"],
+      "denomination_rule": "1 Virality Credit = 25 Crown Credits",
+      "native_site_write": "separately_gated"
+    }
+  }
+}

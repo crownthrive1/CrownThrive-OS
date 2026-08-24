@@ -1,0 +1,67 @@
+---
+title: Crown Credits Production Contract v1
+description: Governed production contract for CrownThrive closed-loop Crown Credits and Stripe funding.
+---
+
+# Crown Credits Production Contract v1
+
+**Effective:** August 23, 2026  
+**Program:** `ct.credit.store.v1`  
+**Runtime:** `crown-credits-control`  
+**State:** Production / active
+
+Crown Credits are CrownThrive LLC closed-loop internal purchasing credits. They are nontransferable, non-cash-redeemable, non-interest-bearing, and are not cryptocurrency or an on-chain asset.
+
+## Production funding rail
+
+Stripe is the production funding provider. The live Crown Credits catalog uses one governed product with five fixed one-time top-up offers. Amounts are resolved server-side from exact governed offer records; clients cannot submit arbitrary funding amounts.
+
+Production settlement uses **provider readback reconciliation** as economic truth. A redirect, browser success page, webhook delivery, or provider-side success label alone cannot issue credits. The backend independently reads the Checkout Session, PaymentIntent, Charge, amount, currency, exact Price/Product mapping, tax state, and idempotency state before the Crown Credits ledger is mutated.
+
+A scheduled reconciliation pass runs every ten minutes for pending live top-ups.
+
+## Stablecoin funding
+
+Crown Credits may be funded through Stripe stablecoin payments when Stripe makes that payment method available on the platform account. Stablecoin is a **tender**, not the stored-value class of Crown Credits.
+
+When a stablecoin payment is used:
+
+1. Stripe handles the customer wallet and stablecoin payment.
+2. Stripe settles the completed payment to the Stripe balance in fiat value.
+3. CrownThrive independently reads the settled provider objects.
+4. Crown Credits are issued only after exact readback validation.
+5. CHLOM Wallet records stablecoin tender provenance and settlement evidence.
+6. Crown Credits remain closed-loop internal credits and do not become crypto assets.
+
+Current provider enablement is represented explicitly. The CrownThrive runtime may be production-active while the Stripe stablecoin payment method remains `PROVIDER_ENABLEMENT_PENDING`.
+
+## Economic authority
+
+Crown Credits operate under ThriveEvergreen economic governance and CHLOM evidence controls.
+
+Provider evidence is not institutional economic truth by itself. Payment success cannot directly manufacture an entitlement, public performance claim, rights grant, or economic authority.
+
+## API and MCP surface
+
+Production API: `https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/crown-credits-control`
+
+Canonical MCP operations include:
+
+- `crown_credits.catalog.read`
+- `crown_credits.balance.read`
+- `crown_credits.topup.create`
+- `crown_credits.topup.reconcile`
+- `crown_credits.purchase`
+
+Mutation operations are bounded to exact governed offers and idempotent requests.
+
+## Non-negotiable boundaries
+
+- No peer-to-peer credit transfer.
+- No cash withdrawal or redemption.
+- No interest.
+- No crypto-credit representation.
+- No arbitrary client-submitted price.
+- No entitlement from redirect alone.
+- No raw provider secrets in API/MCP output.
+- Refund, dispute, or reversal state must reconcile through the institutional ledger.
