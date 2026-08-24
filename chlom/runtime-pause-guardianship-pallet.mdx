@@ -1,0 +1,243 @@
+---
+title: "Pause / Guardianship Pallet — Historical Runtime Record"
+sidebarTitle: "Pause / Guardianship Pallet"
+description: "Individual reconstruction of CHLOM's historical Pause/Guardianship Pallet for emergency holds, guardian authority, bounded suspension, restoration and audit lineage, mapped to current case/remedy controls."
+icon: "hand"
+keywords: ["CHLOM Pause Pallet", "Guardianship Pallet", "emergency halt", "guardian", "HOLD", "restoration"]
+---
+
+# Pause / Guardianship Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.pause-guardianship
+namespace: historical_runtime_pallet
+recovered_title: Pause/Guardianship Pallet
+recovered_help_center_description: emergency pause/guardian controls for modules, assets and operations
+source_recovery: substantive_title_plus_governance/remedy_architecture
+current_mapping:
+  - P-02 Governance & Compliance
+  - cases/disputes/guardianship/override controls
+  - incident response
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Pause/Guardianship Pallet was designed as a circuit breaker. Authorized guardians could temporarily stop sensitive CHLOM operations when continuing execution would be unsafe, disputed, noncompliant or otherwise unacceptable.
+
+```text
+NORMAL OPERATION
+      |
+trigger / evidence
+      |
+      v
+PAUSE REQUEST / EMERGENCY SIGNAL
+      |
+GUARDIAN AUTHORITY CHECK
+      |
+      +--> invalid -> DENY
+      |
+      v
+SCOPE + DURATION
+      |
+      v
+PAUSED / HELD
+      |
+REVIEW / REMEDIATION
+      |
+RESTORE | MODIFY | REVOKE / CLOSE
+```
+
+## Pause is bounded
+
+A pause should identify:
+
+- exact scope;
+- reason/evidence;
+- authority;
+- start time;
+- review/expiry condition;
+- affected operations;
+- restoration criteria;
+- downstream compensation/reconciliation needs.
+
+A universal indefinite pause with no scope/review path is not the intended safe pattern.
+
+## Reconstructed pause object
+
+```yaml
+pause_id: stable ID
+subject_or_scope_ref: module|asset|capability|provider|tenant|operation
+reason_code: controlled
+opened_by_ref: actor/guardian
+authority_ref: required
+evidence_refs: []
+started_at: timestamp
+review_at_or_expiry: nullable
+status: active|partially_lifted|lifted|superseded|converted_to_revocation
+```
+
+## Guardian model
+
+A guardian is a bounded emergency role, not a universal system administrator.
+
+```text
+GUARDIAN ROLE
+   |
+allowed emergency scopes
+   |
+maximum action class
+   |
+required evidence / post-review
+```
+
+Current CHLOM should treat guardian assignments as explicit P-01/P-02 authority records.
+
+## Historical emergency use cases
+
+- compromised issuer/provider;
+- suspicious transaction/license activity;
+- oracle/feed failure;
+- governance exploit;
+- contract/runtime vulnerability;
+- disputed rights/license;
+- treasury/economic anomaly;
+- security incident;
+- critical policy mismatch.
+
+## HOLD mapping
+
+Current CHLOM generalizes many pause conditions into the explicit `HOLD` state.
+
+```text
+PAUSE = operational suspension mechanism
+HOLD  = governance/decision state saying do not proceed yet
+```
+
+They may coexist. A HOLD may trigger a pause; a pause may remain while a case/review resolves.
+
+## Scope hierarchy
+
+```text
+institution-wide
+  > pallet/service
+    > tenant/platform
+      > asset/object
+        > operation
+```
+
+A guardian authorized for a narrow scope cannot silently pause broader scopes.
+
+## Restoration
+
+Restoration requires affirmative evidence that the pause condition is resolved or that an authorized decision permits safe resumption.
+
+```text
+PAUSED
+  |
+remediation/readback
+  |
+review
+  |
+criteria satisfied?
+ no -> remain paused
+ yes
+  |
+RESTORE exact scope
+  |
+DAIL
+```
+
+## Current event mapping
+
+```text
+ct.guardian.pause.requested.v1
+ct.guardian.pause.activated.v1
+ct.guardian.pause.scope.changed.v1
+ct.guardian.pause.lifted.v1
+ct.guardian.pause.expired.v1
+ct.guardian.pause.converted.v1
+```
+
+## Override relationship
+
+A pause lift/override cannot erase the reason the pause existed.
+
+```text
+original condition
+   +
+original pause
+   +
+override/restoration authority
+   +
+new state
+```
+
+all remain linked in DAIL.
+
+## Incident response relationship
+
+Security incidents can invoke emergency pause while incident procedures continue under P-10/security governance. Public pages should not expose exploit-sensitive pause mechanisms.
+
+## Economic/rights compensation
+
+Pausing an action may create obligations to:
+
+- refund;
+- reschedule;
+- restore entitlement;
+- halt payout;
+- re-run verification;
+- preserve evidence;
+- notify affected parties.
+
+The pause pallet does not itself decide every remedy; it routes/blocks safely.
+
+## Security threats
+
+- unauthorized guardian;
+- stolen guardian credentials;
+- overbroad pause scope;
+- guardian censorship/abuse;
+- failure to expire/review;
+- stale pause caches;
+- bypass through another provider;
+- premature restoration;
+- hidden pause with no audit trail.
+
+## Public / restricted split
+
+Public-safe:
+
+- pause/guardian lifecycle;
+- bounded authority principles;
+- HOLD mapping;
+- remedy/evidence semantics.
+
+Restricted:
+
+- guardian identities where sensitive;
+- exact emergency routes;
+- exploit triggers;
+- provider kill-switch details;
+- security topology;
+- incident evidence.
+
+## Invariants
+
+```text
+guardian != universal admin
+pause != permanent revocation
+pause != deletion
+HOLD != DENY
+restoration != erasure
+emergency authority != self-expanding authority
+provider pause != institutional pause unless reconciled
+historical runtime pallet != current chain deployment
+```
+
+## Status
+
+The Pause/Guardianship Pallet remains a distinct historical CHLOM runtime module with current mapping to P-02 holds, case/remedy controls and security/incident-response suspension mechanisms.

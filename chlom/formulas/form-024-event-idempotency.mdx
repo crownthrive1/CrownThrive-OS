@@ -1,0 +1,67 @@
+---
+title: "FORM-024 — Event Idempotency"
+sidebarTitle: "FORM-024 Idempotency"
+description: "Standalone CHLOM idempotency relation requiring repeated delivery of the same semantic command or event to produce no additional consequential effect."
+icon: "arrows-rotate"
+keywords: ["CHLOM FORM-024", "idempotency", "semantic request", "duplicate event", "side effects"]
+---
+
+# FORM-024 — Event Idempotency
+
+## Formula identity
+
+```yaml
+formula_id: FORM-024
+classification: formal_behavioral_invariant
+origin: CHLOM provider/webhook, DAIL and economic execution requirements
+adopted_as_reconstruction_contract: yes
+related_algorithm: ALG-008
+```
+
+## Invariant
+
+For a side-effecting semantic command identified by idempotency key `k`:
+
+```text
+execute(k) at most once for the same semantic request
+```
+
+A functional abstraction is:
+
+```text
+result(execute(k), execute(k), ..., execute(k)) = result(execute(k))
+```
+
+where repeated transport attempts return/recover the original outcome rather than multiplying economic, rights or entitlement effects.
+
+## Semantic versus transport identity
+
+Idempotency must bind to the business meaning of the request. HTTP retry IDs, provider event IDs, queue delivery IDs and request IDs can be aliases but may not be sufficient alone if the same semantic event can arrive through different transport envelopes.
+
+## Scope
+
+The idempotency namespace must include tenant/account and operation type. The same key reused by another tenant or a different operation must not collide.
+
+## Response behavior
+
+A repeated request should normally return the prior result or an explicit `already_processed` receipt. It should not silently claim a new execution.
+
+## Crash consistency
+
+The idempotency record and side effect need recoverable atomicity. A system that transfers value and then crashes before marking the key processed can duplicate effects on retry; implementations must design against that failure.
+
+## Expiry
+
+Some idempotency records may have retention periods, but expiry must be longer than any plausible replay/retry window for consequential operations or use durable semantic event registries.
+
+## Tests
+
+Test exact retry, concurrent duplicate, retry after process restart, different transport ID same semantic event, same key different tenant, same key different operation, failure before effect, failure after effect and replay after retention expiry.
+
+## DAIL evidence
+
+Record idempotency reference, semantic action hash, original execution receipt and duplicate/replay observations where consequential.
+
+## Versioning
+
+Changes to semantic-key construction require migration/replay analysis to avoid making old processed events appear new.

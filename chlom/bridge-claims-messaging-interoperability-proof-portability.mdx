@@ -1,0 +1,330 @@
+---
+title: "Bridge, Claims, Messaging and Interoperability — Proof Portability"
+sidebarTitle: "Bridge & Interop"
+description: "Comprehensive CHLOM interoperability reconstruction covering cross-system claims, messaging, bridges, proof portability, stable identities, trust boundaries and provider-independent adapters."
+icon: "bridge"
+keywords: ["CHLOM bridge", "claims", "messaging", "interoperability", "cross-chain", "proof portability", "DID", "DLA"]
+---
+
+# Bridge, Claims, Messaging and Interoperability — Proof Portability
+
+Historical CHLOM is designed as an industry-agnostic compliance layer capable of interacting with other chains and systems. The Technical Blueprint discusses cross-chain approaches such as Polkadot-style messaging/bridges and examples where assets or identity proofs are recognized across ecosystems. The recovered paper catalog also includes **Bridge/Claims** module families.
+
+The exact original body of every Bridge/Claims module paper is not fully recovered. This page therefore combines **source-grounded interoperability concepts** with current CHLOM provider-independent control requirements and clearly labels the boundary.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_from_source_and_partial_module_lineage
+historical_interop: cross_chain_and_cross_system
+historical_bridge_claims_family: recovered_by_title
+exact_original_bridge_claims_body: partially_unrecovered
+current_mapping: governed_adapters_claims_and_message_contracts
+founder_adjudication: open_after_publication
+```
+
+## Interoperability is not trust collapse
+
+Connecting systems does not mean accepting every remote statement as truth.
+
+```text
+REMOTE SYSTEM
+     |
+     v
+message / claim / proof
+     |
+     v
++----+------------------+
+| Bridge / Adapter      |
++----+------------------+
+     |
+     v
+verify source + identity
+     |
+     v
+verify message/proof format
+     |
+     v
+map remote IDs to stable CHLOM IDs
+     |
+     v
+policy / rights / authority evaluation
+     |
+ PASS / HOLD / DENY
+     |
+     v
+local institutional state + DAIL
+```
+
+## Four distinct interoperability objects
+
+### Message
+
+A request/event delivered from one system to another.
+
+### Claim
+
+A statement such as `credential valid`, `asset locked`, `license active`, or `payment confirmed` made by an attributable source.
+
+### Proof
+
+Cryptographic or evidentiary material supporting a claim.
+
+### Bridge
+
+The transport/verification mechanism connecting trust domains.
+
+```text
+MESSAGE != CLAIM != PROOF != INSTITUTIONAL DECISION
+```
+
+## Historical examples
+
+Recovered sources contemplate:
+
+- mirroring/tokenizing an asset from another chain for compliant use;
+- recognizing CHLOM identity proofs in another ecosystem;
+- using bridges/XCMP-style messaging to connect chains;
+- reusing credentials across contexts;
+- connecting Web2 APIs and databases to CHLOM services.
+
+These are target concepts, not current production bridge claims.
+
+## Stable identity mapping
+
+Remote provider/chain IDs should be aliases, not CrownThrive's canonical identity.
+
+```text
+ct.asset.123
+   |
+   +--> ethereum:0x...
+   +--> provider_A:item_99
+   +--> chain_B:asset_41
+```
+
+If a provider or chain changes, the stable institutional asset ID survives.
+
+## Claims envelope
+
+A cross-system claim should identify:
+
+```yaml
+claim_id: stable_id
+issuer_or_source: remote_authority_id
+subject_id: mapped_stable_id
+claim_type: license_active
+value: true
+issued_at: timestamp
+expires_at: timestamp_or_null
+source_network: explicit
+source_reference: tx_message_document
+proof_reference: optional
+verification_method: explicit
+confidentiality: public_safe_or_restricted
+status: candidate_verified_rejected_revoked
+```
+
+## Inbound message lifecycle
+
+```text
+RECEIVED
+   |
+   v
+AUTHENTICATE SOURCE
+   |
+   +--> fail ------> REJECT
+   |
+   v
+VERIFY REPLAY / NONCE
+   |
+   +--> duplicate -> IDEMPOTENT RETURN
+   |
+   v
+VALIDATE SCHEMA
+   |
+   v
+VERIFY PROOF / CLAIM
+   |
+   v
+MAP STABLE IDS
+   |
+   v
+POLICY / AUTHORITY
+   |
+ PASS / HOLD / DENY
+   |
+   v
+LOCAL EVENT + DAIL
+```
+
+## Replay protection and idempotency
+
+Cross-domain messages may be retried. A bridge must prevent duplicate state effects.
+
+```text
+message_id + source_domain + nonce
+             |
+             v
+        already seen?
+          /     \
+        yes     no
+        |        |
+        v        v
+return prior   process once
+receipt        + persist replay key
+```
+
+## Bridge trust boundary
+
+```text
++================ REMOTE TRUST DOMAIN ================+
+| remote asset / credential / message / consensus     |
++======================+===============================+
+                       |
+                       | bridge proof / signed message
+                       v
++----------------------+-------------------------------+
+| BRIDGE VERIFICATION BOUNDARY                         |
+| source auth | replay | proof | schema | finality     |
++----------------------+-------------------------------+
+                       |
+                       v
++================ LOCAL CHLOM DOMAIN ==================+
+| policy | rights | authority | DAIL | remedies        |
++======================================================+
+```
+
+The bridge verifies the remote statement/transport within its scope. CHLOM still decides what that statement means locally.
+
+## Finality and reorg risk
+
+A remote-chain event may not be final immediately. A bridge policy should define required confirmations/finality before irreversible local effects.
+
+```text
+remote event observed
+      |
+      v
+provisional evidence
+      |
+      v
+finality threshold met?
+    /      \
+  no        yes
+  |          |
+HOLD      eligible for local evaluation
+```
+
+## Revocation and remote corrections
+
+Claims must support correction/revocation.
+
+A credential that is valid on Monday may be revoked Tuesday. A bridge that imports only the original positive claim without a revocation channel creates false permanence.
+
+## Proof portability
+
+One long-term CHLOM goal is that a participant can prove eligibility across systems without re-exposing private data.
+
+```text
+protected credential
+      |
+      v
+portable VC / ZK proof / signed attestation
+      |
+      v
+remote verifier
+      |
+      v
+local policy interprets proof
+```
+
+Portability does not mean universal scope: the relying system still determines which issuers, proof versions and policies it accepts.
+
+## Cross-system DLA/rights
+
+A remote token or NFT cannot automatically become a CHLOM licensing asset.
+
+```text
+remote token exists
+       != legal rights proven
+       != CHLOM rights package
+       != DLA approved
+       != LEX eligible
+```
+
+Rights evidence must be separately reconciled.
+
+## Outbound messaging
+
+CHLOM may need to project an authorized decision to an external system.
+
+```text
+local authorized event
+      |
+      v
+outbound message builder
+      |
+      v
+sign / serialize / version
+      |
+      v
+remote adapter/provider
+      |
+      v
+remote receipt
+      |
+      v
+reconciliation + DAIL
+```
+
+Delivery success does not prove that the remote system interpreted the message correctly; readback/reconciliation may be required.
+
+## Provider/bridge exit
+
+A durable bridge architecture needs a migration path.
+
+```text
+stable interop contract
+      |
+      +--> Bridge Provider A
+      +--> Bridge Provider B
+      +--> direct API fallback
+      +--> future native protocol
+```
+
+Provider aliases should never become institutional concept IDs.
+
+## Failure conditions
+
+HOLD or DENY when:
+
+- remote source cannot be authenticated;
+- message replay/nonce protection fails;
+- proof/claim format is unsupported;
+- finality is insufficient;
+- stable ID mapping is ambiguous;
+- remote and local rights states conflict;
+- remote claim is stale/revoked;
+- bridge provider cannot supply evidence/readback;
+- cross-domain correction behavior is undefined;
+- the bridge attempts to grant local authority outside its contract.
+
+## Current implementation mapping
+
+Historical bridge/interoperability concepts decompose into:
+
+- Adapter Registry;
+- Claims Service;
+- Message Envelope/Router;
+- Stable ID Alias Registry;
+- Proof Verification Service;
+- Replay/Idempotency Store;
+- Finality/Freshness policies;
+- DAIL interoperability events;
+- Cases/Remedies for conflicts;
+- future blockchain/bridge adapters.
+
+## Founder adjudication
+
+`open_after_publication`
+
+New recovery of the original Bridge/Claims module papers may refine this reconstruction. The Founder may later adjudicate supported networks, bridge strategy, claim formats, portability policy or public naming without erasing the historical source lineage.

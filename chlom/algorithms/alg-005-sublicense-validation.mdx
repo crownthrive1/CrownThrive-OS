@@ -1,0 +1,114 @@
+---
+title: "ALG-005 — Sublicense Validation"
+sidebarTitle: "ALG-005 Sublicense Validation"
+description: "Standalone CHLOM procedure for validating child licenses against active parent rights, term, territory, transferability and approval constraints."
+icon: "diagram-project"
+keywords: ["CHLOM ALG-005", "sublicense validation", "parent rights", "license hierarchy", "DLA"]
+---
+
+# ALG-005 — Sublicense Validation
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-005
+name: Sublicense Validation
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: DLA; LEX; hierarchical licensing
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-005 determines whether a proposed child license can lawfully and contractually descend from an existing parent DLA/license. Its purpose is to stop downstream licenses from inventing rights, surviving longer than their parent, reaching unauthorized territories, or bypassing required approvals.
+
+## Preconditions
+
+The parent license must be located by canonical ID/version and its effective rights must be computed using the rights graph. Provider labels, PDFs or marketplace listings are supporting evidence, not substitutes for the canonical parent state.
+
+## Inputs
+
+```yaml
+parent_dla_id:
+parent_version:
+requested_child:
+  rights
+  term
+  territory
+  channels
+  derivative_scope
+  transferability
+  sublicensing
+  economic_schedule
+  proposed_licensee
+approval_context:
+evidence_refs[]:
+```
+
+## Procedure
+
+```text
+function validate_sublicense(parent_dla, requested_child):
+    if not parent_dla.active:
+        return DENY
+
+    if not parent_dla.sublicensing_allowed:
+        return DENY
+
+    if not subset(requested_child.rights, parent_dla.rights):
+        return DENY
+
+    if exceeds_term(requested_child, parent_dla):
+        return DENY
+
+    if exceeds_territory(requested_child, parent_dla):
+        return DENY
+
+    if missing_required_approval(requested_child):
+        return HOLD
+
+    return PASS
+```
+
+## Required comparisons
+
+The validator should compare at minimum rights type, medium/channel, territory, effective dates, exclusivity, derivative-use scope, sublicensing depth, transferability, prohibited uses and any economic or approval conditions inherited from the parent.
+
+Inheritance is restrictive. If a parent says nothing about a sensitive downstream permission, silence should not be interpreted as permission when the relevant policy requires an affirmative grant.
+
+## Licensee evaluation
+
+A child licensee may have requirements independent of the parent: identity, accreditation, jurisdiction, sanctions screening, platform eligibility, brand standards or other policy controls. A structurally valid child grant is not active until those conditions also pass.
+
+## Outputs
+
+```yaml
+disposition: PASS|HOLD|DENY
+parent_dla_ref:
+effective_parent_scope:
+requested_child_scope:
+violations[]:
+missing_approvals[]:
+inherited_constraints[]:
+reason_codes[]:
+```
+
+## Failure semantics
+
+Confirmed attempts to exceed parent rights are DENY. Missing approval, stale parent evidence, unresolved rights conflict or ambiguous parent language routes to HOLD where remediation or adjudication is possible.
+
+## DAIL lineage
+
+The validation receipt should reference the exact parent version and the effective-rights calculation. If the parent is later revoked or corrected, affected child licenses must be reevaluated according to the adopted lifecycle policy; historical validation receipts remain preserved.
+
+## Security and abuse controls
+
+The implementation must prevent license-chain laundering, where a broad child grant is created through successive transformations to hide that the original source never granted the right. Depth limits, parent-chain traversal and source-root verification are therefore part of the security model.
+
+## Tests
+
+Test exact subset, partial subset, prohibited sublicense, expired parent, revoked parent, term overrun, territory overrun, channel overrun, missing approval, stale parent, invalid child licensee and a multi-level chain where a grandchild tries to regain a right removed at the child level.
+
+## Versioning
+
+Any change to inheritance, silence/default semantics, or parent-child constraint handling requires a new algorithm version and migration analysis for existing license chains.

@@ -1,0 +1,223 @@
+---
+title: "Webhooks & Events — CHLOM Delivery Contract"
+sidebarTitle: "Webhooks & Events"
+description: "Individual CHLOM developer article for asynchronous event subscriptions, webhook delivery, authentication, schema versions, retries, idempotency, dead-letter behavior, privacy and DAIL correlation."
+icon: "arrows-turn-to-dots"
+keywords: ["CHLOM webhooks", "events", "event delivery", "developer API", "idempotency", "DAIL"]
+---
+
+# Webhooks & Events — CHLOM Delivery Contract
+
+## Institutional identity
+
+```yaml
+interface_id: CT-CHLOM-EVENTS-001
+name: Webhooks & Events
+source_status: explicitly_recovered_developer_interface_family
+source_lineage: recovered Help Center developer material; SDK & API Gateway; Events/Topics; DAIL and integration architecture
+classification: source_grounded_current_delivery_contract
+exact_production_topics: not_defined_by_this_article
+version: 1.0.0
+```
+
+## Source boundary
+
+Recovered CrownThrive/CHLOM developer material explicitly included **Webhooks & Events**, and the SDK/API Gateway lineage includes webhooks alongside REST, GraphQL, JSON-RPC and typed SDKs. This is therefore a distinct institutional interface family, not merely an implementation detail of one provider.
+
+A complete historical topic catalog or exact endpoint schema has not been located, so this article defines the current provider-neutral event-delivery contract without inventing production topic names.
+
+## Purpose
+
+Webhooks and events deliver asynchronous notice that something was observed, changed or requires follow-up. They reduce unnecessary polling and connect CHLOM services, CrownThrive platforms, partners and provider adapters while preserving a strict separation between **delivery evidence** and **canonical institutional state**.
+
+```text
+CANONICAL EVENT / STATE CHANGE
+        |
+        v
+EVENT PROJECTION / TOPIC
+        |
+        v
+SUBSCRIBER DELIVERY
+        |
+        v
+ACK / RETRY / DEAD LETTER
+
+Delivery success != canonical-state authority
+```
+
+## Event families
+
+Current engineering event classes can include:
+
+- DLA/license lifecycle changes;
+- rights/evidence corrections;
+- credential or attestation changes;
+- policy evaluation or adoption changes;
+- LEX listing/transaction changes;
+- entitlement activation/suspension;
+- payment/settlement/refund/reversal evidence;
+- case/review/remedy changes;
+- audit/certification changes;
+- provider/dependency health changes;
+- interoperability/bridge claim observations;
+- release/deployment/provenance changes.
+
+These are categories derived from institutionalized domains, not asserted historical topic strings.
+
+## Event envelope
+
+A public-safe event projection should include a stable envelope:
+
+```yaml
+event_id:
+event_type:
+schema_id:
+schema_version:
+tenant_id:
+subject_refs[]:
+object_refs[]:
+occurred_at:
+observed_at:
+correlation_id:
+causation_id:
+classification:
+payload_or_projection:
+DAIL_or_source_event_ref:
+```
+
+Restricted evidence bodies and secrets are referenced rather than embedded.
+
+## Canonical event versus delivery event
+
+The canonical DAIL or domain event is the institutional record. A webhook delivery can have its own delivery ID/attempt metadata while referring back to the same canonical event.
+
+```text
+canonical_event_id stable
+webhook_delivery_id per attempt
+```
+
+Retries must not create new institutional events merely because the delivery mechanism retried.
+
+## Subscription registry
+
+Each subscriber registration should record:
+
+```yaml
+subscription_id:
+client_or_tenant_ref:
+endpoint_or_delivery_adapter_ref:
+event_type_filters[]:
+object_or_scope_filters[]:
+schema_versions[]:
+auth_method_ref:
+status:
+created_at:
+expires_or_rotates_at:
+rate_policy_ref:
+privacy_projection_ref:
+```
+
+A subscription cannot broaden the client's underlying authorization. The event projection itself remains audience/scoped.
+
+## Authentication
+
+Webhook receivers verify the registered delivery-authentication mechanism. Signing secrets or credentials remain in secret custody; documentation exposes only method/class and rotation state.
+
+Authentication proves that the delivery originated through the expected integration path. It does not establish that every claim inside the event is sufficient for a separate institutional action.
+
+## Delivery attempts
+
+```yaml
+delivery_id:
+subscription_ref:
+canonical_event_ref:
+attempt_number:
+sent_at:
+response_or_ack_class:
+latency:
+next_retry_at:
+final_delivery_state:
+```
+
+Delivery telemetry can remain operational while consequential event lineage stays tied to the canonical event.
+
+## Retry behavior
+
+Retry transient delivery failures using a bounded policy. Permanent schema, authentication, subscription or policy failures should not be retried indefinitely.
+
+A subscriber must expect at-least-once delivery unless the specific transport guarantees otherwise. Consumers therefore apply semantic idempotency using the canonical event identity.
+
+## Dead-letter state
+
+After the retry policy is exhausted, move the delivery to an explicit dead-letter/failed state for operator review or controlled replay. A dead-letter queue is not a hidden discard path; the missed event remains traceable to its canonical source.
+
+## Ordering
+
+Event ordering requirements are declared per topic/domain. Some event streams need per-object sequence or version checks—such as DLA revocation after activation—while others can be processed independently.
+
+Subscribers should rely on object/event versions and current readback rather than assuming network delivery order always equals effective institutional order.
+
+## Replay
+
+Authorized controlled replay can resend an existing canonical event after a delivery failure or integration repair. Replay uses the same semantic event identity and must not multiply downstream rights, payments or entitlements.
+
+## Event corrections
+
+A correction, reversal or supersession is a **new canonical event** that references the earlier record. It is not implemented by editing an already-delivered webhook body in subscriber history.
+
+## Privacy projections
+
+Subscriptions receive only fields approved for their audience and purpose. A public/partner webhook can receive a safe status change without the private evidence or agreement behind it.
+
+Different subscribers can receive different projections of the same canonical event according to policy.
+
+## Schema evolution
+
+Event types and payloads are versioned. Subscribers can declare supported versions; breaking changes require migration/deprecation. Unknown required fields or unsupported versions should fail safely rather than be silently discarded when they affect semantics.
+
+## DAIL correlation
+
+Consequential event messages carry a DAIL/source-event reference or correlation path where applicable. Webhook infrastructure does not become a separate institutional ledger.
+
+## Provider webhooks
+
+External provider webhooks are inbound observations. CHLOM authenticates, normalizes and idempotently reconciles them before they create any institutional effect. A payment provider webhook success, for example, is not directly an entitlement or settlement event.
+
+## Outbound webhooks
+
+Outbound CHLOM webhooks are projections of canonical state/events to approved consumers. The outbound event should identify the institutional object/version so consumers can perform current-state readback if needed.
+
+## Rate and burst controls
+
+Apply per-subscription/client delivery budgets and backpressure. Event storms should not cause duplicated or silently dropped consequential state. Coalescing is allowed only when the subscriber contract says intermediate states are unnecessary.
+
+## Disable and recovery
+
+A subscription can be disabled for repeated failures, revoked credentials, privacy/security concerns or tenant policy. Re-enabling uses controlled reconciliation/replay according to the event retention policy.
+
+## Observability
+
+Track delivery health, retry counts, authentication failures, latency, dead-letter backlog, schema incompatibility and consumer lag without logging restricted payload bodies unnecessarily.
+
+## Conformance tests
+
+- successful authenticated delivery;
+- invalid delivery authentication;
+- duplicate retry;
+- receiver timeout;
+- schema-version mismatch;
+- dead-letter transition;
+- controlled replay;
+- DLA activation followed by revocation ordering;
+- private event projected to partner-safe payload;
+- provider inbound event normalized before institutional effect;
+- subscription revoked while events are queued;
+- downstream idempotency prevents duplicate economic/entitlement effect.
+
+## Current status
+
+Webhooks & Events are explicitly recovered CHLOM developer surfaces and current-appropriate integration patterns. Exact topics, endpoint formats and production credentials require separate machine manifests and implementation evidence.
+
+## Versioning
+
+Canonical event schemas, subscription schema, delivery adapters, authentication methods and retry policies are independently versioned. Historical event/delivery records retain the versions used.

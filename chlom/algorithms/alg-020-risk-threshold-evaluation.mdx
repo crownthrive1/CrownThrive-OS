@@ -1,0 +1,110 @@
+---
+title: "ALG-020 — Risk Threshold Evaluation"
+sidebarTitle: "ALG-020 Risk Thresholds"
+description: "Standalone CHLOM decision procedure translating governed risk score and uncertainty inputs into PASS-candidate, HOLD or DENY while preserving hard rules and evidence requirements."
+icon: "gauge-high"
+keywords: ["CHLOM ALG-020", "risk thresholds", "PASS HOLD DENY", "uncertainty", "hard block"]
+---
+
+# ALG-020 — Risk Threshold Evaluation
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-020
+name: Risk Threshold Evaluation
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: AIE/ACE risk lineage; Risk Scoring Engine; Compliance Packs
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-020 interprets a risk assessment under a versioned policy. It is deliberately separate from the model that produces a score because threshold ownership is a governance/policy function, not an implicit property of the model.
+
+## Inputs
+
+```yaml
+risk_assessment_ref:
+score:
+score_scale:
+uncertainty:
+rules:
+  hold_threshold
+  deny_threshold
+  max_uncertainty
+  hard_block
+  required_evidence_state
+  threshold_version
+```
+
+## Procedure
+
+```text
+function risk_disposition(score, uncertainty, rules):
+    if rules.hard_block:
+        return DENY
+
+    if rules.required_evidence_missing:
+        return HOLD
+
+    if uncertainty > rules.max_uncertainty:
+        return HOLD
+
+    if score >= rules.deny_threshold:
+        return DENY
+
+    if score >= rules.hold_threshold:
+        return HOLD
+
+    return PASS_CANDIDATE
+```
+
+## Threshold ordering
+
+For increasing-risk scales, policy must validate:
+
+```text
+hold_threshold <= deny_threshold
+```
+
+If a model uses the opposite direction or a non-monotonic output, the threshold policy must define that explicitly. Do not assume every score has the same semantics.
+
+## Hard rules
+
+Hard policy conditions outrank probabilistic score. A prohibited jurisdiction, revoked license, confirmed sanctions match or absent source right cannot be transformed into PASS by a low model score.
+
+## Missing evidence
+
+Missing mandatory evidence produces HOLD even if the model can technically produce a score from remaining features. The model's ability to infer is not permission to substitute inference for required proof.
+
+## Uncertainty
+
+Uncertainty is an independent guard. A point estimate below the hold threshold can still HOLD if uncertainty exceeds the approved maximum or if the model is out of distribution.
+
+## Output
+
+```yaml
+threshold_decision_id:
+risk_assessment_ref:
+threshold_policy_ref:
+score:
+uncertainty:
+disposition: PASS_CANDIDATE|HOLD|DENY
+reason_codes[]:
+valid_until:
+```
+
+PASS remains a candidate for the authority gateway.
+
+## DAIL evidence
+
+Record score/model version, uncertainty, threshold policy, hard-rule/evidence state and result. This enables threshold changes to be analyzed without rewriting earlier decisions.
+
+## Tests
+
+Test below hold, exactly at hold, between hold and deny, exactly at deny, above deny, hard block with low score, missing evidence with low score, excessive uncertainty, invalid threshold ordering and score-scale mismatch.
+
+## Versioning
+
+Threshold changes are policy changes and must be versioned, tested and approved independently of model upgrades.

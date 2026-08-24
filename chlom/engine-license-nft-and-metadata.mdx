@@ -1,0 +1,229 @@
+---
+title: "License NFT & Metadata Engine — Historical Assetization Record"
+sidebarTitle: "License NFT & Metadata Engine"
+description: "Standalone CHLOM engine article preserving historical license-NFT/SBT metadata architecture while mapping current machine-readable DLA metadata to provider-neutral registries without implying live tokenization."
+icon: "file-contract"
+keywords: ["CHLOM License NFT", "metadata engine", "DLA metadata", "SBT", "tokenized license", "historical assetization"]
+---
+
+# License NFT & Metadata Engine — Historical Assetization Record
+
+## Canonical record
+
+```yaml
+engine_id: ct.chlom.engine.license-nft-metadata
+canonical_name: License NFT & Metadata Engine
+artifact_class: historical_engine_with_current_mapping
+source_lineage:
+  - Technical Blueprint
+  - Building and Understanding CHLOM
+  - historical DLA/LEX papers
+  - recovered component atlas
+current_mapping:
+  - P-03 Dynamic Licensing Asset metadata
+  - Metadata Registry Service
+  - optional future token adapter
+status: historical_assetization_architecture_preserved
+live_NFT_claim: false
+```
+
+## Purpose
+
+Historical CHLOM described licenses as NFTs/SBT-like tokenized assets carrying machine-readable metadata. This engine captures that design while separating the **license semantics** from any specific blockchain/token wrapper.
+
+```text
+RIGHTS / AGREEMENT
+      |
+      v
+LICENSE / DLA RECORD
+      |
+      v
+METADATA ENGINE
+      |
+      +--> canonical metadata
+      +--> integrity digest
+      +--> public verification
+      +--> optional token/NFT wrapper
+```
+
+## Historical token wrapper
+
+The historical wrapper could represent:
+
+- unique license identity;
+- issuer/holder;
+- scope;
+- duration;
+- transferability;
+- metadata URI/digest;
+- current status;
+- relationship to LEX.
+
+The wrapper never creates source rights by itself.
+
+## Current DLA mapping
+
+Current CHLOM keeps the license object provider-neutral:
+
+```yaml
+dla_id: stable ID
+asset_ref: required
+rights_ref: required
+issuer_ref: required
+holder_ref: required
+scope: structured
+agreement_ref: required/optional by license type
+version: string
+status: candidate|active|held|suspended|revoked|expired|superseded
+metadata_ref: required
+```
+
+A future token wrapper can point to this object without replacing its institutional meaning.
+
+## Metadata schema
+
+```yaml
+metadata:
+  schema_id: stable ID
+  schema_version: string
+  public_title: string
+  license_type: controlled
+  territory: structured
+  channels: []
+  field_of_use: []
+  effective_from: timestamp
+  expires_at: nullable
+  exclusivity: controlled
+  transferability: controlled
+  sublicensing: controlled
+  public_status: controlled
+  public_proof_refs: []
+```
+
+Private agreement/evidence details are excluded from public metadata.
+
+## Token-wrapper separation
+
+```text
+DLA semantics
+   |
+   +--> database/API object
+   +--> signed credential/attestation
+   +--> NFT/SBT wrapper (future adapter)
+   +--> other provider representation
+```
+
+The same DLA can migrate representations without changing the canonical identity.
+
+## URI independence
+
+Metadata can reference object storage, IPFS/Arweave research, CDN or API representations. Canonical metadata ID/version is independent of a mutable provider URL.
+
+## Integrity
+
+```text
+metadata_digest = H(canonical_serialization(metadata_version))
+```
+
+Digest algorithm/serialization rules must be versioned. Hash integrity does not prove the license is legally valid.
+
+## Historical NFT/SBT distinction
+
+- NFT-like license: potentially transferable according to rules;
+- SBT-like credential/license: non-transferable or identity-bound.
+
+Current CHLOM represents transferability explicitly rather than relying on token class alone.
+
+## LEX integration
+
+```text
+DLA current + transferable/sublicensable scope
+      |
+      v
+LEX listing candidate
+```
+
+Marketplace metadata is a projection of DLA/right state, not an independent source.
+
+## Revocation
+
+Revocation changes current DLA/license state. A historical token may remain visible on-chain while its current institutional status is revoked.
+
+```text
+token exists != license active
+```
+
+This distinction is essential for any future chain adapter.
+
+## Transfer
+
+A token transfer is not sufficient unless the institutional rights/license transfer rules pass.
+
+```text
+token transfer observed
+      |
+      v
+local rights / DLA / policy reconciliation
+      |
+      v
+current holder/entitlement state
+```
+
+## Events
+
+```text
+ct.license.metadata.versioned.v1
+ct.license.metadata.projection.updated.v1
+ct.license.wrapper.minted.v1          # only if future adapter implemented
+ct.license.wrapper.transfer.observed.v1
+ct.license.wrapper.reconciled.v1
+```
+
+Historical event names are not claimed.
+
+## Failure cases
+
+### NFT exists but source rights were invalidated
+
+DLA becomes HOLD/revoked according to rights process; token existence does not override rights.
+
+### Metadata URI breaks
+
+Canonical metadata remains recoverable via registry/source custody; update projection/locator without changing DLA identity.
+
+### Token transferred outside CHLOM policy
+
+Treat chain event as evidence and HOLD/reconcile local holder status.
+
+### Private agreement fields leaked into public metadata
+
+Contain/correct public projection and review data-minimization controls.
+
+## Security/privacy
+
+- avoid PII in immutable public metadata;
+- protect restricted agreement/evidence;
+- validate metadata schemas/content;
+- prevent malicious URI/content injection;
+- reconcile chain/provider state;
+- no secret keys in metadata.
+
+## Restricted companion
+
+Contains historical token schema/code references, unreleased wrapper designs, protected metadata extensions, security analyses and future-chain adapter specifications.
+
+## Invariants
+
+```text
+NFT != rights
+NFT != active license
+metadata != ownership proof
+token transfer != institutional transfer automatically
+public URI != canonical identity
+revoked license != erased token/history
+historical assetization != current live tokenization
+```
+
+## Status
+
+The License NFT & Metadata Engine is preserved as historical CHLOM assetization IP. Current implementation uses provider-neutral DLA/metadata semantics, with token/NFT representation reserved as an optional future adapter.

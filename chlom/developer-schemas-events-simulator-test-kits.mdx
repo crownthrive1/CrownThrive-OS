@@ -1,0 +1,556 @@
+---
+title: "Developer Schemas, Events, Simulator and Test Kits"
+sidebarTitle: "Developer Schemas & Test Kits"
+description: "Comprehensive CHLOM developer contract covering canonical schemas for policies, licenses, payouts and events, simulator scenarios, sandbox fixtures, SDK expectations, test kits and deployment-safe examples."
+icon: "code"
+keywords: ["CHLOM developer schemas", "license schema", "policy schema", "payout schema", "event schema", "simulator", "test kit", "SDK", "sandbox"]
+---
+
+# Developer Schemas, Events, Simulator and Test Kits
+
+The Grand Prospectus dedicates its developer appendices to **technical schemas for policies, licenses, payouts and events**, ASCII system maps, simulators, SDKs, CI/CD references, test kits and runbooks. These materials are design inputs for the modern CHLOM developer surface.
+
+This article converts that source intent into a provider-independent developer contract without claiming that every illustrated endpoint or schema is deployed today.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_source_grounded
+source_families:
+  - Grand Prospectus Appendix B technical schemas
+  - Appendix D developer/runbook/simulator/test-kit references
+  - Technical Blueprint service and module architecture
+  - current Phase 3 service-contract doctrine
+current_mapping:
+  - canonical JSON schemas
+  - event contracts
+  - API/MCP interfaces
+  - SDKs
+  - simulator
+  - fixtures and test kits
+  - conformance tests
+production_endpoint_claim: false
+founder_adjudication: open_after_publication
+```
+
+## Developer principle
+
+CHLOM integrations should bind to **stable institutional contracts**, not vendor-specific database tables or one-off provider payloads.
+
+```text
+INSTITUTIONAL SCHEMA
+       |
+       +--> REST adapter
+       +--> MCP tool
+       +--> SDK object
+       +--> event/webhook
+       +--> provider adapter
+       +--> future chain adapter
+```
+
+The contract should survive a provider migration.
+
+## Canonical schema families
+
+The initial developer schema family should include:
+
+1. identity/organization;
+2. evidence/attestation;
+3. policy/Compliance Pack;
+4. rights/source-control record;
+5. DLA/license;
+6. LEX listing/offer;
+7. agreement/acceptance;
+8. entitlement;
+9. allocation/payout/settlement;
+10. case/remedy;
+11. audit/finding/assurance;
+12. DAIL event;
+13. oracle observation;
+14. model/risk decision;
+15. approval/authority receipt.
+
+## License schema lineage
+
+The Grand Prospectus gives a human-readable license schema containing issuer/holder fingerprints, asset identity, rights, regions, validity, usage limits, royalty percentage, transferability, status, parent license and metadata hash.
+
+Current CHLOM preserves the semantics while separating mutable economics and identity aliases into referenced objects.
+
+```json
+{
+  "dla_id": "ct.dla.example",
+  "asset_ref": "ct.asset.example",
+  "issuer_authority_ref": "ct.auth.issuer",
+  "holder_ref": "ct.org.licensee",
+  "parent_dla_ref": null,
+  "rights": {
+    "media": ["streaming"],
+    "territories": ["US"],
+    "exclusive": false,
+    "transferable": false,
+    "sublicensable": false,
+    "modification_allowed": false
+  },
+  "effective_from": "2026-08-23T00:00:00Z",
+  "expires_at": null,
+  "economic_schedule_ref": "ct.econ.schedule.v1",
+  "status": "active",
+  "source_evidence_refs": ["ct.evidence.1"],
+  "version": "1.0.0"
+}
+```
+
+This is an illustrative contract, not a statement that this exact JSON is production-canonical today.
+
+## Policy schema lineage
+
+The Grand Prospectus also illustrates a Compliance Policy object with policy ID, name, description, rules, jurisdiction, issuer and version.
+
+Current mapping should preserve explicit applicability and effect.
+
+```json
+{
+  "policy_id": "ct.policy.kyc-basic",
+  "version": "2.1.0",
+  "issuer_authority_ref": "ct.policy-authority.compliance",
+  "jurisdictions": ["US"],
+  "applies_to": ["regulated_transaction"],
+  "rules": [
+    {
+      "rule_id": "tx-threshold-credential",
+      "when": {"amount_usd_gt": 10000},
+      "require": {"credential_class": "KYC_LEVEL_1"}
+    }
+  ],
+  "default_disposition": "HOLD"
+}
+```
+
+## Payout/allocation schema
+
+Payout schemas must not equate a calculation with money movement.
+
+```json
+{
+  "allocation_plan_id": "ct.alloc.1001",
+  "trigger_event_ref": "ct.event.sale.8",
+  "economic_schedule_ref": "ct.econ.music.v4",
+  "currency": "USD",
+  "gross_amount_minor": 10000,
+  "allocations": [
+    {"recipient_ref": "ct.party.creator", "amount_minor": 8500},
+    {"recipient_ref": "ct.party.platform", "amount_minor": 1000},
+    {"recipient_ref": "ct.party.reserve", "amount_minor": 500}
+  ],
+  "status": "calculated",
+  "settlement_authorized": false
+}
+```
+
+## DAIL event schema
+
+```json
+{
+  "event_id": "ct.event.01H...",
+  "event_type": "dla.activated",
+  "occurred_at": "2026-08-23T14:00:00Z",
+  "actor_ref": "ct.actor.service",
+  "subject_ref": "ct.dla.example",
+  "tenant_ref": "ct.org.crownthrive",
+  "causation_ref": "ct.decision.1",
+  "correlation_ref": "ct.flow.1",
+  "policy_refs": ["ct.policy.licensing.v3"],
+  "evidence_refs": ["ct.evidence.77"],
+  "confidentiality": "internal",
+  "previous_state_digest": "sha256:...",
+  "new_state_digest": "sha256:...",
+  "correction_of": null
+}
+```
+
+## Event naming standard
+
+Use domain-first event names:
+
+```text
+identity.created
+credential.issued
+credential.revoked
+attestation.verified
+rights.claimed
+rights.verified
+dla.created
+dla.activated
+dla.suspended
+dla.revoked
+lex.listing_activated
+agreement.accepted
+payment.observed
+entitlement.issued
+allocation.calculated
+settlement.reconciled
+case.opened
+remedy.applied
+audit.completed
+assurance.revoked
+```
+
+Provider-specific names remain aliases at the adapter edge.
+
+## Idempotency
+
+Every side-effecting developer interface should define idempotency.
+
+```text
+client request
+   |
+   +--> idempotency key
+            |
+            v
+       already processed?
+        /           \
+      yes            no
+      |              |
+ return prior      execute once
+ result             + persist key
+```
+
+A retry must not create duplicate licenses, payouts or entitlements.
+
+## Error model
+
+A common error envelope should distinguish:
+
+```json
+{
+  "error": {
+    "code": "EVIDENCE_STALE",
+    "disposition": "HOLD",
+    "message": "Required evidence is outside its freshness window.",
+    "retryable": true,
+    "required_actions": ["refresh_evidence"],
+    "correlation_id": "ct.flow.123"
+  }
+}
+```
+
+## PASS / HOLD / DENY developer semantics
+
+```text
+PASS
+  request may proceed within returned authority
+
+HOLD
+  do not proceed; missing/uncertain dependency may be resolvable
+
+DENY
+  request is not authorized under current rules/evidence
+```
+
+Clients must not convert HOLD into PASS by retrying against a different provider.
+
+## Simulator
+
+The Grand Prospectus proposes a CHLOM Simulator where developers can run license, violation and dispute scenarios without real stakes.
+
+Modern simulator topology:
+
+```text
+SCENARIO FIXTURE
+      |
+      v
++-------------------+
+| Simulator Runtime |
++-------------------+
+  |    |    |    |
+  v    v    v    v
+ ID  POLICY DLA  DAIL
+  \    |    /     /
+   +---+---+-----+
+       |
+       v
+ deterministic trace
+       |
+       v
+ expected vs actual
+```
+
+## Scenario file
+
+```yaml
+scenario_id: license-transfer-001
+initial_state:
+  rights: fixtures/rights.json
+  dlas: fixtures/dlas.json
+  credentials: fixtures/credentials.json
+events:
+  - type: lex.transfer_requested
+    actor: buyer-A
+expect:
+  disposition: HOLD
+  reason_codes:
+    - REQUIRED_CREDENTIAL_MISSING
+  emitted_events:
+    - lex.transfer_held
+```
+
+## Simulator rules
+
+The simulator should:
+
+- never use production credentials;
+- never move production money;
+- use isolated tenants/namespaces;
+- produce deterministic event traces where possible;
+- support seeded randomness when testing probabilistic models;
+- record model/policy versions;
+- support time travel for expiry/timelock cases;
+- support failure injection;
+- export replayable evidence.
+
+## Test-kit families
+
+### Identity kit
+
+Fixtures for:
+
+- valid credential;
+- expired credential;
+- revoked credential;
+- issuer removed;
+- key rotation;
+- duplicate identity linkage.
+
+### Rights/DLA kit
+
+Fixtures for:
+
+- valid parent/child license;
+- overbroad sublicense;
+- exclusive-right conflict;
+- revoked parent;
+- missing source evidence.
+
+### Policy kit
+
+Fixtures for:
+
+- applicable pack;
+- non-applicable pack;
+- conflicting rule;
+- stale pack;
+- required professional review.
+
+### Economic kit
+
+Fixtures for:
+
+- valid allocation;
+- provider failure;
+- duplicate payment webhook;
+- refund/reversal;
+- settlement mismatch.
+
+### Case/remedy kit
+
+Fixtures for:
+
+- dispute opened;
+- evidence sealed;
+- appeal;
+- temporary hold;
+- restoration.
+
+## SDK design
+
+SDKs should expose institutional types rather than provider wrappers.
+
+Illustrative TypeScript:
+
+```ts
+const decision = await chlom.licenses.checkTransfer({
+  dlaId,
+  recipientId,
+  context
+});
+
+if (decision.disposition !== "PASS") {
+  throw new ChlomDecisionError(decision);
+}
+```
+
+The SDK must preserve HOLD/DENY semantics.
+
+## MCP/tool design
+
+MCP tools should declare:
+
+- tool identity;
+- side-effect class;
+- required authority;
+- input schema;
+- output schema;
+- evidence behavior;
+- idempotency behavior;
+- sandbox availability;
+- rollback/compensation behavior.
+
+A tool description is not authorization to execute it.
+
+## Versioning
+
+```text
+schema version
+API version
+policy version
+model version
+event version
+SDK version
+```
+
+These should be separately identifiable. Bumping one does not silently bump the others.
+
+## Compatibility
+
+Preferred change types:
+
+- additive optional fields: backward compatible;
+- new enum value: requires tolerant readers;
+- required-field change: breaking;
+- semantic meaning change: breaking even if JSON shape is unchanged.
+
+Semantic drift is more dangerous than syntax drift.
+
+## Webhooks
+
+A webhook event should include:
+
+- event ID;
+- event type/version;
+- timestamp;
+- tenant/org;
+- subject reference;
+- signature;
+- replay protection;
+- delivery attempt;
+- correlation ID.
+
+Consumers must treat delivery as transport evidence, not institutional state unless they verify the event.
+
+## API quotas/request budgets
+
+Request-budget semantics must be machine explicit and not overloaded. API-level provider quotas remain separate from any CrownThrive-local policy ceiling.
+
+Clients should receive deterministic budget/limit metadata where exposed, and fail closed when the local policy state is unresolved.
+
+## Developer portal
+
+A future developer portal should provide:
+
+- schemas;
+- OpenAPI/tool definitions;
+- SDK docs;
+- test credentials for sandbox only;
+- fixture catalog;
+- simulator;
+- webhook inspector;
+- event explorer;
+- conformance test results;
+- version/deprecation notices;
+- incident/status links;
+- migration guides.
+
+## Deprecation
+
+```text
+ACTIVE v1
+  |
+announce v2
+  |
+DEPRECATED v1
+  |
+compatibility window
+  |
+RETIRED v1
+```
+
+Retirement should include migration guidance and evidence of downstream impact review.
+
+## Conformance testing
+
+An implementation claiming CHLOM contract compatibility should pass a defined suite, for example:
+
+```text
+CT-CONFORMANCE-IDENTITY
+CT-CONFORMANCE-POLICY
+CT-CONFORMANCE-DLA
+CT-CONFORMANCE-DAIL
+CT-CONFORMANCE-LEX
+CT-CONFORMANCE-ECONOMICS
+CT-CONFORMANCE-CASES
+```
+
+Passing a conformance suite proves compatibility with that suite/version, not universal legal compliance.
+
+## Failure injection
+
+The simulator/test kits should test:
+
+- database outage;
+- oracle timeout;
+- model outage;
+- stale evidence;
+- webhook duplicate;
+- provider partial failure;
+- delayed settlement;
+- key rotation;
+- clock skew;
+- unavailable reviewer;
+- schema mismatch;
+- corrupted evidence digest.
+
+## Golden traces
+
+A **golden trace** is a canonical expected event sequence for a scenario.
+
+```text
+request
+-> policy.check
+-> DLA.transfer_check
+-> HOLD
+-> case/review requested
+-> evidence refreshed
+-> policy.check
+-> PASS
+-> transfer completed
+-> DAIL reconciled
+```
+
+Golden traces help detect semantic drift across implementations.
+
+## Public examples must be synthetic
+
+Developer examples should use synthetic identities, assets, prices and evidence. Production names, customer data, credentials, secrets or restricted economic terms do not belong in public test fixtures.
+
+## Core invariants
+
+```text
+schema shape != semantic authority
+API success != institutional PASS
+webhook delivery != settlement
+retry != permission to duplicate
+sandbox != production
+test fixture != real evidence
+SDK convenience != authority bypass
+version bump cannot silently change rights meaning
+```
+
+## Current implementation boundary
+
+Canonical JSON schemas, REST/MCP contracts, SDKs, fixture packs and simulators are compatible with the current cloud-first architecture. Protocol-native JSON-RPC, Solidity or Substrate-specific tooling should remain adapters where justified rather than defining the institutional contract.
+
+## Founder adjudication
+
+`open_after_publication`
+
+A later founder decision may establish canonical schema namespaces, API versions, SDK languages, simulator branding, conformance-suite IDs or developer-access policy. Historical Appendix B/D examples remain preserved as source-era design.

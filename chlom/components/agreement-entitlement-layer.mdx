@@ -1,0 +1,164 @@
+---
+title: "Agreement & Entitlement Layer — Component Contract"
+sidebarTitle: "Agreement & Entitlement Layer"
+description: "Individual CHLOM component contract separating signed/accepted agreement state from effective entitlements, DLA rights, economic conditions, fulfillment and provider access."
+icon: "handshake"
+keywords: ["CHLOM agreement layer", "entitlement layer", "DLA", "agreement acceptance", "fulfillment", "rights"]
+---
+
+# Agreement & Entitlement Layer — Component Contract
+
+## Institutional identity
+
+```yaml
+component_id: CT-CHLOM-AEL-001
+name: Agreement & Entitlement Layer
+source_status: recovered_named_component
+source_body_status: combined_lineage_across_DLA_LEX_and_lifecycle_sources
+classification: source_grounded_current_component_reconstruction
+version: 1.0.0
+```
+
+## Purpose
+
+The Agreement & Entitlement Layer separates two institutional facts that are often incorrectly collapsed:
+
+1. **an agreement exists and was accepted under a specific version**, and
+2. **a subject currently possesses a usable entitlement created by that agreement plus valid rights, policy and economic conditions**.
+
+```text
+AGREEMENT ACCEPTED
+      !=
+ENTITLEMENT ACTIVE
+      !=
+PROVIDER ACCESS DELIVERED
+```
+
+This separation is necessary across DLA licensing, LEX transactions, subscriptions, downloads, bookings, member access, API plans and other CrownThrive rights-bearing experiences.
+
+## Agreement object responsibilities
+
+The layer records or references:
+
+- agreement stable ID/version;
+- parties and their canonical identities;
+- DLA or source-right references;
+- agreement type;
+- accepted terms/version;
+- acceptance/assent evidence;
+- effective period;
+- amendment/supersession state;
+- jurisdiction/governing terms where applicable;
+- economic schedule references;
+- transfer/sublicensing restrictions;
+- required approvals;
+- privacy/classification;
+- DAIL event references.
+
+The agreement body can remain in protected legal/evidence custody. Public/default projections should expose only permitted metadata.
+
+## Entitlement responsibilities
+
+An entitlement represents the current permission or benefit the subject can actually exercise. A canonical entitlement should include:
+
+```yaml
+entitlement_id:
+subject_id:
+source_agreement_ref:
+source_dla_ref:
+entitlement_type:
+scope:
+valid_from:
+valid_until:
+capacity_or_usage_limit:
+consumed_state:
+policy_requirements[]:
+economic_condition_refs[]:
+fulfillment_aliases[]:
+status:
+DAIL_refs[]:
+```
+
+## Activation rule
+
+A conservative entitlement predicate is:
+
+```text
+ENTITLEMENT_ACTIVE =
+  agreement_effective
+AND DLA_or_rights_valid
+AND subject_eligible
+AND required_policy_passed
+AND required_economic_conditions_reconciled
+AND not_revoked_or_suspended
+AND within_term
+AND capacity_remaining_or_explicitly_unlimited
+```
+
+Unknown required state routes to HOLD.
+
+## Agreement acceptance
+
+Acceptance evidence must identify the exact version accepted, subject identity, time, method and relevant agreement context. A checkbox, provider account or payment can be acceptance evidence only when the governing legal/contract flow defines it that way; documentation must not infer assent from mere usage.
+
+## Entitlement creation
+
+Entitlement creation is a governed state transition. It may follow DLA activation, LEX fulfillment, subscription/booking confirmation or another authorized workflow. Provider fulfillment should attach as an alias/evidence record after or alongside canonical entitlement creation, not replace it.
+
+## Provider separation
+
+Examples of provider state that may attach to an entitlement:
+
+- storage/download delivery ID;
+- streaming/account permission ID;
+- booking-provider confirmation;
+- payment/subscription ID;
+- external LMS/course enrollment;
+- API plan/client alias.
+
+These are execution aliases. If the provider changes, the entitlement identity and historical agreement lineage remain stable.
+
+## Revocation and suspension
+
+Revocation/suspension can originate from DLA lifecycle, agreement termination, case/remedy, credential/policy state, refund/reversal rules or other adopted authority. The entitlement history is append-only; current provider access must reconcile to the effective institutional state.
+
+## Capacity and usage
+
+Finite entitlements can track seats, downloads, uses, API calls, entries or other quantified permissions. Capacity follows the source license/agreement and cannot be increased by the fulfillment provider. Explicit unlimited semantics must be represented intentionally; unknown is not unlimited.
+
+## Renewal and amendment
+
+A renewal or amendment creates a new agreement/DLA/entitlement version or an explicit extension event according to the governing contract. The layer must preserve which terms controlled each historical period/use.
+
+## UI projections
+
+Primary reusable surfaces:
+
+- DLA Status Card;
+- Usage/Territory/Term Summary;
+- Entitlement Panel;
+- Consent/assent evidence where applicable;
+- Fee Rule Version;
+- Settlement/Reconciliation Status;
+- Correction/Supersession History.
+
+## Security/privacy
+
+- protect confidential agreement bodies;
+- enforce subject/object/tenant access;
+- never expose payment credentials;
+- prevent provider alias from being used as entitlement authority;
+- validate revocation/currentness on consequential use;
+- make access changes idempotent and auditable.
+
+## Failure states
+
+Agreement version mismatch, missing assent evidence, DLA revoked, policy HOLD, payment mismatch, entitlement/provider drift, usage cap reached, term expired, provider access missing despite active entitlement, provider access remaining after entitlement revocation.
+
+## Tests
+
+Test accepted agreement with entitlement HOLD; active entitlement with provider outage; provider access without canonical entitlement; amendment; renewal; refund-triggered suspension; cap exhaustion; explicit unlimited; cross-tenant entitlement lookup; and provider migration.
+
+## Versioning
+
+Agreement, DLA, entitlement and provider fulfillment versions are separate institutional objects. The layer never rewrites prior terms to match current provider or policy state.

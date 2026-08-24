@@ -1,0 +1,87 @@
+---
+title: "FORM-025 — Proof Freshness and Usability Predicate"
+sidebarTitle: "FORM-025 Proof Freshness"
+description: "Standalone CHLOM predicate distinguishing cryptographic proof validity from circuit approval, witness currentness, revocation and policy-context usability."
+icon: "shield-halved"
+keywords: ["CHLOM FORM-025", "proof freshness", "ZKP", "witness currentness", "circuit version"]
+---
+
+# FORM-025 — Proof Freshness and Usability Predicate
+
+## Formula identity
+
+```yaml
+formula_id: FORM-025
+classification: derived_boolean_predicate
+origin: ZK/ZKX proof lifecycle requirements
+adopted_as_reconstruction_contract: yes
+related_algorithm: ALG-013
+```
+
+## Predicate
+
+A proof is usable for a current CHLOM decision only when:
+
+```text
+proof_usable =
+    cryptographically_valid
+AND circuit_version_allowed
+AND verification_key_current
+AND witness_source_current
+AND revocation_state_current
+AND policy_context_matches
+```
+
+Therefore:
+
+```text
+proof_valid != proof_usable
+proof_usable != action_authorized
+```
+
+## Cryptographic validity
+
+The proof verifies under its declared scheme, public inputs and verification key. This is necessary but does not answer whether the proof remains approved for current policy.
+
+## Circuit/key currentness
+
+The circuit and verification key must be active under the current registry. A retired or compromised key can make an otherwise valid proof unusable.
+
+## Witness-source currentness
+
+If the proof was generated from a credential, license, sanctions state, solvency snapshot or other mutable source, that source must satisfy the policy's currentness requirement.
+
+## Revocation
+
+Known revocation/supersession can invalidate reuse even before ordinary expiry/freshness limits.
+
+## Policy context
+
+The statement proven must match the action and scope. A proof for one subject, tenant, jurisdiction or purpose cannot be assumed reusable elsewhere.
+
+## Output
+
+```yaml
+proof_ref:
+cryptographic_validity:
+circuit_state:
+key_state:
+witness_state:
+revocation_state:
+context_match:
+proof_usable: true|false|unknown
+```
+
+Unknown required state maps to HOLD in the decision system.
+
+## Tests
+
+Test current proof, invalid proof, retired circuit, revoked key, stale witness, revoked credential, wrong policy context, cross-tenant replay and proof generated immediately before revocation.
+
+## DAIL evidence
+
+Record proof receipt/digest, circuit/key versions, witness evidence refs, currentness checks and result without storing private witness data.
+
+## Versioning
+
+Changes to usability predicates require explicit versioning independent of cryptographic verification libraries.

@@ -1,0 +1,285 @@
+---
+title: "DID Pallet — Historical Runtime Record"
+sidebarTitle: "DID Pallet"
+description: "Individual reconstruction of CHLOM's historical Decentralized Identifier runtime pallet for DID documents, key sets, rotations, revocations and service endpoints, mapped to current provider-independent identity services."
+icon: "fingerprint"
+keywords: ["CHLOM DID Pallet", "DIDP", "Decentralized Identifier", "key rotation", "revocation", "service endpoints"]
+---
+
+# DID Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.did-pallet
+namespace: historical_runtime_pallet
+recovered_titles:
+  - DID Pallet
+  - CHLOM Decentralized Identifier Pallet (DIDP) Whitepaper
+recovered_help_center_description: decentralized identifiers on chain with key sets, rotations, revocations, and service endpoint references
+source_recovery: substantive_title_plus_foundational_architecture
+current_mapping:
+  - P-01 Identity & Access
+  - Identity Registry Service
+  - credential / DID adapter layer
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The DID Pallet was designed to make decentralized identifiers resolvable inside CHLOM's historical Substrate runtime. A DID record could identify a participant or entity without requiring the public chain to store the person's raw private identity data.
+
+```text
+DID
+ |
+ +--> public verification keys
+ +--> key rotation history
+ +--> revocation state
+ +--> service endpoint references
+ +--> credential / identity linkage
+```
+
+## Historical architecture
+
+The recovered CHLOM paper family describes W3C-aligned DIDs, portable identity, verifiable credentials and privacy-preserving proofs. The historical pallet was the runtime registry for that identity layer.
+
+```text
+OFF-CHAIN / PRIVATE IDENTITY EVIDENCE
+             |
+             v
+VERIFICATION / CREDENTIAL ISSUER
+             |
+             v
+DID / CREDENTIAL REFERENCES
+             |
+             v
+HISTORICAL DID PALLET
+             |
+             +--> other CHLOM pallets
+             +--> LEX / DLA eligibility
+             +--> ZK verification
+```
+
+## Reconstructed DID record
+
+The following is a current semantic reconstruction, not recovered literal Rust storage:
+
+```yaml
+did: did:method:identifier
+controller_refs: []
+verification_methods: []
+service_refs: []
+created_at: timestamp
+updated_at: timestamp
+status: active|deactivated|revoked
+version: integer
+```
+
+## Key rotation
+
+Historical source explicitly names key rotation.
+
+```text
+KEY SET v1
+   |
+rotation authorized
+   |
+KEY SET v2
+   |
+old key no longer current
+```
+
+Prior key history remains part of identity provenance. Rotation must not be modeled as deletion of the former identity state.
+
+## Revocation / deactivation
+
+```text
+ACTIVE DID
+    |
+    +--> KEY ROTATION -> ACTIVE
+    +--> SERVICE UPDATE -> ACTIVE
+    +--> DEACTIVATED / REVOKED
+```
+
+The exact distinction between DID deactivation and credential revocation is important:
+
+```text
+DID status
+   !=
+credential status
+```
+
+A credential can be revoked while a DID remains active, and vice versa.
+
+## Service endpoints
+
+Historical DID documents could reference service endpoints. Current CHLOM should treat endpoint references as replaceable locators rather than permanent authority.
+
+```text
+DID
+ |
+ +--> current resolver endpoint
+ +--> credential service
+ +--> messaging / API service
+```
+
+A changed service provider need not change the institutional identity.
+
+## DID versus account
+
+```text
+DID
+ !=
+wallet address
+ !=
+provider account ID
+ !=
+CrownThrive platform username
+```
+
+They can be linked by verified alias/relationship records.
+
+## Current P-01 mapping
+
+Current CHLOM identity is provider-independent and can operate without a public DID runtime.
+
+```text
+Historical DID Pallet
+         |
+         v
+P-01 stable identity registry
+         |
+         +--> OIDC/SSO aliases
+         +--> organization identity
+         +--> credential refs
+         +--> optional DID adapter
+         +--> future decentralized resolution
+```
+
+A DID adapter is one identity representation—not the sole identity source.
+
+## Credential relationship
+
+```text
+DID / identity subject
+        |
+        +--> credential A
+        +--> credential B
+        +--> verification assertion
+        +--> ZK proof derived from credential
+```
+
+The DID Pallet historically supported the identity anchor; credentials maintain their own lifecycle.
+
+## Fingerprint relationship
+
+Historical Fingerprint ID architecture may bind anti-fraud/multi-signal identity evidence to a DID. Public DID records must not expose protected fingerprint telemetry or biometric detail.
+
+```text
+PRIVATE FINGERPRINT EVIDENCE
+        |
+verification binding
+        |
+        v
+DID / institutional identity reference
+```
+
+## ZK relationship
+
+A DID can identify the subject/controller used in a zero-knowledge proof workflow without revealing underlying attributes.
+
+Proof validity does not imply DID/credential currentness unless those states are checked.
+
+## Historical operation families
+
+Supported by recovered descriptions/architecture:
+
+- create/register DID;
+- add/update verification key;
+- rotate key;
+- add/update service endpoint;
+- deactivate/revoke DID;
+- resolve DID state.
+
+Exact historical extrinsic names are not recovered and are not invented.
+
+## Current event mapping
+
+```text
+ct.identity.did.registered.v1
+ct.identity.did.key.rotated.v1
+ct.identity.did.service.updated.v1
+ct.identity.did.deactivated.v1
+ct.identity.did.alias.bound.v1
+```
+
+## Security model
+
+Threats include:
+
+- key compromise;
+- unauthorized rotation;
+- replay of old key state;
+- DID squatting/impersonation;
+- service-endpoint takeover;
+- accidental publication of private identity data;
+- cross-provider alias collision;
+- stale revocation caches.
+
+## Recovery
+
+Identity/key recovery must not silently erase prior key compromise or reinstate unrelated revoked authority.
+
+```text
+CONTROL LOST
+    |
+RECOVERY AUTHORITY / EVIDENCE
+    |
+NEW CONTROL KEY / ALIAS
+    |
+PRIOR KEY RETIRED
+    |
+DAIL / HISTORY PRESERVED
+```
+
+## Privacy
+
+Public DID projection should expose only public verification material necessary for the intended function. Private documents, biometrics, credentials and consent records remain protected.
+
+## Public / restricted split
+
+Public-safe:
+
+- DID architecture;
+- public verification keys where intentionally published;
+- public service references;
+- revocation/deactivation state;
+- current semantic mapping.
+
+Restricted:
+
+- recovery evidence;
+- private identity mapping;
+- protected Fingerprint algorithms;
+- private credential evidence;
+- key-management procedures;
+- security incident detail.
+
+Private keys are never documented; they remain in approved secret/key custody.
+
+## Invariants
+
+```text
+DID != identity evidence itself
+DID != credential
+DID != authority
+DID != provider account
+key rotation != new human identity
+credential revoked != DID revoked
+DID active != action authorized
+historical on-chain DID != current chain deployment
+```
+
+## Status
+
+The DID Pallet is preserved as a historical runtime/IP component with a current mapping to P-01 provider-independent identity and optional DID/credential adapters. No present Substrate deployment is claimed.

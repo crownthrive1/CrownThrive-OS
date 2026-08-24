@@ -1,0 +1,324 @@
+---
+title: "Wireframe: Override Builder (Phase 3)"
+sidebarTitle: "Override Builder Wireframe"
+description: "Recovered-title implementation article for the CHLOM Override Builder, specifying bounded override requests, original decision preservation, authority/scope, evidence, safeguards, expiry, compensation and DAIL lineage."
+icon: "pen-to-square"
+keywords: ["CHLOM Override Builder", "Phase 3", "override", "governance", "authority", "DAIL", "HOLD"]
+---
+
+# Wireframe: Override Builder (Phase 3)
+
+## Recovery status
+
+```yaml
+ui_asset_id: ct.chlom.ui.override-builder.phase3
+exact_recovered_title: "Wireframe: Override Builder (Phase 3)"
+recovery_status: exact_title_recovered_related_architecture_available
+original_visual_body: not_confirmed_recovered_for_this_article
+current_mapping:
+  - P-02 Governance & Compliance
+  - founder/reserved authority where applicable
+  - bounded override service
+```
+
+## Purpose
+
+The Override Builder is the controlled interface for proposing and authorizing a **bounded exception to an existing decision/control** without erasing the original condition.
+
+```text
+ORIGINAL DECISION / HOLD / DENY
+              |
+              v
+        OVERRIDE REQUEST
+              |
+  authority + scope + evidence
+              |
+  safeguards + expiry + remedy
+              |
+              v
+     APPROVE | HOLD | DENY
+              |
+              v
+NEW EFFECTIVE STATE / LIMITED EXCEPTION
+              |
+              v
+DAIL + ORIGINAL STATE PRESERVED
+```
+
+## Constitutional boundary
+
+```text
+override != erase
+exception != new permanent rule automatically
+authority to override one scope != universal authority
+```
+
+The UI is deliberately more demanding than a generic admin toggle.
+
+## ASCII wireframe
+
+```text
++--------------------------------------------------------------------------------+
+| Override Builder | Target: Decision D-123 / Object ...       Draft / Review      |
++--------------------------------------------------------------------------------+
+| ORIGINAL STATE                                                               |
+| Result: HOLD | Policy: CP-... v4 | Reason class: ... | Time: ...              |
++--------------------------------------------------------------------------------+
+| 1. Override scope                                                             |
+| [object/action] [fields/state] [effective period]                              |
++--------------------------------------------------------------------------------+
+| 2. Authority                                                                  |
+| Proposed authority ref | actor/delegation | ceiling | conflicts                |
++--------------------------------------------------------------------------------+
+| 3. Evidence & justification                                                   |
+| Evidence refs | reason | expected benefit / risk                              |
++--------------------------------------------------------------------------------+
+| 4. Safeguards / limits / compensation                                         |
+| Expiry | rollback/compensation | monitoring | review                           |
++--------------------------------------------------------------------------------+
+| PREVIEW: exact state change + affected systems                                 |
+| [Validate] [Submit for approval]                                               |
++--------------------------------------------------------------------------------+
+```
+
+## Entry conditions
+
+The builder opens from an exact target:
+
+- decision ID;
+- HOLD/DENY record;
+- configuration/policy action;
+- DLA/case/economic/security state;
+- prior override requiring amendment.
+
+The target version is pinned. If it changes, the builder detects a conflict before submission.
+
+## Section 1 — Original state
+
+Read-only, immutable presentation:
+
+```text
+target object/version
+original decision/result
+policy/authority versions
+reason codes
+material evidence refs
+current downstream effects
+```
+
+The original is never editable inside the override form.
+
+## Section 2 — Requested scope
+
+The user must define exactly what changes:
+
+```yaml
+override_scope:
+  subject_ref: required
+  action_or_field: explicit
+  proposed_effect: structured
+  starts_at: timestamp
+  expires_at: required/nullable only under allowed policy
+  tenant_or_platform_scope: explicit
+```
+
+Broad language such as `override all checks` should fail validation unless an extraordinary adopted authority explicitly allows it.
+
+## Section 3 — Authority
+
+UI resolves:
+
+- actor identity;
+- current role/delegation;
+- reserved/founder/council authority if applicable;
+- maximum authority class;
+- target scope compatibility;
+- required co-approvers/quorum;
+- conflicts/separation-of-duties.
+
+```text
+requested scope <= override authority?
+   no -> DENY builder submission
+```
+
+## Section 4 — Evidence / justification
+
+Required fields can include:
+
+- reason code;
+- evidence references;
+- source correction/adjudication;
+- expected impact;
+- unresolved risks;
+- why ordinary remediation is insufficient;
+- professional/legal review if the override crosses a reserved domain.
+
+Free-text justification alone should not replace required evidence/authority.
+
+## Section 5 — Safeguards
+
+Safeguards may include:
+
+```text
+expiry
+time-limited access
+quantity/value cap
+specific asset/tenant scope
+mandatory review
+monitoring condition
+provider readback
+rollback/compensation plan
+post-action audit
+```
+
+## Compensation plan
+
+If an override causes a side effect that cannot be rolled back directly, define compensation:
+
+```text
+payment -> refund/reversal
+entitlement -> restore/revoke
+provider action -> inverse/repair
+public claim -> correction
+license -> superseding state/remedy
+```
+
+## Preview
+
+The builder must show a deterministic human-readable preview:
+
+```text
+Current: DLA transfer = HOLD
+Proposed override: permit one transfer of DLA-123 to ID-456
+Valid: 2026-08-23 12:00–13:00
+Other transfers remain HOLD
+Payment ceiling: unchanged
+Required monitoring: enabled
+Affected systems: P-03, LEX, P-11, Provider X
+```
+
+## Validation result
+
+```text
+VALID
+HOLD — missing independent approval
+DENY — actor lacks override authority
+CONFLICT — target version changed
+```
+
+## Approval workflow
+
+```text
+DRAFT
+  |
+VALIDATED
+  |
+SUBMITTED
+  |
+  +--> HOLD / additional approval
+  +--> DENIED
+  +--> APPROVED
+          |
+       SCHEDULED / ACTIVE
+          |
+       EXPIRED / REVOKED / COMPLETED
+```
+
+## High-risk confirmation
+
+The final confirmation requires exact object/scope/effect and may require re-authentication/step-up under current policy.
+
+## DAIL receipt
+
+Override receipt contains:
+
+```text
+override ID
+original decision ref
+scope/effect
+authority/approvals
+evidence refs
+start/expiry
+safeguards
+execution/readback
+correction/supersession
+```
+
+## Provider propagation
+
+If the override affects external providers, the UI shows:
+
+```text
+Institutional override: ACTIVE
+Provider X: pending
+Provider Y: confirmed
+```
+
+Institutional authorization does not claim provider execution until readback.
+
+## Expiry
+
+Expiry automatically terminates the exception state according to policy and triggers readback/reconciliation.
+
+```text
+override active
+   |
+expiry
+   |
+original/current baseline re-evaluated
+   |
+restore baseline / new policy state
+```
+
+## Revocation
+
+An authorized actor can revoke an active override. Revocation does not remove the original override record.
+
+## Error states
+
+- target version changed;
+- authority resolver unavailable;
+- required evidence missing;
+- approval/quorum unavailable;
+- provider cannot honor action;
+- compensation path invalid;
+- expiry/timezone invalid;
+- DAIL receipt failed.
+
+## Accessibility
+
+- numbered staged flow with headings;
+- read-only original state clearly differentiated;
+- error summary links to fields;
+- preview readable linearly;
+- high-risk effect announced in confirmation;
+- status not color-only.
+
+## Security/privacy
+
+- only authorized actors can open/edit high-risk override details;
+- protected reason/evidence fields classification-bound;
+- no secret/provider credentials rendered;
+- anti-abuse constraints validated server-side;
+- approval tokens/actions replay-protected.
+
+## Restricted companion
+
+Contains emergency override templates, security-sensitive capabilities, protected ceilings/thresholds, reviewer topology, private evidence and exploit-response workflows.
+
+## Invariants
+
+```text
+override != delete original decision
+override scope <= authority scope
+override != permanent policy change automatically
+approval != provider execution
+override expiry != historical erasure
+free-text reason != authority
+founder/reserved authority != universal provider control
+reconstructed layout != recovered original visual
+```
+
+## Known unknowns
+
+The exact original Phase 3 visual has not been confirmed recovered. The title and override architecture are source-grounded; this is the current implementation reconstruction.

@@ -1,0 +1,716 @@
+---
+title: "CHLOM Mathematical Models, Equations and Calculation Reference"
+sidebarTitle: "Math & Equation Reference"
+description: "Source-grounded and clearly classified reference for CHLOM formulas, calculations, thresholds, allocation equations, risk models, quorum math, tokenomics examples, SLA metrics and reconstructed quantitative invariants."
+icon: "square-root-variable"
+keywords: ["CHLOM mathematics", "equations", "calculations", "risk formula", "staking APY", "inflation burn", "quorum", "royalty splits", "SLA", "economic model"]
+---
+
+# CHLOM Mathematical Models, Equations and Calculation Reference
+
+CHLOM's historical papers contain explicit formulas, example calculations and quantitative design parameters. Later reconstruction introduces additional **candidate mathematical contracts** for cloud-first implementation.
+
+This page separates those categories so an illustrative equation cannot silently become a live economic, legal or governance rule.
+
+## Classification
+
+```yaml
+article_state: reconstructed_source_grounded_plus_derived_models
+source_formula: equation explicitly present in recovered CHLOM source
+source_example: arithmetic example explicitly present in source
+derived_model: mathematically consistent reconstruction added for current engineering clarity
+adopted_rule: requires separate ADR/founder/governance decision
+production_parameter: requires runtime evidence and adopted configuration
+```
+
+## Quantitative authority rule
+
+```text
+SOURCE FORMULA
+      !=
+ADOPTED PARAMETER
+      !=
+PRODUCTION CONFIG
+      !=
+LEGAL / FINANCIAL CONCLUSION
+```
+
+Every number needs a status.
+
+## 1. Historical net-supply equation
+
+The Genesis Volume explicitly gives:
+
+```text
+new_coins_per_year = i * S
+coins_burned_per_year = b * N
+net_supply_change = iS - bN
+```
+
+Where:
+
+- `i` = annual inflation rate;
+- `S` = current supply;
+- `b` = average CHLOM burned per transaction;
+- `N` = transactions per year.
+
+### Historical equilibrium condition
+
+```text
+iS ≈ bN
+```
+
+The paper presents this as a possible equilibrium where annual issuance approximately equals annual burn.
+
+### Historical example
+
+If:
+
+```text
+i = 0.05
+S = 1,000,000,000
+b = 0.001
+N = 50,000,000,000
+```
+
+Then:
+
+```text
+issuance = 0.05 * 1,000,000,000
+         = 50,000,000
+
+burn     = 0.001 * 50,000,000,000
+         = 50,000,000
+
+net ΔS   = 0
+```
+
+This is historical tokenomics research, not current production economics.
+
+## 2. Historical staking APY estimate
+
+Genesis gives an illustrative staking-yield model:
+
+```text
+nominal_staking_apy = annual_staking_rewards / total_staked
+```
+
+Example from source:
+
+```text
+reward_pool = 200,000,000 CHLOM
+release_period = 4 years
+annual_rewards ≈ 50,000,000
+staked = 500,000,000
+
+APY ≈ 50,000,000 / 500,000,000
+    ≈ 0.10
+    ≈ 10%
+```
+
+Source also mentions illustrative slashing in the `1%–10%` range depending on severity.
+
+No current APY or slash schedule is adopted merely because this model exists.
+
+## 3. Historical transaction-fee stability target
+
+Genesis explores gradual fee adjustment around a fiat-denominated target, for example:
+
+```text
+target_median_transaction_fee ≈ $0.10
+```
+
+A generalized reconstruction is:
+
+```text
+fee_units_next = fee_units_current * clamp(P_market / P_target, lower, upper)
+```
+
+Where `P_market` is an observed coin/USD relationship and `P_target` represents the desired effective fee-cost relation.
+
+This generalized equation is a **derived model**, not verbatim source code and not a current pricing rule.
+
+## 4. Historical modified equation-of-exchange concept
+
+Genesis describes a simplified relationship:
+
+```text
+P * T = k
+```
+
+Where:
+
+- `P` = CHLOM coin price;
+- `T` = transaction volume / network usage proxy;
+- `k` = a scaling constant influenced by supply, burn and inflation factors.
+
+The source uses this concept to discuss feedback loops and economic stability, not to claim a proven macroeconomic law for CHLOM.
+
+## 5. Historical risk-score example
+
+Genesis explicitly gives an illustrative AI-risk expression:
+
+```text
+risk_score = α * (transaction_amount / std_dev)
+           + β * peer_risk_avg
+           + γ * KYC_level
+```
+
+The source says the actual models would be more complex and likely machine-learned.
+
+### Current correction
+
+Because a higher `KYC_level` would normally represent stronger verification rather than more risk, the sign/direction of that historical term should not be silently assumed in production. A production model must define feature semantics explicitly.
+
+A safer derived normalized model is:
+
+```text
+R = σ(
+      w1 * amount_zscore
+    + w2 * peer_risk
+    + w3 * anomaly_score
+    + w4 * sanctions_risk
+    - w5 * verified_identity_strength
+    + w6 * rights_uncertainty
+    + b0
+)
+```
+
+Where `σ` is a bounded transform such as a logistic function.
+
+This is a **derived model candidate**, not an adopted CHLOM algorithm.
+
+## 6. Risk disposition mathematics
+
+A current candidate policy classification can be represented as:
+
+```text
+if hard_block == true:
+    DENY
+elif missing_required_evidence == true:
+    HOLD
+elif R >= deny_threshold:
+    DENY
+elif R >= hold_threshold:
+    HOLD
+else:
+    PASS
+```
+
+Important:
+
+```text
+risk score != violation
+risk score != legal conclusion
+AI confidence != authority
+```
+
+Hard rules and authority gates outrank probabilistic scoring.
+
+## 7. Governance quorum and voting thresholds
+
+Genesis gives illustrative governance examples:
+
+```text
+quorum_ratio = participating_weight / total_eligible_weight
+approval_ratio = yes_weight / (yes_weight + no_weight)
+```
+
+Historical examples include:
+
+```text
+quorum_ratio >= 15%
+approval_ratio > 50%
+```
+
+and approximately:
+
+```text
+constitutional_threshold >= 2/3
+```
+
+These are illustrative historical parameters.
+
+### Generic current model
+
+```text
+proposal_passes =
+    quorum_ratio >= q_min
+    AND approval_ratio >= θ
+    AND authority_class_allows(proposal_type)
+    AND timelock_satisfied
+    AND no_reserved_human_veto
+```
+
+Governance math never creates legal/corporate authority by itself.
+
+## 8. Conviction-voting abstraction
+
+Historical papers mention conviction locking, where longer token locks may increase vote weight.
+
+A generic derived representation is:
+
+```text
+effective_vote_weight = base_weight * conviction_multiplier(lock_duration)
+```
+
+No multiplier schedule is adopted by this documentation.
+
+## 9. Rights-set conservation
+
+Modern rights modeling uses set relationships.
+
+Let:
+
+- `R_source` = rights controlled at the source/root;
+- `R_parent` = rights granted to a parent license;
+- `R_child` = sublicensed/derived rights.
+
+Invariant:
+
+```text
+R_child ⊆ R_parent ⊆ R_source
+```
+
+Equivalent institutional rule:
+
+```text
+child_rights <= parent_rights <= source_rights
+```
+
+A child DLA cannot manufacture rights absent from its parent.
+
+## 10. Rights-intersection evaluation
+
+An effective use can be represented as:
+
+```text
+R_effective =
+    R_claimed
+    ∩ R_controlled
+    ∩ R_license_scope
+    ∩ R_jurisdiction
+    ∩ R_time_valid
+    ∩ R_channel
+```
+
+If the requested use `u` is not in `R_effective`, authorization must not become PASS.
+
+## 11. License-validity predicate
+
+A DLA may be treated as valid only when all required predicates resolve true:
+
+```text
+VALID(DLA) =
+    rights_valid
+AND issuer_authorized
+AND licensee_eligible
+AND effective_time_valid
+AND not_revoked
+AND not_suspended
+AND required_credentials_current
+AND required_policy_passed
+AND required_economic_conditions_met
+```
+
+Unresolved terms should route to HOLD rather than be coerced to true.
+
+## 12. Royalty/split basis-point math
+
+For a distributable amount `D` and recipient share in basis points `bps_i`:
+
+```text
+allocation_i = D * bps_i / 10,000
+```
+
+Invariant:
+
+```text
+Σ bps_i <= 10,000
+```
+
+If an unallocated reserve is allowed:
+
+```text
+reserve_bps = 10,000 - Σ bps_i
+```
+
+If exact full distribution is required:
+
+```text
+Σ bps_i = 10,000
+```
+
+## 13. Net distributable calculation
+
+A candidate accounting model:
+
+```text
+gross_receipt = G
+approved_refunds = R
+approved_taxes_or_withholding = T
+provider_fees = F
+contractual_reserve = V
+
+net_distributable = G - R - T - F - V
+```
+
+Each subtraction needs an adopted economic/legal basis. Provider fees are evidence, not automatically approved deductions.
+
+## 14. Treasury allocation math
+
+For treasury inflow `I` and approved category weights `w_i`:
+
+```text
+allocation_i = I * w_i
+```
+
+with:
+
+```text
+0 <= w_i <= 1
+Σw_i = 1
+```
+
+Historical Prospectus examples discuss operating, incentive, insurance/reserve and growth funds, and conditional rules such as reserve targets before overflow.
+
+A generic reserve-target model:
+
+```text
+reserve_gap = max(0, reserve_target - reserve_balance)
+reserve_contribution = min(policy_share * I, reserve_gap)
+overflow = policy_share * I - reserve_contribution
+```
+
+This is a derived current engineering pattern.
+
+## 15. Historical micro-fee / insurance-pool concept
+
+Genesis gives an illustrative example where each securities trade could contribute `0.01%` to an investor protection pool.
+
+General form:
+
+```text
+insurance_contribution = transaction_value * insurance_rate
+```
+
+The rate is historical illustration only.
+
+## 16. Burn percentage
+
+Historical whitepaper examples discuss burning a portion of transaction fees, such as `20%`.
+
+General form:
+
+```text
+burn_amount = transaction_fee * burn_fraction
+```
+
+Current state: historical token research only.
+
+## 17. Slashing math
+
+For stake `S` and slash fraction `s`:
+
+```text
+slash_amount = S * s
+stake_after = S * (1 - s)
+```
+
+A real system would need severity classes, appeal/hold logic, evidence requirements and authority gates before financial penalty execution.
+
+## 18. Oracle weighted-confidence model
+
+Historical CHLOM says critical data should use multiple oracles, potentially a median of several sources, multiple identity attestations, reputation and punishment for bad inputs.
+
+A derived current candidate confidence model:
+
+```text
+weight_i = authority_i * reliability_i * freshness_i
+
+C = Σ(weight_i * normalized_claim_i) / Σ(weight_i)
+```
+
+For numeric feeds, a weighted median may be more robust than a weighted mean.
+
+For boolean/attestation claims:
+
+```text
+support_ratio = supporting_trusted_weight / total_trusted_weight
+```
+
+No single formula should replace source-specific evidence requirements.
+
+## 19. Evidence freshness
+
+For evidence observed at `t_obs` with time-to-live `TTL`:
+
+```text
+age = t_now - t_obs
+fresh = age <= TTL
+```
+
+Policy may require:
+
+```text
+if fresh == false:
+    HOLD or REVERIFY
+```
+
+A stale PASS is not a current PASS.
+
+## 20. SLA availability
+
+Generic availability:
+
+```text
+availability = 1 - downtime / measurement_period
+```
+
+or:
+
+```text
+availability_pct = successful_service_time / total_service_time * 100
+```
+
+A service's exact SLO/SLA target must come from an adopted contract or runtime policy.
+
+## 21. SLA latency percentile
+
+A production service may measure:
+
+```text
+p95_latency = percentile(latency_samples, 95)
+p99_latency = percentile(latency_samples, 99)
+```
+
+These are engineering metrics, not guarantees unless adopted as an SLA.
+
+## 22. Timelock condition
+
+```text
+executable =
+    approved
+AND current_time >= approval_time + timelock_duration
+AND evidence_still_current
+AND authority_still_valid
+AND no_hold_or_revocation
+```
+
+Scheduled approval is revalidated at execution.
+
+## 23. DAIL append-only correction relation
+
+For canonical event chain:
+
+```text
+E0 = original event
+E1 = correction referencing E0
+E2 = supersession referencing E1
+```
+
+Current effective state is derived from the valid correction chain, not by deleting `E0`.
+
+A simple reducer abstraction:
+
+```text
+state_n = reduce(valid_events[0..n])
+```
+
+## 24. Event idempotency
+
+For a side-effecting command identified by idempotency key `k`:
+
+```text
+execute(k) at most once for the same semantic request
+```
+
+Formally:
+
+```text
+result(execute(k), execute(k), ..., execute(k)) = result(execute(k))
+```
+
+Repeated transport must not multiply economic or rights effects.
+
+## 25. Proof freshness
+
+For a ZK or cryptographic proof:
+
+```text
+proof_usable =
+    cryptographically_valid
+AND circuit_version_allowed
+AND verification_key_current
+AND witness_source_current
+AND revocation_state_current
+AND policy_context_matches
+```
+
+Thus:
+
+```text
+proof_valid != proof_usable
+proof_usable != action_authorized
+```
+
+## 26. Audit coverage ratio
+
+A derived assurance metric:
+
+```text
+coverage = verified_control_checks / applicable_control_checks
+```
+
+But a `100%` checklist score does not prove legal compliance, absence of fraud or independent certification.
+
+## 27. Reconstruction coverage math
+
+For the 795-title recovery program:
+
+```text
+body_recovery_rate = substantive_bodies / 795
+```
+
+Separate metrics should exist for:
+
+```text
+title_recovery_rate
+source_body_recovery_rate
+substantive_reconstruction_rate
+founder_adjudication_rate
+implementation_mapping_rate
+production_certification_rate
+```
+
+Do not collapse these into one percentage.
+
+## 28. Paper decomposition completeness
+
+For a recovered paper `p`, a candidate decomposition score might track completed dimensions:
+
+```text
+D_p = (concepts + claims + formulas + algorithms + schemas + diagrams + invariants + implementation_links completed)
+      / applicable_dimensions
+```
+
+This is a program-management metric, not source authority.
+
+## 29. Confidence is not authority
+
+A core CHLOM mathematical principle is categorical rather than numeric:
+
+```text
+P(correct | evidence) can be high
+while
+authority_to_act = false
+```
+
+Therefore:
+
+```text
+high_confidence * no_authority = no_execution
+```
+
+## 30. Calculation record schema
+
+Every machine-significant calculation should retain:
+
+```yaml
+calculation_id:
+formula_id:
+formula_version:
+inputs:
+input_evidence_refs:
+units:
+rounding_policy:
+result:
+result_unit:
+executed_by:
+calculated_at:
+policy_version:
+authority_context:
+review_state:
+DAIL_event_ref:
+```
+
+## 31. Unit discipline
+
+Never mix:
+
+- percentages and basis points;
+- annual and monthly rates;
+- nominal and real values;
+- gross and net receipts;
+- token units and fiat units;
+- event time and effective time;
+- current and historical supply;
+- confidence and probability without explicit definition.
+
+## 32. Rounding discipline
+
+Economic calculations should define rounding explicitly, for example:
+
+```text
+rounding_mode = HALF_EVEN | HALF_UP | FLOOR | domain-specific
+precision = currency_minor_units or adopted token precision
+```
+
+Unallocated rounding residue must have a deterministic destination rather than disappear.
+
+## 33. Formula lineage schema
+
+```yaml
+formula_id: ct.chlom.formula.supply.net-change.v1
+name: Net Supply Change
+expression: ΔS = iS - bN
+origin: Genesis Volume Appendix D
+classification: historical_source_formula
+adopted: false
+inputs:
+  - inflation_rate
+  - supply
+  - burn_per_transaction
+  - annual_transactions
+units: mixed_defined
+notes: illustrative tokenomics research
+```
+
+## 34. Model governance
+
+Every adopted quantitative model should specify:
+
+- purpose;
+- feature/input definitions;
+- units;
+- source lineage;
+- calibration data;
+- assumptions;
+- thresholds;
+- sensitivity;
+- limitations;
+- fairness/bias considerations where relevant;
+- security/adversarial risks;
+- approval authority;
+- version;
+- rollback;
+- monitoring/drift;
+- DAIL evidence.
+
+## Final rule
+
+CHLOM should preserve its mathematics with the same discipline it preserves contracts and rights:
+
+```text
+FORMULA
+  + INPUT EVIDENCE
+  + VERSION
+  + UNITS
+  + AUTHORITY
+  + RESULT
+  + REVIEW
+  + DAIL RECEIPT
+  = GOVERNED CALCULATION
+```
+
+A formula without those controls is documentation—not institutional execution.

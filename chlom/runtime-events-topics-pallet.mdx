@@ -1,0 +1,214 @@
+---
+title: "Events / Topics Pallet — Historical Runtime Record"
+sidebarTitle: "Events / Topics Pallet"
+description: "Individual reconstruction of CHLOM's historical Events/Topics Pallet for standardized event emission, subscriptions and module coordination, mapped to the current event bus and DAIL evidence architecture."
+icon: "wave-square"
+keywords: ["CHLOM Events Pallet", "Topics Pallet", "event bus", "DAIL", "subscriptions", "module events"]
+---
+
+# Events / Topics Pallet — Historical Runtime Record
+
+## Record
+
+```yaml
+artifact_id: ct.chlom.runtime.events-topics
+namespace: historical_runtime_pallet
+recovered_title: Events/Topics Pallet
+recovered_help_center_description: standardized events/topics used by modules, indexers, alerts and downstream integrations
+source_recovery: substantive_title_plus_event_architecture
+current_mapping:
+  - canonical event bus
+  - compliance event bus
+  - DAIL
+  - P-10 Operations & Institutional Memory
+runtime_deployment: not_established
+```
+
+## Historical purpose
+
+The Events/Topics Pallet provided a common protocol vocabulary so CHLOM modules could communicate state changes without every downstream system polling internal storage.
+
+```text
+PALLET / MODULE STATE CHANGE
+          |
+          v
+STANDARD EVENT / TOPIC
+          |
+   +------+------+------+
+   |             |      |
+indexer        alerts  downstream automation
+   |             |      |
+   +------+------+------+
+          |
+       audit trail
+```
+
+## Event is not state authority by itself
+
+An event describes an observed/committed transition. Consumers should resolve canonical state when the action requires current truth.
+
+```text
+event observed
+    !=
+current state forever
+```
+
+## Reconstructed event envelope
+
+```yaml
+event_id: stable ID
+event_type: versioned name
+source_module: stable module ID
+subject_refs: []
+actor_ref: optional
+time: timestamp
+correlation_id: optional
+causation_id: optional
+idempotency_key: optional
+payload_or_ref: structured
+classification: public|internal|restricted
+```
+
+Exact historical event schema fields are not fully recovered; this is the modern semantic mapping.
+
+## Topics
+
+Topics group event streams by domain/capability.
+
+Examples of semantic domains:
+
+```text
+identity
+policy
+rights
+licensing
+marketplace
+settlement
+governance
+audit
+oracle
+security
+```
+
+Exact historical topic strings are not invented.
+
+## Current event bus mapping
+
+```text
+Historical Events/Topics Pallet
+           |
+           v
+Canonical Event Bus
+           |
+           +--> domain consumers
+           +--> workflow automation
+           +--> indexers/observability
+           +--> DAIL evidence projector
+```
+
+Current implementation can use cloud messaging/databases/webhooks without changing the event semantics.
+
+## DAIL relationship
+
+Not every high-volume telemetry event must be a heavyweight institutional evidence record. P-10/DAIL classification determines which events require durable evidence lineage.
+
+```text
+raw telemetry
+   |
+normalize
+   |
+material institutional event?
+   | yes
+   v
+DAIL record
+```
+
+## Idempotency
+
+Side-effect consumers require duplicate protection.
+
+```text
+event_id / idempotency key already processed?
+   yes -> no duplicate side effect
+   no  -> process + record
+```
+
+## Ordering
+
+Consumers should not assume total global ordering unless a contract provides it. Domain events can carry sequence/version numbers where ordering matters.
+
+## Event versioning
+
+```text
+ct.domain.event.v1
+        |
+breaking semantic change
+        |
+ct.domain.event.v2
+```
+
+Adding optional fields can be backward compatible; changing meaning requires a version change.
+
+## Classification
+
+Events may contain sensitive subjects or evidence. Public topics must use public-safe payloads rather than copying restricted event content.
+
+## Historical operation families
+
+- emit standardized event;
+- subscribe/index by topic;
+- query event history through related indexer;
+- trigger module/workflow response.
+
+The source does not establish a standalone subscription extrinsic API, so exact calls are not claimed.
+
+## Security threats
+
+- event spoofing;
+- duplicate/replay events;
+- consumer lag;
+- out-of-order processing;
+- payload schema mismatch;
+- private data leakage;
+- forged causal chain;
+- consumer side effects without authority re-check.
+
+## Consumer authority rule
+
+```text
+received event
+    !=
+authority to execute any arbitrary side effect
+```
+
+Consumers must apply their own current policy/authority where needed.
+
+## Public / restricted split
+
+Public-safe:
+
+- event names/schemas approved for developer use;
+- versioning/idempotency principles;
+- architecture.
+
+Restricted:
+
+- security/incident topics;
+- private identity/financial payloads;
+- protected correlation/evasion controls;
+- internal topology.
+
+## Invariants
+
+```text
+event != permanent current state
+event received != side-effect authority
+duplicate event != duplicate economic action
+payload version mismatch != silent accept
+public topic != unrestricted data
+historical runtime event layer != current chain deployment
+```
+
+## Status
+
+The Events/Topics Pallet is preserved as historical runtime IP and maps directly to the current canonical event bus, compliance-event bus, observability streams and DAIL material-evidence projections.

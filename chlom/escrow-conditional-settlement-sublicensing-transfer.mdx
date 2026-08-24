@@ -1,0 +1,313 @@
+---
+title: "Escrow, Conditional Settlement, Sublicensing and Transfer"
+sidebarTitle: "Escrow & Transfer"
+description: "Comprehensive CHLOM reconstruction of escrow, conditional settlement, license transfer, rental/sublicensing, compliance pre-checks, atomicity and remedy behavior."
+icon: "handshake"
+keywords: ["escrow", "conditional settlement", "sublicensing", "license transfer", "LEX", "DLA", "atomic settlement", "CHLOM"]
+---
+
+# Escrow, Conditional Settlement, Sublicensing and Transfer
+
+The Technical Blueprint describes LEX transfer flows in which payment is escrowed, license eligibility/compliance is checked, the license token is transferred, and payment is released only if the transfer succeeds. It also explicitly contemplates rental, sublicensing and transfer restrictions.
+
+The current CHLOM implementation model preserves the **conditionality invariant** without requiring smart-contract escrow or tokenized licenses.
+
+## Reconstruction status
+
+```yaml
+article_state: reconstructed_source_grounded
+historical_execution: tokenized_license_plus_escrow
+current_invariant: rights_and_conditions_before_final_settlement
+smart_contract_escrow_required: false
+founder_adjudication: open_after_publication
+```
+
+## Historical LEX escrow flow
+
+The historical source effectively models:
+
+```text
+seller lists license
+      |
+      v
+buyer initiates purchase
+      |
+      v
+payment escrowed
+      |
+      v
+compliance pre-check
+      |
+      +--> buyer eligible?
+      +--> license active?
+      +--> transfer permitted?
+      +--> sanctions/policy clear?
+      +--> royalty obligations resolvable?
+      |
+      v
+license transfer succeeds
+      |
+      v
+payment released
+```
+
+If compliance or transfer fails, the historical model aborts the trade and does not release payment.
+
+## Modern conditional-settlement topology
+
+```text
++--------------------+
+| Offer / Agreement  |
++---------+----------+
+          |
+          v
++---------+----------+
+| Payment Authorized |
+| / Funds Reserved   |
++---------+----------+
+          |
+          v
++---------+----------+
+| Condition Engine   |
++---------+----------+
+          |
+   +------+-------------------------------+
+   |      |          |          |          |
+   v      v          v          v          v
+Rights   DLA     Participant  Policy   Fulfillment
+check    check    eligibility   check    readiness
+   |      |          |          |          |
+   +------+----------+----------+----------+
+          |
+     PASS/HOLD/DENY
+          |
+   +------+------+
+   |             |
+ PASS          HOLD/DENY
+   |             |
+   v             v
+finalize      release/cancel/
+entitlement  refund/review
+   |
+   v
+settlement + DAIL
+```
+
+## Escrow as a state, not necessarily a product
+
+The institutional meaning of escrow is **conditional control of value pending fulfillment of defined prerequisites**.
+
+It can be implemented through:
+
+- smart-contract escrow;
+- payment authorization/capture separation;
+- marketplace hold;
+- reserve ledger;
+- third-party escrow provider;
+- invoice/deposit workflow;
+- other legally appropriate rails.
+
+The provider may change; the conditions should not.
+
+## Conditional-settlement object
+
+A conditional settlement should identify:
+
+```yaml
+settlement_id: stable_id
+offer_id: stable_offer
+agreement_id: accepted_terms
+payment_evidence_id: provider_reference
+asset_or_license_id: stable_id
+conditions:
+  rights_clear: required
+  DLA_active: required
+  participant_eligible: required
+  transfer_allowed: required
+  fulfillment_complete: required
+  no_active_hold: required
+release_policy: explicit
+refund_or_reversal_policy: explicit
+expires_at: optional
+status: pending_conditions
+```
+
+## Sublicensing
+
+Sublicensing creates a new permission downstream from an existing license. It cannot grant rights the parent license does not contain.
+
+```text
+ORIGINAL RIGHTS
+      |
+      v
+MASTER / PARENT DLA
+      |
+      +--> sublicensing allowed?
+      |
+     NO -----> DENY
+      |
+     YES
+      |
+      v
+child DLA scope <= parent scope
+      |
+      v
+sub-licensee eligibility
+      |
+      v
+child entitlement
+```
+
+## Scope conservation invariant
+
+```text
+CHILD RIGHTS <= PARENT RIGHTS <= SOURCE RIGHTS
+```
+
+A sublicensing system must not expand territory, media, duration, exclusivity, modification rights, transfer rights or economic authority beyond the parent license unless an independent upstream right authorizes the expansion.
+
+## Transfer versus sublicense
+
+These should be distinct operations.
+
+```text
+TRANSFER
+current holder -> successor holder
+rights object may move according to transfer rules
+
+SUBLICENSE
+parent holder retains parent rights
+child permission granted within parent scope
+```
+
+A transfer may terminate or reduce the former holder's entitlement, while a sublicense may preserve it.
+
+## Rental / temporary transfer
+
+Historical LEX materials also contemplate rentals. A rental is best modeled as a time-bounded permission or entitlement rather than permanent ownership transfer.
+
+```text
+ACTIVE
+  |
+  v
+rental_start
+  |
+  v
+TEMPORARY ENTITLEMENT
+  |
+  +--> early termination
+  |
+  v
+rental_expiry
+  |
+  v
+ENTITLEMENT CLOSED
+```
+
+## Transfer pre-check
+
+Before transfer/sublicense, CHLOM should resolve:
+
+- source rights allow the operation;
+- parent DLA is active and not held/revoked;
+- transfer/sublicense cap is not exceeded;
+- destination participant is eligible;
+- jurisdiction/territory restrictions are satisfied;
+- required credentials are current;
+- economic/royalty rules are resolvable;
+- no active case/hold blocks the operation;
+- agreement/assent requirements are satisfied.
+
+## Atomicity versus compensation
+
+Historical smart-contract design emphasizes atomic settlement: either all conditions succeed or nothing changes.
+
+Conventional providers may not offer perfect atomicity across systems. Modern CHLOM therefore needs compensation logic.
+
+```text
+Step A succeeds: payment captured
+Step B fails: entitlement cannot issue
+        |
+        v
+compensating action required
+        |
+        +--> refund
+        +--> void capture
+        +--> credit/reversal
+        +--> case if provider failure
+```
+
+## Idempotency
+
+Retries must not create duplicate licenses or double charges.
+
+```text
+request + idempotency_key
+        |
+        v
+seen before?
+   +----+----+
+   |         |
+  YES       NO
+   |         |
+   v         v
+return      execute once
+prior       + record key
+result
+```
+
+## DAIL event chain
+
+A transfer or sublicense should produce linked events:
+
+```text
+offer accepted
+ -> payment authorized
+ -> conditions evaluated
+ -> transfer/sublicense approved
+ -> DLA/entitlement updated
+ -> fulfillment confirmed
+ -> settlement released
+ -> allocation reconciled
+```
+
+Failures, refunds and corrections append their own events.
+
+## Case/remedy integration
+
+A disputed transfer may require temporary HOLD on settlement or entitlement. Remedies can include cancellation, refund, reversal, license restoration, reissue, partial correction or escalation depending on the governing agreement and authority.
+
+## Current implementation mapping
+
+Historical escrow/transfer logic decomposes into:
+
+- Offer/Agreement Service;
+- Payment Authorization/Capture Adapter;
+- Conditional Settlement Service;
+- DLA/Entitlement Service;
+- Rights/Scope Validator;
+- Participant Eligibility Service;
+- Sublicensing/Transfer Policy;
+- Reconciliation/Compensation Service;
+- Cases/Remedies;
+- DAIL events;
+- optional future smart-contract escrow adapter.
+
+## Failure conditions
+
+HOLD or DENY when:
+
+- parent rights cannot be proven;
+- license is expired/revoked/held;
+- child scope would exceed parent scope;
+- participant eligibility is stale or unresolved;
+- payment and entitlement states diverge without compensation plan;
+- duplicate execution cannot be excluded;
+- provider cannot reverse a failed partial transaction;
+- active dispute blocks settlement.
+
+## Founder adjudication
+
+`open_after_publication`
+
+The Founder may later adjudicate transfer classes, sublicense rules, escrow provider strategy, settlement timing or which LEX products support these features. Historical atomic-transfer design remains source lineage rather than automatic production state.

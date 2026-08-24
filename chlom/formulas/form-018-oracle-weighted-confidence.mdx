@@ -1,0 +1,81 @@
+---
+title: "FORM-018 — Oracle Weighted-Confidence Model"
+sidebarTitle: "FORM-018 Oracle Confidence"
+description: "Standalone CHLOM evidence-aggregation model using authority, reliability and freshness weights while distinguishing corroboration confidence from institutional authority."
+icon: "tower-broadcast"
+keywords: ["CHLOM FORM-018", "oracle confidence", "weighted evidence", "freshness", "source reliability"]
+---
+
+# FORM-018 — Oracle Weighted-Confidence Model
+
+## Formula identity
+
+```yaml
+formula_id: FORM-018
+classification: derived_model
+origin: CHLOM Oracle Lattice source-quorum and reputation requirements
+adopted_weights: false
+related_algorithm: ALG-011
+```
+
+## Generic weighted model
+
+For observation `i`:
+
+```text
+weight_i = authority_i * reliability_i * freshness_i
+```
+
+A normalized numeric aggregation can be expressed as:
+
+```text
+C = Σ(weight_i * normalized_claim_i) / Σ(weight_i)
+```
+
+For boolean/attestation claims, a support ratio can be expressed as:
+
+```text
+support_ratio = supporting_trusted_weight / total_trusted_weight
+```
+
+For adversarial or outlier-prone numeric feeds, a weighted median may be preferable to a weighted mean.
+
+## Variable semantics
+
+`authority_i` represents how authoritative a source is for the claim domain, not organizational prestige. `reliability_i` reflects evidence-backed source performance under a versioned methodology. `freshness_i` reflects currentness under the applicable evidence TTL. All three must use explicit scales.
+
+## Independence
+
+Weights do not replace independence checks. Ten observations ultimately derived from one source should not automatically carry ten times the evidentiary weight. ALG-011 handles source quorum and independence before or alongside weighted aggregation.
+
+## Confidence versus truth
+
+`C` is an evidence confidence/aggregation score under a chosen model. It is not ontological truth, legal certainty or authority.
+
+```text
+high confidence != authority to act
+```
+
+## Missing/zero weight
+
+If `Σ weight_i = 0`, no numeric result is valid. The system should return no-result/HOLD rather than divide by zero or assume a neutral confidence.
+
+## Contradictory evidence
+
+Material contradictions should be surfaced explicitly. A high average must not hide a split between two equally authoritative sources on a binary legal/identity fact.
+
+## Governance
+
+Weight scales, reliability windows, source domains and minimum quorum are policy/model parameters. AI may estimate source reliability, but it cannot silently rewrite active authority weights.
+
+## Tests
+
+Test one source, multiple agreeing sources, outlier, all zero weights, stale source, high-reliability but unauthorized source, correlated sources, contradictory equal-weight evidence and weighted-median behavior.
+
+## DAIL evidence
+
+Record source refs, component weights, model/version, aggregation method, result and contradiction metadata.
+
+## Versioning
+
+Each adopted weighting methodology receives its own model version; old calculations retain the prior weight definitions.

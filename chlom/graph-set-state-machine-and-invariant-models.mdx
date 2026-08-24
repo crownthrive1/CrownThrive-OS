@@ -1,0 +1,673 @@
+---
+title: "CHLOM Graph, Set, State-Machine and Invariant Models"
+sidebarTitle: "Graph & State Models"
+description: "Formalized conceptual models for CHLOM rights graphs, permission sets, state machines, event reductions, entitlement predicates, correction chains and cross-service invariants."
+icon: "diagram-project"
+keywords: ["CHLOM graph model", "rights graph", "set theory", "state machine", "invariants", "event sourcing", "permission sets", "formal model"]
+---
+
+# CHLOM Graph, Set, State-Machine and Invariant Models
+
+CHLOM becomes easier to implement when prose is reduced into **graphs, sets, predicates, transitions and invariants**. This page collects those formal abstractions without pretending they are a fully verified theorem system.
+
+## Model classes
+
+```yaml
+formalization_level: conceptual_to_engineering
+source_basis:
+  - Genesis Volume
+  - Grand Prospectus
+  - Technical Blueprint
+  - 2026 Architecture Build Pack
+current_use: schemas_tests_state_machines_ADRs
+formal_proof_complete: false
+```
+
+## 1. Rights graph
+
+Define a directed graph:
+
+```text
+G_R = (V, E)
+```
+
+Where vertices may include:
+
+```text
+asset
+person
+organization
+claim
+source_right
+agreement
+DLA
+entitlement
+license_offer
+```
+
+Edges may include:
+
+```text
+CLAIMS
+CONTROLS
+ASSIGNS
+LICENSES
+SUBLICENSES
+DERIVES_FROM
+TRANSFERRED_TO
+REVOKES
+SUPERSEDES
+```
+
+## 2. Rights path validity
+
+A rights path from source asset `A` to requested use `U` is valid only if every edge in the path is valid for the relevant time and scope.
+
+```text
+valid_path(A -> U) = AND(valid(edge_i))
+```
+
+One broken required edge breaks the permission path.
+
+## 3. Rights-set conservation
+
+For source, parent and child rights sets:
+
+```text
+R_child ⊆ R_parent ⊆ R_source
+```
+
+This is a central invariant.
+
+## 4. Effective-rights intersection
+
+```text
+R_effective =
+    R_source
+  ∩ R_agreement
+  ∩ R_DLA
+  ∩ R_territory
+  ∩ R_channel
+  ∩ R_term
+  ∩ R_policy
+```
+
+Requested use `u` is permitted only if:
+
+```text
+u ∈ R_effective
+```
+
+## 5. Denied-right override
+
+Reserved or excluded rights `R_excluded` subtract from effective rights:
+
+```text
+R_final = R_effective \ R_excluded
+```
+
+An exclusion cannot be reintroduced by a downstream child grant.
+
+## 6. Temporal interval containment
+
+For a child license term `[c_start, c_end]` and parent `[p_start, p_end]`:
+
+```text
+p_start <= c_start
+AND c_end <= p_end
+```
+
+unless the parent contract explicitly authorizes a distinct downstream term mechanism.
+
+## 7. Territory containment
+
+```text
+T_child ⊆ T_parent
+```
+
+## 8. Channel containment
+
+```text
+C_child ⊆ C_parent
+```
+
+## 9. Permission predicate
+
+A permission may be represented as:
+
+```text
+PERMITTED(actor, action, object, context) =
+    identity_valid(actor)
+AND role_allows(actor, action)
+AND rights_allow(object, action, context)
+AND policy_allows(action, context)
+AND required_evidence_current(context)
+AND authority_allows(actor, action)
+AND no_active_hold(actor, object, action)
+```
+
+## 10. Entitlement predicate
+
+```text
+ENTITLED(subject, benefit) =
+    DLA_active
+AND agreement_effective
+AND required_payment_state_satisfied
+AND policy_passed
+AND not_revoked
+AND not_expired
+```
+
+Payment alone is insufficient.
+
+## 11. DLA state machine
+
+Let states:
+
+```text
+S_DLA = {
+  candidate,
+  rights_review,
+  policy_review,
+  approval_pending,
+  approved,
+  active,
+  suspended,
+  expired,
+  revoked,
+  terminated,
+  appealed,
+  restored
+}
+```
+
+Transitions are allowed only by rules `T_DLA`.
+
+Example:
+
+```text
+candidate -> rights_review
+rights_review -> policy_review | denied
+policy_review -> approval_pending | hold | denied
+approval_pending -> approved | denied
+approved -> active
+active -> suspended | expired | revoked | terminated
+suspended -> restored | revoked | terminated
+```
+
+No transition is valid merely because a database row was manually edited.
+
+## 12. LEX state machine
+
+```text
+candidate
+ -> rights_validated
+ -> listing_eligible
+ -> active_listing
+ -> agreement_pending
+ -> payment_pending
+ -> entitlement_pending
+ -> fulfilled
+ -> settlement_pending
+ -> settled
+```
+
+Exceptional transitions:
+
+```text
+* -> hold
+* -> dispute
+payment_pending -> failed
+entitlement_pending -> refund_or_hold
+settlement_pending -> mismatch_hold
+```
+
+## 13. Evidence state machine
+
+```text
+observed
+ -> normalized
+ -> integrity_checked
+ -> source_classified
+ -> current
+ -> stale
+ -> superseded
+ -> revoked
+```
+
+A stale evidence item remains historical evidence but may no longer satisfy a current decision.
+
+## 14. Credential state machine
+
+```text
+claim
+ -> evidence_review
+ -> issued
+ -> active
+ -> suspended | expired | revoked
+ -> renewed | restored where allowed
+```
+
+Issuance history can remain immutable while validity changes.
+
+## 15. Policy state machine
+
+```text
+draft
+ -> simulation
+ -> review
+ -> approved
+ -> scheduled
+ -> effective
+ -> superseded
+ -> retired
+```
+
+Emergency state:
+
+```text
+effective -> paused
+paused -> resumed | superseded
+```
+
+## 16. Case/remedy state machine
+
+```text
+issue_detected
+ -> case_open
+ -> evidence_preserved
+ -> review
+ -> disposition
+ -> remedy
+ -> appeal(optional)
+ -> restoration_or_closure
+```
+
+## 17. Payment/settlement state machine
+
+```text
+payment_candidate
+ -> provider_pending
+ -> provider_success
+ -> institutional_reconciliation
+ -> obligation_confirmed
+ -> settlement_authorized
+ -> settled
+```
+
+Exception:
+
+```text
+provider_success -> mismatch_hold
+provider_success -> reversal
+settled -> correction / chargeback
+```
+
+## 18. DAIL event model
+
+Let event sequence:
+
+```text
+E = [e0, e1, ..., en]
+```
+
+Current state is a reducer:
+
+```text
+state_n = reduce(E)
+```
+
+No event should be removed merely to alter the projection.
+
+## 19. Correction graph
+
+Corrections form a directed acyclic relation under normal operation:
+
+```text
+E0 <-corrected_by- E1 <-superseded_by- E2
+```
+
+A correction should not create cycles.
+
+Invariant:
+
+```text
+not reachable(Ei, Ei) through supersession edges
+```
+
+## 20. Event causality
+
+Useful identifiers:
+
+```text
+causation_id
+correlation_id
+idempotency_key
+```
+
+Causation graph:
+
+```text
+request
+  |
+  v
+policy decision
+  |
+  v
+DLA event
+  |
+  +--> entitlement event
+  +--> economic event
+  +--> notification event
+```
+
+## 21. Three-valued logical lattice
+
+Required fact values:
+
+```text
+TRUE
+UNKNOWN
+FALSE
+```
+
+Safety mapping:
+
+```text
+TRUE    -> PASS candidate
+UNKNOWN -> HOLD
+FALSE   -> DENY for hard requirement
+```
+
+## 22. Restrictiveness ordering
+
+```text
+PASS < HOLD < DENY
+```
+
+Aggregate required controls with:
+
+```text
+result = max(control_results)
+```
+
+where max is by restrictiveness, not numeric value.
+
+## 23. Authority partial order
+
+Authority can be modeled as capability sets.
+
+If actor `A` has capabilities `C_A` and action requires `C_req`:
+
+```text
+C_req ⊆ C_A
+```
+
+Otherwise action is unauthorized.
+
+A higher business title does not automatically imply a superset unless governance defines it.
+
+## 24. Delegation containment
+
+For delegator authority `C_parent` and delegated `C_child`:
+
+```text
+C_child ⊆ C_parent
+```
+
+Delegation cannot manufacture authority.
+
+## 25. Tenant isolation invariant
+
+For tenant-scoped object `o`:
+
+```text
+tenant(actor) == tenant(o)
+```
+
+unless an explicit cross-tenant capability authorizes access.
+
+## 26. Public projection subset
+
+Let full record fields be `F_full` and public fields `F_public`:
+
+```text
+F_public ⊆ F_full
+```
+
+Sensitive fields must not enter public projection merely because the underlying record is verifiable.
+
+## 27. Evidence disclosure minimization
+
+```text
+D_disclosed ⊆ D_required_for_purpose
+```
+
+The disclosure should be no larger than required for the authorized purpose.
+
+## 28. ZK semantic relation
+
+A proof verifies statement `φ(w, x)` for private witness `w` and public input `x`.
+
+Conceptually:
+
+```text
+prove: exists w such that φ(w, x) = TRUE
+```
+
+But CHLOM still separately evaluates:
+
+```text
+is circuit accepted?
+is witness source current?
+is credential revoked?
+is the action authorized?
+```
+
+## 29. Oracle graph
+
+```text
+source -> observation -> normalized claim -> policy consumer
+```
+
+Multiple sources may point to the same claim.
+
+Source diversity matters; graph fan-in does not equal independence if upstream origins are identical.
+
+## 30. Contradiction relation
+
+Two claims `c1`, `c2` may be contradictory within the same scope/effective time.
+
+```text
+CONTRADICTS(c1, c2)
+```
+
+A contradiction is itself an institutional fact requiring resolution, not a reason to delete one record silently.
+
+## 31. Economic conservation
+
+For allocation event:
+
+```text
+G = D + A + H + R
+```
+
+Where:
+
+- `G` = gross;
+- `D` = deductions;
+- `A` = allocations;
+- `H` = holds;
+- `R` = deterministic rounding residue.
+
+No unexplained value disappears.
+
+## 32. Payment idempotency invariant
+
+For semantic event key `k`:
+
+```text
+count(economic_side_effects(k)) <= 1
+```
+
+unless explicitly modeled as a correction/reversal event with a new semantic key.
+
+## 33. Provider-independence invariant
+
+Stable institutional identity cannot be provider object ID alone.
+
+```text
+institutional_object_id != Stripe_ID
+institutional_object_id != Supabase_row_id
+institutional_object_id != blockchain_tx_hash
+```
+
+Provider IDs are aliases/evidence references.
+
+## 34. Index non-sovereignty
+
+```text
+Index = projection(Canonical Records)
+```
+
+Therefore:
+
+```text
+index loss -> rebuildable
+canonical loss -> continuity incident
+```
+
+## 35. Release-state machine
+
+```text
+draft
+ -> validation
+ -> controlled_test
+ -> release_candidate
+ -> approved
+ -> deployed
+ -> monitored
+ -> maintained
+ -> superseded
+```
+
+A green CI run does not skip authority stages.
+
+## 36. Reconstruction-state machine
+
+```text
+title_only
+ -> source_search
+ -> source_located
+ -> body_extracted
+ -> reconstructed
+ -> conflict_marked
+ -> founder_adjudicated(optional)
+ -> current_mapped
+ -> implemented(optional)
+```
+
+## 37. Paper dependency graph
+
+```text
+Genesis --------+
+Whitepaper -----+--> terminology / concepts
+Blueprint ------+           |
+Prospectus -----+           v
+Build Guide ----+     reconstructed articles
+LEX ------------+           |
+Build Pack -----+           v
+                       algorithms / schemas
+                              |
+                              v
+                       engineering work
+```
+
+## 38. Model/version dependency
+
+```text
+policy v3
+  |
+  +--> model v2
+  +--> threshold set v4
+  +--> evidence schema v5
+  +--> decision receipt schema v2
+```
+
+A replay must use the versions actually effective at the event time, not today's versions by default.
+
+## 39. Temporal truth
+
+A fact can be valid at time `t1` and invalid at `t2`.
+
+Represent:
+
+```text
+valid_from <= t < valid_to
+```
+
+Historical truth and current truth are therefore not contradictions merely because status changed.
+
+## 40. Closed-world versus open-world assumptions
+
+For consequential authorization, CHLOM should generally use a **closed-world/fail-closed** posture for required permissions:
+
+```text
+not proven allowed -> not automatically allowed
+```
+
+For discovery/search, open-world behavior may be appropriate:
+
+```text
+not found != does not exist
+```
+
+These contexts must not be confused.
+
+## 41. Formal invariant registry schema
+
+```yaml
+invariant_id:
+statement:
+formal_expression:
+scope:
+source_basis:
+severity_if_broken:
+test_refs:
+monitoring_refs:
+exceptions:
+version:
+```
+
+## 42. High-priority invariants
+
+```text
+I-001 child_rights <= parent_rights <= source_rights
+I-002 no required UNKNOWN becomes PASS
+I-003 no actor delegates more authority than it holds
+I-004 no provider success creates institutional truth directly
+I-005 no payment creates rights
+I-006 no correction erases source history
+I-007 no public projection includes restricted fields by default
+I-008 no economic allocation loses unexplained value
+I-009 no repeated provider event duplicates a side effect
+I-010 no historical design claim is treated as runtime evidence
+```
+
+## Final model
+
+CHLOM is best understood as several interacting formal systems:
+
+```text
+RIGHTS GRAPH
+   + POLICY LOGIC
+   + AUTHORITY SETS
+   + STATE MACHINES
+   + EVENT SOURCING
+   + ECONOMIC CONSERVATION
+   + PRIVACY SUBSETS
+   + VERSIONED TIME
+   = GOVERNED INSTITUTIONAL STATE
+```
+
+The purpose of formalization is not mathematical ornament. It is to make hidden assumptions testable.

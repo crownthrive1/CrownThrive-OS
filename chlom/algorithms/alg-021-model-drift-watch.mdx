@@ -1,0 +1,88 @@
+---
+title: "ALG-021 — Model Drift Watch"
+sidebarTitle: "ALG-021 Drift Watch"
+description: "Standalone CHLOM procedure for detecting model-performance or data-distribution drift and routing consequential autonomy to review when approved thresholds are exceeded."
+icon: "chart-line"
+keywords: ["CHLOM ALG-021", "model drift", "AIE", "ML governance", "HOLD model review"]
+---
+
+# ALG-021 — Model Drift Watch
+
+## Institutional identity
+
+```yaml
+algorithm_id: ALG-021
+name: Model Drift Watch
+classification: reconstructed_from_requirements
+visibility: public_safe_pattern
+source_family: AIE; CHLOM ML; model governance
+version: 1.0.0
+current_authority: specification_only
+```
+
+ALG-021 monitors whether an approved model continues to operate within the statistical, operational and policy envelope under which it was evaluated. Drift is treated as a governance signal, not an invitation for the model to retrain or reauthorize itself.
+
+## Inputs
+
+```yaml
+model_ref:
+reference_metrics:
+current_metrics:
+approved_thresholds:
+traffic_or_population_slice:
+measurement_window:
+policy_actions_on_drift:
+```
+
+Metrics can include input distribution, missingness, score distribution, error/performance measures where labels exist, calibration, latency, failure rate, subgroup behavior and other model-specific indicators.
+
+## Procedure
+
+```text
+function drift_check(current_metrics, reference_metrics):
+    deltas = compare(current_metrics, reference_metrics)
+
+    if any delta exceeds approved threshold:
+        emit DRIFT_ALERT
+        restrict consequential autonomy if policy requires
+        return HOLD_MODEL_REVIEW
+
+    return PASS
+```
+
+## Drift classes
+
+- **data drift:** input distributions changed;
+- **concept/performance drift:** mapping between inputs and outcomes changed;
+- **calibration drift:** predicted risk no longer corresponds to observed outcomes;
+- **operational drift:** latency/failure behavior changed;
+- **policy drift:** model remains statistically stable but no longer matches current policy or legal requirements.
+
+## Actions
+
+The adopted policy can trigger alerting, increased human review, reduced autonomous scope, fallback to deterministic rules, rollback to an approved prior model or suspension of the model for consequential use. Drift detection alone should not silently replace the model with a newly trained version.
+
+## Output
+
+```yaml
+drift_assessment_id:
+model_ref:
+reference_window:
+current_window:
+metric_deltas[]:
+threshold_breaches[]:
+disposition: PASS|HOLD_MODEL_REVIEW
+required_actions[]:
+```
+
+## DAIL evidence
+
+Append periodic assessments and alerts with metric definitions, populations, versions and threshold policy. This supports later evaluation of whether a decision was made under a model already showing drift.
+
+## Tests
+
+Test stable metrics, one threshold breach, multiple breaches, insufficient sample, missing metric, subgroup-specific drift, operational outage, reference baseline update and false recovery caused by changing the measurement population.
+
+## Versioning
+
+Drift metrics and thresholds are versioned separately from model versions. Baseline replacement requires review and must not erase prior drift history.

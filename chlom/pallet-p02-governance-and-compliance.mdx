@@ -1,0 +1,631 @@
+---
+title: "P-02 Governance & Compliance Pallet"
+sidebarTitle: "P-02 Governance & Compliance"
+description: "Comprehensive current CHLOM capability-pallet contract for CHLOM Core, CIE, policy packs, eligibility, approvals, dS-CaaS events, audit, governance decisions and fail-closed policy enforcement."
+icon: "scale-balanced"
+keywords: ["CHLOM P-02", "Governance and Compliance", "policy packs", "eligibility", "approvals", "dS-CaaS", "audit"]
+---
+
+# P-02 Governance & Compliance Pallet
+
+## Canonical record
+
+```yaml
+pallet_id: P-02
+canonical_name: Governance & Compliance
+namespace: current_capability_pallet
+source_priority: Foundation
+source_components:
+  - CHLOM Core
+  - CIE
+  - policy packs
+  - eligibility
+  - approvals
+  - dS-CaaS events
+  - audit
+current_status: reconstructed_source_grounded
+production_status: not_implied_by_documentation
+public_projection: public_safe
+restricted_companion_required: true
+```
+
+## Purpose
+
+P-02 is the current CHLOM capability container that turns institutional rules into **versioned, explainable, reviewable decisions**. It binds governance authority, policy applicability, eligibility, approvals, compliance evidence, audit, holds, denials, corrections and escalation without allowing automation to manufacture authority.
+
+```text
+SOURCE AUTHORITY
+      |
+      v
+POLICY / GOVERNANCE RECORD
+      |
+      v
+APPLICABILITY + ELIGIBILITY
+      |
+      v
+EVIDENCE SUFFICIENCY
+      |
+      v
+DECISION
+ PASS | HOLD | DENY
+      |
+      v
+ACTION / ESCALATION
+      |
+      v
+DAIL + AUDIT + CORRECTION
+```
+
+## Six Functions mapping
+
+| Function | P-02 responsibility |
+| --- | --- |
+| Rights | Prevent actions that lack required rights or eligibility |
+| Rules | Canonical policy, rule, approval and governance execution |
+| Roles | Resolve decision makers, reviewers, councils and delegated approvers |
+| Revenue | Gate economic activation against policy and authority |
+| Records | Policies, decisions, approvals, audits, exceptions, holds and corrections |
+| Remedies | Review, appeal, override, compensation, suspension and restoration paths |
+
+## Source-component interpretation
+
+### CHLOM Core
+
+CHLOM Core is the shared governance/compliance operating spine represented inside P-02. It includes the logic required to apply CHLOM's Six Functions consistently across pallets without forcing each platform to reimplement policy, authority and evidence behavior independently.
+
+### CIE
+
+The Cultural Imprint Engine is included where cultural-imprint decisions, brand/corridor rules, partner/operator boundaries and imprint-specific approvals require CHLOM-governed policy and evidence. CIE does not become synonymous with all CHLOM governance.
+
+### Policy packs
+
+Policy packs are versioned bundles of rules, tests, evidence requirements and decision outcomes. They may be jurisdictional, contractual, institutional, product-specific or corridor-specific.
+
+### Eligibility
+
+Eligibility is a computed/adjudicated result based on current criteria and evidence. It is not a permanent property of a person or organization.
+
+### Approvals
+
+Approvals are explicit authority-bearing decisions with scope, effective period and evidence.
+
+### dS-CaaS events
+
+P-02 may expose or consume dS-CaaS governance/compliance events. The exact expansion/relationship of dS-CaaS remains governed by source/ADR lineage where contradictory; this pallet treats it functionally as a current governance/runtime service label rather than rewriting historical acronym meaning.
+
+### Audit
+
+Audit is an evidence and assurance process. Audit PASS does not automatically create legal certification or professional opinion.
+
+## Governance object model
+
+```text
+POLICY SOURCE
+    |
+    +--> institutional policy
+    +--> founder adjudication
+    +--> adopted ADR / standard
+    +--> contract / rights condition
+    +--> jurisdiction/professional rule when verified
+    |
+    v
+VERSIONED POLICY OBJECT
+    |
+    +--> applicability
+    +--> tests
+    +--> required evidence
+    +--> decision logic
+    +--> remedies
+```
+
+## Core objects
+
+### Policy record
+
+```yaml
+policy_id: stable ID
+name: canonical name
+version: semantic/versioned identifier
+source_authority_ref: required
+scope: institutional|corridor|pallet|tenant|asset|event
+status: draft|adopted|effective|superseded|retired
+effective_from: timestamp
+effective_until: nullable
+precedence: integer or explicit relation
+conflict_behavior: HOLD|DENY|escalate
+```
+
+### Eligibility record
+
+```yaml
+eligibility_id: stable ID
+subject_ref: identity/organization/object
+purpose: requested activity
+policy_refs: []
+evidence_refs: []
+result: PASS|HOLD|DENY
+reason_codes: []
+calculated_at: timestamp
+valid_until: nullable
+```
+
+### Approval record
+
+```yaml
+approval_id: stable ID
+decision_maker_ref: actor/role
+scope: explicit action/object
+policy_refs: []
+prior_state_ref: optional
+result: approved|held|denied|revoked|expired
+effective_from: timestamp
+expires_at: nullable
+evidence_refs: []
+```
+
+### Audit record
+
+```yaml
+audit_id: stable ID
+subject_ref: pallet/platform/process/object
+scope: explicit
+criteria_refs: []
+evidence_refs: []
+findings: []
+outcome: PASS|PASS_WITH_FINDINGS|HOLD|FAIL
+performed_at: timestamp
+reviewer_refs: []
+```
+
+## Three-valued decision algebra
+
+CHLOM deliberately treats unknown/unresolved state differently from explicit denial.
+
+```text
+PASS = requirements satisfied and action authorized
+HOLD = insufficient, stale, conflicting, unresolved or pending evidence/authority
+DENY = explicit prohibition or failed requirement under current policy
+```
+
+### Combination rule
+
+A safe default for multiple mandatory gates is:
+
+```text
+if any mandatory gate == DENY:
+    result = DENY
+else if any mandatory gate == HOLD:
+    result = HOLD
+else:
+    result = PASS
+```
+
+This public-safe abstraction does not expose protected policy weighting or fraud thresholds.
+
+## Policy stacking
+
+```text
+Institutional Constitution / Founder-Adjudicated Rule
+                    |
+                    v
+Cross-Ecosystem / Corridor Rule
+                    |
+                    v
+Pallet Rule
+                    |
+                    v
+Tenant / Platform Rule
+                    |
+                    v
+Asset / Event / Transaction Rule
+```
+
+A lower layer can narrow permissions but cannot silently expand authority beyond an upper layer.
+
+## Policy conflict behavior
+
+Conflicts are first-class states.
+
+```text
+POLICY A says PASS
+POLICY B says DENY
+        |
+        v
+CONFLICT DETECTED
+        |
+        +--> deterministic precedence available? -- yes --> apply + record
+        |
+        +--> no --> HOLD + adjudication queue
+```
+
+No silent last-write-wins rule is allowed for material governance.
+
+## Founder adjudication
+
+Founder adjudication is an explicit current governance capability where reserved authority applies. It is recorded as a dated decision and propagates through affected policies/articles/machine records while retaining prior lineage.
+
+```text
+source conflict
+     |
+     v
+publish source-grounded state
+     |
+     v
+founder adjudication
+     |
+     v
+new current meaning
+     |
+     +--> supersession links
+     +--> policy updates
+     +--> docs updates
+     +--> DAIL correction
+```
+
+Founder adjudication is not a mechanism for silently erasing historical source meaning.
+
+## Approval lifecycle
+
+```text
+REQUESTED
+   |
+   v
+EVIDENCE_INTAKE
+   |
+   v
+POLICY_EVALUATION
+   |
+   +--> DENIED
+   +--> HOLD / NEEDS_REVIEW
+   +--> APPROVED
+             |
+             v
+        EFFECTIVE
+             |
+     +-------+-------+
+     |               |
+  EXPIRED         REVOKED
+```
+
+## Governance proposal lifecycle
+
+Where formal governance proposals apply:
+
+```text
+DRAFT
+  |
+SUBMITTED
+  |
+VALIDATED
+  |
+REVIEW / DELIBERATION
+  |
+VOTE / DECISION
+  |
+TIMelock if required
+  |
+ENACTED / REJECTED / HELD
+  |
+READBACK + DAIL
+```
+
+Historical DAO/token voting designs remain historical unless separately activated. Current governance can implement the same lifecycle through human/organizational authority, workflow approvals or future adapters.
+
+## Compliance Pack binding
+
+P-02 is the primary current pallet for Compliance Pack governance.
+
+A pack should identify:
+
+- pack ID/version;
+- authority/source;
+- jurisdiction/sector/scope;
+- applicability conditions;
+- required evidence;
+- deterministic rules;
+- human-review triggers;
+- prohibited actions;
+- expiry/deprecation;
+- test vectors;
+- correction/supersession lineage.
+
+## Policy compiler boundary
+
+A policy compiler may convert human-readable policy into executable representations.
+
+```text
+SOURCE POLICY
+     |
+     v
+NORMALIZE / PARSE
+     |
+     v
+MACHINE POLICY CANDIDATE
+     |
+     v
+VALIDATE AGAINST SOURCE
+     |
+     v
+AUTHORIZED VERSION
+     |
+     v
+EXECUTION
+```
+
+Compilation cannot alter legal/institutional meaning or self-authorize a changed interpretation.
+
+## AI boundary
+
+AI may:
+
+- classify evidence;
+- identify possible applicability;
+- detect anomalies;
+- draft policy mappings;
+- simulate impact;
+- recommend review;
+- summarize conflicts.
+
+AI may not, merely because it produced a score:
+
+- create authority;
+- grant protected rights;
+- make reserved professional decisions;
+- move money outside approved authority;
+- self-adopt a policy;
+- bypass a human-reserved D3 decision.
+
+```text
+AI OUTPUT
+   |
+   v
+EVIDENCE / RECOMMENDATION
+   |
+   v
+POLICY + AUTHORITY GATE
+   |
+   v
+DECISION
+```
+
+## CIE governance binding
+
+When a cultural imprint or operator relationship is under CIE governance, P-02 can provide:
+
+- identity/role eligibility;
+- brand/imprint rule versions;
+- license/rights preconditions;
+- approval evidence;
+- corridor restrictions;
+- public-representation rules;
+- dispute/override routing;
+- DAIL event requirements.
+
+CIE-specific rules remain scoped to CIE relationships and cannot become institution-wide simply by reuse.
+
+## dS-CaaS event contract
+
+Representative event families can include:
+
+```text
+ct.governance.policy.adopted.v1
+ct.governance.policy.superseded.v1
+ct.compliance.eligibility.evaluated.v1
+ct.compliance.decision.v1
+ct.approval.granted.v1
+ct.approval.revoked.v1
+ct.governance.proposal.submitted.v1
+ct.governance.proposal.decided.v1
+ct.audit.finding.created.v1
+ct.audit.remediation.closed.v1
+ct.override.executed.v1
+ct.policy.conflict.held.v1
+```
+
+Every event contains source/version/actor/authority/evidence lineage appropriate to the action.
+
+## Cross-pallet topology
+
+```text
+                    P-02
+          Governance & Compliance
+                    |
+   +--------+-------+--------+---------+
+   |        |                |         |
+  P-01     P-03             P-06      P-11
+Identity  Rights           Commerce  Economics
+   |        |                |         |
+   +--------+-------+--------+---------+
+                    |
+                 DAIL
+```
+
+P-02 is cross-cutting but does not replace the domain state owned by other pallets.
+
+## Integration classes
+
+- P-01 identity/roles/verification;
+- P-03 rights/license state;
+- P-10 institutional memory/evidence/runbooks;
+- policy registry;
+- audit/assurance tooling;
+- legal/professional review processes;
+- current provider adapters;
+- DAIL;
+- future runtime/chain governance adapters.
+
+## Audit model
+
+Audit evidence should be reproducible enough to explain:
+
+```text
+what was checked
+against which version
+using which evidence
+by whom / what
+under what authority
+with what outcome
+at what time
+and what remediation followed
+```
+
+## Override model
+
+Overrides are exceptional authority-bearing actions.
+
+An override requires:
+
+- explicit authority;
+- bounded scope;
+- reason/evidence;
+- prior state preservation;
+- effective time;
+- expiry or review point when appropriate;
+- rollback/compensation path;
+- DAIL receipt.
+
+```text
+POLICY BLOCK
+    |
+OVERRIDE REQUEST
+    |
+AUTHORITY VALID?
+  no -> DENY
+  yes
+    |
+SCOPE / SAFEGUARDS VALID?
+  no -> HOLD/DENY
+  yes
+    |
+EXECUTE OVERRIDE
+    |
+DAIL + REVIEW
+```
+
+An override does not rewrite the original policy result.
+
+## Operating procedures
+
+### Policy adoption
+
+1. identify source authority;
+2. record exact source/version;
+3. classify scope;
+4. decompose requirements;
+5. author machine representation;
+6. validate against source;
+7. run tests/simulation;
+8. obtain adoption authority;
+9. set effective period;
+10. publish public/restricted projections;
+11. emit DAIL lineage.
+
+### Policy update
+
+Updates create a new version; prior versions remain tied to historical decisions.
+
+### Emergency hold
+
+A material uncertainty can trigger HOLD without pretending the underlying rule is DENY.
+
+### Audit remediation
+
+Findings become tracked remediation objects with owners, due conditions and closure evidence.
+
+### Appeal/review
+
+Review creates a new decision path; it does not destructively edit the original decision.
+
+## Failure modes
+
+### Conflicting policy versions
+
+**Result:** HOLD until precedence/currentness is resolved.
+
+### Missing authority
+
+**Result:** HOLD or DENY; do not infer approval from prior behavior.
+
+### Stale external regulation evidence
+
+**Result:** fail closed for actions requiring current evidence; do not claim regulatory compliance from stale feeds.
+
+### AI model drift
+
+**Result:** model output can be downgraded/held without rewriting policy authority.
+
+### Provider says success, policy says no
+
+**Result:** provider action is evidence; institutional state remains unreconciled/held or compensated.
+
+### Audit scope ambiguity
+
+**Result:** audit cannot be represented as comprehensive certification beyond its defined scope.
+
+## Metrics
+
+Potential metrics after definitions are adopted:
+
+- policy-version freshness;
+- unresolved policy conflicts;
+- PASS/HOLD/DENY distribution;
+- average HOLD age;
+- approval turnaround by decision class;
+- audit finding age;
+- remediation closure rate;
+- override frequency;
+- override expiry/readback completeness;
+- policy test coverage;
+- evidence completeness;
+- provider/institution mismatch incidents.
+
+## Restricted companion
+
+The restricted twin may contain:
+
+- protected anti-abuse rules;
+- fraud/risk thresholds;
+- confidential legal analyses;
+- nonpublic governance deliberation evidence;
+- exploit-sensitive emergency procedures;
+- internal test/eval corpora;
+- private provider mappings;
+- model calibration and red-team results.
+
+Raw secrets remain in the approved secret store rather than the document.
+
+## Release gates
+
+```text
+[ ] policy source authority identified
+[ ] policy versioning tested
+[ ] precedence/conflict handling tested
+[ ] PASS/HOLD/DENY semantics deterministic
+[ ] approval authority mapped
+[ ] override controls tested
+[ ] AI recommendation boundary enforced
+[ ] audit scope wording verified
+[ ] DAIL evidence emitted/read back
+[ ] restricted/public projection reviewed
+[ ] rollback/correction propagation tested
+```
+
+## Invariants
+
+```text
+policy != authority
+AI score != violation
+eligibility != permanent entitlement
+approval != unlimited delegation
+audit PASS != legal certification
+provider success != institutional PASS
+override != erasure
+conflict != permission
+unknown authority != PASS
+green CI != production authorization
+historical DAO design != current DAO deployment
+```
+
+## Current implementation effect
+
+P-02 is a **Foundation** pallet in the July 2026 Technical Build Pack. The classification establishes sequencing priority and architecture responsibility. It does not by itself prove that every historical governance, DAO, AI, dS-CaaS or audit feature is live.
