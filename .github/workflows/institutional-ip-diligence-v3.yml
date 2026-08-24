@@ -1,0 +1,53 @@
+name: CrownThrive Institutional IP Diligence v3
+
+on:
+  pull_request:
+    paths:
+      - "institutional-ip/**"
+      - "standards/institutional-ip-diligence-and-commercial-proof.mdx"
+      - "scripts/validate_institutional_ip_diligence_v3.py"
+      - "supabase/migrations/20260822224500_institutional_ip_registry_and_integration_candidate.sql"
+      - "supabase/rollback/20260822224500_institutional_ip_registry_and_integration_candidate.rollback.sql"
+      - "developers/manifests/institutional-ip-navigation-patch.v2.json"
+      - "changelog/phase-2-99-institutional-ip-diligence-wiring-2026-08-22.mdx"
+      - ".github/workflows/institutional-ip-diligence-v3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: institutional-ip-diligence-v3-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with: {python-version: "3.12"}
+      - name: Compile
+        run: python -m compileall -q institutional-ip scripts
+      - name: Validate system and wiring
+        run: python scripts/validate_institutional_ip_diligence_v3.py
+      - name: Test public engines and gates
+        run: python -m unittest -v institutional-ip/test_master_ip_diligence.py
+      - name: Verify gate remains HOLD on current evidence
+        run: |
+          python institutional-ip/master_ip_diligence.py institutional-ip/master-ip-diligence-v3.bundle.json --gate > /tmp/gate.json || code=$?
+          test "${code:-0}" = "2"
+          grep -q '"status": "HOLD"' /tmp/gate.json
+      - name: Verify no OIDC or write authority
+        run: |
+          if grep -nE '^[[:space:]]+id-token:[[:space:]]+write([[:space:]]|$)|^[[:space:]]+(contents|pull-requests|packages|actions|security-events):[[:space:]]+write([[:space:]]|$)' .github/workflows/institutional-ip-diligence-v3.yml; then exit 1; fi
+      - name: Check whitespace and conflicts
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then exit 1; fi
+
+# OIDC, release signing, database migration and provider adapters require separate accepted workflows.
