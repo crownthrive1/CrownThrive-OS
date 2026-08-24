@@ -1,0 +1,140 @@
+{
+  "schema_version": "1.0.0",
+  "stable_id": "ct.manifest.website-surface-control.v1",
+  "as_of": "2026-08-20",
+  "program": {
+    "namespace": "institutional_build_phase",
+    "current_phase": 2,
+    "current_subphase": "2.99",
+    "phase_3_entry": "blocked_pending_phase_2_99_hard_exit"
+  },
+  "service": {
+    "service_id": "website_surface_control",
+    "stable_id": "ct.service.website-surface-control",
+    "agent_id": "ct.agent.website-surface-interaction",
+    "external_mutation_allowed": false,
+    "direct_mcp_deployment": "active_deployed_underlying_rpcs_verified_http_mcp_end_to_end_pending_authenticated_probe",
+    "central_mcp_federation": "registered_disabled_until_dispatch_certification",
+    "provider_write_adapter": "not_certified"
+  },
+  "private_tables": [
+    "integration_control.website_surfaces",
+    "integration_control.creative_asset_routes",
+    "integration_control.site_interaction_checks",
+    "integration_control.site_interaction_check_results",
+    "integration_control.site_update_queue"
+  ],
+  "security": {
+    "rls_required": true,
+    "policy": "service_role_only",
+    "ordinary_monitoring_submits_live_forms": false,
+    "ordinary_monitoring_retains_contact_payloads": false,
+    "operational_contact_implies_marketing_consent": false,
+    "security_advisor_lints_observed": 0
+  },
+  "direct_mcp": {
+    "function_slug": "website-surface-control",
+    "function_version": 1,
+    "protocol_version": "2026-07-28",
+    "verify_jwt": true,
+    "tools": [
+      {"name": "sites.surface.list", "risk_class": "D0", "side_effect": "read"},
+      {"name": "sites.interaction.check", "risk_class": "D0", "side_effect": "read_and_append_evidence"},
+      {"name": "sites.asset_routes.list", "risk_class": "D0", "side_effect": "read"},
+      {"name": "sites.update_queue.list", "risk_class": "D0", "side_effect": "read"},
+      {"name": "sites.update.plan", "risk_class": "D1", "side_effect": "internal_plan_only"}
+    ]
+  },
+  "central_registry_tools": [
+    {"name": "sites.surface.list", "enabled": false},
+    {"name": "sites.interaction.check", "enabled": false},
+    {"name": "sites.asset_routes.list", "enabled": false},
+    {"name": "sites.update_queue.list", "enabled": false},
+    {"name": "sites.update.plan", "enabled": false},
+    {"name": "sites.update.apply", "enabled": false, "risk_class": "D2", "requires_human_approval": true}
+  ],
+  "queue_classes": [
+    "website_surface_health",
+    "contact_interaction_drift",
+    "creative_asset_distribution",
+    "site_update_remediation",
+    "public_claim_namespace_drift"
+  ],
+  "surfaces": [
+    {
+      "surface_id": "ct.surface.crownthrive.production",
+      "platform_id": "ct.platform.crownthrive",
+      "canonical_url": "https://crownthrive.com",
+      "contact_url": "https://crownthrive.com/contact-us",
+      "provider_state": "unverified",
+      "update_mode": "plan_only",
+      "external_mutation_allowed": false
+    },
+    {
+      "surface_id": "ct.surface.kjv-visualized.production",
+      "platform_id": "ct.platform.kjv-sermon-toolkit",
+      "canonical_url": "https://kjvsermontoolkit.crownthrive.com",
+      "provider": "Sites",
+      "provider_project_ref": "appgprj_6a7a0322f3b08191b964bc65aeeebb26",
+      "provider_version_ref": "48",
+      "rollback_revision": "aa0e1b659f7a20452aa84f163b71cdfc59b48ada",
+      "deployment_sha256": "633479e20d257d3c0a98f14387a52828394897289dcfc609e0dd8f32f2863b0e",
+      "provider_state": "documented",
+      "external_mutation_allowed": false
+    }
+  ],
+  "creative_routes": [
+    {
+      "route_id": "ct.asset-route.crownthrive.figma-global",
+      "source_system": "Figma",
+      "source_asset_ref": "So4C4ltkiKn786ikT7rwAP",
+      "role": "design_contract",
+      "auto_sync_allowed": false
+    },
+    {
+      "route_id": "ct.asset-route.crownthrive.canva-brand-kit",
+      "source_system": "Canva",
+      "source_asset_ref": "kAGI40OPjnM",
+      "role": "downstream_creative_production",
+      "auto_sync_allowed": false
+    },
+    {
+      "route_id": "ct.asset-route.crownthrive.canva-dark-brand-kit",
+      "source_system": "Canva",
+      "source_asset_ref": "kAGSbAK_NWw",
+      "role": "downstream_creative_production",
+      "auto_sync_allowed": false
+    }
+  ],
+  "first_check_evidence": [
+    {"check_id": "ct.check.crownthrive.home-contact-route", "result": "pass", "http_status": 200},
+    {"check_id": "ct.check.kjv.contact-route", "result": "pass", "http_status": 200},
+    {"check_id": "ct.check.crownthrive.contact-form", "result": "d1_remediation_candidate", "http_status": 200, "form_present": true, "contact_email_text_present": true, "mailto_detected": false}
+  ],
+  "scheduled_jobs": [
+    {"job": "crownthrive_site_interaction_checks_daily", "schedule": "12 5 * * *", "external_mutation": false},
+    {"job": "crownthrive_site_update_planner_daily", "schedule": "17 5 * * *", "external_mutation": false}
+  ],
+  "phase_inheritance": {
+    "2.99": "register surfaces, creative routes, interaction definitions, evidence, queues, direct MCP, federation state and write gates",
+    "3": "make schemas executable and certify a bounded provider adapter before provider-side autonomy",
+    "4": "federate identity, entitlement, support, consent, analytics and design patterns by website cohort",
+    "5": "measure contact/CTA conversion, reliability, accessibility, asset reuse and remediation latency",
+    "6": "license certified site/design templates and APIs under rights/developer controls",
+    "7": "extend interaction contracts to phygital surfaces",
+    "8": "govern provider custody, project inventory, asset ownership, exports and continuity",
+    "9": "activate advanced provenance/interoperability only for validated need",
+    "10": "preserve mappings, interactions, creative lineage, exports, agents and restore procedures"
+  },
+  "absolute_no_go": [
+    "rendered_site_equals_write_integration",
+    "registered_mcp_tool_equals_central_dispatch_certification",
+    "ordinary_health_check_submits_real_customer_form",
+    "operational_contact_equals_marketing_consent",
+    "unregistered_figma_or_canva_asset_auto_published",
+    "unverified_design_token_promoted_by_site_automation",
+    "claim_or_phase_rewritten_without_namespace_evidence",
+    "provider_write_without_rollback_and_read_after_write",
+    "agent_self_approves_consequential_site_mutation"
+  ]
+}

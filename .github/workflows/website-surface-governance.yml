@@ -1,0 +1,66 @@
+name: Website Surface Governance
+
+on:
+  pull_request:
+    paths:
+      - 'technology/web-surface-contact-interaction-automation.mdx'
+      - 'automation/website-surface-interaction-agent.mdx'
+      - 'standards/website-surface-automation-phase-amendment.mdx'
+      - 'changelog/phase-2-99-website-surface-sites-contact-automation.mdx'
+      - 'developers/manifests/website-surface-control.v1.json'
+      - 'scripts/validate_website_surface_control.py'
+      - '.github/workflows/website-surface-governance.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'technology/web-surface-contact-interaction-automation.mdx'
+      - 'automation/website-surface-interaction-agent.mdx'
+      - 'standards/website-surface-automation-phase-amendment.mdx'
+      - 'changelog/phase-2-99-website-surface-sites-contact-automation.mdx'
+      - 'developers/manifests/website-surface-control.v1.json'
+      - 'scripts/validate_website_surface_control.py'
+      - '.github/workflows/website-surface-governance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  website-surface-governance:
+    name: Validate website surface control
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Compile website surface validator
+        run: python -m py_compile scripts/validate_website_surface_control.py
+
+      - name: Validate website surface governance
+        run: python scripts/validate_website_surface_control.py
+
+      - name: Validate institutional documentation
+        run: python scripts/validate_docs.py
+
+      - name: Reject conflict markers in packet
+        shell: bash
+        run: |
+          if grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' \
+            technology/web-surface-contact-interaction-automation.mdx \
+            automation/website-surface-interaction-agent.mdx \
+            standards/website-surface-automation-phase-amendment.mdx \
+            changelog/phase-2-99-website-surface-sites-contact-automation.mdx \
+            developers/manifests/website-surface-control.v1.json \
+            scripts/validate_website_surface_control.py; then
+            echo 'Conflict markers detected.' >&2
+            exit 1
+          fi
