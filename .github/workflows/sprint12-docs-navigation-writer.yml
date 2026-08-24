@@ -1,9 +1,7 @@
 name: Sprint 12 Docs and Navigation Writer
 
 on:
-  push:
-    branches:
-      - docs-sprint-12-ai-collision-hygiene-cie-wave6-20260824
+  pull_request:
     paths:
       - 'scripts/reconcile_pre_wave6_navigation.py'
       - 'knowledge/documentation-substantive-rebuild-wave-6.mdx'
@@ -15,10 +13,13 @@ permissions:
 
 jobs:
   materialize:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'docs-sprint-12-ai-collision-hygiene-cie-wave6-20260824'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Check out exact PR head branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
@@ -115,4 +116,4 @@ sprint_12_wave_6_wave_sha256: c4389ff5f19674813e0a89734a9aa6b65b7e6ecba2e4b37102
           git config user.name 'crownthrive-documentation-bot'
           git config user.email '109931778+mintlify[bot]@users.noreply.github.com'
           git commit -m 'Materialize Sprint 12 Wave 6 docs and navigation projections'
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
