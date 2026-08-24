@@ -1,0 +1,51 @@
+name: CHLOM Fingerprint ID Foundation
+
+on:
+  pull_request:
+    paths:
+      - "developers/manifests/chlom-fingerprint-id-foundation.v1.json"
+      - "scripts/chlom_fingerprint_registry.py"
+      - "scripts/validate_chlom_fingerprint_id_foundation.py"
+      - "chlom/fingerprint-id-did-trust-backbone.mdx"
+      - "changelog/phase-2-99-chlom-fingerprint-id-foundation.mdx"
+      - ".github/workflows/chlom-fingerprint-id-foundation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "developers/manifests/chlom-fingerprint-id-foundation.v1.json"
+      - "scripts/chlom_fingerprint_registry.py"
+      - "scripts/validate_chlom_fingerprint_id_foundation.py"
+      - "chlom/fingerprint-id-did-trust-backbone.mdx"
+      - "changelog/phase-2-99-chlom-fingerprint-id-foundation.mdx"
+      - ".github/workflows/chlom-fingerprint-id-foundation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Fingerprint ID foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile validators
+        run: |
+          python -m py_compile scripts/chlom_fingerprint_registry.py
+          python -m py_compile scripts/validate_chlom_fingerprint_id_foundation.py
+      - name: Validate manifest
+        run: python scripts/validate_chlom_fingerprint_id_foundation.py
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
