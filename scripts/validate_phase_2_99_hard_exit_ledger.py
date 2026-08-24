@@ -24,7 +24,6 @@ EXPECTED_COUNTS = {
     "phase_2_7_platform_framework_rows": 74,
 }
 ARTICLE_OPEN_FIELDS = (
-    "complete_machine_manifest_generated_in_repo",
     "terminal_disposition_assigned_795",
     "section_and_category_mapping_795",
     "exposure_classified_795",
@@ -77,7 +76,7 @@ def require_nonnegative_int(value, label: str) -> None:
 
 
 def validate(data: dict, root: Path, check_files: bool = True) -> None:
-    require_equal(data.get("manifest_version"), "1.2.2", "manifest version")
+    require_equal(data.get("manifest_version"), "1.2.3", "manifest version")
     require_equal(data.get("observation_semantics"), "verification_baseline_snapshot_not_dynamic_post_merge_assertion", "observation semantics")
     require_timestamp(data.get("observed_at"), "observed_at")
 
@@ -121,12 +120,13 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
     require_equal(article.get("source_inventory_verified"), True, "article inventory verified")
     require_equal(article.get("stable_seed_schema_defined"), True, "article seed")
     require_equal(article.get("generator_in_repo"), True, "article generator")
+    require_equal(article.get("complete_machine_manifest_generated_in_repo"), True, "article machine materialization")
     for key in ARTICLE_OPEN_FIELDS:
         require_equal(article.get(key), False, f"articleization.{key}")
     require_equal(article.get("hard_exit_certified"), False, "article hard exit")
-    candidate = article.get("noncanonical_candidate", {})
-    require_equal(candidate.get("pr"), 91, "article candidate PR")
-    require_equal(candidate.get("state"), "deterministic_795_title_hierarchy_manifest_candidate_only", "article candidate state")
+    require_equal(article.get("noncanonical_candidate"), False, "article candidate supersession")
+    require_equal(article.get("machine_manifest_materialization_state"), "merged_canonical_via_pr_91", "article materialization state")
+    require_equal(article.get("machine_manifest_merge_commit"), "8fcb68bf209e32ba2cd265e1b6ca730cb8da64d7", "article materialization merge")
 
     reconciliation = data.get("reconciliation", {})
     require_equal(reconciliation.get("retroactive_phase_2_0_through_2_9_lane"), "active_until_hard_exit", "retroactive lane")
@@ -260,7 +260,7 @@ def validate(data: dict, root: Path, check_files: bool = True) -> None:
         fail("PR #62 five-phase snapshot must remain superseded lineage")
 
     article_text = (root / article["evidence_path"]).read_text(encoding="utf-8")
-    for fragment in ("source_inventory_count: 795", "complete_machine_manifest_generated_in_repo: pending", "P0_P1_disposition_completion: pending"):
+    for fragment in ("source_inventory_count: 795", "complete_machine_manifest_generated_in_repo: complete_merged_pr_91", "P0_P1_disposition_completion: pending"):
         if fragment not in article_text:
             fail(f"article evidence missing: {fragment!r}")
 

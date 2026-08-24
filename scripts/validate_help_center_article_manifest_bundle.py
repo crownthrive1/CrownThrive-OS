@@ -206,8 +206,11 @@ def validate_manifest(descriptor: dict[str, Any], manifest: dict[str, Any]) -> N
     if len(sections) != source.get("top_level_section_count"):
         fail("top-level section count drifted")
 
-    if descriptor.get("publication_state") != "machine_manifest_materialized_candidate_not_canonical_until_merge":
-        fail("publication state must remain candidate until governed merge")
+    if descriptor.get("publication_state") != "machine_manifest_materialized_canonical_via_pr_91":
+        fail("machine materialization must remain bound to the governed PR #91 merge")
+    materialization = descriptor.get("materialization", {})
+    if materialization.get("state") != "merged_canonical" or materialization.get("pull_request") != 91:
+        fail("canonical materialization provenance drifted")
     if descriptor.get("terminal_disposition_state") != "incomplete":
         fail("terminal disposition may not be falsely promoted")
     if descriptor.get("p0_p1_reconstruction_state") != "incomplete":
@@ -234,9 +237,10 @@ def main() -> int:
         output.write_bytes(raw)
         print(f"Validated compact JSON materialized at {output}")
 
-    print("Help Center 795 compact machine-manifest bundle validation: PASS")
+    print("Help Center 795 canonical machine-manifest bundle validation: PASS")
     print("Recovered records: 795; stable article identities derivable: 795; section census: 9 sections.")
     print("Source authority: S11; original article bodies remain unrecovered unless separately proven.")
+    print("Machine materialization: CANONICAL via governed PR #91 merge.")
     print("Terminal disposition: INCOMPLETE; P0/P1 substantive reconstruction: INCOMPLETE.")
     print("Important: bundle PASS != Phase 2.99 Workstream 0 completion or hard-exit PASS.")
     return 0
