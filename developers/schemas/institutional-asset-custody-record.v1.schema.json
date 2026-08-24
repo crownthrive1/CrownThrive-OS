@@ -1,0 +1,639 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:crownthrive:schema:institutional-asset-custody-record:v1",
+  "title": "CrownThrive Institutional Asset Custody Record v1",
+  "description": "Public-safe logical contract for stable asset identity, source and version lineage, custody evidence, independent rights/commerce/release states, corrections, and next-run continuity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "asset_id",
+    "asset_kind",
+    "canonical_name",
+    "owner_ref",
+    "visibility",
+    "lifecycle_state",
+    "implementation_state",
+    "evidence_state",
+    "custody_state",
+    "rights_state",
+    "commerce_state",
+    "release_state",
+    "source_records",
+    "versions",
+    "custody_bindings",
+    "observed_at",
+    "docs_impact"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^ct\\.memory\\.asset\\.[a-z0-9][a-z0-9._-]*$"
+    },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^ct\\.[a-z0-9][a-z0-9._-]*$"
+    },
+    "asset_kind": {
+      "enum": [
+        "editable_source_master",
+        "audio_master",
+        "video_master",
+        "image_master",
+        "design_source",
+        "dataset_source",
+        "code_source",
+        "model_or_prompt_source",
+        "policy_or_schema_source",
+        "distribution_file",
+        "preview_or_derivative",
+        "accessibility_derivative",
+        "product_component",
+        "edition",
+        "fulfillment_bundle",
+        "institutional_report",
+        "evidence_packet",
+        "migration_source",
+        "registry_export",
+        "recovery_artifact",
+        "other_governed"
+      ]
+    },
+    "canonical_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "owner_ref": {
+      "type": "string",
+      "pattern": "^ct\\.[a-z0-9][a-z0-9._-]*$"
+    },
+    "visibility": {
+      "enum": [
+        "public",
+        "community",
+        "internal",
+        "restricted",
+        "strategic",
+        "machine_only"
+      ]
+    },
+    "lifecycle_state": {
+      "enum": [
+        "candidate",
+        "active",
+        "held",
+        "retired",
+        "archived",
+        "superseded",
+        "unknown"
+      ]
+    },
+    "implementation_state": {
+      "enum": [
+        "uninspected",
+        "source_only",
+        "prepared",
+        "controlled_test",
+        "production_limited",
+        "production",
+        "blocked",
+        "retired"
+      ]
+    },
+    "evidence_state": {
+      "enum": [
+        "uninspected",
+        "source_not_located",
+        "source_not_recovered",
+        "observed_unverified",
+        "verified",
+        "contradicted",
+        "blocked",
+        "deferred"
+      ]
+    },
+    "custody_state": {
+      "enum": [
+        "uninspected",
+        "source_located",
+        "drive_pending",
+        "drive_read_verified",
+        "thivebase_registry_pending",
+        "drive_and_registry_verified",
+        "binary_parity_pending",
+        "dual_verified",
+        "quarantined",
+        "blocked"
+      ]
+    },
+    "rights_state": {
+      "enum": [
+        "uninspected",
+        "pending_validation",
+        "cleared_for_registered_scope",
+        "restricted",
+        "disputed",
+        "blocked"
+      ]
+    },
+    "canon_state": {
+      "enum": [
+        "not_applicable",
+        "uninspected",
+        "candidate",
+        "accepted",
+        "alternate",
+        "disputed",
+        "blocked"
+      ],
+      "default": "uninspected"
+    },
+    "accessibility_state": {
+      "enum": [
+        "not_applicable",
+        "uninspected",
+        "needs_remediation",
+        "tested",
+        "certified_for_registered_profile",
+        "blocked"
+      ],
+      "default": "uninspected"
+    },
+    "commerce_state": {
+      "enum": [
+        "not_applicable",
+        "concept",
+        "candidate",
+        "packaged",
+        "rights_cleared",
+        "pricing_authorized",
+        "fulfillment_certified",
+        "checkout_staged",
+        "live",
+        "blocked"
+      ]
+    },
+    "entitlement_state": {
+      "enum": [
+        "not_applicable",
+        "uninspected",
+        "planned",
+        "configured",
+        "tested",
+        "production_verified",
+        "blocked"
+      ],
+      "default": "uninspected"
+    },
+    "release_state": {
+      "enum": [
+        "not_applicable",
+        "intake",
+        "qa",
+        "approved",
+        "published",
+        "blocked",
+        "archived"
+      ]
+    },
+    "source_records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/sourceRecord"
+      }
+    },
+    "versions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/versionRecord"
+      }
+    },
+    "custody_bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/custodyBinding"
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/relationship"
+      },
+      "default": []
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      },
+      "default": []
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unknownRecord"
+      },
+      "default": []
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "effective_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null
+    },
+    "supersedes_record_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^ct\\.memory\\.asset\\.[a-z0-9][a-z0-9._-]*$",
+      "default": null
+    },
+    "correction_reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 1000,
+      "default": null
+    },
+    "docs_impact": {
+      "enum": [
+        "docs_updated",
+        "docs_no_change",
+        "docs_delta_opened"
+      ]
+    },
+    "downstream_phase_effect": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^phase_[0-9]+([._-][0-9]+)*$"
+      },
+      "uniqueItems": true,
+      "default": []
+    }
+  },
+  "$defs": {
+    "sourceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "source_class",
+        "authority_rank",
+        "state",
+        "observed_at"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^ct\\.[a-z0-9][a-z0-9._-]*$"
+        },
+        "source_class": {
+          "enum": [
+            "adopted_authority",
+            "current_provider_evidence",
+            "current_approved_public_statement",
+            "historical_source",
+            "research_or_draft",
+            "founder_attestation",
+            "unknown"
+          ]
+        },
+        "authority_rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "state": {
+          "enum": [
+            "available",
+            "unavailable",
+            "partially_available",
+            "source_not_recovered",
+            "contradicted",
+            "blocked"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$",
+          "default": null
+        },
+        "public_reference": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional approved public reference only. Credential material, signed URLs, private Drive IDs, private Supabase coordinates, and other private provider locators are prohibited and rejected by the packet validator.",
+          "maxLength": 500,
+          "x-crownthrive-private-provider-locators": "prohibited",
+          "default": null
+        }
+      }
+    },
+    "versionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version_id",
+        "version_label",
+        "digest_state",
+        "media_type",
+        "source_master",
+        "distribution_file"
+      ],
+      "properties": {
+        "version_id": {
+          "type": "string",
+          "pattern": "^ct\\.version\\.[a-z0-9][a-z0-9._-]*$"
+        },
+        "version_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "digest_state": {
+          "enum": [
+            "verified",
+            "pending",
+            "unavailable",
+            "mismatch",
+            "blocked"
+          ]
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$",
+          "default": null
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "byte_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "default": null
+        },
+        "source_master": {
+          "type": "boolean"
+        },
+        "distribution_file": {
+          "type": "boolean"
+        },
+        "supersedes_version_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^ct\\.version\\.[a-z0-9][a-z0-9._-]*$",
+          "default": null
+        }
+      }
+    },
+    "custodyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "service_id",
+        "reference_class",
+        "verification_state",
+        "observed_at"
+      ],
+      "properties": {
+        "provider": {
+          "enum": [
+            "google_drive",
+            "thivebase_registry",
+            "supabase_storage",
+            "github",
+            "mintlify",
+            "other_governed"
+          ]
+        },
+        "service_id": {
+          "type": "string",
+          "pattern": "^ct\\.[a-z0-9][a-z0-9._-]*$"
+        },
+        "reference_class": {
+          "enum": [
+            "public_url",
+            "public_stable_id",
+            "private_reference_digest",
+            "restricted_reference",
+            "not_recorded"
+          ]
+        },
+        "reference_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$",
+          "default": null
+        },
+        "verification_state": {
+          "enum": [
+            "uninspected",
+            "pending",
+            "write_acknowledged_readback_pending",
+            "read_verified",
+            "digest_verified",
+            "mismatch",
+            "blocked"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^ct\\.[a-z0-9][a-z0-9._-]*$",
+          "default": null
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relationship_type",
+        "target_id",
+        "evidence_state"
+      ],
+      "properties": {
+        "relationship_type": {
+          "enum": [
+            "alias_of",
+            "version_of",
+            "source_for",
+            "distribution_of",
+            "derivative_of",
+            "duplicate_candidate_of",
+            "byte_identical_to",
+            "supersedes",
+            "predecessor_of",
+            "successor_of",
+            "component_of",
+            "fulfills"
+          ]
+        },
+        "target_id": {
+          "type": "string",
+          "pattern": "^ct\\.[a-z0-9][a-z0-9._-]*$"
+        },
+        "evidence_state": {
+          "enum": [
+            "proposed",
+            "verified",
+            "contradicted",
+            "blocked"
+          ]
+        },
+        "evidence_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^ct\\.[a-z0-9][a-z0-9._-]*$",
+          "default": null
+        }
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "evidence_class",
+        "state",
+        "observed_at"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^ct\\.[a-z0-9][a-z0-9._-]*$"
+        },
+        "evidence_class": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted_reference_only",
+            "provider_readback",
+            "digest",
+            "review",
+            "attestation"
+          ]
+        },
+        "state": {
+          "enum": [
+            "candidate",
+            "verified",
+            "expired",
+            "contradicted",
+            "blocked"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "default": null
+        }
+      }
+    },
+    "unknownRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "state",
+        "reason",
+        "owner_ref",
+        "reopen_trigger"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "state": {
+          "enum": [
+            "uninspected",
+            "source_not_located",
+            "source_not_recovered",
+            "blocked",
+            "deferred",
+            "owner_input_required",
+            "specialist_review_required"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "owner_ref": {
+          "type": "string",
+          "pattern": "^ct\\.[a-z0-9][a-z0-9._-]*$"
+        },
+        "reopen_trigger": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    }
+  }
+}

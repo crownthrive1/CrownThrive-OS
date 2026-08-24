@@ -1,0 +1,79 @@
+name: Institutional Memory and Asset Steward
+
+on:
+  pull_request:
+    paths:
+      - "developers/agent-templates/institutional-memory-asset-steward.agent.template.md"
+      - "developers/skill-templates/institutional-memory-asset-steward/SKILL.template.md"
+      - ".github/workflows/institutional-memory-asset-steward.yml"
+      - "automation/institutional-memory-asset-steward.mdx"
+      - "developers/manifests/institutional-memory-asset-steward.v1.json"
+      - "developers/schemas/institutional-asset-custody-record.v1.schema.json"
+      - "scripts/validate_institutional_memory_asset_steward.py"
+      - "changelog/phase-2-99-institutional-memory-asset-steward-seed.mdx"
+      - ".github/agents/**"
+      - "**/SKILL.md"
+  push:
+    branches:
+      - main
+    paths:
+      - "developers/agent-templates/institutional-memory-asset-steward.agent.template.md"
+      - "developers/skill-templates/institutional-memory-asset-steward/SKILL.template.md"
+      - ".github/workflows/institutional-memory-asset-steward.yml"
+      - "automation/institutional-memory-asset-steward.mdx"
+      - "developers/manifests/institutional-memory-asset-steward.v1.json"
+      - "developers/schemas/institutional-asset-custody-record.v1.schema.json"
+      - "scripts/validate_institutional_memory_asset_steward.py"
+      - "changelog/phase-2-99-institutional-memory-asset-steward-seed.mdx"
+      - ".github/agents/**"
+      - "**/SKILL.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: institutional-memory-asset-steward
+  cancel-in-progress: true
+
+jobs:
+  validate-steward:
+    name: Validate Institutional Memory and Asset Steward
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile steward validator
+        run: python -m py_compile scripts/validate_institutional_memory_asset_steward.py
+
+      - name: Run fail-closed steward self-test
+        run: python scripts/validate_institutional_memory_asset_steward.py --self-test
+
+      - name: Validate steward packet
+        run: python scripts/validate_institutional_memory_asset_steward.py
+
+      - name: Validate institutional documentation
+        run: python scripts/validate_docs.py
+
+      - name: Validate agent-sovereign governance
+        run: python scripts/validate_agent_sovereign_governance.py
+
+      - name: Validate GitHub Actions runtime policy
+        run: python scripts/validate_github_actions_runtime_policy.py
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
