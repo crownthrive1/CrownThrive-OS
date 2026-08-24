@@ -1,0 +1,84 @@
+---
+title: "CHLOM Managed Agent Wallet — Base USDC"
+description: "Production custody and execution contract for CrownThrive's server-managed CHLOM Agent Wallet on Base using native USDC, with Trust Wallet Agent Kit for multichain intelligence and routing."
+sidebarTitle: "Managed Agent Wallet"
+icon: "wallet"
+---
+
+# CHLOM Managed Agent Wallet — Base USDC
+
+CrownThrive now operates a managed institutional Agent Wallet bound to CHLOM Wallet and ThriveEvergreen.
+
+## Production identity
+
+- Runner: `ct.runner.chlom-agent-wallet.base-usdc.v1`
+- Public address: `0x7bc35BEab3bd346590fA6f68C218ccf249759Ab0`
+- Network: Base Mainnet
+- Chain ID: `8453`
+- Primary asset: native USDC on Base
+- Native USDC contract: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+- Money movement authority: `true`
+- Exact ECAC required: `true`
+- D3: human-reserved
+- Unattended value ceiling: `0`
+
+## Custody model
+
+The wallet is CrownThrive server-managed through ThriveBase Vault. The control plane generated a fresh EVM wallet inside the trusted runtime, encrypted it as an Ethereum V3 keystore, stored the encrypted keystore and its decryption secret under separate Vault aliases, and discarded the raw private key and mnemonic.
+
+Public-safe readback currently asserts:
+
+- wallet creation performed: true
+- durable runtime binding: true
+- encrypted private material vaulted: true
+- raw private key persisted: false
+- mnemonic persisted: false
+- private material returned: false
+
+No private wallet material is permitted in GitHub, Google Drive documentation, DAIL payloads, MCP responses, logs, public APIs, or ordinary model output.
+
+## Certification canaries
+
+The managed wallet passed:
+
+- Base `eth_chainId` readback for chain ID 8453;
+- native Base USDC contract-code readback;
+- no-value local message signature;
+- independent signature recovery to the bound public address;
+- Vault replay/idempotency: the second bootstrap reused the same encrypted wallet rather than creating another address.
+
+The Base public RPC is used only as a chain/contract canary because Base documents its public endpoint as rate-limited and not suitable as a production application RPC. Production broadcasts require a governed production-grade RPC/provider path or an independently certified execution provider.
+
+## Trust Wallet Agent Kit relationship
+
+Trust Wallet Agent Kit remains the preferred multichain intelligence, market-data, quote, route-construction and cross-chain provider. Its hosted HMAC plane is production active. The managed Agent Wallet is the signing/custody lane CrownThrive controls directly.
+
+A Trust Wallet quote or transaction build is provider evidence and never authorizes a transaction by itself.
+
+## Execution boundary
+
+`money_movement_authorized=true` means the production economic capability exists. It does not mean a transaction has occurred.
+
+For autonomous execution, the current unattended ceiling remains zero. A positive unattended transfer therefore remains blocked until a later governed policy explicitly raises that ceiling and passes exact ECAC, amount/asset/address allowlists, simulation, readback and incident/rollback controls.
+
+Human-approved WalletConnect and MetaMask Embedded Wallet flows remain separate user-sovereignty lanes.
+
+## Control endpoint
+
+`https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-agent-wallet-control`
+
+The public status response never returns the encrypted keystore, password, mnemonic, raw private key, signature material, or bootstrap secret.
+
+## Acceptance-state distinction
+
+The production commerce acceptance contract records authorization separately from execution. Immediately after wallet binding the machine state was:
+
+- snapshot: `AUTHORIZED_CONFIGURED_NOT_EXECUTED`
+- money movement authorized: true
+- executed money movements: 0
+- unattended ceiling: 0
+- candidate gate: HOLD
+- checkout state: HOLD
+- Agent Wallet: active
+
+This distinction is institutionalized in `developers/contracts/commerce-control-acceptance-addendum.v1.json` and an hourly append-only acceptance snapshot.

@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "ct.contract.commerce-control-acceptance-addendum.v1",
+  "environment": "production",
+  "purpose": "Preserve the distinction between configured production money-movement authority and an actually performed economic transaction.",
+  "canonical_status_function": "public.commerce_control_acceptance_status_v1()",
+  "snapshot_table": "integration_control.commerce_control_acceptance_snapshots_v1",
+  "snapshot_schedule": "47 * * * *",
+  "classification": {
+    "AUTHORIZED_CONFIGURED_NOT_EXECUTED": "money_movement_authorized=true and execution_count=0",
+    "EXECUTION_OBSERVED": "at least one independently recorded execution receipt exists",
+    "HOLD": "production capability is unavailable or a hard gate prevents authorization",
+    "DENY": "an explicit deny decision exists"
+  },
+  "required_projection": {
+    "money_movement_authorized": true,
+    "money_movement_execution_count": 0,
+    "max_unattended_value_minor": 0,
+    "candidate_decision": "HOLD",
+    "checkout_state": "HOLD",
+    "authority_vs_execution_distinction_preserved": true,
+    "authorized_configuration_is_not_performed_transaction": true
+  },
+  "agent_wallet": {
+    "runner_id": "ct.runner.chlom-agent-wallet.base-usdc.v1",
+    "public_address": "0x7bc35BEab3bd346590fA6f68C218ccf249759Ab0",
+    "primary_chain": "base",
+    "chain_id": 8453,
+    "primary_asset": "USDC",
+    "primary_asset_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "custody_model": "crownthrive_server_managed_encrypted_keystore",
+    "private_material_vaulted": true,
+    "raw_private_key_persisted": false,
+    "mnemonic_persisted": false,
+    "private_material_returned": false
+  },
+  "hard_rules": [
+    "Never infer a performed transaction from money_movement_authorized=true.",
+    "Never infer entitlement, rights, payout truth, settlement truth, or provider success as CrownThrive economic authority.",
+    "Agent Wallet unattended value remains zero until separately certified.",
+    "D3 remains human-reserved.",
+    "Private wallet material must never appear in source control, logs, docs, DAIL payloads, MCP responses, or public APIs."
+  ]
+}

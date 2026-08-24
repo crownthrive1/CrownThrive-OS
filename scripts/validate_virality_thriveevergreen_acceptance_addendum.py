@@ -13,6 +13,7 @@ import copy
 import hashlib
 import json
 import re
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -34,11 +35,18 @@ CANONICAL_CONTRACT = ROOT / "developers/contracts/thriveevergreen/production-fab
 POLICY_REDUCER_RUNTIME = ROOT / "developers/scripts/thriveevergreen/production-fabric-policy-reducer.v1.1.ts"
 POLICY_REDUCER_CONTRACT = ROOT / "developers/contracts/thriveevergreen/production-fabric-policy-reducer.contracts.v1.1.json"
 POLICY_REDUCER_TEST = ROOT / "developers/scripts/thriveevergreen/production-fabric-policy-reducer.v1.1.test.ts"
+MANAGED_WALLET_ACCEPTANCE_CONTRACT = ROOT / "developers/contracts/commerce-control-acceptance-addendum.v1.json"
+MANAGED_WALLET_DOCUMENTATION = ROOT / "commerce/chlom-managed-agent-wallet-base-usdc.mdx"
+MANAGED_WALLET_CERTIFICATION = ROOT / "developers/certification/chlom-managed-agent-wallet-and-acceptance-2026-08-24.mdx"
 FABRIC_SOURCE_HEAD = "402ae2e2f35536adf0cca1979594067c8f7ed7e6"
 SUPPORT_INITIAL_BASE_HEAD = "936acfc64990d9bad11c8a4ed1e6bef7ce81c283"
 SUPPORT_CIE_ASSURANCE_MAIN_HEAD = "8f9b9c715bea21221f5952c3853df51efc62387f"
 SUPPORT_ECONOMIC_CONTROL_FORWARD_MAIN_HEAD = "e05400a55158818ffc4b7c70eeaf68211726615a"
-SUPPORT_LATEST_MAIN_HEAD = "1cac8cdb0b8da58ad7a01efaa972d589beac581e"
+SUPPORT_AGENT_WALLET_PACKAGE_CERTIFICATION_HEAD = "1cac8cdb0b8da58ad7a01efaa972d589beac581e"
+SUPPORT_MANAGED_WALLET_CERTIFICATION_COMMIT = "8794b34ea5aa183b73bcb4960d21bd95c5d43b94"
+SUPPORT_LATEST_MAIN_HEAD = "2a0aacd7d326b6837b7ba1b85c4228550724d178"
+SUPPORT_MANAGED_WALLET_ACCEPTANCE_COMMIT = "de917a8a7f11541722cbf6d2da8166ff648962a4"
+SUPPORT_MANAGED_WALLET_DOCUMENTATION_COMMIT = "e54b54267e25427d54642860a9dcbaeb50ae7bc1"
 SUPPORT_COLLISION_HEAD = "58ef7524bae7d2dfcea6573db500c6becd4ef8ff"
 SUPPORT_INITIAL_CUSTODY_HEAD = "009aa96fddb363d1e16f06cd24eaea47f63b793c"
 SUPPORT_CORRECTION_HEAD = "8171982db8b024fef55bc671a3465fdc21f02f27"
@@ -549,7 +557,15 @@ def validate() -> dict[str, Any]:
     require(binding.get("support_initial_base_head") == SUPPORT_INITIAL_BASE_HEAD, "Support initial base drift")
     require(binding.get("support_cie_assurance_main_head") == SUPPORT_CIE_ASSURANCE_MAIN_HEAD, "Support CIE-assurance main head drift")
     require(binding.get("support_latest_main_head_reconciled") == SUPPORT_LATEST_MAIN_HEAD, "Support latest main drift")
-    require(binding.get("support_reconciled_main_delta_state") == "RECONCILED_CIE_ASSURANCE_DOCS_WAVE5_ECONOMIC_CONTROL_FORWARD_RECOVERY_AND_AGENT_WALLET_PACKAGE_NO_VM_ECONOMIC_EXECUTION", "Support current-main delta reconciliation drift")
+    require(binding.get("support_reconciled_main_delta_state") == "RECONCILED_CIE_ASSURANCE_DOCS_WAVE5_ECONOMIC_CONTROL_AGENT_WALLET_PACKAGE_MANAGED_WALLET_ACCEPTANCE_SNAPSHOT_AND_MINTLIFY_NAVIGATION_NO_VM_ECONOMIC_EXECUTION", "Support current-main delta reconciliation drift")
+    git_binding = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", SUPPORT_LATEST_MAIN_HEAD, "HEAD"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    require(git_binding.returncode == 0, "actual Git HEAD does not contain the reconciled Support main head")
     require(binding.get("support_collision_head_reconciled") == SUPPORT_COLLISION_HEAD, "Support collision head drift")
     require(binding.get("support_initial_custody_head_reconciled") == SUPPORT_INITIAL_CUSTODY_HEAD, "Support initial custody head drift")
     require(binding.get("support_correction_head_reconciled") == SUPPORT_CORRECTION_HEAD, "Support corrected custody head drift")
@@ -797,9 +813,11 @@ def validate() -> dict[str, Any]:
     require(planes.get("walletconnect", {}).get("unattended_value_ceiling_minor") == 0, "WalletConnect unattended ceiling drift")
     agent_wallet = planes.get("dedicated_agent_wallet", {})
     require(agent_wallet.get("unattended_value_ceiling_minor") == 0, "Agent Wallet unattended ceiling drift")
-    require(agent_wallet.get("state") == "PACKAGE_SOURCE_PRESENT_NOT_INSTALLABLE_AS_SHIPPED_EXECUTION_HOLD", "Agent Wallet package/current effect state drift")
-    require(agent_wallet.get("repository_source_head") == SUPPORT_LATEST_MAIN_HEAD and agent_wallet.get("repository_package_state") == "PACKAGE_SOURCE_PRESENT_NOT_INSTALLABLE_AS_SHIPPED_EXECUTION_HOLD", "Agent Wallet repository package lineage drift")
-    require(agent_wallet.get("package_source_commit") == "07679e290959b9f9023117f70526b2836c453bfc" and agent_wallet.get("contract_commit") == "29a3d82e70d5c57bcb9b2fab10af99162e7e6891" and agent_wallet.get("certification_claim_commit") == SUPPORT_LATEST_MAIN_HEAD, "Agent Wallet package/contract/certification split drift")
+    require(agent_wallet.get("state") == "PERSISTENT_TWAK_RUNNER_PACKAGE_UNBOUND_NOT_INSTALLABLE_HOLD" and agent_wallet.get("lane") == "FOUNDER_REQUIRED_PERSISTENT_TWAK", "persistent Agent Wallet package/current effect state drift")
+    require(agent_wallet.get("runner_id") == "ct.runner.chlom-agent-wallet.base-usdc.v1" and agent_wallet.get("runner_identity_collision_with_managed_lane") is True, "Agent Wallet runner-identity collision hidden")
+    require(agent_wallet.get("repository_source_head") == SUPPORT_LATEST_MAIN_HEAD and agent_wallet.get("repository_package_state") == "PERSISTENT_TWAK_RUNNER_PACKAGE_UNBOUND_NOT_INSTALLABLE_HOLD", "Agent Wallet repository package lineage drift")
+    require(agent_wallet.get("package_source_commit") == "07679e290959b9f9023117f70526b2836c453bfc" and agent_wallet.get("contract_commit") == "29a3d82e70d5c57bcb9b2fab10af99162e7e6891" and agent_wallet.get("certification_claim_commit") == SUPPORT_AGENT_WALLET_PACKAGE_CERTIFICATION_HEAD, "Agent Wallet package/contract/certification split drift")
+    require(agent_wallet.get("control_evidence_state") == "HISTORICAL_PRE_MANAGED_BINDING_SUPERSEDED_FOR_CURRENT_RUNTIME_FACTS", "historical persistent-runner control evidence was presented as current")
     require(agent_wallet.get("control_endpoint_state") == "PASS_HTTP_200" and agent_wallet.get("control_version") == "1.0.0", "Agent Wallet control readback drift")
     require(agent_wallet.get("runner_state") == "package_ready" and agent_wallet.get("address_state") == agent_wallet.get("health_state") == "pending", "Agent Wallet runtime gate state drift")
     require(agent_wallet.get("persistent_runner_bound") is False and agent_wallet.get("wallet_creation_performed") is False and agent_wallet.get("encrypted_wallet_created") is False and agent_wallet.get("signing_available") is False, "Agent Wallet capability manufactured")
@@ -813,12 +831,58 @@ def validate() -> dict[str, Any]:
         require(agent_wallet.get(field) is False, f"Agent Wallet fail-closed source defect hidden: {field}")
     require(agent_wallet.get("raw_twak_watch_enabled") is True and agent_wallet.get("hmac_secret_passed_in_process_argv") is True, "Agent Wallet raw watch/secret-argv risk hidden")
     require(agent_wallet.get("health_parse_error_canary") == "FAIL_EXIT_0_STATE_PASS_WITH_FIVE_PARSE_ERRORS", "Agent Wallet health fail-open canary hidden")
+
+    managed_wallet = planes.get("managed_vault_agent_wallet", {})
+    require(managed_wallet.get("state") == "ACTIVE_SIGNING_CAPABLE_POLICY_CUSTODY_RECONCILIATION_HOLD" and managed_wallet.get("lane") == "THRIVEBASE_VAULT_SERVER_MANAGED", "managed Agent Wallet evidence/acceptance state drift")
+    require(managed_wallet.get("runner_id") == agent_wallet.get("runner_id") and managed_wallet.get("same_runner_id_as_persistent_twak_package") is True, "same-runner custody collision hidden")
+    require(managed_wallet.get("satisfies_founder_required_persistent_runner_only_custody") is False, "managed Vault lane was misrepresented as founder-required persistent custody")
+    require(managed_wallet.get("main_delta_commits") == {
+        "acceptance_contract": SUPPORT_MANAGED_WALLET_ACCEPTANCE_COMMIT,
+        "managed_wallet_documentation": SUPPORT_MANAGED_WALLET_DOCUMENTATION_COMMIT,
+        "certification_claim": SUPPORT_MANAGED_WALLET_CERTIFICATION_COMMIT,
+    }, "managed-wallet main-delta lineage drift")
+    expected_managed_artifacts = [
+        str(MANAGED_WALLET_ACCEPTANCE_CONTRACT.relative_to(ROOT)),
+        str(MANAGED_WALLET_DOCUMENTATION.relative_to(ROOT)),
+        str(MANAGED_WALLET_CERTIFICATION.relative_to(ROOT)),
+    ]
+    require(managed_wallet.get("main_delta_artifacts") == expected_managed_artifacts, "managed-wallet artifact scope drift")
+    require(file_sha256(MANAGED_WALLET_ACCEPTANCE_CONTRACT) == "42a0fd90e1a9bf17850b9285fd104f17bcd2a62b084662f0bffca14cc05ff7b6", "managed-wallet acceptance contract digest drift")
+    require(file_sha256(MANAGED_WALLET_DOCUMENTATION) == "98fbe05c451f9fff7246378b644bfe60e07278bc5203a6fd49711b25a3cccfb1", "managed-wallet documentation digest drift")
+    require(file_sha256(MANAGED_WALLET_CERTIFICATION) == "17db3533c92db6e9dd0868b91e9c050a65f3a163ce2b3ded9a73d7bf1b6dd27f", "managed-wallet certification-claim digest drift")
+    managed_contract = read_json(MANAGED_WALLET_ACCEPTANCE_CONTRACT)
+    require(managed_contract.get("required_projection") == {
+        "money_movement_authorized": True,
+        "money_movement_execution_count": 0,
+        "max_unattended_value_minor": 0,
+        "candidate_decision": "HOLD",
+        "checkout_state": "HOLD",
+        "authority_vs_execution_distinction_preserved": True,
+        "authorized_configuration_is_not_performed_transaction": True,
+    }, "managed-wallet acceptance contract projection drift")
+    require(managed_wallet.get("control_endpoint_state") == "PASS_HTTP_200" and managed_wallet.get("control_version") == "1.1.0", "managed Agent Wallet control evidence drift")
+    require(managed_wallet.get("runner_state") == "active" and managed_wallet.get("health_state") == "pass" and managed_wallet.get("address_state") == "verified", "managed Agent Wallet current state drift")
+    require(managed_wallet.get("public_address") == "0x7bc35BEab3bd346590fA6f68C218ccf249759Ab0" and managed_wallet.get("chain_id") == 8453 and managed_wallet.get("primary_asset") == "USDC", "managed Agent Wallet public binding drift")
+    require(managed_wallet.get("twak_version") is None and managed_wallet.get("live_metadata_references_unmodified_defective_runner_paths") is True, "managed Agent Wallet source/provider-version gap hidden")
+    for field in ("durable_runner_bound", "wallet_creation_performed", "encrypted_wallet_created", "private_material_vaulted_reported", "separate_vault_aliases_reported", "signing_available_for_no_value_canary", "money_movement_authorized_configuration", "exact_ecac_required", "d3_human_reserved", "execution_effective_reported_by_control"):
+        require(managed_wallet.get(field) is True, f"managed Agent Wallet positive control evidence drift: {field}")
+    for field in ("raw_private_key_persisted", "mnemonic_persisted", "private_material_returned", "raw_secret_export", "vault_principal_separation_proven", "vault_rotation_recovery_readback_present", "execution_receipt_observed", "effective_positive_value_execution_authorized", "unattended_value_ceiling_independently_enforced", "repository_database_migration_source_present", "repository_edge_control_v1_1_source_present", "repository_rollback_receipt_present", "exact_per_intent_ecac_signing_wrapper_source_present", "independent_exact_ecac_signing_wrapper_certified", "production_broadcast_provider_certified", "custody_contract_version_supersession_present"):
+        require(managed_wallet.get(field) is False, f"managed Agent Wallet unproved authority/source/custody gate hidden: {field}")
+    require(managed_wallet.get("signature_canary_state") == "PASS_NO_VALUE" and managed_wallet.get("unauthorized_sign_negative_canary_state") == "NOT_RUN_HOLD", "managed signing canary boundary drift")
+    require(managed_wallet.get("money_movement_execution_count") == managed_wallet.get("unattended_value_ceiling_minor") == 0, "managed wallet execution/ceiling drift")
+    require(managed_wallet.get("candidate_decision") == managed_wallet.get("checkout_state") == "HOLD", "managed wallet candidate/checkout HOLD hidden")
+    require(managed_wallet.get("post_bind_effect_rows") == {"wallet_ledger_events": 0, "crown_credit_ledger": 0, "entitlements": 0, "wallet_rights_entitlements": 0, "checkout_intents": 0}, "managed wallet post-bind economic rows detected or hidden")
+    snapshot = managed_wallet.get("acceptance_snapshot", {})
+    require(snapshot.get("snapshot_id") == "517d9cdd-eee9-4645-bfe1-f9078636e157" and snapshot.get("state") == "AUTHORIZED_CONFIGURED_NOT_EXECUTED" and snapshot.get("evidence_sha256") == "fa406254e0ce007be20b021c55b43f3017105c6e72a47b666277373ed1c29348", "managed-wallet acceptance snapshot drift")
+    require(snapshot.get("authority_vs_execution_distinction_preserved") is True and snapshot.get("snapshot_is_independent_economic_authority") is False, "managed-wallet snapshot manufactured authority")
+    require(managed_wallet.get("independent_acceptance_state") == "HOLD_CUSTODY_IDENTITY_SOURCE_WRAPPER_AND_EXECUTION_GATES", "managed-wallet independent HOLD hidden")
+
     require(planes.get("trustwallet", {}).get("execution_authorized") is False, "Trust Wallet execution activated")
     trustwallet = planes.get("trustwallet", {})
     require(trustwallet.get("hosted_plane_state") == "ACTIVE_HOSTED_READ_QUOTE" and trustwallet.get("control_version") == "1.2.0", "Trust Wallet recovered control state drift")
     require(trustwallet.get("runtime_digest") == "324871d1b93525a833b253d9430a807d86645a0459921eae3096df0f2670b9b3" and trustwallet.get("control_http_state") == "PASS_200", "Trust Wallet runtime binding drift")
-    require(trustwallet.get("local_runner_state") == "OPERATIONAL_BINDING_ABSENT_SOURCE_PACKAGE_PRESENT_UNCERTIFIED", "Trust Wallet source/operational runner distinction drift")
-    require(trustwallet.get("hosted_signing") is False and trustwallet.get("hosted_broadcast") is False and trustwallet.get("execution_authorized") is False, "Trust Wallet signing/broadcast authority manufactured")
+    require(trustwallet.get("local_runner_state") == "PERSISTENT_TWAK_PENDING_MANAGED_VAULT_SIGNING_BOUND_SOURCE_UNCERTIFIED" and trustwallet.get("signing_state") == "MANAGED_VAULT_WALLET_BOUND_NO_VALUE_CANARY_PASS", "Trust Wallet persistent/managed signing distinction drift")
+    require(trustwallet.get("hosted_signing") is False and trustwallet.get("hosted_broadcast") is False and trustwallet.get("provider_execution_authorized") is False and trustwallet.get("crownthrive_economic_authority_bound") is False and trustwallet.get("execution_authorized") is False, "Trust Wallet signing/broadcast authority manufactured")
     require(planes.get("entitlement_and_fulfillment", {}).get("active_existing_entitlements") == 0, "active entitlement count drift")
 
     tools = acceptance.get("api_mcp_tool_states")
@@ -829,17 +893,28 @@ def validate() -> dict[str, Any]:
         "canonical_historical_active_count": 11,
         "canonical_historical_staged_count": 6,
         "canonical_historical_disabled_count": 41,
-        "live_registry_flag_counts": {"total": 59, "enabled": 12, "disabled": 47},
-        "live_registry_observed_at": "2026-08-24T08:05:44.091Z",
-        "live_added_since_canonical_historical_scope": {
-            "tool_name": "thriveevergreen.money_movement.status",
-            "service_id": "thriveevergreen",
-            "risk_class": "D0",
-            "enabled": True,
-            "requires_human_approval": False,
-            "created_at": "2026-08-24T07:52:37.817027Z",
-            "classification": "READ_STATUS_CONFIGURATION_PROJECTION_NOT_EXECUTION_AUTHORITY",
-        },
+        "live_registry_flag_counts": {"total": 60, "enabled": 13, "disabled": 47},
+        "live_registry_observed_at": "2026-08-24T08:33:37.304Z",
+        "live_added_since_canonical_historical_scope": [
+            {
+                "tool_name": "thriveevergreen.money_movement.status",
+                "service_id": "thriveevergreen",
+                "risk_class": "D0",
+                "enabled": True,
+                "requires_human_approval": False,
+                "created_at": "2026-08-24T07:52:37.817027Z",
+                "classification": "READ_STATUS_CONFIGURATION_PROJECTION_NOT_EXECUTION_AUTHORITY",
+            },
+            {
+                "tool_name": "chlom_wallet.agent_wallet.status",
+                "service_id": "chlom_wallet",
+                "risk_class": "D0",
+                "enabled": True,
+                "requires_human_approval": False,
+                "created_at": "2026-08-24T08:06:17.984922Z",
+                "classification": "READ_ONLY_MANAGED_WALLET_STATUS_NOT_SIGNING_OR_EXECUTION_AUTHORITY",
+            },
+        ],
         "staged_tools_are_registry_disabled": True,
         "enabled_registry_flag_is_execution_authority": False,
         "generalized_dispatch_state": "DISABLED_HOLD_EXACT_MUTATION_CONTRACT",
@@ -861,7 +936,30 @@ def validate() -> dict[str, Any]:
     require(automation.get("crown_credits_reconciliation") == "*/10 * * * *", "credit reconcile schedule drift")
     require(automation.get("stablecoin_effective_capability_reconciliation") == "17 */6 * * *", "stablecoin schedule drift")
     require(automation.get("legacy_observer") == "ct-thriveevergreen-hourly-product-cycle-v1 @ 58 * * * *", "legacy observer schedule identity drift")
+    acceptance_job = automation.get("commerce_acceptance_snapshot", {})
+    require(acceptance_job == {
+        "job_id": 143,
+        "job_name": "ct-commerce-control-acceptance-snapshot-v1",
+        "schedule": "47 * * * *",
+        "active": True,
+        "run_history": "NONE_OBSERVED",
+        "fabric_inventory_present": False,
+        "same_minute_existing_job_id": 48,
+        "same_minute_existing_job_name": "crownthrive-interoperability-hourly-subroute-v1",
+        "semantic_duplicate": False,
+        "economic_effect": False,
+    }, "commerce acceptance snapshot scheduler evidence drift")
+    require(automation.get("scheduler_topology_state") == "HOLD_OBSERVER_BUSINESS_RECEIPTS_FAILING_23514_AND_NEW_ACCEPTANCE_SNAPSHOT_ACTIVE_NO_RUN_HISTORY_NOT_IN_V1_FABRIC_INVENTORY", "scheduler topology HOLD hidden")
     receipts = acceptance.get("latest_receipts", {})
+    wallet_canaries = receipts.get("managed_agent_wallet_canaries", [])
+    require([item.get("receipt_type") for item in wallet_canaries] == ["wallet_initialized", "signature_canary", "base_chain_canary"], "managed-wallet canary receipt scope drift")
+    require([item.get("evidence_sha256") for item in wallet_canaries] == [
+        "64b80e4a6622853fb46ffdc444110cd6521587c7dc39c612e55726e73694e4e3",
+        "9600f63e59fcc429e12af45bfcb3fac804dd879ee0907db8f474aa409c203011",
+        "8c906a39f18c8cdd4001a8b7c7b3b9757a5c904f7e67d280d212831485b801b3",
+    ], "managed-wallet canary evidence digest drift")
+    acceptance_snapshot = receipts.get("commerce_acceptance_snapshot", {})
+    require(acceptance_snapshot.get("state") == "AUTHORIZED_CONFIGURED_NOT_EXECUTED" and acceptance_snapshot.get("money_movement_execution_count") == 0 and acceptance_snapshot.get("candidate_decision") == acceptance_snapshot.get("checkout_state") == "HOLD" and acceptance_snapshot.get("economic_authority") is False, "commerce acceptance snapshot manufactured execution or authority")
     observer = receipts.get("legacy_observer", {})
     require(observer.get("cron_scheduler_state") == "SUCCEEDED" and observer.get("business_run_state") == "FAILED" and observer.get("business_error_code") == "23514", "observer scheduler/business result distinction hidden")
     require(observer.get("publication_decision") == "HOLD_OBSERVER_ONLY" and observer.get("publication_count") == observer.get("observed_publication_count") == 0 and observer.get("effect_ceiling") == 0, "observer failure manufactured publication or effects")
@@ -902,7 +1000,10 @@ def validate() -> dict[str, Any]:
     require(edge_candidate.get("verification", {}).get("deno_runtime_check") == edge_summary.get("deno_runtime_check") == "NOT_RUN_DENO_BINARY_UNAVAILABLE_IN_WORKSPACE", "Deno runtime evidence manufactured")
     live = security.get("live_predeployment_canaries", {})
     require(str(live.get("missing_origin_checkout", "")).startswith("FAIL_"), "live missing-Origin defect was hidden")
-    require(security.get("supabase_security_advisors", {}).get("info_label_proves_safety") is False, "INFO label treated as safety proof")
+    security_advisors = security.get("supabase_security_advisors", {})
+    require(security_advisors == {"info_count": 6, "warning_count": 0, "error_count": 0, "new_managed_tables_rls_enabled_no_policy_info_count": 3, "info_label_proves_safety": False}, "Supabase security-advisor evidence drift or INFO treated as safety proof")
+    performance_advisors = security.get("supabase_performance_advisors", {})
+    require(performance_advisors == {"info_count": 621, "warning_count": 0, "error_count": 0, "new_managed_tables_unindexed_foreign_key_info_count": 3, "info_label_proves_safety": False}, "Supabase performance-advisor evidence drift or INFO treated as safety proof")
     matrix = security.get("acceptance_test_matrix")
     require(isinstance(matrix, dict), "missing acceptance test matrix")
     expected_matrix = {
@@ -919,23 +1020,63 @@ def validate() -> dict[str, Any]:
         "amount_mismatch": "PASS_LOCAL_HOLD",
         "currency_mismatch": "NOT_RUN_HOLD",
         "ecac_hold_deny_paths": "PASS_LOCAL_DETERMINISTIC",
-        "unauthorized_wallet_signing": "NOT_RUN_HOLD_NO_SIGNING_CAPABILITY",
-        "agent_wallet_zero_unattended_ceiling": "PASS_DECLARED_CONTROL_HOLD_EFFECTIVE_ENFORCEMENT_ABSENT",
-        "vault_or_secret_leakage": "PASS_NO_LITERAL_REPOSITORY_SECRET_HOLD_AGENT_WALLET_RUNTIME_CUSTODY_UNCERTIFIED",
-        "service_role_leakage": "PASS_NO_CLIENT_LEAKAGE_SERVICE_ROLE_RETAINS_PRIVILEGED_SERVER_DML",
-        "rls_and_actual_grants": "PASS_INSPECTED_ANON_AUTH_DENIED_SERVICE_ROLE_BYPASSES_RLS",
+        "unauthorized_wallet_signing": "POSITIVE_NO_VALUE_SIGNATURE_PASS_UNAUTHORIZED_SIGN_NEGATIVE_NOT_PROVEN_HOLD",
+        "agent_wallet_zero_unattended_ceiling": "PASS_DECLARED_CONTROL_AND_SNAPSHOT_HOLD_PERSISTENT_AND_MANAGED_ENFORCEMENT_NOT_INDEPENDENTLY_CERTIFIED",
+        "vault_or_secret_leakage": "PASS_NO_LITERAL_REPOSITORY_OR_PUBLIC_RESPONSE_SECRET_HOLD_MANAGED_VAULT_WRAPPER_ACL_SEPARATION_ROTATION_AND_RECOVERY_SOURCE_UNCERTIFIED",
+        "service_role_leakage": "PASS_NEW_MANAGED_TABLE_DIRECT_DML_DENIED_ALL_THREE_ROLES_EXISTING_PRIVILEGED_SERVER_DML_RETAINS_SEPARATE_HOLD",
+        "rls_and_actual_grants": "PASS_NEW_MANAGED_TABLES_RLS_ON_NO_POLICIES_DIRECT_DML_DENIED_ANON_AUTH_SERVICE_ROLE_INFO_NOT_SAFETY_PROOF",
         "provider_read_after_write": "ECONOMIC_PROVIDER_READ_AFTER_WRITE_NOT_RUN_HOLD_NON_ECONOMIC_EDGE_SOURCE_PASS_EXACT",
         "rollback_or_compensation": "HOLD_NON_ECONOMIC_EDGE_PRIOR_SOURCES_CAPTURED_NOT_EXECUTED_ECONOMIC_CANARY_NOT_RUN",
     }
     require(matrix == expected_matrix, "acceptance test matrix drift or hidden extra field")
+    managed_grants = security.get("actual_grants", {}).get("managed_wallet_tables", {})
+    require(managed_grants.get("tables") == [
+        "integration_control.agent_wallet_runner_bindings_v1",
+        "integration_control.agent_wallet_runner_receipts_v1",
+        "integration_control.commerce_control_acceptance_snapshots_v1",
+    ], "managed-wallet actual-grant table scope drift")
+    require(managed_grants.get("rls_enabled") is True and managed_grants.get("policy_count_each") == 0, "managed-wallet RLS/no-policy evidence hidden")
+    for field in ("anon_direct_select_insert_update_delete", "authenticated_direct_select_insert_update_delete", "service_role_direct_select_insert_update_delete"):
+        require(managed_grants.get(field) is False, f"managed-wallet direct table privilege unexpectedly granted: {field}")
+    managed_routines = security.get("actual_grants", {}).get("managed_wallet_routines", {})
+    require(managed_routines == {
+        "public_status_functions_anon_and_authenticated_execute": False,
+        "public_status_functions_service_role_execute": True,
+        "bootstrap_and_snapshot_mutators_anon_authenticated_service_role_execute": False,
+        "security_definer": True,
+        "search_path_pinned": True,
+    }, "managed-wallet routine privilege evidence drift")
 
     institutional = acceptance.get("institutionalization")
     require(isinstance(institutional, dict), "missing institutionalization state")
     dail = institutional.get("dail", {})
     require(str(dail.get("chain_anchor_state", "")).startswith("HOLD"), "DAIL anchor hold hidden")
-    require(dail.get("event_count") == 1469 and dail.get("latest_sequence") == 1757 and dail.get("head_hash") == "a494bfb48ecb59c014342db29ce2066bbb198fd67296d64dfd6510c0a2b972be", "DAIL point-in-time snapshot drift")
+    require(isinstance(dail.get("event_count"), int) and dail.get("event_count") >= 1486, "DAIL point-in-time event count predates managed-wallet evidence")
+    require(isinstance(dail.get("latest_sequence"), int) and dail.get("latest_sequence") >= 1774, "DAIL point-in-time sequence predates managed-wallet evidence")
+    require(isinstance(dail.get("head_hash"), str) and SHA256_RE.fullmatch(dail["head_hash"]) is not None, "DAIL point-in-time head hash malformed")
+    require(isinstance(dail.get("latest_payload_sha256"), str) and SHA256_RE.fullmatch(dail["latest_payload_sha256"]) is not None, "DAIL latest payload digest malformed")
     require(dail.get("historical_integrity_replay_through_sequence") == 1699 and dail.get("current_tail_full_integrity_replay_performed") is False, "DAIL current-tail replay gap hidden")
     require(dail.get("forward_reconciliation_receipt_sequences") == [1741, 1747, 1753] and dail.get("observer_business_failure_sequence") == 1755, "DAIL recovery/observer lineage drift")
+    require(dail.get("managed_wallet_receipts") == [
+        {
+            "sequence": 1767,
+            "event_type": "CHLOM_MANAGED_AGENT_WALLET_BOUND_V1",
+            "created_at": "2026-08-24T08:20:38.215251Z",
+            "payload_sha256": "e3f80f34115e326ae3287b4ecdd01be25cc5e9b61ff0cf18397b83c87aa5c7f2",
+            "event_hash": "b3d68d7d1f21bf22c1409a98cba6e95d34639f98f123f41c2797810220ed41ea",
+            "chain_anchor_state": "unanchored",
+            "signature_ref": None,
+        },
+        {
+            "sequence": 1768,
+            "event_type": "COMMERCE_CONTROL_ACCEPTANCE_SNAPSHOT_V1",
+            "created_at": "2026-08-24T08:20:38.219176Z",
+            "payload_sha256": "6e7d676f90db2e161c69f53c957dddcb6116097554f99e5cb2ca47f09ce7516b",
+            "event_hash": "3853fd678b2b38feebece3096eb5cd4d1a1ecefba522141f5ee95710d6abff14",
+            "chain_anchor_state": "unanchored",
+            "signature_ref": None,
+        },
+    ], "managed-wallet DAIL receipt binding drift")
     drive = institutional.get("drive", {})
     require(drive.get("canonical_integration_record_upload_state") == "VERIFIED_PRIVATE_READ_AFTER_WRITE", "canonical Drive custody not verified")
     require(drive.get("acceptance_addendum_upload_state") == "GITHUB_REVIEW_BRANCH_PENDING_OPTIONAL_PRIVATE_CUSTODY", "addendum custody scope hidden")
@@ -965,6 +1106,7 @@ def validate() -> dict[str, Any]:
     require(github.get("pre_acceptance_parent_collision_rtc_state") == "FAIL_CLOSED" and github.get("pre_acceptance_parent_collision_rtc_blocker") == "COLLISION_RTC_GLOBAL_OPEN_PR_317_EXCEEDS_500_FILE_BOUND", "collision RTC blocker hidden")
     require(github.get("pre_acceptance_parent_candidate_contract_collision_tests") == "PASS", "candidate-contract collision tests hidden")
     require(github.get("pre_acceptance_parent_github_advanced_security_state") == "FAIL_UNRESOLVED", "Advanced Security failure hidden")
+    require(github.get("prior_published_acceptance_head") == "58cbce036fdb4c95405694a5fa82fec9acc472e0" and github.get("prior_published_acceptance_head_workflow_runs") == github.get("prior_published_acceptance_head_workflow_successes") == 5, "prior published acceptance workflow readback drift")
     require(github.get("merge_state") == "NOT_MERGED_REVIEW_REQUIRED", "unsafe merge state")
     require(github.get("main_branch_protected") is False, "GitHub protection evidence drift")
 
@@ -990,6 +1132,14 @@ def validate() -> dict[str, Any]:
         "AGENT_WALLET_HEALTH_LEAST_DATA_PARSE_FAIL_CLOSED_AND_NO_VALUE_SIGNING_CANARY",
         "AGENT_WALLET_INSTALLER_PINNING_SECRET_ARGV_KEYCHAIN_AND_RECOVERY_FILE_CUSTODY",
         "AGENT_WALLET_SENSITIVE_CREATE_OUTPUT_TRAP_AND_CUSTODY",
+        "AGENT_WALLET_CUSTODY_IDENTITY_COLLISION_PERSISTENT_RUNNER_ONLY_VS_THRIVEBASE_VAULT_SERVER_MANAGED",
+        "MANAGED_AGENT_WALLET_DATABASE_MIGRATION_SOURCE_ABSENT_FROM_CURRENT_MAIN_DELTA",
+        "MANAGED_AGENT_WALLET_CONTROL_V1_1_EDGE_SOURCE_AND_ROLLBACK_RECEIPT_ABSENT",
+        "MANAGED_AGENT_WALLET_EXACT_ECAC_SIGNING_WRAPPER_NOT_INDEPENDENTLY_CERTIFIED",
+        "MANAGED_AGENT_WALLET_UNAUTHORIZED_SIGN_NEGATIVE_CANARY_NOT_PROVEN",
+        "MANAGED_AGENT_WALLET_PRODUCTION_BROADCAST_PROVIDER_READ_AFTER_WRITE_AND_COMPENSATION_NOT_CERTIFIED",
+        "MANAGED_AGENT_WALLET_VAULT_PRINCIPAL_SEPARATION_ROTATION_AND_RECOVERY_READBACK_NOT_PROVEN",
+        "NEW_ACCEPTANCE_SNAPSHOT_SCHEDULE_ACTIVE_NO_RUN_HISTORY_AND_NOT_IN_FABRIC_INVENTORY",
         "LEGACY_OBSERVER_BUSINESS_RECEIPTS_FAIL_23514_DESPITE_PG_CRON_SUCCESS",
         "DAIL_CURRENT_TAIL_FULL_INTEGRITY_REPLAY",
         "DAIL_CHAIN_ANCHORING",
