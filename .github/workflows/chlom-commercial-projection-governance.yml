@@ -1,0 +1,178 @@
+name: CHLOM Commercial Projection Governance
+
+on:
+  pull_request:
+    paths:
+      - 'commercial/chlom-protocol/**'
+      - 'developers/manifests/chlom-protocol-commercial-projection.v1.json'
+      - 'developers/contracts/chlom-commercial-projection.contract.v1.json'
+      - 'frameworks/chlom-commercial-projection-factory.mdx'
+      - 'scripts/validate_chlom_commercial_projection.py'
+      - '.github/workflows/chlom-commercial-projection-governance.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'commercial/chlom-protocol/**'
+      - 'developers/manifests/chlom-protocol-commercial-projection.v1.json'
+      - 'developers/contracts/chlom-commercial-projection.contract.v1.json'
+      - 'frameworks/chlom-commercial-projection-factory.mdx'
+      - 'scripts/validate_chlom_commercial_projection.py'
+      - '.github/workflows/chlom-commercial-projection-governance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-commercial-projection-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-build:
+    name: Validate and build public-safe CHLOM commercial overlay
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out canonical parent
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Validate commercial projection contract
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/validate_chlom_commercial_projection.py
+          python scripts/validate_chlom_commercial_projection.py
+
+      - name: Materialize exact parent snapshot
+        run: |
+          set -euo pipefail
+          python scripts/validate_chlom_commercial_projection.py --write --check-dist
+
+      - name: Repository hygiene
+        run: |
+          set -euo pipefail
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- .; then
+            echo 'merge-conflict marker detected'
+            exit 1
+          fi
+
+      - name: Emit deterministic projection receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '## CHLOM commercial projection receipt' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat dist/chlom-protocol/.crownthrive/upstream.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Managed files:' >> "$GITHUB_STEP_SUMMARY"
+          find dist/chlom-protocol -type f -print | sort >> "$GITHUB_STEP_SUMMARY"
+
+  project-to-public-child:
+    name: Open governed child projection pull request
+    needs: validate-and-build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out canonical parent
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Resolve bounded cross-repository authority
+        id: auth
+        env:
+          CHILD_TOKEN: ${{ secrets.CHLOM_PUBLIC_REPO_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CHILD_TOKEN:-}" ]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'PUBLISH_HOLD_NO_CHLOM_PUBLIC_REPO_TOKEN'
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Materialize projection
+        if: steps.auth.outputs.ready == 'true'
+        run: python scripts/validate_chlom_commercial_projection.py --write --check-dist
+
+      - name: Create exact-snapshot child candidate PR
+        if: steps.auth.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CHLOM_PUBLIC_REPO_TOKEN }}
+          PARENT_SHA: ${{ github.sha }}
+          CHILD_REPO: crownthrive/chlom-protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          gh repo clone "$CHILD_REPO" "$work/child" -- --depth=1
+          cp -a dist/chlom-protocol/. "$work/child/"
+          cd "$work/child"
+
+          branch="automation/chlom-commercial-${PARENT_SHA:0:12}"
+          git config user.name "crownthrive-chlom-factory"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+
+          git add -- \
+            README.md \
+            COMMERCIAL-LICENSE.md \
+            docs/COMMERCIAL.md \
+            docs/architecture/REPOSITORY_BOUNDARIES.md \
+            docs/architecture/COMMERCIAL_PROJECTION.md \
+            docs/architecture/DAIL_PUBLIC_CONTRACT.md \
+            .crownthrive/upstream.json
+
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No managed projection changes; child already matches parent.'
+            exit 0
+          fi
+
+          staged="$(git diff --cached --name-only | sort)"
+          expected="$(printf '%s\n' \
+            .crownthrive/upstream.json \
+            COMMERCIAL-LICENSE.md \
+            README.md \
+            docs/COMMERCIAL.md \
+            docs/architecture/COMMERCIAL_PROJECTION.md \
+            docs/architecture/DAIL_PUBLIC_CONTRACT.md \
+            docs/architecture/REPOSITORY_BOUNDARIES.md | sort)"
+          unexpected="$(comm -23 <(printf '%s\n' "$staged") <(printf '%s\n' "$expected"))"
+          if [ -n "$unexpected" ]; then
+            echo 'staged child paths escaped the governed managed-path allowlist'
+            printf 'unexpected:\n%s\nstaged:\n%s\nexpected allowlist:\n%s\n' "$unexpected" "$staged" "$expected"
+            exit 1
+          fi
+
+          git commit -m "chlom: project CrownThrive commercial surface"
+          git push origin "HEAD:$branch"
+
+          existing="$(gh pr list --repo "$CHILD_REPO" --head "$branch" --base main --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            gh pr create \
+              --repo "$CHILD_REPO" \
+              --base main \
+              --head "$branch" \
+              --title "AUTO — CHLOM commercial projection from CrownThrive parent" \
+              --body "Governed public-safe CHLOM commercial overlay from parent commit \`$PARENT_SHA\`. The candidate is allowlist-only and carries exact upstream provenance. It designates \`crownthrive/chlom-protocol\` as the public commercial child, canonicalizes DAIL = Decentralized Autonomous Information Ledger and DLA = Dynamic Licensing Asset, and does not assert live checkout, token, mainnet, public API, entitlement or price. This PR requires child-side validation before merge."
+          fi
