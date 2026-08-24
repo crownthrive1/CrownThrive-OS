@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -9,30 +10,60 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave3 as wave3
 
+EXPECTED_P0 = 449
+EXPECTED_WAVE1 = 16
+EXPECTED_WAVE2 = 19
+EXPECTED_WAVE3 = 17
+EXPECTED_CUMULATIVE = 52
+EXPECTED_REMAINING = 397
+EXPECTED_WAVE_SHA = "e7b5c56af1a698d3466259fafc2a8fbceee76220d1befe2cd1be96a6c123fe12"
+EXPECTED_VAULT_SHA = "2948eeb882d0d5e4bd3f7db439e27853cb7a8575e1af7512ce303ea29c8a8da6"
+EXPECTED_STATE_COUNTS = {
+    "evidence_audit_reconciliation": 6,
+    "identity_trust_reconciliation": 11,
+}
+EXPECTED_ANCHOR_COUNTS = {
+    "/chlom/evidence-audit-reconciliation-contract": 6,
+    "/chlom/identity-trust-reconciliation-contract": 11,
+}
+
+
+def load_json(rel: str):
+    return json.loads((ROOT / rel).read_text(encoding="utf-8"))
+
+
 result = wave3.build()
 policy = result["policy"]
 errors: list[str] = []
 
 if result["source_universe_count"] != 795:
     errors.append("source universe must remain exactly 795")
-if result["p0_candidate_count"] != 449:
-    errors.append(f"expected 449 P0 candidates, found {result['p0_candidate_count']}")
-if result["wave_1_selected_count"] != 16:
-    errors.append(f"expected 16 Wave 1 selected records, found {result['wave_1_selected_count']}")
-if result["wave_2_selected_count"] != 19:
-    errors.append(f"expected 19 Wave 2 selected records, found {result['wave_2_selected_count']}")
-if result["prior_wave_selected_count"] != 35:
-    errors.append(f"expected 35 prior-wave selected records, found {result['prior_wave_selected_count']}")
+if result["p0_candidate_count"] != EXPECTED_P0:
+    errors.append(f"expected {EXPECTED_P0} P0 candidates, found {result['p0_candidate_count']}")
+if result["wave_1_selected_count"] != EXPECTED_WAVE1:
+    errors.append(f"expected {EXPECTED_WAVE1} Wave 1 selected records, found {result['wave_1_selected_count']}")
+if result["wave_2_selected_count"] != EXPECTED_WAVE2:
+    errors.append(f"expected {EXPECTED_WAVE2} Wave 2 selected records, found {result['wave_2_selected_count']}")
+if result["prior_wave_selected_count"] != EXPECTED_WAVE1 + EXPECTED_WAVE2:
+    errors.append("prior-wave selected count drift")
+if result["selected_count"] != EXPECTED_WAVE3:
+    errors.append(f"expected stable Wave 3 selection of {EXPECTED_WAVE3}, found {result['selected_count']}")
 if result["prior_wave_overlap_count"] != 0:
     errors.append("Wave 3 may not overlap prior waves")
-if result["selected_count"] <= 0:
-    errors.append("Wave 3 must select a nonzero bounded cohort")
 if result["selected_count"] + result["held_count"] != 795:
     errors.append("selected + held must equal 795")
-if result["cumulative_machine_qualified_p0_count"] != 35 + result["selected_count"]:
-    errors.append("cumulative P0 qualified count mismatch")
-if result["p0_outside_waves_1_2_3_count"] != 449 - result["cumulative_machine_qualified_p0_count"]:
-    errors.append("remaining P0 count mismatch")
+if result["cumulative_machine_qualified_p0_count"] != EXPECTED_CUMULATIVE:
+    errors.append("cumulative P0 qualified count drift")
+if result["p0_outside_waves_1_2_3_count"] != EXPECTED_REMAINING:
+    errors.append("remaining P0 count drift")
+if result["selected_state_counts"] != EXPECTED_STATE_COUNTS:
+    errors.append(f"Wave 3 state-count drift: {result['selected_state_counts']}")
+if result["selected_anchor_counts"] != EXPECTED_ANCHOR_COUNTS:
+    errors.append(f"Wave 3 anchor-count drift: {result['selected_anchor_counts']}")
+if result["selected_section_counts"] != {"CHLOM": EXPECTED_WAVE3}:
+    errors.append(f"Wave 3 section-count drift: {result['selected_section_counts']}")
+if result["wave_sha256"] != EXPECTED_WAVE_SHA:
+    errors.append(f"Wave 3 digest drift: {result['wave_sha256']}")
 
 allowed_states = set(policy["allowed_state_families"])
 anchor_map = dict(policy["state_anchor_routes"])
@@ -89,6 +120,85 @@ if result["guardrails"]["phase_11_20_state"] != "reserved_definition_required":
 if result["guardrails"]["canonical_brand"] != "CrownThrive":
     errors.append("canonical brand drift")
 
+pass_a = load_json("data/documentation/sprint-9-pass-a-receipt.v1.json")
+gap = load_json("data/documentation/substantive-rebuild-wave-3-gap-closure.v1.json")
+pass_b = load_json("data/documentation/sprint-9-pass-b-receipt.v1.json")
+package = load_json("frameworks/documentation-reconciliation-continuity/sprint-9-substantive-wave3-package.v1.json")
+
+for label, obj in [("pass_a", pass_a), ("gap", gap), ("pass_b", pass_b), ("package", package)]:
+    if obj.get("wave_sha256") != EXPECTED_WAVE_SHA:
+        errors.append(f"{label} Wave 3 digest mismatch")
+
+if pass_a.get("wave_3_selected_count") != EXPECTED_WAVE3:
+    errors.append("Pass A Wave 3 selected count mismatch")
+if pass_a.get("selected_state_counts") != EXPECTED_STATE_COUNTS:
+    errors.append("Pass A state-count mismatch")
+if gap.get("machine_qualified_current_successor_count") != EXPECTED_WAVE3:
+    errors.append("gap-closure Wave 3 selected count mismatch")
+if gap.get("cumulative_machine_qualified_p0_count") != EXPECTED_CUMULATIVE:
+    errors.append("gap-closure cumulative count mismatch")
+if gap.get("p0_outside_waves_1_2_3_count") != EXPECTED_REMAINING:
+    errors.append("gap-closure remaining count mismatch")
+if pass_b.get("wave_3_machine_qualified") != EXPECTED_WAVE3:
+    errors.append("Pass B Wave 3 selected count mismatch")
+if pass_b.get("cumulative_machine_qualified_p0_count") != EXPECTED_CUMULATIVE:
+    errors.append("Pass B cumulative count mismatch")
+if pass_b.get("p0_outside_waves_1_2_3_count") != EXPECTED_REMAINING:
+    errors.append("Pass B remaining count mismatch")
+if pass_b.get("selected_state_counts") != EXPECTED_STATE_COUNTS:
+    errors.append("Pass B state-count mismatch")
+if pass_b.get("selected_anchor_counts") != EXPECTED_ANCHOR_COUNTS:
+    errors.append("Pass B anchor-count mismatch")
+if pass_b.get("vault_closure_sha256") != EXPECTED_VAULT_SHA:
+    errors.append("Pass B Vault closure digest mismatch")
+if package.get("wave_3_selected_count") != EXPECTED_WAVE3:
+    errors.append("package Wave 3 selected count mismatch")
+if package.get("cumulative_machine_qualified_p0_count") != EXPECTED_CUMULATIVE:
+    errors.append("package cumulative count mismatch")
+if package.get("p0_outside_waves_1_2_3_count") != EXPECTED_REMAINING:
+    errors.append("package remaining count mismatch")
+if package.get("selected_state_counts") != EXPECTED_STATE_COUNTS:
+    errors.append("package state-count mismatch")
+if package.get("selected_anchor_counts") != EXPECTED_ANCHOR_COUNTS:
+    errors.append("package anchor-count mismatch")
+if package.get("vault", {}).get("binding_state") != "vault_bound":
+    errors.append("Sprint 9 package is not Vault-bound")
+if package.get("vault", {}).get("closure_sha256") != EXPECTED_VAULT_SHA:
+    errors.append("Sprint 9 package Vault closure digest mismatch")
+if package.get("authority", {}).get("parent_certification_state") != "pending":
+    errors.append("parent certification state must remain pending")
+if package.get("authority", {}).get("operationally_enabled") is not False:
+    errors.append("package may not be operationally enabled")
+if package.get("authority", {}).get("public_activation_allowed") is not False:
+    errors.append("package may not allow public activation")
+
+public_page = (ROOT / "knowledge/documentation-substantive-rebuild-wave-3.mdx").read_text(encoding="utf-8")
+changelog = (ROOT / "changelog/docs-substantive-rebuild-sprint-9-wave-3-2026-08-23.mdx").read_text(encoding="utf-8")
+gap_register = (ROOT / "knowledge/documentation-gap-article-rebuild-register.mdx").read_text(encoding="utf-8")
+
+for required in [
+    "449",
+    "17",
+    "52",
+    "397",
+    EXPECTED_WAVE_SHA,
+    "substantive_current_successor_machine_verified_parent_review",
+    "/chlom/identity-trust-reconciliation-contract",
+    "/chlom/evidence-audit-reconciliation-contract",
+]:
+    if required not in public_page:
+        errors.append(f"public Wave 3 register missing required marker: {required}")
+for required in [EXPECTED_WAVE_SHA, EXPECTED_VAULT_SHA, "parent_certification_required: true"]:
+    if required not in changelog:
+        errors.append(f"Sprint 9 changelog missing required marker: {required}")
+for required in [
+    "cumulative_machine_qualified_p0: 52",
+    "p0_outside_waves_1_2_3: 397",
+    "/knowledge/documentation-substantive-rebuild-wave-3",
+]:
+    if required not in gap_register:
+        errors.append(f"gap register missing Sprint 9 marker: {required}")
+
 if errors:
     print("FAIL_SPRINT_9_SUBSTANTIVE_WAVE3")
     for error in errors:
@@ -106,6 +216,7 @@ print("selected_section_counts=" + str(result["selected_section_counts"]))
 print("selected_state_counts=" + str(result["selected_state_counts"]))
 print("selected_anchor_counts=" + str(result["selected_anchor_counts"]))
 print("wave_sha256=" + result["wave_sha256"])
+print("vault_closure_sha256=" + EXPECTED_VAULT_SHA)
 print("terminal_disposition_accepted=false")
 print("parent_certification_required=true")
 print("phase_3_entry=blocked_pending_phase_2_99_hard_exit")
