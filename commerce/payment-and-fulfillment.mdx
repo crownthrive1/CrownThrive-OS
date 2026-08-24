@@ -8,7 +8,7 @@ keywords: ["Stripe webhook", "entitlements", "protected downloads", "refunds", "
 
 # Payment and fulfillment
 
-CrownThrive first-party digital commerce follows a verified-entitlement model.
+CrownThrive first-party digital commerce follows a verified-entitlement model. The diagram below describes direct Stripe checkout where that profile is enabled; Virality Music uses the credit-only profile documented below.
 
 ```mermaid
 flowchart LR
@@ -22,9 +22,17 @@ flowchart LR
     D --> A[Audit, support, refund, and dispute state]
 ```
 
+## Virality Music credit-only profile
+
+Virality Music catalog purchases accept Virality Credits only. Stripe funds credit topups but does not directly authorize catalog fulfillment.
+
+A catalog redemption must resolve the approved SKU and credit price, atomically debit the internal ledger, create the order and entitlement, and preserve reversal evidence. A refund restores or locks the applicable credit buckets and revokes access according to policy.
+
+Private custody and active delivery are separate controls. Google Drive masters must remain private and cannot become storefront delivery objects until exact parity, server-side identity, entitlement, and readback gates pass.
+
 ## Source of truth
 
-The signed payment webhook is the authoritative event for fulfillment.
+For direct Stripe commerce, the signed payment webhook is authoritative for payment state. For Virality Music topups, the signed webhook is authoritative only for credit funding; the atomic ledger debit and server-created order and entitlement authorize catalog fulfillment.
 
 The following are not sufficient proof of payment:
 
@@ -43,8 +51,8 @@ The server resolves:
 
 - product
 - active version
-- Stripe Product and Price
-- amount and currency
+- approved tender mapping: credit price, or Stripe Product and Price for direct-payment profiles
+- amount, currency, or credit quantity as applicable
 - rights class
 - delivery method
 - download allowance
@@ -158,6 +166,8 @@ A credits redemption should still produce:
 Scheduled or operator-driven reconciliation should compare:
 
 - Stripe payment state
+- Stripe topup state and internal credit posting
+- credit debits or reversals and their corresponding orders and entitlements
 - CrownThrive order state
 - entitlement state
 - fulfillment state

@@ -1,0 +1,76 @@
+---
+title: "Virality Music Credit-Only Storefront Checkpoint"
+sidebarTitle: "Virality Credit-Only"
+description: "Public-safe checkpoint for Virality Music's internal-credit catalog, Stripe-funded topups, private master custody, and remaining activation holds."
+icon: "coins"
+---
+
+# Virality Music Credit-Only Storefront Checkpoint
+
+**Checkpoint date:** August 20, 2026  
+**Storefront:** [vm.crownthrive.com](https://vm.crownthrive.com)  
+**Status:** production checkpoint deployed from the verified artifact as Sites version 220; Drive fulfillment remains held pending exact parity and private service identity
+
+## Commerce decision
+
+Virality Music catalog purchases use internal **Virality Credits** as their only storefront tender.
+
+Stripe remains the external funding rail for credit topups. A signed Stripe topup event can fund the member ledger, but it does not directly authorize a catalog entitlement. Catalog fulfillment requires a server-resolved SKU and credit price, an atomic ledger debit, an order, and the corresponding entitlement and license record.
+
+Direct Stripe product checkout is retired from the Virality Music catalog-purchase path. Historical payment records and separately governed creator, subscription, or marketplace flows remain preserved.
+
+## Verified credit workflow
+
+The source-controlled integration suite exercised the lifecycle with a synthetic member in an ephemeral D1 test database and stubbed Stripe fixtures:
+
+1. create a $50 topup checkout for 200 purchased credits and 20 promotional credits;
+2. process signed completion and replay events idempotently;
+3. post a 220-credit balance once;
+4. redeem 24 credits for SKU `VM-BR-001`;
+5. use the promotional bucket before the purchased bucket;
+6. create the order, entitlement, and signed personal-license record;
+7. reconcile partial and remainder topup refunds without double posting.
+
+The test passed without charging a live payment method or granting credits to a live person. A live customer grant requires an exact verified recipient and authenticated operator approval.
+
+## Master custody and delivery boundary
+
+The current private Google Drive custody revision contains **236 locally available masters** totaling **147,316,774 source bytes**. The export is split into two book volumes and one printables/templates volume, with a manifest, exact checksums, parity report, integrity tests, and a final custody receipt.
+
+All uploaded custody files were read back as owner-only and not shared. Public Drive links are prohibited.
+
+Google Drive is not yet the active storefront delivery plane. The protected delivery registry contains **144 R2-only exact assets** totaling **424,676,170 bytes** that do not yet have local byte-for-byte matches in the Drive export. Entitlement-gated R2 delivery therefore remains active while Drive-hosted fulfillment stays on **HOLD**.
+
+Drive delivery requires all of the following before activation:
+
+- exact export and checksum parity for every protected object;
+- a private server-side OAuth or service-account identity;
+- entitlement-gated file resolution;
+- download, refund, dispute, and revocation tests;
+- permission and readback verification without public sharing.
+
+## THIVEBASE boundary
+
+Supabase/THIVEBASE remains a separate, fail-closed institutional lane. Its credit program is inactive, legal/tax review is pending, and the connected schema does not currently expose an authenticated customer credit route.
+
+Synthetic ledger evidence is test evidence only. It does not authorize production activation, a customer grant, or a change of transaction authority. Any later promotion requires an isolated development branch, Stripe test mode, a purpose-built synthetic Auth user, access-policy review, reconciliation, and governed production acceptance.
+
+## Rights routing
+
+Broader commercial rights route canonically through [CHLOM](https://vm.crownthrive.com/chlom-licensing). The legacy `/gso-licensing` and `/licensing-sync` URLs remain permanent compatibility redirects.
+
+A credit catalog purchase grants only the rights attached to its recorded entitlement. It does not imply adaptation, resale, synchronization, training-data, master-use, manufacturing, or other broader rights.
+
+## Security and governance boundary
+
+Public documentation and GitHub history must not contain:
+
+- API keys or provider credentials;
+- webhook or signing secrets;
+- private Drive IDs or storage object keys;
+- signed delivery URLs;
+- customer records;
+- raw entitlement or ledger data;
+- production authentication material.
+
+Credentials remain runtime-only. Documentation changes remain reviewable until collision checks, automated checks, and the applicable governance approval complete.
