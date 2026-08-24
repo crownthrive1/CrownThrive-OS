@@ -1,0 +1,202 @@
+---
+title: "Trust Wallet Agent Kit Production Runner"
+description: "Production contract for Trust Wallet Agent Kit hosted intelligence, local MCP/CLI wallet operations, holdings, signing, and CHLOM Wallet integration."
+sidebarTitle: "Trust Wallet Agent Kit"
+icon: "wallet"
+keywords: ["Trust Wallet Agent Kit", "TWAK", "CHLOM Wallet", "WalletConnect", "Agent Wallet", "portfolio", "holdings", "swap"]
+---
+
+# Trust Wallet Agent Kit production runner
+
+Trust Wallet Agent Kit is integrated into CrownThrive as two related but distinct execution planes:
+
+1. a **production hosted HMAC gateway** for market and routing intelligence; and
+2. a **persistent local TWAK CLI/MCP runner** for wallet holdings, portfolio, signing, and autonomous Agent Wallet execution.
+
+The hosted plane is active. The local wallet plane is staged until a durable runner and wallet path are bound.
+
+## Current state
+
+| Capability | State | Boundary |
+| --- | --- | --- |
+| API credentials | **VERIFIED / vaulted** | Values are private and never returned by public CrownThrive APIs or docs. |
+| Live price query | **PASS / production** | Hosted HMAC API. |
+| Trending/market data | **ACTIVE / production** | Hosted HMAC API. |
+| Routing domains | **PASS / production** | 32 live provider-routing domains observed in the current canary. |
+| Swap providers | **ACTIVE / production** | Hosted routing plane. |
+| Swap quote | **PASS / production** | Quote only; does not sign or broadcast. |
+| Transaction step construction | **ACTIVE / production gated** | Produces transaction material only. |
+| Own-wallet balance | **STAGED** | Requires installed TWAK local runner plus bound Agent Wallet. |
+| Own-wallet portfolio | **STAGED** | Requires installed TWAK local runner plus bound Agent Wallet. |
+| Any-address balance | **STAGED** | Official TWAK CLI operation; requires durable installed CLI/MCP runner. |
+| Signing/broadcast | **STAGED / human-gated** | Requires Agent Wallet policy or WalletConnect approval. |
+
+## First provider request
+
+The production HMAC credentials were canaried successfully against Trust Wallet's live service. The first CrownThrive production request returned a live BNB/USD ticker.
+
+A separate live route canary returned 32 current routing domains, and a BNB-to-USDT quote returned multiple provider routes, fee data, price-impact data, and an expiry.
+
+No wallet was created and no transaction was signed or broadcast during certification.
+
+## Official installation
+
+On a persistent macOS, Linux, WSL, Codex CLI, Claude Code, Cursor, or compatible MCP runner, use Trust Wallet's official installer:
+
+```bash
+curl -fsSL https://agent-kit.trustwallet.com/install.sh | bash
+```
+
+The installer:
+
+- installs the `twak` CLI;
+- prompts for the Trust Wallet Access ID and HMAC secret;
+- verifies and stores them locally;
+- wires supported agent harnesses;
+- offers an Agent Wallet, WalletConnect, or read-only path;
+- exposes the tool surface through `twak serve` for MCP clients.
+
+CrownThrive credentials are already vaulted in ThriveBase. Do not publish them in source control, documentation, screenshots, issue bodies, logs, or MCP responses.
+
+## Verify a local installation
+
+After installation:
+
+```bash
+twak auth status --json
+```
+
+Market-data smoke test:
+
+```bash
+twak price BNB --json
+```
+
+Quote-only smoke test:
+
+```bash
+twak swap 100 USDC ETH --quote-only --json
+```
+
+The exact asset/network arguments must match the intended route. Quote success does not authorize execution.
+
+## Holdings and portfolio
+
+Trust Wallet's Agent Kit wallet skill defines holdings through the local CLI/MCP wallet plane.
+
+Own-wallet balance:
+
+```bash
+twak wallet balance --chain ethereum --json
+twak wallet balance --chain solana --json
+twak wallet balance --all --json
+```
+
+Full portfolio:
+
+```bash
+twak wallet portfolio --json
+twak wallet portfolio --chains ethereum,base,bsc,solana --json
+```
+
+Any-address read:
+
+```bash
+twak balance --address <address> --coin 60 --json
+twak balance --address <address> --chain bsc --json
+```
+
+A canary against an assumed hosted `/v1/balance` path returned HTTP 404. CrownThrive therefore does **not** expose a fabricated hosted balance API. Wallet holdings remain attached to the official local TWAK CLI/MCP contract.
+
+## Staged CrownThrive MCP contracts
+
+The following contracts are registered but disabled until a persistent TWAK runner is bound:
+
+- `trustwallet.wallet.balance`
+- `trustwallet.wallet.portfolio`
+- `trustwallet.balance.address`
+- `trustwallet.wallet.sign`
+
+They are intentionally `staged`, not production-exposed.
+
+## Production CrownThrive MCP contracts
+
+The hosted production plane currently exposes:
+
+- `trustwallet.price.read`
+- `trustwallet.trending.read`
+- `trustwallet.domains.read`
+- `trustwallet.providers.read`
+- `trustwallet.swap.quote`
+- `trustwallet.swap.step.build`
+
+`trustwallet.swap.step.build` remains transaction-material construction only. It never converts a quote into permission to sign.
+
+## Choose the wallet trust model
+
+### WalletConnect
+
+Use WalletConnect when a human-controlled Trust Wallet should retain full per-transaction approval.
+
+Characteristics:
+
+- no new CrownThrive-held private key;
+- transaction proposed by the agent;
+- explicit wallet approval required;
+- appropriate for consumer/copilot flows and high-sovereignty execution.
+
+### Agent Wallet
+
+Use an Agent Wallet for bounded autonomous operation on a persistent trusted runner.
+
+Characteristics:
+
+- dedicated non-custodial wallet;
+- keys remain on the developer-controlled runner;
+- policy can define asset allowlists, address allowlists, spend limits, and automation boundaries;
+- suitable for DCA, limit strategies, scheduled execution, x402, and other bounded automations.
+
+An Agent Wallet is not created inside a transient Supabase Edge Function or ordinary ChatGPT response runtime.
+
+## CHLOM Wallet relationship
+
+CHLOM Wallet remains the institutional evidence, rights, policy, and economic-lineage wallet. It is not silently converted into a hosted custodial crypto wallet.
+
+The Trust Wallet adapter is bound as:
+
+```text
+ct.adapter.trustwallet.agentkit.v1
+```
+
+Current CHLOM state:
+
+```text
+hosted market/routing plane: production
+wallet account bound: false
+holdings/portfolio: local runner required
+signing: Agent Wallet or WalletConnect required
+provider execution authorized: false until exact wallet/policy gate passes
+```
+
+## ThriveEvergreen boundary
+
+A Trust Wallet route, quote, signed transaction, or on-chain confirmation is provider evidence. It cannot create CrownThrive economic authority by itself.
+
+Any CrownThrive commerce effect remains subject to ThriveEvergreen's exact `ECAC | HOLD | DENY` decision and the relevant CHLOM policy/rights/settlement gates.
+
+## Production completion gate
+
+The wallet/holdings plane becomes production-exposed only after all of the following pass:
+
+1. persistent TWAK CLI/MCP runner installed;
+2. credentials verified without secret leakage;
+3. wallet path selected: WalletConnect or Agent Wallet;
+4. wallet identity/address bound to the CHLOM wallet registry;
+5. holdings canary passes on the bound wallet;
+6. transaction build canary passes;
+7. signing boundary test passes;
+8. negative unauthorized-sign test passes;
+9. policy limits and rollback/compensation model are certified;
+10. production MCP exposures are promoted from `staged` only after readback.
+
+Until then, the hosted intelligence/quote plane remains production while holdings and signing remain explicitly staged.
