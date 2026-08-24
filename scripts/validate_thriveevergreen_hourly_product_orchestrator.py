@@ -118,15 +118,23 @@ def main() -> int:
     dail = hardening["dail_pre_final_event"]
     if dail != {"ok": True, "checked_events": 968, "failure_count": 0}:
         fail("DAIL pre-final-event projection drift")
-    if hardening.get("dail_post_documentation_final_event") != "PENDING":
-        fail("post-documentation DAIL verification must remain pending")
+    final_dail = hardening.get("dail_post_documentation_final_event")
+    if final_dail != {
+        "ok": True,
+        "checked_events": 971,
+        "failure_count": 0,
+        "head_matches_final_event": True,
+        "integrity_state": "pass_with_documented_legacy_correction",
+    }:
+        fail("post-documentation DAIL verification drift")
 
     verification = manifest["verification"]
     if verification.get("state") != "ACTIVE_OBSERVER_WITH_FRESH_SLOT_CANARY_PENDING":
         fail("verification ceiling drift")
-    for key in ("fresh_slot_persistence_canary", "dail_post_documentation_final_event"):
-        if verification.get(key) != "PENDING":
-            fail(f"pending verification drift: {key}")
+    if verification.get("fresh_slot_persistence_canary") != "PENDING":
+        fail("fresh-slot pending verification drift")
+    if verification.get("dail_post_documentation_final_event") != "PASS":
+        fail("final DAIL verification PASS removed")
     if verification.get("dispatcher_exact_hash_rollback") != "HOLD":
         fail("dispatcher rollback HOLD removed")
     if verification.get("economic_publications") != 0 or verification.get("provider_writes") != 0:
@@ -135,7 +143,7 @@ def main() -> int:
     required_docs = {
         AUTHORITY: ["production_observer_active", "read-only v1.1 preview", "current publication target: 0"],
         AUTOMATION: ["ACTIVE_OBSERVER_WITH_FRESH_SLOT_CANARY_PENDING", "publication target is zero", "not a promise that", "fresh unconsumed-hour persistence canary", "HOLD` after HTTP `403`"],
-        CHANGELOG: ["production_observer_active", "ACTIVE_OBSERVER_WITH_FRESH_SLOT_CANARY_PENDING", "checked_events=968", "Post-documentation final DAIL verification"],
+        CHANGELOG: ["production_observer_active", "ACTIVE_OBSERVER_WITH_FRESH_SLOT_CANARY_PENDING", "checked_events=971", "Post-documentation final DAIL verification"],
     }
     for path, fragments in required_docs.items():
         for fragment in fragments:
