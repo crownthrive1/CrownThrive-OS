@@ -129,6 +129,26 @@ Release, checkout, sales, outreach, publishing, fulfillment, or other customer-f
 
 After every wave, re-read queue state, duplicate scheduling, stale leases, DAIL, provider/economic side effects, and error state before advancing.
 
+## CHLOM Agentic Foundry production handoff
+
+Founder-authorized foundry package `ct.system.chlom-agentic-foundry.v1` is a Wave 3 bounded-builder/executor activation candidate. Canonical handoff:
+
+`institutional/maintenance/handoffs/chlom-agentic-foundry-production-v1.json`
+
+The coordinator must resolve the current governed successors of CrownThrive-CIE PR #24 and CrownThrive-Support PR #375 before acting. Never trust a stale head literal over the current accepted source.
+
+The foundry contains SidecarForge, AssetForge, VaultBridge, InteropMesh, ThriveOptimizer, PatchPilot, and RelayFabric. Source-package PASS does not mean live ThriveBase activation. While maintenance release does not permit Wave 3, state remains `HOLD_MAINTENANCE` and no foundry migration is applied.
+
+When Wave 3 becomes eligible, require exact-head foundry/CIE governance PASS, current public-safe contract consistency, DAIL integrity, rollback readiness, no newer supersession, and zero new external scheduler requirement. Apply only the exact source-controlled migration from the accepted CIE source; never reconstruct protected SQL from public documentation.
+
+After apply, immediately second-read and prove: seven active planes; at least thirteen bounded sidecar classes; D2 maximum; non-voting/non-quorum/no-authority-inheritance; Vault alias presence without reading the secret; protected-body exposure false; MCP/plugin/skill bindings; internal pg_cron at the governed cadence; reuse of the existing External Evidence Relay; and zero new ChatGPT scheduler slots.
+
+Required negative tests include D3 patch rejection, recursive sidecar rejection, owner/verifier collision rejection, invalid asset digest rejection, client-role denial, no raw-secret/public-body return, patch `apply_authorized=false` default, and no provider-write/money/rights/credential authority manufactured by foundry candidate creation.
+
+Run `chlom_runtime.agentic_foundry_stress_test_v1()` at least twice on unchanged state and require deterministic PASS. Record exact activation/readback/stress/security evidence in the foundry receipt ledger and DAIL. Only then may the public certification advance from `PASS_PACKAGE / HOLD_MAINTENANCE_RUNTIME` to `PASS_PRODUCTION_RUNTIME`.
+
+This foundry handoff never authorizes closing the broader maintenance event, D3, money movement, rights/entitlements, credential export, protected-body publication, or provider-write expansion.
+
 ## Vault and secret handling
 
 Vault is the secret custody plane. Public source and ordinary Drive artifacts may contain only safe references such as alias, fingerprint, provider, purpose, rotation/custody state, and restore requirements. Drive may contain ciphertext when governed, but never ordinary plaintext secrets.
