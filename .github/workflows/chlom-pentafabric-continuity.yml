@@ -1,0 +1,132 @@
+name: CHLOM Pentafabric Continuity
+
+on:
+  pull_request:
+    paths:
+      - 'commercial/chlom-protocol/**'
+      - 'developers/manifests/chlom-pentafabric.v1.json'
+      - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-continuous-build.contract.v1.json'
+      - 'frameworks/chlom-pentafabric-metaprotocol.mdx'
+      - 'automation/chlom-continuous-research-commercialization.mdx'
+      - 'technology/chlom-website-mesh-and-failover.mdx'
+      - 'skills/frameworks/chlom-pentafabric/SKILL.md'
+      - '.github/workflows/chlom-pentafabric-continuity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'commercial/chlom-protocol/**'
+      - 'developers/manifests/chlom-pentafabric.v1.json'
+      - 'developers/manifests/chlom-agent-factory-candidates.v1.json'
+      - 'developers/contracts/chlom-machine-access.contract.v1.json'
+      - 'developers/contracts/chlom-continuous-build.contract.v1.json'
+      - 'frameworks/chlom-pentafabric-metaprotocol.mdx'
+      - 'automation/chlom-continuous-research-commercialization.mdx'
+      - 'technology/chlom-website-mesh-and-failover.mdx'
+      - 'skills/frameworks/chlom-pentafabric/SKILL.md'
+      - '.github/workflows/chlom-pentafabric-continuity.yml'
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-pentafabric-continuity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-pentafabric:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out CrownThrive Support
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Validate five-layer architecture and bounded agents
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('.')
+          pentafabric = json.loads((root/'developers/manifests/chlom-pentafabric.v1.json').read_text())
+          agents = json.loads((root/'developers/manifests/chlom-agent-factory-candidates.v1.json').read_text())
+          machine = json.loads((root/'developers/contracts/chlom-machine-access.contract.v1.json').read_text())
+          continuous = json.loads((root/'developers/contracts/chlom-continuous-build.contract.v1.json').read_text())
+
+          assert pentafabric['canonical_name'] == 'CrownThrive Pentafabric'
+          assert pentafabric['layer_count'] == 5
+          assert [x['layer'] for x in pentafabric['layers']] == [1,2,3,4,5]
+          assert pentafabric['canonical_terms']['DAIL'] == 'Decentralized Autonomous Information Ledger'
+          assert pentafabric['canonical_terms']['DLA'] == 'Dynamic Licensing Asset'
+          assert pentafabric['repository_family']['both_public'] is True
+          assert pentafabric['repository_family']['restricted_state_in_public_git'] is False
+
+          ids = {a['agent_id'] for a in agents['agents']}
+          required = {
+              'ct.agent.chlom-rd-researcher',
+              'ct.agent.chlom-rights-identity-steward',
+              'ct.agent.chlom-compliance-oracle',
+              'ct.agent.chlom-docs-projection-steward',
+              'ct.agent.chlom-commercial-packager',
+              'ct.agent.chlom-mesh-reliability',
+          }
+          assert required <= ids
+          assert agents['factory_binding']['direct_main_write'] is False
+          assert agents['factory_binding']['self_certification'] is False
+          assert machine['default_state'] == 'DENY_UNLESS_EXPLICITLY_AUTHORIZED'
+          assert machine['authority_rules']['provider_success_is_institutional_truth'] is False
+          assert continuous['economic_boundary']['activation_authority'] == 'ThriveEvergreen / ECAC'
+          assert continuous['projection']['child_pull_request_required'] is True
+          print('PASS_CHLOM_PENTAFABRIC')
+          PY
+
+      - name: Validate managed commercial projection
+        run: python scripts/validate_chlom_commercial_projection.py
+
+  observe-public-mesh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Observe redundant public discovery routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          routes=(
+            'https://crownthrive.com'
+            'https://crownthrivesupport.com'
+            'https://crownthrive.io'
+            'https://github.com/crownthrive/chlom-protocol'
+            'https://github.com/crownthrive1/CrownThrive-Support'
+          )
+          ok=0
+          echo '## CHLOM public mesh observation' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          for url in "${routes[@]}"; do
+            code="$(curl -L -sS -o /dev/null --max-time 15 -w '%{http_code}' "$url" || true)"
+            if [[ "$code" =~ ^[23][0-9][0-9]$ ]]; then
+              ok=$((ok+1))
+              state='REACHABLE'
+            else
+              state='UNREACHABLE_OR_DEGRADED'
+            fi
+            printf -- '- %s — %s — HTTP %s\n' "$url" "$state" "${code:-000}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo "Reachable routes: $ok/${#routes[@]}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$ok" -eq 0 ]; then
+            echo 'All public discovery routes failed.'
+            exit 1
+          fi
