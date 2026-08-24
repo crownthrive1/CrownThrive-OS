@@ -31,6 +31,7 @@ The hosted plane is active. CrownThrive has selected a dual execution model for 
 | Any-address balance | **STAGED** | Official TWAK CLI operation; requires durable installed CLI/MCP runner. |
 | WalletConnect user approval | **PRODUCTION CONTRACT / frontend pending** | Human confirmation is mandatory; current unattended ceiling is zero. |
 | Dedicated Agent Wallet | **PRODUCTION CONTRACT / runner pending** | Persistent runner and encrypted wallet are not yet bound; current unattended ceiling is zero. |
+| Agent Wallet policy evaluation | **STAGED** | Exact evaluator runtime is promoted only with the persistent Agent Wallet runner. |
 | Signing/broadcast | **STAGED** | No signing tool is production-exposed until its lane-specific gate passes. |
 
 ## First provider request
@@ -118,8 +119,10 @@ The following Trust Wallet runner contracts are registered but disabled until a 
 - `trustwallet.wallet.portfolio`
 - `trustwallet.balance.address`
 - `trustwallet.wallet.sign`
+- `chlom_wallet.agent_wallet.evaluate`
+- `chlom_wallet.agent_wallet.execute`
 
-The broader CHLOM execution layer also keeps `chlom_wallet.agent_wallet.execute` disabled until its exact production gate passes.
+`chlom_wallet.agent_wallet.evaluate` is intentionally staged because the exact evaluator must run against the same persistent Agent Wallet environment it governs. It cannot be treated as executable merely because an authority record exists.
 
 ## Production CrownThrive MCP contracts
 
@@ -134,12 +137,7 @@ The hosted production plane currently exposes:
 
 `trustwallet.swap.step.build` remains transaction-material construction only. It never converts a quote into permission to sign.
 
-The production policy layer also exposes:
-
-- `chlom_wallet.execution_modes.status`
-- `chlom_wallet.agent_wallet.evaluate`
-
-Evaluation can return a policy result but cannot sign or broadcast.
+The CHLOM production policy surface exposes `chlom_wallet.execution_modes.status` as a read-only authority-state contract. WalletConnect request, Agent Wallet evaluation, and Agent Wallet execution remain separately staged behind their lane-specific gates.
 
 ## Dual wallet trust model selected
 
@@ -193,6 +191,7 @@ runtime contract: production
 activation: configured_pending_runner
 wallet creation performed: false
 durable runner bound: false
+policy evaluator: staged
 money movement: deny-by-default
 ```
 
@@ -230,6 +229,8 @@ provider execution: denied until exact lane gate passes
 
 A Trust Wallet route, quote, signed transaction, or on-chain confirmation is provider evidence. It cannot create CrownThrive economic authority by itself.
 
+The canonical VM-facing authority is ThriveEvergreen v2. Its internal engine is `production_write` and `production_publisher_active` with production effects enabled and `ECAC` publication activation. Its generalized external mutation/dispatch API remains separately held; exact candidate evaluation is available without mutation.
+
 Any CrownThrive commerce effect remains subject to ThriveEvergreen's exact `ECAC | HOLD | DENY` decision and the relevant CHLOM policy/rights/settlement gates.
 
 ## WalletConnect completion gate
@@ -252,11 +253,12 @@ The autonomous lane becomes transaction-active only after:
 2. credentials verified without secret leakage;
 3. dedicated Agent Wallet created on that persistent runner;
 4. only public addresses/account IDs registered in CHLOM Wallet;
-5. holdings canary passes on the bound wallet;
-6. transaction build canary passes;
-7. unauthorized-sign test proves denial;
-8. asset/address allowlists, unattended-value ceiling, rollback/compensation, and incident controls are certified;
-9. exact ThriveEvergreen ECAC authorization is enforced immediately before each economic effect;
-10. signing/broadcast MCP exposure is promoted only after readback.
+5. exact policy evaluator bound to the persistent runner and canaried;
+6. holdings canary passes on the bound wallet;
+7. transaction build canary passes;
+8. unauthorized-sign test proves denial;
+9. asset/address allowlists, unattended-value ceiling, rollback/compensation, and incident controls are certified;
+10. exact ThriveEvergreen ECAC authorization is enforced immediately before each economic effect;
+11. signing/broadcast MCP exposure is promoted only after readback.
 
 Until those lane-specific gates pass, the hosted intelligence/quote plane remains production while transaction execution remains fail-closed.
