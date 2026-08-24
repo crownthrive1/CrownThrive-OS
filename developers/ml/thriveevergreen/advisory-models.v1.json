@@ -1,0 +1,37 @@
+{
+  "schema_version":"1.0.0",
+  "authority":"ADVISORY_ONLY",
+  "models":[
+    {
+      "model_id":"ct.ml.thriveevergreen.demand-score.v1",
+      "model_class":"governed_linear_logistic_score",
+      "semantic_version":"1.0.0",
+      "features":["views_z","conversion_z","save_z","search_z","seasonality"],
+      "weights":{"views_z":0.28,"conversion_z":0.32,"save_z":0.14,"search_z":0.18,"seasonality":0.08},
+      "output":"0..1 demand score",
+      "use":"ranking and opportunity triage only",
+      "final_authority":false
+    },
+    {
+      "model_id":"ct.ml.thriveevergreen.price-elasticity-advisor.v1",
+      "model_class":"governed_elasticity_estimator",
+      "semantic_version":"1.0.0",
+      "features":["price_change_pct","demand_change_pct","sample_weight"],
+      "output":"elasticity estimate plus confidence",
+      "use":"pricing analysis only; cannot publish an effective price",
+      "final_authority":false
+    },
+    {
+      "model_id":"ct.ml.thriveevergreen.anomaly-risk.v1",
+      "model_class":"robust_weighted_anomaly_score",
+      "semantic_version":"1.0.0",
+      "features":["refund_z","dispute_z","price_drift_z","provider_mismatch_z","fulfillment_latency_z"],
+      "weights":{"refund_z":0.25,"dispute_z":0.25,"price_drift_z":0.18,"provider_mismatch_z":0.20,"fulfillment_latency_z":0.12},
+      "output":"0..1 anomaly score plus HOLD recommendation",
+      "use":"risk triage and SAFE_HOLD recommendation only",
+      "final_authority":false
+    }
+  ],
+  "prohibited_effects":["ECAC issuance","rights grant","price publication","provider write","money movement","payout","entitlement activation","sovereign vote"],
+  "calibration_contract":{"minimum_samples":30,"drift_review":"weekly","feature_schema_change":"new model version required","weight_change":"new digest and independent review required"}
+}
