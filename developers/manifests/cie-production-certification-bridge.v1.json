@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0.0",
+  "bridge_id": "ct.bridge.cie.production-certification.v1",
+  "framework_id": "ct.framework.cultural-imprint-engine",
+  "canonical_engine_name": "Cultural Imprint Engine",
+  "package_id": "ct.framework-package.cie",
+  "algorithm_id": "ct.algorithm.cie.v1",
+  "accepted_public_contract_digest": "e5e6ac0e9cf6749ba361435bb65ad212f78562960d0b5522898e06583b8d86c2",
+  "migration": "supabase/migrations/20260824011626_cie_production_certification_bridge_v1.sql",
+  "functions": {
+    "parent_certification_reconcile": "chlom_runtime.cie_parent_certification_reconcile_v1(text,text,uuid,text,text)",
+    "lifecycle_release_reconcile": "chlom_runtime.cie_lifecycle_release_reconcile_v1(text,text,uuid,text,text,text,text)",
+    "status": "chlom_runtime.cie_production_certification_bridge_status_v1(text,text)",
+    "hardened_wave4_gate": "chlom_runtime.cie_wave4_activation_evidence_gate_v1(text,text,text)"
+  },
+  "authority_model": {
+    "originator_may_certify": false,
+    "service_role_may_manufacture_verifier_disposition": false,
+    "agent_d_resolution_required": true,
+    "agent_d_certification_exact_snapshot_bound": true,
+    "lifecycle_verifier": "ct.gen7.agent-q",
+    "semantic_evidence_required": true,
+    "security_evidence_required": true,
+    "reviewer_owner_separation_required": true,
+    "d3_human_reserved": true,
+    "vote_effect": false,
+    "provider_write_effect": false,
+    "economic_effect": false,
+    "rights_effect": false,
+    "production_activation_effect": false
+  },
+  "parent_certification_input": {
+    "required_issue_state": "resolved",
+    "required_issue_authority_class": "D2",
+    "required_verifier_agent_id": "ct.relay.agent-d",
+    "required_resolution_event_type": "resolved",
+    "required_exact_evidence": [
+      "current CIE main SHA",
+      "current Support main SHA",
+      "exact technical-link receipt",
+      "accepted CIE public-contract digest"
+    ],
+    "writes": [
+      "framework_package_registry.parent_certification_state",
+      "exact-snapshot certification metadata",
+      "restricted DAIL reconciliation receipt"
+    ],
+    "does_not_write": [
+      "repository operational state",
+      "package operational state",
+      "algorithm production state",
+      "API/MCP activation",
+      "commerce",
+      "D3",
+      "vote"
+    ]
+  },
+  "lifecycle_release_input": {
+    "required_issue_state": "resolved",
+    "required_verifier_agent_id": "ct.gen7.agent-q",
+    "required_parent_certification": "certified_for_exact_current_snapshot",
+    "required_independent_evidence": ["semantic", "security"],
+    "writes": [
+      "integration_control.platform_certification_dimensions[cie:lifecycle_release]=pass",
+      "restricted DAIL reconciliation receipt"
+    ],
+    "production_activation_effect": false
+  },
+  "stale_certification_rule": "A certified package is not considered parent-certified by the Wave 4 gate unless certification metadata matches the exact current child head, parent head, link receipt and accepted contract digest.",
+  "status_states": [
+    "HOLD_SOURCE_INTEGRATION",
+    "HOLD_AGENT_D_EXACT_CERTIFICATION",
+    "HOLD_LIFECYCLE_RELEASE",
+    "CERTIFICATION_BRIDGE_READY_NON_ACTIVATING"
+  ],
+  "production_activation": {
+    "performed_by_bridge": false,
+    "separate_function": "chlom_runtime.activate_cie_production_v1",
+    "still_requires": [
+      "valid production authority",
+      "all certification dimensions closed",
+      "protected-runtime canary PASS",
+      "current exact parent-child link",
+      "all existing activation-function predicates"
+    ]
+  }
+}
