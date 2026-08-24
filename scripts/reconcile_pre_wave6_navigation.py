@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Reconcile and validate documentation routes that must be visible before Wave 6.
+"""Reconcile and validate required documentation navigation continuity.
 
-This script is intentionally narrow and idempotent. It adds only the known
-Sprint 6-11 documentation surfaces that already exist in the repository, keeps
-Changelog and Decisions as the final CrownThrive OS navigation group, and
-fails if any required backing page is missing.
+The filename is retained for backward compatibility with the navigation-governance
+workflow introduced before substantive Wave 6. The contract is cumulative: every
+new governed substantive wave must extend REQUIRED rather than allowing prior
+routes to fall out of Mintlify navigation.
 """
 from __future__ import annotations
 
@@ -18,12 +18,16 @@ DOCS = ROOT / "docs.json"
 
 REQUIRED: dict[str, dict[str, list[str]]] = {
     "CrownThrive OS": {
+        "Institutional Doctrine": [
+            "doctrine/cie-framework-reconciliation-contract",
+        ],
         "Institutional Knowledge": [
             "knowledge/documentation-substantive-rebuild-wave-1",
             "knowledge/documentation-substantive-rebuild-wave-2",
             "knowledge/documentation-substantive-rebuild-wave-3",
             "knowledge/documentation-substantive-rebuild-wave-4",
             "knowledge/documentation-substantive-rebuild-wave-5",
+            "knowledge/documentation-substantive-rebuild-wave-6",
         ],
         "Changelog and Decisions": [
             "changelog/docs-freshness-sprint-6-final-94-2026-08-23",
@@ -32,6 +36,7 @@ REQUIRED: dict[str, dict[str, list[str]]] = {
             "changelog/docs-substantive-rebuild-sprint-9-wave-3-2026-08-23",
             "changelog/docs-substantive-rebuild-sprint-10-wave-4-2026-08-24",
             "changelog/docs-substantive-rebuild-sprint-11-wave-5-2026-08-24",
+            "changelog/docs-substantive-rebuild-sprint-12-wave-6-2026-08-24",
         ],
     },
     "CHLOM": {
@@ -130,7 +135,7 @@ def validate(data: dict[str, Any]) -> list[str]:
             errors.append("Changelog and Decisions must remain the final CrownThrive OS group")
 
     if not errors:
-        print("PASS_PRE_WAVE6_DOCUMENTATION_NAVIGATION")
+        print("PASS_DOCUMENTATION_NAVIGATION_CONTINUITY")
         print(f"required_routes={expected_count}")
         print("missing_routes=0")
         print("backing_pages_missing=0")
@@ -152,7 +157,7 @@ def main() -> None:
 
     errors = validate(data)
     if errors:
-        print("FAIL_PRE_WAVE6_DOCUMENTATION_NAVIGATION")
+        print("FAIL_DOCUMENTATION_NAVIGATION_CONTINUITY")
         for error in errors:
             print(error)
         raise SystemExit(1)
