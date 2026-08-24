@@ -1,0 +1,118 @@
+name: CHLOM Runtime Fabric
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'developers/contracts/**'
+      - 'developers/manifests/chlom-*-candidates.v1.json'
+      - 'automation/**'
+      - 'frameworks/**'
+      - 'scripts/chlom_runtime_fabric.py'
+      - 'schemas/dail/**'
+      - '.github/workflows/chlom-runtime-fabric.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: chlom-runtime-fabric-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  discover-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      run_id: ${{ steps.fabric.outputs.run_id }}
+      state: ${{ steps.fabric.outputs.state }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - id: fabric
+        name: Run governed fabric controller
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python scripts/chlom_runtime_fabric.py run --output runtime
+          echo "run_id=$(cat runtime/run_id)" >> "$GITHUB_OUTPUT"
+          echo "state=$(cat runtime/state)" >> "$GITHUB_OUTPUT"
+      - name: Upload DAIL evidence packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: chlom-dail-runtime-${{ github.run_id }}
+          path: runtime/
+          if-no-files-found: error
+          retention-days: 30
+
+  agent-lanes:
+    needs: discover-contracts
+    if: needs.discover-contracts.outputs.state == 'READY'
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: [rnd, documentation, rights_identity, compliance_oracle, commercial, mesh_reliability, continuity, maintenance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Execute bounded agent contract
+        env:
+          CHLOM_AGENT: ${{ matrix.agent }}
+          CHLOM_RUN_ID: ${{ needs.discover-contracts.outputs.run_id }}
+        run: |
+          python scripts/chlom_runtime_fabric.py agent --agent "$CHLOM_AGENT" --run-id "$CHLOM_RUN_ID" --output agent-result
+      - name: Upload agent evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: chlom-agent-${{ matrix.agent }}-${{ github.run_id }}
+          path: agent-result/
+          if-no-files-found: error
+          retention-days: 30
+
+  assurance:
+    needs: [discover-contracts, agent-lanes]
+    if: always() && needs.discover-contracts.outputs.run_id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Reconcile DAIL packet and publish summary
+        env:
+          FABRIC_RUN_ID: ${{ needs.discover-contracts.outputs.run_id }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p assurance
+          python scripts/chlom_runtime_fabric.py reconcile --run-id "$FABRIC_RUN_ID" --output assurance
+          cat assurance/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload reconciliation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: chlom-dail-reconciliation-${{ github.run_id }}
+          path: assurance/
+          if-no-files-found: error
+          retention-days: 90
