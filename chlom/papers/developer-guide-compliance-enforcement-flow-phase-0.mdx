@@ -1,0 +1,164 @@
+---
+title: "Developer Guide — Compliance Enforcement Flow (Phase 0 — High-Level)"
+sidebarTitle: "Compliance Enforcement Flow"
+description: "Exact-title reconstruction of the historical DLA developer guide for compliance enforcement flow, mapping source-era DLA/AI/oracle checks into current rules, approval, Dynamic Licensing Asset, entitlement and DAIL contracts."
+icon: "code-branch"
+keywords: ["Compliance Enforcement Flow", "DLA developer guide", "CHLOM Phase 0", "Rules Registry", "Approval Service"]
+---
+
+# Developer Guide — Compliance Enforcement Flow (Phase 0 — High-Level)
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.devguide-compliance-enforcement-flow-phase0
+exact_recovered_title: Developer Guide — Compliance Enforcement Flow (Phase 0 — High-Level)
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+source_basis: recovered DLA + AI/compliance architecture
+historical_DLA: Decentralized Licensing Authority
+current_DLA: Dynamic Licensing Asset
+```
+
+## Developer objective
+
+This guide reconstructs the enforcement sequence an integration must respect when a requested action depends on CHLOM licensing/compliance state.
+
+## Historical source flow
+
+Related CHLOM sources describe a pre-execution pattern where identity, license validity, compliance rules, AI/risk signals and external evidence are evaluated before a regulated/licensed action proceeds.
+
+## Current normalized flow
+
+```text
+REQUESTED ACTION
+      |
+authenticate caller / resolve subject
+      |
+resolve source rights + issuer authority if licensing state changes
+      |
+resolve Dynamic Licensing Asset / entitlement state
+      |
+resolve applicable policy versions
+      |
+collect required evidence/oracle/risk inputs
+      |
+Approval Service
+  /      |      \
+PASS    HOLD    DENY
+ |       |       |
+execute review   reject
+ |       |       |
+record outcome / evidence in DAIL
+```
+
+## Step 1 — Classify the action
+
+The caller must identify the governed action, target asset/right, subject, channel/use context and any requested state change. Policy cannot be evaluated against an undefined action.
+
+## Step 2 — Resolve identity
+
+```text
+account/key authenticated
+        !=
+institutional identity resolved
+```
+
+Use CHLOM DID/Fingerprint/role evidence appropriate to the profile.
+
+## Step 3 — Resolve licensing state
+
+For an action requiring permission, read the relevant Dynamic Licensing Asset and verify:
+
+- status;
+- version;
+- term;
+- territory;
+- allowed uses/channels;
+- transfer/sublicense state where relevant;
+- holder/subject relationship;
+- required authority/evidence references.
+
+## Step 4 — Resolve policy
+
+The Rules Registry determines which versioned policy packs/rules apply to the exact action. Never load “latest” rules without recording which version decided the request.
+
+## Step 5 — Gather evidence
+
+Evidence may include:
+
+- credentials/attestations;
+- source-rights records;
+- issuer authority;
+- oracle observations;
+- sanctions or eligibility data where actually required;
+- risk/model results;
+- prior approvals/holds;
+- economic/settlement preconditions.
+
+## Step 6 — Evaluate
+
+Use three-valued decision semantics:
+
+```text
+PASS = all mandatory predicates satisfied
+HOLD = material predicate unresolved/stale/conflicting
+DENY = explicit prohibition or failed mandatory predicate
+```
+
+Unknown is not PASS.
+
+## Step 7 — Execute only inside authority
+
+A PASS permits only the requested action and scope. It does not grant unrelated permissions or allow the caller/service to expand its role.
+
+## Step 8 — Record outcome
+
+A state-changing decision should append a DAIL event with subject, action, decision, policy versions, evidence refs, authority ref, reason codes and resulting state.
+
+## Pseudocode pattern
+
+```text
+ctx = resolve_context(request)
+identity = identity_service.resolve(ctx.subject)
+rights = rights_service.resolve(ctx.asset)
+dla = dla_service.resolve(ctx.license_ref)
+rules = rules_registry.resolve(ctx)
+evidence = evidence_service.collect_required(rules, ctx)
+decision = approval_service.evaluate(ctx, identity, rights, dla, rules, evidence)
+
+if decision == HOLD:
+    open_review_case(ctx, decision)
+    append_dail_event(ctx, decision)
+    return HOLD
+
+if decision == DENY:
+    append_dail_event(ctx, decision)
+    return DENY
+
+result = execute_bounded_action(ctx)
+append_dail_event(ctx, PASS, result)
+return result
+```
+
+This is current-safe pseudocode, not recovered historical code.
+
+## Fail-closed conditions
+
+HOLD/DENY when mandatory data is missing, stale, contradictory, unverifiable or outside authority. A provider timeout does not become approval.
+
+## Current links
+
+- [Rules Registry](/chlom/systems/rules-registry)
+- [Approval Service](/chlom/systems/approval-service)
+- [Dynamic Licensing Asset](/chlom/systems/dynamic-licensing-asset)
+- [DAIL](/chlom/systems/dail-decentralized-autonomous-information-ledger)
+- [Three-Valued Policy Evaluation](/chlom/algorithms/alg-001-three-valued-policy-evaluation)
+
+## Nonclaims
+
+This reconstruction does not establish active regulatory screening, deployed AI enforcement, current endpoint names or production SLA.
+
+## Status
+
+`TITLE_RECOVERED + ENFORCEMENT_FLOW_RECONSTRUCTED + EXACT_BODY_NOT_LOCATED`
