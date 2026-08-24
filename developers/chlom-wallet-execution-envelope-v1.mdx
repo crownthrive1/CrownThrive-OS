@@ -1,0 +1,107 @@
+---
+title: "CHLOM Wallet Execution Envelope v1"
+sidebarTitle: "Wallet Execution Envelope"
+description: "Per-skill execution envelopes and independent-handoff evidence routing for controlled-test CHLOM Wallet operations."
+icon: "route"
+---
+
+# CHLOM Wallet Execution Envelope v1
+
+The execution-envelope layer closes the gap between a skill existing in the Wallet Agent catalog and that skill being eligible to run a bounded controlled-test action. A skill name, pallet mapping, handoff label, provider event, or AI recommendation is never sufficient by itself.
+
+Each request is bound to:
+
+```text
+skill
+  + pallet
+  + action type
+  + value class
+  + environment
+  + A/D authority
+  + exact source head
+  + source / rollback evidence
+  + required independent handoffs
+  + deterministic Policy Assurance v2
+        ↓
+ECAC | HOLD | DENY
+```
+
+`ECAC` means only **eligible controlled-action candidate**. It is not a production approval, capability grant, reviewer vote, money instruction, rights grant, chain transaction, pricing authorization, checkout authorization, merge authorization, or phase transition.
+
+## Per-skill closure
+
+`ct.registry.chlom-wallet.execution-envelopes.v1` contains one profile for every current Wallet skill:
+
+- 20 canonical Wallet Agent v2 skills;
+- HARP Proof Capsule Builder;
+- EASOR Settlement Plan Compiler;
+- Portable Wallet Capsule Builder.
+
+Every profile declares its allowed WalletKit pallets, controlled-test action types, value classes, and the stable independent handoffs required before `ECAC` is possible.
+
+Current closure target:
+
+```yaml
+skills: 23
+walletkit_pallets: 12
+missing_skill_profiles: 0
+unmapped_profile_pallets: 0
+```
+
+## Handoff Evidence Router
+
+`ct.contract.chlom-wallet.handoff-evidence-router.v1` validates existing independent evidence. It does **not** mint a heartbeat, create a review receipt, or grant a capability.
+
+For each required handoff it checks:
+
+1. exact stable agent ID exists in the verified handoff crosswalk;
+2. registry binding is active;
+3. reviewer is independent of the originator;
+4. receipt role matches the registered role;
+5. receipt is bound to the same source head;
+6. reviewer heartbeat is fresh;
+7. receipt decision is `PASS`, not `HOLD` or `DENY`;
+8. receipt hash has a valid digest shape.
+
+Missing or stale evidence returns `HOLD`. Explicit independent denial, self-review, role mismatch, an unverified reviewer, or an attempted pending-alias receipt returns `DENY`.
+
+## Pending Agent E and Agent H aliases
+
+The quarantined labels remain:
+
+- `ct.agent.api-mcp`
+- `ct.agent.webhook-delivery`
+
+They are represented in the profiles where the historical role is relevant, but they remain **non-executing labels**. A receipt attributed directly to either pending alias is rejected. The current controlled-test profiles use already verified stable specialists for executable review and do not convert either alias into an identity.
+
+## Policy composition
+
+The execution envelope cannot weaken Policy Assurance v2. Final disposition is the strictest of:
+
+- per-skill profile validation;
+- handoff-evidence routing;
+- deterministic Policy Assurance v2.
+
+Therefore a `DENY` from any layer remains `DENY`; a `HOLD` cannot be upgraded to `ECAC` by another layer; and AI remains advisory-only behind the AI Counsel Firewall.
+
+## Hard boundaries
+
+This tranche creates no production authority. The following remain false:
+
+```yaml
+authority_granted: false
+capability_grant_created: false
+provider_write: false
+custody: false
+token_issuance: false
+money_movement: false
+rights_grant: false
+chain_broadcast: false
+effective_price_publication: false
+checkout_activation: false
+merge_authorized: false
+phase_advancement: false
+ai_final_authority: false
+```
+
+Independent review evidence must be produced by the independent reviewer lane itself. The Wallet Agent may validate and route that evidence; it may not fabricate it.
