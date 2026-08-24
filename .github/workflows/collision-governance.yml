@@ -1,0 +1,84 @@
+name: Collision Governance
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '40 * * * *'
+    - cron: '50 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: collision-governance-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  collision-governance:
+    name: CrownThrive collision, convergence and refactor governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact workflow ref
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate collision governance contract
+        run: python3 scripts/validate_collision_governance.py
+
+      - name: Validate canonical Founder Orchestrator identity
+        run: python3 scripts/validate_founder_orchestrator_identity_reconciliation.py
+
+      - name: Deterministic collision controller self-test
+        run: python3 scripts/governed_collision_control.py --mode self-test
+
+      - name: Deterministic convergence/refactor self-test
+        run: python3 scripts/governed_convergence_refactor.py --self-test
+
+      - name: Pull-request collision preflight
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          python3 scripts/governed_collision_preflight_policy.py
+          --repo "${GITHUB_REPOSITORY}"
+          --pr "${{ github.event.pull_request.number }}"
+
+      - name: Hourly queue and throttle review
+        if: (github.event_name == 'schedule' && github.event.schedule == '40 * * * *') || github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          python3 scripts/governed_collision_control.py
+          --mode queue
+          --repo "${GITHUB_REPOSITORY}"
+
+      - name: Rotate attention and emit whole-estate refactor plan
+        if: (github.event_name == 'schedule' && github.event.schedule == '40 * * * *') || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          python3 scripts/governed_convergence_refactor.py
+          --repo "${GITHUB_REPOSITORY}"
+
+      - name: Post-merge and staleness reconciliation
+        if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule == '50 * * * *')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          python3 scripts/governed_collision_control.py
+          --mode postmerge
+          --repo "${GITHUB_REPOSITORY}"
+          --merged-sha "${GITHUB_SHA}"
+
+      - name: Post-merge convergence/refactor refresh
+        if: github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule == '50 * * * *')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          python3 scripts/governed_convergence_refactor.py
+          --repo "${GITHUB_REPOSITORY}"
