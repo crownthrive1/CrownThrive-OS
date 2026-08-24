@@ -152,9 +152,10 @@ jobs:
             docs/architecture/COMMERCIAL_PROJECTION.md \
             docs/architecture/DAIL_PUBLIC_CONTRACT.md \
             docs/architecture/REPOSITORY_BOUNDARIES.md | sort)"
-          if [ "$staged" != "$expected" ]; then
-            echo 'staged child paths differ from governed managed-path allowlist'
-            printf 'staged:\n%s\nexpected:\n%s\n' "$staged" "$expected"
+          unexpected="$(comm -23 <(printf '%s\n' "$staged") <(printf '%s\n' "$expected"))"
+          if [ -n "$unexpected" ]; then
+            echo 'staged child paths escaped the governed managed-path allowlist'
+            printf 'unexpected:\n%s\nstaged:\n%s\nexpected allowlist:\n%s\n' "$unexpected" "$staged" "$expected"
             exit 1
           fi
 
