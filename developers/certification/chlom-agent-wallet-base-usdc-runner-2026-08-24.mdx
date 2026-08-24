@@ -1,0 +1,89 @@
+---
+title: "CHLOM Agent Wallet Base/USDC Runner Certification — 2026-08-24"
+description: "Public-safe certification of the production-ready Trust Wallet Agent Kit persistent runner package for the dedicated CHLOM Agent Wallet on Base with native USDC."
+---
+
+# CHLOM Agent Wallet Base/USDC Runner Certification — 2026-08-24
+
+## State
+
+**PRODUCTION RUNNER PACKAGE READY / WALLET CREATION PENDING ON PERSISTENT RUNNER**
+
+The dedicated autonomous CHLOM Agent Wallet stack is built around Trust Wallet Agent Kit.
+
+Canonical identity:
+
+- runner: `ct.runner.chlom-agent-wallet.base-usdc.v1`
+- wallet mode: `ct.wallet-mode.agent-wallet.autonomous.v1`
+- provider: Trust Wallet Agent Kit
+- primary chain: Base mainnet (`eip155:8453`)
+- primary asset: native Circle USDC
+- USDC contract: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+- bridged USDbC: not an approved default asset
+- authority ceiling: D2
+- D3: human-reserved
+- `money_movement_authorized=true`
+- exact ThriveEvergreen/CHLOM ECAC required
+- current unattended value ceiling: `0`
+
+## Source package
+
+- `runners/chlom-agent-wallet/README.md`
+- `runners/chlom-agent-wallet/bin/bootstrap.sh`
+- `runners/chlom-agent-wallet/bin/health.sh`
+- `runners/chlom-agent-wallet/bin/preflight.sh`
+- `runners/chlom-agent-wallet/config/policy.base-usdc.json`
+- `runners/chlom-agent-wallet/systemd/chlom-agent-wallet.service`
+- `developers/contracts/chlom-agent-wallet-base-usdc-production.v1.json`
+
+The bootstrap uses Trust Wallet's official Agent Kit installer and official `twak wallet create` flow. Wallet creation output is treated as potentially sensitive and is never retained in source or ThriveBase.
+
+## Runtime control plane
+
+Production endpoint:
+
+`https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-agent-wallet-control`
+
+Runtime version: `1.0.0`
+
+Runtime digest: `97b61318d4025297a98216940711bc15114a161030172372e1417abaecf3450e`
+
+Current readback:
+
+- environment: production
+- runner state: `package_ready`
+- address state: `pending`
+- health state: `pending`
+- public address: null
+- money movement authorized: true
+- execution effective: false
+- durable runner bound: false
+- wallet creation performed: false
+- max unattended value minor: 0
+- private material stored in ThriveBase: false
+
+## VM / ThriveEvergreen binding
+
+The runner is bound remotely to `ct.surface.virality-music.production` at D2. No native Sites source mutation is required for the control binding.
+
+ThriveEvergreen metadata now identifies Base/USDC as the default dedicated Agent Wallet execution corridor while preserving exact ECAC and the zero unattended ceiling.
+
+## Activation gate
+
+The stack becomes transaction-effective only after the persistent runner:
+
+1. installs Trust Wallet Agent Kit;
+2. authenticates the vaulted Trust Wallet developer credentials locally;
+3. creates the dedicated Agent Wallet locally;
+4. derives the Base public address;
+5. registers only that public address in ThriveBase;
+6. passes wallet status, Base balance/portfolio and no-value signing canaries;
+7. passes unauthorized-sign negative testing;
+8. passes transaction simulation and exact ECAC enforcement;
+9. preserves read-after-write and rollback/compensation evidence.
+
+Until that activation sequence is complete, `money_movement_authorized=true` describes production capability, while `execution_effective=false` correctly reflects the missing persistent wallet binding.
+
+## Custody boundary
+
+No mnemonic, private key, wallet password or recovery material is accepted by the CrownThrive control endpoint or stored in the institutional database. Private material remains local to the persistent runner.
