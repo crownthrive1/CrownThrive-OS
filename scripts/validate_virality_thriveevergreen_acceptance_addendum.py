@@ -875,6 +875,10 @@ def validate() -> dict[str, Any]:
     snapshot = managed_wallet.get("acceptance_snapshot", {})
     require(snapshot.get("snapshot_id") == "517d9cdd-eee9-4645-bfe1-f9078636e157" and snapshot.get("state") == "AUTHORIZED_CONFIGURED_NOT_EXECUTED" and snapshot.get("evidence_sha256") == "fa406254e0ce007be20b021c55b43f3017105c6e72a47b666277373ed1c29348", "managed-wallet acceptance snapshot drift")
     require(snapshot.get("authority_vs_execution_distinction_preserved") is True and snapshot.get("snapshot_is_independent_economic_authority") is False, "managed-wallet snapshot manufactured authority")
+    latest_snapshot = managed_wallet.get("latest_scheduled_snapshot", {})
+    require(latest_snapshot.get("snapshot_id") == "2e3cf817-47d1-4118-a306-c129d056cf94" and latest_snapshot.get("state") == "AUTHORIZED_CONFIGURED_NOT_EXECUTED" and latest_snapshot.get("observed_at") == "2026-08-24T08:47:00.113866Z", "managed-wallet first scheduled snapshot drift")
+    require(latest_snapshot.get("money_movement_execution_count") == latest_snapshot.get("unattended_value_ceiling_minor") == 0 and latest_snapshot.get("candidate_decision") == latest_snapshot.get("checkout_state") == "HOLD", "managed-wallet scheduled snapshot manufactured execution")
+    require(latest_snapshot.get("evidence_sha256") == "fa406254e0ce007be20b021c55b43f3017105c6e72a47b666277373ed1c29348" and latest_snapshot.get("authority_vs_execution_distinction_preserved") is True and latest_snapshot.get("economic_authority") is False, "managed-wallet scheduled snapshot manufactured authority")
     require(managed_wallet.get("independent_acceptance_state") == "HOLD_CUSTODY_IDENTITY_SOURCE_WRAPPER_AND_EXECUTION_GATES", "managed-wallet independent HOLD hidden")
 
     require(planes.get("trustwallet", {}).get("execution_authorized") is False, "Trust Wallet execution activated")
@@ -942,14 +946,20 @@ def validate() -> dict[str, Any]:
         "job_name": "ct-commerce-control-acceptance-snapshot-v1",
         "schedule": "47 * * * *",
         "active": True,
-        "run_history": "NONE_OBSERVED",
+        "run_history": "SUCCEEDED_1_RUN_OBSERVED",
+        "latest_run_id": "16414",
+        "latest_run_started_at": "2026-08-24T08:47:00.060415Z",
+        "latest_run_completed_at": "2026-08-24T08:47:00.117799Z",
+        "latest_run_status": "succeeded",
+        "latest_run_return": "1 row",
+        "snapshot_rows_after_run": 2,
         "fabric_inventory_present": False,
         "same_minute_existing_job_id": 48,
         "same_minute_existing_job_name": "crownthrive-interoperability-hourly-subroute-v1",
         "semantic_duplicate": False,
         "economic_effect": False,
     }, "commerce acceptance snapshot scheduler evidence drift")
-    require(automation.get("scheduler_topology_state") == "HOLD_OBSERVER_BUSINESS_RECEIPTS_FAILING_23514_AND_NEW_ACCEPTANCE_SNAPSHOT_ACTIVE_NO_RUN_HISTORY_NOT_IN_V1_FABRIC_INVENTORY", "scheduler topology HOLD hidden")
+    require(automation.get("scheduler_topology_state") == "HOLD_OBSERVER_BUSINESS_RECEIPTS_FAILING_23514_AND_ACCEPTANCE_SNAPSHOT_FIRST_RUN_SUCCEEDED_NOT_IN_V1_FABRIC_INVENTORY_REPOSITORY_SOURCE_ABSENT", "scheduler topology HOLD hidden")
     receipts = acceptance.get("latest_receipts", {})
     wallet_canaries = receipts.get("managed_agent_wallet_canaries", [])
     require([item.get("receipt_type") for item in wallet_canaries] == ["wallet_initialized", "signature_canary", "base_chain_canary"], "managed-wallet canary receipt scope drift")
@@ -959,6 +969,7 @@ def validate() -> dict[str, Any]:
         "8c906a39f18c8cdd4001a8b7c7b3b9757a5c904f7e67d280d212831485b801b3",
     ], "managed-wallet canary evidence digest drift")
     acceptance_snapshot = receipts.get("commerce_acceptance_snapshot", {})
+    require(acceptance_snapshot.get("snapshot_id") == "2e3cf817-47d1-4118-a306-c129d056cf94" and acceptance_snapshot.get("schedule_run_id") == "16414", "latest scheduled commerce acceptance snapshot identity drift")
     require(acceptance_snapshot.get("state") == "AUTHORIZED_CONFIGURED_NOT_EXECUTED" and acceptance_snapshot.get("money_movement_execution_count") == 0 and acceptance_snapshot.get("candidate_decision") == acceptance_snapshot.get("checkout_state") == "HOLD" and acceptance_snapshot.get("economic_authority") is False, "commerce acceptance snapshot manufactured execution or authority")
     observer = receipts.get("legacy_observer", {})
     require(observer.get("cron_scheduler_state") == "SUCCEEDED" and observer.get("business_run_state") == "FAILED" and observer.get("business_error_code") == "23514", "observer scheduler/business result distinction hidden")
@@ -1051,8 +1062,8 @@ def validate() -> dict[str, Any]:
     require(isinstance(institutional, dict), "missing institutionalization state")
     dail = institutional.get("dail", {})
     require(str(dail.get("chain_anchor_state", "")).startswith("HOLD"), "DAIL anchor hold hidden")
-    require(isinstance(dail.get("event_count"), int) and dail.get("event_count") >= 1486, "DAIL point-in-time event count predates managed-wallet evidence")
-    require(isinstance(dail.get("latest_sequence"), int) and dail.get("latest_sequence") >= 1774, "DAIL point-in-time sequence predates managed-wallet evidence")
+    require(isinstance(dail.get("event_count"), int) and dail.get("event_count") >= 1507, "DAIL point-in-time event count predates scheduled acceptance evidence")
+    require(isinstance(dail.get("latest_sequence"), int) and dail.get("latest_sequence") >= 1796, "DAIL point-in-time sequence predates scheduled acceptance evidence")
     require(isinstance(dail.get("head_hash"), str) and SHA256_RE.fullmatch(dail["head_hash"]) is not None, "DAIL point-in-time head hash malformed")
     require(isinstance(dail.get("latest_payload_sha256"), str) and SHA256_RE.fullmatch(dail["latest_payload_sha256"]) is not None, "DAIL latest payload digest malformed")
     require(dail.get("historical_integrity_replay_through_sequence") == 1699 and dail.get("current_tail_full_integrity_replay_performed") is False, "DAIL current-tail replay gap hidden")
@@ -1077,6 +1088,7 @@ def validate() -> dict[str, Any]:
             "signature_ref": None,
         },
     ], "managed-wallet DAIL receipt binding drift")
+    require(dail.get("scheduled_acceptance_snapshot_new_dail_event_observed") is False, "scheduled acceptance snapshot DAIL append was manufactured")
     drive = institutional.get("drive", {})
     require(drive.get("canonical_integration_record_upload_state") == "VERIFIED_PRIVATE_READ_AFTER_WRITE", "canonical Drive custody not verified")
     require(drive.get("acceptance_addendum_upload_state") == "GITHUB_REVIEW_BRANCH_PENDING_OPTIONAL_PRIVATE_CUSTODY", "addendum custody scope hidden")
@@ -1106,7 +1118,7 @@ def validate() -> dict[str, Any]:
     require(github.get("pre_acceptance_parent_collision_rtc_state") == "FAIL_CLOSED" and github.get("pre_acceptance_parent_collision_rtc_blocker") == "COLLISION_RTC_GLOBAL_OPEN_PR_317_EXCEEDS_500_FILE_BOUND", "collision RTC blocker hidden")
     require(github.get("pre_acceptance_parent_candidate_contract_collision_tests") == "PASS", "candidate-contract collision tests hidden")
     require(github.get("pre_acceptance_parent_github_advanced_security_state") == "FAIL_UNRESOLVED", "Advanced Security failure hidden")
-    require(github.get("prior_published_acceptance_head") == "58cbce036fdb4c95405694a5fa82fec9acc472e0" and github.get("prior_published_acceptance_head_workflow_runs") == github.get("prior_published_acceptance_head_workflow_successes") == 5, "prior published acceptance workflow readback drift")
+    require(github.get("prior_published_acceptance_head") == "0e87c8c0d8bf5b7bc7e91a6ef81b845afe16dcc0" and github.get("prior_published_acceptance_head_workflow_runs") == github.get("prior_published_acceptance_head_workflow_successes") == 5, "prior published acceptance workflow readback drift")
     require(github.get("merge_state") == "NOT_MERGED_REVIEW_REQUIRED", "unsafe merge state")
     require(github.get("main_branch_protected") is False, "GitHub protection evidence drift")
 
@@ -1139,7 +1151,7 @@ def validate() -> dict[str, Any]:
         "MANAGED_AGENT_WALLET_UNAUTHORIZED_SIGN_NEGATIVE_CANARY_NOT_PROVEN",
         "MANAGED_AGENT_WALLET_PRODUCTION_BROADCAST_PROVIDER_READ_AFTER_WRITE_AND_COMPENSATION_NOT_CERTIFIED",
         "MANAGED_AGENT_WALLET_VAULT_PRINCIPAL_SEPARATION_ROTATION_AND_RECOVERY_READBACK_NOT_PROVEN",
-        "NEW_ACCEPTANCE_SNAPSHOT_SCHEDULE_ACTIVE_NO_RUN_HISTORY_AND_NOT_IN_FABRIC_INVENTORY",
+        "ACCEPTANCE_SNAPSHOT_FIRST_RUN_SUCCEEDED_BUT_NOT_IN_FABRIC_INVENTORY_AND_REPOSITORY_SOURCE_ABSENT",
         "LEGACY_OBSERVER_BUSINESS_RECEIPTS_FAIL_23514_DESPITE_PG_CRON_SUCCESS",
         "DAIL_CURRENT_TAIL_FULL_INTEGRITY_REPLAY",
         "DAIL_CHAIN_ANCHORING",
