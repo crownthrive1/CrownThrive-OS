@@ -1,0 +1,41 @@
+name: Pre-Wave 6 Navigation Reconciliation Writer
+
+on:
+  push:
+    branches:
+      - docs-nav-reconcile-before-wave6-20260824
+    paths:
+      - 'scripts/reconcile_pre_wave6_navigation.py'
+      - '.github/workflows/pre-wave6-navigation-reconcile-write.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile-navigation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Reconcile navigation
+        run: python scripts/reconcile_pre_wave6_navigation.py --write
+      - name: Validate navigation
+        run: python scripts/reconcile_pre_wave6_navigation.py
+      - name: Commit navigation-only change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add docs.json
+          if git diff --cached --quiet; then
+            echo 'Navigation already reconciled.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-navigation-bot'
+          git config user.email '109931778+mintlify[bot]@users.noreply.github.com'
+          git commit -m 'Reconcile documentation navigation before Wave 6'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
