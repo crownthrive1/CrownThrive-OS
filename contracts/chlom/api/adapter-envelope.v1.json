@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.0",
+  "contract_id": "ct.contract.chlom.adapter-envelope.v1",
+  "contract_version": "1.0.0",
+  "phase": "2.99",
+  "state": "prototype_non_production",
+  "authority": {
+    "roadmap": "CT-ADR-ROADMAP-010/ten_phase_v1",
+    "governance": "CT-ADR-GOV-011",
+    "provider_is_sovereign_authority": false,
+    "provider_capability_implies_deployment": false,
+    "provider_capability_implies_entitlement": false,
+    "production_provider_mutation_enabled": false
+  },
+  "classification": {
+    "side_effect_classes": ["none", "read", "bounded_write", "destructive"],
+    "data_classes": ["public", "internal", "restricted"],
+    "autonomy_classes": ["D0", "D1", "D2", "D3"],
+    "phase_2_99_allowed_side_effects": ["none", "read"],
+    "phase_2_99_write_behavior": "fail_closed"
+  },
+  "request_envelope": {
+    "required": [
+      "request_id",
+      "correlation_id",
+      "idempotency_key",
+      "adapter_id",
+      "operation_id",
+      "side_effect_class",
+      "data_class",
+      "risk_class",
+      "actor",
+      "input"
+    ],
+    "actor_required": ["actor_id", "org_id", "authenticated"],
+    "rules": {
+      "request_id": "non_empty_string",
+      "correlation_id": "non_empty_string",
+      "idempotency_key": "non_empty_string",
+      "adapter_id": "non_empty_string",
+      "operation_id": "non_empty_string",
+      "side_effect_class": "enum:classification.side_effect_classes",
+      "data_class": "enum:classification.data_classes",
+      "risk_class": "enum:classification.autonomy_classes",
+      "actor.authenticated": "must_be_true_for_execution",
+      "input": "object_only"
+    }
+  },
+  "response_envelope": {
+    "required": [
+      "request_id",
+      "correlation_id",
+      "adapter_id",
+      "operation_id",
+      "outcome",
+      "side_effect_performed",
+      "evidence"
+    ],
+    "outcomes": ["allow", "deny", "hold", "error"],
+    "evidence_required": [
+      "observed_at",
+      "provider_deployment_state",
+      "sanitization_applied",
+      "rate_limit_checked"
+    ],
+    "rules": {
+      "side_effect_performed": "must_be_false_in_phase_2_99",
+      "provider_deployment_state": "verified|unverified|not_applicable",
+      "provider_status": "integer_or_null",
+      "response_sha256": "hex_sha256_or_empty_on_pre_provider_failure",
+      "dail_event_ref": "opaque_reference_only"
+    }
+  },
+  "standard_errors": [
+    {"code": "AUTH_REQUIRED", "default_outcome": "deny", "retriable": false},
+    {"code": "AUTHZ_DENIED", "default_outcome": "deny", "retriable": false},
+    {"code": "SCHEMA_INVALID", "default_outcome": "deny", "retriable": false},
+    {"code": "GOVERNANCE_APPROVAL_REQUIRED", "default_outcome": "hold", "retriable": false},
+    {"code": "HUMAN_AUTHORITY_REQUIRED", "default_outcome": "hold", "retriable": false},
+    {"code": "PROVIDER_STATE_UNVERIFIED", "default_outcome": "hold", "retriable": false},
+    {"code": "PROVIDER_UNAVAILABLE", "default_outcome": "error", "retriable": true},
+    {"code": "PROVIDER_TIMEOUT", "default_outcome": "error", "retriable": true},
+    {"code": "RATE_LIMITED", "default_outcome": "error", "retriable": true},
+    {"code": "RESPONSE_TOO_LARGE", "default_outcome": "error", "retriable": false},
+    {"code": "RESPONSE_SCHEMA_INVALID", "default_outcome": "error", "retriable": false},
+    {"code": "WRITE_GATE_CLOSED", "default_outcome": "deny", "retriable": false},
+    {"code": "IDEMPOTENCY_CONFLICT", "default_outcome": "deny", "retriable": false},
+    {"code": "WEBHOOK_SIGNATURE_INVALID", "default_outcome": "deny", "retriable": false},
+    {"code": "WEBHOOK_REPLAY", "default_outcome": "deny", "retriable": false}
+  ],
+  "future_write_contract": {
+    "active": false,
+    "required_sequence": [
+      "sovereign_authorization",
+      "read_before",
+      "bounded_allowlisted_write",
+      "immediate_readback",
+      "exact_field_comparison",
+      "dail_evidence",
+      "rollback_or_compensating_action"
+    ],
+    "wildcard_field_write": false,
+    "credential_rotation": "D3_human_reserved",
+    "privilege_expansion": "D3_human_reserved"
+  },
+  "webhook_contract": {
+    "active": "schema_only",
+    "required_controls": [
+      "sender_authenticity",
+      "signature_verification",
+      "timestamp_or_nonce",
+      "replay_detection",
+      "idempotency",
+      "bounded_body_size",
+      "sanitization",
+      "dail_evidence",
+      "retry_and_dead_letter_evidence"
+    ],
+    "unsigned_delivery": "deny",
+    "replayed_delivery": "deny"
+  },
+  "mcp_contract": {
+    "protocol": "2026-07-28",
+    "tool_exposure": "governed_enabled_read_only_only",
+    "input_schema_validation_required": true,
+    "private_cache_required": true,
+    "provider_body_sanitization_required": true,
+    "request_evidence_required": true,
+    "mutating_tools_phase_2_99": "disabled"
+  },
+  "docs_impact": "docs_updated",
+  "rollback": "revert_child_packet; no provider state or production data mutation exists"
+}

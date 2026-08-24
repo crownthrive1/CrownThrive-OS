@@ -1,0 +1,289 @@
+{
+  "schema_version": "1.0",
+  "fixture_id": "ct.fixture.chlom.adapter-conformance.v1",
+  "contract_id": "ct.contract.chlom.adapter-envelope.v1",
+  "phase": "2.99",
+  "state": "prototype_mock_only",
+  "cases": [
+    {
+      "case_id": "read_verified_allow",
+      "request": {
+        "request_id": "req-001",
+        "correlation_id": "corr-001",
+        "idempotency_key": "idem-001",
+        "adapter_id": "ct.adapter.mock.read",
+        "operation_id": "resource.read",
+        "side_effect_class": "read",
+        "data_class": "internal",
+        "risk_class": "D0",
+        "actor": {"actor_id": "actor-1", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1"}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "allow", "error_code": null, "side_effect_performed": false}
+    },
+    {
+      "case_id": "missing_auth_deny",
+      "request": {
+        "request_id": "req-002",
+        "correlation_id": "corr-002",
+        "idempotency_key": "idem-002",
+        "adapter_id": "ct.adapter.mock.read",
+        "operation_id": "resource.read",
+        "side_effect_class": "read",
+        "data_class": "internal",
+        "risk_class": "D0",
+        "actor": {"actor_id": "actor-2", "org_id": "org-1", "authenticated": false},
+        "input": {"resource_org_id": "org-1"}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "deny", "error_code": "AUTH_REQUIRED", "side_effect_performed": false}
+    },
+    {
+      "case_id": "cross_org_deny",
+      "request": {
+        "request_id": "req-003",
+        "correlation_id": "corr-003",
+        "idempotency_key": "idem-003",
+        "adapter_id": "ct.adapter.mock.read",
+        "operation_id": "resource.read",
+        "side_effect_class": "read",
+        "data_class": "internal",
+        "risk_class": "D0",
+        "actor": {"actor_id": "actor-3", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-2"}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "deny", "error_code": "AUTHZ_DENIED", "side_effect_performed": false}
+    },
+    {
+      "case_id": "provider_unverified_hold",
+      "request": {
+        "request_id": "req-004",
+        "correlation_id": "corr-004",
+        "idempotency_key": "idem-004",
+        "adapter_id": "ct.adapter.mock.read",
+        "operation_id": "resource.read",
+        "side_effect_class": "read",
+        "data_class": "internal",
+        "risk_class": "D0",
+        "actor": {"actor_id": "actor-4", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1"}
+      },
+      "provider": {
+        "deployment_state": "unverified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "hold", "error_code": "PROVIDER_STATE_UNVERIFIED", "side_effect_performed": false}
+    },
+    {
+      "case_id": "provider_unavailable_error",
+      "request": {
+        "request_id": "req-005",
+        "correlation_id": "corr-005",
+        "idempotency_key": "idem-005",
+        "adapter_id": "ct.adapter.mock.read",
+        "operation_id": "resource.read",
+        "side_effect_class": "read",
+        "data_class": "internal",
+        "risk_class": "D0",
+        "actor": {"actor_id": "actor-5", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1"}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": false,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "error", "error_code": "PROVIDER_UNAVAILABLE", "side_effect_performed": false}
+    },
+    {
+      "case_id": "rate_limit_error",
+      "request": {
+        "request_id": "req-006",
+        "correlation_id": "corr-006",
+        "idempotency_key": "idem-006",
+        "adapter_id": "ct.adapter.mock.read",
+        "operation_id": "resource.read",
+        "side_effect_class": "read",
+        "data_class": "internal",
+        "risk_class": "D0",
+        "actor": {"actor_id": "actor-6", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1"}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": false,
+        "response_schema_valid": true,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "error", "error_code": "RATE_LIMITED", "side_effect_performed": false}
+    },
+    {
+      "case_id": "invalid_response_error",
+      "request": {
+        "request_id": "req-007",
+        "correlation_id": "corr-007",
+        "idempotency_key": "idem-007",
+        "adapter_id": "ct.adapter.mock.read",
+        "operation_id": "resource.read",
+        "side_effect_class": "read",
+        "data_class": "internal",
+        "risk_class": "D0",
+        "actor": {"actor_id": "actor-7", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1"}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": false,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "error", "error_code": "RESPONSE_SCHEMA_INVALID", "side_effect_performed": false}
+    },
+    {
+      "case_id": "write_gate_closed_deny",
+      "request": {
+        "request_id": "req-008",
+        "correlation_id": "corr-008",
+        "idempotency_key": "idem-008",
+        "adapter_id": "ct.adapter.mock.write",
+        "operation_id": "resource.update",
+        "side_effect_class": "bounded_write",
+        "data_class": "internal",
+        "risk_class": "D2",
+        "actor": {"actor_id": "actor-8", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1", "governance_approved": true}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "deny", "error_code": "WRITE_GATE_CLOSED", "side_effect_performed": false}
+    },
+    {
+      "case_id": "d2_missing_governance_hold",
+      "request": {
+        "request_id": "req-009",
+        "correlation_id": "corr-009",
+        "idempotency_key": "idem-009",
+        "adapter_id": "ct.adapter.mock.read",
+        "operation_id": "resource.read",
+        "side_effect_class": "read",
+        "data_class": "restricted",
+        "risk_class": "D2",
+        "actor": {"actor_id": "actor-9", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1", "governance_approved": false}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "hold", "error_code": "GOVERNANCE_APPROVAL_REQUIRED", "side_effect_performed": false}
+    },
+    {
+      "case_id": "d3_human_authority_hold",
+      "request": {
+        "request_id": "req-010",
+        "correlation_id": "corr-010",
+        "idempotency_key": "idem-010",
+        "adapter_id": "ct.adapter.mock.read",
+        "operation_id": "resource.read",
+        "side_effect_class": "read",
+        "data_class": "restricted",
+        "risk_class": "D3",
+        "actor": {"actor_id": "actor-10", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1", "governance_approved": true}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "request_response"
+      },
+      "expected": {"outcome": "hold", "error_code": "HUMAN_AUTHORITY_REQUIRED", "side_effect_performed": false}
+    },
+    {
+      "case_id": "unsigned_webhook_deny",
+      "request": {
+        "request_id": "req-011",
+        "correlation_id": "corr-011",
+        "idempotency_key": "idem-011",
+        "adapter_id": "ct.adapter.mock.webhook",
+        "operation_id": "event.receive",
+        "side_effect_class": "none",
+        "data_class": "internal",
+        "risk_class": "D0",
+        "actor": {"actor_id": "provider-webhook", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1"}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "webhook",
+        "signature_valid": false,
+        "replay_detected": false
+      },
+      "expected": {"outcome": "deny", "error_code": "WEBHOOK_SIGNATURE_INVALID", "side_effect_performed": false}
+    },
+    {
+      "case_id": "replayed_webhook_deny",
+      "request": {
+        "request_id": "req-012",
+        "correlation_id": "corr-012",
+        "idempotency_key": "idem-012",
+        "adapter_id": "ct.adapter.mock.webhook",
+        "operation_id": "event.receive",
+        "side_effect_class": "none",
+        "data_class": "internal",
+        "risk_class": "D0",
+        "actor": {"actor_id": "provider-webhook", "org_id": "org-1", "authenticated": true},
+        "input": {"resource_org_id": "org-1"}
+      },
+      "provider": {
+        "deployment_state": "verified",
+        "available": true,
+        "rate_allowed": true,
+        "response_schema_valid": true,
+        "transport": "webhook",
+        "signature_valid": true,
+        "replay_detected": true
+      },
+      "expected": {"outcome": "deny", "error_code": "WEBHOOK_REPLAY", "side_effect_performed": false}
+    }
+  ]
+}
