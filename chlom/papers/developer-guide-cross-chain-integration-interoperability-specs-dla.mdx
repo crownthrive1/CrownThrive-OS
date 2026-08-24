@@ -1,0 +1,153 @@
+---
+title: "Developer Guide — Cross-Chain Integration & Interoperability Specs for DLA (High-Level)"
+sidebarTitle: "DLA Cross-Chain Integration"
+description: "Exact-title reconstruction of the historical DLA cross-chain integration and interoperability guide, preserving bridge, identity, license-state and evidence portability concepts without asserting deployed bridges or inventing lost protocols."
+icon: "bridge"
+keywords: ["DLA cross-chain integration", "interoperability", "CHLOM developer guide", "license portability", "bridge claims"]
+---
+
+# Developer Guide — Cross-Chain Integration & Interoperability Specs for DLA (High-Level)
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.devguide-dla-cross-chain-interoperability
+exact_recovered_title: Developer Guide — Cross-Chain Integration & Interoperability Specs for DLA (High-Level)
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+historical_DLA: Decentralized Licensing Authority
+current_DLA: Dynamic Licensing Asset
+bridge_deployment_claim: none
+```
+
+## Developer objective
+
+This guide reconstructs the architectural problem implied by the lost title: how a CHLOM licensing decision or governed rights object can be referenced across external networks without allowing a foreign chain, bridge, wrapped token or provider to manufacture rights.
+
+## Source-grounded lineage
+
+Recovered CHLOM technical sources discuss interoperability with Ethereum, Polkadot/XCM, Cosmos-style networks, mirrored/wrapped assets, cross-chain identity proofs and compliant transfers. Those are research/target architecture concepts unless current deployment evidence exists.
+
+## Current interoperability invariant
+
+```text
+foreign representation
+      !=
+source rights
+      !=
+issuer authority
+      !=
+active Dynamic Licensing Asset
+```
+
+Cross-chain transport can carry evidence or a representation; it cannot expand the underlying grant.
+
+## Reference architecture
+
+```text
+SOURCE CHAIN / INSTITUTIONAL STATE
+          |
+   canonical DLA + rights refs
+          |
+     bridge/export claim
+          |
+ evidence / proof / finality checks
+          |
+   CHLOM bridge-claims layer
+          |
+      imported projection
+          |
+Rules Registry / Approval Service
+          |
+local entitlement/use decision
+          |
+        DAIL
+```
+
+## Interoperability objects
+
+A high-level portable claim should identify:
+
+```yaml
+cross_chain_claim:
+  claim_id: stable
+  source_network: explicit
+  source_tx_or_state_ref: explicit
+  source_asset_ref: explicit
+  source_rights_or_dla_ref: explicit
+  subject_or_holder_ref: optional|required_by_profile
+  claim_type: ownership|license_state|credential|attestation|other
+  source_finality_ref: required
+  proof_or_attestation_refs: []
+  observed_at: timestamp
+  freshness_profile_ref: required
+  imported_status: candidate|verified|held|rejected|superseded
+```
+
+This is a current-safe reconstruction, not a recovered exact schema.
+
+## Export rule
+
+Only export claims that the local authority is permitted to attest. A bridge service may attest to observed state; it does not become a licensor merely by operating the bridge.
+
+## Import rule
+
+Imported state is evidence. It must be evaluated against current CHLOM policy before becoming an entitlement or licensing state.
+
+```text
+verified foreign claim
+      +
+current policy
+      +
+current rights/authority mapping
+      =
+PASS | HOLD | DENY
+```
+
+## Identity portability
+
+DID/credential proofs can be referenced across environments where verification methods and issuer trust are recognized. Identity portability does not imply license portability automatically.
+
+## Asset wrapping/mirroring
+
+A wrapped or mirrored token representing an asset must retain a link to the canonical source and cannot claim broader rights than the source object.
+
+```text
+wrapped_rights <= canonical_rights
+```
+
+## Replay/double-use controls
+
+Cross-chain designs need controls for duplicate claims, replayed proofs, stale finality, reorgs, already-consumed entitlements and conflicting source updates.
+
+## Revocation propagation
+
+When canonical licensing/credential state becomes revoked, expired or corrected, dependent cross-chain projections should be re-evaluated and superseded/held according to policy.
+
+## Failure modes
+
+HOLD or reject when:
+
+- source network cannot be verified;
+- finality is insufficient;
+- proof format is unsupported;
+- source claim conflicts with institutional rights evidence;
+- imported data is stale;
+- bridge provider is unavailable and current state cannot be proven;
+- canonical DLA has been superseded or revoked.
+
+## Current links
+
+- [Bridge Claims Pallet](/chlom/runtime-bridge-claims-pallet)
+- [Bridge Attestation Mirror Pallet](/chlom/runtime-bridge-attestation-mirror-pallet)
+- [Bridge Claims & Messaging Architecture](/chlom/bridge-claims-messaging-interoperability-proof-portability)
+- [Dynamic Licensing Asset](/chlom/systems/dynamic-licensing-asset)
+- [DAIL](/chlom/systems/dail-decentralized-autonomous-information-ledger)
+
+## Nonclaims
+
+This article does not claim a production bridge, current XCM/Ethereum/Cosmos integration, deployed wrapped asset, or legal portability of any real-world license across jurisdictions.
+
+## Status
+
+`TITLE_RECOVERED + CROSS_CHAIN_ARCHITECTURE_RECONSTRUCTED + DEPLOYED_PROTOCOLS_NOT_INVENTED + EXACT_BODY_NOT_LOCATED`
