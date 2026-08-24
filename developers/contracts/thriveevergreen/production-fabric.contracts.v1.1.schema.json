@@ -1,0 +1,433 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/thriveevergreen/production-fabric.contracts.v1.1.schema.json",
+  "title": "ThriveEvergreen Production Fabric deterministic/advisory request contracts v1.1",
+  "description": "Closed, least-data request schemas for local runtime helpers. This schema does not create a network dispatcher or economic authority.",
+  "x-crownthrive-contract-version": "1.1.0",
+  "x-crownthrive-generalized-dispatch": "DISABLED",
+  "x-crownthrive-authority-invariants": {
+    "exact_ecac_external": true,
+    "d3_human_reserved": true,
+    "self_approval": false,
+    "provider_success_manufactures_authority": false,
+    "money_movement_authorized": false,
+    "provider_write_authorized": false,
+    "rights_grant_authorized": false,
+    "price_publication_authorized": false,
+    "entitlement_mutation_authorized": false
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/normalizeCandidateRequest" },
+    { "$ref": "#/$defs/evaluateEcacRequest" },
+    { "$ref": "#/$defs/computeSkuKeyRequest" },
+    { "$ref": "#/$defs/classifyTopologyRequest" },
+    { "$ref": "#/$defs/computePriceEnvelopeRequest" },
+    { "$ref": "#/$defs/guardMarginRequest" },
+    { "$ref": "#/$defs/reduceProviderReadbackRequest" },
+    { "$ref": "#/$defs/reduceEntitlementStateRequest" },
+    { "$ref": "#/$defs/reconcileSettlementRequest" },
+    { "$ref": "#/$defs/planRollbackCompensationRequest" },
+    { "$ref": "#/$defs/advisoryDemandScoreRequest" },
+    { "$ref": "#/$defs/advisoryPriceElasticityRequest" },
+    { "$ref": "#/$defs/advisoryAnomalyScoreRequest" }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "stableId": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]+$"
+    },
+    "effectId": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9._:-]+$"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "evidenceState": {
+      "enum": ["PASS", "HOLD", "DENY", "NOT_APPLICABLE"]
+    },
+    "candidateEvidenceState": {
+      "enum": ["PASS", "HOLD", "DENY"]
+    },
+    "nonnegativeMinor": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "finiteNumber": {
+      "type": "number"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "subjectRef",
+        "exactVersionRef",
+        "contentSha256",
+        "rightsState",
+        "channel",
+        "currency"
+      ],
+      "properties": {
+        "candidateId": { "$ref": "#/$defs/uuid" },
+        "subjectRef": { "$ref": "#/$defs/stableId" },
+        "exactVersionRef": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "contentSha256": { "$ref": "#/$defs/sha256" },
+        "rightsState": { "$ref": "#/$defs/candidateEvidenceState" },
+        "cieState": { "$ref": "#/$defs/evidenceState" },
+        "channel": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "currency": { "$ref": "#/$defs/currency" },
+        "requestedEffects": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/effectId" }
+        },
+        "providerAliases": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": { "$ref": "#/$defs/effectId" },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        }
+      }
+    },
+    "normalizeCandidateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "normalizeCandidate" },
+        "input": { "$ref": "#/$defs/candidate" }
+      }
+    },
+    "evaluateEcacInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate", "gates", "requiredGateKeys"],
+      "properties": {
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "gates": {
+          "type": "object",
+          "maxProperties": 128,
+          "propertyNames": { "$ref": "#/$defs/effectId" },
+          "additionalProperties": { "$ref": "#/$defs/evidenceState" }
+        },
+        "requiredGateKeys": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/effectId" }
+        }
+      }
+    },
+    "evaluateEcacRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "evaluateEcac" },
+        "input": { "$ref": "#/$defs/evaluateEcacInput" }
+      }
+    },
+    "skuInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brand", "className", "asset", "variant", "license", "version"],
+      "properties": {
+        "brand": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "className": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "asset": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "variant": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "license": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "computeSkuKeyRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "computeSkuKey" },
+        "input": { "$ref": "#/$defs/skuInput" }
+      }
+    },
+    "topologyInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["firstParty", "recurring", "marketplace", "booking", "usageBased", "physical", "licenseBearing"],
+      "properties": {
+        "firstParty": { "type": "boolean" },
+        "recurring": { "type": "boolean" },
+        "marketplace": { "type": "boolean" },
+        "booking": { "type": "boolean" },
+        "usageBased": { "type": "boolean" },
+        "physical": { "type": "boolean" },
+        "licenseBearing": { "type": "boolean" }
+      }
+    },
+    "classifyTopologyRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "classifyTopology" },
+        "input": { "$ref": "#/$defs/topologyInput" }
+      }
+    },
+    "priceEnvelopeInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "costMinor",
+        "providerFeeMinor",
+        "fulfillmentMinor",
+        "supportMinor",
+        "riskMinor",
+        "royaltyMinor",
+        "commissionMinor",
+        "targetMarginBps"
+      ],
+      "properties": {
+        "costMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "providerFeeMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "fulfillmentMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "supportMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "riskMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "royaltyMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "commissionMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "targetMarginBps": { "type": "integer", "minimum": 0, "maximum": 9500 },
+        "strategicPremiumBps": { "type": "integer", "minimum": 0, "maximum": 100000 }
+      }
+    },
+    "computePriceEnvelopeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "computePriceEnvelope" },
+        "input": { "$ref": "#/$defs/priceEnvelopeInput" }
+      }
+    },
+    "marginInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["priceMinor", "totalCostMinor", "minimumMarginBps"],
+      "properties": {
+        "priceMinor": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "totalCostMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "minimumMarginBps": { "type": "integer", "minimum": 0, "maximum": 10000 }
+      }
+    },
+    "guardMarginRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "guardMargin" },
+        "input": { "$ref": "#/$defs/marginInput" }
+      }
+    },
+    "providerExpected": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "amountMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "currency": { "$ref": "#/$defs/currency" },
+        "state": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "providerObserved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceSha256"],
+      "properties": {
+        "amountMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "currency": { "$ref": "#/$defs/currency" },
+        "state": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "evidenceSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "providerReadbackInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected", "observed"],
+      "properties": {
+        "expected": { "$ref": "#/$defs/providerExpected" },
+        "observed": { "$ref": "#/$defs/providerObserved" }
+      }
+    },
+    "reduceProviderReadbackRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "reduceProviderReadback" },
+        "input": { "$ref": "#/$defs/providerReadbackInput" }
+      }
+    },
+    "entitlementState": {
+      "enum": ["PENDING", "ACTIVE", "SUSPENDED", "REVOKED", "REFUNDED", "DISPUTED", "EXPIRED"]
+    },
+    "entitlementInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prior", "qualifyingEvent", "licensePass", "paymentPass"],
+      "properties": {
+        "prior": { "$ref": "#/$defs/entitlementState" },
+        "qualifyingEvent": { "type": "boolean" },
+        "licensePass": { "type": "boolean" },
+        "paymentPass": { "type": "boolean" },
+        "refunded": { "type": "boolean" },
+        "disputed": { "type": "boolean" },
+        "expired": { "type": "boolean" }
+      }
+    },
+    "reduceEntitlementStateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "reduceEntitlementState" },
+        "input": { "$ref": "#/$defs/entitlementInput" }
+      }
+    },
+    "settlementInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grossMinor",
+        "taxMinor",
+        "refundMinor",
+        "providerFeeMinor",
+        "royaltyMinor",
+        "commissionMinor"
+      ],
+      "properties": {
+        "grossMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "taxMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "refundMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "providerFeeMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "royaltyMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "commissionMinor": { "$ref": "#/$defs/nonnegativeMinor" },
+        "expectedNetMinor": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "reconcileSettlementRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "reconcileSettlement" },
+        "input": { "$ref": "#/$defs/settlementInput" }
+      }
+    },
+    "rollbackInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providerReversible", "institutionalReversible", "adverseEvidenceRefs"],
+      "properties": {
+        "providerReversible": { "type": "boolean" },
+        "institutionalReversible": { "type": "boolean" },
+        "adverseEvidenceRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 128,
+          "items": { "type": "string", "minLength": 1, "maxLength": 255 }
+        }
+      }
+    },
+    "planRollbackCompensationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "planRollbackCompensation" },
+        "input": { "$ref": "#/$defs/rollbackInput" }
+      }
+    },
+    "demandInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["viewsZ", "conversionZ", "saveZ", "searchZ", "seasonality"],
+      "properties": {
+        "viewsZ": { "$ref": "#/$defs/finiteNumber" },
+        "conversionZ": { "$ref": "#/$defs/finiteNumber" },
+        "saveZ": { "$ref": "#/$defs/finiteNumber" },
+        "searchZ": { "$ref": "#/$defs/finiteNumber" },
+        "seasonality": { "$ref": "#/$defs/finiteNumber" }
+      }
+    },
+    "advisoryDemandScoreRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "advisoryDemandScore" },
+        "input": { "$ref": "#/$defs/demandInput" }
+      }
+    },
+    "elasticityInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["priceChangePct", "demandChangePct", "sampleWeight"],
+      "properties": {
+        "priceChangePct": { "$ref": "#/$defs/finiteNumber" },
+        "demandChangePct": { "$ref": "#/$defs/finiteNumber" },
+        "sampleWeight": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "advisoryPriceElasticityRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "advisoryPriceElasticity" },
+        "input": { "$ref": "#/$defs/elasticityInput" }
+      }
+    },
+    "anomalyInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["refundZ", "disputeZ", "priceDriftZ", "providerMismatchZ", "fulfillmentLatencyZ"],
+      "properties": {
+        "refundZ": { "$ref": "#/$defs/finiteNumber" },
+        "disputeZ": { "$ref": "#/$defs/finiteNumber" },
+        "priceDriftZ": { "$ref": "#/$defs/finiteNumber" },
+        "providerMismatchZ": { "$ref": "#/$defs/finiteNumber" },
+        "fulfillmentLatencyZ": { "$ref": "#/$defs/finiteNumber" }
+      }
+    },
+    "advisoryAnomalyScoreRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "input"],
+      "properties": {
+        "operation": { "const": "advisoryAnomalyScore" },
+        "input": { "$ref": "#/$defs/anomalyInput" }
+      }
+    }
+  }
+}

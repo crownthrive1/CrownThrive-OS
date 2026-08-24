@@ -1,0 +1,63 @@
+---
+title: "ThriveEvergreen Production Fabric Runtime v1.1 — Errata Candidate"
+description: "Public-safe additive correction record for fail-closed deterministic runtime contracts and their V1–V8 regression suite."
+---
+
+# ThriveEvergreen Production Fabric Runtime v1.1 — Errata Candidate
+
+**Prepared:** August 24, 2026
+
+**Status:** `SOURCE_CANDIDATE`
+
+**Inspected base head:** `e9ae755aade91724e172ac665fa64fedef9b20c5`
+
+**Production deployment effect:** `NONE`
+**Generalized dispatch:** `DISABLED`
+
+This additive candidate corrects fail-open behavior found in the public-safe v1 helper runtime. It does not alter the immutable v1 files, certify a live deployment, grant ECAC, activate a provider, move money, publish a price, grant rights, or activate an entitlement.
+
+## Lineage and scope
+
+The following accepted source artifacts remain byte-identical:
+
+| Preserved artifact | SHA-256 |
+| --- | --- |
+| `developers/scripts/thriveevergreen/production-fabric-runtime.v1.ts` | `943b11047f52fbd8c7850aafdba7d6b8411c2d2725283c92a9029d31f16ca085` |
+| `developers/contracts/thriveevergreen/production-fabric.contracts.v1.json` | `7e55be37dbc58e75263de45fd2dd74832d642b3d5836e9c5d90dd04206c991fb` |
+
+For new integrations, this candidate supersedes only those helper-runtime and input-contract behaviors after governed acceptance. Existing live callers remain unchanged until separately migrated, tested, independently reviewed, and read back.
+
+## Corrections
+
+| Repro | v1 observation | v1.1 fail-closed result |
+| --- | --- | --- |
+| V1 | malformed candidate material was not runtime-validated | closed runtime validation rejects it |
+| V2 | an empty required-gate policy could produce `ECAC_CANDIDATE` | empty required gates resolve `HOLD` |
+| V3 | gate digests depended on object insertion order | canonical key ordering produces one digest |
+| V4 | lossy SKU cleanup could collapse distinct inputs | exact-part key material differs and lossy proposals carry `HOLD` |
+| V5 | negative price inputs were silently clamped | negative minor values are rejected |
+| V6 | empty provider expectation could pass | missing expectation or invalid evidence digest resolves `HOLD` |
+| V7 | a revoked exact entitlement could reactivate | terminal `REVOKED` remains `REVOKED` |
+| V8 | absent expected settlement net could pass | missing expected net resolves `HOLD` |
+
+All fully passing gate evaluations still return only `ECAC_CANDIDATE`. Money movement, provider write, rights grant, price publication, entitlement mutation, publication authority, and self-approval remain false; D3 remains human-reserved.
+
+## Candidate artifacts and validation
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `developers/scripts/thriveevergreen/production-fabric-runtime.v1.1.ts` | `1f4877beae06627236ba5b6f8484839dea33c524cd77c6ebca990ef235eaee5f` |
+| `developers/contracts/thriveevergreen/production-fabric.contracts.v1.1.schema.json` | `72ba702219c58e64de04d561a1815274573e6fc29cb2d64f417986c529372a4d` |
+| `scripts/tests/thriveevergreen-production-fabric-runtime.v1.1.test.mjs` | `b63b1cddd3cc03761267391ff797e24a702c64e99cbd336f377d0962a900a922` |
+
+Validation command:
+
+```text
+node --test scripts/tests/thriveevergreen-production-fabric-runtime.v1.1.test.mjs
+```
+
+Observed source-candidate result: `16 passed; 0 failed`, comprising V1–V8 and eight positive/authority-boundary controls. Node syntax validation and JSON parsing also passed.
+
+## Promotion and rollback boundary
+
+Promotion requires reviewed merge, independent security/contract verification, exact caller migration, and post-deployment readback. Until then, v1.1 is source only. Before merge, rollback is omission of these additive files. After merge, corrections must append a successor; accepted history must not be silently overwritten.
