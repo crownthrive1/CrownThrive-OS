@@ -1,0 +1,299 @@
+---
+title: "TLaaS (LEX) — License Issuance & Renewal Functions: Solidity Code, Validations, and Events"
+sidebarTitle: "TLaaS LEX Issuance & Renewal"
+description: "Exact-title forensic reconstruction of the historical Solidity issuance and renewal paper, preserving validation and event semantics without fabricating lost source code, ABI, addresses or production deployment."
+icon: "code"
+keywords: ["TLaaS LEX issuance", "license renewal", "Solidity", "Dynamic Licensing Asset", "events"]
+---
+
+# TLaaS (LEX) — License Issuance & Renewal Functions: Solidity Code, Validations, and Events
+
+## Forensic record
+
+```yaml
+paper_id: ct.chlom.paper.tlaas-lex-issuance-renewal-functions
+exact_recovered_title: TLaaS (LEX) — License Issuance & Renewal Functions: Solidity Code, Validations, and Events
+artifact_class: historical_code_implementation_paper
+recovery_state: TITLE_RECOVERED + RECONSTRUCTED
+exact_original_body_recovered: false
+exact_solidity_recovered: false
+historical_DLA: Decentralized Licensing Authority
+current_DLA: Dynamic Licensing Asset
+production_contract_claim: none
+```
+
+## Recovery boundary
+
+The exact title is recovered, but the historical Solidity implementation is not. Related CHLOM sources explicitly describe license application, identity validation, prerequisite checks, optional compliance bonds, minting/issuance, active-state registration, renewal, revocation and events. This record preserves those semantics without fabricating contract code.
+
+## Issuance objective
+
+```text
+REQUEST
+  |
+resolve identity
+  |
+resolve source rights
+  |
+resolve issuer authority
+  |
+validate license profile / eligibility
+  |
+policy + evidence + approval
+  |
+PASS -> activate canonical DLA
+  |
+optional token/provider representation
+  |
+DAIL receipt
+```
+
+## Preconditions
+
+A material issuance action should verify:
+
+- actor identity;
+- issuer authority for the exact asset/catalog;
+- source-right evidence;
+- license class/profile;
+- holder/applicant identity where required;
+- credential/eligibility predicates;
+- territory and term validity;
+- exclusivity/conflict constraints;
+- policy versions;
+- evidence freshness;
+- agreement/consent requirements;
+- economic schedule where applicable.
+
+## Semantic issuance function
+
+The historical function name is not recovered. A provider-neutral semantic contract can be represented as:
+
+```text
+issueLicense(request)
+  -> validate request identity
+  -> validate issuer authority
+  -> validate source-right ceiling
+  -> evaluate policy/evidence
+  -> create/activate DLA version
+  -> bind optional representation
+  -> emit institutional events
+```
+
+This is pseudocode, not recovered Solidity.
+
+## Request object
+
+```yaml
+issuance_request:
+  request_id: stable
+  asset_ref: required
+  source_rights_refs: []
+  issuer_authority_ref: required
+  applicant_or_holder_ref: required by profile
+  license_profile_ref: exact version
+  requested_permissions: []
+  requested_restrictions: []
+  territory: structured
+  term: structured
+  evidence_refs: []
+  policy_refs: []
+  economic_schedule_ref: optional|required
+  agreement_ref: optional|required
+  idempotency_key: required
+```
+
+## Rights ceiling validation
+
+```text
+requested permissions
+  <= issuer authority ceiling
+  <= licensable source rights
+```
+
+Violation is DENY, not a warning.
+
+## Three-valued evaluation
+
+```text
+PASS -> may continue within authority
+HOLD -> missing/conflicting/stale evidence; no issuance
+DENY -> action prohibited
+```
+
+The historical code-oriented title does not justify fail-open behavior.
+
+## Canonical activation
+
+A successful issuance creates or activates a Dynamic Licensing Asset with an exact version and effective time.
+
+```yaml
+activation_result:
+  dla_ref: stable
+  version: exact
+  state: active
+  effective_at: timestamp
+  authority_ref: required
+  policy_versions: []
+  evidence_refs: []
+```
+
+## Provider/token mint ordering
+
+```text
+canonical DLA activation
+ -> optional provider representation
+```
+
+If business/profile rules require the provider representation to be part of the same externally visible activation, orchestration must compensate or HOLD when the provider step fails. Provider mint success alone never creates an institutional license.
+
+## Renewal objective
+
+Renewal is not a blind date extension. It revalidates the conditions that remain material at renewal time.
+
+```text
+current DLA
+ + source rights current
+ + issuer authority current
+ + holder eligibility current where required
+ + policy/evidence current
+ + agreement/economic conditions satisfied
+ -> renewal candidate
+```
+
+## Renewal types
+
+A profile may model renewal as:
+
+- new DLA version under stable DLA identity;
+- distinct replacement DLA with explicit predecessor;
+- term extension amendment;
+- reissuance after expiry.
+
+The governing profile/agreement decides; the implementation must not assume one universal pattern.
+
+## Renewal request
+
+```yaml
+renewal_request:
+  request_id: stable
+  dla_ref: required
+  current_version: exact
+  requested_term: structured
+  amendment_refs: []
+  evidence_refs: []
+  economic_schedule_ref: optional
+  idempotency_key: required
+```
+
+## Renewal validation
+
+Reject or HOLD when:
+
+- source rights expired;
+- issuer delegation expired;
+- license is non-renewable;
+- holder no longer meets required credentials;
+- conflicting exclusive right exists;
+- required payment/agreement evidence unresolved;
+- material policy changed and new requirements are unsatisfied.
+
+## Event semantics
+
+Historical source materials use smart-contract events for transparency. Current institutional event family can include:
+
+```text
+ct.dla.issuance.requested.v1
+ct.dla.issuance.eligibility_evaluated.v1
+ct.dla.activated.v1
+ct.dla.representation.bound.v1
+ct.dla.renewal.requested.v1
+ct.dla.renewal.evaluated.v1
+ct.dla.renewed.v1
+ct.dla.renewal.held.v1
+ct.dla.renewal.denied.v1
+```
+
+These are current event design names, not recovered Solidity event constants.
+
+## Event payload discipline
+
+Events should carry safe identifiers and version references, not confidential contracts or personal records.
+
+```yaml
+event_payload:
+  event_id: stable
+  dla_ref: required
+  version_ref: exact
+  actor_ref: institutional
+  authority_ref: optional|required
+  policy_refs: []
+  evidence_refs: []
+  occurred_at: timestamp
+```
+
+## Idempotency
+
+Repeated provider/API requests must not issue duplicate canonical licenses.
+
+```text
+same idempotency key + same governed request
+ -> same canonical result
+```
+
+Conflicting reuse of an idempotency key is an error/HOLD.
+
+## Payment interaction
+
+Historical source examples discuss license fees and token payments. Current ordering remains:
+
+```text
+payment authorization/capture
+   != license authority
+```
+
+If payment is required before activation, failure to activate after payment triggers reconciliation/refund/compensation rather than a fabricated license.
+
+## Reentrancy and state-transition safety
+
+A real Solidity implementation would require audited handling for reentrancy, external calls, checks-effects-interactions, authorization modifiers, pausing, upgrade behavior and event consistency. No exact production pattern is inferred from the title.
+
+## LEX handoff
+
+An issued/renewed DLA becomes a LEX candidate only if transfer/sublicense terms permit it and current listing eligibility passes.
+
+## Correction and supersession
+
+A wrong issuance or renewal is corrected through explicit state/version events. Historical records are not deleted.
+
+## Test vectors
+
+1. valid issuance -> one canonical active DLA;
+2. unauthorized issuer -> DENY;
+3. stale credential -> HOLD;
+4. requested right exceeds source -> DENY;
+5. duplicate issuance retry -> same DLA/result;
+6. provider mint succeeds but canonical activation fails -> no institutional license;
+7. renewal after source-right expiry -> DENY/HOLD;
+8. renewal with new policy unmet -> HOLD/DENY;
+9. provider representation unavailable -> canonical/provider state reconciled per profile;
+10. correction -> prior event retained, new state appended.
+
+## Restricted companion
+
+Private custody may contain recovered Solidity if later found, ABI, audits, tests, addresses, deployment configuration, exact validation algorithms, private economic parameters, key-management controls and incident records.
+
+## Invariants
+
+```text
+code execution != authority
+mint != license
+payment != approval
+renewal != blind extension
+HOLD != PASS
+event != proof of source rights by itself
+```
+
+## Status
+
+`TITLE_RECOVERED + RECONSTRUCTED + EXACT_SOLIDITY_NOT_RECOVERED + PRODUCTION_NOT_CLAIMED`.
