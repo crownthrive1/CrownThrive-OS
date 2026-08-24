@@ -13,6 +13,7 @@ on:
       - "automation/framework-factory.mdx"
       - "automation/framework-agent-registry.mdx"
       - "scripts/repository_federation_sync.py"
+      - "scripts/cie_pre_cert_parent_ack.py"
       - "scripts/validate_repository_federation.py"
       - "scripts/cie_scan.py"
       - "scripts/framework_factory.py"
@@ -36,6 +37,7 @@ on:
       - "automation/framework-factory.mdx"
       - "automation/framework-agent-registry.mdx"
       - "scripts/repository_federation_sync.py"
+      - "scripts/cie_pre_cert_parent_ack.py"
       - "scripts/validate_repository_federation.py"
       - "scripts/cie_scan.py"
       - "scripts/framework_factory.py"
@@ -46,7 +48,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: repository-federation-${{ github.workflow }}-${{ github.ref }}
@@ -57,7 +58,8 @@ jobs:
     name: Validate repository federation
     runs-on: ubuntu-latest
     timeout-minutes: 12
-
+    permissions:
+      contents: read
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -70,6 +72,7 @@ jobs:
       - name: Compile federation controls
         run: |
           python -m py_compile scripts/repository_federation_sync.py
+          python -m py_compile scripts/cie_pre_cert_parent_ack.py
           python -m py_compile scripts/validate_repository_federation.py
           python -m py_compile scripts/cie_scan.py
           python -m py_compile scripts/framework_factory.py
@@ -86,22 +89,41 @@ jobs:
       - name: Validate Framework Factory dependency
         run: python scripts/framework_factory.py --self-test
 
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+  federation-runtime:
+    name: Trusted federation runtime and pre-cert proof
+    needs: validate
+    if: ${{ needs.validate.result == 'success' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
       - name: Verify parent repository state through GitHub OIDC
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
         run: python scripts/repository_federation_sync.py state
 
       - name: Synchronize non-voting parent agent transport bindings
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
         run: python scripts/repository_federation_sync.py sync-agents --agent-id ct.subagent.governance-marshal --target-repo-id ct.repo.crownthrive-support
 
       - name: Prove sovereign Agent A cannot invoke sync_agents
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
         run: |
           if python scripts/repository_federation_sync.py sync-agents --agent-id ct.relay.agent-a --target-repo-id ct.repo.crownthrive-support; then
             echo "Sovereign Agent A unexpectedly received sync_agents transport authority."
@@ -110,21 +132,15 @@ jobs:
           echo "Expected sovereign-caller sync_agents denial observed."
 
       - name: Emit parent federation heartbeat
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
         run: python scripts/repository_federation_sync.py heartbeat --agent-id ct.relay.agent-a
 
       - name: Prove agent-scoped message pull
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
         run: python scripts/repository_federation_sync.py pull --agent-id ct.relay.agent-a --limit 5
 
-      - name: Prove protected CIE runtime through bound parent agent
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+      - name: Accept exact CIE pre-cert return message and register parent forward link when available
+        run: python scripts/cie_pre_cert_parent_ack.py
+
+      - name: Prove parent direct CIE algorithm invocation remains denied before linked_governed
         run: |
           cat > /tmp/cie-bound-agent-test.json <<'JSON'
           {
@@ -140,13 +156,19 @@ jobs:
             "findings": []
           }
           JSON
-          python scripts/repository_federation_sync.py cie-score --agent-id ct.relay.agent-a --input /tmp/cie-bound-agent-test.json
+          set +e
+          output="$(python scripts/repository_federation_sync.py cie-score --agent-id ct.relay.agent-a --input /tmp/cie-bound-agent-test.json 2>&1)"
+          status=$?
+          set -e
           rm -f /tmp/cie-bound-agent-test.json
+          if [ "$status" -eq 0 ]; then
+            echo "Parent direct invocation unexpectedly succeeded before linked_governed."
+            exit 1
+          fi
+          echo "$output" | grep -q "algorithm_implementation_repository_mismatch"
+          echo "Expected algorithm implementation-repository denial observed."
 
       - name: Prove unbound agent is denied
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
         run: |
           if python scripts/repository_federation_sync.py heartbeat --agent-id ct.agent.unregistered-federation-test; then
             echo "Unbound agent unexpectedly received federation capability."
@@ -155,9 +177,6 @@ jobs:
           echo "Expected unbound-agent denial observed."
 
       - name: Prove Agent A cannot certify a child
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
         run: |
           if python scripts/repository_federation_sync.py certify-child --agent-id ct.relay.agent-a --child-repo-id ct.repo.cie --child-sha unavailable --child-contract-digest test --parent-contract-digest test; then
             echo "Agent A unexpectedly received child-certification authority."
@@ -165,21 +184,10 @@ jobs:
           fi
           echo "Expected Agent-A certification denial observed."
 
-      - name: Prove Agent D still cannot certify nonexistent CIE repository
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          CT_FEDERATION_URL: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus
+      - name: Prove Agent D cannot certify CIE with incomplete or mismatched evidence
         run: |
           if python scripts/repository_federation_sync.py certify-child --agent-id ct.relay.agent-d --child-repo-id ct.repo.cie --child-sha unavailable --child-contract-digest test --parent-contract-digest test; then
-            echo "Missing physical CIE child was unexpectedly certified."
+            echo "CIE unexpectedly certified with incomplete evidence."
             exit 1
           fi
-          echo "Expected child-not-bootstrapped denial observed after Agent-D authority check."
-
-      - name: Check whitespace and conflict markers
-        run: |
-          git diff --check
-          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
-            echo "Unresolved merge-conflict markers detected."
-            exit 1
-          fi
+          echo "Expected fail-closed Agent-D incomplete-evidence denial observed."

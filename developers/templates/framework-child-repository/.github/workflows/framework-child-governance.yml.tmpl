@@ -1,0 +1,121 @@
+name: CrownThrive Framework Child Governance
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "{{SCHEDULE_MINUTE}} * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: framework-child-governance-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate governed framework package
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile package controls
+        run: |
+          python -m py_compile engine/engine.py
+          python -m py_compile scripts/federation_client.py
+          python -m py_compile scripts/validate_child_repository.py
+
+      - name: Validate package contract and authority locks
+        run: python scripts/validate_child_repository.py
+
+      - name: Run package health
+        run: python engine/engine.py health
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- .; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+  federation-runtime:
+    name: Trusted federation state and heartbeat
+    needs: validate
+    if: ${{ needs.validate.result == 'success' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify package federation state through GitHub OIDC
+        run: python scripts/federation_client.py state
+
+      - name: Emit heartbeat only after parent-certified operational state
+        run: python scripts/federation_client.py heartbeat --if-enabled
+
+  route-drift:
+    name: Route governance drift
+    needs: validate
+    if: ${{ always() && needs.validate.result == 'failure' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DRIFT_TITLE: "CT Framework Package Governance Drift — {{CANONICAL_NAME}}"
+    steps:
+      - name: Create or update idempotent drift issue
+        run: |
+          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"${DRIFT_TITLE}\") | .number" | head -n1)"
+          body="Automated governed-framework package validation failed for run ${GITHUB_RUN_ID} on ${GITHUB_SHA}. This is an internal WATCH/HOLD, not a sovereign vote or parent certification. Repair root cause through a reviewed packet and rerun unchanged controls."
+          if [ -z "$existing" ]; then
+            gh issue create --title "$DRIFT_TITLE" --body "$body"
+          else
+            gh issue comment "$existing" --body "$body"
+          fi
+
+  reconcile-drift:
+    name: Reconcile recovered drift
+    needs: [validate, federation-runtime]
+    if: ${{ always() && needs.validate.result == 'success' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DRIFT_TITLE: "CT Framework Package Governance Drift — {{CANONICAL_NAME}}"
+    steps:
+      - name: Close recovered drift issue when present
+        run: |
+          existing="$(gh issue list --state open --search "\"${DRIFT_TITLE}\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"${DRIFT_TITLE}\") | .number" | head -n1)"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Framework package validation recovered on run ${GITHUB_RUN_ID} at ${GITHUB_SHA}. Closing this operational drift record does not certify the package or create a sovereign vote."
+            gh issue close "$existing" --reason completed
+          fi

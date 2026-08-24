@@ -68,7 +68,7 @@ def federation_call(action: str, payload: dict[str, Any], *, federation_url: str
     req = urllib.request.Request(
         url,
         data=data,
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "CrownThrive-Repository-Federation/1.1"},
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json", "User-Agent": "CrownThrive-Repository-Federation/1.2"},
         method="POST",
     )
     try:
@@ -126,8 +126,14 @@ def self_test() -> None:
     assert auth["audience"] == OIDC_AUDIENCE
     assert auth["long_lived_shared_secret_required"] is False
     child = next(item for item in manifest["repositories"] if item["repo_id"] == "ct.repo.cie")
-    assert child["governance_state"] == "pending_provisioning"
+    assert child["role"] == "framework_child"
+    assert child["github_repository_id"] == 1341314455
+    assert child["governance_state"] == "provisioned_unlinked"
     assert child["operationally_enabled"] is False
+    assert child["can_vote"] is False
+    assert child["precert_transport_enabled"] is True
+    assert manifest["authority"]["linked_governed_physical_child_repository_required"] is True
+    assert manifest["framework_child_policy"]["linked_governed_requires_physical_repository"] is True
     assert manifest["framework_child_policy"]["transport_messages_create_votes"] is False
     assert manifest["framework_child_policy"]["framework_subagents_create_votes"] is False
     assert inventory["rules"]["agent_repository_binding_required"] is True
@@ -135,13 +141,14 @@ def self_test() -> None:
     assert inventory["rules"]["child_certification_agent"] == "ct.relay.agent-d"
     assert all(item.get("vote_eligible") is not True for item in inventory["parent_non_voting_transport_bindings"])
     prospective = inventory["prospective_cie_child_bindings"]
-    assert prospective[0]["agent_id"] == "ct.framework-agent.cie" and prospective[0]["binding_state"] == "prospective"
-    assert all(item["vote_eligible"] is False for item in prospective[1:])
+    assert prospective[0]["agent_id"] == "ct.framework-agent.cie"
+    assert all(item["vote_eligible"] is False for item in prospective)
     forbidden_static = "SUPABASE_" + "SERVICE_ROLE_KEY"
     assert forbidden_static not in Path(__file__).read_text(encoding="utf-8")
     print(
         "Repository federation client self-test PASS: OIDC + repository-agent bindings; "
-        f"contract_sha256={manifest_digest()}; non-voting sync bounded; pending CIE child disabled."
+        f"contract_sha256={manifest_digest()}; physical CIE child=1341314455 provisioned_unlinked; "
+        "pre-cert transport bounded; non-voting sync bounded; linked_governed still requires Agent D."
     )
 
 

@@ -1,0 +1,129 @@
+{
+  "manifest_version": "2.0.0",
+  "manifest_id": "ct.manifest.chlom-agent-identity-assurance.v1",
+  "authority_issue": 148,
+  "ip_governance_issue": 131,
+  "canonical_parent_repository": "crownthrive1/CrownThrive-Support",
+  "supabase_project_ref": "tzajnzshmtzjenqulehq",
+  "public_directory_url": "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/public-agent-identity-directory",
+  "source_contract": {
+    "public_did": true,
+    "fingerprint_id_public": false,
+    "fingerprint_commitment_public": false,
+    "credentials_public": false,
+    "framework_package_identity_public": true,
+    "physical_repository_required_for_framework_identity": false,
+    "public_did_note": "CHLOM source doctrine permits the public-facing DID while keeping Fingerprint ID private. Current did:chlom records remain candidate/internal until an accepted resolver method makes them externally resolvable."
+  },
+  "auto_assignment": {
+    "agent_binding_source": "institutional_federation.repository_agent_bindings",
+    "framework_package_source": "institutional_federation.framework_package_registry",
+    "identity_registry": "chlom_identity.agent_identity_records",
+    "did_registry": "chlom_identity.did_bindings",
+    "private_attestation_history": "chlom_identity.agent_identity_attestations",
+    "public_projection": "public.ct_public_agent_identity_directory",
+    "on_agent_binding": true,
+    "on_framework_package_binding": true,
+    "on_repository_identity_change": true,
+    "on_repository_heartbeat": true,
+    "uuid_generated": true,
+    "sha256_public_identity_digest": true,
+    "private_fingerprint_commitment": true
+  },
+  "public_required_agent_fields": [
+    "agent_uuid",
+    "agent_id",
+    "did_uri",
+    "did_state",
+    "public_identity_digest_sha256",
+    "assurance_state"
+  ],
+  "transport_fields_when_applicable": [
+    "repo_id",
+    "github_repository_id",
+    "repo_full_name",
+    "head_sha",
+    "heartbeat_at",
+    "heartbeat_fresh"
+  ],
+  "framework_package_fields": [
+    "package_id",
+    "framework_id",
+    "framework_agent_id",
+    "canonical_host_repo_id",
+    "package_state",
+    "public_activation_allowed",
+    "can_vote"
+  ],
+  "private_prohibited_public_fields": [
+    "fingerprint_record_uuid",
+    "fingerprint_salt",
+    "fingerprint_commitment_sha256",
+    "key_ref",
+    "private_key",
+    "secret",
+    "seed",
+    "mnemonic",
+    "credential"
+  ],
+  "lifecycle_rules": {
+    "framework_package_source_discovery": {
+      "did_and_uuid_required": true,
+      "public_digest_required": true,
+      "github_repository_id_required": false,
+      "head_sha_required": false,
+      "heartbeat_required": false,
+      "operational_claim_allowed": false
+    },
+    "framework_package_controlled_test": {
+      "did_and_uuid_required": true,
+      "public_digest_required": true,
+      "physical_repository_required": false,
+      "canonical_host_repository_may_supply_sha_and_oidc": true,
+      "public_activation_allowed": false,
+      "operational_claim_allowed_before_parent_certification": false
+    },
+    "transport_verified_current": {
+      "applies_to_physical_repository_transport": true,
+      "github_repository_id_required": true,
+      "head_sha_required": true,
+      "heartbeat_required": true,
+      "heartbeat_must_be_fresh": true,
+      "public_digest_required": true,
+      "did_required": true
+    }
+  },
+  "documentation_review": {
+    "hard_gate": true,
+    "validator": "scripts/chlom_identity_assurance.py",
+    "workflow": ".github/workflows/docs-governance.yml",
+    "missing_public_identity_fields": "FAIL",
+    "fingerprint_or_secret_leak": "FAIL",
+    "active_transport_without_repository_sha_or_heartbeat": "FAIL",
+    "framework_package_requires_physical_repository": "FAIL",
+    "framework_package_claimed_operational_before_parent_certification": "FAIL",
+    "pull_request_validation_with_oidc_authority": "FAIL",
+    "fresh_heartbeat_required_on_default_branch_runtime_check": true
+  },
+  "assigned_agents": [
+    {"agent_id": "ct.agent.framework-factory", "role": "orchestrate identity assurance across framework packages", "vote_effect": "none"},
+    {"agent_id": "ct.subagent.governance-marshal", "role": "auto-register and reconcile non-voting D0-D2 agent/package bindings", "vote_effect": "none"},
+    {"agent_id": "ct.subagent.evidence-provenance", "role": "verify source lineage, package identity, UUID/DID binding and digest provenance", "vote_effect": "none"},
+    {"agent_id": "ct.subagent.verification-tevv", "role": "independently verify package identity, transport SHA linkage and heartbeat behavior", "vote_effect": "none"},
+    {"agent_id": "ct.subagent.operations-sre", "role": "monitor package/runtime heartbeat freshness, drift and recovery", "vote_effect": "none"},
+    {"agent_id": "ct.subagent.blockchain-protocol", "role": "review DID/cryptographic method correctness without exposing Fingerprint internals", "vote_effect": "none"},
+    {"agent_id": "ct.agent.documentation-sentinel", "role": "block stale or incomplete public identity documentation", "vote_effect": "none"},
+    {"agent_id": "ct.agent.documentation-steward", "role": "maintain the public-safe package/agent identity projection", "vote_effect": "none"},
+    {"agent_id": "ct.relay.agent-d", "role": "independent parent certification after package/OIDC/identity evidence passes", "vote_effect": "existing constitutional vote only"}
+  ],
+  "authority_locks": {
+    "identity_record_creates_vote": false,
+    "did_creates_vote": false,
+    "heartbeat_creates_vote": false,
+    "repository_id_creates_vote": false,
+    "package_id_creates_vote": false,
+    "fingerprint_record_creates_vote": false,
+    "d3_human_reserved": true,
+    "agent_d_parent_certification_required": true
+  }
+}

@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""Minimal CrownThrive framework-package OIDC federation client.
+
+Supported actions are deliberately narrow: state, bootstrap and heartbeat. A framework
+package is not a physical repository identity. GitHub OIDC authenticates the trusted
+host workflow, while package_id/framework_agent_id identify the governed child package.
+This client cannot certify a package, sync agents, cast votes or mutate providers.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+CONTRACT = ROOT / ".crownthrive/federation.json"
+FEDERATION_URL = "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/repository-federation-bus"
+PUBLIC_IDENTITY_URL = "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/public-agent-identity-directory"
+OIDC_AUDIENCE = "crownthrive-repository-federation"
+MAX_RESPONSE_BYTES = 256 * 1024
+SHA64 = re.compile(r"^[0-9a-f]{64}$")
+FORBIDDEN_PUBLIC_KEYS = {
+    "fingerprint_record_uuid",
+    "fingerprint_salt",
+    "fingerprint_commitment_sha256",
+    "key_ref",
+    "private_key",
+    "secret",
+    "seed",
+    "mnemonic",
+    "credential",
+}
+
+
+def load_contract() -> dict[str, Any]:
+    value = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise RuntimeError("federation_contract_invalid")
+    if value.get("package_role") != "framework_child_execution_package":
+        raise RuntimeError("framework_package_role_invalid")
+    if value.get("physical_repository_required") is not False:
+        raise RuntimeError("physical_repository_must_not_be_required")
+    identity = value.get("identity_assurance")
+    if not isinstance(identity, dict) or identity.get("auto_assign_via_chlom_identity") is not True:
+        raise RuntimeError("identity_assurance_contract_missing")
+    if identity.get("public_did") is not True or identity.get("private_fingerprint_id") is not True:
+        raise RuntimeError("identity_privacy_contract_invalid")
+    oidc = value.get("oidc")
+    if not isinstance(oidc, dict) or oidc.get("pull_request_validation_receives_oidc") is not False:
+        raise RuntimeError("oidc_pr_isolation_contract_invalid")
+    return value
+
+
+def oidc_token() -> str:
+    request_url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL", "").strip()
+    request_token = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "").strip()
+    if not request_url or not request_token:
+        raise RuntimeError("github_actions_oidc_environment_missing")
+    parsed = urllib.parse.urlsplit(request_url)
+    query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    query.append(("audience", OIDC_AUDIENCE))
+    url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), parsed.fragment))
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {request_token}", "Accept": "application/json"}, method="GET")
+    with urllib.request.urlopen(req, timeout=15) as response:
+        raw = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_RESPONSE_BYTES:
+        raise RuntimeError("oidc_response_too_large")
+    body = json.loads(raw.decode("utf-8"))
+    token = str(body.get("value", "")).strip() if isinstance(body, dict) else ""
+    if token.count(".") != 2:
+        raise RuntimeError("github_actions_oidc_token_missing")
+    return token
+
+
+def call(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if action not in {"state", "bootstrap", "heartbeat"}:
+        raise RuntimeError("child_action_not_allowed")
+    data = json.dumps({"action": action, "input": payload}, separators=(",", ":")).encode("utf-8")
+    req = urllib.request.Request(
+        FEDERATION_URL,
+        data=data,
+        headers={
+            "Authorization": f"Bearer {oidc_token()}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "CrownThrive-Framework-Package/2.0",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as response:
+        raw = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_RESPONSE_BYTES:
+        raise RuntimeError("federation_response_too_large")
+    body = json.loads(raw.decode("utf-8"))
+    if not isinstance(body, dict) or body.get("ok") is not True:
+        raise RuntimeError("federation_response_not_ok")
+    return body
+
+
+def verify_public_identity(agent_id: str) -> dict[str, Any]:
+    url = PUBLIC_IDENTITY_URL + "?agent_id=" + urllib.parse.quote(agent_id, safe="")
+    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "CrownThrive-Framework-Package/2.0"})
+    with urllib.request.urlopen(req, timeout=30) as response:
+        raw = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_RESPONSE_BYTES:
+        raise RuntimeError("identity_directory_response_too_large")
+    body = json.loads(raw.decode("utf-8"))
+    if not isinstance(body, dict):
+        raise RuntimeError("identity_directory_invalid")
+    privacy = body.get("privacy_contract")
+    if not isinstance(privacy, dict) or privacy.get("did_public") is not True or privacy.get("fingerprint_id_public") is not False:
+        raise RuntimeError("identity_directory_privacy_mismatch")
+    records = body.get("records")
+    if not isinstance(records, list):
+        raise RuntimeError("identity_directory_records_invalid")
+    record = next((item for item in records if isinstance(item, dict) and item.get("agent_id") == agent_id), None)
+    if record is None:
+        raise RuntimeError("agent_identity_record_missing")
+    leaked = FORBIDDEN_PUBLIC_KEYS.intersection(record)
+    if leaked:
+        raise RuntimeError("private_identity_field_public")
+    uuid.UUID(str(record.get("agent_uuid", "")))
+    if not str(record.get("did_uri", "")).startswith("did:"):
+        raise RuntimeError("public_did_missing")
+    if not SHA64.fullmatch(str(record.get("public_identity_digest_sha256", ""))):
+        raise RuntimeError("public_identity_digest_invalid")
+    if record.get("vote_eligible") is not False:
+        raise RuntimeError("framework_identity_must_remain_non_voting")
+    return record
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("action", choices=("state", "bootstrap", "heartbeat"))
+    parser.add_argument("--if-enabled", action="store_true")
+    args = parser.parse_args()
+    contract = load_contract()
+    agent_id = str(contract["framework_agent_id"])
+    package_id = str(contract["package_id"])
+
+    if args.action == "bootstrap":
+        if contract.get("runtime_integration_allowed") is not True:
+            raise SystemExit("HOLD: runtime integration is not allowed by the parent factory manifest")
+        if contract.get("vote_eligible") is not False or contract.get("operationally_enabled") is not False:
+            raise SystemExit("HOLD: initial package bootstrap must be non-voting and non-operational")
+        payload = {"agent_id": agent_id, "contract_digest": __import__("hashlib").sha256(CONTRACT.read_bytes()).hexdigest()}
+    elif args.action == "heartbeat":
+        if args.if_enabled and contract.get("operationally_enabled") is not True:
+            print("Heartbeat skipped: framework package is not yet parent-certified/operational.")
+            verify_public_identity(agent_id)
+            return 0
+        payload = {"agent_id": agent_id, "contract_digest": __import__("hashlib").sha256(CONTRACT.read_bytes()).hexdigest()}
+    else:
+        payload = {}
+
+    result = call(args.action, payload)
+    identity = verify_public_identity(agent_id)
+    print(json.dumps({
+        "ok": True,
+        "action": args.action,
+        "package_id": package_id,
+        "framework_id": contract.get("framework_id"),
+        "host_repository": result.get("repository"),
+        "agent_uuid": identity.get("agent_uuid"),
+        "did_uri": identity.get("did_uri"),
+        "assurance_state": identity.get("assurance_state"),
+        "public_identity_digest_sha256": identity.get("public_identity_digest_sha256"),
+    }, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

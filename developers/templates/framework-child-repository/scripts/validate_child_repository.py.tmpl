@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+"""Fail-closed validator for a CrownThrive framework execution package."""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path
+
+EXPECTED_PACKAGE_ID = "{{PACKAGE_ID}}"
+EXPECTED_FRAMEWORK = "{{FRAMEWORK_ID}}"
+EXPECTED_AGENT = "{{FRAMEWORK_AGENT_ID}}"
+EXPECTED_PARENT = "{{PARENT_REPOSITORY}}"
+EXPECTED_STATE = "{{PACKAGE_STATE}}"
+EXPECTED_RUNTIME_INTEGRATION = json.loads("{{RUNTIME_INTEGRATION_ALLOWED}}")
+
+REQUIRED = (
+    "README.md",
+    "AGENTS.md",
+    "SECURITY.md",
+    ".crownthrive/federation.json",
+    "framework/manifest.json",
+    "engine/engine.py",
+    "skills/framework/SKILL.md",
+    "tools/tools.v1.json",
+    "api/api-contract.v1.json",
+    "mcp/mcp-tools.v1.json",
+    "evals/evals.v1.json",
+    "commercial/offer-manifest.v1.json",
+    ".github/CODEOWNERS",
+    ".github/dependabot.yml",
+    ".github/pull_request_template.md",
+    ".github/workflows/framework-child-bootstrap.yml",
+    ".github/workflows/framework-child-governance.yml",
+    "scripts/federation_client.py",
+    "scripts/validate_child_repository.py",
+)
+FORBIDDEN = (
+    "vote_eligible: true",
+    '"vote_eligible": true',
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION",
+    "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24",
+    "private_eval_corpora\": true",
+)
+PINNED = (
+    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+    "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7",
+)
+
+
+def fail(message: str) -> None:
+    raise SystemExit(f"ERROR: {message}")
+
+
+def load_json(path: Path) -> dict:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        fail(f"JSON object required: {path}")
+    return value
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    args = parser.parse_args()
+    root = args.root.resolve()
+
+    for rel in REQUIRED:
+        if not (root / rel).is_file():
+            fail(f"missing framework package file: {rel}")
+
+    package = load_json(root / "framework/manifest.json")
+    expected_package = {
+        "package_id": EXPECTED_PACKAGE_ID,
+        "framework_id": EXPECTED_FRAMEWORK,
+        "framework_agent_id": EXPECTED_AGENT,
+        "authority_ceiling": "D2",
+        "vote_eligible": False,
+        "d3_human_reserved": True,
+        "parent_certification_agent": "ct.relay.agent-d",
+        "parent_certification_state": "pending",
+        "package_state": EXPECTED_STATE,
+        "public_activation_allowed": False,
+        "physical_repository_required": False,
+    }
+    for key, value in expected_package.items():
+        if package.get(key) != value:
+            fail(f"package manifest drift for {key}: expected {value!r}, got {package.get(key)!r}")
+
+    contract = load_json(root / ".crownthrive/federation.json")
+    expected_contract = {
+        "package_id": EXPECTED_PACKAGE_ID,
+        "framework_id": EXPECTED_FRAMEWORK,
+        "framework_agent_id": EXPECTED_AGENT,
+        "package_role": "framework_child_execution_package",
+        "canonical_parent_repository": EXPECTED_PARENT,
+        "package_state": EXPECTED_STATE,
+        "runtime_integration_allowed": EXPECTED_RUNTIME_INTEGRATION,
+        "public_activation_allowed": False,
+        "physical_repository_required": False,
+        "operationally_enabled": False,
+        "vote_eligible": False,
+        "d3_human_reserved": True,
+        "parent_certification_agent": "ct.relay.agent-d",
+        "parent_certification_state": "pending",
+    }
+    for key, value in expected_contract.items():
+        if contract.get(key) != value:
+            fail(f"federation contract drift for {key}: expected {value!r}, got {contract.get(key)!r}")
+
+    oidc = contract.get("oidc", {})
+    if oidc.get("issuer") != "https://token.actions.githubusercontent.com":
+        fail("GitHub OIDC issuer drift")
+    if oidc.get("audience") != "crownthrive-repository-federation":
+        fail("GitHub OIDC audience drift")
+    if oidc.get("pull_request_validation_receives_oidc") is not False:
+        fail("pull request validation must not receive OIDC authority")
+    if oidc.get("workflow_ref_environment_agent_capability_binding_required") is not True:
+        fail("workflow/ref/environment/agent/capability binding must remain required")
+    if oidc.get("long_lived_shared_secret_required") is not False:
+        fail("long-lived federation shared secret must remain unnecessary")
+
+    locks = contract.get("locks", {})
+    for key in (
+        "child_self_activation",
+        "child_self_certification",
+        "child_may_change_quorum",
+        "child_may_remove_agent_d",
+        "child_may_create_sovereign_vote",
+        "sync_agents_allowed",
+    ):
+        if locks.get(key) is not False:
+            fail(f"framework package authority lock drift: {key}")
+
+    texts: list[tuple[str, str]] = []
+    for rel in REQUIRED:
+        text = (root / rel).read_text(encoding="utf-8")
+        texts.append((rel, text))
+        if rel == "scripts/validate_child_repository.py":
+            continue
+        for fragment in FORBIDDEN:
+            if fragment in text:
+                fail(f"{rel} contains forbidden authority/secret fragment: {fragment}")
+
+    governance = (root / ".github/workflows/framework-child-governance.yml").read_text(encoding="utf-8")
+    bootstrap = (root / ".github/workflows/framework-child-bootstrap.yml").read_text(encoding="utf-8")
+    workflow = governance + "\n" + bootstrap
+    for pinned in PINNED:
+        if pinned not in workflow:
+            fail(f"workflow missing pinned action reference: {pinned}")
+    for forbidden_permission in ("contents: write", "pull-requests: write", "packages: write", "actions: write"):
+        if forbidden_permission in workflow:
+            fail(f"framework workflow contains forbidden permission: {forbidden_permission}")
+
+    pre_jobs = governance.split("jobs:", 1)[0]
+    if "id-token: write" in pre_jobs:
+        fail("governance workflow grants OIDC at workflow scope")
+    validate_segment = governance.split("  validate:", 1)[1].split("  federation-runtime:", 1)[0]
+    if "id-token: write" in validate_segment:
+        fail("pull-request validation job can receive OIDC authority")
+    federation_segment = governance.split("  federation-runtime:", 1)[1]
+    if "id-token: write" not in federation_segment:
+        fail("trusted federation runtime job must request OIDC")
+    if "github.event_name != 'pull_request'" not in federation_segment:
+        fail("trusted federation runtime must exclude pull_request")
+
+    tools = load_json(root / "tools/tools.v1.json")
+    if any(item.get("enabled") is True and item.get("risk") != "D0" for item in tools.get("tools", [])):
+        fail("non-D0 package tool enabled before certification")
+    mcp = load_json(root / "mcp/mcp-tools.v1.json")
+    if any(item.get("enabled") is True for item in mcp.get("tools", [])):
+        fail("MCP package tools must remain disabled before governed promotion")
+    commercial = load_json(root / "commercial/offer-manifest.v1.json")
+    for key in ("exact_price_authorized", "stripe_product_created", "stripe_price_created", "checkout_enabled", "license_grant_active", "certification_status_active", "customer_entitlement_active"):
+        if commercial.get(key) is not False:
+            fail(f"commercial fail-closed state drift: {key}")
+
+    client = (root / "scripts/federation_client.py").read_text(encoding="utf-8")
+    if 'action not in {"state", "bootstrap", "heartbeat"}' not in client:
+        fail("federation client action allowlist drift")
+    if '"certify_child"' in client or '"sync_agents"' in client:
+        fail("framework package federation client contains prohibited certification/sync operation")
+
+    engine = (root / "engine/engine.py").read_text(encoding="utf-8")
+    if "HOLD_PRIVATE_RUNTIME_REQUIRED" not in engine:
+        fail("public engine must fail closed when protected runtime is required")
+
+    joined = "\n".join(text for _rel, text in texts)
+    credential_patterns = (
+        r"\bgh[pousr]_[A-Za-z0-9]{20,}\b",
+        r"\bgithub_pat_[A-Za-z0-9_]{20,}\b",
+        r"\bsb_secret_[A-Za-z0-9_-]{16,}\b",
+        r"\bsk-[A-Za-z0-9]{20,}\b",
+    )
+    for pattern in credential_patterns:
+        if re.search(pattern, joined):
+            fail("credential-shaped value detected in framework package")
+
+    print(
+        f"Framework package validation PASS: {EXPECTED_FRAMEWORK}; package={EXPECTED_PACKAGE_ID}; "
+        f"state={EXPECTED_STATE}; non-voting; D3 human-reserved; physical-repo-not-required."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
