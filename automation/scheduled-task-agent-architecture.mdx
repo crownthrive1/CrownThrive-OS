@@ -45,6 +45,17 @@ The production stress suite passed with zero retired clocks enabled, zero pendin
 
 See [Agent Scheduler Topology Production Convergence](/developers/certification/agent-scheduler-topology-production-convergence-2026-08-24) and the machine contract `developers/contracts/agent-scheduler-topology-production.v1.json`.
 
+### GitHub Actions cron controllers (current state)
+
+As of August 24, 2026, two repository-native GitHub Actions scheduled controllers also run in the CHLOM lane:
+
+- **CHLOM Pentafabric Continuity** — hourly (`17 * * * *`). It validates the Pentafabric manifests, contracts and the maintenance projection gate. Scheduled runs are validation/observation only; they do not release maintenance and do not activate external commerce.
+- **CHLOM Runtime Fabric** — twice hourly (`7,37 * * * *`). It runs the governed Pentafabric runtime controller, fans out bounded agent lanes only when the discovery gate reports `READY` (otherwise the run fail-closes to `HOLD`), and uploads a DAIL evidence packet on every run.
+
+Both controllers are governed, fail-closed, maintenance-gated observation/orchestration lanes. They hold read-only repository permissions, emit DAIL evidence, and do not manufacture legal or economic authority. Ownership transfer, legal-authority creation, unapproved commercial activation, secret export and self-certification remain prohibited actions for these lanes.
+
+GitHub Actions cron is classified as repository-native recurrence inside the internal execution fabric, alongside `pg_cron` and Mintlify workflows. It is **not** counted against the external failure-domain clocks. The post-maintenance external-clock target remains three, and these controllers neither consume nor create external scheduler slots, so the zero-new-external-scheduler posture is unchanged.
+
 ```text
 Founder / governed objective
         ↓
@@ -148,7 +159,7 @@ metadata:
 
 Provider task identifiers and private routing details are restricted operational evidence and are not required in the public documentation projection.
 
-The August 21, 2026 reconciliation recorded a historical snapshot of **20 active provider-task bindings**. That count is preserved as lineage only and no longer describes the production scheduler surface. Current runtime state resolves from `chlom_runtime.scheduler_topology_v1`, `chlom_runtime.automation_agent_bindings`, `chlom_runtime.agent_schedule_definitions`, the active external task readback, `pg_cron`, and Mintlify workflows. Disabled historical bindings may remain recoverable without consuming an active external scheduler slot.
+The August 21, 2026 reconciliation recorded a historical snapshot of **20 active provider-task bindings**. That count is preserved as lineage only and no longer describes the production scheduler surface. Current runtime state resolves from `chlom_runtime.scheduler_topology_v1`, `chlom_runtime.automation_agent_bindings`, `chlom_runtime.agent_schedule_definitions`, the active external task readback, `pg_cron`, Mintlify workflows, and the repository GitHub Actions cron controllers. Disabled historical bindings may remain recoverable without consuming an active external scheduler slot.
 
 ## Task lifecycle
 
