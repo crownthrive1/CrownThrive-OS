@@ -7,6 +7,7 @@ on:
       - 'scripts/execute_docs_rebuild_quad_lane_batch.py'
       - '.github/workflows/docs-rebuild-quad-lane.yml'
       - 'developers/manifests/docs-rebuild-quad-lane.v1.json'
+      - 'developers/manifests/docs-rebuild-quad-lane-batch-001.v1.json'
       - 'data/documentation/**'
       - 'scripts/build_substantive_rebuild_wave*.py'
       - 'scripts/build_help_center_*crosswalk.py'
@@ -16,6 +17,7 @@ on:
       - 'scripts/execute_docs_rebuild_quad_lane_batch.py'
       - '.github/workflows/docs-rebuild-quad-lane.yml'
       - 'developers/manifests/docs-rebuild-quad-lane.v1.json'
+      - 'developers/manifests/docs-rebuild-quad-lane-batch-001.v1.json'
       - 'data/documentation/**'
       - 'scripts/build_substantive_rebuild_wave*.py'
       - 'scripts/build_help_center_*crosswalk.py'
@@ -62,12 +64,45 @@ jobs:
           assert d['counting']['remaining_p0_delta'] == 0
           assert d['counting']['official_machine_qualified_after_batch'] == 61
           assert d['counting']['official_remaining_p0_after_batch'] == 388
+          assert d['guardrails']['lane_a_requires_zero_flags'] is True
+          assert d['guardrails']['lane_a_high_risk_semantics_prohibited'] is True
           assert d['guardrails']['invented_inventory_ids'] is False
           assert d['guardrails']['historical_body_recovery_fabricated'] is False
           assert d['guardrails']['terminal_disposition_self_authorized'] is False
+          assert d['guardrails']['specialist_authority_promoted'] is False
+          lane_a = d['lanes']['A']
+          assert all(r['flags'] == [] for r in lane_a)
+          assert all(r['lane_a_zero_flag_invariant'] is True for r in lane_a)
+          assert all(r['qualified_route_observation_count'] >= 1 for r in lane_a)
+          assert all(r['terminal_acceptance'] is False for lane in d['lanes'].values() for r in lane)
           ids = [r['inventory_id'] for lane in d['lanes'].values() for r in lane]
           assert len(ids) == len(set(ids)) == 16
           print('PASS_QUAD_LANE_RECEIPT_INVARIANTS')
+          PY
+      - name: Compare canonical batch-001 receipt when present
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          runtime = json.loads(Path('runtime/docs-rebuild/quad-lane-batch-001.json').read_text())
+          canonical_path = Path('developers/manifests/docs-rebuild-quad-lane-batch-001.v1.json')
+          if not canonical_path.is_file():
+              print('CANONICAL_BATCH_RECEIPT_NOT_YET_PRESENT')
+              raise SystemExit(0)
+          canonical = json.loads(canonical_path.read_text())
+          assert canonical['execution_id'] == runtime['execution_id']
+          assert canonical['execution_sha256'] == runtime['execution_sha256']
+          assert canonical['lane_inventory_ids'] == {
+              lane: [r['inventory_id'] for r in runtime['lanes'][lane]]
+              for lane in ('A', 'B', 'C', 'D')
+          }
+          assert canonical['official_counts_after_batch'] == {
+              'machine_qualified_p0': 61,
+              'pending_p0': 388,
+          }
+          assert canonical['terminal_disposition_self_authorized'] is False
+          assert canonical['supersedes_pre_hardening_run'] is True
+          print('PASS_CANONICAL_BATCH_RECEIPT_MATCH')
           PY
       - name: Upload quad-lane execution evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
