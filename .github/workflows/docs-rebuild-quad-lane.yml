@@ -1,0 +1,78 @@
+name: Documentation Rebuild Quad Lane
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/execute_docs_rebuild_quad_lane_batch.py'
+      - '.github/workflows/docs-rebuild-quad-lane.yml'
+      - 'developers/manifests/docs-rebuild-quad-lane.v1.json'
+      - 'data/documentation/**'
+      - 'scripts/build_substantive_rebuild_wave*.py'
+      - 'scripts/build_help_center_*crosswalk.py'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/execute_docs_rebuild_quad_lane_batch.py'
+      - '.github/workflows/docs-rebuild-quad-lane.yml'
+      - 'developers/manifests/docs-rebuild-quad-lane.v1.json'
+      - 'data/documentation/**'
+      - 'scripts/build_substantive_rebuild_wave*.py'
+      - 'scripts/build_help_center_*crosswalk.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: docs-rebuild-quad-lane-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  execute-quad-lane-batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Execute 4 x 4 bounded documentation batch
+        run: |
+          mkdir -p runtime/docs-rebuild
+          python scripts/execute_docs_rebuild_quad_lane_batch.py \
+            --output runtime/docs-rebuild/quad-lane-batch-001.json \
+            | tee runtime/docs-rebuild/quad-lane-batch-001.log
+      - name: Validate execution receipt invariants
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('runtime/docs-rebuild/quad-lane-batch-001.json')
+          d = json.loads(p.read_text())
+          assert d['parallel_lane_count'] == 4
+          assert d['records_per_lane'] == 4
+          assert d['unique_records_touched'] == 16
+          assert d['waves_1_6_machine_qualified'] == 61
+          assert d['remaining_p0_before_batch'] == 388
+          assert d['counting']['machine_qualified_delta'] == 0
+          assert d['counting']['remaining_p0_delta'] == 0
+          assert d['counting']['official_machine_qualified_after_batch'] == 61
+          assert d['counting']['official_remaining_p0_after_batch'] == 388
+          assert d['guardrails']['invented_inventory_ids'] is False
+          assert d['guardrails']['historical_body_recovery_fabricated'] is False
+          assert d['guardrails']['terminal_disposition_self_authorized'] is False
+          ids = [r['inventory_id'] for lane in d['lanes'].values() for r in lane]
+          assert len(ids) == len(set(ids)) == 16
+          print('PASS_QUAD_LANE_RECEIPT_INVARIANTS')
+          PY
+      - name: Upload quad-lane execution evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-rebuild-quad-lane-${{ github.run_id }}
+          path: runtime/docs-rebuild/
+          if-no-files-found: error
+          retention-days: 90
