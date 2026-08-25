@@ -229,6 +229,7 @@ def main() -> int:
         "actions/checkout",
         "actions/setup-python",
         "actions/dependency-review-action",
+        "actions/upload-artifact",
     }
     if set(approved) != required_actions:
         fail(f"Approved action inventory drifted: {sorted(approved)}")
