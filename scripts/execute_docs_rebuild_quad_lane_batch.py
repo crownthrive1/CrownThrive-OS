@@ -32,6 +32,7 @@ HIGH_RISK_TERMS = (
     "investment", "securities", "patent", "trademark", "franchise",
     "token", "exchange", "settlement", "payment", "credential", "identity",
     "restricted", "private", "authority", "governance", "ownership",
+    "security", "2fa", "access", "permission", "verification", "budget",
 )
 
 
@@ -63,7 +64,7 @@ def normalized_text(row: dict[str, Any]) -> str:
 
 def is_high_risk(row: dict[str, Any]) -> bool:
     text = normalized_text(row)
-    return any(term in text for term in HIGH_RISK_TERMS)
+    return bool(row.get("flags")) or any(term in text for term in HIGH_RISK_TERMS)
 
 
 def base_receipt(row: dict[str, Any], lane: str, operation: str) -> dict[str, Any]:
@@ -105,8 +106,14 @@ def lane_a_candidates(rows: list[dict[str, Any]], used: set[str]) -> list[dict[s
                 quality.append(wave1.route_quality(route))
             except FileNotFoundError:
                 quality.append({"route": route, "path": None, "status": "missing"})
+        qualified_route_count = sum(
+            1 for q in quality
+            if q.get("body_characters", 0) >= 1800 and q.get("internal_link_count", 0) >= 3
+        )
         receipt.update({
             "route_quality_observations": quality,
+            "qualified_route_observation_count": qualified_route_count,
+            "lane_a_zero_flag_invariant": True,
             "result": "CANDIDATE_REQUIRES_DEDICATED_SUBSTANTIVE_GATE",
             "official_qualification_count_delta": 0,
         })
@@ -124,7 +131,7 @@ def lane_b_candidates(rows: list[dict[str, Any]], used: set[str]) -> list[dict[s
             continue
         receipt = base_receipt(row, "B", "specialist_evidence_resolution")
         receipt.update({
-            "specialist_reason": "high_risk_semantics_or_explicit_specialist_flag",
+            "specialist_reason": "high_risk_semantics_or_any_nonempty_candidate_flag",
             "result": "HOLD_SPECIALIST_EVIDENCE_REQUIRED",
             "authority_effect": "NONE_UNLESS_SEPARATELY_PROVEN",
             "official_qualification_count_delta": 0,
@@ -223,8 +230,13 @@ def build() -> dict[str, Any]:
         used |= ids
         lanes[lane] = selected
 
+    if any(r.get("flags") for r in lanes["A"]):
+        raise ValueError("Lane A must contain zero candidate flags")
+    if any(is_high_risk(r) for r in lanes["A"]):
+        raise ValueError("Lane A contains a high-risk semantic record")
+
     payload: dict[str, Any] = {
-        "schema_version": "1.0.0",
+        "schema_version": "1.0.1",
         "execution_id": "ct.docs.rebuild.wave7.quad-lane.batch-001",
         "source_universe_count": 795,
         "p0_candidate_estate": 449,
@@ -243,6 +255,8 @@ def build() -> dict[str, Any]:
         },
         "guardrails": {
             "unique_operation_leases": True,
+            "lane_a_requires_zero_flags": True,
+            "lane_a_high_risk_semantics_prohibited": True,
             "invented_inventory_ids": False,
             "historical_body_recovery_fabricated": False,
             "terminal_disposition_self_authorized": False,
