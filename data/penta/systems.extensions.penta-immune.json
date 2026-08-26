@@ -1,30 +1,25 @@
 {
-  "schema": "ct.penta.system-extension.v1",
-  "extension_id": "ct.penta.immune-system",
-  "version": "1.0.0",
-  "state": "CANDIDATE",
-  "target_phase": "Phase 3 — Execute",
-  "components": [
-    {
-      "id": "penta.evi-builder",
-      "name": "PentaEVIBuilder",
-      "role": "construct exact-head evidence bundles, provenance receipts, rollback/fallback bindings and advisory repair memory",
-      "may_self_certify": false,
-      "may_promote_production": false,
-      "may_expand_authority": false
-    },
-    {
-      "id": "penta.immune",
-      "name": "PentaImmune",
-      "role": "rank authorized repository-local weaknesses and prepare bounded reversible repair work",
-      "may_scan_external_targets": false,
-      "may_execute_arbitrary_commands": false,
-      "may_self_certify": false,
-      "may_promote_production": false,
-      "may_expand_authority": false
-    }
-  ],
-  "autonomy": {
+  "schema_version": "1.0.0",
+  "registry_id": "crownthrive.penta.systems.extensions.penta-immune",
+  "status_vocabulary": ["specified", "implemented", "certified", "production", "hold", "retired"],
+  "authority_invariant": "PentaImmune and PentaEVIBuilder may discover, rank, repair-plan, test and preserve evidence only within authority already granted by CrownThrive/CHLOM and repository policy. They never manufacture D3, provider, credential, security, legal, economic, rights, deployment, certification or production authority.",
+  "production_evidence": {
+    "initial_pr": 533,
+    "premerge_head_sha": "1fb79c7130f3a039da82a488bc3e13f6cffde621",
+    "merge_sha": "0ad7aff61027be9913f84852a1286fb6a4f1c429",
+    "premerge_assurance_run": 33021239591,
+    "main_assurance_run": 33021479616,
+    "premerge_evidence_receipt_sha256": "ecf54d83d5be0d906d48bb859a0500e5d1c2633f2910f37a1d2e24701b778e3e",
+    "premerge_certification_decision_sha256": "d62feeaf450bdc04fddc3f5f58ff53ff2dff9c93471beba7f1487b0886b278ea",
+    "required_governed_merge_gate": "success",
+    "main_deterministic_assurance": "success",
+    "main_independent_exact_head_certification": "success",
+    "main_live_read_only_hunt": "success",
+    "rollback": "revert merge/activation commit",
+    "fallback": "HOLD and known-good main",
+    "evidence_scope": "exact observed GitHub state only"
+  },
+  "autonomy_contract": {
     "default_authority": "A2",
     "autonomous_decision_classes": ["D0", "D1", "D2"],
     "human_reserved_decision_classes": ["D3"],
@@ -33,7 +28,12 @@
     "max_attempts_per_candidate": 2,
     "cooldown_seconds": 3600,
     "scheduled_hunt_cron": "17 * * * *",
-    "scope": "authorized CrownThrive repository-local issues, CI failures, tests, evidence, registry and documentation drift only"
+    "scope": "authorized CrownThrive repository-local issues, CI failures, tests, evidence, registry and documentation drift only",
+    "arbitrary_command_execution": false,
+    "external_target_scanning": false,
+    "self_certification": false,
+    "self_production_promotion": false,
+    "authority_expansion": false
   },
   "repair_contract": {
     "builder": "penta.factory",
@@ -41,30 +41,57 @@
     "evidence_builder": "penta.evi-builder",
     "independent_certifier": "penta.certify",
     "assurance": "penta.assure",
-    "required_outputs": [
-      "exact_head_sha",
-      "test_receipts",
-      "evidence_receipt_sha256",
-      "rollback",
-      "fallback_redundancy",
-      "failure_or_hold_reason"
-    ],
+    "required_outputs": ["exact_head_sha", "test_receipts", "evidence_receipt_sha256", "rollback", "fallback_redundancy", "failure_or_hold_reason"],
     "repair_memory_is_advisory_only": true,
     "repair_memory_requires_retest": true,
-    "failed_repairs_may_enter_success_memory": false
+    "failed_repairs_may_enter_success_memory": false,
+    "sha_drift_fails_closed": true
   },
+  "systems": [
+    {
+      "machine_key": "penta.evi-builder",
+      "canonical_name": "PentaEVIBuilder",
+      "aliases": ["Penta Evidence Builder"],
+      "category": "evidence_construction",
+      "purpose": "Construct deterministic exact-head evidence bundles, provenance receipts, test bindings, rollback/fallback evidence and advisory repair memory for governed CrownThrive software operations.",
+      "human_surface": "Evidence bundles, certification inputs, repair receipts and provenance views",
+      "authority_boundary": "Constructs proof only. It cannot certify its own evidence, promote production, expand authority, convert HOLD into PASS or substitute historical evidence for current-head evidence.",
+      "risk_ceiling": "D2",
+      "maturity": "production",
+      "dependencies": ["penta.factory", "penta.certify", "penta.assure", "penta.trace", "penta.docs"],
+      "five_stage": {
+        "discover": "Resolve the work order, source reference, exact Git head, observations, tests and required claims.",
+        "govern": "Apply exact-SHA, producer/verifier separation, evidence sufficiency, D3 reservation and rollback/fallback requirements.",
+        "execute": "Build a canonical JSON evidence bundle and SHA-256 receipt without granting certification or production state.",
+        "verify": "Require an independent verifier to reproduce receipt integrity, exact-head binding and required test/evidence conditions.",
+        "preserve": "Retain immutable evidence identifiers and advisory repair memory that always requires fresh retesting before reuse."
+      }
+    },
+    {
+      "machine_key": "penta.immune",
+      "canonical_name": "PentaImmune",
+      "aliases": ["Penta Immune System"],
+      "category": "autonomic_maintenance",
+      "purpose": "Continuously discover and rank authorized repository-local weaknesses, create bounded reversible repair work, verify exact-head outcomes and preserve reusable repair intelligence without crossing governance boundaries.",
+      "human_surface": "Weakness queue, hunt results, repair plans, rollback/fallback state, certification evidence and repair memory",
+      "authority_boundary": "May autonomously prepare D0-D2 reversible repair candidates only through allowlisted handlers. D3, arbitrary commands, external target scanning, self-certification, self-promotion and authority expansion are prohibited.",
+      "risk_ceiling": "D2",
+      "maturity": "production",
+      "dependencies": ["penta.factory", "penta.pr", "penta.evi-builder", "penta.certify", "penta.assure", "penta.error", "penta.logger", "penta.trace", "penta.docs"],
+      "five_stage": {
+        "discover": "Read authorized repository-local CI failures, test/evidence gaps, stale automation and explicitly admitted issue candidates.",
+        "govern": "Score severity, recurrence, confidence, reversibility, testability and blast radius while enforcing kill switch, retry caps and D3 reservation.",
+        "execute": "Emit one bounded repair plan per default cycle with deterministic rollback and fallback/redundancy; execution remains routed through PentaFactory/PentaPR.",
+        "verify": "Require exact-head tests, PentaEVIBuilder evidence and independent PentaCertify/PentaAssure PASS before governed merge or release.",
+        "preserve": "Store successful repair fingerprints and recipes as advisory memory only; every reuse requires prerequisite matching and fresh retesting."
+      }
+    }
+  ],
   "penta_creation_contract": {
     "may_propose_new_pentas": true,
     "proposal_state": "CANDIDATE",
     "self_registration_authorized": false,
     "self_activation_authorized": false,
     "external_governance_required": true
-  },
-  "production_claim_contract": {
-    "current_claim": "candidate until governed PR exact-head CI and merge evidence exist",
-    "old_evidence_may_be_reused_as_new": false,
-    "certifier_must_differ_from_evidence_producer": true,
-    "sha_drift_fails_closed": true,
-    "D3_requires_human_gate": true
   }
 }
