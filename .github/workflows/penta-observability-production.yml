@@ -8,10 +8,19 @@ on:
       - runtime/penta_logger.py
       - runtime/penta_trace.py
       - runtime/penta_metric.py
+      - runtime/penta_interop.py
+      - runtime/penta_runtime_suite.py
+      - runtime/penta_family.py
       - tests/test_penta_observability.py
+      - tests/test_penta_runtime_suite.py
+      - tests/test_penta_interop.py
       - data/penta/systems.extensions.observability.json
+      - data/penta/family.registry.json
+      - data/penta/interoperability.registry.json
+      - schemas/penta/interoperability-envelope.schema.json
       - PENTA-OBSERVABILITY-SUITE.md
       - .github/workflows/penta-observability-production.yml
+      - .github/workflows/penta-interoperability-production.yml
   push:
     branches:
       - main
@@ -21,10 +30,19 @@ on:
       - runtime/penta_logger.py
       - runtime/penta_trace.py
       - runtime/penta_metric.py
+      - runtime/penta_interop.py
+      - runtime/penta_runtime_suite.py
+      - runtime/penta_family.py
       - tests/test_penta_observability.py
+      - tests/test_penta_runtime_suite.py
+      - tests/test_penta_interop.py
       - data/penta/systems.extensions.observability.json
+      - data/penta/family.registry.json
+      - data/penta/interoperability.registry.json
+      - schemas/penta/interoperability-envelope.schema.json
       - PENTA-OBSERVABILITY-SUITE.md
       - .github/workflows/penta-observability-production.yml
+      - .github/workflows/penta-interoperability-production.yml
   workflow_dispatch:
 
 permissions:
@@ -36,37 +54,36 @@ concurrency:
 
 jobs:
   certify:
-    name: Certify Penta observability
+    name: Certify Penta observability in family fabric
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
 
       - name: Run unit and compatibility tests
         run: |
-          python -m unittest -v tests/test_penta_observability.py tests/test_penta_runtime_suite.py
+          python -m unittest -v tests/test_penta_observability.py
+          python -m unittest -v tests/test_penta_runtime_suite.py
+          python -m unittest -v tests/test_penta_interop.py
+          python tests/test_penta_family.py
 
       - name: Run built-in observability self-test
         run: python runtime/penta_observability.py --self-test
 
-      - name: Verify Penta Runtime Suite production gates
+      - name: Verify observability is in the Penta Family production census
         run: |
           python runtime/penta_runtime_suite.py --root . --gate penta.error
           python runtime/penta_runtime_suite.py --root . --gate penta.logger
           python runtime/penta_runtime_suite.py --root . --gate penta.trace
           python runtime/penta_runtime_suite.py --root . --gate penta.metric
+          python runtime/penta_interop.py --root . --certify --output penta-interoperability-certification.json
 
       - name: Compile runtime surfaces
         run: |
-          python -m py_compile \
-            runtime/penta_observability.py \
-            runtime/penta_error.py \
-            runtime/penta_logger.py \
-            runtime/penta_trace.py \
-            runtime/penta_metric.py
+          python -m py_compile             runtime/penta_observability.py             runtime/penta_error.py             runtime/penta_logger.py             runtime/penta_trace.py             runtime/penta_metric.py             runtime/penta_interop.py             runtime/penta_runtime_suite.py             runtime/penta_family.py

@@ -8,14 +8,19 @@ on:
       - "runtime/penta_institutional_services.py"
       - "runtime/penta_institutional_controls.py"
       - "runtime/penta_family.py"
+      - "runtime/penta_interop.py"
+      - "runtime/penta_runtime_suite.py"
       - "tests/test_penta_institutional_services.py"
       - "tests/test_penta_institutional_controls.py"
       - "tests/test_penta_institutional_controls_family.py"
       - "tests/test_penta_family.py"
+      - "tests/test_penta_interop.py"
       - "automation/penta-family*.mdx"
+      - "automation/penta-interoperability-fabric.mdx"
       - "docs/phase3/PENTA_INSTITUTIONAL_OPERATING_FABRIC_v1.2.md"
       - "docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v*.md"
       - ".github/workflows/penta-institutional-services.yml"
+      - ".github/workflows/penta-interoperability-production.yml"
   push:
     branches: [main]
     paths:
@@ -24,13 +29,18 @@ on:
       - "runtime/penta_institutional_services.py"
       - "runtime/penta_institutional_controls.py"
       - "runtime/penta_family.py"
+      - "runtime/penta_interop.py"
+      - "runtime/penta_runtime_suite.py"
       - "tests/test_penta_institutional_services.py"
       - "tests/test_penta_institutional_controls.py"
       - "tests/test_penta_institutional_controls_family.py"
       - "tests/test_penta_family.py"
+      - "tests/test_penta_interop.py"
       - "automation/penta-family*.mdx"
+      - "automation/penta-interoperability-fabric.mdx"
       - "docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v*.md"
       - ".github/workflows/penta-institutional-services.yml"
+      - ".github/workflows/penta-interoperability-production.yml"
   workflow_dispatch:
 
 permissions:
@@ -44,9 +54,9 @@ jobs:
   verify:
     name: Verify institutional services, controls, census and Penta Family
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
@@ -58,18 +68,23 @@ jobs:
         run: |
           python -m json.tool data/penta/institutional-services.registry.json >/dev/null
           python -m json.tool data/penta/family.registry.json >/dev/null
+          python -m json.tool data/penta/interoperability.registry.json >/dev/null
           python -m json.tool data/penta/systems.registry.json >/dev/null
           python -m json.tool data/penta/systems.extensions.pentascribe-marketer.json >/dev/null
           python -m json.tool data/penta/systems.extensions.operations-workforce.json >/dev/null
           python -m json.tool data/penta/systems.extensions.institutional-controls.json >/dev/null
+          python -m json.tool data/penta/systems.extensions.observability.json >/dev/null
           python -m json.tool schemas/penta/decision-packet.schema.json >/dev/null
           python -m json.tool schemas/penta/family-registry.schema.json >/dev/null
+          python -m json.tool schemas/penta/interoperability-envelope.schema.json >/dev/null
 
       - name: Compile governance runtimes
         run: |
           python -m py_compile runtime/penta_institutional_services.py
           python -m py_compile runtime/penta_institutional_controls.py
           python -m py_compile runtime/penta_family.py
+          python -m py_compile runtime/penta_runtime_suite.py
+          python -m py_compile runtime/penta_interop.py
 
       - name: Smoke test institutional controls runtime
         run: python runtime/penta_institutional_controls.py >/dev/null
@@ -86,6 +101,7 @@ jobs:
           python runtime/penta_family.py --root . --member penta.compliance --portal >/dev/null
           python runtime/penta_family.py --root . --member penta.identity --portal >/dev/null
           python runtime/penta_family.py --root . --member penta.procure --portal >/dev/null
+          python runtime/penta_family.py --root . --member penta.error --portal >/dev/null
 
       - name: Run institutional service authority-boundary tests
         run: python tests/test_penta_institutional_services.py
@@ -98,3 +114,8 @@ jobs:
 
       - name: Run Penta Family production-contract tests
         run: python tests/test_penta_family.py
+
+      - name: Run family-wide interoperability certification
+        run: |
+          python -m unittest -v tests/test_penta_interop.py
+          python runtime/penta_interop.py --root . --certify --output penta-interoperability-certification.json

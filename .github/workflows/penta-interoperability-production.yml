@@ -1,0 +1,134 @@
+name: Penta Interoperability Production
+
+on:
+  pull_request:
+    paths:
+      - 'runtime/penta_*.py'
+      - 'runtime/penta-provider-control-plane/**'
+      - 'data/penta/**'
+      - 'schemas/penta/**'
+      - 'tests/test_penta*.py'
+      - 'developers/manifests/penta-runtime-suite.v1.json'
+      - 'automation/penta-interoperability-fabric.mdx'
+      - 'docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v1.3.md'
+      - '.github/workflows/penta-interoperability-production.yml'
+      - '.github/workflows/penta-runtime-suite.yml'
+      - '.github/workflows/penta-institutional-services.yml'
+      - '.github/workflows/penta-observability-production.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/penta_*.py'
+      - 'runtime/penta-provider-control-plane/**'
+      - 'data/penta/**'
+      - 'schemas/penta/**'
+      - 'tests/test_penta*.py'
+      - 'developers/manifests/penta-runtime-suite.v1.json'
+      - 'automation/penta-interoperability-fabric.mdx'
+      - 'docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v1.3.md'
+      - '.github/workflows/penta-interoperability-production.yml'
+      - '.github/workflows/penta-runtime-suite.yml'
+      - '.github/workflows/penta-institutional-services.yml'
+      - '.github/workflows/penta-observability-production.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-interoperability-production-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    name: Certify all-Penta interoperability
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Validate machine contracts
+        run: |
+          python -m json.tool data/penta/family.registry.json >/dev/null
+          python -m json.tool data/penta/interoperability.registry.json >/dev/null
+          python -m json.tool data/penta/systems.extensions.observability.json >/dev/null
+          python -m json.tool data/penta/systems.extensions.institutional-controls.json >/dev/null
+          python -m json.tool schemas/penta/family-registry.schema.json >/dev/null
+          python -m json.tool schemas/penta/interoperability-envelope.schema.json >/dev/null
+          python -m json.tool developers/manifests/penta-runtime-suite.v1.json >/dev/null
+
+      - name: Compile interoperable runtime surfaces
+        run: |
+          python -m py_compile             runtime/penta_family.py             runtime/penta_runtime_suite.py             runtime/penta_interop.py             runtime/penta_institutional_services.py             runtime/penta_institutional_controls.py             runtime/penta_mail.py             runtime/penta_observability.py             runtime/penta_error.py             runtime/penta_logger.py             runtime/penta_trace.py             runtime/penta_metric.py             runtime/penta-provider-control-plane/penta_control_plane.py
+
+      - name: Run Penta Family and interoperability tests
+        run: |
+          python tests/test_penta_family.py
+          python -m unittest -v tests/test_penta_runtime_suite.py
+          python -m unittest -v tests/test_penta_interop.py
+
+      - name: Run institutional control interoperability tests
+        run: |
+          python tests/test_penta_institutional_services.py
+          python tests/test_penta_institutional_controls.py
+          python tests/test_penta_institutional_controls_family.py
+
+      - name: Run communications and observability tests
+        run: |
+          python -m unittest -v tests/test_penta_mail.py
+          python -m unittest -v tests/test_penta_observability.py
+          python runtime/penta_observability.py --self-test
+
+      - name: Validate certified provider contracts
+        run: python scripts/validate_penta_provider_control_plane.py
+
+      - name: Certify family-wide protocol coverage
+        run: |
+          python runtime/penta_interop.py             --root .             --certify             --output penta-interoperability-certification.json
+
+      - name: Assert production certification receipt
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("penta-interoperability-certification.json").read_text())
+          assert report["status"] == "PASS", report["blockers"]
+          assert report["production_state"] == "production"
+          assert report["blocker_count"] == 0
+          assert report["family_member_count"] == report["addressable_member_count"]
+          assert report["family_member_count"] == report["runtime_inventory_member_count"]
+          print(
+              "PASS_PENTA_INTEROPERABILITY_PRODUCTION_V1",
+              report["family_member_count"],
+              report["execution_eligible_member_count"],
+          )
+          PY
+
+      - name: Publish certification summary
+        if: always()
+        run: |
+          {
+            echo '## Penta Family Interoperability'
+            echo
+            if [ -f penta-interoperability-certification.json ]; then
+              python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("penta-interoperability-certification.json").read_text())
+          print(f"- Status: **{r['status']}**")
+          print(f"- Production state: **{r['production_state']}**")
+          print(f"- Registered/addressable Pentas: **{r['addressable_member_count']}**")
+          print(f"- Execution-eligible Pentas: **{r['execution_eligible_member_count']}**")
+          print(f"- Blockers: **{r['blocker_count']}**")
+          print("- Child maturity remains independent; protocol certification does not manufacture authority.")
+          PY
+            else
+              echo '- Certification receipt missing: **HOLD**'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

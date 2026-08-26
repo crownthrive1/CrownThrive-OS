@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0.0",
+  "registry_id": "crownthrive.penta.interoperability",
+  "canonical_name": "Penta Family Interoperability Fabric",
+  "mark": "Penta Family Interoperability Fabric™",
+  "owner": "CrownThrive LLC",
+  "status": "production",
+  "production_scope": "repository_native_interoperability_control_plane",
+  "protocol_version": "1.0.0",
+  "doctrine": "Discover -> Govern -> Execute -> Verify -> Preserve",
+  "authority_invariant": "Interoperability makes registered Penta systems mutually addressable but never creates child maturity, legal authority, provider authority, financial authority, governance authority, or permission to execute.",
+  "references": {
+    "family_registry": "data/penta/family.registry.json",
+    "envelope_schema": "schemas/penta/interoperability-envelope.schema.json",
+    "runtime": "runtime/penta_interop.py",
+    "runtime_suite": "runtime/penta_runtime_suite.py",
+    "provider_control_plane": "runtime/penta-provider-control-plane"
+  },
+  "required_spine": [
+    "penta.control",
+    "penta.mcp",
+    "penta.route",
+    "penta.federation",
+    "penta.docs",
+    "penta.assure"
+  ],
+  "required_observability": [
+    "penta.error",
+    "penta.logger",
+    "penta.trace",
+    "penta.metric"
+  ],
+  "invariants": {
+    "all_registered_members_addressable": true,
+    "unknown_members_fail_closed": true,
+    "exact_source_target_machine_keys": true,
+    "trace_required": true,
+    "idempotency_required": true,
+    "evidence_required": true,
+    "execution_preserves_member_maturity": true,
+    "consequential_execution_requires_authority": true,
+    "provider_execution_requires_certified_binding_and_readback": true
+  },
+  "handoff_contract": {
+    "envelope": "ct.penta.interoperability-envelope.v1",
+    "effects": [
+      "analyze",
+      "prepare",
+      "route",
+      "execute",
+      "verify",
+      "preserve"
+    ],
+    "non_execution_handoffs_allowed_for_registered_non_held_members": true,
+    "execute_requires_source_and_target_maturity": [
+      "certified",
+      "production"
+    ],
+    "execute_requires_authority_trace": true,
+    "d2_d3_require_human_gate": true,
+    "provider_effect_requires_provider_binding_ref": true,
+    "execute_requires_readback_strategy": true,
+    "receipts_sha256": true
+  },
+  "maturity_semantics": {
+    "family_fabric": "production",
+    "child_maturity_remains_independent": true,
+    "specified_and_implemented_members_may_receive_bounded_non_execution_work": true,
+    "specified_and_implemented_members_cannot_execute": true,
+    "certification_does_not_promote_children": true
+  },
+  "certification": {
+    "workflow": ".github/workflows/penta-interoperability-production.yml",
+    "test": "tests/test_penta_interop.py",
+    "must_match_runtime_inventory_to_family_census": true,
+    "must_resolve_all_penta_dependencies": true,
+    "must_include_required_spine": true,
+    "must_include_required_observability": true,
+    "must_have_zero_provider_contract_errors": true,
+    "failure_disposition": "hold_fail_closed"
+  }
+}

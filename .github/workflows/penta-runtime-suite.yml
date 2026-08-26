@@ -3,27 +3,30 @@ name: Penta Runtime Suite
 on:
   pull_request:
     paths:
-      - 'runtime/penta_mail.py'
-      - 'runtime/penta_runtime_suite.py'
-      - 'tests/test_penta_mail.py'
-      - 'tests/test_penta_runtime_suite.py'
+      - 'runtime/penta_*.py'
       - 'runtime/penta-provider-control-plane/**'
+      - 'tests/test_penta*.py'
       - 'data/penta/**'
+      - 'schemas/penta/**'
       - 'developers/manifests/penta-runtime-suite.v1.json'
       - '.github/workflows/penta-runtime-suite.yml'
+      - '.github/workflows/penta-interoperability-production.yml'
       - '.github/workflows/penta-mail-live-certification.yml'
+      - '.github/workflows/penta-observability-production.yml'
   push:
     branches: [main]
     paths:
-      - 'runtime/penta_mail.py'
-      - 'runtime/penta_runtime_suite.py'
-      - 'tests/test_penta_mail.py'
-      - 'tests/test_penta_runtime_suite.py'
+      - 'runtime/penta_*.py'
       - 'runtime/penta-provider-control-plane/**'
+      - 'tests/test_penta*.py'
       - 'data/penta/**'
+      - 'schemas/penta/**'
       - 'developers/manifests/penta-runtime-suite.v1.json'
       - '.github/workflows/penta-runtime-suite.yml'
+      - '.github/workflows/penta-interoperability-production.yml'
       - '.github/workflows/penta-mail-live-certification.yml'
+      - '.github/workflows/penta-observability-production.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,20 +38,30 @@ concurrency:
 jobs:
   runtime-suite:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
 
       - name: Compile Penta runtime software
         run: |
-          python3 -m py_compile runtime/penta_mail.py runtime/penta_runtime_suite.py runtime/penta-provider-control-plane/penta_control_plane.py
+          python3 -m py_compile             runtime/penta_mail.py             runtime/penta_runtime_suite.py             runtime/penta_interop.py             runtime/penta_family.py             runtime/penta_institutional_services.py             runtime/penta_institutional_controls.py             runtime/penta_observability.py             runtime/penta_error.py             runtime/penta_logger.py             runtime/penta_trace.py             runtime/penta_metric.py             runtime/penta-provider-control-plane/penta_control_plane.py
 
       - name: Run focused Penta runtime tests
         run: |
-          python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
-          python3 -m unittest discover -s tests -p 'test_penta_runtime_suite.py' -v
-          python3 -m unittest discover -s tests -p 'test_penta_family.py' -v
-          python3 -m unittest discover -s tests -p 'test_penta_institutional_services.py' -v
+          python3 -m unittest -v tests/test_penta_mail.py
+          python3 -m unittest -v tests/test_penta_runtime_suite.py
+          python3 -m unittest -v tests/test_penta_interop.py
+          python3 tests/test_penta_family.py
+          python3 tests/test_penta_institutional_services.py
+          python3 tests/test_penta_institutional_controls.py
+          python3 tests/test_penta_institutional_controls_family.py
+          python3 -m unittest -v tests/test_penta_observability.py
 
       - name: Validate provider contracts
         run: python3 scripts/validate_penta_provider_control_plane.py
@@ -76,17 +89,33 @@ jobs:
               raise SystemExit('Resend provider missing from Penta provider registry')
           PY
 
+      - name: Certify interoperability snapshot
+        run: |
+          python3 runtime/penta_interop.py             --root .             --certify             --output penta-interoperability-certification.json
+
       - name: Publish suite summary
         if: always()
         run: |
           {
             echo '## Penta Runtime Suite'
             echo
-            echo 'This workflow validates executable runtime assets. It does not promote registry maturity.'
+            echo 'Executable runtime, provider-contract, family, observability, and interoperability verification.'
             echo
             if [ -f penta-runtime-suite-report.json ]; then
-              echo 'Truth snapshot generated successfully.'
+              echo '- Truth snapshot: generated'
             else
-              echo 'Truth snapshot was not generated.'
+              echo '- Truth snapshot: missing'
+            fi
+            if [ -f penta-interoperability-certification.json ]; then
+              python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("penta-interoperability-certification.json").read_text())
+          print(f"- Interoperability: {r['status']} / {r['production_state']}")
+          print(f"- Addressable Pentas: {r['addressable_member_count']}")
+          print(f"- Blockers: {r['blocker_count']}")
+          PY
+            else
+              echo '- Interoperability: HOLD (receipt missing)'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
