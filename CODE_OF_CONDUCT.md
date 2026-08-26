@@ -1,78 +1,108 @@
 # CrownThrive Community & Contribution Conduct 👑
 
-CrownThrive's public repository is a collaboration surface for institutional documentation, governance, interoperability, support, research, and public-safe ecosystem development. Participation requires conduct that protects people, culture, intellectual property, evidence integrity, privacy, security, and the continuity of the institutional record.
+**Phase 3 edition — effective 2026-08-26**
+
+CrownThrive's repository and documentation surfaces support institutional documentation, governance, interoperability, support, research, software/factory work, and public-safe ecosystem development. Participation must protect people, culture, intellectual property, evidence integrity, privacy, security, and continuity of the institutional record.
 
 ## Our standard
 
 Participants are expected to:
 
-- engage with people respectfully and professionally;
+- engage respectfully, professionally, and in good faith;
 - critique ideas, evidence, code, documentation, and decisions without attacking people;
-- respect cultural context, names, identities, communities, creative works, and lived experience;
-- preserve source attribution, provenance, stable identities, historical context, and correction history;
-- keep public and restricted information properly separated;
-- disclose conflicts, uncertainty, limitations, and material use of automated or AI-generated work when relevant to review;
-- use accessible, understandable language where the audience requires it;
-- accept evidence-based correction without retaliating against reporters or contributors;
-- follow repository governance, licensing, security, contribution, and review requirements.
+- respect cultural context, communities, names, imprints, canon, creative works, and lived experience;
+- preserve attribution, source lineage, provenance, stable identities, historical context, and correction history;
+- distinguish current, historical, candidate, controlled-test, held, and production states;
+- keep public, internal, restricted, confidential, and secret information properly separated;
+- disclose conflicts, uncertainty, material limitations, and material automated/AI contribution where relevant to review;
+- avoid presenting provider capability, generated artifacts, screenshots, or model output as institutional authority;
+- follow repository governance, licensing, security, contribution, archive, and review requirements;
+- accept evidence-based correction without retaliation.
 
 ## Unacceptable conduct
 
-The following are not acceptable in CrownThrive public collaboration spaces:
+Unacceptable conduct includes:
 
-- harassment, threats, stalking, intimidation, discrimination, sexual harassment, or targeted abuse;
-- slurs, dehumanizing language, deliberate humiliation, or attacks based on protected or personal characteristics;
-- doxxing, publishing private contact information, credentials, personal records, protected identities, or restricted evidence;
-- impersonating CrownThrive, its people, agents, brands, partners, maintainers, or institutional authority;
-- knowingly submitting stolen, infringing, confidential, fabricated, manipulated, or unauthorized material;
-- using a contribution, issue, pull request, payment, sponsorship, or public interaction to falsely claim ownership, partnership, endorsement, governance authority, license rights, employment, or priority treatment;
-- spamming, deceptive promotion, fake metrics, fabricated testimonials, mass-generated low-value content, or coordinated manipulation;
-- attempting to bypass review, access control, security checks, rights controls, payment controls, or institutional gates;
-- publishing exploit details, secrets, private incident evidence, or other security-sensitive material through public channels;
-- retaliating against good-faith security, rights, privacy, cultural, accessibility, or evidence-integrity reports.
+- harassment, threats, stalking, intimidation, discrimination, sexual harassment, targeted abuse, slurs, dehumanizing language, or deliberate humiliation;
+- doxxing or publishing credentials, personal/private records, customer data, protected identities, restricted evidence, or confidential material;
+- impersonating CrownThrive, its people, agents, brands, partners, maintainers, certification programs, or institutional authority;
+- knowingly submitting stolen, infringing, confidential, fabricated, manipulated, deceptive, or unauthorized material;
+- falsely claiming ownership, partnership, endorsement, governance authority, certification, license rights, employment, compensation, or priority treatment;
+- spamming, deceptive promotion, fake metrics, fabricated testimonials, mass-generated low-value content, coordinated manipulation, or issue/PR flooding;
+- attempting to bypass review, access control, CHLOM gates, CIE boundaries, payment/entitlement controls, security checks, provider-write certification, or reserved human authority;
+- converting `HOLD`, `CONTROLLED_TEST`, `candidate`, `historical`, or unverified material into a production claim without evidence;
+- using archived or superseded material to knowingly misrepresent current CrownThrive state;
+- exposing exploit-enabling detail, secrets, private incident evidence, or security-sensitive material through public channels;
+- retaliating against good-faith security, rights, privacy, cultural, accessibility, compliance, or evidence-integrity reporting.
 
-## Culture, creativity, and community stewardship
+## Cultural and community stewardship
 
-CrownThrive operates across culture, media, beauty, wellness, education, technology, commerce, community, and intellectual-property systems. Contributors must avoid flattening cultural context into generic output, treating community identity as a marketing prop, or using CrownThrive's public visibility as permission to appropriate protected creative or institutional material.
+CrownThrive operates across culture, media, beauty, wellness, education, technology, faith, commerce, community, and intellectual-property systems. Contributors must not flatten cultural context into generic output, treat community identity as a marketing prop, erase source communities, appropriate protected creative/institutional material, or deliberately break established imprint/canon boundaries.
 
-Disagreement is permitted. Evidence-based challenge is welcome. Cultural disrespect, bad-faith extraction, harassment, and misrepresentation are not.
+Disagreement is permitted. Evidence-based challenge is welcome. Cultural disrespect, extraction, harassment, and misrepresentation are not.
 
-## AI and automated contributions
+## AI, agents, factories, and automated contributors
 
-AI, ML, LLM, agent, script, and automation output is reviewable contribution material, not independent authority. Automated contributors must obey the same source, evidence, licensing, privacy, security, accessibility, and conduct requirements as human contributors.
+AI, ML, LLM, agent, script, factory, and automation output is reviewable contribution material—not independent authority.
 
-Automation must not impersonate a human reviewer, conceal consequential uncertainty, fabricate sources, manufacture consensus, or self-approve reserved decisions.
+Automated contributors must obey the same source, evidence, licensing, privacy, security, accessibility, cultural, and conduct requirements as human contributors. They must not:
+
+- impersonate a human reviewer or Founder;
+- self-create D3/sovereign or other reserved authority;
+- fabricate sources, evidence, provider responses, approvals, consensus, rights, payments, entitlements, or certifications;
+- silently overwrite current records or erase historical lineage;
+- publish secrets/restricted evidence;
+- infer a provider write or deployment from documentation capability alone;
+- self-approve a consequential action when separation of duties is required.
+
+Generated scale does not reduce the standard of review. A factory producing thousands of candidates remains bounded by the same authority and evidence gates.
+
+## Current-state and archive integrity
+
+Phase 3 depends on accurate current-state documentation. Participants must preserve the distinction between:
+
+- current operating instruction;
+- effective policy;
+- verified runtime/provider state;
+- generated candidate;
+- historical snapshot;
+- deprecated/superseded material;
+- unresolved evidence.
+
+Historical material should be preserved and labeled, not rewritten to manufacture present-day truth. Current material should link to the successor/archival record where that relationship matters.
 
 ## Security and private information
 
-Do not report credentials, vulnerabilities, private customer information, payment data, protected identities, private contracts, restricted rights evidence, or exploit-enabling details in public issues or pull requests.
+Do not report credentials, vulnerabilities, private customer information, payment data, private contracts, protected identities, restricted rights evidence, private prompts/evals, or exploit-enabling details in public issues or pull requests.
 
-Follow `SECURITY.md` and use **contact@crownthrive.com** for private disclosure.
+Follow `SECURITY.md` and use **contact@crownthrive.com** for private disclosure. Do not include unnecessary private data in an initial report.
+
+## Intellectual property and machine use
+
+Participation does not waive CrownThrive rights or create an implied license. Contributors and automated systems must follow `LICENSE`, `PHASE-3-LICENSING-AND-MACHINE-USE-ADDENDUM.md`, `TRADEMARKS.md`, and applicable file/package terms.
+
+Public access is not permission to bulk-extract, train models on, commercialize, clone, rebrand, or create unauthorized certified/endorsed derivatives from protected CrownThrive material.
 
 ## Scope
 
-This conduct standard applies to participation in this repository and CrownThrive-controlled public collaboration spaces connected to it, including issues, pull requests, discussions, reviews, comments, documentation contributions, and related public project interactions.
+This standard applies to CrownThrive-controlled public collaboration spaces connected to this repository, including issues, pull requests, reviews, comments, discussions, documentation contributions, release/reconciliation work, and automated contribution channels.
 
-It does not convert CrownThrive's private systems, accounts, community spaces, or restricted records into public forums.
+It does not convert private systems, accounts, data rooms, runtime stores, or restricted records into public forums.
 
 ## Enforcement
 
-CrownThrive maintainers may edit or remove content, close or lock conversations, reject contributions, limit participation, block abusive accounts, preserve evidence, or escalate an incident when conduct threatens people, systems, rights, privacy, security, or institutional continuity.
+CrownThrive maintainers may edit/remove content, reject contributions, close/lock conversations, limit participation, block abusive accounts, quarantine automated contributors, revoke repository/integration access where authorized, preserve evidence, or escalate an incident when conduct threatens people, systems, rights, privacy, security, culture, or institutional continuity.
 
-Enforcement should be proportionate to severity, recurrence, intent, impact, evidence, and safety needs. Serious threats, credential exposure, exploitation, criminal conduct, or material rights/privacy/security incidents may be escalated through the appropriate private, provider, legal, or public-safety process.
+Enforcement should be proportionate to severity, recurrence, intent, impact, evidence, and safety needs. Serious threats, exploitation, credential exposure, criminal conduct, or material rights/privacy/security incidents may be escalated through appropriate private, provider, legal, or public-safety channels.
 
-Good-faith disagreement with a technical, cultural, governance, or business decision is not itself misconduct.
+Good-faith disagreement with a technical, cultural, governance, evidence, or business decision is not misconduct.
 
-## Reporting conduct concerns
+## Reporting concerns
 
-For a public-safe moderation concern, you may reference the issue or pull request and ask a maintainer to review it.
-
-For harassment, threats, privacy issues, security issues, protected evidence, or other matters that should not be public, contact:
+For a public-safe moderation issue, reference the relevant issue/PR and request maintainer review. For harassment, threats, privacy, security, protected evidence, or other matters that should not be public, contact:
 
 **contact@crownthrive.com**
 
-Do not include unnecessary private data in the first report. If protected evidence is needed, request a controlled transfer method.
+## Relationship to governing terms
 
-## Relationship to repository terms
-
-This conduct standard does not replace `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `AGENTS.md`, applicable law, binding agreements, or governing CrownThrive records. Participation does not create a license, ownership interest, compensation right, partnership, employment relationship, or institutional authority.
+This conduct standard does not replace `LICENSE`, licensing addenda, `CONTRIBUTING.md`, `SECURITY.md`, `AGENTS.md`, applicable law, binding agreements, or governing CrownThrive records. Participation does not create ownership, a license, compensation, partnership, employment, certification, governance authority, or other institutional rights not separately granted.
