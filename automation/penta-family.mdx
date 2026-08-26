@@ -1,9 +1,9 @@
 ---
 title: "Penta Family — Production Control Plane"
-description: "Canonical public-safe contract for CrownThrive's Penta Family production umbrella, member maturity, dispatch gates, control planes, portals and authority boundaries."
+description: "Canonical public-safe contract for CrownThrive's Penta Family production umbrella, member maturity, dispatch gates, on-demand readiness, control planes, portals and authority boundaries."
 sidebarTitle: "Penta Family"
 icon: "sitemap"
-keywords: ["Penta Family", "Penta", "CrownThrive OS", "Phase 3", "production", "control plane", "Penta portals", "PentaDocs", "CHLOM", "DAIL"]
+keywords: ["Penta Family", "Penta", "CrownThrive OS", "Phase 3", "production", "PentaOD", "PentaHeartbeat", "PentaBeata", "control plane", "Penta portals", "PentaDocs", "CHLOM", "DAIL"]
 ---
 
 # Penta Family™ // Production Control Plane
@@ -28,8 +28,9 @@ The production family contract provides:
 - a fail-closed member eligibility gate;
 - production snapshots and maturity counts;
 - execution-eligible and held-member visibility;
+- HOT/WARM/SLEEP/HOLD/DEGRADED/RETIRED readiness through PentaOD and PentaHeartbeat;
 - a mandatory per-member portal and guide contract;
-- bounded control-plane topology across governance, routing, build, security, knowledge, media, economics, workforce, service delivery, intelligence and institutional services; and
+- bounded control-plane topology across governance, routing, readiness, build, security, knowledge, media, economics, workforce, service delivery, intelligence and institutional services; and
 - evidence/readback requirements before downstream side effects.
 
 The family runtime does not directly execute provider actions. It establishes whether a registered member is eligible to proceed to its own downstream gates and can render the canonical portal payload for each system.
@@ -57,6 +58,7 @@ Only `certified` and `production` pass the Penta Family eligibility gate. Passin
  ┌────────────────────────────────────────────────────────────┐
  │ Human governance       Hybrid / Alumni / Board             │
  │ Routing/execution      Control / MCP / Route / Mation/Time │
+ │ Readiness/liveness     OD / Heartbeat / Beata / Status     │
  │ Build/release          Factory / Build / Certify / Release │
  │ Convergence            PR / Merge / Closer / Nurture       │
  │ Credentials/security   Credentials / Security / Risk/Audit │
@@ -75,6 +77,20 @@ Only `certified` and `production` pass the Penta Family eligibility gate. Passin
 
 These groupings establish responsibility and interoperability. They do not collapse system-of-record boundaries or manufacture authority.
 
+## PentaOD, PentaHeartbeat and PentaBeata
+
+The family now uses three distinct readiness layers rather than treating every service as permanently executing:
+
+- **PentaOD™** is the on-demand readiness controller. It classifies registered services and exact certified operations as `HOT`, `WARM`, `SLEEP`, `HOLD`, `DEGRADED`, or `RETIRED`; wakes eligible components on real demand; idles wake-on-demand components; and appends wake/dispatch receipts.
+- **PentaHeartbeat™** is the whole-system readiness aggregate. It combines PentaOD state, PentaMesh/Fabric health and the canonical ThriveBase heartbeat into a five-minute institutional readiness signal.
+- **PentaBeata™** is the public-safe liveness primitive. It reports sanitized PentaRoute plus readiness state without issuing provider writes or exposing secrets.
+
+`HOT` means **ready inside authority already earned**. It does not mean unrestricted permissions.
+
+A certified-write-on-demand operation is dispatch-ready only when its exact PentaCertify record is `verified_write`, risk is D0–D2, credential state is verified, idempotency is verified or explicitly not applicable, rollback/compensation is verified or explicitly not applicable, read-after-write is verified, certification has not expired, and the PentaOD heartbeat is fresh. D3, blocked, held and retired operations do not auto-wake.
+
+For Partnero attribution, `customers.create` and `transactions.create` remain separate exact operations. When PentaCertify marks either exact operation `verified_write`, certification triggers immediately synchronize the Partnero surface flags and the PentaOD component. A genuine signup or transaction event then wakes that exact component on demand and dispatches only after PentaOD confirms fresh readiness. Coupons, deletes, balances, partner lifecycle administration and unrelated Partnero mutations remain closed.
+
 ## Production dispatch contract
 
 A member can pass the family eligibility gate only when:
@@ -86,15 +102,15 @@ A member can pass the family eligibility gate only when:
 5. the member maturity is `certified` or `production`; and
 6. the family itself composes without an invariant failure.
 
-Consequential execution still requires the applicable CHLOM/DAIL authority trace, accountable owner, PentaHybrid/human gate, provider adapter certification, PentaCredentials binding, legal/rights/security/spend controls, release policy, and provider readback.
+Consequential execution still requires the applicable CHLOM/DAIL authority trace, accountable owner, PentaHybrid/human gate, provider adapter certification, PentaCredentials binding, legal/rights/security/spend controls, release policy, PentaOD readiness when the capability is on-demand, and provider readback.
 
 <Warning>
-  **Fail closed.** Unknown members, unresolved control-plane names, duplicate machine keys, missing required catalogs, invalid maturity, `specified`, `implemented`, `hold`, and `retired` states are not execution eligible through the family control plane.
+  **Fail closed.** Unknown members, unresolved control-plane names, duplicate machine keys, missing required catalogs, invalid maturity, `specified`, `implemented`, `hold`, `retired`, stale heartbeat, missing credential, or unverified exact-write certification are not execution eligible through the family control plane.
 </Warning>
 
 ## Portals and comprehensive system guides
 
-Every registered Penta now has a canonical portal contract at:
+Every registered Penta has a canonical portal contract at:
 
 ```text
 /penta/{machine_key_suffix}
@@ -115,18 +131,15 @@ python runtime/penta_family.py --root . --member penta.mail --portal
 
 ## Canonical catalogs
 
-The production family composes four required catalogs:
-
-- `data/penta/systems.registry.json` — core PENTA institutional catalog;
-- `data/penta/systems.extensions.pentascribe-marketer.json` — PentaScribe/PentaMarketer extension;
-- `data/penta/institutional-services.registry.json` — institutional operating-fabric services; and
-- `data/penta/systems.extensions.operations-workforce.json` — software delivery, credentials, maintenance, mail/concierge/status, economic controls, workforce, HR, board/compliance and agent-suite systems.
+The production family composes the required catalogs declared by `data/penta/family.registry.json`, including core systems, PentaScribe/PentaMarketer, institutional services, operations/workforce, institutional controls, and the observability/readiness extension containing PentaOD, PentaHeartbeat and PentaBeata.
 
 Catalog membership is explicit and change-controlled. A new `Penta*` name does not become executable merely by appearing in documentation.
 
 ## Runtime and verification
 
 The canonical family runtime is `runtime/penta_family.py`. It validates the production contract, composes a deterministic family snapshot, rejects unresolved control-plane references, exposes member maturity, generates the portal index, renders per-member portal payloads, and returns a fail-closed dispatch disposition.
+
+Live readiness is separately carried by the ThriveBase PentaOD/PentaHeartbeat runtime. PentaOD reconciliation runs every two minutes, PentaHeartbeat records a system readiness heartbeat every five minutes, and on-demand idle reconciliation runs every fifteen minutes. Certification changes are event-driven and do not wait for the periodic sweep.
 
 The CI lane validates all required PENTA catalogs and schemas, compiles the runtimes, verifies the family census, renders the portal index and a representative PentaMail portal, runs institutional authority-boundary tests, and runs dedicated Penta Family regression tests. Those tests prove that production members may pass the family eligibility gate while `specified`, `implemented`, and unknown members remain held.
 
@@ -136,6 +149,8 @@ Penta Family is designed to make the PENTA estate more executable **without maki
 
 ```text
 FAMILY PRODUCTION ≠ UNIVERSAL CHILD PRODUCTION
+HOT ≠ UNBOUNDED AUTHORITY
+WAKE ≠ CERTIFICATION
 PORTAL CONTRACTED ≠ FRONTEND DEPLOYED
 MEMBER ELIGIBLE ≠ FINAL AUTHORIZATION
 CREDENTIAL PRESENT ≠ PERMISSION GRANTED
@@ -144,10 +159,10 @@ DOCUMENTED ≠ DEPLOYED
 SUCCESSFUL CALL ≠ UNBOUNDED AUTHORITY
 ```
 
-The operating rule remains: **build the capability, certify the capability, bind the capability, execute within authority, preserve evidence, maintain it, and carry it forward.**
+The operating rule remains: **build the capability, certify the capability, bind the capability, keep it ready, wake it on demand, execute within authority, verify the result, preserve evidence, maintain it, and carry it forward.**
 
 ## Source of truth
 
-The machine-readable source of truth is `data/penta/family.registry.json`; the schema is `schemas/penta/family-registry.schema.json`; the executable verifier and portal renderer is `runtime/penta_family.py`; the full portal/census guide is `automation/penta-family-portals.mdx`; and the current long-form institutional contract is `docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v1.1.md`.
+The machine-readable source of truth is `data/penta/family.registry.json`; the schema is `schemas/penta/family-registry.schema.json`; the executable verifier and portal renderer is `runtime/penta_family.py`; the full portal/census guide is `automation/penta-family-portals.mdx`; the observability/readiness member definitions are in `data/penta/systems.extensions.observability.json`; and the current long-form institutional contract is `docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v1.1.md`.
 
-Changes to family membership, portal requirements, status semantics, execution-eligible maturity, authority invariants, required catalogs, control-plane references, or fail-closed behavior are production control-plane changes and must pass CrownThrive's governed source, review, CI, merge, release, and evidence pathways.
+Changes to family membership, portal requirements, status semantics, readiness semantics, execution-eligible maturity, authority invariants, required catalogs, control-plane references, or fail-closed behavior are production control-plane changes and must pass CrownThrive's governed source, review, CI, merge, release, and evidence pathways.
