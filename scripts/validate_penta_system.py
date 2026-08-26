@@ -12,8 +12,8 @@ REQUIRED = {
     "PentaStars", "PentaRithms", "PentaSets", "PentaBound", "PentaBind",
     "PentaWire", "PentaSecure", "PentaInterOps", "PentaMaps", "PentaFlows",
     "PentaSkills", "PentaTools", "PentaOrchestrator", "PentaBase", "PentaIP",
-    "PentaScripts", "PentaFactory", "PentaDocs", "PentaRoute", "PentaFederation",
-    "PentaGeneration", "PentaStudios", "PentaBooks"
+    "PentaScripts", "PentaFactory", "PentaDocs", "PentaScribe", "PentaMarketer",
+    "PentaRoute", "PentaFederation", "PentaGeneration", "PentaStudios", "PentaBooks"
 }
 AXES = {"truth", "authority", "execution", "interoperation", "continuity"}
 
@@ -41,9 +41,21 @@ def main() -> int:
         aliases = c.get("aliases", [])
         assert isinstance(aliases, list), c
 
+    by_name = {c["name"]: c for c in components}
+    assert by_name["PentaScribe"]["axis"] == "truth"
+    assert by_name["PentaScribe"]["contract"] == "ct.penta.scribe.v1"
+    assert by_name["PentaMarketer"]["axis"] == "execution"
+    assert by_name["PentaMarketer"]["contract"] == "ct.penta.marketer.v1"
+
     required_files = [
         ROOT / "penta" / "README.md",
         ROOT / "penta" / "runtime" / "penta_vergence.ts",
+        ROOT / "penta" / "runtime" / "evidence.py",
+        ROOT / "penta" / "scribe" / "pentascribe.py",
+        ROOT / "penta" / "scribe" / "runtime.py",
+        ROOT / "penta" / "marketer" / "pentamarketer.py",
+        ROOT / "penta" / "marketer" / "runtime.py",
+        ROOT / "penta" / "marketer" / "adapters.registry.json",
         ROOT / "penta" / "maps" / "PENTAMAP-001.md",
         ROOT / "supabase" / "migrations" / "20260826_penta_os_vergence_v1.sql",
         ROOT / "supabase" / "functions" / "penta-flex" / "index.ts",
@@ -65,9 +77,6 @@ def main() -> int:
         assert invariant.lower() in migration.lower(), f"migration invariant missing: {invariant}"
 
     reconciler = (ROOT / "scripts" / "penta_vergence_reconciler.py").read_text(encoding="utf-8").lower()
-    for forbidden in ["force-push", "delete branch", "self-approve"]:
-        # Forbidden concepts may appear only in explanatory docstrings; operational command forms are checked below.
-        pass
     assert "git push --force" not in reconciler
     assert "delete_ref" not in reconciler
     assert "merge_candidate" in reconciler

@@ -46,6 +46,8 @@ Every Penta component declares at least one primary axis and may participate in 
 | PentaBase | canonical human name for the ThriveBase data/control-plane substrate |
 | PentaFactory | governed software/component production factory |
 | PentaDocs | documentation and institutional-knowledge projection |
+| PentaScribe | canonical institutional language, semantic continuity, dictionaries/glossaries/indexes/FAQs, term discovery and mark-use evidence control plane |
+| PentaMarketer | governed campaign validation, message packaging, queueing, bounded artifact dispatch and marketing evidence control plane |
 | PentaRoute | routing and delivery primitives |
 | PentaFederation | repository/platform/system federation |
 | PentaFabric | runtime/federation fabric compatibility name |
@@ -63,8 +65,11 @@ A Penta rename may change presentation and registry aliases. It may **not** sile
 
 PentaBase stores the canonical Penta component registry, topology edges, agent registry, convergence jobs and receipts. PentaVergence schedules reconciliation in PentaBase; repository workers merely execute jobs that PentaBase has already authorized and queued.
 
+PentaScribe and PentaMarketer also have a verified repository-native production control-plane lane. PentaScribe continuously reconciles and compiles semantic/IP-use evidence without auto-promoting candidates. PentaMarketer validates and queues campaigns and may emit bounded channel artifacts, while external provider mutation remains independently capability-bound. Their first verified production run is recorded in `data/penta/systems.extensions.pentascribe-marketer.json`; the live contract is documented in `docs/phase3/PENTASCRIBE_PENTAMARKETER_PRODUCTION.md`.
+
 The normal cadence is:
 
+- **PentaScribe/PentaMarketer control-plane cycle:** hourly at minute 23 through the governed GitHub Actions provider;
 - **continuity convergence:** every 4 hours;
 - **deep convergence:** once per local day at 11:00 PM America/New_York, DST-safe through a PentaBase local-time gate;
 - provider-worker polling may occur more frequently but performs no convergence work unless a PentaBase job exists.
@@ -78,5 +83,7 @@ PentaVergence is preservation-first:
 - an automatic merge requires the governed merge gate to be successful on the exact head, no HOLD marker, no draft state, no failed check, no unresolved base drift and no D3/human-reserved effect;
 - force-push, branch deletion, history rewriting and fabricated evidence are prohibited;
 - missing capability becomes a build/repair work item rather than an invented PASS.
+
+PentaScribe and PentaMarketer inherit the same preservation rule: discovered terminology stays candidate-only until governed, mark-symbol evidence never manufactures legal registration, and a campaign artifact never manufactures provider publication or spend authority.
 
 PentaOS is therefore a rebrand **and** a versioned institutional ontology: one discoverable family for architecture, execution, interfaces, intelligence, IP and continuity without sacrificing backward compatibility.
