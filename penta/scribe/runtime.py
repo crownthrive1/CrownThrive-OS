@@ -25,11 +25,54 @@ def load_module(name: str, path: pathlib.Path):
 
 
 scribe = load_module("pentascribe", ROOT / "penta/scribe/pentascribe.py")
+federation_governance = load_module("pentascribe_federation_governance", ROOT / "penta/scribe/federation_governance.py")
 evidence = load_module("penta_evidence", ROOT / "penta/runtime/evidence.py")
 
 
 def run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def controlled_conflict_hold(
+    *,
+    rid: str,
+    run_dir: pathlib.Path,
+    state_root: pathlib.Path,
+    registry: dict,
+    sources: dict | None,
+    audit: dict,
+    authority_ref: str,
+) -> dict:
+    summary = {
+        "schema_version": "1.2.0",
+        "system": "PentaScribe",
+        "run_id": rid,
+        "status": "HOLD_FEDERATION_CONFLICTS",
+        "seed_term_count": len(registry.get("terms", [])),
+        "federation_conflict_count": audit.get("conflict_count", 0),
+        "candidate_count": None,
+        "authority_ref": authority_ref,
+        "promotion_state": "NO_AUTOMATIC_PROMOTION",
+        "hold_reason": "Federated semantic authority is ambiguous; discovery and downstream semantic projection are not trusted until the conflict is governed.",
+    }
+    evidence.atomic_write_json(run_dir / "federation-audit.json", audit)
+    evidence.atomic_write_json(run_dir / "summary.json", summary)
+    receipt = evidence.receipt(
+        system="PentaScribe",
+        operation="federation_authority_audit",
+        status=summary["status"],
+        authority_ref=authority_ref,
+        inputs={"registry": registry, "sources": sources or {}},
+        outputs={"summary": summary, "federation_audit": audit},
+    )
+    evidence.atomic_write_json(run_dir / "receipt.json", receipt)
+    evidence.atomic_write_json(state_root / "latest.json", {
+        "run_id": rid,
+        "status": summary["status"],
+        "federation_conflict_count": audit.get("conflict_count", 0),
+        "receipt_sha256": receipt["receipt_sha256"],
+    })
+    return {"run_dir": run_dir.as_posix(), "summary": summary, "receipt": receipt}
 
 
 def cycle(
@@ -50,8 +93,21 @@ def cycle(
 
     rid = run_id()
     run_dir = state_root / "runs" / rid
+    audit = federation_governance.audit_federation(registry, sources)
+    if audit["result"] != "PASS":
+        return controlled_conflict_hold(
+            rid=rid,
+            run_dir=run_dir,
+            state_root=state_root,
+            registry=registry,
+            sources=sources,
+            audit=audit,
+            authority_ref=authority_ref,
+        )
+
     products_dir = run_dir / "products"
     discovery = scribe.discover_candidates(registry, scan_roots, sources)
+    candidate_queue = federation_governance.build_candidate_queue(discovery)
     products = scribe.compile_registry(registry, products_dir)
     federation = scribe.federated_index_document(registry, sources) if sources else {
         "schema_version": "1.0.0",
@@ -65,13 +121,16 @@ def cycle(
 
     status = "PASS" if discovery["candidate_count"] == 0 else "HOLD_CANDIDATES"
     summary = {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "system": "PentaScribe",
         "run_id": rid,
         "status": status,
         "seed_term_count": reconciliation["term_count"],
         "federated_identity_count": federation["resolved_identity_count"],
+        "federation_overlap_count": audit.get("overlap_count", 0),
+        "federation_conflict_count": audit.get("conflict_count", 0),
         "candidate_count": discovery["candidate_count"],
+        "candidate_review_count": candidate_queue["review_count"],
         "federated_observation_count": discovery.get("federated_observation_count", 0),
         "rejected_observation_count": discovery.get("rejected_observation_count", 0),
         "mark_observation_count": len(discovery["mark_observations"]),
@@ -79,13 +138,15 @@ def cycle(
         "authority_ref": authority_ref,
         "promotion_state": "NO_AUTOMATIC_PROMOTION",
     }
+    evidence.atomic_write_json(run_dir / "federation-audit.json", audit)
     evidence.atomic_write_json(run_dir / "federated-index.json", federation)
     evidence.atomic_write_json(run_dir / "discovery.json", discovery)
+    evidence.atomic_write_json(run_dir / "candidate-queue.json", candidate_queue)
     evidence.atomic_write_json(run_dir / "reconciliation.json", reconciliation)
     evidence.atomic_write_json(run_dir / "summary.json", summary)
     receipt = evidence.receipt(
         system="PentaScribe",
-        operation="federate_reconcile_compile_discover",
+        operation="audit_federate_reconcile_compile_discover_triage",
         status=status,
         authority_ref=authority_ref,
         inputs={
@@ -95,8 +156,10 @@ def cycle(
         },
         outputs={
             "summary": summary,
+            "federation_audit": audit,
             "federation": federation,
             "discovery": discovery,
+            "candidate_queue": candidate_queue,
             "reconciliation": reconciliation,
         },
     )
@@ -105,7 +168,9 @@ def cycle(
         "run_id": rid,
         "status": status,
         "candidate_count": discovery["candidate_count"],
+        "candidate_review_count": candidate_queue["review_count"],
         "federated_identity_count": federation["resolved_identity_count"],
+        "federation_conflict_count": audit.get("conflict_count", 0),
         "receipt_sha256": receipt["receipt_sha256"],
     })
     return {"run_dir": run_dir.as_posix(), "summary": summary, "receipt": receipt}
