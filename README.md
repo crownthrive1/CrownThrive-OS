@@ -1,83 +1,157 @@
 # CrownThrive Operating System 👑
 
-**CrownThrive's public-safe institutional knowledge, governance, developer, licensing, and implementation map.**
+**Phase 3 canonical institutional knowledge, governance, developer, licensing, release, and implementation map for CrownThrive, LLC.**
 
-This repository is the version-controlled public projection for **CrownThrive, LLC** and its Convergent Ecosystem. It documents how CrownThrive's doctrine, platforms, corridors, intellectual property, CHLOM, Cultural Imprint Engine, Thrive Flywheel, MM Suites, ThriveBase, ThriveEvergreen, media, commerce, education, support, data, APIs, MCP servers, automation, recovery, and selective future decentralization fit together without exposing the private institutional core.
+**CrownThrive OS is CrownThrive's authoritative institutional source of truth.** It records the current institutional generation, governance, stable identities, versions, evidence boundaries, component state, release lineage, corrections, archives, and how CrownThrive doctrine, corridors, platforms, intellectual property, CHLOM, Cultural Imprint Engine (CIE), Thrive Flywheel, MM Suites, ThriveBase, ThriveEvergreen, media, commerce, education, support, data, APIs, MCP servers, automation, factories, recovery, and governed provider integrations fit together.
 
-**Website:** https://crownthrive.com  
+Mintlify, websites, help centers, storefronts, media surfaces, and other public properties are **downstream projections of the OS**. They may be reconciled on a later publication cadence and do not override OS state merely because an older statement remains publicly visible.
+
+**Institutional generation:** Phase 3 / OS 3.x  
+**Current release target:** v3.0.0  
 **Contact:** contact@crownthrive.com  
 **Repository:** https://github.com/crownthrive1/CrownThrive-Support
 
-> **Public-safe rule:** documentation is evidence of an institutional record or design decision. It is not, by itself, proof that a runtime, legal status, commercial offer, provider integration, entitlement, registration, credential, or production capability is live.
+> **Truth boundary:** Phase 3 is the current institutional operating generation. That statement does **not** mean every CrownThrive subsystem, provider adapter, commercial rail, API/MCP endpoint, autonomous workflow, or historical recovery lane is production-certified. Component state remains independently evidenced and fail-closed.
 
-## 🧬 CHLOM Pentafabric™
+## Source-of-truth hierarchy
 
-CrownThrive now defines **Pentafabric** as the five-layer architecture through which CHLOM operates as a metaprotocol:
+1. **CrownThrive OS canonical records** — institutional phase, version registry, adopted governance, current-state records, stable identities, effective policies, releases, corrections, and archive dispositions.
+2. **OS-bound evidence and operational state** — ThriveBase records, CHLOM/DAIL evidence, exact Git/release receipts, certified provider readbacks, and other evidence incorporated by the OS within its scope.
+3. **Component repositories** — CHLOM and CIE packages/contracts/schemas are authoritative for their exact component scope while remaining subordinate to the OS for institution-wide state.
+4. **Mintlify** — public-safe documentation projection generated from OS state.
+5. **Websites and other public surfaces** — downstream publication, commerce, media, and discovery projections; updated later as their own workstream.
+6. **Archive/history** — preserved prior truth, plans, versions, terminology, and evidence; never current merely because it remains accessible.
 
-1. **Identity & Imprint** — identity, DIDs, Fingerprints, provenance, custody, authorship, ownership evidence, and Cultural Imprint context.
-2. **Rights & Conditions** — rights, rules, roles, DLA, issuer authority, permissions, conditions, eligibility, restrictions, revocation, and remedies.
-3. **Ledger & Assurance** — DAIL evidence, attestations, compliance oracles, audits, disputes, corrections, holds, appeals, and certification.
-4. **Execution & Interoperability** — pallets, modules, containers, scaffolds, wireframes, portals, frameworks, plugins, skills, APIs, MCPs, SDKs, webhooks, agents, builders, verifiers, and mesh routes.
-5. **Economy & Distribution** — ThriveEvergreen / ECAC, SKUs, pricing, entitlements, payments, settlement, royalties, commissions, distribution, enterprise licensing, OEM licensing, and support.
+A downstream projection can create a reconciliation task. It cannot demote, promote, or redefine the CrownThrive OS.
 
-CHLOM connects these layers as a governed metaprotocol. The detailed lifecycle is documented in [`chlom/architecture/pentafabric-autonomous-lifecycle.v1.md`](chlom/architecture/pentafabric-autonomous-lifecycle.v1.md).
+## Phase 3 operating picture
 
-## ♾️ Seven-generation continuity
+CrownThrive has moved from recovery and pre-entry convergence into the Phase 3 generation: institutional convergence, autonomous operations, software/factory execution, governed provider interoperability, certification, reconciliation, and evidence-backed release management.
 
-CrownThrive uses a seven-generation planning horizon for institutional continuity, succession readiness, architectural lineage, rights preservation, recoverability, and maintainability. The charter is a stewardship framework rather than an automatic legal transfer mechanism. See [`standards/crownthrive-generational-continuity-charter.v1.md`](standards/crownthrive-generational-continuity-charter.v1.md).
+The current operating model preserves four distinct questions:
 
-The operating model is intentionally hybrid: machines may continuously observe, research, reconcile, test, document, prepare candidates, maintain bounded components, quarantine failures, and prepare recovery; reserved human authority remains required for legal succession, ownership transfer, destructive actions, privileged secrets, consequential economic activation, and other governed decisions.
+1. **What generation governs the institution?** Phase 3.
+2. **What version is a specific component?** Its own independently versioned release/contract/schema version.
+3. **What maturity state is the component in?** For example `production`, `active`, `controlled_test`, `hold`, `historical`, `reserve`, or another evidence-backed state.
+4. **What authority may it exercise?** Only the authority proven by its current governance, credentials, provider certification, and evidence gates.
 
-## 🤖 Continuous CHLOM factory
+A Phase 3 label never converts `HOLD` to `PASS`, never creates provider-write authority, never creates a license or entitlement, and never turns a historical design into current production truth.
 
-CHLOM R&D, Rights & Identity, Compliance Oracle, Documentation & Projection, Commercial Packaging, Mesh Reliability, Generational Continuity, and Maintenance Controller agents are registered as governed factory candidates. Their manifests specify autonomy ceilings, authority boundaries, triggers, outputs, and prohibitions. They are designed to work continuously while remaining fail-closed at consequential authority boundaries.
+See [`docs/phase3/CURRENT_STATE.md`](docs/phase3/CURRENT_STATE.md).
 
-The system preserves a distinction between **candidate**, **verified**, **authorized**, and **released** state. A workflow definition, repository file, provider response, or generated artifact does not independently establish production truth.
+## Institutional architecture
 
-## 🏭 PentaFramework Factory™
+### CHLOM Pentafabric™
 
-**PentaFramework Factory™** is CrownThrive's canonical governed framework and software-production system. Its five production stages are **Plan → Build → Verify → Package → Release**, mapped over the existing eight internal execution lanes so the rename does not break proven queues, RPCs, provider bridges, OIDC audiences, artifact paths, or deployment adapters.
+CHLOM connects five governed layers:
 
-The canonical product contract is `ct.pentaframework-factory.v1`. Existing `framework-factory-v2`, `ct-factory-*`, `ct.factory.v4`, and related implementation identifiers remain compatibility identifiers where required for production continuity. CHLOM governs authority and rights; ThriveBase preserves runtime state; CIE supplies applicable cultural/framework constraints; certified provider adapters perform bounded implementation and readback.
+1. **Identity & Imprint** — identity, provenance, custody, authorship, ownership evidence, and Cultural Imprint context.
+2. **Rights & Conditions** — Rights, Rules, Roles, licensing authority, permissions, restrictions, revocation, and remedies.
+3. **Ledger & Assurance** — DAIL evidence, attestations, audits, disputes, corrections, holds, appeals, and certification.
+4. **Execution & Interoperability** — components, frameworks, skills, APIs, MCPs, SDKs, webhooks, agents, factories, verifiers, and mesh routes.
+5. **Economy & Distribution** — ThriveEvergreen/ECAC, SKUs, pricing, entitlements, payments, settlement, royalties, commissions, licensing, distribution, and support.
 
-Canonical architecture: [`PentaFramework Factory v1`](https://github.com/crownthrive1/chlom-protocol/blob/main/docs/architecture/pentaframework-factory.v1.md).
+Detailed lifecycle: [`chlom/architecture/pentafabric-autonomous-lifecycle.v1.md`](chlom/architecture/pentafabric-autonomous-lifecycle.v1.md).
 
-## 🔎 Start here
+### Cultural Imprint Engine
 
-- 👤 **About Kavonte Jones Sr.** — [`ABOUT_ME.md`](ABOUT_ME.md) and [`about/kavonte-jones-sr.mdx`](about/kavonte-jones-sr.mdx)
-- 🧬 **CHLOM** — [`chlom/overview.mdx`](chlom/overview.mdx)
-- 🏗️ **Pentafabric lifecycle** — [`chlom/architecture/pentafabric-autonomous-lifecycle.v1.md`](chlom/architecture/pentafabric-autonomous-lifecycle.v1.md)
-- 🏭 **PentaFramework Factory** — [`canonical architecture`](https://github.com/crownthrive1/chlom-protocol/blob/main/docs/architecture/pentaframework-factory.v1.md)
-- ♾️ **Seven-generation continuity** — [`standards/crownthrive-generational-continuity-charter.v1.md`](standards/crownthrive-generational-continuity-charter.v1.md)
-- 💻 **Developer Platform** — [`developers/overview.mdx`](developers/overview.mdx)
-- ⚖️ **Licensing & IP** — [`LICENSE`](LICENSE) and [`support/licensing-and-ip-overview.mdx`](support/licensing-and-ip-overview.mdx)
-- 🛟 **Support** — [`SUPPORT.md`](SUPPORT.md) and [`support/help-center-architecture.mdx`](support/help-center-architecture.mdx)
+CIE governs cultural meaning, narrative continuity, representation, imprint identity, aesthetics, audience/canon constraints, and responsible reuse. CIE and CHLOM interoperate but do not collapse into one authority surface: CIE does not manufacture rights, and CHLOM does not manufacture cultural truth.
 
-The complete institutional taxonomy remains available through the repository and Mintlify sidebar.
+### Autonomous production fabric
 
-## 🧭 Institutional operating rule
+CrownThrive's Phase 3 direction is factory-based rather than chat-dependent: governed software, framework, documentation, commerce, integration, and evidence lanes generate candidates, validate them, bind them to institutional identity, route them through authority gates, deploy only where certified, and preserve receipts. Reserved decisions remain human-controlled.
 
-> **Platforms perform the work. Corridors organize the work. CHLOM governs the work. ThriveBase preserves institutional state. The institutional record proves what happened.**
+### PentaFramework Factory™
 
-CrownThrive uses stable IDs, effective-dated versions, source authority, evidence classes, explicit rights, role and relationship access, approval gates, append-only corrections, DAIL events, tested recovery, and audience-specific projections.
+CrownThrive defines **PentaFramework Factory** as a dedicated Phase 3 build/certification factory for frameworks, products, platforms, engines, universities, services, and similar institutional assets. It is complementary to `ct.system.framework-factory.v2` rather than a replacement: Framework Factory remains the generic framework compiler, while PentaFramework Factory adds an eight-stage institutionalization and certification path with deterministic preview candidate IDs and machine-readable parent evidence.
 
-A website sentence, product card, historical prospectus, generated file, vendor dashboard, model output, payment link, provider response, or chat message does not independently establish current production, ownership, permission, legal status, payment, entitlement, registration, audited performance, or institutional authority.
+Control plane: [`docs/framework-factory/pentaframework-factory.v1.md`](docs/framework-factory/pentaframework-factory.v1.md).
 
-## 🏛️ Ownership and contact
+Its production/certification behavior follows the same Phase 3 rule: factory or candidate existence does not by itself promote manufactured outputs into public, commercial, provider-write, or D3 authority.
+
+## Current-state discipline
+
+Every OS claim must distinguish among:
+
+- **source exists**;
+- **candidate built**;
+- **validation passed**;
+- **authority granted**;
+- **provider path certified**;
+- **deployed**;
+- **read back / independently evidenced**;
+- **commercially or legally activated**.
+
+A repository file, workflow definition, model output, vendor dashboard, screenshot, payment link, provider response, generated artifact, Mintlify page, or website sentence is not independently sufficient proof of all downstream states.
+
+## Versioning and archive
+
+Phase 3 establishes a stronger current-canon / historical-record boundary.
+
+- Current operational guidance stays in active OS documentation and machine-readable registries.
+- Superseded, stale, historical, pre-entry, and prior-version material is preserved rather than silently erased.
+- Historical material is evidence of what CrownThrive knew, planned, or operated at that time; it is not current instruction unless an active OS record explicitly incorporates it.
+- Schema/API/contract versions such as v1/v2 remain valid when they are the current component-level contract. Institutional OS v3 does not force-renumber them.
+- Projection layers inherit archive/current-state classifications from the OS; they do not create competing history rules.
+
+Archive policy: [`docs/archive/README.md`](docs/archive/README.md).  
+Version registry: [`docs/versioning/VERSION_REGISTRY.json`](docs/versioning/VERSION_REGISTRY.json).
+
+## Licensing, IP, machine use, and brand protection
+
+This repository is public-safe and publicly viewable; it is **not open source by default**. CrownThrive reserves its applicable rights in its documentation, code and configuration where proprietary, compilations, schemas, taxonomies, ontologies, frameworks, methods, brands, media, training/evaluation corpora, prompts, agent systems, interfaces, CIE, CHLOM, Thrive Flywheel, MM Suites, ThriveBase public-safe specifications, ThriveEvergreen materials, and related institutional knowledge.
+
+Repository visibility does not create a general license to clone, resell, commercialize, train models on, bulk-extract, reconstruct protected methods from, impersonate, certify, or create confusingly similar CrownThrive systems.
+
+Read:
+
+- [`LICENSE`](LICENSE)
+- [`PHASE-3-LICENSING-AND-MACHINE-USE-ADDENDUM.md`](PHASE-3-LICENSING-AND-MACHINE-USE-ADDENDUM.md)
+- [`CHLOM-REPOSITORY-FAMILY-LICENSE-ADDENDUM.md`](CHLOM-REPOSITORY-FAMILY-LICENSE-ADDENDUM.md)
+- [`TRADEMARKS.md`](TRADEMARKS.md)
+- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+
+Nothing in these repository notices replaces jurisdiction-specific legal review, registrations, assignments, contributor instruments, or negotiated licenses.
+
+## Repository operating tabs
+
+- **README** — current institutional orientation and source-of-truth hierarchy.
+- **LICENSE / licensing addenda** — repository-use, machine-use, IP, and commercial permission boundaries.
+- **CODE_OF_CONDUCT** — participation, cultural stewardship, evidence, AI, privacy, and security conduct.
+- **CONTRIBUTING** — governed contribution and rights-intake requirements.
+- **SECURITY** — coordinated disclosure, secret handling, and protected-runtime boundaries.
+- **SUPPORT** — support routing and escalation.
+- **TRADEMARKS** — marks, naming, certification, and brand-use boundaries.
+- **AGENTS** — automated contributor and institutional-agent rules.
+- **Changelog / releases** — effective-dated institutional history.
+
+## Start here
+
+- **Phase 3 Current State** — [`docs/phase3/CURRENT_STATE.md`](docs/phase3/CURRENT_STATE.md)
+- **CHLOM** — [`chlom/overview.mdx`](chlom/overview.mdx)
+- **Cultural Imprint Engine** — [`doctrine/cultural-imprint-engine.mdx`](doctrine/cultural-imprint-engine.mdx)
+- **Developer Platform** — [`developers/overview.mdx`](developers/overview.mdx)
+- **Institutional Archive** — [`docs/archive/README.md`](docs/archive/README.md)
+- **Licensing & IP** — [`support/licensing-and-ip-overview.mdx`](support/licensing-and-ip-overview.mdx)
+- **Support** — [`SUPPORT.md`](SUPPORT.md)
+- **Founder** — [`ABOUT_ME.md`](ABOUT_ME.md)
+
+## Seven-generation continuity
+
+CrownThrive uses a seven-generation planning horizon for institutional continuity, architectural lineage, rights preservation, recoverability, stewardship, and maintainability. It is a planning and governance framework, not an automatic legal transfer mechanism. See [`standards/crownthrive-generational-continuity-charter.v1.md`](standards/crownthrive-generational-continuity-charter.v1.md).
+
+## Institutional operating rule
+
+> **CrownThrive OS governs institutional truth. Platforms perform the work. Corridors organize the work. CIE protects cultural coherence. CHLOM governs rights and authority. ThriveBase preserves operational state. The institutional record proves what happened. Projections publish what the OS has authorized them to say.**
+
+CrownThrive uses stable IDs, effective-dated versions, source authority, evidence classes, explicit rights, role/relationship access, approval gates, append-only corrections, DAIL events, tested recovery, and audience-specific projections.
+
+## Ownership and contact
 
 **Institutional owner:** CrownThrive, LLC  
-**Founding Member:** Kavonte Jones Sr. — see [`ABOUT_ME.md`](ABOUT_ME.md)  
-**Contact:** contact@crownthrive.com  
-**Primary ecosystem:** https://crownthrive.com
-
-## ☕ Support CrownThrive
-
-Voluntary support helps sustain public documentation, research, cultural infrastructure, and ecosystem-building work:
-
-**[☕ Buy CrownThrive a Coffee — $5 per coffee](https://donate.stripe.com/28E7sKfU02tkbmi3SLbAs0h)**
-
-Support does not create ownership, equity, governance authority, partnership, licensing rights, service entitlement, tax-deductible status, or preferential treatment.
+**Founding Member:** Kavonte Jones Sr.  
+**Contact:** contact@crownthrive.com
 
 ---
 
-**Impact. Legacy. Cultural advancement. Governed convergence. 👑**
+**Impact. Legacy. Cultural advancement. Governed convergence. Phase 3. 👑**
