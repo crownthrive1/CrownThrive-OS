@@ -106,6 +106,12 @@ CrownThrive IO is the operating/control surface; PentaDocs is the authoritative 
 | PentaPay™ | governed compensation/payment workflow coordination, subject to existing financial authority | `/io/pentas/pay` |
 | PentaOFAC™ | sanctions/compliance screening and fail-closed risk-control authority | `/io/pentas/ofac` |
 | PentaSecure™ | security-control, prevention, detection, response, and security-readiness layer | `/io/pentas/secure` |
+| PentaLiency™ | resilience engineering, hardening-plan authority, health-gated remediation, and recovery assurance | `/io/pentas/liency` |
+| PentaBlue™ | defensive detection, containment, restore validation, and control-effectiveness assurance | `/io/pentas/blue` |
+| PentaRed™ | sandbox-only adversarial simulation inside authorized PentaHoneyPot clone ranges | `/io/pentas/red` |
+| PentaHoneyPot™ | ephemeral OS-clone range, Red/Blue duel orchestration, evidence, and teardown | `/io/pentas/honeypot` |
+| PentaSnapshot™ | SHA-256 evidence-backed snapshot, manifest, and restore-baseline authority | `/io/pentas/snapshot` |
+| PentaRollback™ | approved staged restore, recovery health-gate, and rollback authority | `/io/pentas/rollback` |
 | PentaVault™ | governed secret/reference/valuable-asset custody and vault binding layer | `/io/pentas/vault` |
 | PentaIP™ | intellectual-property, marks, rights metadata, provenance, and governance | `/io/pentas/ip` |
 | PentaBoard™ | highest Penta directive/oversight body beneath applicable CrownThrive/CHLOM authority | `/io/pentas/board` |

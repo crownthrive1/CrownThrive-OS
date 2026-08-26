@@ -1,0 +1,58 @@
+name: Penta Resilience Assurance
+
+on:
+  push:
+    paths:
+      - 'penta/runtime/resilience/**'
+      - 'tests/test_penta_resilience.py'
+      - 'penta/registry/resilience-suite.json'
+      - 'PENTA-RESILIENCE-SUITE.md'
+      - '.github/workflows/penta-resilience-assurance.yml'
+  pull_request:
+    paths:
+      - 'penta/runtime/resilience/**'
+      - 'tests/test_penta_resilience.py'
+      - 'penta/registry/resilience-suite.json'
+      - 'PENTA-RESILIENCE-SUITE.md'
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resilience-assurance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile resilience runtime
+        run: python -m compileall -q penta/runtime/resilience
+      - name: Run Penta resilience tests
+        run: python -m unittest -v tests.test_penta_resilience
+      - name: Run sandbox-only smoke drill
+        run: |
+          mkdir -p /tmp/penta-smoke
+          printf 'stable\n' > /tmp/penta-smoke/state.txt
+          python -m penta.runtime.resilience drill /tmp/penta-smoke > /tmp/penta-drill.json
+          python - <<'PY'
+          import json
+          report = json.load(open('/tmp/penta-drill.json'))
+          assert report['source_unchanged'] is True
+          assert report['clone_restored'] is True
+          assert report['digest']
+          PY
+      - name: Scheduled full repository clone drill
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: python -m penta.runtime.resilience drill . > penta-resilience-report.json
+      - name: Preserve resilience evidence
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: penta-resilience-evidence
+          path: penta-resilience-report.json
+          retention-days: 30
