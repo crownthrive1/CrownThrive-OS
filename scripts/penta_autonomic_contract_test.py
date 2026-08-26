@@ -6,6 +6,7 @@ FIX = ROOT / 'supabase/migrations/20260826185700_pentagreen_hourly_candidate_ide
 SUITE = ROOT / 'supabase/migrations/20260826190019_penta_autonomic_incident_response_suite_v1.sql'
 RECURRENCE = ROOT / 'supabase/migrations/20260826200533_penta_autonomic_recurrence_and_maker_routing_v2.sql'
 STATUS = ROOT / 'supabase/migrations/20260826200616_pentagreen_hourly_status_identity_projection_v2.sql'
+HARDEN = ROOT / 'supabase/migrations/20260826201527_penta_autonomic_security_definer_rpc_hardening_v1.sql'
 DOC = ROOT / 'docs/phase3/PENTA_AUTONOMIC_OPERATIONS.md'
 MAKER_DOC = ROOT / 'docs/phase3/PENTA_MAKER.md'
 
@@ -20,6 +21,7 @@ def main() -> None:
     suite = SUITE.read_text()
     recurrence = RECURRENCE.read_text()
     status = STATUS.read_text()
+    harden = HARDEN.read_text()
     doc = DOC.read_text()
     maker_doc = MAKER_DOC.read_text()
 
@@ -46,7 +48,7 @@ def main() -> None:
         require(suite, fn)
 
     # Original safety invariants remain intact.
-    if 'drop constraint thriveevergreen_packets_candidate_identity_v1' in (suite + recurrence + status).lower():
+    if 'drop constraint thriveevergreen_packets_candidate_identity_v1' in (suite + recurrence + status + harden).lower():
         raise AssertionError('protective PentaGreen candidate identity constraint must not be dropped')
     require(suite, "p_dry_run boolean default true")
     require(suite, "'dry_run'")
@@ -79,6 +81,18 @@ def main() -> None:
     require(status, "'candidate_sku',latest.selected_sku")
     if "coalesce(latest.selected_candidate_ref,latest.selected_sku)" in status:
         raise AssertionError('candidate_ref must not alias selected_sku')
+
+    # Every autonomic SECURITY DEFINER mutation/control RPC found by the
+    # production security advisor is service-role-only at the API perimeter.
+    for signature in (
+        'public.penta_backup_control_plane_v1(text,text)',
+        'public.penta_flush_ephemeral_v1(interval,boolean)',
+        'public.penta_redblue_pentagreen_23514_v1()',
+        'public.penta_remediate_pentagreen_23514_v1()',
+        'public.penta_restore_plan_v1(uuid)',
+    ):
+        require(harden, f'revoke execute on function {signature} from public, anon, authenticated;')
+        require(harden, f'grant execute on function {signature} to service_role;')
 
     require(doc, "run-occurrence fingerprint")
     require(doc, "candidate_ref = NULL")
