@@ -1,7 +1,8 @@
 # GitHub Actions Runtime and Supply-Chain Standard
 
-**Effective:** 2026-08-18  
-**Phase:** 2.99  
+**Effective:** 2026-08-26<br />
+**Phase:** 3<br />
+**Historical origin:** adopted during the retired Phase 2.99 transition
 **Status:** current, fail-closed  
 **Machine policy:** `developers/manifests/github-actions-runtime-policy.v1.json`
 
@@ -17,7 +18,10 @@ The current runtime floor is **Node 24**. **Node 20 action runtime is prohibited
 | --- | --- | --- | --- | --- |
 | `actions/checkout` | `v7.0.1` | `3d3c42e5aac5ba805825da76410c181273ba90b1` | Node 24 | repository checkout |
 | `actions/setup-python` | `v7` | `5fda3b95a4ea91299a34e894583c3862153e4b97` | Node 24 | Python toolchain |
+| `actions/setup-node` | `v6.5.0` | `249970729cb0ef3589644e2896645e5dc5ba9c38` | Node 24 | governed Node/TypeScript toolchain |
 | `actions/dependency-review-action` | `v5.0.0` | `a1d282b36b6f3519aa1f3fc636f609c47dddb294` | Node 24 | dependency-change review |
+| `actions/upload-artifact` | `v7.0.1` | `043fb46c780ffb56dc0cd67821f98d1f9c8c2cbf` | Node 24 | governed evidence upload |
+| `actions/attest-build-provenance` | `v4.1.1` | `15e5d137e173a95636557f19f96715f6f45570be` | Node 24 | provenance attestation for certification evidence |
 
 GitHub CodeQL remains **provider-managed default setup** for this repository. While that provider mode is enabled, CrownThrive must not add a duplicate `github/codeql-action/*` advanced workflow simply to satisfy a local workflow checklist.
 
@@ -33,7 +37,7 @@ This is a supply-chain control, not only a deprecation control. An upstream tag 
 
 The machine policy records `2.327.1` as the minimum Node-24-capable Actions runner floor for this policy generation.
 
-GitHub-hosted runners are permitted. Self-hosted runners are blocked from governed workflows until a machine-verifiable attestation proves the required runner generation and Node-24-supported operating-system/architecture profile. Unsupported Node-24 targets, including ARM32 self-hosted runners and macOS 13.4 or older, must not be introduced by assumption.
+GitHub-hosted runners are permitted. Production and secret-bearing self-hosted execution remains blocked until a separate machine-verifiable promotion proves the required runner generation and Node-24-supported operating-system/architecture profile. One workflow-dispatch-only, secret-free bootstrap certification lane may use the exact labels and repository/ref guard registered in the machine policy so it can produce that attestation. The exception does not authorize provider credentials or production work. Unsupported Node-24 targets, including ARM32 self-hosted runners and macOS 13.4 or older, must not be introduced by assumption.
 
 ## Prohibited migration shortcuts
 
@@ -55,7 +59,7 @@ The following are not valid repairs:
 2. Every remote action is in the approved inventory.
 3. Every remote action uses the exact approved full-length SHA and version comment.
 4. No runtime escape-hatch variable is present.
-5. No unverified self-hosted runner is introduced.
+5. No unverified production/self-hosted runner is introduced and the one bootstrap certification lane remains exact-label, exact-repository, exact-ref and secret-free.
 6. Provider-managed CodeQL is not duplicated by an advanced CodeQL action.
 7. Daily GitHub Actions dependency proposals remain configured through Dependabot.
 8. Runtime self-healing cannot write directly to `main` or bypass agent governance.
@@ -93,6 +97,6 @@ Agents must reconcile against the newest PR head before writing. If another agen
 
 ## Phase gates
 
-This standard is a **Phase 2.99 hard-exit requirement** and a **Phase 3 entry requirement**. Phase 3 cannot open while any governed workflow contains an unapproved/mutable action reference, a Node-20 action line, an unverified self-hosted runner, a prohibited runtime escape hatch, or an unreconciled dependency update.
+This standard originated as a historical Phase 2.99 hard-exit and Phase 3 entry requirement. It now operates as an ongoing **Phase 3 execution and supply-chain gate**. Phase 3 work remains blocked within the affected scope while any governed workflow contains an unapproved/mutable action reference, a Node-20 action line, an unverified production self-hosted runner, a prohibited runtime escape hatch, or an unreconciled dependency update.
 
-GitHub branch protection remains separate defense-in-depth under `CT-ADR-GOV-011`; passing the runtime gate does not claim branch protection exists and does not satisfy the other Phase 2.99 exit requirements.
+GitHub branch/ruleset enforcement remains separate defense-in-depth under `CT-ADR-GOV-011`; passing the runtime gate does not manufacture current provider enforcement or satisfy independent component/provider gates.

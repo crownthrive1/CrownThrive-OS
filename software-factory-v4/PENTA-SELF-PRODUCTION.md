@@ -31,6 +31,8 @@ PentaSELF owns the self-* behaviors required for CrownThrive to behave as a livi
 
 The registry is extensible: a newly required self-* behavior is added as a typed capability with a handler, action mode, maximum risk class, reversibility rule, and verification rule rather than being implemented as unbounded autonomous code.
 
+Every registered Penta member also has the governed software-gap route defined by `data/penta/self-build.contract.json`: typed gap through PentaRFA, PentaFactory candidate, acceptance/negative/stress tests, independent PentaCertify/PentaAssure evidence, governed release/PR/merge, provider readback and preservation. This creates institution-wide software-building capability without allowing the requesting member or PentaFactory to self-certify or self-promote.
+
 ## Self-healing cycle
 
 `penta_self.tick_v1()` is the canonical production healing loop. It acquires a concurrency lock and then performs:

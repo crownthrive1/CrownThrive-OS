@@ -26,6 +26,8 @@ Canonical terminology for the Phase 3 PENTA architecture. The machine-readable s
 - **PentaAssure** — independent assurance/certification layer aggregating evidence sufficiency, tests, audits, policy conformance, red-team checks, and release/capability readiness.
 - **PentaFederation** — canonical name for the cross-system, cross-repository, and cross-provider binding/interoperability layer. **Penta Federation** remains a recognized historical/display alias.
 - **PentaFactory** — canonical name for the governed software/framework production system: specification, generation, compilation, testing, packaging, release, and provider-native deployment. **PentaFramework Factory** is retained as a superseded alias for the same system.
+- **PentaCompliance** — adopted-obligation applicability, control, evidence-sufficiency, exception and remediation control plane. It does not discover law or create binding attestations.
+- **PentaLicense** — exact rights-bound license eligibility, immutable grant and append-only license lifecycle control plane. It cannot manufacture ownership, chain of title, terms, acceptance or signatory authority.
 - **PentaMedia** — governed media operations, asset bindings, maintenance, receipts, and continuity.
 - **PentaBooks** — governed book/manuscript/edition/QA/publication/adaptation lifecycle.
 - **PentaGeneration** — seven-generation continuity, horizons, handoff, proof, succession, archive/version inheritance, and institutional memory.

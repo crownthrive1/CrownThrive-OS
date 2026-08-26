@@ -93,11 +93,11 @@ No reviewer heartbeat, independent receipt, or synthesis is fabricated to make t
 
 The source-controlled migration chain is:
 
-- `supabase/migrations/20260826203600_scheduler_topology_post_maintenance_reconciliation_v2.sql`
-- `supabase/migrations/20260826205000_retire_document_recovery_external_scheduler_scaffolding_v1.sql`
-- `supabase/migrations/20260826205300_retire_duplicate_penta_external_clocks_v1.sql`
+- `supabase/migrations/20260826204425_scheduler_topology_post_maintenance_reconciliation_v2.sql`
+- `supabase/migrations/20260826204942_retire_document_recovery_external_scheduler_scaffolding_v1.sql`
+- `supabase/migrations/20260826205239_retire_duplicate_penta_external_clocks_v1.sql`
 
-The production database recorded and applied the corresponding runtime migrations. All changes are bounded topology/evidence reconciliation; no provider write, payment, entitlement, credential, sovereign-vote or D3 capability was added.
+The production database recorded and applied those exact versions and names. All changes are bounded topology/evidence reconciliation; no provider write, payment, entitlement, credential, sovereign-vote or D3 capability was added.
 
 Exact final readback:
 
@@ -107,7 +107,7 @@ production topology ready               true
 maintenance active                       false
 post-maintenance external clock target   2
 enabled external bindings                2
-active pg_cron jobs                       103
+active pg_cron jobs                       104
 retired-but-enabled external clocks       0
 pending external dispositions             0
 unreconciled external schedules           0
@@ -125,9 +125,11 @@ Read-only topology stress test result after all retirements:
 
 ```text
 decision                         PASS
-evidence_digest_sha256          5ef78073bc53b525d8502553ead6367c51cf8cb0d04caae4482e9bbb60fb35e3
+evidence_digest_sha256          9e4fcbe4731ed39403721c669b758e0e7c6dbf9cf8219564713e850a124d9789
 persisted                        false
 ```
+
+A refreshed provider readback at `2026-08-26T20:57:15Z`, after later concurrent provider activity, returned the values above with `persisted=false`. The three scheduler migrations are now preserved under their exact provider versions. Broader repository migration custody remains `HOLD` because the provider reports 891 applied migrations while this repository contains 39 governed migration files; missing SQL history must be recovered authoritatively rather than fabricated.
 
 Every stress predicate passed, including duplicate-clock prevention, recursive-scheduler prohibition, D3 human reservation, authority-expansion false, retired clocks disabled, canonical relay binding, backup and communications failure-domain presence, and external-disposition reconciliation.
 

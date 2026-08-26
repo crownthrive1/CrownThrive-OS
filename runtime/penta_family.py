@@ -44,6 +44,16 @@ REQUIRED_PORTAL_SECTIONS = {
     "changelog",
     "support",
 }
+REQUIRED_SELF_BUILD_TRUE_FLAGS = {
+    "applies_to_all_registered_members",
+    "typed_gap_required",
+    "penta_factory_builder_required",
+    "independent_certification_required",
+    "negative_and_stress_tests_required",
+    "rollback_required",
+    "authority_never_manufactured",
+    "d3_human_reserved",
+}
 
 
 class PentaFamilyError(ValueError):
@@ -156,6 +166,21 @@ def validate_family_registry(registry: Mapping[str, Any]) -> None:
     missing_sections = sorted(REQUIRED_PORTAL_SECTIONS - sections)
     if missing_sections:
         raise PentaFamilyError("portal contract missing required sections: " + ", ".join(missing_sections))
+
+    self_build = registry.get("self_build_contract")
+    if not isinstance(self_build, dict):
+        raise PentaFamilyError("self_build_contract must be an object")
+    for flag in sorted(REQUIRED_SELF_BUILD_TRUE_FLAGS):
+        if self_build.get(flag) is not True:
+            raise PentaFamilyError(f"self_build_contract.{flag} must be true")
+    expected_paths = {
+        "contract_path": "data/penta/self-build.contract.json",
+        "candidate_schema_path": "schemas/penta/self-build-candidate.schema.json",
+        "runtime_path": "runtime/penta_self_build.py",
+    }
+    for field, expected in expected_paths.items():
+        if self_build.get(field) != expected:
+            raise PentaFamilyError(f"self_build_contract.{field} must be {expected}")
 
 
 def _iter_systems(catalog: Mapping[str, Any], *, source: str) -> Iterable[Tuple[str, Dict[str, Any]]]:
@@ -272,6 +297,13 @@ def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
             "source": member_sources[key],
             "portal_route": route,
             "portal_state": "contracted",
+            "self_build": {
+                "enabled": True,
+                "gap_intake": "penta.rfa",
+                "builder": "penta.factory",
+                "independent_certifier": "penta.certify",
+                "production_promotion_automatic": False,
+            },
         }
 
     return {
@@ -285,6 +317,11 @@ def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
         "held_members": held,
         "control_plane_resolution": control_plane_resolution,
         "portal_index": portal_index,
+        "self_build_coverage": {
+            "covered_member_count": len(member_snapshot),
+            "all_registered_members_covered": len(member_snapshot) == len(members),
+            "contract_path": registry["self_build_contract"]["contract_path"],
+        },
         "members": member_snapshot,
     }
 

@@ -19,7 +19,7 @@ from runtime.penta_institutional_controls import (  # noqa: E402
     validate_control_request,
 )
 
-EXPECTED = {"penta.compliance", "penta.privacy", "penta.identity", "penta.data", "penta.records", "penta.procure", "penta.vendor", "penta.contracts", "penta.quality"}
+EXPECTED = {"penta.compliance", "penta.privacy", "penta.identity", "penta.data", "penta.records", "penta.procure", "penta.vendor", "penta.contracts", "penta.license", "penta.quality"}
 
 
 def expect_error(fn, contains: str) -> None:
@@ -39,7 +39,7 @@ def authority() -> dict:
     return {"chlom_ref": "chlom:authority:1", "dail_ref": None, "accountable_owner": "role:owner"}
 
 
-def test_all_nine_systems_registered_in_runtime() -> None:
+def test_all_ten_systems_registered_in_runtime() -> None:
     assert KNOWN_SYSTEMS == EXPECTED
     assert EXECUTION_ELIGIBLE == {"certified", "production"}
 
@@ -160,6 +160,43 @@ def test_compliance_attestation_requires_source_and_evidence_review() -> None:
     assert result["disposition"] == "governance_required"
     assert any("obligation source" in reason for reason in result["reasons"])
     assert any("evidence-sufficiency" in reason for reason in result["reasons"])
+
+
+def test_license_issuance_requires_exact_rights_terms_and_acceptance() -> None:
+    packet = build_control_request(
+        system="penta.license", action="issue_license", requested_effect="execute",
+        evidence_refs=["evidence:license-request:1"], member_maturity="production",
+        authority_trace=authority(), human_gate=approved_gate(separation=True), provider_effect=True,
+        provider_binding_ref="provider-binding:license:1", readback_strategy="read exact provider grant and document hash",
+    )
+    result = evaluate_control_request(packet)
+    assert result["disposition"] == "governance_required"
+    assert any("rights-control profile" in reason for reason in result["reasons"])
+    assert any("asset/version/hash" in reason for reason in result["reasons"])
+    assert any("adopted terms" in reason for reason in result["reasons"])
+    assert any("acceptance" in reason for reason in result["reasons"])
+
+
+def test_license_issuance_can_be_ready_only_with_all_gates() -> None:
+    packet = build_control_request(
+        system="penta.license", action="issue_license", requested_effect="execute",
+        evidence_refs=["evidence:license-request:2", "evidence:rights:2", "evidence:terms:2"], member_maturity="production",
+        authority_trace=authority(), human_gate=approved_gate(separation=True), provider_effect=True,
+        provider_binding_ref="provider-binding:license:2", readback_strategy="read exact provider grant and document hash",
+        metadata={
+            "rights_profile_ref": "chlom:rights:2", "asset_version_ref": "asset:2@sha256:abc",
+            "terms_ref": "terms:license:2", "acceptance_ref": "acceptance:2",
+        },
+    )
+    assert evaluate_control_request(packet)["disposition"] == "execution_ready"
+
+
+def test_license_cannot_manufacture_rights() -> None:
+    packet = build_control_request(
+        system="penta.license", action="fabricate_rights", requested_effect="prepare",
+        evidence_refs=["evidence:request:forbidden"], member_maturity="production",
+    )
+    assert evaluate_control_request(packet)["disposition"] == "hold_fail_closed"
 
 
 def test_request_validation_rejects_unknown_system() -> None:

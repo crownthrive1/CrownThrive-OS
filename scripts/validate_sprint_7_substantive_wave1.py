@@ -15,7 +15,7 @@ EXPECTED_P0 = 449
 # Current corpus reconciliation has a separately pinned deterministic identity so
 # later documentation changes cannot silently rewrite that historical receipt.
 EXPECTED_HISTORICAL_WAVE_SHA = "98021ca9c32a4cdf7cd9d8588271b1451f09d6f5cafb09629771943b10272add"
-EXPECTED_CURRENT_WAVE_SHA = "12cdd6f6d8cb79de3912fe689c2a77127117a19367a9a1f6ddf3d03bbf3204ac"
+EXPECTED_CURRENT_WAVE_SHA = "0b63f9ddfac0e8e7dc33c0f8a89e9fa554bb1d35d95923acf92d5fa7906e0353"
 EXPECTED_VAULT_SHA = "d03bc3e8e0052fb2091dac16703bbef233f9a8df4fec57df45f4c5f80d2ec7d9"
 
 
