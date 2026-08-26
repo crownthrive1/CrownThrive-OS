@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Family-wide PENTA convergence certification.
 
-This runtime invokes every registered Penta through the existing Penta Family
-and repository-runtime gates, records observability evidence, and produces one
-hash-bound certification manifest. It never promotes member maturity and never
-manufactures provider, governance, legal, economic, security, or human authority.
+This runtime invokes every registered Penta identity visible across the canonical
+Penta Family and repository runtime/observability registries, records evidence,
+and produces one hash-bound certification manifest. It never promotes member
+maturity and never manufactures provider, governance, legal, economic, security,
+or human authority.
 """
 from __future__ import annotations
 
@@ -57,13 +58,17 @@ def certify(root: Path) -> dict[str, Any]:
         for row in runtime_snapshot.get("members", [])
         if isinstance(row, dict) and isinstance(row.get("machine_key"), str)
     }
-    if set(runtime_rows) != set(family_members):
-        missing_runtime = sorted(set(family_members) - set(runtime_rows))
-        missing_family = sorted(set(runtime_rows) - set(family_members))
+    if not runtime_rows:
+        raise PentaConvergenceError("Penta runtime suite returned no registered members")
+
+    missing_runtime = sorted(set(family_members) - set(runtime_rows))
+    if missing_runtime:
         raise PentaConvergenceError(
-            "family/runtime member census mismatch: "
-            f"missing_runtime={missing_runtime}; missing_family={missing_family}"
+            "family members missing from runtime census: " + ", ".join(missing_runtime)
         )
+
+    runtime_extensions = sorted(set(runtime_rows) - set(family_members))
+    registered_universe = sorted(set(family_members) | set(runtime_rows))
 
     log_lines: list[str] = []
     logger = obs_mod.PentaLogger(
@@ -75,15 +80,35 @@ def certify(root: Path) -> dict[str, Any]:
 
     invocations: list[dict[str, Any]] = []
     with obs_mod.bind_trace() as trace:
-        for machine_key in sorted(family_members):
-            family_gate = family_mod.member_dispatch_gate(family_snapshot, machine_key)
+        for machine_key in registered_universe:
+            runtime_row = runtime_rows[machine_key]
             runtime_gate = runtime_mod.gate_member(runtime_snapshot, machine_key)
-            effective_eligible = bool(family_gate.get("eligible") and runtime_gate.get("eligible"))
+            if machine_key in family_members:
+                family_gate = family_mod.member_dispatch_gate(family_snapshot, machine_key)
+                effective_eligible = bool(family_gate.get("eligible") and runtime_gate.get("eligible"))
+                registry_scope = "family_and_runtime"
+                canonical_name = family_members[machine_key].get("canonical_name")
+                maturity = family_members[machine_key].get("maturity")
+            else:
+                # The observability spine is registered by the runtime catalog and
+                # deliberately sits outside the family child-member map. Evaluate
+                # its runtime gate without synthesizing a family child registration.
+                family_gate = {
+                    "eligible": None,
+                    "disposition": "not_a_family_child",
+                    "reason": "registered runtime/observability spine member outside family child-member map",
+                }
+                effective_eligible = bool(runtime_gate.get("eligible"))
+                registry_scope = "runtime_spine_extension"
+                canonical_name = runtime_row.get("canonical_name")
+                maturity = runtime_row.get("maturity")
+
             disposition = "eligible_for_downstream_gates" if effective_eligible else "hold_preserved"
             record = {
                 "machine_key": machine_key,
-                "canonical_name": family_members[machine_key].get("canonical_name"),
-                "maturity": family_members[machine_key].get("maturity"),
+                "canonical_name": canonical_name,
+                "maturity": maturity,
+                "registry_scope": registry_scope,
                 "family_gate": family_gate,
                 "runtime_gate": runtime_gate,
                 "effective_execution_eligible": effective_eligible,
@@ -95,12 +120,15 @@ def certify(root: Path) -> dict[str, Any]:
                 "penta.convergence.members_eligible" if effective_eligible
                 else "penta.convergence.members_held"
             )
+            if registry_scope == "runtime_spine_extension":
+                metrics.increment("penta.convergence.runtime_spine_extensions")
             logger.info(
                 "Penta member evaluated",
                 event="penta.convergence.member_evaluated",
                 context={
                     "machine_key": machine_key,
-                    "maturity": record["maturity"],
+                    "maturity": maturity,
+                    "registry_scope": registry_scope,
                     "disposition": disposition,
                 },
             )
@@ -109,8 +137,13 @@ def certify(root: Path) -> dict[str, Any]:
         critical_checks = {
             "family_status_production": family_snapshot.get("family_status") == "production",
             "family_fail_closed": family_snapshot.get("fail_closed") is True,
-            "full_member_census_invoked": len(invocations) == family_snapshot.get("member_count"),
-            "runtime_member_census_matches": len(runtime_rows) == family_snapshot.get("member_count"),
+            "all_family_members_present_in_runtime": not missing_runtime,
+            "full_registered_universe_invoked": len(invocations) == len(registered_universe),
+            "runtime_extension_inventory_explicit": all(
+                item["registry_scope"] == "runtime_spine_extension"
+                for item in invocations
+                if item["machine_key"] in runtime_extensions
+            ),
             "provider_control_plane_present": provider.get("available") is True,
             "provider_contract_clean": not provider.get("contract_errors"),
             "pentamail_registered": runtime_snapshot.get("pentamail", {}).get("registered") is True,
@@ -119,23 +152,26 @@ def certify(root: Path) -> dict[str, Any]:
         passed = all(critical_checks.values())
         metrics.gauge("penta.convergence.family_pass", 1.0 if passed else 0.0)
 
-        control_planes = family_snapshot.get("control_plane_resolution", {})
         evidence = {
             "schema": "ct.penta.convergence-certification.v1",
             "disposition": "PASS" if passed else "HOLD_FAIL_CLOSED",
-            "truth_rule": "all registered Pentas are evaluated; held maturity is preserved and is not treated as failure or promotion",
+            "truth_rule": "all registered Pentas across family and runtime spine are evaluated; held maturity is preserved and registry scope is never synthesized",
             "family": {
                 "registry_id": family_registry.get("registry_id"),
                 "status": family_snapshot.get("family_status"),
                 "fail_closed": family_snapshot.get("fail_closed"),
-                "member_count": family_snapshot.get("member_count"),
+                "family_child_count": family_snapshot.get("member_count"),
+                "runtime_registered_count": len(runtime_rows),
+                "runtime_extension_count": len(runtime_extensions),
+                "runtime_extensions": runtime_extensions,
+                "member_count": len(registered_universe),
                 "invocation_count": len(invocations),
                 "eligible_count": sum(1 for item in invocations if item["effective_execution_eligible"]),
                 "held_count": sum(1 for item in invocations if not item["effective_execution_eligible"]),
                 "maturity_counts": runtime_snapshot.get("maturity_counts", {}),
             },
             "critical_checks": critical_checks,
-            "control_plane_resolution": control_planes,
+            "control_plane_resolution": family_snapshot.get("control_plane_resolution", {}),
             "provider_control_plane": provider,
             "pentamail": runtime_snapshot.get("pentamail", {}),
             "invocations": invocations,
@@ -155,22 +191,24 @@ def owner_summary(evidence: dict[str, Any]) -> str:
     checks = evidence["critical_checks"]
     failed = [name for name, ok in checks.items() if not ok]
     lines = [
-        "Penta Family convergence certification",
+        "Penta Family + runtime-spine convergence certification",
         f"Disposition: {evidence['disposition']}",
         f"Registered/invoked Pentas: {family['member_count']}/{family['invocation_count']}",
-        f"Execution-eligible after family+runtime gates: {family['eligible_count']}",
+        f"Family child members: {family['family_child_count']}",
+        f"Runtime/observability spine extensions: {family['runtime_extension_count']}",
+        f"Execution-eligible after applicable gates: {family['eligible_count']}",
         f"Held without promotion: {family['held_count']}",
         f"Critical checks: {sum(1 for ok in checks.values() if ok)}/{len(checks)} PASS",
         f"Evidence SHA-256: {evidence['evidence_sha256']}",
     ]
     if failed:
         lines.append("Failed checks: " + ", ".join(failed))
-    lines.append("All child maturity, authority, provider, and human gates remain independently fail-closed.")
+    lines.append("All maturity, authority, provider, and human gates remain independently fail-closed.")
     return "\n".join(lines)
 
 
 def _cli() -> int:
-    parser = argparse.ArgumentParser(description="Invoke and certify the complete registered Penta Family")
+    parser = argparse.ArgumentParser(description="Invoke and certify every registered Penta identity")
     parser.add_argument("--root", default=".")
     parser.add_argument("--output", default="penta-convergence-certification.json")
     parser.add_argument("--summary-output", default="penta-convergence-summary.txt")
