@@ -9,7 +9,11 @@ on:
       - 'data/**'
       - 'penta/scribe/**'
       - 'penta/marketer/**'
+      - 'penta/runtime/**'
       - 'tests/test_penta_scribe_marketer.py'
+      - 'tests/test_penta_production_runtime.py'
+      - '.github/workflows/penta-scribe-marketer-governance.yml'
+      - '.github/workflows/penta-scribe-marketer-production.yml'
   pull_request:
     paths:
       - 'README.md'
@@ -17,7 +21,11 @@ on:
       - 'data/**'
       - 'penta/scribe/**'
       - 'penta/marketer/**'
+      - 'penta/runtime/**'
       - 'tests/test_penta_scribe_marketer.py'
+      - 'tests/test_penta_production_runtime.py'
+      - '.github/workflows/penta-scribe-marketer-governance.yml'
+      - '.github/workflows/penta-scribe-marketer-production.yml'
   workflow_dispatch:
 
 permissions:
@@ -26,9 +34,18 @@ permissions:
 jobs:
   semantic-and-marketing-governance:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compile executable surfaces
+        run: |
+          python -m py_compile penta/scribe/pentascribe.py
+          python -m py_compile penta/marketer/pentamarketer.py
+          python -m py_compile penta/runtime/evidence.py
+          python -m py_compile penta/scribe/runtime.py
+          python -m py_compile penta/marketer/runtime.py
       - name: Validate PentaScribe registry
         run: python penta/scribe/pentascribe.py validate
       - name: Reconcile PentaScribe registry
@@ -36,13 +53,19 @@ jobs:
       - name: Discover terminology and mark-use candidates
         run: python penta/scribe/pentascribe.py discover --out /tmp/pentascribe/discovery.json
       - name: Compile PentaScribe products
-        run: python penta/scribe/pentascribe.py compile --out /tmp/pentascribe
+        run: python penta/scribe/pentascribe.py compile --out /tmp/pentascribe/products
       - name: Validate PentaMarketer reference campaign
         run: python penta/marketer/pentamarketer.py validate --campaign penta/marketer/campaign.example.json
       - name: Compile governed reference manifest
         run: python penta/marketer/pentamarketer.py compile --campaign penta/marketer/campaign.example.json --out /tmp/pentamarketer-manifest.json
       - name: Unit tests
-        run: python -m unittest discover -s tests -p 'test_penta_scribe_marketer.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_penta_scribe_marketer.py' -v
+          python -m unittest discover -s tests -p 'test_penta_production_runtime.py' -v
+      - name: Run bounded production smoke cycle
+        run: |
+          python penta/scribe/runtime.py cycle --state-root /tmp/pentascribe-production --authority-ref chlom:penta.scribe:ci-preflight
+          python penta/marketer/runtime.py cycle --campaign penta/marketer/campaign.example.json --state-root /tmp/pentamarketer-production
       - name: Publish evidence bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -50,4 +73,6 @@ jobs:
           path: |
             /tmp/pentascribe/
             /tmp/pentamarketer-manifest.json
+            /tmp/pentascribe-production/
+            /tmp/pentamarketer-production/
           if-no-files-found: error
