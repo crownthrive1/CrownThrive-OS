@@ -61,3 +61,19 @@ For business, licensing, development, media, partnership, ecosystem, research, o
 ---
 
 This is a public-safe professional and institutional profile. It does not disclose private contracts, restricted evidence, protected algorithms, confidential economic schedules, credentials, private customer data, unpublished source assets, or other restricted CrownThrive material.
+
+<!-- pentarelease:managed-release-surface:start -->
+## Latest PentaRelease — v3.11.0.1
+
+
+- **Official release:** https://github.com/crownthrive1/CrownThrive-Support/releases/tag/v3.11.0.1
+- **Release title:** CrownThrive OS 3.11.0.1 — Autonomous PentaRelease
+- **Why:** governed integration/version/evidence delta
+- **Changed paths:** 4
+- **Penta components:** PentaRelease, PentaReleaseComprehensiveReleaseSurface
+- **Direct USD payload cost:** not available
+- **CIE score:** not available
+- **Data/evidence:** comprehensive record, FAQ, changelog, costs, CIE status, data catalog, and evidence are attached to the official release.
+
+This section is maintained by PentaRelease. Content outside the managed markers remains under its existing ownership and editorial authority.
+<!-- pentarelease:managed-release-surface:end -->
