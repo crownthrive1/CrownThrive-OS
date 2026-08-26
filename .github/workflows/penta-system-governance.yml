@@ -1,0 +1,30 @@
+name: PentaOS System Governance
+
+on:
+  pull_request:
+    paths:
+      - 'penta/**'
+      - 'scripts/penta_vergence_reconciler.py'
+      - 'scripts/validate_penta_system.py'
+      - 'supabase/functions/penta-flex/**'
+      - 'supabase/functions/penta-vergence-bridge/**'
+      - 'supabase/migrations/*penta*'
+      - '.github/workflows/penta-vergence-reconciler.yml'
+      - '.github/workflows/penta-system-governance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate canonical Penta namespace and continuity invariants
+        run: python3 scripts/validate_penta_system.py
+      - name: Compile PentaVergence worker
+        run: python3 -m py_compile scripts/penta_vergence_reconciler.py
