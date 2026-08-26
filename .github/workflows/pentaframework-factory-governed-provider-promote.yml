@@ -1,4 +1,4 @@
-name: PentaFramework Factory Governed Provider Promotion
+name: PentaFactory Governed Provider Promotion
 
 on:
   workflow_run:
@@ -85,7 +85,7 @@ jobs:
           MANIFEST=$(git diff-tree --no-commit-id --name-only -r HEAD | grep -E '^generated/factory/[^/]+/factory-manifest\.json$' | head -n 1)
           [ -n "$MANIFEST" ] || { echo "factory manifest missing from governed commit" >&2; exit 2; }
           [ "$(jq -r '.job.id' "$MANIFEST")" = "$JOB_ID" ] || { echo "provider job binding mismatch" >&2; exit 2; }
-          [ "$(jq -r '.product_contract' "$MANIFEST")" = "ct.pentaframework-factory.v1" ] || { echo "PentaFramework product contract missing" >&2; exit 2; }
+          [ "$(jq -r '.product_contract' "$MANIFEST")" = "ct.pentaframework-factory.v1" ] || { echo "PentaFactory compatibility product contract missing" >&2; exit 2; }
           COUNT=$(jq '.files | length' "$MANIFEST")
           echo "file_count=$COUNT" >> "$GITHUB_OUTPUT"
           echo "manifest=$MANIFEST" >> "$GITHUB_OUTPUT"
@@ -121,7 +121,7 @@ jobs:
           set -euo pipefail
           OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
           jq -n --arg job "$JOB_ID" --arg sha "$COMMIT_SHA" --arg url "$COMMIT_URL" --arg gate "$GATE_RUN_ID" --argjson count "$FILE_COUNT" '{action:"complete",job_id:$job,commit_sha:$sha,head_sha:$sha,commit_url:$url,branch:"main",file_count:$count,governance_gate_run_id:$gate,rollback_ref:("git:"+$sha+"^1")}' > complete.json
-          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @complete.json "$BRIDGE" | jq .
+          curl -fsSL -H "Authorization: Bearer ${OIDIDC}" -H 'Content-Type: application/json' --data-binary @complete.json "$BRIDGE" | jq .
 
       - name: Delete governed staging branch
         if: success()
