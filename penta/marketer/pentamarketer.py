@@ -21,6 +21,23 @@ def resolve_terms(names, registry):
         else: resolved.append({"input": name, "id": term["id"], "canonical": term["canonical"]})
     return resolved, unknown
 
+def registered_mark_forms(registry):
+    forms = set()
+    for term in registry.get("terms", []):
+        tm = term.get("trademark") or {}
+        if tm.get("status") != "registered" or not tm.get("registration"):
+            continue
+        for name in [term.get("canonical", ""), *(term.get("aliases") or [])]:
+            bare = name.replace("™", "").replace("®", "").strip()
+            if bare: forms.add(bare + "®")
+    return sorted(forms, key=len, reverse=True)
+
+def unverified_registered_symbol_use(message, registry):
+    remainder = message
+    for form in registered_mark_forms(registry):
+        remainder = re.sub(re.escape(form), "", remainder, flags=re.I)
+    return "®" in remainder
+
 def validate_campaign(campaign, registry, policy):
     errors = []
     for key in ("campaign_id","objective","audience","message","cta","channels","terms","cie_imprint","chlom_authority_ref"):
@@ -32,9 +49,8 @@ def validate_campaign(campaign, registry, policy):
     message = " ".join([campaign.get("message", ""), campaign.get("cta", "")])
     for pattern in policy.get("claim_policy", {}).get("blocked_patterns", []):
         if re.search(pattern, message, re.I): errors.append(f"blocked claim pattern: {pattern}")
-    if "®" in message:
-        registered = any((t.get("trademark") or {}).get("status") == "registered" and (t.get("trademark") or {}).get("registration") for t in registry.get("terms", []))
-        if not registered: errors.append("® used but registry contains no evidence-backed registered mark")
+    if "®" in message and unverified_registered_symbol_use(message, registry):
+        errors.append("® used for a mark without evidence-backed registered status")
     return errors, resolved
 
 def compile_manifest(campaign, registry, policy):
