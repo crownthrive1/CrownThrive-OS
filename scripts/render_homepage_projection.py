@@ -20,6 +20,12 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/homepage-projection.v2.json"
 START = "{/*  HOMEPAGE_PROJECTION:START  */}"
 END = "{/*  HOMEPAGE_PROJECTION:END  */}"
+INSERTION_ANCHORS = (
+    "## What “Production \\+ Convergence” means",
+    "## What \"Production \\+ Convergence\" means",
+    "## How truth moves",
+    "## The Penta Model",
+)
 
 
 def args() -> argparse.Namespace:
@@ -108,10 +114,13 @@ def replace_region(index: str, generated: str) -> str:
     start_count = index.count(START)
     end_count = index.count(END)
     if start_count == 0 and end_count == 0:
-        anchor = "## How truth moves"
-        if anchor not in index:
-            raise ValueError(f"homepage insertion anchor missing: {anchor}")
-        return index.replace(anchor, generated + "\n\n" + anchor, 1)
+        for anchor in INSERTION_ANCHORS:
+            if anchor in index:
+                return index.replace(anchor, generated + "\n\n" + anchor, 1)
+        raise ValueError(
+            "homepage insertion anchor missing; expected one of: "
+            + ", ".join(INSERTION_ANCHORS)
+        )
     if start_count != 1 or end_count != 1:
         raise ValueError("homepage projection markers must each occur exactly once")
     start = index.index(START)
