@@ -1,0 +1,51 @@
+name: PentaScribe + PentaMarketer Governance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'penta/scribe/**'
+      - 'penta/marketer/**'
+      - 'data/penta/systems.extensions.pentascribe-marketer.json'
+      - 'docs/phase3/PENTASCRIBE.md'
+      - 'docs/phase3/PENTAMARKETER.md'
+      - 'tests/test_penta_scribe_marketer.py'
+  pull_request:
+    paths:
+      - 'penta/scribe/**'
+      - 'penta/marketer/**'
+      - 'data/penta/systems.extensions.pentascribe-marketer.json'
+      - 'docs/phase3/PENTASCRIBE.md'
+      - 'docs/phase3/PENTAMARKETER.md'
+      - 'tests/test_penta_scribe_marketer.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semantic-and-marketing-governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PentaScribe registry
+        run: python penta/scribe/pentascribe.py validate
+      - name: Reconcile PentaScribe registry
+        run: python penta/scribe/pentascribe.py reconcile
+      - name: Compile PentaScribe products
+        run: python penta/scribe/pentascribe.py compile --out /tmp/pentascribe
+      - name: Validate PentaMarketer reference campaign
+        run: python penta/marketer/pentamarketer.py validate --campaign penta/marketer/campaign.example.json
+      - name: Compile governed reference manifest
+        run: python penta/marketer/pentamarketer.py compile --campaign penta/marketer/campaign.example.json --out /tmp/pentamarketer-manifest.json
+      - name: Unit tests
+        run: python -m unittest discover -s tests -p 'test_penta_scribe_marketer.py' -v
+      - name: Publish evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: penta-scribe-marketer-evidence
+          path: |
+            /tmp/pentascribe/
+            /tmp/pentamarketer-manifest.json
+          if-no-files-found: error
