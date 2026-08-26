@@ -62,11 +62,11 @@ Deno.serve(async (req) => {
     let result: unknown;
     if (action === "nurture" || action === "reconcile") {
       const { data, error } = await db.rpc("penta_nurture_tick_v1");
-      if (error) throw error;
+      if (error) throw new Error("nurture_tick_failed");
       result = data;
     } else {
       const { data, error } = await db.rpc("penta_nurture_status_v1");
-      if (error) throw error;
+      if (error) throw new Error("nurture_status_failed");
       result = data;
     }
 
@@ -86,10 +86,10 @@ Deno.serve(async (req) => {
       p_actor_class: "software",
       p_metadata: metadata,
     });
-    if (telemetryError) throw telemetryError;
+    if (telemetryError) throw new Error("nurture_telemetry_failed");
 
     return json({ ok: true, service: "PentaNurture", action, result, telemetry: { cookie_value_stored: false, server_hash: "SHA-256" } }, 200, session);
-  } catch (e) {
-    return json({ ok: false, service: "PentaNurture", error: e instanceof Error ? e.message : String(e) }, 500, session);
+  } catch {
+    return json({ ok: false, service: "PentaNurture", error: "internal_runtime_error" }, 500, session);
   }
 });
