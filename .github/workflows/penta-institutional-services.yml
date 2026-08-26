@@ -1,4 +1,4 @@
-name: PENTA Institutional Services
+name: PENTA Institutional Services + Family
 
 on:
   pull_request:
@@ -6,8 +6,11 @@ on:
       - "data/penta/**"
       - "schemas/penta/**"
       - "runtime/penta_institutional_services.py"
+      - "runtime/penta_family.py"
       - "tests/test_penta_institutional_services.py"
+      - "tests/test_penta_family.py"
       - "docs/phase3/PENTA_INSTITUTIONAL_OPERATING_FABRIC_v1.2.md"
+      - "docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v1.0.md"
       - ".github/workflows/penta-institutional-services.yml"
   push:
     branches: [main]
@@ -15,7 +18,10 @@ on:
       - "data/penta/**"
       - "schemas/penta/**"
       - "runtime/penta_institutional_services.py"
+      - "runtime/penta_family.py"
       - "tests/test_penta_institutional_services.py"
+      - "tests/test_penta_family.py"
+      - "docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v1.0.md"
       - ".github/workflows/penta-institutional-services.yml"
   workflow_dispatch:
 
@@ -28,7 +34,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Verify institutional services
+    name: Verify institutional services and Penta Family
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -43,10 +49,20 @@ jobs:
       - name: Validate JSON artifacts
         run: |
           python -m json.tool data/penta/institutional-services.registry.json >/dev/null
+          python -m json.tool data/penta/family.registry.json >/dev/null
           python -m json.tool schemas/penta/decision-packet.schema.json >/dev/null
+          python -m json.tool schemas/penta/family-registry.schema.json >/dev/null
 
-      - name: Compile governance runtime
-        run: python -m py_compile runtime/penta_institutional_services.py
+      - name: Compile governance runtimes
+        run: |
+          python -m py_compile runtime/penta_institutional_services.py
+          python -m py_compile runtime/penta_family.py
+
+      - name: Verify Penta Family snapshot
+        run: python runtime/penta_family.py --root .
 
       - name: Run authority-boundary tests
         run: python tests/test_penta_institutional_services.py
+
+      - name: Run Penta Family production-contract tests
+        run: python tests/test_penta_family.py
