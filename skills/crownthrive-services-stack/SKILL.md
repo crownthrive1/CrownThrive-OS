@@ -2,18 +2,19 @@
 
 ## Purpose
 
-Use the 14 stable `ct.css.service.*` identities as provider-independent service semantics beneath the current PentaFabric execution layer.
+Use the 14 stable `ct.css.service.*` identities as provider-independent service semantics beneath the production Penta Family control plane.
 
 ## Current sequence
 
 1. Resolve the stable CSS service ID.
 2. Resolve the current operation contract and data class.
-3. Ask PentaCredentials for a valid credential binding reference; never consume raw secret material from this skill.
-4. Ask PentaCertify for current exact-operation certification.
-5. Resolve CHLOM/Penta authority for the requested operation.
-6. Route through PentaFabric only when credential, certification, authority, and provider state all satisfy the contract.
-7. Require readback for side effects.
-8. Route drift/failure to PentaNurture and current status to PentaStatus.
+3. Resolve human/service identity through PentaIdentity where applicable.
+4. Ask PentaCredentials for a valid credential binding reference; never consume raw secret material from this skill.
+5. Ask PentaCertify for current exact-operation certification.
+6. Resolve CHLOM/Penta authority for the requested operation.
+7. Use PentaMation for governed workflow orchestration, PentaRoute for the execution path, and PentaFederation for cross-system bindings/proofs only when those registered members and the target path are eligible.
+8. Require provider readback for side effects.
+9. Route drift/failure to PentaNurture and current state to PentaStatus.
 
 ## Historical CSS runtime
 
@@ -29,3 +30,4 @@ The predecessor Edge source is not a production candidate because it contains ha
 - No money movement from billing/commerce labels alone.
 - No rights grant from licensing labels alone.
 - No self-approval or D3 automation.
+- No unregistered Penta name may be used as an execution owner.
