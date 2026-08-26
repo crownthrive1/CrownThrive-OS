@@ -1,0 +1,73 @@
+name: PentaDocs Historical Context Migration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'knowledge/**'
+      - 'chlom/**'
+      - 'start-here/**'
+      - 'data/documentation/**'
+      - 'developers/manifests/historical-context-guardian.v1.json'
+      - 'scripts/historical-context-guardian.mjs'
+      - '.github/workflows/historical-context-migration.yml'
+  schedule:
+    - cron: '43 * * * *'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: pentadocs-historical-context-migration
+  cancel-in-progress: false
+
+jobs:
+  verify-and-retire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Historical Context Guardian
+        id: guardian
+        shell: bash
+        run: |
+          set +e
+          node scripts/historical-context-guardian.mjs > historical-context-guardian-report.json
+          status=$?
+          cat historical-context-guardian-report.json
+          if [ "$status" -eq 0 ]; then
+            echo "complete=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "complete=false" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$status"
+
+      - name: Upload migration receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-context-guardian-report
+          path: historical-context-guardian-report.json
+          retention-days: 30
+
+      - name: Self-retire completed migration schedule
+        if: >-
+          steps.guardian.outputs.complete == 'true' &&
+          github.ref == 'refs/heads/main' &&
+          github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          curl --fail-with-body \
+            --request PUT \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/historical-context-migration.yml/disable"
+          echo "Historical-context migration verified complete; scheduled workflow disabled itself."
