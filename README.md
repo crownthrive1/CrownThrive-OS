@@ -34,11 +34,20 @@ CHLOM R&D, Rights & Identity, Compliance Oracle, Documentation & Projection, Com
 
 The system preserves a distinction between **candidate**, **verified**, **authorized**, and **released** state. A workflow definition, repository file, provider response, or generated artifact does not independently establish production truth.
 
+## 🏭 PentaFramework Factory™
+
+**PentaFramework Factory™** is CrownThrive's canonical governed framework and software-production system. Its five production stages are **Plan → Build → Verify → Package → Release**, mapped over the existing eight internal execution lanes so the rename does not break proven queues, RPCs, provider bridges, OIDC audiences, artifact paths, or deployment adapters.
+
+The canonical product contract is `ct.pentaframework-factory.v1`. Existing `framework-factory-v2`, `ct-factory-*`, `ct.factory.v4`, and related implementation identifiers remain compatibility identifiers where required for production continuity. CHLOM governs authority and rights; ThriveBase preserves runtime state; CIE supplies applicable cultural/framework constraints; certified provider adapters perform bounded implementation and readback.
+
+Canonical architecture: [`PentaFramework Factory v1`](https://github.com/crownthrive1/chlom-protocol/blob/main/docs/architecture/pentaframework-factory.v1.md).
+
 ## 🔎 Start here
 
 - 👤 **About Kavonte Jones Sr.** — [`ABOUT_ME.md`](ABOUT_ME.md) and [`about/kavonte-jones-sr.mdx`](about/kavonte-jones-sr.mdx)
 - 🧬 **CHLOM** — [`chlom/overview.mdx`](chlom/overview.mdx)
 - 🏗️ **Pentafabric lifecycle** — [`chlom/architecture/pentafabric-autonomous-lifecycle.v1.md`](chlom/architecture/pentafabric-autonomous-lifecycle.v1.md)
+- 🏭 **PentaFramework Factory** — [`canonical architecture`](https://github.com/crownthrive1/chlom-protocol/blob/main/docs/architecture/pentaframework-factory.v1.md)
 - ♾️ **Seven-generation continuity** — [`standards/crownthrive-generational-continuity-charter.v1.md`](standards/crownthrive-generational-continuity-charter.v1.md)
 - 💻 **Developer Platform** — [`developers/overview.mdx`](developers/overview.mdx)
 - ⚖️ **Licensing & IP** — [`LICENSE`](LICENSE) and [`support/licensing-and-ip-overview.mdx`](support/licensing-and-ip-overview.mdx)
