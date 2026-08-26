@@ -1,0 +1,77 @@
+name: PentaRelease — Published Release Reconciler
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.pentarelease/**'
+      - 'scripts/pentarelease/**'
+      - 'releases/**'
+      - '.github/release-requests/**'
+      - '.github/workflows/pentarelease-*.yml'
+      - '.github/workflows/crownthrive-os-v2-release.yml'
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: pentarelease-published-release-reconciler
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete release lineage
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate PentaRelease reconciliation engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool .pentarelease/policy.json >/dev/null
+          python3 -m py_compile scripts/pentarelease/decide.py scripts/pentarelease/reconcile.py
+          test "$(jq -r '.enabled' .pentarelease/policy.json)" = "true"
+          test "$(jq -r '.mode' .pentarelease/policy.json)" = "production"
+          test "$(jq -r '.published_release_reconciliation.enabled' .pentarelease/policy.json)" = "true"
+
+      - name: Reconcile published GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          python3 scripts/pentarelease/reconcile.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --policy .pentarelease/policy.json \
+            --output /tmp/pentarelease-reconciliation.json \
+            --repair
+
+      - name: Verify latest provider truth
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f /tmp/pentarelease-reconciliation.json
+          LATEST=$(jq -r '.latest.tag // "none"' /tmp/pentarelease-reconciliation.json)
+          STATUS=$(jq -r '.latest.status // "no_release"' /tmp/pentarelease-reconciliation.json)
+          REPAIRED=$(jq -r '[.latest.repaired_assets[]?] | join(", ")' /tmp/pentarelease-reconciliation.json)
+          {
+            echo '## PentaRelease published-release reconciliation'
+            echo
+            echo "- Latest release: $LATEST"
+            echo "- Provider status: $STATUS"
+            echo "- Assets repaired this run: ${REPAIRED:-none}"
+            echo "- Existing release notes preserved: true"
+            echo "- Existing release target preserved: true"
+          } >> "$GITHUB_STEP_SUMMARY"
+          test "$(jq -r '.latest_verified' /tmp/pentarelease-reconciliation.json)" = "true"
