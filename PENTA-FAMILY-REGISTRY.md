@@ -90,6 +90,11 @@ CrownThrive IO is the operating/control surface; PentaDocs is the authoritative 
 | PentaMerge™ | governed merge execution and merge-readiness authority | `/io/pentas/merge` |
 | PentaCloser™ | closes verified gaps/PRs after bounded remediation windows | `/io/pentas/closer` |
 | PentaRelease™ | release-aware observe/classify/version/package/publish/readback subsystem | `/io/pentas/release` |
+| PentaVersion™ | canonical component/content/policy/schema/version lineage, compatibility, effective-state, and supersession authority | `/io/pentas/version` |
+| PentaSerialized™ | append-only serialization, stable identity, anti-overwrite/delete gating, tombstones, lineage, integrity, snapshots, and continuity receipts | `/io/pentas/serialized` |
+| PentaFormat™ | canonical format, media type, schema identity, extension, migration, and format-compatibility authority | `/io/pentas/format` |
+| PentaSOPs™ | governed SOP registry, procedure versioning, ownership, review, supersession, and operational continuity | `/io/pentas/sops` |
+| PentaSLAs™ | governed SLA/SLO registry, effective targets, escalation ownership, measurement lineage, and service-commitment continuity | `/io/pentas/slas` |
 | PentaTime™ | canonical scheduling, temporal policy, clock, TTL, deadline, and scheduler authority | `/io/pentas/time` |
 | PentaDocs™ | institutional documentation, knowledge, navigation, glossary, and documentation governance | `/io/pentas/docs` |
 | PentaScribe™ | terms, glossaries, indexes, FAQs, dictionary, trademark and institutional record maintenance | `/io/pentas/scribe` |
