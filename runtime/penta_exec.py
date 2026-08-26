@@ -30,7 +30,7 @@ except ModuleNotFoundError:
     from runtime.penta_family import load_family, member_dispatch_gate
     from runtime.penta_interop import build_envelope, evaluate_handoff
 
-RUNTIME_VERSION = "1.0.0"
+RUNTIME_VERSION = "1.1.0"
 ADAPTER_REGISTRY = Path("data/penta/execution-adapters.registry.json")
 EXECUTION_ELIGIBLE = {"certified", "production"}
 VALID_EFFECTS = {"analyze", "prepare", "route", "execute", "verify", "preserve"}
@@ -139,8 +139,8 @@ def member_status(snapshot: Mapping[str, Any], machine_key: str) -> dict[str, An
 def validate_adapter_registry(registry: Mapping[str, Any]) -> None:
     if registry.get("registry_id") != "crownthrive.penta.execution-adapters":
         raise PentaExecutionError("unexpected adapter registry_id")
-    if registry.get("version") != "1.0.0" or registry.get("fail_closed") is not True:
-        raise PentaExecutionError("adapter registry must be v1.0.0 and fail closed")
+    if registry.get("version") != "1.1.0" or registry.get("fail_closed") is not True:
+        raise PentaExecutionError("adapter registry must be v1.1.0 and fail closed")
     adapters = registry.get("adapters")
     if not isinstance(adapters, list):
         raise PentaExecutionError("adapters must be a list")
@@ -247,10 +247,87 @@ def _mesh_route_check(ctx: AdapterContext) -> dict[str, Any]:
     }
 
 
+def _error_normalize(ctx: AdapterContext) -> dict[str, Any]:
+    from runtime.penta_observability import normalize_error
+    message = ctx.payload.get("message", "bounded PentaError normalization probe")
+    code = ctx.payload.get("code", "PENTA_EXEC_ADAPTER_ERROR")
+    context = ctx.payload.get("context") or {}
+    if not isinstance(message, str) or not message.strip():
+        raise PentaExecutionError("error_normalize payload.message must be a non-empty string")
+    if not isinstance(code, str) or not code.strip():
+        raise PentaExecutionError("error_normalize payload.code must be a non-empty string")
+    if not isinstance(context, Mapping):
+        raise PentaExecutionError("error_normalize payload.context must be an object")
+    return normalize_error(RuntimeError(message), code=code, context=context).envelope(include_internal=False)
+
+
+def _logger_emit(ctx: AdapterContext) -> dict[str, Any]:
+    from runtime.penta_observability import PentaLogger, Severity
+    service = ctx.payload.get("service", "penta-exec")
+    message = ctx.payload.get("message", "bounded executable-family log probe")
+    event = ctx.payload.get("event", "penta.exec.probe")
+    severity = ctx.payload.get("severity", "info")
+    context = ctx.payload.get("context") or {}
+    if not all(isinstance(value, str) and value.strip() for value in (service, message, event)):
+        raise PentaExecutionError("logger_emit service/message/event must be non-empty strings")
+    if not isinstance(context, Mapping):
+        raise PentaExecutionError("logger_emit payload.context must be an object")
+    lines: list[str] = []
+    logger = PentaLogger(service=service, penta_member="penta.logger", minimum_severity=Severity.DEBUG, sink=lines.append)
+    record = logger.emit(severity, message, event=event, context=context)
+    if record is None or not lines:
+        raise PentaExecutionError("logger_emit produced no record")
+    return {"record": record, "line_sha256": sha256(lines[-1].encode("utf-8")).hexdigest()}
+
+
+def _trace_new_context(ctx: AdapterContext) -> dict[str, Any]:
+    from runtime.penta_observability import TraceContext
+    parent = ctx.payload.get("parent_span_id")
+    if parent is not None and (not isinstance(parent, str) or not parent.strip()):
+        raise PentaExecutionError("trace_new_context parent_span_id must be null or a non-empty string")
+    return TraceContext(parent_span_id=parent).as_dict()
+
+
+def _metric_snapshot(ctx: AdapterContext) -> dict[str, Any]:
+    from runtime.penta_observability import MetricRegistry
+    counters = ctx.payload.get("counters") or {}
+    gauges = ctx.payload.get("gauges") or {}
+    observations = ctx.payload.get("observations") or {}
+    if not all(isinstance(value, Mapping) for value in (counters, gauges, observations)):
+        raise PentaExecutionError("metric_snapshot counters/gauges/observations must be objects")
+    if len(counters) + len(gauges) + len(observations) > 100:
+        raise PentaExecutionError("metric_snapshot accepts at most 100 metric names")
+    metrics = MetricRegistry()
+    for name, value in counters.items():
+        if not isinstance(value, (int, float)):
+            raise PentaExecutionError("counter values must be numeric")
+        metrics.increment(str(name), float(value))
+    for name, value in gauges.items():
+        if not isinstance(value, (int, float)):
+            raise PentaExecutionError("gauge values must be numeric")
+        metrics.gauge(str(name), float(value))
+    observation_count = 0
+    for name, values in observations.items():
+        if not isinstance(values, list):
+            raise PentaExecutionError("observation values must be arrays")
+        observation_count += len(values)
+        if observation_count > 1000:
+            raise PentaExecutionError("metric_snapshot accepts at most 1000 observations")
+        for value in values:
+            if not isinstance(value, (int, float)):
+                raise PentaExecutionError("observation values must be numeric")
+            metrics.observe(str(name), float(value))
+    return metrics.snapshot()
+
+
 BUILTIN_HANDLERS: dict[str, Callable[[AdapterContext], dict[str, Any]]] = {
     "family_snapshot": _family_snapshot,
     "beata_heartbeat": _beata_heartbeat,
     "mesh_route_check": _mesh_route_check,
+    "error_normalize": _error_normalize,
+    "logger_emit": _logger_emit,
+    "trace_new_context": _trace_new_context,
+    "metric_snapshot": _metric_snapshot,
 }
 
 
@@ -270,8 +347,8 @@ def family_validate(root: Path, registry: Mapping[str, Any], snapshot: Mapping[s
         target = adapter["member"]
         if target not in members:
             blockers.append({"adapter_id": adapter["adapter_id"], "kind": "unknown_adapter_member", "member": target})
-        elif adapter["requested_effect"] == "execute" and members[target].get("maturity") not in EXECUTION_ELIGIBLE:
-            blockers.append({"adapter_id": adapter["adapter_id"], "kind": "execute_adapter_targets_ineligible_member", "member": target, "maturity": members[target].get("maturity")})
+        elif adapter["requires_execution_eligible"] and members[target].get("maturity") not in EXECUTION_ELIGIBLE:
+            blockers.append({"adapter_id": adapter["adapter_id"], "kind": "adapter_targets_ineligible_member", "member": target, "maturity": members[target].get("maturity")})
     return _receipt(
         "family_validate",
         "pass" if not blockers else "fail_closed",
