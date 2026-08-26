@@ -1,5 +1,5 @@
 name: PentaMail Live Certification
-# activation-revision: 2026-08-26.3 — attested provider send/readback with PentaFabric routing.
+# activation-revision: 2026-08-26.4 — provider send/readback with sanitized evidence artifact.
 
 on:
   workflow_dispatch:
@@ -8,14 +8,6 @@ on:
         description: 'Authorized PentaMail certification recipient'
         required: false
         default: 'jones.usmc.kj@gmail.com'
-      runner_mode:
-        description: 'Trusted execution fabric'
-        required: true
-        type: choice
-        options:
-          - self-hosted
-          - github-hosted
-        default: self-hosted
   push:
     branches: [main]
     paths:
@@ -25,8 +17,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
-  attestations: write
 
 concurrency:
   group: pentamail-live-certification
@@ -34,11 +24,10 @@ concurrency:
 
 jobs:
   certify-send-readback:
-    # A tagged trusted main push uses GitHub-hosted bootstrap capacity. Manual
-    # production certification defaults to the isolated PentaFabric/RTC runner.
-    # Never add pull_request to this secret-bearing provider workflow.
+    # Current fail-closed runtime policy permits only the attested literal
+    # GitHub-hosted label. Never add pull_request to this secret-bearing workflow.
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[pentamail-live-certify]')
-    runs-on: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.runner_mode == 'self-hosted') && '["self-hosted","linux","x64","crownthrive","pentafabric","rtc","trusted","pentamail"]' || '["ubuntu-latest"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
@@ -229,29 +218,24 @@ jobs:
               'attested_at': datetime.now(timezone.utc).isoformat(),
           }
           if evidence['disposition'] != 'PASS':
-              raise SystemExit('refusing to attest an unproven PentaMail provider write')
+              raise SystemExit('refusing to publish unproven PentaMail provider evidence')
           payload = json.dumps(evidence, indent=2, sort_keys=True) + '\n'
-          Path('pentamail-live-attestation.json').write_text(payload)
+          Path('pentamail-live-evidence.json').write_text(payload)
           digest = hashlib.sha256(payload.encode()).hexdigest()
-          Path('pentamail-live-attestation.sha256').write_text(
-              digest + '  pentamail-live-attestation.json\n'
+          Path('pentamail-live-evidence.sha256').write_text(
+              digest + '  pentamail-live-evidence.json\n'
           )
           print(payload)
           print('sha256=' + digest)
           PY
 
-      - name: Attest exact PentaMail provider proof
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
-        with:
-          subject-path: pentamail-live-attestation.json
-
       - name: Upload sanitized PentaMail proof
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pentamail-live-certification-${{ github.run_id }}
           path: |
-            pentamail-live-attestation.json
-            pentamail-live-attestation.sha256
+            pentamail-live-evidence.json
+            pentamail-live-evidence.sha256
             pentamail-certification-result.json
           if-no-files-found: error
           retention-days: 30
@@ -271,7 +255,7 @@ jobs:
           print('Lifecycle at readback: ' + r.get('lifecycle_state', 'UNKNOWN'))
           print('Provider message ID: ' + r.get('provider_message_id', 'UNKNOWN'))
           print('email_send eligible: ' + str(r.get('email_send_gate', {}).get('eligible', False)))
-          print('Attested evidence: ' + str(Path('pentamail-live-attestation.json').exists()))
+          print('Sanitized evidence artifact: ' + str(Path('pentamail-live-evidence.json').exists()))
           PY
           else
             echo '## PentaMail Live Certification — HOLD/FAILED' >> "$GITHUB_STEP_SUMMARY"
