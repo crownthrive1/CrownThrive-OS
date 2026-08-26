@@ -1,0 +1,107 @@
+name: Virality Public Mesh Governance
+
+on:
+  pull_request:
+    paths:
+      - "docs.json"
+      - "virality-music/**"
+      - "platforms/virality-music-institutional-registry.mdx"
+      - "changelog/virality-music-website-mesh-pentadocs-portal-2026-08-26.mdx"
+      - "registry/virality-music/**"
+      - "scripts/sync_virality_public_mesh.py"
+      - "scripts/validate_virality_public_mesh.py"
+      - "scripts/verify_virality_source_parity.py"
+      - "tests/test_virality_public_mesh.py"
+      - ".github/workflows/virality-public-mesh-governance.yml"
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: virality-public-mesh-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Validate public mesh contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify stdlib-only crawler and validator syntax
+        run: |
+          python -m py_compile scripts/sync_virality_public_mesh.py
+          python -m py_compile scripts/validate_virality_public_mesh.py
+          python -m py_compile scripts/verify_virality_source_parity.py
+
+      - name: Run offline public mesh contract tests
+        run: python -m unittest -v tests/test_virality_public_mesh.py
+
+  live-observation:
+    name: Validate live public mesh coverage
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Crawl full XML-first public mesh
+        id: crawl
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts/virality-public-mesh
+          observed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          python scripts/sync_virality_public_mesh.py \
+            --sitemap-url https://vm.crownthrive.com/sitemap.xml \
+            --route-index registry/virality-music/public-route-index-2026-08-26.json \
+            --xml-estate-index registry/virality-music/public-xml-estate-index-2026-08-26.json \
+            --source-timestamp "$observed_at" \
+            --max-routes 0 \
+            --concurrency 8 \
+            --output artifacts/virality-public-mesh/virality-public-mesh.json
+
+      - name: Validate snapshot and dated-census coverage
+        id: validate
+        if: always()
+        continue-on-error: true
+        run: |
+          test -s artifacts/virality-public-mesh/virality-public-mesh.json
+          python scripts/validate_virality_public_mesh.py \
+            --input artifacts/virality-public-mesh/virality-public-mesh.json \
+            --route-index registry/virality-music/public-route-index-2026-08-26.json \
+            --xml-estate-index registry/virality-music/public-xml-estate-index-2026-08-26.json \
+            --report artifacts/virality-public-mesh/virality-public-mesh-validation-report.json
+
+      - name: Upload read-only observation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: virality-public-mesh-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/virality-public-mesh/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Preserve fail-closed observation result
+        if: always() && (steps.crawl.outcome != 'success' || steps.validate.outcome != 'success')
+        run: |
+          echo "Public mesh crawl or coverage validation failed; artifact evidence was retained and no repository mutation occurred."
+          exit 1
