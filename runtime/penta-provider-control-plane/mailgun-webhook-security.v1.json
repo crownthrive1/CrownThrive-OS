@@ -1,0 +1,57 @@
+{
+  "schema": "ct.penta.provider-supplement.v1",
+  "version": "1.0.0",
+  "provider_id": "mailgun",
+  "owner_system": "PentaMailer",
+  "credential_authority": "PentaCredentials",
+  "priority": "software",
+  "credentials": [
+    {
+      "credential_id": "mailgun_sending_primary",
+      "purpose": "email_send",
+      "environment_alias": "MAILGUN_SENDING_KEY_PRIMARY",
+      "vault_alias": "ct.pentamailer.mailgun.primary.api_key",
+      "secret": true,
+      "redundancy_rank": 1
+    },
+    {
+      "credential_id": "mailgun_sending_secondary",
+      "purpose": "email_send",
+      "environment_alias": "MAILGUN_SENDING_KEY_SECONDARY",
+      "vault_alias": "ct.pentamailer.mailgun.secondary.api_key",
+      "secret": true,
+      "redundancy_rank": 2
+    },
+    {
+      "credential_id": "mailgun_webhook_signing",
+      "purpose": "webhook_verify",
+      "environment_alias": "MAILGUN_WEBHOOK_SIGNING_KEY",
+      "vault_alias": "ct.pentamailer.mailgun.webhook_signing_key",
+      "secret": true,
+      "redundancy_rank": 1
+    }
+  ],
+  "operations": [
+    {
+      "operation": "webhook_verify",
+      "side_effect": false,
+      "authority_class": "D0",
+      "algorithm": "HMAC-SHA256",
+      "signed_material": "timestamp || token",
+      "separator": "none",
+      "constant_time_compare": true,
+      "supports_parent_signature": true,
+      "replay_protection": "token-fingerprint TTL cache",
+      "timestamp_policy": "configurable; default 24h max age and 5m future skew"
+    }
+  ],
+  "secret_handling": {
+    "raw_values_in_repository": false,
+    "raw_values_in_logs": false,
+    "raw_values_in_evidence": false,
+    "raw_webhook_tokens_in_replay_cache": false
+  },
+  "documentation": "https://documentation.mailgun.com/docs/mailgun/user-manual/webhooks/securing-webhooks",
+  "runtime": "runtime/penta_mailgun_security.py",
+  "tests": "tests/test_penta_mailgun_security.py"
+}

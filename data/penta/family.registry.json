@@ -67,6 +67,12 @@
       "path": "data/penta/systems.extensions.observability.json",
       "required": true,
       "role": "production_observability_extension"
+    },
+    {
+      "catalog_id": "penta.readiness",
+      "path": "data/penta/systems.extensions.readiness.json",
+      "required": true,
+      "role": "heartbeat_mesh_fabric_and_on_demand_readiness_extension"
     }
   ],
   "control_plane_validation": {
@@ -94,6 +100,15 @@
       "PentaRoute",
       "PentaMation",
       "PentaTime"
+    ],
+    "readiness_liveness": [
+      "PentaOD",
+      "PentaHeartbeat",
+      "PentaBeata",
+      "PentaStatus",
+      "PentaCertify",
+      "PentaMesh",
+      "PentaFabric"
     ],
     "build_release": [
       "PentaFactory",
@@ -232,27 +247,27 @@
       "PentaAudit"
     ]
   },
+  "on_demand_contract": {
+    "controller": "PentaOD",
+    "system_heartbeat": "PentaHeartbeat",
+    "liveness_primitive": "PentaBeata",
+    "hot_means_ready_not_unbounded": true,
+    "verified_write_required_for_certified_write_on_demand": true,
+    "credential_required_when_provider_auth_is_required": true,
+    "heartbeat_freshness_required": true,
+    "d3_auto_wake": false,
+    "held_auto_wake": false,
+    "retired_auto_wake": false,
+    "arbitrary_provider_payload_proxy": false,
+    "authority_expansion": false
+  },
   "portal_contract": {
     "every_registered_member_has_portal": true,
     "base_route": "/penta",
     "route_pattern": "/penta/{machine_key_suffix}",
     "portal_state_is_independent_from_maturity": true,
     "portal_does_not_create_execution_authority": true,
-    "required_sections": [
-      "overview",
-      "status",
-      "responsibilities",
-      "inputs_outputs",
-      "authority_boundary",
-      "dependencies",
-      "sops_slas",
-      "runbooks",
-      "guides",
-      "evidence",
-      "api_mcp",
-      "changelog",
-      "support"
-    ]
+    "required_sections": ["overview", "status", "responsibilities", "inputs_outputs", "authority_boundary", "dependencies", "sops_slas", "runbooks", "guides", "evidence", "api_mcp", "changelog", "support"]
   },
   "interoperability_contract": {
     "protocol_version": "1.0.0",
@@ -310,6 +325,7 @@
     "require_authority_trace_for_consequential_actions": true,
     "require_certified_provider_binding_when_provider_action": true,
     "require_human_gate_when_policy_demands": true,
+    "require_pentaod_readiness_when_on_demand": true,
     "require_readback_receipt": true,
     "preserve_evidence": true
   },
@@ -323,6 +339,8 @@
     "emit_control_plane_resolution": true,
     "emit_portal_index": true,
     "emit_interoperability_coverage": true,
-    "emit_protocol_blockers": true
+    "emit_protocol_blockers": true,
+    "emit_pentaod_readiness_counts": true,
+    "emit_pentaheartbeat_freshness": true
   }
 }

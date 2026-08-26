@@ -1,0 +1,81 @@
+name: PentaMailer Mailgun Webhook Security
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'runtime/penta_mailgun_security.py'
+      - 'tests/test_penta_mailgun_security.py'
+      - 'runtime/penta-provider-control-plane/mailgun-webhook-security.v1.json'
+      - 'developers/manifests/pentamailer-mailgun-webhook-security.v1.json'
+      - 'developers/PENTAMAILER-MAILGUN-WEBHOOK-SECURITY.md'
+      - '.github/workflows/pentamailer-mailgun-webhook-security.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/penta_mailgun_security.py'
+      - 'tests/test_penta_mailgun_security.py'
+      - 'runtime/penta-provider-control-plane/mailgun-webhook-security.v1.json'
+      - 'developers/manifests/pentamailer-mailgun-webhook-security.v1.json'
+      - 'developers/PENTAMAILER-MAILGUN-WEBHOOK-SECURITY.md'
+      - '.github/workflows/pentamailer-mailgun-webhook-security.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentamailer-mailgun-webhook-security-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compile Mailgun webhook verifier
+        run: python3 -m py_compile runtime/penta_mailgun_security.py
+
+      - name: Run Mailgun webhook security regression suite
+        run: python3 -m unittest discover -s tests -p 'test_penta_mailgun_security.py' -v
+
+      - name: Validate PentaCredentials provider supplement
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          base = json.loads(Path('runtime/penta-provider-control-plane/providers.json').read_text())
+          overlay = json.loads(Path('runtime/penta-provider-control-plane/mailgun-webhook-security.v1.json').read_text())
+          manifest = json.loads(Path('developers/manifests/pentamailer-mailgun-webhook-security.v1.json').read_text())
+
+          mailgun = next((p for p in base.get('providers', []) if p.get('provider_id') == 'mailgun'), None)
+          if not mailgun:
+              raise SystemExit('base Mailgun provider is not registered')
+          if overlay.get('provider_id') != 'mailgun':
+              raise SystemExit('Mailgun provider supplement has wrong provider_id')
+
+          aliases = {item.get('environment_alias') for item in overlay.get('credentials', [])}
+          required = {'MAILGUN_SENDING_KEY_PRIMARY', 'MAILGUN_SENDING_KEY_SECONDARY', 'MAILGUN_WEBHOOK_SIGNING_KEY'}
+          if not required.issubset(aliases):
+              raise SystemExit('PentaCredentials Mailgun aliases incomplete')
+          if manifest.get('webhook_security', {}).get('secret_environment_alias') != 'MAILGUN_WEBHOOK_SIGNING_KEY':
+              raise SystemExit('manifest webhook alias mismatch')
+
+          production_paths = [
+              Path('runtime/penta_mailgun_security.py'),
+              Path('runtime/penta-provider-control-plane/mailgun-webhook-security.v1.json'),
+              Path('developers/manifests/pentamailer-mailgun-webhook-security.v1.json'),
+              Path('developers/PENTAMAILER-MAILGUN-WEBHOOK-SECURITY.md'),
+          ]
+          exact_hex_secret = re.compile(r'(?<![0-9A-Za-z])[0-9a-fA-F]{32}(?![0-9A-Za-z])')
+          for path in production_paths:
+              if exact_hex_secret.search(path.read_text(errors='ignore')):
+                  raise SystemExit(f'possible 32-hex secret literal detected in {path}')
+
+          print('Mailgun webhook security contract: PASS')
+          PY
