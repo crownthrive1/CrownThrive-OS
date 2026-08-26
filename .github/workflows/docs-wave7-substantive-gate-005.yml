@@ -1,0 +1,76 @@
+name: Wave 7 Substantive Gate 005
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/qualify_wave7_substantive_gate_005.py'
+      - '.github/workflows/docs-wave7-substantive-gate-005.yml'
+      - 'developers/manifests/docs-wave7-substantive-gate-005.v1.json'
+      - 'developers/manifests/docs-rebuild-bulk-quad-lane-batch-005.v1.json'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/qualify_wave7_substantive_gate_005.py'
+      - '.github/workflows/docs-wave7-substantive-gate-005.yml'
+      - 'developers/manifests/docs-wave7-substantive-gate-005.v1.json'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: docs-wave7-substantive-gate-005-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  qualify-cohort-005:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {fetch-depth: 1, persist-credentials: false}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with: {python-version: '3.12'}
+      - name: Execute substantive Gate 005
+        run: |
+          mkdir -p runtime/docs-rebuild
+          python scripts/qualify_wave7_substantive_gate_005.py --output runtime/docs-rebuild/wave7-substantive-gate-005.json | tee runtime/docs-rebuild/wave7-substantive-gate-005.log
+      - name: Validate Gate 005 invariants
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('runtime/docs-rebuild/wave7-substantive-gate-005.json').read_text())
+          assert d['records_evaluated']==2
+          assert d['counting']['machine_qualified_before']==76 and d['counting']['pending_p0_before']==373
+          assert 0<=d['records_machine_qualified']<=2
+          assert sorted(d['qualified_inventory_ids']+d['held_inventory_ids'])==['HC-0521','HC-0716']
+          assert d['counting']['machine_qualified_after']==76+d['records_machine_qualified']
+          assert d['counting']['pending_p0_after']==373-d['records_machine_qualified']
+          assert d['guardrails']['held_records_count_as_qualified'] is False
+          assert d['guardrails']['historical_body_recovery_claimed'] is False
+          assert d['guardrails']['terminal_disposition_self_authorized'] is False
+          for r in d['results']:
+              if r['machine_substantive_qualified']:
+                  assert r['candidate_flags']==[] and r['accepted_successor'] is not None
+                  assert r['accepted_successor']['body_characters']>=12000 and r['accepted_successor']['internal_link_count']>=4 and r['accepted_successor']['lexical_pass'] is True
+              else: assert r['hold_reasons']
+          print('PASS_WAVE7_SUBSTANTIVE_GATE_005_INVARIANTS')
+          PY
+      - name: Compare permanent Gate 005 receipt when present
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          pth=Path('developers/manifests/docs-wave7-substantive-gate-005.v1.json')
+          if not pth.exists(): print('NO_PERMANENT_GATE_005_RECEIPT_YET'); raise SystemExit(0)
+          d=json.loads(Path('runtime/docs-rebuild/wave7-substantive-gate-005.json').read_text()); p=json.loads(pth.read_text())
+          assert p['gate_id']==d['gate_id'] and p['gate_sha256']==d['gate_sha256']
+          assert p['qualified_inventory_ids']==d['qualified_inventory_ids'] and p['held_inventory_ids']==d['held_inventory_ids']
+          assert p['official_counts_after_gate']=={'machine_qualified_p0':d['counting']['machine_qualified_after'],'pending_p0':d['counting']['pending_p0_after']}
+          print('PASS_PERMANENT_WAVE7_GATE_005_RECEIPT')
+          PY
+      - name: Upload Gate 005 evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-wave7-substantive-gate-005-${{ github.run_id }}
+          path: runtime/docs-rebuild/
+          if-no-files-found: error
+          retention-days: 90
