@@ -1,0 +1,137 @@
+name: PentaSerialized Continuity Assurance
+
+on:
+  pull_request:
+    paths:
+      - 'penta/runtime/serialized/**'
+      - 'penta/registry/serialized-suite.json'
+      - 'penta/continuity/receipts/**'
+      - 'tests/test_penta_serialized.py'
+      - 'PENTA-SERIALIZED.md'
+      - 'PENTA-FAMILY-REGISTRY.md'
+      - 'docs/versioning/**'
+      - 'docs/phase3/**'
+      - 'docs/archive/**'
+      - 'standards/**'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'penta/runtime/serialized/**'
+      - 'penta/registry/serialized-suite.json'
+      - 'penta/continuity/receipts/**'
+      - 'tests/test_penta_serialized.py'
+      - 'PENTA-SERIALIZED.md'
+      - 'PENTA-FAMILY-REGISTRY.md'
+      - 'docs/versioning/**'
+      - 'docs/phase3/**'
+      - 'docs/archive/**'
+      - 'standards/**'
+      - '.github/workflows/**'
+  schedule:
+    - cron: '29 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-serialized-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  serialized-assurance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out CrownThrive Support with lineage
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Compile PentaSerialized
+        run: python -m compileall -q penta/runtime/serialized tests/test_penta_serialized.py
+
+      - name: Run PentaSerialized tests
+        run: python -m unittest -v tests.test_penta_serialized
+
+      - name: Exercise serialized mutation and recovery path
+        shell: bash
+        run: |
+          set -euo pipefail
+          store="${RUNNER_TEMP}/penta-serialized-smoke"
+          python -m penta.runtime.serialized init "$store" > "${RUNNER_TEMP}/init.json"
+          python -m penta.runtime.serialized put "$store" sample:record Generic 1.0.0 '{"value":1}' --actor ci --idempotency-key smoke-1 > "${RUNNER_TEMP}/create.json"
+          rev1="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["revision_id"])' "${RUNNER_TEMP}/create.json")"
+          python -m penta.runtime.serialized put "$store" sample:record Generic 1.1.0 '{"value":2}' --actor ci --reason 'smoke update' --expected-revision "$rev1" --idempotency-key smoke-2 > "${RUNNER_TEMP}/update.json"
+          rev2="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["revision_id"])' "${RUNNER_TEMP}/update.json")"
+          python -m penta.runtime.serialized tombstone "$store" sample:record --actor ci --reason 'smoke tombstone' --expected-revision "$rev2" --idempotency-key smoke-3 > "${RUNNER_TEMP}/tombstone.json"
+          tomb="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["revision_id"])' "${RUNNER_TEMP}/tombstone.json")"
+          python -m penta.runtime.serialized restore "$store" sample:record --actor ci --reason 'smoke restore' --expected-revision "$tomb" --idempotency-key smoke-4 > "${RUNNER_TEMP}/restore.json"
+          python -m penta.runtime.serialized verify "$store" > "${RUNNER_TEMP}/verify.json"
+          python -m penta.runtime.serialized snapshot "$store" --actor ci --reason 'smoke recovery baseline' > "${RUNNER_TEMP}/snapshot.json"
+          python -m penta.runtime.serialized doctor "$store" > "${RUNNER_TEMP}/doctor.json"
+
+      - name: Gate Git continuity receipts
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE"
+            head="$PR_HEAD"
+          else
+            base="$PUSH_BASE"
+            head="$PUSH_HEAD"
+          fi
+          python -m penta.runtime.serialized git-gate \
+            --repo . \
+            --base "$base" \
+            --head "$head" \
+            --policy penta/registry/serialized-suite.json \
+            > "${RUNNER_TEMP}/git-gate.json"
+
+      - name: Publish PentaStatus summary
+        if: always()
+        shell: bash
+        run: |
+          echo '## PentaSerialized continuity assurance' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Control plane: PentaSerialized v1.0.0' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Hard delete API: disabled/absent' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Mutation model: expected-revision + append-only hash chain + tombstones' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Git gate: deletions, renames, and protected modifications require continuity receipts' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "${RUNNER_TEMP}/verify.json" ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ['RUNNER_TEMP']) / 'verify.json'
+          d = json.loads(p.read_text())
+          print(f"- Runtime integrity: {d['status']}")
+          print(f"- Smoke events: {d['events']}")
+          print(f"- Smoke artifacts: {d['artifacts']}")
+          print(f"- Last event hash: `{d['last_event_hash']}`")
+          PY
+          fi
+          if [ -f "${RUNNER_TEMP}/git-gate.json" ]; then
+            python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ['RUNNER_TEMP']) / 'git-gate.json'
+          d = json.loads(p.read_text())
+          print(f"- Git continuity gate: {d['status']}")
+          print(f"- Continuity-controlled changes: {d['continuity_checked']}")
+          PY
+          fi
