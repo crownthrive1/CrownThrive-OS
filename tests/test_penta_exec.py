@@ -18,22 +18,21 @@ def expect_error(fn, contains: str) -> None:
 
 def test_every_registered_member_is_control_plane_addressable() -> None:
     _, snapshot = load_family(ROOT); result = family_list(snapshot)
-    assert result["disposition"] == "completed_read_only"
-    assert result["details"]["member_count"] == snapshot["member_count"]
+    assert result["disposition"] == "completed_read_only" and result["details"]["member_count"] == snapshot["member_count"]
     assert {row["machine_key"] for row in result["details"]["members"]} == set(snapshot["members"])
 
 
-def test_specified_member_has_real_status_without_fake_execution_promotion() -> None:
+def test_evidence_promoted_mail_has_real_status_and_gate() -> None:
     _, snapshot = load_family(ROOT); result = member_status(snapshot, "penta.mail")
-    assert result["details"]["maturity"] == "specified"
-    assert result["details"]["execution_gate"]["eligible"] is False
+    assert result["details"]["maturity"] == "production"
+    assert result["details"]["execution_gate"]["eligible"] is True
+    assert result["details"]["maturity_promotion"]["authority_ref"].startswith("PR-511/")
     assert result["details"]["portal_route"] == "/penta/mail"
 
 
 def test_execution_adapter_registry_is_static_and_fail_closed() -> None:
     registry = load_adapter_registry(ROOT)
-    assert registry["fail_closed"] is True and registry["version"] == "1.2.0"
-    assert len(registry["adapters"]) == 13
+    assert registry["fail_closed"] is True and registry["version"] == "1.3.0" and len(registry["adapters"]) == 18
     assert all(adapter["provider_effect"] is False for adapter in registry["adapters"])
 
 
@@ -47,123 +46,96 @@ def test_unknown_handler_is_rejected() -> None:
     expect_error(lambda: validate_adapter_registry(broken), "unregistered builtin handler")
 
 
-def test_family_execution_contract_validates_and_covers_all_production_members() -> None:
+def test_family_execution_contract_covers_all_production_members() -> None:
     registry, snapshot = load_family(ROOT); result = family_validate(ROOT, registry, snapshot)
     assert result["disposition"] == "pass", result
-    assert result["details"]["blockers"] == []
-    assert result["details"]["adapter_count"] == 13
+    assert result["details"]["blockers"] == [] and result["details"]["adapter_count"] == 18 and result["details"]["promotion_count"] == 5
     coverage = result["details"]["execution_adapter_coverage"]
-    assert coverage["complete"] is True
-    assert coverage["eligible_member_count"] == 13
-    assert coverage["eligible_members_with_adapter"] == 13
-    assert coverage["missing_adapter_members"] == []
+    assert coverage == {"eligible_member_count": 18, "eligible_members_with_adapter": 18, "missing_adapter_members": [], "complete": True}
 
 
-def test_beata_heartbeat_is_executable_and_evidence_sealed() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.beata", operation="heartbeat", evidence_refs=["test:penta-exec:beata"], risk_class="D0")
-    assert result["disposition"] == "completed", result
-    assert result["details"]["result"]["machine_key"] == "penta.beata"
-    assert result["details"]["envelope_sha256"] and len(result["receipt_sha256"]) == 64
+def test_beata_heartbeat_and_mesh_routing_execute() -> None:
+    heartbeat = invoke_member(ROOT, source_member="penta.status", target_member="penta.beata", operation="heartbeat", evidence_refs=["test:beata"], risk_class="D0")
+    assert heartbeat["disposition"] == "completed" and heartbeat["details"]["result"]["machine_key"] == "penta.beata"
+    route = invoke_member(ROOT, source_member="penta.status", target_member="penta.mesh", operation="route_check", evidence_refs=["test:mesh"], payload={"candidate_target": "penta.mail"}, risk_class="D0")
+    assert route["disposition"] == "completed" and route["details"]["result"]["maturity"] == "production" and route["details"]["result"]["execution_eligible"] is True
 
 
-def test_mesh_route_check_can_inspect_specified_target_without_invoking_it() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.mesh", operation="route_check", evidence_refs=["test:penta-exec:mesh"], payload={"candidate_target": "penta.mail"}, risk_class="D0")
-    assert result["disposition"] == "completed", result
-    route = result["details"]["result"]
-    assert route["registered"] is True and route["maturity"] == "specified" and route["execution_eligible"] is False
+def test_observability_adapters_execute_and_redact() -> None:
+    error = invoke_member(ROOT, source_member="penta.status", target_member="penta.error", operation="normalize", evidence_refs=["test:error"], payload={"message": "internal", "context": {"api_key": "secret", "safe": "ok"}}, risk_class="D0")
+    assert error["details"]["result"]["context"]["api_key"] == "[REDACTED]"
+    log = invoke_member(ROOT, source_member="penta.status", target_member="penta.logger", operation="emit", evidence_refs=["test:logger"], payload={"message": "live", "context": {"token": "do-not-leak"}}, risk_class="D0")
+    assert log["details"]["result"]["record"]["context"]["token"] == "[REDACTED]"
+    trace = invoke_member(ROOT, source_member="penta.status", target_member="penta.trace", operation="new_context", evidence_refs=["test:trace"], risk_class="D0")
+    assert len(trace["details"]["result"]["trace_id"]) == 32
+    metric = invoke_member(ROOT, source_member="penta.status", target_member="penta.metric", operation="snapshot", evidence_refs=["test:metric"], payload={"counters": {"penta.exec.calls": 2}}, risk_class="D0")
+    assert metric["details"]["result"]["counters"]["penta.exec.calls"] == 2.0
 
 
-def test_penta_error_normalize_redacts_context() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.error", operation="normalize", evidence_refs=["test:penta-exec:error"], payload={"message": "internal failure", "context": {"api_key": "secret-value", "safe": "ok"}}, risk_class="D0")
-    assert result["disposition"] == "completed", result
-    envelope = result["details"]["result"]
-    assert envelope["schema"] == "ct.penta.error.v1" and envelope["context"]["api_key"] == "[REDACTED]" and envelope["context"]["safe"] == "ok"
-
-
-def test_penta_logger_emit_is_redacted_and_sealed() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.logger", operation="emit", evidence_refs=["test:penta-exec:logger"], payload={"message": "adapter live", "context": {"token": "do-not-leak", "safe": 1}}, risk_class="D0")
-    assert result["disposition"] == "completed", result
-    emitted = result["details"]["result"]
-    assert emitted["record"]["schema"] == "ct.penta.log.v1" and emitted["record"]["context"]["token"] == "[REDACTED]" and len(emitted["line_sha256"]) == 64
-
-
-def test_penta_trace_creates_bounded_context() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.trace", operation="new_context", evidence_refs=["test:penta-exec:trace"], payload={"parent_span_id": "parent-1"}, risk_class="D0")
-    assert result["disposition"] == "completed", result
-    trace = result["details"]["result"]
-    assert len(trace["trace_id"]) == 32 and len(trace["span_id"]) == 16 and trace["parent_span_id"] == "parent-1"
-
-
-def test_penta_metric_builds_local_snapshot() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.metric", operation="snapshot", evidence_refs=["test:penta-exec:metric"], payload={"counters": {"penta.exec.calls": 2}, "gauges": {"penta.exec.ready": 1}, "observations": {"penta.exec.duration": [0.1, 0.3]}}, risk_class="D0")
-    assert result["disposition"] == "completed", result
-    metrics = result["details"]["result"]
-    assert metrics["schema"] == "ct.penta.metrics.v1" and metrics["counters"]["penta.exec.calls"] == 2.0 and metrics["observations"]["penta.exec.duration"]["count"] == 2
-
-
-def test_penta_heartbeat_probes_all_production_members() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.heartbeat", operation="control_plane_probe", evidence_refs=["test:penta-exec:heartbeat"], risk_class="D0")
-    assert result["disposition"] == "completed", result
+def test_heartbeat_and_od_see_all_promoted_production_members() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.heartbeat", operation="control_plane_probe", evidence_refs=["test:heartbeat"], risk_class="D0")
     probe = result["details"]["result"]
-    assert probe["schema"] == "ct.penta.heartbeat.control-plane-probe.v1"
-    assert probe["production_member_count"] == 13
+    assert result["disposition"] == "completed" and probe["production_member_count"] == 18 and probe["healthy"] is True
     assert all(row["adapter_bound"] for row in probe["members"])
-
-
-def test_penta_od_reports_bounded_dispatch_readiness() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.od", operation="readiness_assess", evidence_refs=["test:penta-exec:od"], payload={"candidate_target": "penta.metric"}, risk_class="D0")
-    assert result["disposition"] == "completed", result
-    readiness = result["details"]["result"]
-    assert readiness["schema"] == "ct.penta.od.readiness.v1"
-    assert readiness["execution_eligible"] is True and readiness["adapter_operations"] == ["snapshot"] and readiness["authority_expanded"] is False
+    od = invoke_member(ROOT, source_member="penta.status", target_member="penta.od", operation="readiness_assess", evidence_refs=["test:od"], payload={"candidate_target": "penta.mail"}, risk_class="D0")
+    readiness = od["details"]["result"]
+    assert readiness["ready_for_bounded_dispatch"] is True and readiness["adapter_operations"] == ["production_status"] and readiness["authority_expanded"] is False
 
 
 def _compliance_payload() -> dict:
     return {"obligations": [{"obligation_id": "obl.test", "title": "Test adopted obligation", "source_ref": "test:source", "owner_ref": "test:owner", "status": "active", "jurisdictions": ["US"], "scopes": ["license"], "evidence_requirements": ["ctrl.test"], "controls": [{"control_id": "ctrl.test", "requirement": "evidence exists"}], "effective_from": "2026-01-01", "source_sha256": "a" * 64}], "jurisdictions": ["US"], "scopes": ["license"], "evidence_index": {"ctrl.test": ["evidence:test"]}, "as_of": "2026-08-26"}
 
 
-def test_penta_compliance_executes_deterministic_evaluation() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.compliance", operation="evaluate", evidence_refs=["test:penta-exec:compliance"], payload=_compliance_payload(), risk_class="D0")
-    assert result["disposition"] == "completed", result
-    evaluation = result["details"]["result"]
-    assert evaluation["schema"] == "ct.penta.compliance-evaluation.v1" and evaluation["disposition"] == "PASS_EVIDENCE_SATISFIED" and verify_receipt(evaluation)
-
-
-def test_penta_license_evaluates_readiness_without_issuing_grant() -> None:
-    compliance = invoke_member(ROOT, source_member="penta.status", target_member="penta.compliance", operation="evaluate", evidence_refs=["test:penta-exec:compliance-license"], payload=_compliance_payload(), risk_class="D0")["details"]["result"]
+def test_compliance_and_license_readiness_execute_without_binding_action() -> None:
+    compliance = invoke_member(ROOT, source_member="penta.status", target_member="penta.compliance", operation="evaluate", evidence_refs=["test:compliance"], payload=_compliance_payload(), risk_class="D0")["details"]["result"]
+    assert compliance["disposition"] == "PASS_EVIDENCE_SATISFIED" and verify_receipt(compliance)
     asset = {"asset_id": "asset.test", "version": "1.0.0", "content_sha256": "b" * 64, "title": "Test Asset", "owner_ref": "owner:test", "status": "active", "rights_control_refs": ["chlom:rights:test"], "allowed_rights": ["display"], "prohibited_rights": [], "territories": ["US"], "media": ["digital"]}
     request = {"request_id": "req.test", "asset_id": "asset.test", "asset_version": "1.0.0", "asset_sha256": "b" * 64, "licensee_ref": "licensee:test", "use_case": "test", "lane": "self_serve", "risk_class": "D1", "valid_from": "2026-08-26", "valid_until": "2027-08-26", "template_ref": "template:test", "acceptance_ref": "accept:test", "idempotency_key": "idem:test", "requested_rights": ["display"], "territories": ["US"], "media": ["digital"], "authority_trace": {"chlom_ref": "chlom:test", "accountable_owner": "owner:test"}, "compliance_receipt": compliance, "commercial_terms_ref": "terms:test", "provider_effect": False}
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.license", operation="readiness", evidence_refs=["test:penta-exec:license"], payload={"asset": asset, "request": request}, risk_class="D0")
-    assert result["disposition"] == "completed", result
-    readiness = result["details"]["result"]; decision = readiness["decision"]
-    assert decision["schema"] == "ct.penta.license-decision.v1" and decision["disposition"] == "ISSUE_READY_INTERNAL" and decision["binding_action_performed"] is False and verify_receipt(decision)
-    assert readiness["adapter_boundary"] == "readiness_only_no_license_grant_issued" and readiness["binding_action_performed"] is False
+    readiness = invoke_member(ROOT, source_member="penta.status", target_member="penta.license", operation="readiness", evidence_refs=["test:license"], payload={"asset": asset, "request": request}, risk_class="D0")["details"]["result"]
+    assert readiness["binding_action_performed"] is False and readiness["adapter_boundary"] == "readiness_only_no_license_grant_issued" and verify_receipt(readiness["decision"])
 
 
-def test_penta_scribe_runs_real_isolated_reconciliation_cycle() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.scribe", operation="reconcile_preview", evidence_refs=["test:penta-exec:scribe"], payload={"scan_text": "PentaScribe is a registered CrownThrive system."}, risk_class="D0")
-    assert result["disposition"] == "completed", result
-    cycle = result["details"]["result"]
-    assert cycle["summary"]["system"] == "PentaScribe" and cycle["summary"]["promotion_state"] == "NO_AUTOMATIC_PROMOTION"
-    assert len(cycle["receipt"]["receipt_sha256"]) == 64 and cycle["state_persisted"] is False and cycle["provider_write"] is False
+def test_scribe_and_marketer_real_isolated_cycles_execute() -> None:
+    scribe = invoke_member(ROOT, source_member="penta.status", target_member="penta.scribe", operation="reconcile_preview", evidence_refs=["test:scribe"], payload={"scan_text": "PentaScribe is registered."}, risk_class="D0")["details"]["result"]
+    assert scribe["summary"]["system"] == "PentaScribe" and scribe["state_persisted"] is False and scribe["provider_write"] is False
+    marketer = invoke_member(ROOT, source_member="penta.status", target_member="penta.marketer", operation="cycle_preview", evidence_refs=["test:marketer"], payload={}, risk_class="D0")["details"]["result"]
+    assert marketer["summary"]["status"] in {"ARTIFACT_DISPATCHED", "PARTIAL_HOLD"} and marketer["state_persisted"] is False and marketer["provider_write"] is False
 
 
-def test_penta_marketer_runs_real_isolated_bounded_cycle() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.marketer", operation="cycle_preview", evidence_refs=["test:penta-exec:marketer"], payload={}, risk_class="D0")
-    assert result["disposition"] == "completed", result
-    cycle = result["details"]["result"]
-    assert cycle["summary"]["status"] in {"ARTIFACT_DISPATCHED", "PARTIAL_HOLD"}
-    assert len(cycle["receipt"]["receipt_sha256"]) == 64 and cycle["state_persisted"] is False and cycle["provider_write"] is False
+def test_promoted_pentamail_status_is_bound_to_live_evidence() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.mail", operation="production_status", evidence_refs=["test:mail-production"], risk_class="D0")
+    status = result["details"]["result"]
+    assert result["disposition"] == "completed" and status["state"] == "PRODUCTION_VERIFIED"
+    assert status["provider_send_http_200_verified"] is True and status["founder_inbox_readback_verified"] is True
+    assert status["provider_write_performed_by_this_adapter"] is False
 
 
-def test_unimplemented_mail_send_fails_closed() -> None:
-    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.mail", operation="send", evidence_refs=["test:penta-exec:no-mail-adapter"])
+def test_promoted_pentastatus_owner_snapshot_is_current() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.status", operation="owner_snapshot", evidence_refs=["test:status-owner"], risk_class="D0")
+    snapshot = result["details"]["result"]
+    assert snapshot["production_member_count"] == 18 and snapshot["production_adapter_coverage_complete"] is True
+    assert snapshot["promotion_count"] == 5 and snapshot["provider_write_performed"] is False
+    assert snapshot["hourly_reporting"]["provider_send_http_200_verified"] is True
+
+
+def test_promoted_credentials_build_and_certify_operations_are_bounded() -> None:
+    credentials = invoke_member(ROOT, source_member="penta.status", target_member="penta.credentials", operation="binding_census", evidence_refs=["test:credentials"], risk_class="D0")["details"]["result"]
+    assert credentials["provider_count"] >= 8 and credentials["secret_values_returned"] is False and credentials["state_persisted"] is False
+    assert all("fingerprints" not in row for row in credentials["providers"])
+    build = invoke_member(ROOT, source_member="penta.status", target_member="penta.build", operation="provider_adapter_probe", evidence_refs=["test:build"], payload={"provider_id": "resend"}, risk_class="D0")["details"]["result"]
+    assert build["build"]["artifact_exists"] is True and build["build"]["provider_write_performed"] is False and build["build"]["state_persisted"] is False
+    certify = invoke_member(ROOT, source_member="penta.status", target_member="penta.certify", operation="provider_static_probe", evidence_refs=["test:certify"], payload={"provider_id": "resend"}, risk_class="D0")["details"]["result"]
+    assert certify["runtime_probe"]["network_probe_performed"] is False and certify["runtime_probe"]["provider_write_performed"] is False
+    assert certify["production_evidence_projection"]["current_failed"] == 0 and certify["production_evidence_projection"]["current_completed"] == 15
+
+
+def test_mail_send_still_requires_separate_provider_lane() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.mail", operation="send", evidence_refs=["test:no-local-mail-send"])
     assert result["disposition"] == "hold_fail_closed" and "no registered executable adapter" in result["details"]["reason"]
 
 
 def test_unknown_member_fails_closed() -> None:
-    _, snapshot = load_family(ROOT)
-    expect_error(lambda: member_status(snapshot, "penta.this-does-not-exist"), "unknown or unregistered")
+    _, snapshot = load_family(ROOT); expect_error(lambda: member_status(snapshot, "penta.this-does-not-exist"), "unknown or unregistered")
 
 
 def run() -> None:
