@@ -1,11 +1,13 @@
 import importlib.util
 from pathlib import Path
+import sys
 import unittest
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "runtime" / "penta_context.py"
 SPEC = importlib.util.spec_from_file_location("penta_context", MODULE_PATH)
 assert SPEC and SPEC.loader
 penta_context = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = penta_context
 SPEC.loader.exec_module(penta_context)
 
 
