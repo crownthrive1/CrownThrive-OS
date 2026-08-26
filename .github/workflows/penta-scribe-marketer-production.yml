@@ -9,6 +9,7 @@ on:
       - 'penta/runtime/**'
       - 'tests/test_penta_production_runtime.py'
       - 'tests/test_penta_federated_semantics.py'
+      - 'tests/test_penta_federation_governance.py'
       - '.github/workflows/penta-scribe-marketer-production.yml'
   schedule:
     - cron: '23 * * * *'
@@ -34,19 +35,23 @@ jobs:
         run: |
           python -m py_compile penta/runtime/evidence.py
           python -m py_compile penta/scribe/pentascribe.py
+          python -m py_compile penta/scribe/federation_governance.py
           python -m py_compile penta/scribe/runtime.py
           python -m py_compile penta/marketer/pentamarketer.py
           python -m py_compile penta/marketer/runtime.py
+      - name: Verify federation authority before production
+        run: python penta/scribe/federation_governance.py audit --out /tmp/pentascribe-federation-audit.json
       - name: Verify production runtime contracts
         run: |
           python -m unittest discover -s tests -p 'test_penta_production_runtime.py' -v
           python -m unittest discover -s tests -p 'test_penta_federated_semantics.py' -v
-      - name: Run PentaScribe federated production reconciliation cycle
+          python -m unittest discover -s tests -p 'test_penta_federation_governance.py' -v
+      - name: Run PentaScribe governed federated production reconciliation cycle
         run: |
           python penta/scribe/runtime.py cycle \
             --state-root /tmp/pentascribe-production \
             --authority-ref chlom:penta.scribe:production-control-plane
-      - name: Run PentaMarketer federated bounded production cycle
+      - name: Run PentaMarketer governed federated bounded production cycle
         run: |
           python penta/marketer/runtime.py cycle \
             --campaign penta/marketer/campaign.example.json \
@@ -56,6 +61,7 @@ jobs:
         with:
           name: penta-scribe-marketer-production-${{ github.run_id }}
           path: |
+            /tmp/pentascribe-federation-audit.json
             /tmp/pentascribe-production/
             /tmp/pentamarketer-production/
           if-no-files-found: error
