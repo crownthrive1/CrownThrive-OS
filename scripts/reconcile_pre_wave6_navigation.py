@@ -4,7 +4,18 @@
 The filename is retained for backward compatibility with the navigation-governance
 workflow introduced before substantive Wave 6. The contract is cumulative: every
 new governed substantive wave must extend REQUIRED rather than allowing prior
-routes to fall out of Mintlify navigation.
+routes to fall out of PentaDocs navigation.
+
+PentaDocs has used two valid Mintlify tab shapes over its lifetime:
+
+1. tabs with a top-level ``groups`` array; and
+2. tabs with a ``pages`` array containing group objects (plus, optionally,
+   standalone page routes).
+
+This validator accepts both shapes while preserving the same cumulative route
+continuity guarantees. It does not force the current Production + Convergence
+navigation back into a historical representation merely to satisfy an old
+validator assumption.
 """
 from __future__ import annotations
 
@@ -66,8 +77,30 @@ def tab(data: dict[str, Any], name: str) -> dict[str, Any]:
     raise KeyError(f"missing navigation tab: {name}")
 
 
+def navigation_items(tab_obj: dict[str, Any]) -> list[Any]:
+    """Return the mutable container that owns group objects for a tab."""
+    groups = tab_obj.get("groups")
+    if isinstance(groups, list):
+        return groups
+    pages = tab_obj.get("pages")
+    if isinstance(pages, list):
+        return pages
+    raise KeyError(
+        f"navigation tab {tab_obj.get('tab')!r} has neither a groups nor pages array"
+    )
+
+
+def group_items(tab_obj: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return only group objects, ignoring standalone page routes."""
+    return [
+        item
+        for item in navigation_items(tab_obj)
+        if isinstance(item, dict) and isinstance(item.get("group"), str)
+    ]
+
+
 def group(tab_obj: dict[str, Any], name: str) -> dict[str, Any]:
-    for item in tab_obj.get("groups", []):
+    for item in group_items(tab_obj):
         if item.get("group") == name:
             return item
     raise KeyError(f"missing navigation group {name!r} in tab {tab_obj.get('tab')!r}")
@@ -89,17 +122,32 @@ def reconcile(data: dict[str, Any]) -> int:
                     pages.append(route)
                     added += 1
 
+    # Keep Changelog and Decisions the final *group* without moving or deleting
+    # any standalone page routes that a tab may intentionally contain.
     crown_tab = tab(data, "CrownThrive OS")
-    groups = crown_tab["groups"]
+    items = navigation_items(crown_tab)
     changelog_index = next(
-        (i for i, item in enumerate(groups) if item.get("group") == "Changelog and Decisions"),
+        (
+            i
+            for i, item in enumerate(items)
+            if isinstance(item, dict) and item.get("group") == "Changelog and Decisions"
+        ),
         None,
     )
     if changelog_index is None:
         raise KeyError("missing Changelog and Decisions group")
-    if changelog_index != len(groups) - 1:
-        changelog = groups.pop(changelog_index)
-        groups.append(changelog)
+
+    later_group_indexes = [
+        i
+        for i, item in enumerate(items)
+        if i > changelog_index and isinstance(item, dict) and item.get("group")
+    ]
+    if later_group_indexes:
+        changelog = items.pop(changelog_index)
+        last_group_index = max(
+            i for i, item in enumerate(items) if isinstance(item, dict) and item.get("group")
+        )
+        items.insert(last_group_index + 1, changelog)
     return added
 
 
@@ -127,7 +175,7 @@ def validate(data: dict[str, Any]) -> list[str]:
                     errors.append(f"required backing page missing: {route}")
 
     try:
-        crown_groups = tab(data, "CrownThrive OS")["groups"]
+        crown_groups = group_items(tab(data, "CrownThrive OS"))
     except KeyError as exc:
         errors.append(str(exc))
     else:
