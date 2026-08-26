@@ -1,0 +1,107 @@
+name: PentaRelease — Comprehensive Historical Backfill
+
+on:
+  schedule:
+    - cron: '17 5 * * 0'
+  workflow_dispatch:
+    inputs:
+      max_releases:
+        description: "Maximum published releases to reconcile."
+        required: false
+        default: "20"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pentarelease-comprehensive-historical-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current PentaRelease engine
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate backfill engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool .pentarelease/policy.json >/dev/null
+          python3 -m py_compile scripts/pentarelease/release_surface.py
+
+      - name: Backfill missing comprehensive release surfaces
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_MAX: ${{ github.event.inputs.max_releases }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAX="${REQUESTED_MAX:-20}"
+          if ! [[ "$MAX" =~ ^[0-9]+$ ]] || [ "$MAX" -lt 1 ] || [ "$MAX" -gt 100 ]; then
+            echo "Invalid max_releases=$MAX; expected 1..100." >&2
+            exit 2
+          fi
+
+          mapfile -t TAGS < <(
+            gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit "$MAX" --json tagName --jq '.[].tagName'
+          )
+
+          repaired=0
+          verified=0
+          for TAG in "${TAGS[@]}"; do
+            READBACK=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body,url)
+            READY=$(echo "$READBACK" | jq '
+              (.body | contains("pentarelease:comprehensive-release:start")) and
+              ([.assets[].name] as $n |
+                ["PENTARELEASE_COMPREHENSIVE_RELEASE.md","PENTARELEASE_RELEASE_RECORD.json","PENTARELEASE_COSTS.json","PENTARELEASE_CIE_SCORE.json","PENTARELEASE_DATA_CATALOG.json","PENTARELEASE_EVIDENCE.json","PENTARELEASE_FAQ.md","PENTARELEASE_CHANGELOG.md"]
+                | all(. as $x | $n | index($x)))
+            ')
+            if [ "$READY" = "true" ]; then
+              echo "$TAG already comprehensive."
+              verified=$((verified+1))
+              continue
+            fi
+
+            echo "Backfilling $TAG"
+            rm -rf /tmp/pentarelease-source "dist/pentarelease-backfill"
+            mkdir -p /tmp/pentarelease-source "dist/pentarelease-backfill"
+
+            for NAME in MANIFEST.json RELEASE_NOTES.md COSTS.json PENTARELEASE_COSTS.json; do
+              gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$NAME" --dir /tmp/pentarelease-source --clobber || true
+            done
+
+            python3 scripts/pentarelease/release_surface.py \
+              --repository "$GITHUB_REPOSITORY" \
+              --tag "$TAG" \
+              --policy .pentarelease/policy.json \
+              --source-dir /tmp/pentarelease-source \
+              --outdir dist/pentarelease-backfill \
+              --no-sync-repository
+
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" dist/pentarelease-backfill/* --clobber
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --notes-file dist/pentarelease-backfill/PENTARELEASE_COMPREHENSIVE_RELEASE.md
+
+            AFTER=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body,url)
+            echo "$AFTER" | jq -e '.body | contains("pentarelease:comprehensive-release:start")' >/dev/null
+            for EXPECTED in PENTARELEASE_COMPREHENSIVE_RELEASE.md PENTARELEASE_RELEASE_RECORD.json PENTARELEASE_COSTS.json PENTARELEASE_CIE_SCORE.json PENTARELEASE_DATA_CATALOG.json PENTARELEASE_EVIDENCE.json PENTARELEASE_FAQ.md PENTARELEASE_CHANGELOG.md; do
+              echo "$AFTER" | jq -e --arg n "$EXPECTED" '.assets[] | select(.name == $n)' >/dev/null
+            done
+            repaired=$((repaired+1))
+          done
+
+          {
+            echo '## PentaRelease comprehensive historical backfill'
+            echo
+            echo "- Releases examined: ${#TAGS[@]}"
+            echo "- Already comprehensive: $verified"
+            echo "- Backfilled: $repaired"
+            echo "- Direct costs/CIE scores: never fabricated when release-linked values are absent"
+          } >> "$GITHUB_STEP_SUMMARY"
