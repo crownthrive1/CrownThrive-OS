@@ -8,14 +8,6 @@ on:
         description: 'Authorized PentaMail certification recipient'
         required: false
         default: 'jones.usmc.kj@gmail.com'
-      runner_mode:
-        description: 'Trusted execution fabric'
-        required: true
-        type: choice
-        options:
-          - self-hosted
-          - github-hosted
-        default: self-hosted
   push:
     branches: [main]
     paths:
@@ -34,11 +26,10 @@ concurrency:
 
 jobs:
   certify-send-readback:
-    # A tagged trusted main push uses GitHub-hosted bootstrap capacity. Manual
-    # production certification defaults to the isolated PentaFabric/RTC runner.
-    # Never add pull_request to this secret-bearing provider workflow.
+    # Current fail-closed runtime policy permits only the attested literal
+    # GitHub-hosted label. Never add pull_request to this secret-bearing workflow.
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[pentamail-live-certify]')
-    runs-on: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.runner_mode == 'self-hosted') && '["self-hosted","linux","x64","crownthrive","pentafabric","rtc","trusted","pentamail"]' || '["ubuntu-latest"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
