@@ -6,8 +6,10 @@ on:
       - "data/penta/**"
       - "schemas/penta/**"
       - "runtime/penta_institutional_services.py"
+      - "runtime/penta_institutional_controls.py"
       - "runtime/penta_family.py"
       - "tests/test_penta_institutional_services.py"
+      - "tests/test_penta_institutional_controls.py"
       - "tests/test_penta_family.py"
       - "automation/penta-family*.mdx"
       - "docs/phase3/PENTA_INSTITUTIONAL_OPERATING_FABRIC_v1.2.md"
@@ -19,8 +21,10 @@ on:
       - "data/penta/**"
       - "schemas/penta/**"
       - "runtime/penta_institutional_services.py"
+      - "runtime/penta_institutional_controls.py"
       - "runtime/penta_family.py"
       - "tests/test_penta_institutional_services.py"
+      - "tests/test_penta_institutional_controls.py"
       - "tests/test_penta_family.py"
       - "automation/penta-family*.mdx"
       - "docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v*.md"
@@ -62,7 +66,11 @@ jobs:
       - name: Compile governance runtimes
         run: |
           python -m py_compile runtime/penta_institutional_services.py
+          python -m py_compile runtime/penta_institutional_controls.py
           python -m py_compile runtime/penta_family.py
+
+      - name: Smoke test institutional controls runtime
+        run: python runtime/penta_institutional_controls.py >/dev/null
 
       - name: Verify Penta Family census snapshot
         run: python runtime/penta_family.py --root .
@@ -77,8 +85,11 @@ jobs:
           python runtime/penta_family.py --root . --member penta.identity --portal >/dev/null
           python runtime/penta_family.py --root . --member penta.procure --portal >/dev/null
 
-      - name: Run authority-boundary tests
+      - name: Run institutional service authority-boundary tests
         run: python tests/test_penta_institutional_services.py
+
+      - name: Run institutional control authority-boundary tests
+        run: python tests/test_penta_institutional_controls.py
 
       - name: Run Penta Family production-contract tests
         run: python tests/test_penta_family.py
