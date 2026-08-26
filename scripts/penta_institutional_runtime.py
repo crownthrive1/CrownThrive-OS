@@ -291,7 +291,7 @@ def _self_test() -> dict[str, Any]:
         "quorum_required": 2,
         "participants": ["ctid:a", "ctid:b"],
         "disposition": "approved",
-        "override_reason": null,
+        "override_reason": None,
         "receipts": ["dail:decision-1"]
     }
     decision_result = evaluate_hybrid_decision(decision, charter_result, 2)
