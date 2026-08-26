@@ -1,0 +1,72 @@
+name: Penta Family of Families
+
+on:
+  pull_request:
+    paths:
+      - "PENTA-FAMILY-REGISTRY.md"
+      - "PENTA-FAMILIES.md"
+      - "data/penta/**"
+      - "penta/registry/**"
+      - "penta/families/**"
+      - "schemas/penta/penta-families.schema.json"
+      - "runtime/penta_families.py"
+      - "tests/test_penta_families.py"
+      - "docs/phase3/PENTA_FAMILY_OF_FAMILIES_PRODUCTION_CONTRACT_v1.0.md"
+      - ".github/workflows/penta-family-of-families.yml"
+  push:
+    branches: [main]
+    paths:
+      - "PENTA-FAMILY-REGISTRY.md"
+      - "PENTA-FAMILIES.md"
+      - "data/penta/**"
+      - "penta/registry/**"
+      - "penta/families/**"
+      - "schemas/penta/penta-families.schema.json"
+      - "runtime/penta_families.py"
+      - "tests/test_penta_families.py"
+      - "docs/phase3/PENTA_FAMILY_OF_FAMILIES_PRODUCTION_CONTRACT_v1.0.md"
+      - ".github/workflows/penta-family-of-families.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-families-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify complete Penta family topology
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate family registry and schema JSON
+        run: |
+          python -m json.tool penta/registry/penta-families.v1.json >/dev/null
+          python -m json.tool schemas/penta/penta-families.schema.json >/dev/null
+
+      - name: Compile family runtime and tests
+        run: |
+          python -m py_compile runtime/penta_families.py
+          python -m py_compile tests/test_penta_families.py
+
+      - name: Verify exhaustive discovery and family portal index
+        run: python runtime/penta_families.py --root . --portal-index
+
+      - name: Verify representative family portals
+        run: |
+          python runtime/penta_families.py --root . --family system-architecture
+          python runtime/penta_families.py --root . --family security-trust
+          python runtime/penta_families.py --root . --family commerce-economy
+
+      - name: Run family-of-families regression suite
+        run: python tests/test_penta_families.py
