@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0.0",
+  "registry_id": "crownthrive.penta.systems.extensions.observability",
+  "status_vocabulary": ["specified", "implemented", "certified", "production", "hold", "retired"],
+  "authority_invariant": "Observability records and evaluates execution evidence but never manufactures provider, security, legal, economic, deployment, or governance authority.",
+  "systems": [
+    {
+      "machine_key": "penta.error",
+      "canonical_name": "PentaError",
+      "aliases": [],
+      "category": "error_governance",
+      "purpose": "Canonical typed error taxonomy, safe error envelopes, retryability classification, normalization, and dead-letter evidence across PENTA runtimes.",
+      "human_surface": "Runtime error evidence, incident diagnostics, and operator-safe failure readback",
+      "authority_boundary": "May classify and serialize failures but cannot authorize retries, provider writes, rollback, or remediation beyond already-granted policy.",
+      "risk_ceiling": "D2",
+      "maturity": "production",
+      "dependencies": ["penta.trace", "penta.docs"],
+      "five_stage": {"discover": "Capture the concrete exception, operation, trace, and bounded context.", "govern": "Apply error code, severity, safety, retryability, and redaction policy.", "execute": "Normalize the failure into a canonical PentaError envelope.", "verify": "Validate schema, redaction, trace linkage, retry semantics, and safe/public messaging.", "preserve": "Retain error evidence through registered logging, dead-letter, status, and archive paths."}
+    },
+    {
+      "machine_key": "penta.logger",
+      "canonical_name": "PentaLogger",
+      "aliases": [],
+      "category": "structured_logging",
+      "purpose": "Structured JSON-line logging with severity controls, trace correlation, contextual child loggers, mandatory secret redaction, and normalized exception evidence.",
+      "human_surface": "Machine-readable operational logs and operator diagnostics",
+      "authority_boundary": "Emits evidence only; log emission does not create execution, notification, retention, or external-provider authority.",
+      "risk_ceiling": "D1",
+      "maturity": "production",
+      "dependencies": ["penta.error", "penta.trace", "penta.docs"],
+      "five_stage": {"discover": "Resolve service/member identity, trace context, severity, event, and bounded fields.", "govern": "Apply redaction, minimum severity, safe error, and environment policy.", "execute": "Emit deterministic structured JSON evidence to the configured local sink.", "verify": "Parse output and prove required schema, trace, redaction, and level behavior.", "preserve": "Hand structured evidence to separately authorized storage, status, audit, or alert routes."}
+    },
+    {
+      "machine_key": "penta.trace",
+      "canonical_name": "PentaTrace",
+      "aliases": [],
+      "category": "execution_correlation",
+      "purpose": "Trace, correlation, span, parent-span, and scoped context propagation across bounded PENTA operations.",
+      "human_surface": "Cross-runtime execution lineage and correlation evidence",
+      "authority_boundary": "Correlation identifies lineage only and never expands the caller's capability or authority.",
+      "risk_ceiling": "D1",
+      "maturity": "production",
+      "dependencies": ["penta.docs"],
+      "five_stage": {"discover": "Resolve or create trace and correlation context.", "govern": "Preserve lineage boundaries and avoid embedding secret material in identifiers.", "execute": "Bind scoped context and create child spans where required.", "verify": "Confirm parent/child trace continuity and deterministic correlation propagation.", "preserve": "Attach trace evidence to logs, errors, metrics, receipts, and dead-letter payloads."}
+    },
+    {
+      "machine_key": "penta.metric",
+      "canonical_name": "PentaMetric",
+      "aliases": ["PentaMetrics"],
+      "category": "runtime_metrics",
+      "purpose": "Thread-safe local counters, gauges, duration observations, and deterministic metric snapshots for PENTA runtime evidence.",
+      "human_surface": "Runtime health and performance measurements",
+      "authority_boundary": "Collects local metric evidence only; external export or alerting requires a separately certified provider route.",
+      "risk_ceiling": "D1",
+      "maturity": "production",
+      "dependencies": ["penta.trace", "penta.docs"],
+      "five_stage": {"discover": "Resolve metric name, type, value, operation, and runtime context.", "govern": "Validate metric names and bounded numeric semantics.", "execute": "Record counters, gauges, observations, and timers locally.", "verify": "Produce deterministic snapshots and validate count/sum/min/max/average semantics.", "preserve": "Expose snapshots to separately authorized telemetry, assurance, and status lanes."}
+    }
+  ]
+}

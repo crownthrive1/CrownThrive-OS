@@ -1,0 +1,72 @@
+name: Penta Observability Production
+
+on:
+  pull_request:
+    paths:
+      - runtime/penta_observability.py
+      - runtime/penta_error.py
+      - runtime/penta_logger.py
+      - runtime/penta_trace.py
+      - runtime/penta_metric.py
+      - tests/test_penta_observability.py
+      - data/penta/systems.extensions.observability.json
+      - PENTA-OBSERVABILITY-SUITE.md
+      - .github/workflows/penta-observability-production.yml
+  push:
+    branches:
+      - main
+    paths:
+      - runtime/penta_observability.py
+      - runtime/penta_error.py
+      - runtime/penta_logger.py
+      - runtime/penta_trace.py
+      - runtime/penta_metric.py
+      - tests/test_penta_observability.py
+      - data/penta/systems.extensions.observability.json
+      - PENTA-OBSERVABILITY-SUITE.md
+      - .github/workflows/penta-observability-production.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-observability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    name: Certify Penta observability
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run unit and compatibility tests
+        run: |
+          python -m unittest -v tests/test_penta_observability.py tests/test_penta_runtime_suite.py
+
+      - name: Run built-in observability self-test
+        run: python runtime/penta_observability.py --self-test
+
+      - name: Verify Penta Runtime Suite production gates
+        run: |
+          python runtime/penta_runtime_suite.py --root . --gate penta.error
+          python runtime/penta_runtime_suite.py --root . --gate penta.logger
+          python runtime/penta_runtime_suite.py --root . --gate penta.trace
+          python runtime/penta_runtime_suite.py --root . --gate penta.metric
+
+      - name: Compile runtime surfaces
+        run: |
+          python -m py_compile \
+            runtime/penta_observability.py \
+            runtime/penta_error.py \
+            runtime/penta_logger.py \
+            runtime/penta_trace.py \
+            runtime/penta_metric.py
