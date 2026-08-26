@@ -1,0 +1,52 @@
+{
+  "schema": "ct.penta.hourly-update-governance.v1",
+  "manifest_id": "ct.penta.hourly-updates.v1",
+  "version": "1.0.0",
+  "state": "PRODUCTION",
+  "mandatory": true,
+  "delivery": {
+    "recipient": "jones.usmc.kj@gmail.com",
+    "cron": "0 * * * *",
+    "report": "State Architecture Report",
+    "delivery_system": "PentaMail",
+    "immediate_severities": ["CRITICAL", "HIGH"]
+  },
+  "source_routing": {
+    "dispatch": "PentaOD",
+    "heartbeat": "PentaHeartbeat",
+    "state": "PentaStatus",
+    "reports": "PentaReports",
+    "notifications": "PentaNotifs",
+    "delivery": "PentaMail",
+    "credentials": "PentaCredentials",
+    "certification": "PentaCertify",
+    "build": "PentaBuild",
+    "factory": "PentaFactory",
+    "release": "PentaRelease",
+    "incidents": ["PentaTriage", "PentaMation"],
+    "continuity": ["PentaScribe", "PentaSerialized", "PentaVersion"]
+  },
+  "continuity": {
+    "policy_history": "append_only",
+    "report_receipts": "append_only_hash_chain",
+    "mail_outbox_receipts": "append_only_hash_chain",
+    "silent_overwrite_allowed": false,
+    "policy_enforcement_cron": "*/15 * * * *"
+  },
+  "pentaod": {
+    "reconcile_cron": "*/2 * * * *",
+    "heartbeat_cron": "*/5 * * * *",
+    "idle_sleep_cron": "*/15 * * * *",
+    "wake_grace_preserved": true,
+    "dispatch_requires_fresh_heartbeat": true
+  },
+  "invariants": [
+    "hourly_delivery_policy_cannot_be_silently_replaced",
+    "every_report_lifecycle_transition_has_an_immutable_receipt",
+    "every_mail_outbox_lifecycle_transition_has_an_immutable_receipt",
+    "source_pentas_are_attributed_dynamically_from_observed_changes",
+    "policy_drift_is_repaired_by_the_enforcer",
+    "PentaOD_wake_state_survives_reconcile_during_idle_grace",
+    "authority_expansion_is_false"
+  ]
+}
