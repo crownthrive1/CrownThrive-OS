@@ -1,0 +1,74 @@
+name: Penta Proprietary Software Assurance
+
+on:
+  pull_request:
+    paths:
+      - 'LICENSE'
+      - 'data/penta/proprietary-software-policy.json'
+      - 'scripts/penta_proprietary_gate.py'
+      - 'tests/test_penta_proprietary_gate.py'
+      - 'docs/phase3/PENTA_PROPRIETARY_SOFTWARE_ENFORCEMENT.md'
+      - 'releases/**'
+      - '.github/release-requests/**'
+      - '.pentarelease/**'
+      - '.github/workflows/penta-proprietary-assurance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'LICENSE'
+      - 'data/penta/proprietary-software-policy.json'
+      - 'scripts/penta_proprietary_gate.py'
+      - 'tests/test_penta_proprietary_gate.py'
+      - 'docs/phase3/PENTA_PROPRIETARY_SOFTWARE_ENFORCEMENT.md'
+      - 'releases/**'
+      - '.github/release-requests/**'
+      - '.pentarelease/**'
+      - '.github/workflows/penta-proprietary-assurance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-proprietary-assurance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  assurance:
+    name: PentaLegal + PentaPolicy + PentaAssure proprietary gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Validate proprietary policy
+        run: python -m json.tool data/penta/proprietary-software-policy.json >/dev/null
+
+      - name: Compile proprietary gate
+        run: python -m py_compile scripts/penta_proprietary_gate.py tests/test_penta_proprietary_gate.py
+
+      - name: Run proprietary regression tests
+        run: python tests/test_penta_proprietary_gate.py
+
+      - name: Enforce repository proprietary policy
+        run: python scripts/penta_proprietary_gate.py --root . --receipt build/penta-proprietary/receipt.json
+
+      - name: PentaStatus summary
+        if: always()
+        shell: bash
+        run: |
+          echo '## Penta Proprietary Software Assurance' >> "$GITHUB_STEP_SUMMARY"
+          echo '- PentaLegal/PentaPolicy: existing CrownThrive rights notice operationalized, not enlarged by software' >> "$GITHUB_STEP_SUMMARY"
+          echo '- PentaScribe: canonical policy identifiers and notices preserved' >> "$GITHUB_STEP_SUMMARY"
+          echo '- PentaAssure: exact-head license/SPDX/release-safety gate executed' >> "$GITHUB_STEP_SUMMARY"
+          echo '- PentaSerialized: deterministic receipt emitted for downstream preservation' >> "$GITHUB_STEP_SUMMARY"
+          echo '- PentaRelease: secret/vault/private-key material remains excluded from release packages' >> "$GITHUB_STEP_SUMMARY"
