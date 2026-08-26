@@ -1,0 +1,30 @@
+{
+  "schema": "ct.pentamailer.mailgun-redundancy.v1",
+  "version": "1.0.0",
+  "provider": "mailgun",
+  "service": "PentaMailer",
+  "purpose": "redundant outbound mail transport",
+  "secret_source": "ThriveBase Vault",
+  "bindings": [
+    {
+      "lane": "primary",
+      "vault_name": "ct.pentamailer.mailgun.primary.api_key",
+      "runtime_env": "MAILGUN_API_KEY_PRIMARY",
+      "secret_value_in_repository": false
+    },
+    {
+      "lane": "secondary",
+      "vault_name": "ct.pentamailer.mailgun.secondary.api_key",
+      "runtime_env": "MAILGUN_API_KEY_SECONDARY",
+      "secret_value_in_repository": false
+    }
+  ],
+  "shared_requirements": ["MAILGUN_DOMAIN"],
+  "failover_order": ["primary", "secondary", "legacy"],
+  "policy": {
+    "fail_closed": true,
+    "live_provider_readback_required_for_certification": true,
+    "exact_send_readback_required_for_email_send": true,
+    "never_log_secret_values": true
+  }
+}
