@@ -1,0 +1,54 @@
+{
+  "schema": "ct.media.provider-endpoints.v1",
+  "generated_at": "2026-08-26T01:15:00Z",
+  "authority": {
+    "registry": "crownthrive1/CrownThrive-Support",
+    "rights_governance": "CHLOM",
+    "cultural_context": "Cultural Imprint Engine",
+    "secret_policy": "runtime-secret-reference-only"
+  },
+  "bindings": [
+    {
+      "binding_id": "riverside-hosting-rss-primary",
+      "provider": "Riverside",
+      "kind": "podcast-rss-feed",
+      "endpoint": "https://api.riverside.com/hosting/HdbnBVG2.rss",
+      "availability": "bound",
+      "verification_state": "founder-supplied; external fetch not independently resolved in this session",
+      "vault_class": "public-distribution-endpoint",
+      "mesh_roles": ["podcast-distribution", "feed-discovery", "syndication-source", "archive-index"],
+      "routes_to": ["CrownThrive Studios", "Melanated Voices TV", "Melanated TV", "CrownLytics", "CrownPulse"]
+    },
+    {
+      "binding_id": "riverside-crownthrive-studio-entrypoint",
+      "provider": "Riverside",
+      "kind": "studio-entrypoint",
+      "endpoint": "https://riverside.com/studio/crownthrive",
+      "availability": "bound",
+      "verification_state": "founder-supplied alias; not resolved to a dashboard studio immutable ID by the connected Riverside inventory",
+      "vault_class": "public-provider-entrypoint",
+      "mesh_roles": ["capture-entrypoint", "guest-session-entrypoint", "production-intake"],
+      "routes_to": ["Riverside Media Mesh", "Asset Bound Vault", "CrownThrive Studios"]
+    },
+    {
+      "binding_id": "viloud-rtmp-ingest-primary",
+      "provider": "Viloud",
+      "kind": "rtmp-ingest-base",
+      "endpoint": "rtmp://broadcast.viloud.tv/in/",
+      "availability": "bound-awaiting-runtime-secret",
+      "verification_state": "founder-supplied ingest base; stream authorization requires runtime secret",
+      "vault_class": "ingest-endpoint-with-secret-reference",
+      "secret_ref": "VILOUD_RTMP_STREAM_KEY",
+      "mesh_roles": ["live-ingest", "linear-distribution", "syndication-ingest"],
+      "routes_to": ["Melanated TV", "Melanated Voices TV", "Locticians TV", "CrownThrive Studios"]
+    }
+  ],
+  "binding_invariants": {
+    "endpoint_identity": "binding_id + provider + endpoint",
+    "secrets": "secret values never enter source control; only secret_ref names are permitted",
+    "rss": "RSS URL may be used as a public discovery/syndication pointer but feed contents remain provider-authoritative",
+    "rtmp": "RTMP ingest is not operationally authenticated until the runtime vault resolves the named stream-key secret",
+    "studio_alias": "public studio entrypoints never replace immutable Riverside dashboard studio IDs in the asset registry",
+    "lineage": "all future objects discovered through these bindings attach to the Asset Bound Vault using provider-native immutable IDs when available"
+  }
+}
