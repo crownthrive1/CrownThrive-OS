@@ -25,6 +25,22 @@ import build_substantive_rebuild_wave1 as wave1
 
 POLICY_PATH = ROOT / "data/documentation/substantive-rebuild-wave-2-policy.v1.json"
 
+# Wave 2 owns machine-contract reconciliation.  Identity/trust and
+# evidence/audit rows remain visible as continuity candidates but are reserved
+# to Wave 3's state-specific contracts before any generic Wave 2 anchor scan.
+WAVE2_OWNED_STATE_FAMILIES = wave1.WAVE2_RESERVED_STATE_FAMILIES
+WAVE3_RESERVED_STATE_FAMILIES = wave1.WAVE3_RESERVED_STATE_FAMILIES
+WAVE2_STATE_ANCHOR_ROUTES = {
+    # This mapping is preserved from the governed Sprint 8 Wave 2 register and
+    # receipt.  It is not inferred from today's body-size/link thresholds.
+    "machine_contract_reconciliation": "/chlom/ecosystem-integrations",
+}
+WAVE2_CONTINUITY_ONLY_ROUTES = frozenset({"/chlom/registry-model"})
+WAVE2_STATE_FAMILY_DEFERRAL_REASONS = {
+    state: "deferred_to_wave_3_identity_evidence_state_lane"
+    for state in WAVE3_RESERVED_STATE_FAMILIES
+}
+
 
 def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -38,7 +54,21 @@ def text_has_any(text: str, terms: list[str]) -> bool:
 def choose_anchor(row: dict[str, Any], policy: dict[str, Any]) -> tuple[str | None, list[dict[str, Any]]]:
     allowed = set(policy["canonical_anchor_routes"])
     checked: list[dict[str, Any]] = []
-    for route in row.get("target_routes", []):
+    state = str(row.get("current_state_candidate", ""))
+    designated = WAVE2_STATE_ANCHOR_ROUTES.get(state)
+    target_routes = list(row.get("target_routes", []))
+    qualification_routes = (
+        [designated]
+        if designated is not None and designated in target_routes
+        else [
+            route
+            for route in target_routes
+            if route not in WAVE2_CONTINUITY_ONLY_ROUTES
+        ]
+    )
+    for route in qualification_routes:
+        if route is None:
+            continue
         if route not in allowed:
             continue
         try:
@@ -47,7 +77,8 @@ def choose_anchor(row: dict[str, Any], policy: dict[str, Any]) -> tuple[str | No
             continue
         checked.append(quality)
         if (
-            quality["body_characters"] >= int(policy["minimum_anchor_body_characters"])
+            quality["editorial_current_successor_eligible"]
+            and quality["body_characters"] >= int(policy["minimum_anchor_body_characters"])
             and quality["internal_link_count"] >= int(policy["minimum_anchor_internal_links"])
         ):
             return route, checked
@@ -64,9 +95,12 @@ def classify(
     title = str(row.get("legacy_title", ""))
     state = str(row.get("current_state_candidate", ""))
     flags = " ".join(str(x) for x in row.get("flags", []))
+    deferred_state_reason = WAVE2_STATE_FAMILY_DEFERRAL_REASONS.get(state)
 
     if inventory_id in wave1_ids:
         reasons.append("already_selected_wave_1")
+    if deferred_state_reason:
+        reasons.append(deferred_state_reason)
     if row.get("priority") != policy["required_priority"]:
         reasons.append("not_p0")
     if row.get("disposition_candidate") != policy["required_candidate_disposition"]:
@@ -82,9 +116,12 @@ def classify(
     if text_has_any(flags, policy["blocked_flag_terms"]):
         reasons.append("explicit_high_risk_flag")
 
-    anchor, quality = choose_anchor(row, policy)
-    if not anchor:
-        reasons.append("no_qualified_substantive_anchor")
+    if deferred_state_reason:
+        anchor, quality = None, []
+    else:
+        anchor, quality = choose_anchor(row, policy)
+        if not anchor:
+            reasons.append("no_qualified_substantive_anchor")
 
     base = {
         "inventory_id": inventory_id,
@@ -96,6 +133,10 @@ def classify(
         "candidate_disposition": row.get("disposition_candidate"),
         "current_state_candidate": state,
         "target_routes": row.get("target_routes", []),
+        "continuity_only_routes": sorted(
+            set(row.get("target_routes", [])) & WAVE2_CONTINUITY_ONLY_ROUTES
+        ),
+        "source_specialist_review_flags": wave1.source_specialist_review_flags(row),
     }
 
     if reasons:
@@ -123,6 +164,15 @@ def classify(
 
 def build() -> dict[str, Any]:
     policy = load_json(POLICY_PATH)
+    allowed_states = set(policy["allowed_state_families"])
+    if not WAVE2_OWNED_STATE_FAMILIES <= allowed_states:
+        raise ValueError("Wave 2 policy omits its reserved machine-contract state lane")
+    if not WAVE3_RESERVED_STATE_FAMILIES <= allowed_states:
+        raise ValueError("Wave 2 policy cannot transparently defer absent Wave 3 state lanes")
+    if set(WAVE2_STATE_ANCHOR_ROUTES) != WAVE2_OWNED_STATE_FAMILIES:
+        raise ValueError("Wave 2 state-anchor map must cover exactly its owned state families")
+    if not set(WAVE2_STATE_ANCHOR_ROUTES.values()) <= set(policy["canonical_anchor_routes"]):
+        raise ValueError("Wave 2 state-anchor route is outside the governed policy allowlist")
     rows = wave1.aggregate_candidate_rows()
     first = wave1.build()
     wave1_ids = {str(row["inventory_id"]) for row in first["selected_records"]}
@@ -147,6 +197,7 @@ def build() -> dict[str, Any]:
 
     payload = {
         "schema_version": "1.0.0",
+        "selection_view": wave1.current_selection_view(2),
         "wave_id": "ct.docs.substantive-rebuild.wave-2.v1",
         "sprint": 8,
         "pass": "A_stale_state_and_evidence_identity_registry_machine_contract_qualification",
@@ -165,6 +216,7 @@ def build() -> dict[str, Any]:
         "policy": policy,
         "selected_records": selected,
         "held_records": held,
+        "editorial_current_successor_exclusions": wave1.editorial_exclusion_report(held),
         "guardrails": {
             "historical_body_recovery_claimed": False,
             "terminal_disposition_self_authorized": False,

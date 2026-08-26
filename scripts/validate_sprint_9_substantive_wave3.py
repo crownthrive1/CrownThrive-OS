@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave3 as wave3
+import substantive_rebuild_current_snapshot as current_snapshot
 
 EXPECTED_P0 = 449
 EXPECTED_WAVE1 = 16
@@ -33,37 +34,46 @@ def load_json(rel: str):
 
 
 result = wave3.build()
+semantic_snapshot = current_snapshot.load_snapshot()
+current_wave_1 = semantic_snapshot["current_waves"]["1"]
+current_wave_2 = semantic_snapshot["current_waves"]["2"]
+current_wave = semantic_snapshot["current_waves"]["3"]
 policy = result["policy"]
-errors: list[str] = []
+errors: list[str] = current_snapshot.validate_current_wave(result, 3, semantic_snapshot)
 
 if result["source_universe_count"] != 795:
     errors.append("source universe must remain exactly 795")
 if result["p0_candidate_count"] != EXPECTED_P0:
     errors.append(f"expected {EXPECTED_P0} P0 candidates, found {result['p0_candidate_count']}")
-if result["wave_1_selected_count"] != EXPECTED_WAVE1:
-    errors.append(f"expected {EXPECTED_WAVE1} Wave 1 selected records, found {result['wave_1_selected_count']}")
-if result["wave_2_selected_count"] != EXPECTED_WAVE2:
-    errors.append(f"expected {EXPECTED_WAVE2} Wave 2 selected records, found {result['wave_2_selected_count']}")
-if result["prior_wave_selected_count"] != EXPECTED_WAVE1 + EXPECTED_WAVE2:
+if result["wave_1_selected_count"] != current_wave_1["selected_count"]:
+    errors.append(f"current Wave 1 selected-count drift: {result['wave_1_selected_count']}")
+if result["wave_2_selected_count"] != current_wave_2["selected_count"]:
+    errors.append(f"current Wave 2 selected-count drift: {result['wave_2_selected_count']}")
+if result["prior_wave_selected_count"] != (
+    current_wave_1["selected_count"] + current_wave_2["selected_count"]
+):
     errors.append("prior-wave selected count drift")
-if result["selected_count"] != EXPECTED_WAVE3:
-    errors.append(f"expected stable Wave 3 selection of {EXPECTED_WAVE3}, found {result['selected_count']}")
+if result["selected_count"] != current_wave["selected_count"]:
+    errors.append(
+        f"expected current semantic Wave 3 selection of {current_wave['selected_count']}, "
+        f"found {result['selected_count']}"
+    )
 if result["prior_wave_overlap_count"] != 0:
     errors.append("Wave 3 may not overlap prior waves")
 if result["selected_count"] + result["held_count"] != 795:
     errors.append("selected + held must equal 795")
-if result["cumulative_machine_qualified_p0_count"] != EXPECTED_CUMULATIVE:
+if result["cumulative_machine_qualified_p0_count"] != current_wave["cumulative_machine_qualified_p0_count"]:
     errors.append("cumulative P0 qualified count drift")
-if result["p0_outside_waves_1_2_3_count"] != EXPECTED_REMAINING:
+if result["p0_outside_waves_1_2_3_count"] != current_wave["p0_outside_current_waves_count"]:
     errors.append("remaining P0 count drift")
-if result["selected_state_counts"] != EXPECTED_STATE_COUNTS:
+if result["selected_state_counts"] != current_wave["selected_state_counts"]:
     errors.append(f"Wave 3 state-count drift: {result['selected_state_counts']}")
-if result["selected_anchor_counts"] != EXPECTED_ANCHOR_COUNTS:
+if result["selected_anchor_counts"] != current_wave["selected_anchor_counts"]:
     errors.append(f"Wave 3 anchor-count drift: {result['selected_anchor_counts']}")
-if result["selected_section_counts"] != {"CHLOM": EXPECTED_WAVE3}:
+if result["selected_section_counts"] != current_wave["selected_section_counts"]:
     errors.append(f"Wave 3 section-count drift: {result['selected_section_counts']}")
-if result["wave_sha256"] != EXPECTED_WAVE_SHA:
-    errors.append(f"Wave 3 digest drift: {result['wave_sha256']}")
+if result["wave_sha256"] != current_wave["wave_sha256"]:
+    errors.append(f"current semantic Wave 3 digest drift: {result['wave_sha256']}")
 
 allowed_states = set(policy["allowed_state_families"])
 anchor_map = dict(policy["state_anchor_routes"])
@@ -215,7 +225,8 @@ print(f"p0_outside_waves_1_2_3_count={result['p0_outside_waves_1_2_3_count']}")
 print("selected_section_counts=" + str(result["selected_section_counts"]))
 print("selected_state_counts=" + str(result["selected_state_counts"]))
 print("selected_anchor_counts=" + str(result["selected_anchor_counts"]))
-print("wave_sha256=" + result["wave_sha256"])
+print("current_wave_sha256=" + result["wave_sha256"])
+print("historical_wave_sha256=" + EXPECTED_WAVE_SHA)
 print("vault_closure_sha256=" + EXPECTED_VAULT_SHA)
 print("terminal_disposition_accepted=false")
 print("parent_certification_required=true")

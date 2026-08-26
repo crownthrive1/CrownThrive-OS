@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave5 as wave5
+import substantive_rebuild_current_snapshot as current_snapshot
 
 WAVE_SHA = "0c7359b03dbf17f539adf055a3ad620243a7a3ef604ef864aaf6654f04cff9a8"
 VAULT_SHA = "614439bca7459554c8ecc629e40a0bd3bbb3ec803e31d1b04a361e25dae7a368"
@@ -34,22 +35,27 @@ def extract_yaml_int_marker(text: str, key: str) -> int | None:
 
 
 result = wave5.build()
+semantic_snapshot = current_snapshot.load_snapshot()
+current_waves = semantic_snapshot["current_waves"]
+current_wave = current_waves["5"]
 policy = result["policy"]
-errors: list[str] = []
+errors: list[str] = current_snapshot.validate_current_wave(result, 5, semantic_snapshot)
 
 if result["source_universe_count"] != 795:
     errors.append("source universe must remain exactly 795")
 if result["p0_candidate_count"] != 449:
     errors.append(f"expected 449 P0 candidates, found {result['p0_candidate_count']}")
 for key, expected in [
-    ("wave_1_selected_count", 16),
-    ("wave_2_selected_count", 19),
-    ("wave_3_selected_count", 17),
-    ("wave_4_selected_count", 5),
+    ("wave_1_selected_count", current_waves["1"]["selected_count"]),
+    ("wave_2_selected_count", current_waves["2"]["selected_count"]),
+    ("wave_3_selected_count", current_waves["3"]["selected_count"]),
+    ("wave_4_selected_count", current_waves["4"]["selected_count"]),
 ]:
     if result[key] != expected:
         errors.append(f"{key} drift: expected {expected}, found {result[key]}")
-if result["prior_wave_selected_count"] != 57:
+if result["prior_wave_selected_count"] != sum(
+    current_waves[str(number)]["selected_count"] for number in range(1, 5)
+):
     errors.append("prior-wave cumulative count drift")
 if result["prior_wave_overlap_count"] != 0:
     errors.append("Wave 5 may not overlap prior waves")
@@ -73,26 +79,29 @@ if collision["ai_agent_algorithm_p0_candidate_count"] != 35:
 if collision["broad_ai_family_qualified"] is not False:
     errors.append("AI collision family may not be broadly qualified")
 
-if result["selected_count"] != 1:
-    errors.append(f"Wave 5 pivot must select exactly one bounded P0 identity, found {result['selected_count']}")
+if result["selected_count"] != current_wave["selected_count"]:
+    errors.append(
+        f"current semantic Wave 5 pivot expected {current_wave['selected_count']} bounded P0 "
+        f"identity, found {result['selected_count']}"
+    )
 if result["selected_count"] + result["held_count"] != 795:
     errors.append("selected + held must equal 795")
-if result["cumulative_machine_qualified_p0_count"] != 58:
-    errors.append("cumulative qualified P0 count must be 58")
-if result["p0_outside_waves_1_2_3_4_5_count"] != 391:
-    errors.append("remaining P0 count must be 391")
+if result["cumulative_machine_qualified_p0_count"] != current_wave["cumulative_machine_qualified_p0_count"]:
+    errors.append("current semantic cumulative qualified P0 count drift")
+if result["p0_outside_waves_1_2_3_4_5_count"] != current_wave["p0_outside_current_waves_count"]:
+    errors.append("current semantic remaining P0 count drift")
 if result["pivot_inventory_id"] != "HC-0076":
     errors.append("pivot inventory identity drift")
 if result["pivot_state_family"] != "io_surface_and_machine_contract_reconciliation":
     errors.append("pivot state family drift")
-if result["selected_section_counts"] != {"Convergent Ecosystem": 1}:
+if result["selected_section_counts"] != current_wave["selected_section_counts"]:
     errors.append("selected section counts drift")
-if result["selected_state_counts"] != {"io_surface_and_machine_contract_reconciliation": 1}:
+if result["selected_state_counts"] != current_wave["selected_state_counts"]:
     errors.append("selected state counts drift")
-if result["selected_anchor_counts"] != {"/technology/crownthrive-io-surface-machine-contract-reconciliation": 1}:
+if result["selected_anchor_counts"] != current_wave["selected_anchor_counts"]:
     errors.append("selected anchor counts drift")
-if result["wave_sha256"] != WAVE_SHA:
-    errors.append(f"Wave 5 digest drift: {result['wave_sha256']}")
+if result["wave_sha256"] != current_wave["wave_sha256"]:
+    errors.append(f"current semantic Wave 5 digest drift: {result['wave_sha256']}")
 
 selected = result["selected_records"]
 if len(selected) == 1:
@@ -248,7 +257,8 @@ print(f"p0_outside_waves_1_2_3_4_5_count={result['p0_outside_waves_1_2_3_4_5_cou
 print("selected_section_counts=" + str(result["selected_section_counts"]))
 print("selected_state_counts=" + str(result["selected_state_counts"]))
 print("selected_anchor_counts=" + str(result["selected_anchor_counts"]))
-print("wave_sha256=" + result["wave_sha256"])
+print("current_wave_sha256=" + result["wave_sha256"])
+print("historical_wave_sha256=" + WAVE_SHA)
 print("vault_closure_sha256=" + VAULT_SHA)
 print("terminal_disposition_accepted=false")
 print("parent_certification_required=true")

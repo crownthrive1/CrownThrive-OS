@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave6 as wave6
+import substantive_rebuild_current_snapshot as current_snapshot
 
 EXPECTED_WAVE = "c4389ff5f19674813e0a89734a9aa6b65b7e6ecba2e4b3710278fa05a4616caa"
 EXPECTED_OVERLAY = "f9b621dce0c92f1ad594a10edac9419d7a19c13ef0303968f26c131ee7d7cabf"
@@ -59,18 +60,33 @@ def nav_group(data: dict, tab_name: str, group_name: str) -> dict:
 
 def main() -> None:
     built = wave6.build()
+    semantic_snapshot = current_snapshot.load_snapshot()
+    current_waves = semantic_snapshot["current_waves"]
+    current_wave = current_waves["6"]
+    snapshot_errors = current_snapshot.validate_current_wave(
+        built, 6, semantic_snapshot
+    )
+    assert not snapshot_errors, "; ".join(snapshot_errors)
     assert built["source_universe_count"] == 795
     assert built["p0_candidate_count"] == 449
-    assert built["prior_wave_selected_count"] == 58
+    assert built["prior_wave_selected_count"] == sum(
+        current_waves[str(number)]["selected_count"] for number in range(1, 6)
+    )
     assert built["ai_collision_candidate_count"] == 35
     assert built["ai_collision_machine_admission_count"] == 0
     assert built["ai_collision_primary_hold_lane_counts"] == EXPECTED_HOLDS
     assert built["ai_collision_overlay_sha256"] == EXPECTED_OVERLAY
     assert built["ai_collision_historical_crosswalk_rewritten"] is False
-    assert built["selected_count"] == 3
+    assert built["selected_count"] == current_wave["selected_count"]
     assert sorted(r["inventory_id"] for r in built["selected_records"]) == EXPECTED_IDS
-    assert built["cumulative_machine_qualified_p0_count"] == 61
-    assert built["p0_outside_waves_1_2_3_4_5_6_count"] == 388
+    assert (
+        built["cumulative_machine_qualified_p0_count"]
+        == current_wave["cumulative_machine_qualified_p0_count"]
+    )
+    assert (
+        built["p0_outside_waves_1_2_3_4_5_6_count"]
+        == current_wave["p0_outside_current_waves_count"]
+    )
     assert built["prior_wave_overlap_count"] == 0
     assert built["selected_section_counts"] == {"Cultural Imprint Engine (CIE)": 3}
     assert built["selected_state_counts"] == {"cie_framework_reconciliation": 3}
@@ -190,8 +206,13 @@ def main() -> None:
     print("ai_collision_machine_admission=0")
     print("ai_collision_overlay_sha256=" + EXPECTED_OVERLAY)
     print("wave_6_selected_count=3")
-    print("cumulative_machine_qualified_p0=61")
-    print("p0_remaining=388")
+    print(
+        "current_cumulative_machine_qualified_p0="
+        + str(built["cumulative_machine_qualified_p0_count"])
+    )
+    print("current_p0_remaining=" + str(built["p0_outside_waves_1_2_3_4_5_6_count"]))
+    print("historical_cumulative_machine_qualified_p0=61")
+    print("historical_p0_remaining=388")
     print("historical_wave_sha256=" + EXPECTED_WAVE)
     print("current_recomputed_wave_sha256=" + current_recomputed_wave_sha)
     print("vault_closure_sha256=" + EXPECTED_VAULT)

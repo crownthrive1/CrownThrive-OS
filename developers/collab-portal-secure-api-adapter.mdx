@@ -4,11 +4,57 @@ sidebarTitle: "Collab Portal API"
 description: "Verified OpenAPI 3.0.3 adapter contract for portal.crownthrive.com Secure API, covering CRM, project-status, marketing and Worlds endpoints, header authentication, current automation limits, security boundaries and Phase 3 integration requirements."
 icon: "plug"
 keywords: ["Collab Portal", "SuitePro", "Secure API", "OpenAPI", "projects", "CRM", "X-Public-ID", "X-Secret-Key", "Phase 3"]
+standard_version: "1.0.0"
+primary_audience: "developer"
+page_type: "developer"
+content_state: "unresolved"
 ---
 
-# Collab Portal Secure API Adapter
+{/* pentadocs:audience-orientation:v2 */}
+<Note>
+  **Audience:** Collab Portal adapter developers, project-automation owners, credential custodians, and security reviewers. Use the exact Secure API contract on this page with the [permissions and approval gates](/automation/permissions-and-approval-gates) and [API integration standards](/technology/api-integration-standards).
+
+  **This page:** Collab Portal Secure API Adapter — Verified OpenAPI 3.0.3 adapter contract for portal.crownthrive.com Secure API, covering CRM, project-status, marketing and Worlds endpoints, header authentication, current automation limits, security boundaries and Phase 3 integration requirements.
+
+  **Documentation state:** `unresolved` for page type `developer`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Unresolved reason:** no explicit page-level editorial acceptance state was declared in the migrated source.
+
+  **Evidence needed:** an accepted governing source or accountable-owner attestation.
+
+  **Review role:** PentaDocs governance.
+
+  **Review trigger:** next material edit or source reconciliation.
+</Note>
+{/* /pentadocs:audience-orientation:v2 */}
+
+## Collab Portal Secure API Adapter
 
 **Current institutional context:** Phase 3 — Execute. The initial credential and provider observations below originated in the historical Phase 2.99 integration lane; their unresolved holds remain current until new exact provider evidence supersedes them.
+
+<Warning>
+  **State reconciliation required before execution.** This page proves an OpenAPI contract and preserves time-layered adapter evidence, including an earlier screenshot-transcription `401`, closed write gate, later runtime/webhook observations, and downstream registry claims. Treat production mutations as closed unless the exact credential source, current project UID/schema, permitted fields, and newer write/readback certification are all bound to the same revision and authority record.
+</Warning>
+
+## Contract-inspection quickstart
+
+<Steps>
+  <Step title="Pin the OpenAPI source">
+    Retrieve the public-safe Swagger specification and verify the recorded OpenAPI version and SHA-256 before generating a client or relying on endpoint coverage.
+  </Step>
+  <Step title="Resolve credential custody privately">
+    Bind the exact `X-Public-ID` and `X-Secret-Key` through the governed server-side Vault path. Never transcribe screenshots, commit values, or place them in browser code.
+  </Step>
+  <Step title="Discover project metadata">
+    After current read authority is confirmed, call `GET /project/meta` to resolve the account-specific project fields. Do not invent custom-field UUIDs.
+  </Step>
+  <Step title="Pin one existing project">
+    Resolve the approved project and retain its stable UID. The verified Secure API contract does not provide project creation.
+  </Step>
+  <Step title="Keep writes closed until reconciled">
+    Require current-object read, bounded diff validation, operation-specific authority, write, immediate readback, and evidence capture on one consistent credential/runtime state.
+  </Step>
+</Steps>
 
 ## Verified source contract
 
@@ -36,6 +82,27 @@ X-Secret-Key: <server-side secret>
 ```
 
 Both headers are required by the documented secured operations.
+
+<ParamField header="X-Public-ID" type="string" required>
+  Public API identifier from the Collab Portal Secure API account. It is paired with the server-side secret and does not authorize an operation by itself.
+</ParamField>
+
+<ParamField header="X-Secret-Key" type="string" required>
+  Server-side Secure API secret. Use a placeholder in examples and a governed secret reference at runtime; never expose the value in public source, browser code, screenshots, logs, messages, or evidence payloads.
+</ParamField>
+
+<RequestExample>
+
+```bash Read project metadata after authorization
+curl --request GET \
+  --url "https://portal.crownthrive.com/secure-api/project/meta" \
+  --header "X-Public-ID: <public-id>" \
+  --header "X-Secret-Key: <server-side-secret>"
+```
+
+</RequestExample>
+
+The request above shows the verified method, URL, and header names only. It is not permission to use a production credential and no response example is supplied because this page does not reproduce an exact current account-specific response body.
 
 Production credentials must remain server-side. They must not be committed to this public repository, Mintlify, browser JavaScript, screenshots, Gmail, GitHub comments, logs or DAIL payload bodies.
 
@@ -84,6 +151,21 @@ Write authority remains closed until exact credential binding, project metadata,
 | POST | `/marketing/subscribe` | Subscribe contacts to marketing audiences | out of scope for PM loop unless separately approved |
 | GET | `/worlds` | List Worlds | optional; requires Worlds power-up |
 
+<Tabs>
+  <Tab title="Projects">
+    Project metadata, list, lookup, and update are present. No project-create, task, comment, milestone, file, signature, or webhook-registration route appears in this Secure API specification.
+  </Tab>
+  <Tab title="CRM">
+    Contact and company metadata, list, find, create, and update operations are present. CRM writes are outside the default project-manager loop and require separate D2 scope.
+  </Tab>
+  <Tab title="Marketing and Worlds">
+    Marketing subscription is present but suppression/opt-out and separate campaign authority apply. Worlds listing is optional and depends on the Worlds power-up.
+  </Tab>
+  <Tab title="Separate capability lanes">
+    Provider UI webhooks, email automation, files, signatures, tasks, comments, milestones, and any future MCP remain independently contracted and certified.
+  </Tab>
+</Tabs>
+
 ### Important negative findings
 
 The supplied OpenAPI contract does **not** expose:
@@ -102,14 +184,26 @@ Those capabilities may exist elsewhere in SuitePro/Collab Portal, but they are *
 
 Because the verified API can **read and update existing projects but cannot create projects**, the initial safe pattern is:
 
-1. use an existing manually created CrownThrive institutional project;
-2. discover the account-specific project schema with `GET /project/meta`;
-3. resolve the project with `GET /project/uid/{uid}` or exact-name lookup;
-4. preserve current fields and calculate a bounded update;
-5. write approved project status/information/custom-field values with `PUT /project/uid/{uid}`;
-6. immediately read the project back and verify the expected values;
-7. record the request/response evidence reference and result in the institutional changelog/DAIL layer;
-8. on 401/404/422/429 or semantic mismatch, do not retry mutation blindly; open a governed delta and fall back to GitHub \+ Gmail reporting.
+<Steps>
+  <Step title="Use a pre-created institutional project">
+    Select an existing, approved CrownThrive project; do not invent or assume a project UID.
+  </Step>
+  <Step title="Discover account-specific fields">
+    Read `GET /project/meta` and pin the actual project and custom-field identities.
+  </Step>
+  <Step title="Resolve and preserve current state">
+    Prefer `GET /project/uid/{uid}` after bootstrap. Read the existing object and preserve fields outside the bounded update.
+  </Step>
+  <Step title="Validate the proposed diff">
+    Allow only the approved status/information/custom-field values and exclude billing, legal, financial, rights, sensitive IP, and client/staff authority mutations.
+  </Step>
+  <Step title="Write and read back once">
+    Use `PUT /project/uid/{uid}`, then immediately retrieve the project and compare the expected values.
+  </Step>
+  <Step title="Record or fail closed">
+    Record the non-sensitive request/response evidence reference. On `401`, `404`, `422`, `429`, unknown outcome, or semantic mismatch, do not retry blindly; open a governed delta and use the documented fallback.
+  </Step>
+</Steps>
 
 ### Recommended Collab Portal project record
 
@@ -180,6 +274,14 @@ The adapter must maintain:
 - dead-letter/delta record for failed writes;
 - secret-safe logging;
 - request correlation IDs in CrownThrive's own adapter layer when implemented.
+
+| Failure or ambiguity | Documented handling |
+| --- | --- |
+| `401` during screenshot-transcribed credential test | Classify as transcription authentication failure; do not label the provider credential invalid or brute-force variants |
+| `429` | Respect request-budget limits; safe idempotent reads may use bounded backoff |
+| `404` or `422` | Preserve the response evidence, open a delta, and do not retry a mutation blindly |
+| Unknown write outcome | Read back before any further decision; never assume failure or success |
+| Account UI vs OpenAPI quota conflict | Keep both dated sources; do not hard-code either as a permanent guarantee |
 
 ## OpenAPI security-definition anomaly
 
@@ -389,3 +491,9 @@ Phase 2.99 must now produce:
 - rollback/fallback to GitHub \+ Gmail.
 
 No future phase may continue describing Collab Portal as having no verified API contract. Conversely, no future phase may describe the integration as production-write-ready until authenticated evidence completes the remaining checkpoints.
+
+## Compatibility and support boundary
+
+The exact installed SuitePro/SuiteDash-family provider version remains a separate verification item, and the API-key security annotations do not establish OAuth-style scopes. Generated clients must remain pinned to the verified OpenAPI snapshot and be regenerated only after a reviewed contract change.
+
+Use the [support request workflow](/workflows/support-request) when the current credential source, project identity, custom-field schema, provider version, quota, webhook integrity, or write certification cannot be reconciled. Never include raw credentials, unrestricted response bodies, or private project/customer data in the request.

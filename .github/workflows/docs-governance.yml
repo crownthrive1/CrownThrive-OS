@@ -44,6 +44,16 @@ jobs:
       - name: Verify validator syntax
         run: |
           python -m py_compile scripts/validate_docs.py
+          python -m py_compile scripts/pentadocs_quality.py
+          python -m py_compile tests/test_pentadocs_quality.py
+          python -m py_compile scripts/substantive_rebuild_current_snapshot.py
+          python -m py_compile scripts/build_substantive_rebuild_wave{1,2,3,4,5,6}.py
+          python -m py_compile scripts/validate_sprint_7_substantive_wave1.py
+          python -m py_compile scripts/validate_sprint_8_substantive_wave2.py
+          python -m py_compile scripts/validate_sprint_9_substantive_wave3.py
+          python -m py_compile scripts/validate_sprint_10_substantive_wave4.py
+          python -m py_compile scripts/validate_sprint_11_substantive_wave5.py
+          python -m py_compile scripts/validate_sprint_12_substantive_wave6.py
           python -m py_compile scripts/validate_phase3_institutional_gate.py
           python -m py_compile scripts/validate_gate_registry_v4.py
           python -m py_compile scripts/run_phase4_preparation_audit.py
@@ -74,6 +84,19 @@ jobs:
 
       - name: Validate Phase 4 V4 gate contract
         run: python scripts/validate_gate_registry_v4.py
+
+      - name: Test PentaDocs audience and component quality engine
+        run: python -m unittest -v tests.test_pentadocs_quality
+
+      - name: Validate current semantic and immutable historical substantive views
+        run: |
+          python scripts/substantive_rebuild_current_snapshot.py --check
+          python scripts/validate_sprint_7_substantive_wave1.py
+          python scripts/validate_sprint_8_substantive_wave2.py
+          python scripts/validate_sprint_9_substantive_wave3.py
+          python scripts/validate_sprint_10_substantive_wave4.py
+          python scripts/validate_sprint_11_substantive_wave5.py
+          python scripts/validate_sprint_12_substantive_wave6.py
 
       - name: Run CrownThrive governance validator
         run: python scripts/validate_docs.py

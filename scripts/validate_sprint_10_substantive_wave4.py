@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave4 as wave4
+import substantive_rebuild_current_snapshot as current_snapshot
 
 EXPECTED_P0 = 449
 EXPECTED_SELECTED = 5
@@ -24,38 +25,46 @@ def load_json(rel: str):
 
 
 result = wave4.build()
+semantic_snapshot = current_snapshot.load_snapshot()
+current_waves = semantic_snapshot["current_waves"]
+current_wave = current_waves["4"]
 policy = result["policy"]
-errors: list[str] = []
+errors: list[str] = current_snapshot.validate_current_wave(result, 4, semantic_snapshot)
 
 if result["source_universe_count"] != 795:
     errors.append("source universe must remain exactly 795")
 if result["p0_candidate_count"] != EXPECTED_P0:
     errors.append(f"expected {EXPECTED_P0} P0 candidates, found {result['p0_candidate_count']}")
-if result["wave_1_selected_count"] != 16:
+if result["wave_1_selected_count"] != current_waves["1"]["selected_count"]:
     errors.append("Wave 1 count drift")
-if result["wave_2_selected_count"] != 19:
+if result["wave_2_selected_count"] != current_waves["2"]["selected_count"]:
     errors.append("Wave 2 count drift")
-if result["wave_3_selected_count"] != 17:
+if result["wave_3_selected_count"] != current_waves["3"]["selected_count"]:
     errors.append("Wave 3 count drift")
-if result["prior_wave_selected_count"] != 52:
+if result["prior_wave_selected_count"] != sum(
+    current_waves[str(number)]["selected_count"] for number in range(1, 4)
+):
     errors.append("prior-wave cumulative count drift")
 if result["prior_wave_overlap_count"] != 0:
     errors.append("Wave 4 may not overlap prior waves")
-if result["selected_count"] != EXPECTED_SELECTED:
-    errors.append(f"expected exact Wave 4 selection of {EXPECTED_SELECTED}, found {result['selected_count']}")
+if result["selected_count"] != current_wave["selected_count"]:
+    errors.append(
+        f"expected current semantic Wave 4 selection of {current_wave['selected_count']}, "
+        f"found {result['selected_count']}"
+    )
 if result["selected_count"] + result["held_count"] != 795:
     errors.append("selected + held must equal 795")
-if result["cumulative_machine_qualified_p0_count"] != EXPECTED_CUMULATIVE:
+if result["cumulative_machine_qualified_p0_count"] != current_wave["cumulative_machine_qualified_p0_count"]:
     errors.append("cumulative qualified count mismatch")
-if result["p0_outside_waves_1_2_3_4_count"] != EXPECTED_REMAINING:
+if result["p0_outside_waves_1_2_3_4_count"] != current_wave["p0_outside_current_waves_count"]:
     errors.append("remaining P0 count mismatch")
-if result["wave_sha256"] != EXPECTED_WAVE_SHA:
-    errors.append(f"Wave 4 digest drift: {result['wave_sha256']}")
-if result["selected_section_counts"] != {"CHLOM": EXPECTED_SELECTED}:
+if result["wave_sha256"] != current_wave["wave_sha256"]:
+    errors.append(f"current semantic Wave 4 digest drift: {result['wave_sha256']}")
+if result["selected_section_counts"] != current_wave["selected_section_counts"]:
     errors.append("Wave 4 section count drift")
-if result["selected_state_counts"] != {"component_framework_reconciliation": EXPECTED_SELECTED}:
+if result["selected_state_counts"] != current_wave["selected_state_counts"]:
     errors.append("Wave 4 state count drift")
-if result["selected_anchor_counts"] != {EXPECTED_ANCHOR: EXPECTED_SELECTED}:
+if result["selected_anchor_counts"] != current_wave["selected_anchor_counts"]:
     errors.append("Wave 4 anchor count drift")
 
 for row in result["selected_records"]:
@@ -182,7 +191,8 @@ print(f"p0_outside_waves_1_2_3_4_count={result['p0_outside_waves_1_2_3_4_count']
 print("selected_section_counts=" + str(result["selected_section_counts"]))
 print("selected_state_counts=" + str(result["selected_state_counts"]))
 print("selected_anchor_counts=" + str(result["selected_anchor_counts"]))
-print("wave_sha256=" + result["wave_sha256"])
+print("current_wave_sha256=" + result["wave_sha256"])
+print("historical_wave_sha256=" + EXPECTED_WAVE_SHA)
 print("vault_closure_sha256=" + EXPECTED_VAULT_SHA)
 print("terminal_disposition_accepted=false")
 print("parent_certification_required=true")

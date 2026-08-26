@@ -25,6 +25,7 @@ import build_substantive_rebuild_wave1 as wave1
 import build_substantive_rebuild_wave2 as wave2
 
 POLICY_PATH = ROOT / "data/documentation/substantive-rebuild-wave-3-policy.v1.json"
+WAVE3_OWNED_STATE_FAMILIES = wave1.WAVE3_RESERVED_STATE_FAMILIES
 
 
 def load_json(path: Path) -> Any:
@@ -78,6 +79,8 @@ def classify(
         except FileNotFoundError:
             reasons.append("substantive_anchor_missing")
         else:
+            if not anchor_quality["editorial_current_successor_eligible"]:
+                reasons.append("substantive_anchor_not_current_editorial_state")
             if anchor_quality["body_characters"] < int(policy["minimum_anchor_body_characters"]):
                 reasons.append("substantive_anchor_body_too_small")
             if anchor_quality["internal_link_count"] < int(policy["minimum_anchor_internal_links"]):
@@ -95,6 +98,7 @@ def classify(
         "candidate_disposition": row.get("disposition_candidate"),
         "current_state_candidate": state,
         "target_routes": target_routes,
+        "source_specialist_review_flags": wave1.source_specialist_review_flags(row),
     }
 
     if reasons:
@@ -124,6 +128,8 @@ def classify(
 
 def build() -> dict[str, Any]:
     policy = load_json(POLICY_PATH)
+    if set(policy["allowed_state_families"]) != WAVE3_OWNED_STATE_FAMILIES:
+        raise ValueError("Wave 3 policy must own exactly the reserved identity/evidence state lanes")
     rows = wave1.aggregate_candidate_rows()
     first = wave1.build()
     second = wave2.build()
@@ -154,6 +160,7 @@ def build() -> dict[str, Any]:
 
     payload = {
         "schema_version": "1.0.0",
+        "selection_view": wave1.current_selection_view(3),
         "wave_id": "ct.docs.substantive-rebuild.wave-3.v1",
         "sprint": 9,
         "pass": "A_stale_state_then_B_identity_evidence_substantive_gap_closure",
@@ -174,6 +181,7 @@ def build() -> dict[str, Any]:
         "policy": policy,
         "selected_records": selected,
         "held_records": held,
+        "editorial_current_successor_exclusions": wave1.editorial_exclusion_report(held),
         "guardrails": {
             "historical_body_recovery_claimed": False,
             "terminal_disposition_self_authorized": False,

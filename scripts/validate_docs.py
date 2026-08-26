@@ -15,6 +15,11 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
+try:
+    from pentadocs_quality import validate_repository as validate_pentadocs_quality
+except ModuleNotFoundError:  # Imported as scripts.validate_docs in unit tests.
+    from scripts.pentadocs_quality import validate_repository as validate_pentadocs_quality
+
 TEXT_SUFFIXES = {".md", ".mdx", ".json", ".svg", ".yml", ".yaml", ".py", ".txt"}
 SKIP_DIRECTORIES = {".git", ".venv", "venv", "node_modules", ".mintlify", "__pycache__"}
 ALLOWED_TEMPLATE_NOTICE_PATHS = {Path("THIRD_PARTY_NOTICES.md")}
@@ -156,6 +161,8 @@ def validate(root: Path) -> tuple[list[str], list[str], dict[str, int]]:
         "internal_links_checked": 0,
         "governed_unlisted_pages": 0,
         "json_files_parsed": 0,
+        "pentadocs_standard_pages": 0,
+        "pentadocs_orientation_pages": 0,
     }
 
     if not root.exists():
@@ -221,14 +228,18 @@ def validate(root: Path) -> tuple[list[str], list[str], dict[str, int]]:
             continue
 
         frontmatter, body = parsed
-        missing_fields = sorted(FRONTMATTER_REQUIRED_FIELDS - frontmatter_keys(frontmatter))
+        keys = frontmatter_keys(frontmatter)
+        missing_fields = sorted(FRONTMATTER_REQUIRED_FIELDS - keys)
         if missing_fields:
             errors.append(f"Missing frontmatter fields {missing_fields}: {relative}")
 
         substantive = re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL).strip()
         if len(substantive) < 120:
             errors.append(f"Navigated page has insufficient substantive body content: {relative}")
-        if not re.search(r"(?m)^#\s+\S", substantive):
+        # Standardized Mintlify pages receive their H1 from frontmatter title;
+        # the PentaDocs quality validator below rejects body H1s outside fenced
+        # examples. Preserve the legacy H1 check only until a page is migrated.
+        if "standard_version" not in keys and not re.search(r"(?m)^#\s+\S", substantive):
             errors.append(f"Navigated page is missing an H1 heading: {relative}")
 
     mdx_files = [path for path in root.rglob("*.mdx") if not any(part in SKIP_DIRECTORIES for part in path.relative_to(root).parts)]
@@ -361,6 +372,11 @@ def validate(root: Path) -> tuple[list[str], list[str], dict[str, int]]:
                     f"Broken internal documentation link in {path.relative_to(root)}: {target}"
                 )
 
+    quality_errors, quality_stats = validate_pentadocs_quality(root)
+    errors.extend(f"PentaDocs quality: {error}" for error in quality_errors)
+    stats["pentadocs_standard_pages"] = quality_stats["standard_pages"]
+    stats["pentadocs_orientation_pages"] = quality_stats["orientation_pages"]
+
     return errors, warnings, stats
 
 
@@ -378,7 +394,9 @@ def main() -> int:
         f"{stats['text_files_scanned']} text files, "
         f"{stats['json_files_parsed']} JSON files, "
         f"{stats['governed_unlisted_pages']} governed unlisted pages, and "
-        f"{stats['internal_links_checked']} internal links."
+        f"{stats['internal_links_checked']} internal links; "
+        f"{stats['pentadocs_standard_pages']} standardized pages and "
+        f"{stats['pentadocs_orientation_pages']} audience orientations."
     )
 
     for warning in warnings:

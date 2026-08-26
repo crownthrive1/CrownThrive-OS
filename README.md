@@ -42,7 +42,7 @@ CHLOM is the principal governance architecture for Rights, Rules, Roles, Revenue
 
 ### Execute
 
-Execute what is authorized through durable software: PentaRoute, PentaTun, Penta primitives, PentaFramework Factory, CrownThrive Software Factory, schedulers, queues, provider-native adapters, internal services, publication systems, media systems, PentaGreen commerce/economic activation, and governed automation.
+Execute what is authorized through durable software: PentaRoute, PentaTun, Penta primitives, PentaFactory, CrownThrive Software Factory, schedulers, queues, provider-native adapters, internal services, publication systems, media systems, PentaGreen commerce/economic activation, and governed automation.
 
 Execution remains bounded. PentaDelete does not imply universal delete. A generated artifact is not automatically accepted. A deployed endpoint does not automatically gain D3 authority.
 
@@ -80,7 +80,7 @@ Phase 3 converts CrownThrive's institutional knowledge, provider access, governa
 
 The objective is not simply 'more automation.' The objective is an institution that can continue performing priority work without requiring a founder, a single ChatGPT session, or one SaaS dashboard to manually push every recurring operation.
 
-The Phase 3 execution fabric includes PentaRoute, PentaTun, PentaBeata, the wider Penta primitive family, PentaFramework Factory, CrownThrive Software Factory, Penta Federation, PentaMedia, PentaBooks, PentaGeneration, PentaStudios, PentaDocs, PentaGreen, ThriveBase, CHLOM, CIE, CrownThrive IO, repository federation, provider-native adapters, queues, schedulers, proof surfaces, deployment lanes, publishing controls, and self-discovery/certification loops.
+The Phase 3 execution fabric includes PentaRoute, PentaTun, PentaBeata, the wider Penta primitive family, PentaFactory, CrownThrive Software Factory, Penta Federation, PentaMedia, PentaBooks, PentaGeneration, PentaStudios, PentaDocs, PentaGreen, ThriveBase, CHLOM, CIE, CrownThrive IO, repository federation, provider-native adapters, queues, schedulers, proof surfaces, deployment lanes, publishing controls, and self-discovery/certification loops.
 
 Phase 3 is not complete because a repository says `v3`, because an Edge Function exists, or because an agent generated code. Priority functions must execute durably, have known ownership and source-of-truth, operate within bounded authority, create evidence when they fail, support recovery, and produce enough independent proof for assurance to become the dominant objective of Phase 4.
 
@@ -139,7 +139,7 @@ ThriveBase is CrownThrive's durable operational state, workflow, queue, evidence
 
 PENTA provides the shared human-and-machine vocabulary for institutional execution. PentaRoute, PentaTun, PentaBeata, PentaFetch, PentaGet, PentaQuery, PentaSearch, PentaQueue, PentaRetry, PentaBind, PentaVault, PentaAuth, PentaAudit, PentaTest, PentaDeploy, PentaReconcile and the wider primitive family make previously implicit software responsibilities explicit and governable.
 
-### PentaFramework Factory and CrownThrive Software Factory
+### PentaFactory and CrownThrive Software Factory
 
 Factories generate, validate, package, bind, test, and deploy governed software/framework candidates through provider-native adapters. Generation is not acceptance; acceptance is not provider authority; provider authority is not D3 authority.
 
