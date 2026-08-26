@@ -25,6 +25,16 @@ from penta_github_labels import (
 
 API = "https://api.github.com"
 MARKER = "<!-- penta-pr-lifecycle:"
+PRECLOSE_REQUIRED_LABELS = frozenset(
+    {
+        "penta:tagged",
+        "penta:authority:tagger",
+        "penta:entity:pr",
+        "penta:authority:pr",
+        "penta:close",
+        "penta:stage:close-candidate",
+    }
+)
 
 
 class GH:
@@ -42,7 +52,7 @@ class GH:
                 "Authorization": "Bearer " + self.token,
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "PentaPR/2.0",
+                "User-Agent": "PentaPR/2.0.1",
             },
         )
         try:
@@ -151,6 +161,38 @@ def set_labels(gh: GH, number: int, disposition: str) -> set[str]:
         add_labels(gh, number, missing)
         current.update(missing)
     return current
+
+
+def require_preclose_readback(
+    gh: GH,
+    number: int,
+    *,
+    lifecycle_head_sha: str | None,
+    expected_head_sha: str | None,
+) -> set[str]:
+    if not lifecycle_head_sha or not expected_head_sha or lifecycle_head_sha != expected_head_sha:
+        raise RuntimeError(
+            f"preclose_lifecycle_head_stale:{number}:"
+            f"lifecycle={lifecycle_head_sha or 'missing'}:expected={expected_head_sha or 'missing'}"
+        )
+
+    pull = gh.get(f"/repos/{gh.repo}/pulls/{number}")
+    observed_head_sha = ((pull.get("head") or {}).get("sha"))
+    if pull.get("state") != "open":
+        raise RuntimeError(f"preclose_pr_not_open:{number}:{pull.get('state') or 'unknown'}")
+    if observed_head_sha != expected_head_sha:
+        raise RuntimeError(
+            f"preclose_head_changed:{number}:expected={expected_head_sha}:observed={observed_head_sha or 'missing'}"
+        )
+
+    readback = read_labels(gh, number)
+    if "penta:hold" in readback:
+        raise RuntimeError(f"preclose_hold_detected:{number}")
+
+    missing = PRECLOSE_REQUIRED_LABELS.difference(readback)
+    if missing:
+        raise RuntimeError(f"preclose_label_readback_failed:{number}:{','.join(sorted(missing))}")
+    return readback
 
 
 def mark_terminal(gh: GH, number: int, terminal: str, authority: str) -> None:
@@ -265,17 +307,26 @@ def pentacloser(gh: GH, number: int | None = None) -> None:
     now = dt.datetime.now(dt.timezone.utc)
     pull_requests = open_pull_requests(gh, number)
     for pr in pull_requests:
-        labels = read_labels(gh, pr["number"])
+        number = pr["number"]
+        labels = read_labels(gh, number)
         if "penta:hold" in labels:
-            print(f"PentaCloser #{pr['number']} terminal=HELD")
+            print(f"PentaCloser #{number} terminal=HELD")
             continue
-        _, state = lifecycle_comment(gh, pr["number"])
+        _, state = lifecycle_comment(gh, number)
         if not state or now < parse_iso(state["deadline_at"]):
             continue
 
-        merged, message = attempt_merge(gh, pr["number"])
+        expected_head_sha = ((pr.get("head") or {}).get("sha"))
+        lifecycle_head_sha = state.get("head_sha")
+        if lifecycle_head_sha != expected_head_sha:
+            raise RuntimeError(
+                f"preclose_lifecycle_head_stale:{number}:"
+                f"lifecycle={lifecycle_head_sha or 'missing'}:expected={expected_head_sha or 'missing'}"
+            )
+
+        merged, message = attempt_merge(gh, number)
         if merged:
-            print(f"PentaCloser #{pr['number']} terminal=MERGED")
+            print(f"PentaCloser #{number} terminal=MERGED")
             continue
 
         state.update(
@@ -285,23 +336,31 @@ def pentacloser(gh: GH, number: int | None = None) -> None:
                 "updated_at": iso(now),
             }
         )
-        set_labels(gh, pr["number"], "CLOSE")
-        save_state(gh, pr["number"], state)
+        set_labels(gh, number, "CLOSE")
+        save_state(gh, number, state)
+        readback = require_preclose_readback(
+            gh,
+            number,
+            lifecycle_head_sha=lifecycle_head_sha,
+            expected_head_sha=expected_head_sha,
+        )
         gh.post(
-            f"/repos/{gh.repo}/issues/{pr['number']}/comments",
+            f"/repos/{gh.repo}/issues/{number}/comments",
             {
                 "body": (
                     "PentaCloser terminal disposition at the 12-hour hard limit. "
                     "This PR did not satisfy current exact-head merge requirements and is being closed, "
-                    "not force-merged. The `penta:close` and `penta:stage:close-candidate` labels were "
-                    f"read back before closure. Merge attempt: `{message}`. "
+                    "not force-merged. Fresh GitHub provider readback confirmed "
+                    "`penta:tagged`, `penta:close`, and `penta:stage:close-candidate` "
+                    f"on exact head `{expected_head_sha}` before closure "
+                    f"({len(readback)} total labels visible). Merge attempt: `{message}`. "
                     "History and branch provenance remain preserved."
                 )
             },
         )
-        gh.patch(f"/repos/{gh.repo}/pulls/{pr['number']}", {"state": "closed"})
-        mark_terminal(gh, pr["number"], "penta:terminal:closed", "penta:authority:closer")
-        print(f"PentaCloser #{pr['number']} terminal=CLOSED")
+        gh.patch(f"/repos/{gh.repo}/pulls/{number}", {"state": "closed"})
+        mark_terminal(gh, number, "penta:terminal:closed", "penta:authority:closer")
+        print(f"PentaCloser #{number} terminal=CLOSED")
 
 
 def main() -> int:
