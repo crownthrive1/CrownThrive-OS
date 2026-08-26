@@ -1,0 +1,41 @@
+contract_id: ct.contract.maintenance.vault-recovery-reference.v1
+version: 1.0.0
+classification: public_safe_interface
+current_owner: PentaCredentials
+maintenance_owner: PentaTime
+purpose: >-
+  Define what maintenance and recovery automation may persist outside Vault
+  when a recoverability workflow depends on secret-bearing provider state.
+
+custody:
+  canonical_secret_plane: Vault
+  raw_secret_return_allowed: false
+  plaintext_drive_secret_allowed: false
+  plaintext_github_secret_allowed: false
+  plaintext_mintlify_secret_allowed: false
+  encrypted_provider_export_allowed: true
+  drive_ciphertext_allowed: true
+  decryption_key_separate_from_ciphertext: true
+
+reference_record:
+  required: [secret_reference_id, secret_alias, provider, purpose, custody_state, restore_requirements]
+  optional: [public_fingerprint, key_version, rotation_state, last_verified_at, encrypted_backup_ref, encrypted_backup_sha256, supersedes]
+  prohibited: [plaintext_secret, password, api_key_value, private_key, signing_secret, database_service_key, oauth_client_secret, ssh_private_key, private_identity_mapping]
+
+maintenance_rules:
+  - A secret reference never proves runtime authentication.
+  - Runtime authentication never creates provider-write authority.
+  - Provider-write authority remains separately gated by PentaCredentials, PentaCertify, authority trace and provider binding.
+  - Missing secret custody fails the affected capability closed.
+  - Missing secret custody does not block unrelated recovery work.
+  - A Drive ciphertext object is not certified until exact-byte or cryptographic readback passes.
+  - Secret rotation creates a new version/supersession record; do not silently overwrite custody history.
+
+recovery_evidence:
+  minimum: [alias_or_secret_id, provider, purpose, custody_state, encrypted_backup_state, restore_requirements, last_verification_result]
+
+maintenance_preflight:
+  required_for_secret_mutation: true
+  preflight_function: chlom_runtime.maintenance_preflight_v1
+  maintenance_capability: ct.capability.maintenance.control.v1
+  d3_human_reserved: true
