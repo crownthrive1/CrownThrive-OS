@@ -1,16 +1,28 @@
 # CrownThrive Operating System 👑
 
-**Phase 3 public-safe institutional knowledge, governance, developer, licensing, release, and implementation map for CrownThrive, LLC.**
+**Phase 3 canonical institutional knowledge, governance, developer, licensing, release, and implementation map for CrownThrive, LLC.**
 
-CrownThrive OS is the version-controlled public projection of the CrownThrive Convergent Ecosystem. It documents how CrownThrive doctrine, corridors, platforms, intellectual property, CHLOM, Cultural Imprint Engine (CIE), Thrive Flywheel, MM Suites, ThriveBase, ThriveEvergreen, media, commerce, education, support, data, APIs, MCP servers, automation, factories, recovery, and governed provider integrations fit together without exposing the private institutional core.
+**CrownThrive OS is CrownThrive's authoritative institutional source of truth.** It records the current institutional generation, governance, stable identities, versions, evidence boundaries, component state, release lineage, corrections, archives, and how CrownThrive doctrine, corridors, platforms, intellectual property, CHLOM, Cultural Imprint Engine (CIE), Thrive Flywheel, MM Suites, ThriveBase, ThriveEvergreen, media, commerce, education, support, data, APIs, MCP servers, automation, factories, recovery, and governed provider integrations fit together.
+
+Mintlify, websites, help centers, storefronts, media surfaces, and other public properties are **downstream projections of the OS**. They may be reconciled on a later publication cadence and do not override OS state merely because an older statement remains publicly visible.
 
 **Institutional generation:** Phase 3 / OS 3.x  
 **Current release target:** v3.0.0  
-**Website:** https://crownthrive.com  
 **Contact:** contact@crownthrive.com  
 **Repository:** https://github.com/crownthrive1/CrownThrive-Support
 
 > **Truth boundary:** Phase 3 is the current institutional operating generation. That statement does **not** mean every CrownThrive subsystem, provider adapter, commercial rail, API/MCP endpoint, autonomous workflow, or historical recovery lane is production-certified. Component state remains independently evidenced and fail-closed.
+
+## Source-of-truth hierarchy
+
+1. **CrownThrive OS canonical records** — institutional phase, version registry, adopted governance, current-state records, stable identities, effective policies, releases, corrections, and archive dispositions.
+2. **OS-bound evidence and operational state** — ThriveBase records, CHLOM/DAIL evidence, exact Git/release receipts, certified provider readbacks, and other evidence incorporated by the OS within its scope.
+3. **Component repositories** — CHLOM and CIE packages/contracts/schemas are authoritative for their exact component scope while remaining subordinate to the OS for institution-wide state.
+4. **Mintlify** — public-safe documentation projection generated from OS state.
+5. **Websites and other public surfaces** — downstream publication, commerce, media, and discovery projections; updated later as their own workstream.
+6. **Archive/history** — preserved prior truth, plans, versions, terminology, and evidence; never current merely because it remains accessible.
+
+A downstream projection can create a reconciliation task. It cannot demote, promote, or redefine the CrownThrive OS.
 
 ## Phase 3 operating picture
 
@@ -51,7 +63,7 @@ CrownThrive's Phase 3 direction is factory-based rather than chat-dependent: gov
 
 ## Current-state discipline
 
-Every public claim must distinguish among:
+Every OS claim must distinguish among:
 
 - **source exists**;
 - **candidate built**;
@@ -62,16 +74,17 @@ Every public claim must distinguish among:
 - **read back / independently evidenced**;
 - **commercially or legally activated**.
 
-A repository file, workflow definition, model output, vendor dashboard, screenshot, payment link, provider response, generated artifact, or website sentence is not independently sufficient proof of all downstream states.
+A repository file, workflow definition, model output, vendor dashboard, screenshot, payment link, provider response, generated artifact, Mintlify page, or website sentence is not independently sufficient proof of all downstream states.
 
 ## Versioning and archive
 
-Phase 3 introduces a stronger current-canon / historical-record boundary.
+Phase 3 establishes a stronger current-canon / historical-record boundary.
 
-- Current operational guidance stays in active documentation.
+- Current operational guidance stays in active OS documentation and machine-readable registries.
 - Superseded, stale, historical, pre-entry, and prior-version material is preserved rather than silently erased.
-- Historical material is evidence of what CrownThrive knew, planned, or operated at that time; it is not current instruction unless an active document explicitly incorporates it.
+- Historical material is evidence of what CrownThrive knew, planned, or operated at that time; it is not current instruction unless an active OS record explicitly incorporates it.
 - Schema/API/contract versions such as v1/v2 remain valid when they are the current component-level contract. Institutional OS v3 does not force-renumber them.
+- Projection layers inherit archive/current-state classifications from the OS; they do not create competing history rules.
 
 Archive policy: [`docs/archive/README.md`](docs/archive/README.md).  
 Version registry: [`docs/versioning/VERSION_REGISTRY.json`](docs/versioning/VERSION_REGISTRY.json).
@@ -94,7 +107,7 @@ Nothing in these repository notices replaces jurisdiction-specific legal review,
 
 ## Repository operating tabs
 
-- **README** — current institutional orientation and truth boundary.
+- **README** — current institutional orientation and source-of-truth hierarchy.
 - **LICENSE / licensing addenda** — repository-use, machine-use, IP, and commercial permission boundaries.
 - **CODE_OF_CONDUCT** — participation, cultural stewardship, evidence, AI, privacy, and security conduct.
 - **CONTRIBUTING** — governed contribution and rights-intake requirements.
@@ -121,7 +134,7 @@ CrownThrive uses a seven-generation planning horizon for institutional continuit
 
 ## Institutional operating rule
 
-> **Platforms perform the work. Corridors organize the work. CIE protects cultural coherence. CHLOM governs rights and authority. ThriveBase preserves operational state. The institutional record proves what happened.**
+> **CrownThrive OS governs institutional truth. Platforms perform the work. Corridors organize the work. CIE protects cultural coherence. CHLOM governs rights and authority. ThriveBase preserves operational state. The institutional record proves what happened. Projections publish what the OS has authorized them to say.**
 
 CrownThrive uses stable IDs, effective-dated versions, source authority, evidence classes, explicit rights, role/relationship access, approval gates, append-only corrections, DAIL events, tested recovery, and audience-specific projections.
 
@@ -129,8 +142,7 @@ CrownThrive uses stable IDs, effective-dated versions, source authority, evidenc
 
 **Institutional owner:** CrownThrive, LLC  
 **Founding Member:** Kavonte Jones Sr.  
-**Contact:** contact@crownthrive.com  
-**Primary ecosystem:** https://crownthrive.com
+**Contact:** contact@crownthrive.com
 
 ---
 
