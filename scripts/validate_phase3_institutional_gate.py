@@ -98,7 +98,8 @@ def main() -> int:
     require(CURRENT, "PentaDocs")
 
     require(AGENTS, "institutional generation: `Phase 3`")
-    require(AGENTS, "Phase 3 is not used as blanket production certification")
+    require(AGENTS, "production/certification: subsystem-by-subsystem and evidence-by-evidence")
+    require(AGENTS, "a Phase 3 umbrella does not force v1/v2 contracts to become v3")
     require(AGENTS, "`HOLD` never becomes `PASS`")
     require(PR_TEMPLATE, "Institutional generation: `Phase 3`")
     require(PR_TEMPLATE, "Phase 3 is not used as blanket production certification")
