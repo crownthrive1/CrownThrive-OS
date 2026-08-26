@@ -1,5 +1,5 @@
 name: PentaMail Live Certification
-# activation-revision: 2026-08-26.4 — GitHub-native workflow_run bridge for connector-originated merges.
+# activation-revision: 2026-08-26.5 — GitHub-native workflow_run bridge with governed hosted bootstrap.
 
 on:
   workflow_dispatch:
@@ -8,14 +8,6 @@ on:
         description: 'Authorized PentaMail certification recipient'
         required: false
         default: 'jones.usmc.kj@gmail.com'
-      runner_mode:
-        description: 'Trusted execution fabric'
-        required: true
-        type: choice
-        options:
-          - self-hosted
-          - github-hosted
-        default: self-hosted
   push:
     branches: [main]
     paths:
@@ -42,6 +34,8 @@ jobs:
     # workflows. workflow_run therefore bridges from GitHub's own successful
     # CodeQL execution. The one-time activation token is still mandatory.
     # Public pull_request code never enters this secret-bearing provider lane.
+    # Self-hosted execution remains staged until CrownThrive's Node-24 runner
+    # attestation policy is machine-verified and promoted.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && contains(github.event.head_commit.message, '[pentamail-live-certify]')) ||
@@ -49,7 +43,7 @@ jobs:
        github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.run_attempt == 1 &&
        contains(github.event.workflow_run.head_commit.message, '[pentamail-live-certify]'))
-    runs-on: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.runner_mode == 'self-hosted') && '["self-hosted","linux","x64","crownthrive","pentafabric","rtc","trusted","pentamail"]' || '["ubuntu-latest"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
@@ -259,7 +253,7 @@ jobs:
           subject-path: pentamail-live-attestation.json
 
       - name: Upload sanitized PentaMail proof
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pentamail-live-certification-${{ github.run_id }}
           path: |
