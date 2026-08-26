@@ -573,12 +573,15 @@ def sync_repository_surfaces(
 
 
 def docs_page(title: str, body: str, description: str) -> str:
+    rendered_body = body.rstrip()
+    if not re.search(r"(?m)^#\s+", rendered_body):
+        rendered_body = f"# {title}\n\n{rendered_body}"
     return f"""---
 title: "{title}"
 description: "{description}"
 ---
 
-{body.rstrip()}
+{rendered_body}
 """
 
 

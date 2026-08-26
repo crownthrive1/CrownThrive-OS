@@ -4,6 +4,14 @@ on:
   workflow_run:
     workflows: ["PentaRelease — Autonomous Release Awareness"]
     types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pentarelease-comprehensive-release-surface.yml'
+      - '.pentarelease/policy.json'
+      - 'scripts/pentarelease/release_surface.py'
+  schedule:
+    - cron: '47 5 * * *'
   workflow_dispatch:
     inputs:
       tag:
@@ -23,7 +31,7 @@ concurrency:
 
 jobs:
   synchronize:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout institutional source
@@ -149,6 +157,7 @@ jobs:
           set -euo pipefail
           git config user.name 'PentaRelease'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          BASE_SHA=$(git rev-parse HEAD)
           BRANCH="pentarelease/surface-${TAG//\//-}-${GITHUB_RUN_ID}"
           git checkout -b "$BRANCH"
 
@@ -170,6 +179,7 @@ jobs:
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Govern and merge synchronized surfaces
         if: steps.commit.outputs.changed == 'true'
@@ -178,6 +188,7 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
           BRANCH: ${{ steps.commit.outputs.branch }}
           HEAD_SHA: ${{ steps.commit.outputs.head_sha }}
+          BASE_SHA: ${{ steps.commit.outputs.base_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -196,10 +207,28 @@ jobs:
           done
           test "$success" = true
 
-          PR_URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
-            --title "PentaRelease comprehensive surface $TAG" \
-            --body "Synchronizes the bounded seven-file release surface, PentaDocs Release & Evidence tab, canonical release URL, comprehensive release notes, CIE/cost/data disclosure, FAQ, changelog, and evidence. Only PentaRelease-owned files/blocks are removable.")
-          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --squash --delete-branch
+          PR_URL=""
+          if PR_URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+              --title "PentaRelease comprehensive surface $TAG" \
+              --body "Synchronizes the bounded seven-file release surface, PentaDocs Release & Evidence tab, canonical release URL, comprehensive release notes, CIE/cost/data disclosure, FAQ, changelog, and evidence. Only PentaRelease-owned files/blocks are removable." 2>/tmp/pentarelease-pr.err); then
+            echo "Created governed surface PR: $PR_URL"
+            gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --squash --delete-branch
+          else
+            cat /tmp/pentarelease-pr.err || true
+            echo "GitHub Actions PR creation unavailable; evaluating exact-head fast-forward fallback."
+            git fetch origin main
+            CURRENT_MAIN=$(git rev-parse origin/main)
+            if [ "$CURRENT_MAIN" != "$BASE_SHA" ]; then
+              echo "PentaRelease surface HOLD: main moved from $BASE_SHA to $CURRENT_MAIN; refusing stale fast-forward fallback." >&2
+              exit 45
+            fi
+            STATE=$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
+            test "$STATE" = "completed:success"
+            git push origin "$HEAD_SHA":refs/heads/main
+            git push origin --delete "$BRANCH" || true
+            echo "Published synchronized surfaces by governed exact-head fast-forward."
+          fi
 
       - name: Production proof
         env:
@@ -220,4 +249,5 @@ jobs:
             echo "- CIE disclosure: explicit; missing scores remain unavailable"
             echo "- Deletion boundary: only PentaRelease-created files/tabs; unmanaged content preserved"
             echo "- Provider release readback: verified"
+            echo "- Merge resilience: governed PR preferred; exact-head fast-forward only when PR creation is unavailable, main is unchanged, and the required gate is successful"
           } >> "$GITHUB_STEP_SUMMARY"
