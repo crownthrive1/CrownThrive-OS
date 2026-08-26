@@ -1,5 +1,5 @@
 name: PentaMail Live Certification
-# activation-revision: 2026-08-26.3 — attested provider send/readback with PentaFabric routing.
+# activation-revision: 2026-08-26.4 — provider send/readback with sanitized evidence artifact.
 
 on:
   workflow_dispatch:
@@ -17,8 +17,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
-  attestations: write
 
 concurrency:
   group: pentamail-live-certification
@@ -220,29 +218,24 @@ jobs:
               'attested_at': datetime.now(timezone.utc).isoformat(),
           }
           if evidence['disposition'] != 'PASS':
-              raise SystemExit('refusing to attest an unproven PentaMail provider write')
+              raise SystemExit('refusing to publish unproven PentaMail provider evidence')
           payload = json.dumps(evidence, indent=2, sort_keys=True) + '\n'
-          Path('pentamail-live-attestation.json').write_text(payload)
+          Path('pentamail-live-evidence.json').write_text(payload)
           digest = hashlib.sha256(payload.encode()).hexdigest()
-          Path('pentamail-live-attestation.sha256').write_text(
-              digest + '  pentamail-live-attestation.json\n'
+          Path('pentamail-live-evidence.sha256').write_text(
+              digest + '  pentamail-live-evidence.json\n'
           )
           print(payload)
           print('sha256=' + digest)
           PY
-
-      - name: Attest exact PentaMail provider proof
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
-        with:
-          subject-path: pentamail-live-attestation.json
 
       - name: Upload sanitized PentaMail proof
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pentamail-live-certification-${{ github.run_id }}
           path: |
-            pentamail-live-attestation.json
-            pentamail-live-attestation.sha256
+            pentamail-live-evidence.json
+            pentamail-live-evidence.sha256
             pentamail-certification-result.json
           if-no-files-found: error
           retention-days: 30
@@ -262,7 +255,7 @@ jobs:
           print('Lifecycle at readback: ' + r.get('lifecycle_state', 'UNKNOWN'))
           print('Provider message ID: ' + r.get('provider_message_id', 'UNKNOWN'))
           print('email_send eligible: ' + str(r.get('email_send_gate', {}).get('eligible', False)))
-          print('Attested evidence: ' + str(Path('pentamail-live-attestation.json').exists()))
+          print('Sanitized evidence artifact: ' + str(Path('pentamail-live-evidence.json').exists()))
           PY
           else
             echo '## PentaMail Live Certification — HOLD/FAILED' >> "$GITHUB_STEP_SUMMARY"
