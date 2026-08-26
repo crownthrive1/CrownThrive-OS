@@ -9,6 +9,7 @@ on:
       - "runtime/penta_family.py"
       - "tests/test_penta_institutional_services.py"
       - "tests/test_penta_family.py"
+      - "automation/penta-family*.mdx"
       - "docs/phase3/PENTA_INSTITUTIONAL_OPERATING_FABRIC_v1.2.md"
       - "docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v1.0.md"
       - ".github/workflows/penta-institutional-services.yml"
@@ -21,6 +22,7 @@ on:
       - "runtime/penta_family.py"
       - "tests/test_penta_institutional_services.py"
       - "tests/test_penta_family.py"
+      - "automation/penta-family*.mdx"
       - "docs/phase3/PENTA_FAMILY_PRODUCTION_CONTRACT_v1.0.md"
       - ".github/workflows/penta-institutional-services.yml"
   workflow_dispatch:
@@ -34,7 +36,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Verify institutional services and Penta Family
+    name: Verify institutional services, census and Penta Family
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -50,6 +52,9 @@ jobs:
         run: |
           python -m json.tool data/penta/institutional-services.registry.json >/dev/null
           python -m json.tool data/penta/family.registry.json >/dev/null
+          python -m json.tool data/penta/systems.registry.json >/dev/null
+          python -m json.tool data/penta/systems.extensions.pentascribe-marketer.json >/dev/null
+          python -m json.tool data/penta/systems.extensions.operations-workforce.json >/dev/null
           python -m json.tool schemas/penta/decision-packet.schema.json >/dev/null
           python -m json.tool schemas/penta/family-registry.schema.json >/dev/null
 
@@ -58,8 +63,14 @@ jobs:
           python -m py_compile runtime/penta_institutional_services.py
           python -m py_compile runtime/penta_family.py
 
-      - name: Verify Penta Family snapshot
+      - name: Verify Penta Family census snapshot
         run: python runtime/penta_family.py --root .
+
+      - name: Verify portal index
+        run: python runtime/penta_family.py --root . --portal >/dev/null
+
+      - name: Verify representative service portal
+        run: python runtime/penta_family.py --root . --member penta.mail --portal >/dev/null
 
       - name: Run authority-boundary tests
         run: python tests/test_penta_institutional_services.py
