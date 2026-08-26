@@ -98,6 +98,17 @@ The CHLOM runtime fabric executes the governed portion of the lifecycle on repos
 
 The runtime executes only the authority actually granted to each lane. It does not manufacture legal/economic authority, transfer ownership, disclose secrets or self-certify production state.
 
+### Repository-native cron controllers
+
+Two GitHub Actions controllers are part of the internal CHLOM recurrence fabric:
+
+- **CHLOM Pentafabric Continuity** — hourly at `17 * * * *`. It validates Pentafabric manifests/contracts and the maintenance projection gate. Scheduled runs are validation/observation only; they do not release maintenance or activate external commerce.
+- **CHLOM Runtime Fabric** — twice hourly at `7,37 * * * *`. It runs the governed runtime controller, fans out bounded agent lanes only when discovery reports `READY`, otherwise fail-closes to `HOLD`, and emits/uploads DAIL evidence for the cycle.
+
+These are repository-native recurrence lanes, not additional external failure-domain clocks. They remain bounded by the same authority limits as the rest of CHLOM: no ownership transfer, no legal-authority manufacture, no unapproved economic activation, no secret export, and no self-certification.
+
+The canonical scheduler topology continues to treat repository-native GitHub Actions, database-native recurrence, and PentaDocs recurrence as internal execution mechanisms rather than external failure-domain clocks.
+
 ## DAIL runtime evidence contract
 
 Runtime cycles use the `dail.chlom.runtime-event.v1` evidence schema. The event binds cycle identity/state to an integrity hash and records the authority envelope. An illustrative shape is:
