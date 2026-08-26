@@ -1,0 +1,52 @@
+name: PENTA Institutional Services
+
+on:
+  pull_request:
+    paths:
+      - "data/penta/**"
+      - "schemas/penta/**"
+      - "runtime/penta_institutional_services.py"
+      - "tests/test_penta_institutional_services.py"
+      - "docs/phase3/PENTA_INSTITUTIONAL_OPERATING_FABRIC_v1.2.md"
+      - ".github/workflows/penta-institutional-services.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/penta/**"
+      - "schemas/penta/**"
+      - "runtime/penta_institutional_services.py"
+      - "tests/test_penta_institutional_services.py"
+      - ".github/workflows/penta-institutional-services.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-institutional-services-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify institutional services
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate JSON artifacts
+        run: |
+          python -m json.tool data/penta/institutional-services.registry.json >/dev/null
+          python -m json.tool schemas/penta/decision-packet.schema.json >/dev/null
+
+      - name: Compile governance runtime
+        run: python -m py_compile runtime/penta_institutional_services.py
+
+      - name: Run authority-boundary tests
+        run: python tests/test_penta_institutional_services.py
