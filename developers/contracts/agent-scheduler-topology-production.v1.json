@@ -1,48 +1,93 @@
 {
   "contract_id": "ct.scheduler-topology.production.v1",
-  "semantic_version": "1.0.0",
+  "semantic_version": "1.2.0",
   "environment": "production",
   "lifecycle_state": "production",
   "runtime_source_of_truth": "ThriveBase/chlom_runtime.scheduler_topology_v1",
   "founder_authority_ref": "founder-directive-2026-08-24-agent-scheduler-production-convergence",
+  "current_reconciliation_ref": "founder-directive-2026-08-26-current-topology-reconciliation",
   "founder_approval": {
     "signer": "Kavonte Jones Sr.",
     "date": "2026-08-24",
     "scope": "production convergence of CrownThrive agent scheduler topology"
   },
-  "execution_state_during_targeted_maintenance": "PRODUCTION_BOUND_MAINTENANCE_SUSPENDED",
+  "execution_state": "PRODUCTION",
+  "maintenance_state": "CLOSED",
   "canonical_external_clock_model": {
-    "post_maintenance_target_count": 3,
+    "post_maintenance_target_count": 2,
     "external_evidence_relay": {
       "canonical_name": "CrownThrive External Evidence Relay",
       "schedule_id": "ct.schedule.external-evidence-relay.hourly.v1",
       "binding_id": "ct.automation.vendor-engine-watch.v1",
+      "external_task_id": "6a8620e935cc8191bbd31075e12dd22a",
       "cadence": "hourly at minute 17",
-      "maintenance_state": "disabled_until_governed_reactivation_wave",
-      "dispatch_policy": "due-only from chlom_runtime.agent_schedule_definitions"
+      "state": "ACTIVE_CONNECTOR_FAILURE_DOMAIN_ONLY",
+      "dispatch_policy": "due-only from chlom_runtime.agent_schedule_definitions",
+      "authority_expansion": false
     },
     "communications": {
       "canonical_name": "CrownThrive Communications Watch",
       "binding_id": "ct.automation.email-attention.v1",
       "failure_domain": "email_and_communications_connector",
-      "maintenance_mode": "read_only_founder_attention_only"
+      "state": "ACTIVE_COMMUNICATIONS_FAILURE_DOMAIN_ONLY"
     },
     "backup_continuity": {
-      "canonical_name": "CrownThrive Daily Backup & Continuity",
-      "binding_id": "ct.automation.monthly-heartbeat.v1",
-      "failure_domain": "backup_recovery"
+      "canonical_name": "CrownThrive Midnight Backup & Continuity v2",
+      "schedule_id": "ct.schedule.backup-continuity.midnight.v2",
+      "binding_id": "ct.binding.backup-continuity.midnight.v2",
+      "internal_clock": "pg_cron",
+      "external_connector_parent": "ct.schedule.external-evidence-relay.hourly.v1",
+      "dedicated_external_clock": "RETIRED_SCHEDULING_SCAFFOLDING",
+      "failure_domain": "connector-only Google Drive evidence/readback/restore subroute"
     },
     "maintenance_coordinator": {
       "binding_id": "ct.automation.maintenance-coordinator.v1",
-      "temporary": true,
-      "retire_when_maintenance_closes_and_no_persistent_duty_remains": true
+      "state": "RETIRED_SCHEDULING_SCAFFOLDING",
+      "task_enabled": false,
+      "maintenance_closed": true
     }
   },
   "internal_clock_model": {
     "database_native": "pg_cron",
+    "software_factory": "PentaFactory/PentaBuild and governed production queues",
+    "framework_factory": "PentaFactory governed framework build routes",
     "documentation": "Mintlify workflows",
     "logical_agent_execution": "internal agent/subroute identities and governed work packets",
-    "legacy_external_one_agent_one_clock": "RETIRED_SCHEDULING_SCAFFOLDING"
+    "legacy_external_one_agent_one_clock": "RETIRED_SCHEDULING_SCAFFOLDING",
+    "legacy_abcds_scheduler_roles": "SUPERSEDED_SCHEDULING_SCAFFOLDING_IDENTITIES_PRESERVED",
+    "document_recovery_executor": "pg_cron:ct-chlom-document-recovery-dispatch-15m",
+    "penta_hourly_delivery_executors": [
+      "pg_cron:penta-mail-state-architecture-hourly-v1",
+      "pg_cron:penta-mail-outage-watch-v1",
+      "pg_cron:penta-mail-outbox-dispatch-v1",
+      "pg_cron:pentaod-reconcile-v1",
+      "pg_cron:pentaod-heartbeat-v1",
+      "pg_cron:penta-hourly-update-policy-enforcer-v1"
+    ]
+  },
+  "retired_external_scaffolding": {
+    "document_recovery_legacy_external_schedule": "ct.schedule.chlom.document-recovery-continuity.hourly.v1",
+    "document_recovery_state": "RETIRED_SCHEDULING_SCAFFOLDING",
+    "penta_hourly_delivery_watch_state": "RETIRED_SCHEDULING_SCAFFOLDING",
+    "penta_reward_v5_review_state": "RETIRED_SCHEDULING_SCAFFOLDING",
+    "penta_reward_v5_review_successor": "ct.schedule.version-threat.daily via ct.schedule.external-evidence-relay.hourly.v1",
+    "historical_records_preserved": true
+  },
+  "wallet_reconciliation": {
+    "legacy_pr": 230,
+    "legacy_pr_state": "closed_unmerged",
+    "legacy_exact_head": "bc42315a539c40ce8082342d3b6bb97c1817d06b",
+    "legacy_review_cohort_state": "SUPERSEDED_RETIRED_SCHEDULING_SCAFFOLDING",
+    "current_phase3_successor_pr": 476,
+    "current_phase3_successor_merge_commit": "e6466e7a56c27b05b2ed15eb4fa1ae34ea490018",
+    "current_owner_model": "PentaNurture/PentaStatus/PentaCredentials/PentaCertify/PentaFactory/PentaBuild/PentaTriage with CHLOM authority boundary",
+    "historical_v1_v2_review_records_preserved": true,
+    "current_historical_lane_count": 5,
+    "current_v2_receipt_count": 0,
+    "current_v2_synthesis_count": 0,
+    "new_reviewer_heartbeats_fabricated": false,
+    "new_review_receipts_fabricated": false,
+    "new_synthesis_fabricated": false
   },
   "invariants": {
     "no_duplicate_clocks": true,
@@ -54,25 +99,45 @@
     "money_movement_from_scheduler": false,
     "provider_write_authority_from_scheduler": false,
     "raw_secret_export": false,
-    "direct_main_write_from_scheduler": false
+    "direct_main_write_from_scheduler": false,
+    "append_or_supersede_history": true
   },
   "certification": {
-    "stress_test_decision": "PASS",
-    "stress_test_sha256": "8940fe822102680796f1f97c3b7f2d68eec870c87f0a724676bcd0c4b9ec5330",
-    "stress_test_repeatable": true,
+    "original_stress_test_decision": "PASS",
+    "original_stress_test_sha256": "8940fe822102680796f1f97c3b7f2d68eec870c87f0a724676bcd0c4b9ec5330",
+    "runtime_migration_applied": true,
+    "runtime_migration_name": "scheduler_topology_post_maintenance_reconciliation_v2",
+    "runtime_migration_version": "20260826204425",
+    "runtime_reconciled_at": "2026-08-26T20:44:25.155517+00:00",
+    "runtime_revalidation_required_after_v1_2_0_apply": false,
+    "runtime_revalidation_decision": "PASS",
+    "runtime_revalidation_digest_sha256": "9e4fcbe4731ed39403721c669b758e0e7c6dbf9cf8219564713e850a124d9789",
+    "runtime_revalidated_at": "2026-08-26T20:57:15Z",
+    "runtime_stress_persisted": false,
+    "active_pg_cron_count": 104,
+    "enabled_external_binding_count": 2,
     "retired_external_clocks_enabled": 0,
     "pending_external_dispositions": 0,
     "unreconciled_external_schedules": 0,
     "enabled_d3_external_clocks": 0,
-    "scheduler_reconciliation_gate": "PASS",
-    "scheduler_reconciliation_receipt": "2ffa0b1f-40dd-4b25-9e9e-7a5ab55fdb20",
-    "dail_event_id": "13341bcc-be93-4ada-9c87-cced641636f3",
-    "dail_head_after_certification": "8a1b434da6e785ad5b7597252c6b55da70ecc8efc09dae46d5ccf38b1de5dd24"
+    "active_relay_bound_still_suspended": 0,
+    "due_backup_jobs": 0,
+    "scheduler_reconciliation_gate": "PASS"
   },
   "maintenance_boundary": {
     "maintenance_event": "ct.maintenance.2026-08-24.targeted-quiescence.v1",
+    "maintenance_state": "CLOSED",
+    "targeted_maintenance_closed_at": "2026-08-26T02:55:34.393989+00:00",
     "scheduler_reconciliation_release_satisfied": true,
-    "overall_maintenance_release_ready": false,
-    "rule": "scheduler certification does not manufacture PASS for unrelated recovery gates"
+    "rule": "closed maintenance does not manufacture PASS for unrelated gates"
+  },
+  "source_lineage": {
+    "predecessor_topology_merge_commit": "e6195cd42c28c90d12797f4f755fae1dd548dff3",
+    "support_main_at_reconciliation_start": "92f69e40d4cb595b05d22167537d5af763d5dcba",
+    "runtime_applied_from_pr": 514,
+    "subsequent_provider_migration_observed": "20260826205239_retire_duplicate_penta_external_clocks_v1",
+    "subsequent_provider_migration_source_custody": "RECOVERED_EXACT_PROVIDER_VERSION",
+    "subsequent_provider_migration_source_path": "supabase/migrations/20260826205239_retire_duplicate_penta_external_clocks_v1.sql",
+    "history_policy": "append_or_supersede_never_silent_delete"
   }
 }

@@ -1,0 +1,163 @@
+---
+title: "Agent Scheduler Topology Post-Maintenance Reconciliation — 2026-08-26"
+sidebarTitle: "Scheduler Topology Reconciliation"
+description: "Current-state reconciliation of CrownThrive's production scheduler after targeted maintenance closure, including the two-clock external failure-domain model and retirement of stale PR-specific scheduling scaffolding."
+icon: "arrows-rotate"
+keywords: ["CrownThrive", "scheduler", "ThriveBase", "Penta", "CHLOM", "pg_cron", "maintenance", "wallet", "continuity"]
+---
+
+# Agent Scheduler Topology Post-Maintenance Reconciliation — 2026-08-26
+
+## Current decision
+
+The production scheduler remains `ct.scheduler-topology.production.v1`. ThriveBase is runtime-authoritative. This reconciliation updates source-controlled projection to the **post-maintenance** topology rather than rewriting the original August 24 certification.
+
+```text
+runtime topology semantic version   1.2.0
+maintenance                         CLOSED
+external clock target               2
+external failure domain #1          CrownThrive External Evidence Relay
+external failure domain #2          CrownThrive Communications Watch
+backup clock                        internal pg_cron
+backup connector work               subroute of External Evidence Relay
+maintenance coordinator             RETIRED_SCHEDULING_SCAFFOLDING
+legacy one-agent-one-clock model     RETIRED_SCHEDULING_SCAFFOLDING
+```
+
+The scheduler clock creates no authority. D3 remains human-reserved. No topology change authorizes provider writes, money movement, rights, entitlements, checkout, credential export, sovereign voting, or phase advancement.
+
+## Why this reconciliation exists
+
+The August 24 source projection still described the maintenance-era topology and a normal three-clock target. ThriveBase subsequently closed targeted maintenance and converged backup continuity so that midnight due generation and dedupe are owned by `pg_cron`, while the connector-only Google Drive portion is serviced by the canonical External Evidence Relay. The dedicated backup ChatGPT clock remains retired.
+
+The current external topology therefore has two clocks, not three:
+
+```text
+External Evidence Relay
+└─ due connector-only logical subroutes
+   ├─ midnight backup Drive evidence/readback/restore when a ThriveBase job is due
+   ├─ vendor/provider evidence that cannot run internally
+   └─ other explicitly bound connector-only duties
+
+Communications Watch
+└─ email/communications connector failure domain
+```
+
+Everything compatible with ThriveBase, pg_cron, queues, PentaFactory/PentaBuild, framework software, GitHub Actions, Mintlify workflows, Edge Functions, or another production-native executor stays internal.
+
+## Retired duplicate scheduling scaffolding
+
+The following stale or duplicate external clocks were retired without deleting their historical records:
+
+- `ct.schedule.agent-a.portfolio-fallback.hourly` — superseded by the production portfolio/queue fabric.
+- the five PR #230 CHLOM Wallet independent-review schedule rows — superseded because PR #230 is closed/unmerged and their exact-head cohort is stale; historical v1/v2 evidence remains preserved.
+- `ct.schedule.chlom.document-recovery-continuity.hourly.v1` — superseded by active production-native pg_cron job `ct-chlom-document-recovery-dispatch-15m`, which invokes `chlom_runtime.chlom_document_recovery_dispatch_tick()` every 15 minutes.
+- the external Penta hourly delivery/readiness watch — retired after successful readback of the production-native PentaMail/PentaOD/PentaHeartbeat cron family.
+- the standalone CrownRewards/Reward Loyalty v5 reminder — retired because vendor/version drift is already owned by `ct.schedule.version-threat.daily` under the canonical External Evidence Relay.
+
+The dedicated midnight backup external task and the targeted-maintenance coordinator were already retired and remain disabled.
+
+### Penta internal executor readback
+
+Before retiring the duplicate Penta hourly external watch, the following production-native jobs were read back active and successful with no failures in the inspected three-hour window:
+
+- `penta-mail-state-architecture-hourly-v1`;
+- `penta-mail-outage-watch-v1`;
+- `penta-mail-outbox-dispatch-v1`;
+- `pentaod-reconcile-v1`;
+- `pentaod-heartbeat-v1`;
+- `pentaod-idle-sleep-v1`;
+- `penta-hourly-update-policy-enforcer-v1`.
+
+The external retirement reduces duplicate scheduler risk; it does not certify every downstream email delivery or provider operation.
+
+## CHLOM Wallet PR #230 review scaffolding
+
+PR #230 is closed and unmerged. Its five independent-review schedules remain historically valuable but cannot continue as live current-head dispatch targets because their PR/head/evidence cohort is stale.
+
+The five schedule rows are therefore superseded as `SUPERSEDED_RETIRED_SCHEDULING_SCAFFOLDING`. Historical v1/v2 lane, heartbeat, receipt, and synthesis records remain untouched.
+
+Current Phase-3 Wallet continuity ownership is the Penta model merged through PR #476:
+
+- PentaNurture — continuity maintenance, drift, and recovery-plan stewardship;
+- PentaStatus — current-state projection and readback;
+- PentaCredentials — credential/server-binding readiness;
+- PentaCertify — exact-operation certification;
+- PentaFactory / PentaBuild — software, adapters, and candidates;
+- PentaTriage — incident routing;
+- CHLOM — authority boundary.
+
+No reviewer heartbeat, independent receipt, or synthesis is fabricated to make the historical PR #230 cohort look current.
+
+## Runtime migrations and exact readback
+
+The source-controlled migration chain is:
+
+- `supabase/migrations/20260826204425_scheduler_topology_post_maintenance_reconciliation_v2.sql`
+- `supabase/migrations/20260826204942_retire_document_recovery_external_scheduler_scaffolding_v1.sql`
+- `supabase/migrations/20260826205239_retire_duplicate_penta_external_clocks_v1.sql`
+
+The production database recorded and applied those exact versions and names. All changes are bounded topology/evidence reconciliation; no provider write, payment, entitlement, credential, sovereign-vote or D3 capability was added.
+
+Exact final readback:
+
+```text
+topology semantic version               1.2.0
+production topology ready               true
+maintenance active                       false
+post-maintenance external clock target   2
+enabled external bindings                2
+active pg_cron jobs                       104
+retired-but-enabled external clocks       0
+pending external dispositions             0
+unreconciled external schedules           0
+enabled D3 external clocks                0
+relay-bound rows still maintenance-held   0
+current due backup jobs                   0
+Wallet historical v2 lanes                5
+Wallet new v2 review receipts             0
+Wallet new v2 syntheses                    0
+```
+
+The external automation connector readback now shows only the two canonical external clocks enabled: CrownThrive External Evidence Relay and CrownThrive Communications Watch. The Penta hourly delivery watch and Reward Loyalty v5 reminder are preserved disabled as `RETIRED_SCHEDULING_SCAFFOLDING`.
+
+Read-only topology stress test result after all retirements:
+
+```text
+decision                         PASS
+evidence_digest_sha256          9e4fcbe4731ed39403721c669b758e0e7c6dbf9cf8219564713e850a124d9789
+persisted                        false
+```
+
+A refreshed provider readback at `2026-08-26T20:57:15Z`, after later concurrent provider activity, returned the values above with `persisted=false`. The three scheduler migrations are now preserved under their exact provider versions. Broader repository migration custody remains `HOLD` because the provider reports 891 applied migrations while this repository contains 39 governed migration files; missing SQL history must be recovered authoritatively rather than fabricated.
+
+Every stress predicate passed, including duplicate-clock prevention, recursive-scheduler prohibition, D3 human reservation, authority-expansion false, retired clocks disabled, canonical relay binding, backup and communications failure-domain presence, and external-disposition reconciliation.
+
+## Security-advisor disposition
+
+The post-apply Supabase security advisor reported existing `RLS enabled/no policy` informational findings on multiple private/service-only tables and a warning that `public.penta_pr_status_v1()` is a `SECURITY DEFINER` function executable by `anon` and `authenticated`. This scheduler migration did not create or alter that function. Its exposure remains a separate Penta security-hardening packet rather than being silently changed by scheduler reconciliation.
+
+Supabase remediation reference: https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable
+
+## Invariants
+
+- append/supersede, never silent delete;
+- no recurring external task is created;
+- no provider write authority is added;
+- no money-movement authority is added;
+- no credential material is read or exported;
+- no main branch is written directly;
+- no historical Wallet review receipt is promoted to current truth;
+- no scheduler identity becomes a sovereign voter or quorum member;
+- no D3 action is automated.
+
+## Source lineage
+
+```text
+original topology merge       e6195cd42c28c90d12797f4f755fae1dd548dff3
+Wallet Phase-3 successor      PR #476 / e6466e7a56c27b05b2ed15eb4fa1ae34ea490018
+main at reconciliation start  92f69e40d4cb595b05d22167537d5af763d5dcba
+runtime source packet          PR #514
+```
+
+The original August 24 certification remains preserved as historical evidence. This page is its additive post-maintenance successor.
