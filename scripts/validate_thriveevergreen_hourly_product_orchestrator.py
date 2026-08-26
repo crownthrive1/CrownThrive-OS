@@ -30,6 +30,28 @@ def require(text: str, fragment: str, source: Path) -> None:
         fail(f"missing {fragment!r} in {source.relative_to(ROOT)}")
 
 
+def navigation_pages(nav: dict) -> list[str]:
+    """Return string routes from both legacy and current PentaDocs tab schemas.
+
+    The repository historically used ``tab.groups[]``. PentaDocs now stores
+    group objects under ``tab.pages[]``. The validator must fail closed on the
+    governed routes themselves, not on a superseded navigation container key.
+    """
+    routes: list[str] = []
+    for tab in nav.get("navigation", {}).get("tabs", []):
+        groups = tab.get("groups")
+        if not isinstance(groups, list):
+            candidate = tab.get("pages", [])
+            groups = candidate if isinstance(candidate, list) else []
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            for page in group.get("pages", []):
+                if isinstance(page, str):
+                    routes.append(page)
+    return routes
+
+
 def main() -> int:
     manifest = json.loads(read(MANIFEST))
     docs = {path: read(path) for path in (AUTHORITY, AUTOMATION, CHANGELOG)}
@@ -149,10 +171,7 @@ def main() -> int:
             require(docs[path], fragment, path)
 
     nav = json.loads(read(NAV))
-    pages: list[str] = []
-    for tab in nav.get("navigation", {}).get("tabs", []):
-        for group in tab.get("groups", []):
-            pages.extend(group.get("pages", []))
+    pages = navigation_pages(nav)
     for route in (
         "automation/thriveevergreen-hourly-product-orchestration",
         "changelog/thriveevergreen-hourly-observer-v1-1-hardening-2026-08-23",
