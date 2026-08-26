@@ -2,8 +2,9 @@
   "schema": "crownthrive.penta.serialized.git-receipt/v1",
   "receipt_id": "ct.penta.serialized.pentacloser-preclose-readback.20260826.v2.0.1",
   "created_at": "2026-08-26T21:59:55Z",
+  "updated_at": "2026-08-26T22:10:00Z",
   "actor": "PentaFactory GitHub control-plane operator",
-  "reason": "Correct PentaCloser so terminal closure cannot occur before fresh GitHub provider readback confirms PentaTagger identity, close-candidate labels, exact lifecycle head, open PR state, and absence of a late penta:hold override.",
+  "reason": "Correct PentaCloser so terminal closure cannot occur before fresh GitHub provider readback confirms PentaTagger identity, close-candidate labels, exact lifecycle head, open PR state, and absence of a late penta:hold override; also repair the machine governance-readback transport permission required to upsert PR conversation evidence.",
   "changes": [
     {
       "path": ".github/workflows/penta-pr-lifecycle-reusable.yml",
@@ -28,6 +29,14 @@
       "new_blob_sha": "7b4eef9d59fe68573c074c31fce9abb9ad846298",
       "reason": "Add regression coverage for hidden labels, missing PentaTagger preflight, late hold insertion, stale lifecycle head, exact open-head readback, and terminal workflow ordering.",
       "rollback_ref": "2edc24e4b2fa19dd9ed25f5f3ca1771f3237c6d9"
+    },
+    {
+      "path": ".github/workflows/governance-observability.yml",
+      "operation": "modify",
+      "previous_blob_sha": "4896669cab5f3c3755c9364d9f3f16ad5076402f",
+      "new_blob_sha": "f4ec7efaace1f3885b63e5e8d0b4ccef4a01645f",
+      "reason": "GitHub reproducibly returned HTTP 403 when the machine observability actor attempted to create its PR conversation readback with issues:write but pull-requests:read. Grant pull-requests:write solely so the marker comment can be created or updated.",
+      "rollback_ref": "10094b040841316147898dbe59710e366ce908f6"
     }
   ],
   "continuity": {
@@ -42,7 +51,8 @@
     "PentaTagger": "semantic classification and provider readback before and after terminal authority",
     "PentaPR": "lifecycle classification and exact-head deadline state",
     "PentaMerge": "exact-head governed merge execution only",
-    "PentaCloser": "terminal close only after preflight, close-candidate write, fresh provider readback, exact-head recheck, and hold recheck"
+    "PentaCloser": "terminal close only after preflight, close-candidate write, fresh provider readback, exact-head recheck, and hold recheck",
+    "GovernanceObservability": "read exact-head PR and workflow state and create or update one machine-owned PR conversation comment; no approval, review, merge, close, label, contents, deployment, rights, money, or secret authority"
   },
   "failure_contract": {
     "missing_tagger_marker": "BLOCK_CLOSE",
@@ -50,12 +60,28 @@
     "provider_label_eventual_consistency": "BLOCK_CLOSE_AND_RETRY_LATER",
     "late_hold": "BLOCK_CLOSE",
     "head_changed": "BLOCK_CLOSE_AND_RECLASSIFY",
-    "pr_not_open": "BLOCK_CLOSE"
+    "pr_not_open": "BLOCK_CLOSE",
+    "observability_comment_forbidden": "REPORT_TRANSPORT_FAILURE_WITHOUT_MANUFACTURING_GOVERNANCE_DISPOSITION"
+  },
+  "transport_evidence": {
+    "failed_run_id": 33018137340,
+    "initial_failed_job_id": 98341582165,
+    "rerun_failed_job_id": 98342093313,
+    "provider_error": "HTTP 403 Forbidden on POST /issues/525/comments",
+    "token_before": {
+      "issues": "write",
+      "pull_requests": "read"
+    },
+    "token_after": {
+      "issues": "write",
+      "pull_requests": "write"
+    }
   },
   "exclusions": [
     "No governance or continuity gate was weakened.",
     "No PR was closed to test this patch.",
     "No provider credential or secret material was read or changed.",
+    "No approval, review, merge, close, label, contents, deployment, rights, money, licensing, or database authority was granted to Governance Observability.",
     "No money, licensing, rights, deployment, or database authority was exercised."
   ]
 }
