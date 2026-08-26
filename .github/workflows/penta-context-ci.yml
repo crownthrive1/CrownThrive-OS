@@ -1,0 +1,51 @@
+name: PentaContext CI
+
+on:
+  pull_request:
+    paths:
+      - "PENTACONTEXT.md"
+      - "runtime/penta_context.py"
+      - "tests/test_penta_context.py"
+      - "schemas/penta-context-record-v1.schema.json"
+      - "supabase/functions/penta-context/**"
+      - "supabase/migrations/*penta_context*"
+      - ".github/workflows/penta-context-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "runtime/penta_context.py"
+      - "tests/test_penta_context.py"
+      - "schemas/penta-context-record-v1.schema.json"
+      - "supabase/functions/penta-context/**"
+      - "supabase/migrations/*penta_context*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-context-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile runtime
+        run: python -m py_compile runtime/penta_context.py
+      - name: Run contract tests
+        run: python -m unittest tests.test_penta_context -v
+      - name: Validate JSON schema syntax
+        run: python -m json.tool schemas/penta-context-record-v1.schema.json >/dev/null
+      - name: Enforce no embedded service-role secret
+        shell: bash
+        run: |
+          if grep -RIE --exclude='*.md' --exclude='*.sql' '(sb_secret_[A-Za-z0-9_-]{10,}|SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=[[:space:]]*[^$])' runtime/penta_context.py supabase/functions/penta-context; then
+            echo "Potential embedded service-role material detected"
+            exit 1
+          fi
