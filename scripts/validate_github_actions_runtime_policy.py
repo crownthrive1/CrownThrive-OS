@@ -73,7 +73,6 @@ def split_yaml_comment(raw: str) -> tuple[str, Optional[str]]:
                 continue
         elif quote == "'":
             if char == quote:
-                # YAML represents a literal single quote as two adjacent quotes.
                 if index + 1 < len(raw) and raw[index + 1] == "'":
                     continue
                 quote = None
@@ -104,8 +103,6 @@ def decode_literal_scalar(raw: str) -> tuple[str, Optional[str]]:
         if quote == "'":
             inner = inner.replace("''", "'")
         elif "\\" in inner:
-            # Action and runner identifiers require no escape sequences. Reject
-            # rather than risk accepting a YAML escape with a different meaning.
             raise PolicyParseError("escaped double-quoted directive is outside the accepted profile")
         value = inner
     else:
@@ -167,16 +164,14 @@ def parser_self_test() -> None:
             pass
         else:
             if parsed is not None:
-                # Folded/block forms are rejected later as invalid remote refs;
-                # this branch guarantees they cannot be silently skipped.
                 assert parsed[0] in {">", ">-", ">+", "|", "|-", "|+"}
 
 
 def main() -> int:
     parser_self_test()
     policy = load_policy()
-    if policy.get("manifest_version") != "1.0.1":
-        fail("GitHub Actions runtime policy must include parser/runner hardening version 1.0.1")
+    if policy.get("manifest_version") != "1.0.2":
+        fail("GitHub Actions runtime policy must include provenance hardening version 1.0.2")
     if policy.get("status") != "active_fail_closed":
         fail("GitHub Actions runtime policy must remain active_fail_closed")
     if policy.get("target_runtime") != "node24" or policy.get("node20_status") != "prohibited":
@@ -209,6 +204,14 @@ def main() -> int:
     if refs.get("quoted_uses_scalars") != "parsed_and_governed":
         fail("Quoted uses scalars must remain governed")
 
+    provenance = policy.get("provenance_policy", {})
+    if provenance.get("production_evidence_attestation") != "permitted_after_underlying_gate_pass":
+        fail("Provenance attestations must remain downstream of the underlying PASS gate")
+    if provenance.get("attestation_must_not_convert_hold_to_pass") is not True:
+        fail("Provenance attestations must never manufacture PASS")
+    if provenance.get("subject_must_be_sanitized_non_secret_evidence") is not True:
+        fail("Provenance subjects must remain sanitized non-secret evidence")
+
     if policy.get("escape_hatches", {}).get("ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION") != "prohibited":
         fail("Insecure Node runtime escape hatch must remain prohibited")
 
@@ -221,7 +224,8 @@ def main() -> int:
             fail(f"Approved action {action!r} lacks a full lowercase SHA")
         if item.get("runtime") != "node24" or item.get("compatibility") != "approved":
             fail(f"Approved action {action} is not explicitly Node 24 compatible")
-        if "verified_2026-08-19" not in str(item.get("upstream_evidence", "")):
+        evidence = str(item.get("upstream_evidence", ""))
+        if not re.search(r"verified_2026-08-(?:19|25|26)", evidence):
             fail(f"Approved action {action} lacks current upstream runtime/source evidence")
         approved[action] = {"sha": sha, "version": version}
 
@@ -230,6 +234,7 @@ def main() -> int:
         "actions/setup-python",
         "actions/dependency-review-action",
         "actions/upload-artifact",
+        "actions/attest-build-provenance",
     }
     if set(approved) != required_actions:
         fail(f"Approved action inventory drifted: {sorted(approved)}")
@@ -312,6 +317,7 @@ def main() -> int:
     print("Runtime floor: Node 24; Node 20 and runtime warning-suppression escape hatches: prohibited.")
     print("Runner policy: approved literal GitHub-hosted labels only; dynamic/matrix/self-hosted labels fail closed.")
     print("Remote actions: quoted/unquoted uses parsed, canonical root, full-SHA pinned; Dependabot daily proposals only.")
+    print("Provenance: sanitized PASS evidence may be attested; attestation never promotes HOLD.")
     print("CodeQL: provider-managed default setup; duplicate advanced workflow action references: prohibited.")
     return 0
 
