@@ -1,0 +1,147 @@
+name: PentaFramework Factory Governed Provider Promotion
+
+on:
+  workflow_run:
+    workflows:
+      - Governed Merge Gate
+    types:
+      - completed
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: pentaframework-provider-promote-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  release-rejected:
+    if: >-
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      startsWith(github.event.workflow_run.head_branch, 'factory/provider-job-') &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Release provider job rejected by governed gate
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-factory-github-bridge
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          GATE_RUN_ID: ${{ github.event.workflow_run.id }}
+          GATE_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          set -euo pipefail
+          JOB_ID="${HEAD_BRANCH#factory/provider-job-}"
+          case "$JOB_ID" in
+            ????????-????-????-????-????????????) ;;
+            *) echo "invalid provider job branch: $HEAD_BRANCH" >&2; exit 2;;
+          esac
+          OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
+          jq -n --arg job "$JOB_ID" --arg err "Governed Merge Gate ${GATE_RUN_ID} concluded ${GATE_CONCLUSION}; provider write not promoted" '{action:"release",job_id:$job,error:$err}' > release.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @release.json "$BRIDGE" | jq .
+
+  promote-approved:
+    if: >-
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      startsWith(github.event.workflow_run.head_branch, 'factory/provider-job-') &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Derive governed provider context
+        id: ctx
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          JOB_ID="${HEAD_BRANCH#factory/provider-job-}"
+          case "$JOB_ID" in
+            ????????-????-????-????-????????????) ;;
+            *) echo "invalid provider job branch: $HEAD_BRANCH" >&2; exit 2;;
+          esac
+          echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact governed SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Verify factory manifest binds to provider job
+        id: manifest
+        shell: bash
+        env:
+          JOB_ID: ${{ steps.ctx.outputs.job_id }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          [ "$ACTUAL_SHA" = "$EXPECTED_SHA" ] || { echo "governed SHA mismatch" >&2; exit 2; }
+          MANIFEST=$(git diff-tree --no-commit-id --name-only -r HEAD | grep -E '^generated/factory/[^/]+/factory-manifest\.json$' | head -n 1)
+          [ -n "$MANIFEST" ] || { echo "factory manifest missing from governed commit" >&2; exit 2; }
+          [ "$(jq -r '.job.id' "$MANIFEST")" = "$JOB_ID" ] || { echo "provider job binding mismatch" >&2; exit 2; }
+          [ "$(jq -r '.product_contract' "$MANIFEST")" = "ct.pentaframework-factory.v1" ] || { echo "PentaFramework product contract missing" >&2; exit 2; }
+          COUNT=$(jq '.files | length' "$MANIFEST")
+          echo "file_count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "manifest=$MANIFEST" >> "$GITHUB_OUTPUT"
+
+      - name: Promote exact governed SHA to main
+        id: promote
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          [ "$(git rev-parse HEAD)" = "$EXPECTED_SHA" ] || { echo "head changed after governance" >&2; exit 2; }
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            echo "main advanced after provider staging; exact governed SHA must be regenerated from current main" >&2
+            exit 3
+          fi
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${GITHUB_REPOSITORY}/commit/$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Complete provider job after governed production readback
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-factory-github-bridge
+          JOB_ID: ${{ steps.ctx.outputs.job_id }}
+          COMMIT_SHA: ${{ steps.promote.outputs.sha }}
+          COMMIT_URL: ${{ steps.promote.outputs.url }}
+          FILE_COUNT: ${{ steps.manifest.outputs.file_count }}
+          GATE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
+          jq -n --arg job "$JOB_ID" --arg sha "$COMMIT_SHA" --arg url "$COMMIT_URL" --arg gate "$GATE_RUN_ID" --argjson count "$FILE_COUNT" '{action:"complete",job_id:$job,commit_sha:$sha,head_sha:$sha,commit_url:$url,branch:"main",file_count:$count,governance_gate_run_id:$gate,rollback_ref:("git:"+$sha+"^1")}' > complete.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @complete.json "$BRIDGE" | jq .
+
+      - name: Delete governed staging branch
+        if: success()
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          git push origin --delete "$HEAD_BRANCH" || true
+
+      - name: Release provider job on promotion failure
+        if: failure()
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-factory-github-bridge
+          JOB_ID: ${{ steps.ctx.outputs.job_id }}
+          GATE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          [ -n "$JOB_ID" ] || exit 0
+          OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
+          jq -n --arg job "$JOB_ID" --arg err "Governed provider promotion failed after successful gate ${GATE_RUN_ID}; job released for clean regeneration" '{action:"release",job_id:$job,error:$err}' > release.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @release.json "$BRIDGE" | jq .
