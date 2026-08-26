@@ -1,0 +1,52 @@
+name: PENTA Registry Governance
+
+on:
+  pull_request:
+    paths:
+      - 'data/penta/**'
+      - 'tools/penta_registry.py'
+      - 'docs/phase3/PENTA_*.md'
+      - '.github/workflows/penta-registry-governance.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/penta/**'
+      - 'tools/penta_registry.py'
+      - 'docs/phase3/PENTA_*.md'
+      - '.github/workflows/penta-registry-governance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-registry-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-registry:
+    name: Validate machine-readable PENTA registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate registry
+        run: python tools/penta_registry.py --json
+
+      - name: Resolve new canonical layers
+        run: |
+          python tools/penta_registry.py --system PentaInstitute --closure --json
+          python tools/penta_registry.py --system PentaAlumni --closure --json
+          python tools/penta_registry.py --system PentaHybrid --closure --json
+          python tools/penta_registry.py --system PentaMation --closure --json
+          python tools/penta_registry.py --system PentaSignal --closure --json
+          python tools/penta_registry.py --system PentaAssure --closure --json
+          python tools/penta_registry.py --system PentaFederation --closure --json
