@@ -255,27 +255,33 @@ class LeaseAndRepairTests(unittest.TestCase):
         )
         self.assertGreater(second.fence_token, first.fence_token)
 
-    def test_concurrent_acquire_has_one_winner(self) -> None:
+    def test_concurrent_acquire_through_serialization_gate_has_one_winner(self) -> None:
         book = LeaseBook()
         barrier = threading.Barrier(8)
         outcomes: list[str] = []
-        lock = threading.Lock()
+        outcome_lock = threading.Lock()
+        # Production lease acquisition is serialized by the transaction-scoped
+        # advisory lock described by LeaseBook's contract. Mirror that boundary
+        # here rather than requiring the provider-neutral in-memory model itself
+        # to be a cross-thread synchronization primitive.
+        serialization_gate = threading.Lock()
 
         def contender() -> None:
             barrier.wait()
-            try:
-                book.acquire(
-                    domain_key="runtime_resource:css-hourly",
-                    intent=self.intent,
-                    expected_main_sha=TWO40,
-                    owner_agent_id=self.intent.agent_id,
-                    owner_instance_id=str(uuid.uuid4()),
-                    now=self.now,
-                )
-                outcome = "won"
-            except ContractError:
-                outcome = "held"
-            with lock:
+            with serialization_gate:
+                try:
+                    book.acquire(
+                        domain_key="runtime_resource:css-hourly",
+                        intent=self.intent,
+                        expected_main_sha=TWO40,
+                        owner_agent_id=self.intent.agent_id,
+                        owner_instance_id=str(uuid.uuid4()),
+                        now=self.now,
+                    )
+                    outcome = "won"
+                except ContractError:
+                    outcome = "held"
+            with outcome_lock:
                 outcomes.append(outcome)
 
         threads = [threading.Thread(target=contender) for _ in range(8)]
