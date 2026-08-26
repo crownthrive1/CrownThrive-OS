@@ -14,6 +14,7 @@ Before contributing, read:
 - `docs/archive/README.md` — historical/supersession policy;
 - `SECURITY.md` — private disclosure requirements;
 - `SUPPORT.md` — support versus issue-routing guidance.
+- `standards/pentadocs-audience-and-component-standard.mdx` — required audience, page-profile, structure, and Mintlify component semantics for navigated documentation.
 
 ## Current contribution baseline
 
@@ -75,6 +76,10 @@ A material pull request should identify:
 ## Documentation rules
 
 Every navigated MDX page requires valid frontmatter, unique title/description, substantive content, material state, public-safe language, source discipline, correct internal links, and no unsupported production/legal/provider/economic claims.
+
+Every new or materially changed navigated page must conform to the PentaDocs Audience and Component Standard. Record `standard_version`, `primary_audience`, `page_type`, and `content_state`; begin the body with the page-type audience guide; use frontmatter as the page H1; and select Mintlify components for their documented meaning rather than decoration. `CardGroup` is deprecated in new work; use responsive `Columns` with `Card` elements. Historical and superseded pages require a visible boundary and a current successor when one is known.
+
+Run `python3 scripts/pentadocs_quality.py --check` directly when developing documentation. `python3 scripts/validate_docs.py` invokes the same gate in the normal repository validation path. A quality PASS proves source-format and corpus-contract conformance only; it does not prove provider deployment, independent review, institutional acceptance, or runtime certification.
 
 Recovered historical bodies must not be rewritten to manufacture present-day authority. Preserve history and add a current overlay, disposition, correction, or successor record.
 

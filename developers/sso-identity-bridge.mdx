@@ -3,23 +3,80 @@ title: "SSO, CrownThrive ID and Social Identity Bridge"
 sidebarTitle: "SSO & Identity"
 description: "The development model for using CrownThrive Commons/social infrastructure as an identity entry point while CrownThrive ID remains the durable identity, role, consent, and SSO authority."
 icon: "id-card"
+standard_version: "1.0.0"
+primary_audience: "developer"
+page_type: "developer"
+content_state: "unresolved"
 ---
 
-# SSO, CrownThrive ID and Social Identity Bridge
+{/* pentadocs:audience-orientation:v2 */}
+<Note>
+  **Audience:** identity architects, application developers, security reviewers, and platform integrators. Use this boundary model with [CrownThrive ID](/technology/crownthrive-id) and the [security and privacy continuity standard](/technology/security-privacy-continuity).
+
+  **This page:** SSO, CrownThrive ID and Social Identity Bridge — The development model for using CrownThrive Commons/social infrastructure as an identity entry point while CrownThrive ID remains the durable identity, role, consent, and SSO authority.
+
+  **Documentation state:** `unresolved` for page type `developer`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Unresolved reason:** no explicit page-level editorial acceptance state was declared in the migrated source.
+
+  **Evidence needed:** an accepted governing source or accountable-owner attestation.
+
+  **Review role:** PentaDocs governance.
+
+  **Review trigger:** next material edit or source reconciliation.
+</Note>
+{/* /pentadocs:audience-orientation:v2 */}
+
+<Warning>
+  **Target architecture.** No current issuer URL, authorization or token endpoint, client-registration process, redirect URI, claim schema, scope catalog, token lifetime, signing-key set, SDK, or production migration is established by this page. Do not configure OIDC/OAuth from the diagram alone.
+</Warning>
+
+## Integration starting point
+
+<Steps>
+  <Step title="Inventory the local identity">
+    Record the platform account identifier, authentication provider, roles, recovery path, profile fields, consent data, and suspension state without treating them as CrownThrive-wide authority.
+  </Step>
+  <Step title="Create an explicit account link">
+    Map the local account to a stable CrownThrive ID only through an approved, auditable linking flow. Preserve unlinking and recovery history.
+  </Step>
+  <Step title="Adopt brokered SSO where supported">
+    Use standards-based OAuth 2.0/OIDC only after issuer, client, redirect, scope, claim, assurance, signing, and environment contracts are verified.
+  </Step>
+  <Step title="Consume bounded claims">
+    A platform receives only the approved roles, consent, eligibility, and profile references required for its purpose; it does not read unrestricted institutional databases.
+  </Step>
+  <Step title="Test failure and recovery">
+    Verify expired/revoked credentials, account-link conflict, suspension, re-authentication, MFA for privileged roles, consent withdrawal, and vendor-independent recovery before migration.
+  </Step>
+</Steps>
+
+## Identity boundary
 
 The source architecture explicitly allows the CrownThrive social/community platform—historically represented through **WoWonder / CrownThrive Commons**—to support gated community, social interaction and identity entry. It should **not** become the permanent institutional identity source of truth.
 
 ## Target relationship
 
-```text
-CrownThrive Commons / social platform
-        ↓ login / community / profile experience
-CrownThrive ID broker
-        ↓ OIDC/OAuth + roles + consent + eligibility
-Platform adapters
-        ↓
-Laravel / Next.js / hosted SaaS / media / commerce / future apps
+```mermaid
+flowchart TD
+  A["Commons or local platform"] -->|"login and local profile"| B["CrownThrive ID broker"]
+  B -->|"bounded claims and consent"| C["Platform adapter"]
+  C --> D["Application surface"]
 ```
+
+The arrows represent the intended trust and data-minimization relationship, not a verified production token exchange.
+
+<Tabs>
+  <Tab title="CrownThrive ID authority">
+    Owns durable person and organization identifiers, account links, role and authority references, consent, assurance, recovery state, service identities, and audit events for privileged changes.
+  </Tab>
+  <Tab title="Local/social authority">
+    Owns its community experience, local profile, feeds, groups, relationships, moderation state, and optional onboarding entry for that platform.
+  </Tab>
+  <Tab title="Must stay separate">
+    A local platform must not silently become the rights ledger, legal-identity record, master entitlement database, universal role authority, or sole account-recovery mechanism.
+  </Tab>
+</Tabs>
 
 ## CrownThrive ID owns
 
@@ -46,12 +103,14 @@ It must not silently become the rights ledger, legal identity record, master ent
 
 ## Integration stages
 
-1. **External/heterogeneous auth** — current reality for many CrownThrive properties.
-2. **Account linking** — map existing platform accounts to stable CrownThrive IDs.
-3. **Brokered SSO** — standards-based OAuth 2.0/OIDC where platforms support it.
-4. **Role and entitlement awareness** — platforms consume approved claims/scopes, not raw institutional databases.
-5. **Portable profile and consent** — selected user-controlled fields can travel between platforms.
-6. **One Seat, Multiple Industries** — mature unified experience without forcing all platforms onto one application stack.
+| Stage | Meaning | Evidence boundary |
+| --- | --- | --- |
+| External/heterogeneous auth | Current reality for many properties | Local provider behavior only |
+| Account linking | Map local accounts to stable CrownThrive IDs | Requires explicit link schema, consent and audit evidence |
+| Brokered SSO | OAuth 2.0/OIDC where supported | Requires exact issuer/client/claim/environment contract |
+| Role and entitlement awareness | Consume approved claims/scopes | Does not grant raw database or universal role access |
+| Portable profile and consent | Move selected user-controlled fields | Requires field-level purpose and consent rules |
+| One Seat, Multiple Industries | Mature unified experience across modular stacks | Target outcome, not current deployment proof |
 
 ## Security rules
 
@@ -68,3 +127,9 @@ It must not silently become the rights ledger, legal identity record, master ent
 ## Phase 3 requirement
 
 Sprint 0 should establish identity IDs, role vocabulary, auth assurance, account-link schema, provider registry and event contracts before any broad SSO migration.
+
+## Error and support boundary
+
+This page does not define protocol error codes or a recovery API. Until an exact identity contract exists, applications must fail closed on an unknown issuer, signature, audience, tenant, role, link, consent, assurance, or suspension state. They must not guess a user match from email alone or silently widen privileges during fallback.
+
+Use the [permissions and approval gates](/automation/permissions-and-approval-gates) for authority decisions and the [support request workflow](/workflows/support-request) when account-link ownership, consent, recovery, or role state cannot be reconciled.

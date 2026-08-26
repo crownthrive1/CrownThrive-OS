@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave2 as wave2
+import substantive_rebuild_current_snapshot as current_snapshot
 
 EXPECTED_P0 = 449
 EXPECTED_WAVE1 = 16
@@ -28,30 +29,39 @@ def load_json(rel: str):
 
 
 result = wave2.build()
+semantic_snapshot = current_snapshot.load_snapshot()
+current_wave_1 = semantic_snapshot["current_waves"]["1"]
+current_wave = semantic_snapshot["current_waves"]["2"]
 policy = result["policy"]
-errors: list[str] = []
+errors: list[str] = current_snapshot.validate_current_wave(result, 2, semantic_snapshot)
 
 if result["source_universe_count"] != 795:
     errors.append("source universe must remain exactly 795")
 if result["p0_candidate_count"] != EXPECTED_P0:
     errors.append(f"expected {EXPECTED_P0} P0 candidates, found {result['p0_candidate_count']}")
-if result["wave_1_selected_count"] != EXPECTED_WAVE1:
-    errors.append(f"expected {EXPECTED_WAVE1} Wave 1 selected records, found {result['wave_1_selected_count']}")
-if result["selected_count"] != EXPECTED_WAVE2:
-    errors.append(f"expected stable Wave 2 selection of {EXPECTED_WAVE2}, found {result['selected_count']}")
-if result["cumulative_machine_qualified_p0_count"] != EXPECTED_CUMULATIVE:
+if result["wave_1_selected_count"] != current_wave_1["selected_count"]:
+    errors.append(
+        f"expected {current_wave_1['selected_count']} current Wave 1 selected records, "
+        f"found {result['wave_1_selected_count']}"
+    )
+if result["selected_count"] != current_wave["selected_count"]:
+    errors.append(
+        f"expected current semantic Wave 2 selection of {current_wave['selected_count']}, "
+        f"found {result['selected_count']}"
+    )
+if result["cumulative_machine_qualified_p0_count"] != current_wave["cumulative_machine_qualified_p0_count"]:
     errors.append("cumulative P0 qualified count mismatch")
-if result["p0_outside_waves_1_2_count"] != EXPECTED_REMAINING:
+if result["p0_outside_waves_1_2_count"] != current_wave["p0_outside_current_waves_count"]:
     errors.append("remaining P0 count mismatch")
 if result["wave_1_overlap_count"] != 0:
     errors.append("Wave 2 may not overlap Wave 1")
 if result["selected_count"] + result["held_count"] != 795:
     errors.append("selected + held must equal 795")
-if result["selected_section_counts"] != EXPECTED_SECTION_COUNTS:
+if result["selected_section_counts"] != current_wave["selected_section_counts"]:
     errors.append(f"selected section drift: {result['selected_section_counts']}")
-if result["selected_state_counts"] != EXPECTED_STATE_COUNTS:
+if result["selected_state_counts"] != current_wave["selected_state_counts"]:
     errors.append(f"selected state drift: {result['selected_state_counts']}")
-if result["selected_anchor_counts"] != EXPECTED_ANCHOR_COUNTS:
+if result["selected_anchor_counts"] != current_wave["selected_anchor_counts"]:
     errors.append(f"selected anchor drift: {result['selected_anchor_counts']}")
 
 # Phase 3 distinction: EXPECTED_WAVE_SHA is the immutable Sprint 8 receipt digest.

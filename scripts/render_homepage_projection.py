@@ -25,7 +25,10 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/homepage-projection.v2.json"
 START = "{/*  HOMEPAGE_PROJECTION:START  */}"
 END = "{/*  HOMEPAGE_PROJECTION:END  */}"
-PRODUCTION_CONVERGENCE_MARKER = "# CrownThrive OS // Production \\+ Convergence"
+PRODUCTION_CONVERGENCE_MARKERS = (
+    'title: "CrownThrive OS — Production + Convergence"',
+    "# CrownThrive OS // Production \\+ Convergence",  # historical source shape
+)
 INSERTION_ANCHORS = (
     "## What “Production \\+ Convergence” means",
     "## What \"Production \\+ Convergence\" means",
@@ -119,7 +122,7 @@ def render(manifest: dict) -> str:
 def production_convergence_supersedes_legacy_projection(index: str) -> bool:
     """Return True when the current homepage intentionally retired the old gate region."""
     return (
-        PRODUCTION_CONVERGENCE_MARKER in index
+        any(marker in index for marker in PRODUCTION_CONVERGENCE_MARKERS)
         and START not in index
         and END not in index
     )

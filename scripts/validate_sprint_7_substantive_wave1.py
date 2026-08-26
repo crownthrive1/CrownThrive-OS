@@ -8,14 +8,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import build_substantive_rebuild_wave1 as wave1
+import substantive_rebuild_current_snapshot as current_snapshot
 
-EXPECTED_SELECTED = 16
+EXPECTED_HISTORICAL_SELECTED = 16
 EXPECTED_P0 = 449
 # The historical Sprint-7 receipt is immutable evidence from its original baseline.
 # Current corpus reconciliation has a separately pinned deterministic identity so
 # later documentation changes cannot silently rewrite that historical receipt.
 EXPECTED_HISTORICAL_WAVE_SHA = "98021ca9c32a4cdf7cd9d8588271b1451f09d6f5cafb09629771943b10272add"
-EXPECTED_CURRENT_WAVE_SHA = "0b63f9ddfac0e8e7dc33c0f8a89e9fa554bb1d35d95923acf92d5fa7906e0353"
 EXPECTED_VAULT_SHA = "d03bc3e8e0052fb2091dac16703bbef233f9a8df4fec57df45f4c5f80d2ec7d9"
 
 
@@ -24,18 +24,23 @@ def load_json(rel: str):
 
 
 result = wave1.build()
+semantic_snapshot = current_snapshot.load_snapshot()
+current_wave = semantic_snapshot["current_waves"]["1"]
 policy = result["policy"]
-errors: list[str] = []
+errors: list[str] = current_snapshot.validate_current_wave(result, 1, semantic_snapshot)
 
 if result["source_universe_count"] != 795:
     errors.append("source universe must remain exactly 795")
 if result["p0_candidate_count"] != EXPECTED_P0:
     errors.append(f"expected {EXPECTED_P0} P0 candidates across completed map, found {result['p0_candidate_count']}")
-if result["selected_count"] != EXPECTED_SELECTED:
-    errors.append(f"expected stable Wave 1 selection of {EXPECTED_SELECTED}, found {result['selected_count']}")
+if result["selected_count"] != current_wave["selected_count"]:
+    errors.append(
+        f"expected current semantic Wave 1 selection of {current_wave['selected_count']}, "
+        f"found {result['selected_count']}"
+    )
 if result["selected_count"] + result["held_count"] != 795:
     errors.append("selected + held rows must equal the 795-row source universe")
-if result["wave_sha256"] != EXPECTED_CURRENT_WAVE_SHA:
+if result["wave_sha256"] != current_wave["wave_sha256"]:
     errors.append(f"Current Wave 1 digest drift: {result['wave_sha256']}")
 
 for row in result["selected_records"]:
@@ -77,11 +82,11 @@ for label, obj in [("pass_a", pass_a), ("gap", gap), ("pass_b", pass_b), ("packa
     if obj.get("wave_sha256") != EXPECTED_HISTORICAL_WAVE_SHA:
         errors.append(f"{label} historical Wave 1 digest mismatch")
 
-if pass_a.get("selected_count") != EXPECTED_SELECTED or pass_a.get("p0_candidate_count") != EXPECTED_P0:
+if pass_a.get("selected_count") != EXPECTED_HISTORICAL_SELECTED or pass_a.get("p0_candidate_count") != EXPECTED_P0:
     errors.append("Pass A receipt count mismatch")
-if gap.get("machine_qualified_current_successor_count") != EXPECTED_SELECTED:
+if gap.get("machine_qualified_current_successor_count") != EXPECTED_HISTORICAL_SELECTED:
     errors.append("gap-closure selected count mismatch")
-if pass_b.get("machine_qualified_substantive_current_successors_wave1") != EXPECTED_SELECTED:
+if pass_b.get("machine_qualified_substantive_current_successors_wave1") != EXPECTED_HISTORICAL_SELECTED:
     errors.append("Pass B selected count mismatch")
 if pass_b.get("vault_closure_sha256") != EXPECTED_VAULT_SHA:
     errors.append("Pass B Vault closure digest mismatch")

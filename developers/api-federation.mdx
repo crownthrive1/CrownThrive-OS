@@ -3,9 +3,55 @@ title: "API Federation and Platform API Registry"
 sidebarTitle: "API Federation"
 description: "How CrownThrive inventories, versions, secures, and exposes APIs for first-party and vendor-backed platforms without forcing every product into one backend."
 icon: "plug"
+standard_version: "1.0.0"
+primary_audience: "developer"
+page_type: "developer"
+content_state: "unresolved"
 ---
 
-# API Federation and Platform API Registry
+{/* pentadocs:audience-orientation:v2 */}
+<Note>
+  **Audience:** API architects, adapter builders, platform owners, and integration reviewers. Pair this target federation model with the [platform API matrix](/developers/platform-api-adapter-matrix) and [MCP/API governance standard](/standards/mcp-api-governance).
+
+  **This page:** API Federation and Platform API Registry — How CrownThrive inventories, versions, secures, and exposes APIs for first-party and vendor-backed platforms without forcing every product into one backend.
+
+  **Documentation state:** `unresolved` for page type `developer`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Unresolved reason:** no explicit page-level editorial acceptance state was declared in the migrated source.
+
+  **Evidence needed:** an accepted governing source or accountable-owner attestation.
+
+  **Review role:** PentaDocs governance.
+
+  **Review trigger:** next material edit or source reconciliation.
+</Note>
+{/* /pentadocs:audience-orientation:v2 */}
+
+<Warning>
+  **Architecture state: unresolved.** The capability namespaces below are target domains, not verified production paths. This page does not establish a universal base URL, authentication method, environment, request/response schema, rate policy, or deployed gateway.
+</Warning>
+
+## Start an adapter record
+
+<Steps>
+  <Step title="Resolve the platform identity">
+    Use the stable platform ID and current lifecycle record. Do not derive identity from a hostname, vendor account, or UI label alone.
+  </Step>
+  <Step title="Classify the available interface">
+    Identify whether the bounded capability is public, partner, private, vendor-adapted, MCP, event/webhook, batch, or not yet available.
+  </Step>
+  <Step title="Pin the contract and environment">
+    Record the current base URI by environment, version, auth, scopes, schemas, side effects, data classes, events, limits, and deprecation policy from authoritative evidence.
+  </Step>
+  <Step title="Map institutional ownership">
+    Separate the provider/platform record from CrownThrive identity, rights, order, entitlement, approval, evidence, and claim authority.
+  </Step>
+  <Step title="Test and promote by scope">
+    Advance documentation, authentication, sandbox, integration, production-read, production-write, and monitoring states separately.
+  </Step>
+</Steps>
+
+## Federation outcome
 
 CrownThrive should operate a **federated API architecture**. Platforms remain modular, while CrownThrive IO provides consistent identity, governance, routing, metering, documentation and observability.
 
@@ -33,19 +79,17 @@ Each platform record should carry:
 
 ## Interface classes
 
-**Public API** — approved external developer access.
-
-**Partner API** — authenticated ecosystem/enterprise integrations.
-
-**Private API** — CrownThrive services and controlled platform-to-platform calls.
-
-**Vendor adapter** — CrownThrive-normalized wrapper over a third-party API.
-
-**MCP tool** — agent-facing operation with bounded schema and permissions.
-
-**Event/webhook adapter** — integration driven primarily by signed events.
-
-**Batch connector** — governed import/export where real-time API access does not exist.
+<Tabs>
+  <Tab title="Direct APIs">
+    **Public API** is approved external developer access. **Partner API** is an authenticated ecosystem or enterprise integration. **Private API** is limited to controlled CrownThrive service-to-service or platform-to-platform calls.
+  </Tab>
+  <Tab title="Adapters">
+    A **vendor adapter** normalizes a third-party contract without making the provider authoritative for every institutional record. A **batch connector** governs import/export where a supported real-time interface does not exist.
+  </Tab>
+  <Tab title="Tools and events">
+    An **MCP tool** exposes one bounded agent-facing operation with explicit permissions. An **event/webhook adapter** handles a versioned and authenticated event contract. Neither class creates authority beyond the underlying operation.
+  </Tab>
+</Tabs>
 
 ## Canonical API domains for Phase 3
 
@@ -72,6 +116,10 @@ The institutional API should grow around stable capability namespaces rather tha
 
 Platform-specific APIs can extend these without changing their core meaning.
 
+<Info>
+  Names such as `/identity` and `/assets` are semantic namespace candidates. Builders must not concatenate them with a guessed hostname or treat them as callable until a versioned interface record supplies an exact base URI and contract.
+</Info>
+
 ## Contract standards
 
 - semantic/versioned contracts;
@@ -89,8 +137,14 @@ Platform-specific APIs can extend these without changing their core meaning.
 
 ## Platform onboarding
 
-As each CrownThrive platform is added, the developer team performs:
-
-`inventory → provider/API inspection → data map → identity map → rights map → event map → adapter contract → sandbox → test → approval → production → version monitoring`.
+As each CrownThrive platform is added, the developer team performs inventory, provider/API inspection, data mapping, identity mapping, rights mapping, event mapping, adapter contracting, sandbox work, testing, approval, production promotion, and version monitoring in that order.
 
 The registry therefore scales incrementally with the portfolio instead of delaying the entire ecosystem until every platform has a perfect API.
+
+## Authentication, failures, and support
+
+Authentication is recorded per interface; there is no federation-wide credential in this page. A registry row must distinguish human session, service identity, OAuth/OIDC, API key, signed request, provider token, and unauthenticated public access where applicable, along with its scope and tenant boundary.
+
+No common error envelope, retry schedule, pagination contract, or idempotency key is defined here. An adapter must preserve the provider's exact failure semantics while exposing a stable CrownThrive-facing contract only after those semantics are tested. Unknown mutation outcomes must not be replayed blindly.
+
+Use [API endpoint discovery](/developers/api-endpoint-discovery-and-adapter-registry) to establish a missing contract, [SDKs and sandbox](/developers/sdk-sandbox-webhooks) for safe test design, and the [support request workflow](/workflows/support-request) for ownership, credential, or production-state conflicts.

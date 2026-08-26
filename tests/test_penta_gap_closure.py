@@ -111,6 +111,116 @@ class PentaGapClosureTests(unittest.TestCase):
         self.assertEqual(status, 2)
         self.assertEqual(summary["counts"]["REPAIR_REQUIRED"], 1)
 
+    def test_generated_v2_orientation_does_not_manufacture_alias_hits(self) -> None:
+        quality = gap.pentadocs_quality
+        retired_phase = "Phase " + "2.99"
+        profile = quality.PageProfile(
+            route="record",
+            path="record.mdx",
+            navigation_context=(),
+            primary_audience="historical",
+            page_type="historical_record",
+            content_state="historical",
+            orientation_component="Warning",
+            role_links=(
+                "/start-here/current-operational-state",
+                "/knowledge/source-authority-hierarchy",
+            ),
+        )
+        orientation = quality.orientation_block(
+            profile,
+            f"{retired_phase} source",
+            f"{retired_phase} evidence.",
+        )
+        content = f"""---
+title: "{retired_phase} source"
+description: "{retired_phase} evidence."
+standard_version: "1.0.0"
+primary_audience: "historical"
+page_type: "historical_record"
+content_state: "historical"
+---
+
+{orientation}
+
+## Preserved body
+
+{retired_phase} source snapshot.
+"""
+        root = self.make_root(
+            "historical_alias_evidence",
+            content,
+            aliases=3,
+            stale=0,
+        )
+        summary, status = gap.scan(root)
+        self.assertEqual(status, 0)
+        self.assertEqual(summary["findings"], [])
+
+    def test_custom_v2_keeps_custom_prose_but_strips_generated_supplement(self) -> None:
+        quality = gap.pentadocs_quality
+        retired_phase = "Phase " + "2.99"
+        profile = quality.PageProfile(
+            route="record",
+            path="record.mdx",
+            navigation_context=(),
+            primary_audience="historical",
+            page_type="historical_record",
+            content_state="historical",
+            orientation_component="Warning",
+            role_links=(
+                "/start-here/current-operational-state",
+                "/knowledge/source-authority-hierarchy",
+            ),
+        )
+        generated = quality.orientation_block(
+            profile,
+            f"{retired_phase} source",
+            f"{retired_phase} evidence.",
+        )
+        custom = generated.replace(
+            "  **Audience:** governance reviewers and researchers (`historical`).",
+            "  **Audience:** archive reviewers. Custom lineage prose remains.",
+            1,
+        )
+        content = f"""---
+title: "{retired_phase} source"
+description: "{retired_phase} evidence."
+standard_version: "1.0.0"
+primary_audience: "historical"
+page_type: "historical_record"
+content_state: "historical"
+---
+
+{custom}
+
+{retired_phase} source snapshot.
+"""
+        normalized = gap.substantive_wave1.normalize_pentadocs_envelope(content)
+        self.assertIn("Custom lineage prose remains", normalized)
+        self.assertNotIn("**This page:**", normalized)
+        root = self.make_root(
+            "historical_alias_evidence",
+            content,
+            aliases=3,
+            stale=0,
+        )
+        summary, status = gap.scan(root)
+        self.assertEqual(status, 0)
+        self.assertEqual(summary["findings"], [])
+
+    def test_recovered_evidence_is_explicit_historical_context(self) -> None:
+        retired_phase = "Phase " + "2.99"
+        root = self.make_root(
+            "historical_alias_evidence",
+            f"Recovered requirements from {retired_phase}; not current authority.",
+            aliases=1,
+            stale=0,
+        )
+        summary, status = gap.scan(root)
+        self.assertEqual(status, 0)
+        self.assertEqual(summary["findings"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,194 @@
+---
+title: "PentaDocs Authoring and Review Playbook"
+sidebarTitle: "PentaDocs Authoring"
+description: "A practical, audience-aware workflow for creating, upgrading, validating, reviewing, and safely publishing PentaDocs pages with the governed Mintlify component standard."
+icon: "pen-ruler"
+keywords: ["PentaDocs", "authoring", "Mintlify", "MDX", "documentation review", "quality gate", "templates"]
+standard_version: "1.0.0"
+primary_audience: "operator"
+page_type: "how_to"
+content_state: "candidate"
+---
+
+{/* pentadocs:audience-orientation:v2 */}
+<Note>
+  **Audience:** operators and administrators responsible for governed documentation changes (`operator`).
+
+  **This page:** PentaDocs Authoring and Review Playbook — A practical, audience-aware workflow for creating, upgrading, validating, reviewing, and safely publishing PentaDocs pages with the governed Mintlify component standard.
+
+  **Documentation state:** `candidate` for page type `how_to`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Related guidance:** [PentaDocs Audience and Component Standard](/standards/pentadocs-audience-and-component-standard) and [Documentation Source-of-Truth Standard](/standards/documentation-source-of-truth-and-autonomous-governance).
+</Note>
+{/* /pentadocs:audience-orientation:v2 */}
+
+<Warning>
+  **Candidate workflow.** This playbook operationalizes the version 1.0 candidate standard. Passing its checks proves source-contract conformance at the tested revision; it does not adopt the standard, merge a pull request, deploy Mintlify, certify an underlying system, or grant legal, rights, financial, provider-write, or D3 authority.
+</Warning>
+
+## Choose the correct starting lane
+
+<Tabs>
+  <Tab title="New page">
+    Start from the template for the page's primary audience. Establish the governing source, intended outcome, page type, content state, and visibility boundary before drafting.
+  </Tab>
+
+  <Tab title="Existing page">
+    Preserve substantive meaning and stable identity. Replace only an exact known generated-v1 audience block. Retain tailored prose and useful additional valid links through an explicit `custom` page-profile registration, correct unsupported current-state language, and use an explicit successor or historical overlay instead of silently rewriting lineage.
+  </Tab>
+
+  <Tab title="Historical page">
+    Treat the body as evidence. Add a visible historical warning, current successor, source classification, and non-authority boundary; do not convert the historical instructions into an executable current workflow.
+  </Tab>
+
+  <Tab title="Redirect">
+    Keep the page minimal, `deprecated`, and `noindex`; record a root-relative `redirect_to` that exactly matches `docs.json`. Redirects are compatibility controls, not content hiding or security controls.
+  </Tab>
+</Tabs>
+
+## Authoring workflow
+
+<Steps>
+  <Step title="Resolve the audience and outcome">
+    Select one primary audience: executive, public, operator, developer, rights/support, or historical. Write the reader outcome in plain language and split incompatible audiences into linked projections.
+  </Step>
+
+  <Step title="Establish source and state">
+    Identify the controlling record, evidence scope, owner or reviewing role, effective period, current successor, and unresolved predicates. Use `unresolved` when a formatting migration cannot safely establish editorial state, then include the four governed unresolved lines shown below.
+  </Step>
+
+  <Step title="Apply the page profile">
+    Add `standard_version`, `primary_audience`, `page_type`, and `content_state`. Let frontmatter supply the H1; begin body sections at H2.
+  </Step>
+
+  <Step title="Add the audience guide">
+    Place the bounded v2 orientation block first. Include the exact `Audience:`, `This page:`, and `Documentation state:` labels and the universal non-certification boundary. A managed block selects exactly two links. A custom block may retain additional useful links but requires at least two; every counted link must be distinct, existing, root-relative, non-self, and not a redirect source. Historical pages also require the exact dated-context sentence.
+  </Step>
+
+  <Step title="Select components by meaning">
+    Use Steps for ordered work, Tabs for equivalent variants, Columns and Cards for choices, tables for exact mappings, callouts for bounded emphasis, and API components only for verified contracts. Do not add components merely to make a page look busy.
+  </Step>
+
+  <Step title="Validate boundaries and accessibility">
+    Recheck public/private separation, evidence language, historical context, link targets, heading order, media alternatives, mobile collapse order, code placeholders, and stop/rollback instructions.
+  </Step>
+
+  <Step title="Run gates and request review">
+    Run the quality engine, repository validator, orientation escaping/hash/idempotence tests, scope-specific tests, and diff checks. Require `page_specific_orientation_rate: 1.0`; `generic_v1_page_count`, `self_link_page_count`, and `invalid_link_page_count` at zero; and both group and excess counts at zero for input and render collisions. Open a reviewed pull request with exact evidence and leave adoption, merge, provider deployment, and certification as separate decisions.
+  </Step>
+</Steps>
+
+### Required unresolved lines
+
+When `content_state` is `unresolved`, include these exact four labeled statements in the orientation block:
+
+- **Unresolved reason:** no explicit page-level editorial acceptance state was declared in the migrated source.
+- **Evidence needed:** an accepted governing source or accountable-owner attestation.
+- **Review role:** PentaDocs governance.
+- **Review trigger:** next material edit or source reconciliation.
+
+Do not add `orientation_mode` to frontmatter. The generated page-profile manifest records `managed_v2`, `custom`, or `redirect_exempt`, along with the deterministic input and render SHA-256 digests. A human edit to managed orientation prose requires an explicit custom profile override; it must not be disguised as generated output.
+
+<Check>
+  A page is ready for review when its audience and outcome are obvious, state claims are evidence-bounded, its managed or custom orientation resolves in the machine profile with deterministic hashes, links work, components carry meaning, and the validator passes at the exact source revision.
+</Check>
+
+## Toolkit map
+
+<FileTree>
+
+- `standards/`
+  - `pentadocs-audience-and-component-standard.mdx` — governing candidate standard
+  - `pentadocs-authoring-and-review-playbook.mdx` — this operating guide
+- `templates/pentadocs/`
+  - `executive.mdx.template`
+  - `public.mdx.template`
+  - `operator.mdx.template`
+  - `developer.mdx.template`
+  - `rights-support.mdx.template`
+  - `historical.mdx.template`
+- `schemas/documentation/`
+  - `pentadocs-page-profile.schema.json`
+- `data/documentation/`
+  - `pentadocs-audience-component-standard.v1.json`
+  - `pentadocs-page-profiles.v1.json`
+- `scripts/`
+  - `pentadocs_quality.py`
+  - `validate_docs.py`
+- `tests/`
+  - `test_pentadocs_quality.py`
+
+</FileTree>
+
+## Commands and expected evidence
+
+<CodeGroup>
+
+```bash Validate the PentaDocs contract
+python3 scripts/pentadocs_quality.py --check
+```
+
+```bash Run repository documentation governance
+python3 scripts/validate_docs.py
+```
+
+```bash Run the focused unit suite
+python3 -m unittest -v tests.test_pentadocs_quality
+```
+
+```bash Check patch hygiene
+git diff --check
+```
+
+</CodeGroup>
+
+| Check | PASS means | PASS does not mean |
+| --- | --- | --- |
+| PentaDocs quality | Profiles, orientation blocks, headings, links, historical boundaries, redirects, and component deprecations conform | The page is adopted, deployed, semantically true, or independently certified |
+| Repository validator | Navigation, public-safe source, unlisted dispositions, internal links, and integrated quality checks pass | External systems or provider writes work |
+| Unit tests | The tested quality-engine invariants behave as specified | Every future edge case is covered |
+| Mintlify readback | The exact page can be retrieved from the targeted provider branch or deployment | The underlying product, right, payment, or runtime is active |
+
+## Review by audience
+
+<Columns cols={2}>
+  <Card title="Executive review" icon="chart-line" href="/governance/model">
+    Confirm strategic outcome, decision boundary, accountable owner, evidence, risk, and next milestone.
+  </Card>
+
+  <Card title="Operator review" icon="gears" href="/start-here/operating-principles">
+    Confirm authority, prerequisites, procedure, readback, rollback, evidence retention, and escalation.
+  </Card>
+
+  <Card title="Developer review" icon="code" href="/technology/api-integration-standards">
+    Confirm contract version, environment, authentication, side effects, errors, examples, limits, and compatibility.
+  </Card>
+
+  <Card title="Rights and support review" icon="scale-balanced" href="/support/licensing-and-ip-overview">
+    Confirm scope, governing instrument, intake, evidence handling, permitted action, privacy, remedy, and qualified review boundaries.
+  </Card>
+</Columns>
+
+## Common review questions
+
+<AccordionGroup>
+  <Accordion title="Should every page use every component?" id="component-quota">
+    No. Component choice follows the information need. A short reference may need only an orientation callout and table; a runbook may need Steps, Warning, Check, code, and rollback sections. Decorative component quotas fail this standard.
+  </Accordion>
+
+  <Accordion title="Can a green CI result certify a production claim?" id="ci-certification">
+    No. CI validates the exact source and tested invariants. Production, provider-write, rights, legal, financial, deployment, and certification states require their own scoped evidence and authority.
+  </Accordion>
+
+  <Accordion title="Can Visibility or hidden navigation protect restricted content?" id="visibility-security">
+    No. Both provider variants and direct routes must remain public-safe. Restricted material belongs outside the public repository and projection.
+  </Accordion>
+
+  <Accordion title="What if the current state cannot be proven during migration?" id="unresolved-state">
+    Record `content_state: unresolved`, preserve the source, use the exact unresolved reason, evidence-needed, review-role, and review-trigger lines above, and link the current authority path. Never invent an owner, article ID, date, certification, or operational state to satisfy formatting.
+  </Accordion>
+</AccordionGroup>
+
+## Handoff
+
+After review, record the exact head revision, commands run, results, unresolved gates, changed pages, redirect/navigation impact, and provider readback status. Source acceptance may proceed only through the governing workflow; Mintlify publication and independent certification remain downstream evidence events.

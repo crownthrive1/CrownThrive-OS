@@ -4,7 +4,7 @@
 
 This repository is CrownThrive's authoritative public-safe **Operating System source and support-routing surface**. Use the route below that matches what you need so private or restricted information does not end up in a public issue.
 
-> **Source-of-truth rule:** CrownThrive OS governs current institutional state. CHLOM, CIE, and other component repositories govern their exact component scopes. Mintlify, websites, storefronts, media surfaces, and other public properties are downstream projections and may be reconciled later without overriding OS state.
+> **Source-of-truth rule:** CrownThrive OS governs current institutional state. CHLOM, CIE, and other component repositories govern their exact component scopes. PentaDocs, websites, storefronts, media surfaces, and other public properties are downstream projections and may be reconciled later without overriding OS state. Mintlify is the current third-party rendering/hosting provider for PentaDocs.
 
 ## Current institutional information
 
@@ -16,7 +16,7 @@ For current Phase 3 state, use:
 - `docs/archive/README.md` — archive and supersession policy;
 - applicable CHLOM/CIE/component records for exact subsystem state.
 
-A website, Mintlify page, public dashboard, storefront, provider page, or historical document can identify a projection or evidence item, but it does not redefine the OS merely because it remains publicly visible.
+A website, PentaDocs page rendered through Mintlify, public dashboard, storefront, provider page, or historical document can identify a projection or evidence item, but it does not redefine the OS merely because it remains publicly visible.
 
 ## Public documentation questions and corrections
 

@@ -45,6 +45,15 @@ Phase 3 changes must keep the control-plane projection contract explicit. A sour
 - Corrections or supersessions:
 - Deferred or unresolved items:
 
+### PentaDocs audience and component contract
+
+- Primary audience: `executive | public | operator | developer | rights_support | historical`
+- Page type / content state:
+- PentaDocs standard version:
+- Mintlify components added or changed, and why each is semantically appropriate:
+- Historical/current boundary and successor, where applicable:
+- Accessibility evidence for images, video, embeds, tables, diagrams, or icon-only meaning:
+
 ## Institutional invariants
 
 - [ ] CrownThrive OS remains the institution-wide source of truth
@@ -97,6 +106,11 @@ Phase 3 changes must keep the control-plane projection contract explicit. A sour
 ## Validation
 
 - [ ] `python3 scripts/validate_docs.py` where applicable
+- [ ] `python3 scripts/pentadocs_quality.py --check` for PentaDocs changes
+- [ ] Audience, page type, content state, and standard version resolve in the page-profile registry
+- [ ] Frontmatter supplies the H1; body headings begin at H2 and do not skip levels
+- [ ] Components communicate structure or state and are not decorative substitutes for explanation
+- [ ] Provider rendering/readback remains separate from source-quality validation
 - [ ] Scope-specific validators/tests completed
 - [ ] Diff reviewed for unrelated changes
 - [ ] Internal links and repository references verified

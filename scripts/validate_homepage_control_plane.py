@@ -24,8 +24,18 @@ DOCS_STANDARD = ROOT / "standards/documentation-source-of-truth-and-autonomous-g
 NON_NEGOTIABLES = ROOT / "standards/non-negotiables.mdx"
 PR_TEMPLATE = ROOT / ".github/pull_request_template.md"
 
-PRODUCTION_H1 = "# CrownThrive OS // Production \\+ Convergence"
-LEGACY_CONTROL_H1 = "# CrownThrive OS // Institutional Control Plane"
+PRODUCTION_MARKERS = (
+    'title: "CrownThrive OS — Production + Convergence"',
+    "# CrownThrive OS // Production \\+ Convergence",  # historical source shape
+)
+LEGACY_CONTROL_MARKERS = (
+    'title: "CrownThrive OS — Institutional Control Plane"',
+    "# CrownThrive OS // Institutional Control Plane",
+)
+
+
+def contains_any(text: str, markers: tuple[str, ...]) -> bool:
+    return any(marker in text for marker in markers)
 
 
 def read(path: Path) -> str:
@@ -52,7 +62,7 @@ def parse_readiness_decision(readiness: str, errors: list[str]) -> str | None:
 
 def validate_production_convergence(index: str, readiness: str, errors: list[str]) -> None:
     required = {
-        "Production + Convergence H1": PRODUCTION_H1,
+        "Production + Convergence page identity": PRODUCTION_MARKERS[0],
         "current production posture": "CURRENT OPERATING STATE — PRODUCTION \\+ CONVERGENCE.",
         "Penta operating model": "## The Penta Model",
         "institutional pulse": "## Current institutional pulse",
@@ -71,7 +81,7 @@ def validate_production_convergence(index: str, readiness: str, errors: list[str
     parse_readiness_decision(readiness, errors)
 
     stale_for_production = {
-        "legacy control-plane H1": LEGACY_CONTROL_H1,
+        "legacy control-plane page identity": LEGACY_CONTROL_MARKERS[0],
         "obsolete live-pulse heading": "## Live institutional pulse",
         "obsolete pull-propagation homepage section": "## Every pull updates the institution",
     }
@@ -82,7 +92,7 @@ def validate_production_convergence(index: str, readiness: str, errors: list[str
 
 def validate_legacy_projection(index: str, readiness: str, errors: list[str]) -> None:
     required_homepage_markers = {
-        "control-plane H1": LEGACY_CONTROL_H1,
+        "control-plane page identity": LEGACY_CONTROL_MARKERS[0],
         "live pulse": "## Live institutional pulse",
         "pull propagation": "## Every pull updates the institution",
         "source-flow model": "SOURCE PULL / PR / LIVE EVIDENCE / AUTHORIZED DECISION",
@@ -133,10 +143,10 @@ def main() -> int:
     non_negotiables = read(NON_NEGOTIABLES)
     pr_template = read(PR_TEMPLATE)
 
-    if PRODUCTION_H1 in index:
+    if contains_any(index, PRODUCTION_MARKERS):
         mode = "phase_3_production_convergence"
         validate_production_convergence(index, readiness, errors)
-    elif LEGACY_CONTROL_H1 in index:
+    elif contains_any(index, LEGACY_CONTROL_MARKERS):
         mode = "legacy_readiness_projection"
         validate_legacy_projection(index, readiness, errors)
     else:

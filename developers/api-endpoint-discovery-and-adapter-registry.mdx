@@ -3,32 +3,83 @@ title: "API Endpoint Discovery and Adapter Registry"
 sidebarTitle: "Endpoint Discovery"
 description: "The operational process and record model for discovering platform engines, API base URLs, endpoints, docs, authentication, webhooks, exports, adapters and health."
 icon: "magnifying-glass"
+standard_version: "1.0.0"
+primary_audience: "developer"
+page_type: "developer"
+content_state: "unresolved"
 ---
 
-# API Endpoint Discovery and Adapter Registry
+{/* pentadocs:audience-orientation:v2 */}
+<Note>
+  **Audience:** integration engineers, platform owners, API reviewers, and adapter maintainers. Use this workflow with the [platform API matrix](/developers/platform-api-adapter-matrix) and [API integration standards](/technology/api-integration-standards).
+
+  **This page:** API Endpoint Discovery and Adapter Registry — The operational process and record model for discovering platform engines, API base URLs, endpoints, docs, authentication, webhooks, exports, adapters and health.
+
+  **Documentation state:** `unresolved` for page type `developer`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Unresolved reason:** no explicit page-level editorial acceptance state was declared in the migrated source.
+
+  **Evidence needed:** an accepted governing source or accountable-owner attestation.
+
+  **Review role:** PentaDocs governance.
+
+  **Review trigger:** next material edit or source reconciliation.
+</Note>
+{/* /pentadocs:audience-orientation:v2 */}
+
+<Warning>
+  **Discovery is not authorization.** Do not probe private systems, test credentials, invoke writes, register webhooks, or publish internal endpoints without explicit scope. A route name, vendor feature, source-defined baseline, or successful public page request stays `unverified` until its exact contract and permitted test evidence are recorded.
+</Warning>
+
+## Discovery quickstart
+
+<Steps>
+  <Step title="Select one bounded capability">
+    Start from a stable platform ID and a specific need such as catalog read, entitlement check, signed event intake, or governed export. Avoid whole-platform access requests.
+  </Step>
+  <Step title="Collect authoritative sources">
+    Inspect only authorized provider docs, source routes/specifications, configuration, admin integration records, SDK manifests, and existing event/export evidence.
+  </Step>
+  <Step title="Create the platform API record">
+    Record provider, interface type, state, environment-specific base URLs, docs/schema references, auth, scopes, limits, events, owner, and last verification. Leave unknown values null or `unverified`.
+  </Step>
+  <Step title="Create endpoint and webhook records">
+    Capture exact method/path, schemas, data classes, side effects, idempotency, limits, errors, events, authority class, environment, deprecation, and evidence. Keep secret values as restricted references.
+  </Step>
+  <Step title="Run the smallest authorized test">
+    Prefer a public health/version read or synthetic sandbox case. A safe read does not certify a write, webhook, broader scope, or production environment.
+  </Step>
+  <Step title="Reconcile and publish the state">
+    Update the matrix with the exact result, failed predicates, owner, timestamp, and next action; generate docs or SDKs only from the authoritative contract.
+  </Step>
+</Steps>
+
+## Purpose and state boundary
 
 Phase 2.98 and Phase 3 require a verified integration inventory. A marketing page that says “API available” is not sufficient; each interface must be inspected, tested where authorized and classified.
 
 ## Discovery sources
 
-For each platform inspect, as applicable:
-
-- official vendor/product documentation;
-- repository routes/controllers/OpenAPI/GraphQL schemas;
-- network/service configuration;
-- admin integration settings;
-- existing webhooks and callback URLs;
-- Postman/Insomnia collections;
-- SDK/package manifests;
-- WordPress REST routes and custom plugins;
-- database/export capabilities;
-- feeds, CSV/SFTP, RSS/Atom, webhooks and email ingestion;
-- current CrownThrive source files and prior build records;
-- live health/version endpoints.
+<Tabs>
+  <Tab title="Contract sources">
+    Official vendor/product documentation; repository routes and controllers; OpenAPI or GraphQL schemas; SDK/package manifests; Postman/Insomnia collections; WordPress REST routes and custom plugins.
+  </Tab>
+  <Tab title="Runtime sources">
+    Authorized network/service configuration, admin integration settings, existing webhook/callback registrations, and bounded live health or version endpoints.
+  </Tab>
+  <Tab title="Data movement">
+    Database/export capability records, feeds, CSV/SFTP, RSS/Atom, webhook delivery evidence, and governed email ingestion paths.
+  </Tab>
+  <Tab title="Institutional evidence">
+    Current CrownThrive source files, prior build records, platform/authority registries, credential references, and dated validation evidence.
+  </Tab>
+</Tabs>
 
 Do not probe private systems without authorization. Unknown stays `unverified`.
 
 ## Platform API record
+
+The following is a registry example with intentionally unresolved fields. It is not a callable Virality Music API contract.
 
 ```yaml
 api_id: ct.api.virality.public
@@ -106,6 +157,16 @@ These source specifications are baselines for implementation, not proof that the
 
 `uninspected → discovered → documented → authenticated → sandbox_tested → integration_tested → certified → production_monitored`
 
+| Transition | Minimum evidence |
+| --- | --- |
+| `uninspected` → `discovered` | Interface source and stable platform relationship identified |
+| `discovered` → `documented` | Exact contract/version, environment, auth, schema, limits and owner recorded |
+| `documented` → `authenticated` | Authorized credential flow succeeds for the tested scope |
+| `authenticated` → `sandbox_tested` | Synthetic or provider-test operation and failure cases pass |
+| `sandbox_tested` → `integration_tested` | CrownThrive adapter behavior, mapping and readback pass |
+| `integration_tested` → `certified` | Applicable security, privacy, rights, authority and resilience gates are recorded |
+| `certified` → `production_monitored` | Exact production scope has health, drift, incident and recovery evidence |
+
 ## Base URL rules
 
 - separate environment URLs;
@@ -119,6 +180,10 @@ These source specifications are baselines for implementation, not proof that the
 ## Webhook registry
 
 Collect endpoint owner, signing secret reference, event types, provider account, replay behavior, idempotency, retry/dead-letter policy, ordering assumptions, payload version, data class and last successful delivery. Old webhook endpoints must be disabled only after dependency checks.
+
+<Info>
+  Store only the name or identifier of a governed secret reference in public-safe records. Never copy an API token, signing secret, internal host, customer payload, or restricted failure body into PentaDocs.
+</Info>
 
 ## Generated developer docs
 
@@ -140,3 +205,16 @@ Where OpenAPI/GraphQL/schema sources exist, generate docs and SDKs from authorit
 ## Phase 3 output
 
 The registry becomes executable health checks, adapters, generated docs, credential scopes, event routes and MCP discovery.
+
+## Failure and support boundary
+
+| Condition | Classification | Required response |
+| --- | --- | --- |
+| Public page responds but API docs are absent | `public_host_verified` only | Continue authorized contract discovery; do not infer API paths |
+| Vendor docs exist but account/version/scopes are unknown | Vendor capability evidence | Keep CrownThrive integration unverified |
+| Authentication fails | Failed test for the supplied binding only | Preserve status/evidence without exposing secrets; reconcile ownership and credential source |
+| Read works but write is untested | Read-verified scope only | Keep provider writes closed |
+| Mutation returns an unknown outcome | Ambiguous/failed integration test | Do not replay blindly; perform a safe readback or open a delta/incident |
+| Contract and runtime disagree | Drift or compatibility hold | Pin both versions and escalate before generation or promotion |
+
+Use the [support request workflow](/workflows/support-request) when authorization, credential ownership, provider access, data classification, or a conflicting contract prevents safe discovery.

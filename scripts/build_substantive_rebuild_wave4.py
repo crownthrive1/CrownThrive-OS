@@ -78,6 +78,8 @@ def classify(row: dict[str, Any], policy: dict[str, Any], prior_ids: set[str]) -
         except FileNotFoundError:
             reasons.append("substantive_anchor_missing")
         else:
+            if not anchor_quality["editorial_current_successor_eligible"]:
+                reasons.append("substantive_anchor_not_current_editorial_state")
             if anchor_quality["body_characters"] < int(policy["minimum_anchor_body_characters"]):
                 reasons.append("substantive_anchor_body_too_small")
             if anchor_quality["internal_link_count"] < int(policy["minimum_anchor_internal_links"]):
@@ -156,6 +158,7 @@ def build() -> dict[str, Any]:
 
     payload = {
         "schema_version": "1.0.0",
+        "selection_view": wave1.current_selection_view(4),
         "wave_id": "ct.docs.substantive-rebuild.wave-4.v1",
         "sprint": 10,
         "pass": "A_stale_state_then_B_component_framework_substantive_gap_closure",
@@ -177,6 +180,7 @@ def build() -> dict[str, Any]:
         "policy": policy,
         "selected_records": selected,
         "held_records": held,
+        "editorial_current_successor_exclusions": wave1.editorial_exclusion_report(held),
         "guardrails": {
             "historical_body_recovery_claimed": False,
             "terminal_disposition_self_authorized": False,

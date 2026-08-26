@@ -98,6 +98,8 @@ def classify_pivot(row: dict[str, Any], policy: dict[str, Any], prior_ids: set[s
         except FileNotFoundError:
             reasons.append("substantive_anchor_missing")
         else:
+            if not anchor_quality["editorial_current_successor_eligible"]:
+                reasons.append("substantive_anchor_not_current_editorial_state")
             if anchor_quality["body_characters"] < int(policy["minimum_anchor_body_characters"]):
                 reasons.append("substantive_anchor_body_too_small")
             if anchor_quality["internal_link_count"] < int(policy["minimum_anchor_internal_links"]):
@@ -155,6 +157,7 @@ def build() -> dict[str, Any]:
 
     payload = {
         "schema_version": "1.0.0",
+        "selection_view": wave1.current_selection_view(6),
         "wave_id": "ct.docs.substantive-rebuild.wave-6.v1",
         "sprint": 12,
         "pass": "A_ai_collision_hygiene_zero_admission_then_B_cie_framework_pivot",
@@ -186,6 +189,7 @@ def build() -> dict[str, Any]:
         "ai_collision_overlay": overlay,
         "selected_records": selected,
         "held_records": held,
+        "editorial_current_successor_exclusions": wave1.editorial_exclusion_report(held),
         "guardrails": {
             "historical_body_recovery_claimed": False,
             "terminal_disposition_self_authorized": False,

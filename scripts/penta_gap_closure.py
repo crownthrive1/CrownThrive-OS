@@ -14,6 +14,13 @@ import pathlib
 import re
 import sys
 
+try:
+    from scripts import build_substantive_rebuild_wave1 as substantive_wave1
+    from scripts import pentadocs_quality
+except ImportError:  # Direct execution places scripts/ itself on sys.path.
+    import build_substantive_rebuild_wave1 as substantive_wave1
+    import pentadocs_quality
+
 RETIRED = re.compile(
     r"\bPhase(?:(?:\*\*)?[ \t]*:[ \t]*(?:\*\*)?[ \t]*|[ \t]+)"
     r"2\.(?:5|7|8|9|95|97|98|99)\b",
@@ -38,6 +45,7 @@ HISTORICAL_HINTS = (
     "retired",
     "lineage",
     "recovery",
+    "recovered",
 )
 TEXT_SUFFIXES = {".md", ".mdx", ".json", ".yml", ".yaml", ".py", ".sql"}
 SKIP_PARTS = {".git", "__pycache__", ".venv", "venv", "node_modules"}
@@ -47,10 +55,22 @@ CATEGORIES = {"historical_alias_evidence", "current_record_contextual_reference"
 
 def classify(path: pathlib.Path, text: str) -> dict:
     rel = path.as_posix()
-    hits = [match.group(0) for match in RETIRED.finditer(text)]
-    stale = [match.group(0) for match in CURRENT_STALE.finditer(text)]
-    historical = any(
-        hint in rel.lower() or hint in text[:1200].lower()
+    profile_values: dict[str, str] = {}
+    if path.suffix.lower() in {".md", ".mdx"}:
+        parsed = pentadocs_quality.split_frontmatter(text)
+        if parsed is not None:
+            profile_values = pentadocs_quality.parse_frontmatter(parsed[0]).values
+        scan_text = substantive_wave1.normalize_pentadocs_envelope(text)
+    else:
+        scan_text = text
+    hits = [match.group(0) for match in RETIRED.finditer(scan_text)]
+    stale = [match.group(0) for match in CURRENT_STALE.finditer(scan_text)]
+    historical_profile = (
+        profile_values.get("primary_audience") == "historical"
+        or profile_values.get("content_state") in {"historical", "superseded"}
+    )
+    historical = historical_profile or any(
+        hint in rel.lower() or hint in scan_text[:1200].lower()
         for hint in HISTORICAL_HINTS
     )
     return {

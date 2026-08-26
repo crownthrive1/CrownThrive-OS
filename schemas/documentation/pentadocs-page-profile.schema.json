@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/documentation/pentadocs-page-profile.schema.json",
+  "title": "PentaDocs Page Profile",
+  "description": "Machine contract for PentaDocs version 1.0.0 audience, page-type, editorial-state, evidence, and redirect metadata.",
+  "type": "object",
+  "required": [
+    "title",
+    "description",
+    "standard_version",
+    "primary_audience",
+    "page_type",
+    "content_state"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "standard_version": {
+      "const": "1.0.0"
+    },
+    "primary_audience": {
+      "enum": [
+        "executive",
+        "public",
+        "operator",
+        "developer",
+        "rights_support",
+        "historical"
+      ]
+    },
+    "page_type": {
+      "enum": [
+        "orientation",
+        "doctrine",
+        "registry",
+        "reference",
+        "status",
+        "workflow",
+        "runbook",
+        "standard",
+        "support",
+        "how_to",
+        "policy",
+        "legal",
+        "developer",
+        "changelog",
+        "historical_record",
+        "redirect"
+      ]
+    },
+    "content_state": {
+      "enum": [
+        "current",
+        "current_with_holds",
+        "candidate",
+        "historical",
+        "superseded",
+        "unresolved"
+      ]
+    },
+    "orientation_mode": {
+      "description": "Generated page-profile-manifest field. It is not authored in page frontmatter.",
+      "readOnly": true,
+      "enum": [
+        "managed_v2",
+        "custom",
+        "redirect_exempt"
+      ]
+    },
+    "orientation_input_sha256": {
+      "description": "Generated SHA-256 digest of canonical orientation inputs: decoded normalized title, description, audience, page type, content state, and two ordered link-label/target records. Null only for redirect_exempt profiles.",
+      "readOnly": true,
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "orientation_render_sha256": {
+      "description": "Generated SHA-256 digest of the exact bounded v2 orientation block bytes. Null only for redirect_exempt profiles.",
+      "readOnly": true,
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "role_links": {
+      "description": "Generated ordered input-hash link targets. managed_v2 and custom profiles record exactly two selected distinct existing non-self, non-redirect routes; a custom rendered block may preserve additional valid links. redirect_exempt profiles contain none.",
+      "readOnly": true,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^/[A-Za-z0-9][A-Za-z0-9/_-]*$"
+      },
+      "uniqueItems": true,
+      "maxItems": 2
+    },
+    "article_id": {
+      "type": "string",
+      "pattern": "^ct\\.article\\.[a-z0-9][a-z0-9._-]*$"
+    },
+    "last_verified_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(?:T.*)?$"
+    },
+    "evidence_level": {
+      "enum": [
+        "E0_unverified",
+        "E1_source_exists",
+        "E2_owner_attested",
+        "E3_operational",
+        "E4_transactional",
+        "E5_independent",
+        "E6_reconciled"
+      ]
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "deprecated": {
+      "type": "boolean"
+    },
+    "noindex": {
+      "type": "boolean"
+    },
+    "redirect_to": {
+      "type": "string",
+      "pattern": "^/[A-Za-z0-9][A-Za-z0-9/_-]*$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "page_type": {
+            "const": "redirect"
+          }
+        },
+        "required": [
+          "page_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "deprecated",
+          "noindex",
+          "redirect_to"
+        ],
+        "properties": {
+          "deprecated": {
+            "const": true
+          },
+          "noindex": {
+            "const": true
+          },
+          "content_state": {
+            "const": "superseded"
+          },
+          "orientation_mode": {
+            "const": "redirect_exempt"
+          },
+          "orientation_input_sha256": {
+            "const": null
+          },
+          "orientation_render_sha256": {
+            "const": null
+          },
+          "role_links": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "primary_audience": {
+            "const": "historical"
+          }
+        },
+        "required": [
+          "primary_audience"
+        ]
+      },
+      "then": {
+        "properties": {
+          "content_state": {
+            "enum": [
+              "historical",
+              "superseded",
+              "unresolved"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "page_type",
+          "orientation_mode"
+        ],
+        "properties": {
+          "page_type": {
+            "not": {
+              "const": "redirect"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "orientation_input_sha256",
+          "orientation_render_sha256",
+          "role_links"
+        ],
+        "properties": {
+          "orientation_mode": {
+            "enum": [
+              "managed_v2",
+              "custom"
+            ]
+          },
+          "orientation_input_sha256": {
+            "type": "string"
+          },
+          "orientation_render_sha256": {
+            "type": "string"
+          },
+          "role_links": {
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": true
+}
