@@ -51,11 +51,15 @@ jobs:
           python -m py_compile scripts/validate_github_actions_runtime_policy.py
           python -m py_compile scripts/governed_merge_decision.py
           python -m py_compile scripts/governed_current_pr_preflight.py
+          python -m py_compile scripts/governed_current_pr_preflight_v2.py
           python -m py_compile scripts/resolve_pm_notification_recipients.py
           python -m py_compile scripts/security_self_heal_plan.py
 
       - name: Validate GitHub Actions runtime and supply-chain policy
         run: python scripts/validate_github_actions_runtime_policy.py
+
+      - name: Validate evidence-data classifier negative vectors
+        run: python scripts/governed_current_pr_preflight_v2.py --self-test
 
       - name: Hydrate exact immutable PR commits
         if: github.event_name == 'pull_request'
@@ -78,7 +82,7 @@ jobs:
             --verify-git-diff \
             --git-base "$CT_GIT_BASE_SHA" \
             --git-head "$CT_GIT_HEAD_SHA"
-          python scripts/governed_current_pr_preflight.py \
+          python scripts/governed_current_pr_preflight_v2.py \
             --git-base "$CT_GIT_BASE_SHA" \
             --git-head "$CT_GIT_HEAD_SHA"
 
@@ -106,7 +110,7 @@ jobs:
         run: python scripts/validate_s103_74_canonical_crosswalk.py
 
       - name: Validate S103/S100 engine-domain edges
-        run: python scripts/validate_s103_s100_engine_domain_edges.py
+        run: python scripts/validate_s103_s100_engine-domain edges.py
 
       - name: Validate ten-phase namespace and API/MCP control plane
         run: python scripts/validate_phase_namespace_and_api_control.py
