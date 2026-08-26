@@ -1,0 +1,54 @@
+name: CHLOM Wallet Continuity Penta v2
+# certification-revision: 2026-08-26.2 — current-main retrigger after Actions policy repair.
+
+on:
+  pull_request:
+    paths:
+      - 'developers/reference/chlom-wallet/continuity/**'
+      - 'security/chlom-wallet-continuity-penta-v2-threat-model.mdx'
+      - 'skills/chlom-wallet-continuity/**'
+      - 'supabase/functions/chlom-wallet-continuity/**'
+      - '.github/workflows/chlom-wallet-continuity-penta-v2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'developers/reference/chlom-wallet/continuity/**'
+      - 'security/chlom-wallet-continuity-penta-v2-threat-model.mdx'
+      - 'skills/chlom-wallet-continuity/**'
+      - 'supabase/functions/chlom-wallet-continuity/**'
+      - '.github/workflows/chlom-wallet-continuity-penta-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-wallet-continuity-penta-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Penta continuity contract + 50k chaos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify hosted Node runtime
+        run: node --version
+      - name: Validate Penta continuity compatibility contract
+        run: node developers/reference/chlom-wallet/continuity/test-continuity-penta-v2.mjs
+      - name: Run deterministic continuity chaos suite
+        run: node developers/reference/chlom-wallet/continuity/continuity-chaos-v1.mjs
+      - name: Record PentaStatus assurance summary
+        if: always()
+        shell: bash
+        run: |
+          echo '## CHLOM Wallet Continuity Penta v2' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Owner plane: PentaNurture / PentaStatus / PentaCredentials / PentaCertify / PentaFactory / PentaBuild / PentaTriage' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Authority: CHLOM; no provider write, money movement, rights grant, destructive recovery, or self-approval' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Stress suite: deterministic 50,000-case continuity chaos test' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Exact-head verification is required before merge' >> "$GITHUB_STEP_SUMMARY"

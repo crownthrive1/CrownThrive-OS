@@ -1,0 +1,49 @@
+# CHLOM Wallet Continuity Penta v2 — Threat Model
+
+## Scope
+
+This model covers the production-available **private** Wallet continuity control plane and its Phase-3 source contract. It does not grant public API access, browser/client credentials, money movement, provider mutation, rights authority, chain authority, destructive recovery, or autonomous final authority.
+
+## Authentication and exposure
+
+The observed Supabase Edge deployment is `ACTIVE`, has `verify_jwt=true`, and additionally requires equality with the runtime service-role credential. The underlying public RPC wrappers and the internal continuity tick grant execute only to `service_role`/postgres; `anon` and `authenticated` execute are false.
+
+The service-role credential is server-side infrastructure. It must never be embedded in browser code, returned in responses, logged as plaintext, or exposed through MCP content. A future move away from raw service-role equality must use PentaCredentials-managed references and an equally or more restrictive machine identity envelope.
+
+## Primary risks and controls
+
+### Authority confusion
+Risk: “production” is interpreted as permission to spend, write providers, grant rights, broadcast chain actions, perform destructive recovery, or advance phases.
+Control: production refers only to private service availability. All privileged operation boundaries remain false; CHLOM/Penta authority remains separately required.
+
+### Stale runtime truth
+Risk: historical Phase-E counts, bindings, or health are treated as current.
+Control: dated readback is evidence, not evergreen truth; PentaStatus refresh is required for later runtime decisions.
+
+### Historical agent authority
+Risk: Gen6 agent ownership is interpreted as current sovereignty.
+Control: Gen6 rows remain lineage. Current stewardship is PentaNurture/PentaStatus/PentaCredentials/PentaCertify/PentaFactory/PentaBuild/PentaTriage with CHLOM authority boundaries.
+
+### Unsafe SQL replay
+Risk: old Phase-E migrations overwrite or conflict with newer shared continuity layers.
+Control: old Phase-E SQL replay is prohibited. The live shared schema is preserved and mutated only by explicit current migrations.
+
+### Oracle mutation
+Risk: an oracle becomes a write-capable authority path.
+Control: oracle observations are read-only/sanitized and non-read-only evidence fails closed.
+
+### Destructive recovery
+Risk: an ECAC recovery plan is mistaken for execution permission.
+Control: recovery is plan-only. `execution_authorized=false`, `automatic_destructive_action=false`, and privileged action boundaries remain false.
+
+### Advisory-model escalation
+Risk: risk scoring becomes decision authority.
+Control: advisory score remains `final_authority=false`.
+
+### CI scheduler failure
+Risk: GitHub startup failures are relabeled as successful checks or used to hide unverified code.
+Control: failed/queued provider runs remain recorded as such. Resilience evidence is exact-head, exact-Git-object execution plus live provider canaries; it does not rewrite provider status.
+
+## Promotion rule
+
+The private service may remain production-available while individual actions stay bounded. Any future authority expansion requires fresh provider readback, PentaCredentials readiness, exact-operation PentaCertify evidence, rollback evidence where applicable, and CHLOM-governed authority. Ambiguity resolves to HOLD or DENY.
