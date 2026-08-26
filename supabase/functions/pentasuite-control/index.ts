@@ -99,14 +99,14 @@ Deno.serve(async (req: Request) => {
 
     const args = (body.args ?? {}) as Record<string, unknown>;
     const { data, error } = await sb.rpc(rpc, args);
-    if (error) return json({ ok: false, action, error: error.message, code: error.code }, 409);
+    if (error) return json({ ok: false, action, error: "request_rejected", code: error.code ?? "RPC_ERROR" }, 409);
 
     return json({ ok: true, action, result: data });
-  } catch (error) {
+  } catch {
     return json({
       ok: false,
       action,
-      error: error instanceof Error ? error.message : String(error),
+      error: "internal_control_plane_error",
     }, 500);
   }
 });
