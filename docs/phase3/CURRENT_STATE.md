@@ -121,6 +121,12 @@ Current OS documents must state the **real-life picture**: what exists, what is 
 
 PentaDocs, websites, help centers, storefronts, media pages, and other downstream surfaces are updated from the OS on their own projection cadence. The Mintlify provider implementation may serve PentaDocs where configured, but provider reachability or editor state is a separate state dimension. Temporary projection lag is a documentation/publication delta, not an OS-state ambiguity.
 
+## Organic control-plane baseline
+
+PentaBrain, PentaSpine, PentaNerves, PentaBody, PentaHealth, PentaLoad, PentaBalancer and PentaCosts now form the deterministic organic control-plane baseline. The software accepts Vault-ID/public-key-fingerprint identity references, routes amendment/adjudication/execution signals to PentaLegislature/PentaJudicial/PentaExecutive, assesses organ health/load/cost/capacity/redundancy, preserves a hash-chained event spine and produces a sanitized Command Center health projection.
+
+IP addresses are transport observations, not institutional identities. Private keys and raw secrets remain outside public source and evidence. Learning is bounded and observational: it cannot self-authorize governance, provider writes, money movement, private-data training, model promotion or release promotion. External cryptographic signing, live providers and the Command Center deployment remain separately evidence-bound surfaces.
+
 ## Release discipline
 
 OS 3.x is the institutional Phase 3 release line. Component versions remain independent. Historical releases and old documentation are retained as evidence, moved or indexed under the archive where appropriate, and marked historical/superseded rather than erased.
