@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/penta/institutional-contracts-v1.json",
+  "title": "CrownThrive PENTA Institutional Contracts v1",
+  "description": "Machine contracts for PentaMation, PentaHybrid, PentaAlumni, PentaInstitute, PentaSignal and PentaAssure. These schemas define shape and evidence obligations; they do not grant authority.",
+  "$defs": {
+    "riskClass": {
+      "type": "string",
+      "enum": ["D0", "D1", "D2", "D3"]
+    },
+    "evidenceRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pentaMationWorkflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflow_id",
+        "version",
+        "trigger",
+        "risk_class",
+        "authority_ref",
+        "owner",
+        "dependencies",
+        "human_gate",
+        "idempotency_key_strategy",
+        "retry_policy",
+        "compensation",
+        "verify",
+        "preserve"
+      ],
+      "properties": {
+        "workflow_id": {"type": "string", "pattern": "^penta\\.mation\\.[a-z0-9._-]+$"},
+        "version": {"type": "integer", "minimum": 1},
+        "trigger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "source"],
+          "properties": {
+            "type": {"enum": ["event", "schedule", "manual", "dependency"]},
+            "source": {"type": "string", "minLength": 1},
+            "schedule_ref": {"type": ["string", "null"]},
+            "event_type": {"type": ["string", "null"]}
+          }
+        },
+        "risk_class": {"$ref": "#/$defs/riskClass"},
+        "authority_ref": {"type": "string", "minLength": 1},
+        "owner": {"type": "string", "minLength": 1},
+        "dependencies": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "human_gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "policy_ref"],
+          "properties": {
+            "required": {"type": "boolean"},
+            "policy_ref": {"type": ["string", "null"]},
+            "required_role": {"type": ["string", "null"]},
+            "quorum": {"type": ["integer", "null"], "minimum": 1}
+          }
+        },
+        "idempotency_key_strategy": {"type": "string", "minLength": 1},
+        "retry_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_attempts", "backoff_seconds"],
+          "properties": {
+            "max_attempts": {"type": "integer", "minimum": 1, "maximum": 20},
+            "backoff_seconds": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}}
+          }
+        },
+        "compensation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {"enum": ["none", "rollback", "remedy", "manual"]},
+            "contract_ref": {"type": ["string", "null"]}
+          }
+        },
+        "verify": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "preserve": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "pentaHybridDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "workflow_ref",
+        "risk_class",
+        "requested_action",
+        "machine_recommendation",
+        "evidence_refs",
+        "required_human_role",
+        "authority_ref",
+        "conflict_check",
+        "disposition",
+        "receipts"
+      ],
+      "properties": {
+        "decision_id": {"type": "string", "pattern": "^penta\\.hybrid\\.[a-z0-9._-]+$"},
+        "workflow_ref": {"type": "string", "minLength": 1},
+        "risk_class": {"$ref": "#/$defs/riskClass"},
+        "requested_action": {"type": "string", "minLength": 1},
+        "machine_recommendation": {"type": "string", "minLength": 1},
+        "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "evidence_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidenceRef"}},
+        "required_human_role": {"type": "string", "minLength": 1},
+        "authority_ref": {"type": "string", "minLength": 1},
+        "conflict_check": {"enum": ["pending", "pass", "fail"]},
+        "quorum_required": {"type": "integer", "minimum": 1},
+        "participants": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "disposition": {"enum": ["pending", "approved", "rejected", "modified", "recused", "hold", "expired"]},
+        "override_reason": {"type": ["string", "null"]},
+        "receipts": {"type": "array", "items": {"$ref": "#/$defs/evidenceRef"}}
+      }
+    },
+    "pentaAlumniCharter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "charter_id",
+        "body_id",
+        "purpose",
+        "authority_class",
+        "scope",
+        "risk_ceiling",
+        "member_roles",
+        "eligibility_rules",
+        "term_rules",
+        "quorum",
+        "recusal_rules",
+        "conflict_rules",
+        "revocation_authority",
+        "state"
+      ],
+      "properties": {
+        "charter_id": {"type": "string", "pattern": "^chlom\\.charter\\.[a-z0-9._-]+$"},
+        "body_id": {"type": "string", "pattern": "^penta\\.alumni\\.[a-z0-9._-]+$"},
+        "purpose": {"type": "string", "minLength": 1},
+        "authority_class": {"enum": ["advisory", "delegated", "binding"]},
+        "scope": {"type": "array", "minItems": 1, "items": {"type": "string"},
+        "risk_ceiling": {"$ref": "#/$defs/riskClass"},
+        "member_roles": {"type": "array", "minItems": 1, "items": {"type": "string"},
+        "eligibility_rules": {"type": "array", "items": {"type": "string"}},
+        "term_rules": {"type": "string", "minLength": 1},
+        "quorum": {"type": "integer", "minimum": 1},
+        "vote_rule": {"type": ["string", "null"]},
+        "recusal_rules": {"type": "array", "items": {"type": "string"}},
+        "conflict_rules": {"type": "array", "items": {"type": "string"}},
+        "revocation_authority": {"type": "string", "minLength": 1},
+        "state": {"enum": ["draft", "active", "suspended", "expired", "revoked", "historical"]}
+      }
+    },
+    "pentaInstituteResearch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "research_id",
+        "version",
+        "research_class",
+        "question",
+        "sponsor_role",
+        "sources",
+        "assumptions",
+        "competing_hypotheses",
+        "methods",
+        "findings",
+        "confidence",
+        "recommendations",
+        "known_unknowns",
+        "chlom_disposition",
+        "preservation_targets"
+      ],
+      "properties": {
+        "research_id": {"type": "string", "pattern": "^penta\\.institute\\.[a-z0-9._-]+$"},
+        "version": {"type": "integer", "minimum": 1},
+        "research_class": {"enum": ["rapid_brief", "strategic_study", "scenario_set", "red_team_review", "program_evaluation", "research_paper", "research_watch"]},
+        "question": {"type": "string", "minLength": 1},
+        "sponsor_role": {"type": "string", "minLength": 1},
+        "sources": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+        "competing_hypotheses": {"type": "array", "items": {"type": "string"}},
+        "methods": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "findings": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"enum": ["low", "medium", "high"]},
+        "recommendations": {"type": "array", "items": {"type": "string"}},
+        "known_unknowns": {"type": "array", "items": {"type": "string"}},
+        "chlom_disposition": {"enum": ["pending", "accepted", "rejected", "modified", "hold", "archived"]},
+        "preservation_targets": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    },
+    "pentaSignalObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal_id", "observed_at", "source_refs", "claim", "confidence", "corroboration_state", "risk_class", "disposition"],
+      "properties": {
+        "signal_id": {"type": "string", "pattern": "^penta\\.signal\\.[a-z0-9._-]+$"},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "source_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "claim": {"type": "string", "minLength": 1},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "corroboration_state": {"enum": ["uncorroborated", "partially_corroborated", "corroborated", "contradicted"]},
+        "risk_class": {"$ref": "#/$defs/riskClass"},
+        "disposition": {"enum": ["observe", "escalate", "research_candidate", "incident_candidate", "dismissed", "resolved"]}
+      }
+    },
+    "pentaAssureCertification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["certification_id", "subject_ref", "standard_ref", "risk_class", "evidence_refs", "independence_state", "checks", "disposition", "preserve"],
+      "properties": {
+        "certification_id": {"type": "string", "pattern": "^penta\\.assure\\.[a-z0-9._-]+$"},
+        "subject_ref": {"type": "string", "minLength": 1},
+        "standard_ref": {"type": "string", "minLength": 1},
+        "risk_class": {"$ref": "#/$defs/riskClass"},
+        "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "independence_state": {"enum": ["independent", "human_independent", "separation_of_duties_satisfied", "not_satisfied"]},
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "status"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "status": {"enum": ["pass", "fail", "hold", "not_applicable"]},
+              "evidence_ref": {"type": ["string", "null"]}
+            }
+          }
+        },
+        "disposition": {"enum": ["certified", "not_certified", "hold", "expired", "revoked"]},
+        "preserve": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    }
+  }
+}
