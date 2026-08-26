@@ -1,0 +1,154 @@
+{
+  "schema": "ct.penta.provider-control-plane.v1",
+  "version": "1.0.0",
+  "institutional_phase": "phase_3",
+  "priority": "software",
+  "policy": {
+    "fail_closed": true,
+    "credential_values_in_state": false,
+    "credential_values_in_cookies": false,
+    "write_requires_exact_operation_readback": true,
+    "certification_ttl_hours": 24,
+    "cookie_role": "signed_non_sensitive_priority_health_pointer_only"
+  },
+  "providers": [
+    {
+      "provider_id": "github",
+      "provider_class": "vendor",
+      "priority": "software",
+      "auth_model": "github_token_or_actions_oidc",
+      "credential_sets": [
+        {"all_of": ["GITHUB_TOKEN"]},
+        {"all_of": ["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"]}
+      ],
+      "adapter": {
+        "adapter_id": "ct.adapter.github.v1",
+        "version": "1.0.0",
+        "operations": [
+          {"operation": "repository_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "contents_write", "side_effect": true, "authority_class": "D1", "requires_readback": true},
+          {"operation": "branch_write", "side_effect": true, "authority_class": "D1", "requires_readback": true},
+          {"operation": "workflow_dispatch", "side_effect": true, "authority_class": "D1", "requires_readback": true}
+        ]
+      },
+      "evidence_hints": [".github/workflows/crownthrive-factory-github-provider.yml"]
+    },
+    {
+      "provider_id": "supabase",
+      "provider_class": "vendor",
+      "priority": "software",
+      "auth_model": "service_role_or_oidc_bridge",
+      "credential_sets": [
+        {"all_of": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]},
+        {"all_of": ["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"]}
+      ],
+      "adapter": {
+        "adapter_id": "ct.adapter.supabase.v1",
+        "version": "1.0.0",
+        "operations": [
+          {"operation": "health_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "function_invoke", "side_effect": true, "authority_class": "D1", "requires_readback": true},
+          {"operation": "state_write", "side_effect": true, "authority_class": "D1", "requires_readback": true}
+        ]
+      },
+      "evidence_hints": [".github/workflows/crownthrive-factory-github-provider.yml"]
+    },
+    {
+      "provider_id": "vercel",
+      "provider_class": "vendor",
+      "priority": "software",
+      "auth_model": "bearer_token",
+      "credential_sets": [{"all_of": ["VERCEL_TOKEN"]}],
+      "adapter": {
+        "adapter_id": "ct.adapter.vercel.v1",
+        "version": "1.0.0",
+        "operations": [
+          {"operation": "deployment_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "deployment_create", "side_effect": true, "authority_class": "D1", "requires_readback": true}
+        ]
+      },
+      "evidence_hints": []
+    },
+    {
+      "provider_id": "stripe",
+      "provider_class": "vendor",
+      "priority": "software",
+      "auth_model": "secret_key",
+      "credential_sets": [{"all_of": ["STRIPE_SECRET_KEY"]}],
+      "adapter": {
+        "adapter_id": "ct.adapter.stripe.v1",
+        "version": "1.0.0",
+        "operations": [
+          {"operation": "account_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "product_write", "side_effect": true, "authority_class": "D2", "requires_readback": true},
+          {"operation": "price_write", "side_effect": true, "authority_class": "D2", "requires_readback": true}
+        ]
+      },
+      "evidence_hints": ["developers/certification/stripe-crown-credits-chlom-thriveevergreen-production-2026-08-23.mdx"]
+    },
+    {
+      "provider_id": "resend",
+      "provider_class": "vendor",
+      "priority": "software",
+      "auth_model": "api_key",
+      "credential_sets": [{"all_of": ["RESEND_API_KEY"]}],
+      "adapter": {
+        "adapter_id": "ct.adapter.resend.v1",
+        "version": "1.0.0",
+        "operations": [
+          {"operation": "domain_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "email_send", "side_effect": true, "authority_class": "D1", "requires_readback": true}
+        ]
+      },
+      "evidence_hints": []
+    },
+    {
+      "provider_id": "mailgun",
+      "provider_class": "vendor",
+      "priority": "software",
+      "auth_model": "api_key",
+      "credential_sets": [{"all_of": ["MAILGUN_API_KEY", "MAILGUN_DOMAIN"]}],
+      "adapter": {
+        "adapter_id": "ct.adapter.mailgun.v1",
+        "version": "1.0.0",
+        "operations": [
+          {"operation": "domain_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "email_send", "side_effect": true, "authority_class": "D1", "requires_readback": true}
+        ]
+      },
+      "evidence_hints": []
+    },
+    {
+      "provider_id": "slack",
+      "provider_class": "vendor",
+      "priority": "software",
+      "auth_model": "bot_token",
+      "credential_sets": [{"all_of": ["SLACK_BOT_TOKEN"]}],
+      "adapter": {
+        "adapter_id": "ct.adapter.slack.v1",
+        "version": "1.0.0",
+        "operations": [
+          {"operation": "auth_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "message_write", "side_effect": true, "authority_class": "D1", "requires_readback": true}
+        ]
+      },
+      "evidence_hints": []
+    },
+    {
+      "provider_id": "elevenlabs",
+      "provider_class": "vendor",
+      "priority": "software",
+      "auth_model": "api_key",
+      "credential_sets": [{"all_of": ["ELEVENLABS_API_KEY"]}],
+      "adapter": {
+        "adapter_id": "ct.adapter.elevenlabs.v1",
+        "version": "1.0.0",
+        "operations": [
+          {"operation": "account_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "generation_create", "side_effect": true, "authority_class": "D1", "requires_readback": true}
+        ]
+      },
+      "evidence_hints": []
+    }
+  ]
+}
