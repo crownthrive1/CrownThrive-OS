@@ -1,0 +1,112 @@
+{
+  "schema": "crownthrive.penta.serialized.policy/v1",
+  "registry_id": "ct.penta.serialized.v1",
+  "canonical_name": "PentaSerialized",
+  "version": "1.0.0",
+  "lifecycle_state": "ACTIVE",
+  "institutional_generation": "phase_3",
+  "mission": "Serialize material CrownThrive state transitions so canonical records cannot be blindly overwritten, silently deleted, or detached from lineage, rollback, evidence, and continuity.",
+  "runtime": "penta/runtime/serialized",
+  "workflow": ".github/workflows/penta-serialized-assurance.yml",
+  "documentation": "PENTA-SERIALIZED.md",
+  "portal_route": "/io/pentas/serialized",
+  "penta_status_adapter": {
+    "overall_state": "source_and_ci_control_plane",
+    "heartbeat": "workflow_readback",
+    "integrity_command": "python -m penta.runtime.serialized verify <store>",
+    "doctor_command": "python -m penta.runtime.serialized doctor <store>"
+  },
+  "serialization_contract": {
+    "encoding": "UTF-8",
+    "canonical_form": "JSON keys sorted, compact separators, Unicode preserved",
+    "hash": "SHA-256",
+    "ledger": "append-only JSONL with event hash chaining",
+    "concurrency": "expected_revision optimistic lock",
+    "idempotency": "semantic mutation fingerprint plus idempotency_key",
+    "deletion": "tombstone by default; no runtime hard-delete API",
+    "restore": "new append-only revision derived from preserved live history",
+    "snapshots": "content-addressed current-state recovery baseline",
+    "atomicity": "temporary file, fsync, atomic replace, POSIX exclusive mutation lock"
+  },
+  "protected_patterns": [
+    "AGENTS.md",
+    "CANONICAL-REGISTRY.yaml",
+    "MASTER_MANIFEST.md",
+    "PENTA-FAMILY-REGISTRY.md",
+    "SECURITY.md",
+    "TRADEMARKS.md",
+    "docs/versioning/**",
+    "docs/phase3/**",
+    "docs/archive/**",
+    "standards/**",
+    "penta/registry/**",
+    ".github/workflows/**"
+  ],
+  "receipt_glob": "penta/continuity/receipts/*.json",
+  "git_gate": {
+    "all_deletions_require_receipt": true,
+    "all_renames_require_receipt": true,
+    "protected_modifications_require_receipt": true,
+    "additions_require_receipt": false,
+    "delete_receipt_requires_tombstone": true,
+    "rename_receipt_requires_successor": true,
+    "receipt_requires_previous_blob_sha": true,
+    "receipt_requires_new_blob_sha_when_present": true,
+    "receipt_requires_reason": true,
+    "receipt_requires_rollback_ref": true
+  },
+  "family_adapters": {
+    "PentaVersion": {
+      "required": ["subject_id", "version", "version_scheme", "lifecycle_state", "effective_at"],
+      "purpose": "stable subject version lineage and lifecycle"
+    },
+    "PentaFormat": {
+      "required": ["format_id", "media_type", "schema_version", "canonical_extension"],
+      "purpose": "canonical format/schema identity and migration safety"
+    },
+    "PentaSOPs": {
+      "required": ["sop_id", "owner", "lifecycle_state", "effective_at", "review_due", "steps"],
+      "purpose": "SOP revision lineage, review continuity, and supersession"
+    },
+    "PentaSLAs": {
+      "required": ["sla_id", "service_id", "effective_at", "targets", "escalation_owner"],
+      "purpose": "SLA/SLO target lineage and effective-period preservation"
+    },
+    "PentaScribe": {
+      "required": ["record_id", "record_type", "source_refs", "lifecycle_state"],
+      "purpose": "provenance-preserving institutional record capture"
+    }
+  },
+  "integrations": {
+    "PentaVersion": "Every serialized material revision carries independent artifact version and parent revision lineage.",
+    "PentaFormat": "Canonical JSON and format adapters prevent format drift from becoming silent state loss.",
+    "PentaSOPs": "SOP changes require explicit revision lineage and can be tombstoned/superseded without erasure.",
+    "PentaSLAs": "SLA state changes preserve effective values and escalation ownership across revisions.",
+    "PentaScribe": "Scribe records become hash-addressed, source-linked institutional events.",
+    "PentaSnapshot": "Consumes content-addressed snapshots as recovery baselines.",
+    "PentaRollback": "Restores by appending a new revision from preserved history rather than rewriting history.",
+    "PentaLiency": "Consumes integrity and continuity failures as hardening/remediation evidence.",
+    "PentaPR": "PR continuity gate rejects unreceipted protected overwrites, deletions, and renames.",
+    "PentaMerge": "Merge readiness includes PentaSerialized assurance status.",
+    "PentaRelease": "Release lineage can serialize immutable release/version/readback facts.",
+    "PentaStatus": "Surfaces ledger integrity, tombstones, artifacts, last hash, and gate state.",
+    "PentaGeneration": "Receives stable IDs, lineage, archive continuity, snapshots, and recovery history for long-horizon stewardship."
+  },
+  "authority": {
+    "may": [
+      "serialize authorized state",
+      "reject blind/stale mutations",
+      "record tombstones",
+      "restore preserved revisions",
+      "verify integrity",
+      "produce snapshots and continuity evidence"
+    ],
+    "may_not": [
+      "manufacture authority",
+      "erase institutional history",
+      "promote HOLD to PASS without evidence",
+      "treat serialization as provider deployment proof",
+      "bypass PentaVersion, rights, security, release, or approval gates"
+    ]
+  }
+}
