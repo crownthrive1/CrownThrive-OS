@@ -1,28 +1,43 @@
 name: Wave 7 Substantive Gate 004
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'scripts/qualify_wave7_substantive_gate_004.py'
       - 'developers/manifests/docs-wave7-substantive-gate-004.v1.json'
       - 'developers/manifests/docs-rebuild-quad-lane-batch-004.v1.json'
       - '.github/workflows/docs-wave7-substantive-gate-004.yml'
-  workflow_dispatch:
+      - 'scripts/build_substantive_rebuild_wave*.py'
+      - 'scripts/build_help_center_*crosswalk.py'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/qualify_wave7_substantive_gate_004.py'
+      - 'developers/manifests/docs-wave7-substantive-gate-004.v1.json'
+      - 'developers/manifests/docs-rebuild-quad-lane-batch-004.v1.json'
+      - '.github/workflows/docs-wave7-substantive-gate-004.yml'
+      - 'scripts/build_substantive_rebuild_wave*.py'
+      - 'scripts/build_help_center_*crosswalk.py'
 
 permissions:
   contents: read
+  actions: read
+
+concurrency:
+  group: docs-wave7-substantive-gate-004-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   qualify-cohort-004:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      # actions/checkout pinned to immutable commit SHA.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
-      # actions/setup-python pinned to immutable commit SHA.
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
       - name: Execute substantive gate 004
@@ -81,8 +96,8 @@ jobs:
           }
           print('PASS_PERMANENT_WAVE7_GATE_004_RECEIPT')
           PY
-      # actions/upload-artifact pinned to immutable commit SHA.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - name: Upload gate 004 evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: docs-wave7-substantive-gate-004-${{ github.run_id }}
           path: runtime/docs-rebuild/
