@@ -10,7 +10,7 @@ CrownThrive is operating in **Phase 3 / CrownThrive OS 3.x**. The former `blocke
 
 **CrownThrive OS is the institutional source of truth.** Security state is recorded in the OS and its bound evidence: accepted repository state, ThriveBase operational records, CHLOM/DAIL evidence, current component records, exact release/workflow receipts, and verified provider evidence within scope.
 
-Mintlify, websites, dashboards, screenshots, provider pages, and other public/projection surfaces do not independently establish security authority or current institutional state. They may surface drift or evidence that must be reconciled into the OS.
+PentaDocs, websites, dashboards, screenshots, provider pages, and other public/projection surfaces do not independently establish security authority or current institutional state. They may surface drift or evidence that must be reconciled into the OS.
 
 Phase 3 does not imply every subsystem is production-certified. Controlled-test bindings, provider capability, API/MCP contracts, workflow success, a public payment surface, or a generated artifact do not independently prove unrestricted production authority, complete hardening, rights clearance, or commercial activation.
 
@@ -46,7 +46,7 @@ Where possible provide:
 
 CrownThrive may reclassify a report as evidence develops.
 
-## Continuous security governance
+## Continuous Security Governance
 
 Security is evaluated continuously through OS-governed workflows, specialist/agent controls, repository validation, provider-managed security evidence where applicable, dependency/supply-chain checks, runtime observations, and recovery controls.
 
@@ -145,4 +145,4 @@ Suspected accidental exposure remains an incident even after deletion because Gi
 **CrownThrive, LLC**  
 **contact@crownthrive.com**
 
-Security policy changes are governed by CrownThrive OS. Downstream documentation/web projections inherit this state; they do not define it.
+Security policy changes are governed by CrownThrive OS. Downstream PentaDocs/web projections inherit this state; they do not define it.
