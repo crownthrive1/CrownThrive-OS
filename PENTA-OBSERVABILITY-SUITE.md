@@ -71,6 +71,8 @@ The production workflow must prove all of the following before the suite is trea
 5. Runtime modules compile under the production Python baseline.
 6. After merge, the same workflow executes against `main` to provide repository readback of the production state.
 
+A post-registration certification PR is used when the workflow is introduced for the first time, ensuring the now-default-branch workflow validates the exact production runtime before final certification readback.
+
 ## Integration pattern
 
 ```python
