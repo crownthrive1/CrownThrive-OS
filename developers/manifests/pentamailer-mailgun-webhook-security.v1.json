@@ -1,0 +1,42 @@
+{
+  "schema": "ct.pentamailer.mailgun-webhook-security.v1",
+  "version": "1.0.0",
+  "status": "active_software_contract",
+  "owner_system": "PentaMailer",
+  "credential_authority": "PentaCredentials",
+  "provider": "mailgun",
+  "webhook_security": {
+    "operation": "webhook_verify",
+    "secret_environment_alias": "MAILGUN_WEBHOOK_SIGNING_KEY",
+    "secret_vault_alias": "ct.pentamailer.mailgun.webhook_signing_key",
+    "algorithm": "HMAC-SHA256",
+    "signed_material": "timestamp || token",
+    "separator": "none",
+    "constant_time_compare": true,
+    "parent_signature_supported": true,
+    "replay_cache": "hashed token with TTL",
+    "default_max_age_seconds": 86400,
+    "default_future_skew_seconds": 300
+  },
+  "sending_redundancy": {
+    "primary_environment_alias": "MAILGUN_SENDING_KEY_PRIMARY",
+    "primary_vault_alias": "ct.pentamailer.mailgun.primary.api_key",
+    "secondary_environment_alias": "MAILGUN_SENDING_KEY_SECONDARY",
+    "secondary_vault_alias": "ct.pentamailer.mailgun.secondary.api_key"
+  },
+  "assets": [
+    "runtime/penta_mailgun_security.py",
+    "tests/test_penta_mailgun_security.py",
+    "runtime/penta-provider-control-plane/mailgun-webhook-security.v1.json",
+    ".github/workflows/pentamailer-mailgun-webhook-security.yml",
+    "developers/PENTAMAILER-MAILGUN-WEBHOOK-SECURITY.md"
+  ],
+  "provider_documentation": "https://documentation.mailgun.com/docs/mailgun/user-manual/webhooks/securing-webhooks",
+  "invariants": [
+    "No raw Mailgun secret may be committed to source control.",
+    "No raw Mailgun signing key may appear in logs, evidence, documentation, or client-visible output.",
+    "Webhook verification fails closed on malformed or mismatched signatures.",
+    "Raw Mailgun webhook tokens are never persisted by the supplied replay-cache implementation.",
+    "Provider transport capability never creates authority for unrelated operations."
+  ]
+}
