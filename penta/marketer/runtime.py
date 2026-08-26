@@ -53,7 +53,13 @@ def enqueue(campaign_path: pathlib.Path, state_root: pathlib.Path, adapters_path
         if not adapter:
             holds.append({"channel": channel, "reason": "NO_REGISTERED_ADAPTER"})
             continue
-        route = {"channel": channel, "adapter_id": adapter["adapter_id"], "state": adapter["state"], "execution_mode": adapter["execution_mode"], "mutation_authority": adapter["mutation_authority"]}
+        route = {
+            "channel": channel,
+            "adapter_id": adapter["adapter_id"],
+            "state": adapter["state"],
+            "execution_mode": adapter["execution_mode"],
+            "mutation_authority": adapter["mutation_authority"],
+        }
         routes.append(route)
         if adapter["state"] == "hold_unbound" or adapter["execution_mode"] == "none":
             holds.append({"channel": channel, "reason": "HOLD_UNBOUND"})
@@ -67,7 +73,7 @@ def enqueue(campaign_path: pathlib.Path, state_root: pathlib.Path, adapters_path
         "holds": holds,
         "queue_state": "READY_ARTIFACT_ROUTING" if not holds else "READY_WITH_HOLDS",
         "enqueued_at": datetime.now(timezone.utc).isoformat(),
-        "authority_note": "Queue readiness is not provider publication authority."
+        "authority_note": "Queue readiness is not provider publication authority.",
     }
     path = state_root / "queue" / f"{qid}.json"
     evidence.atomic_write_json(path, item)
@@ -96,7 +102,7 @@ def dispatch(item_path: pathlib.Path, state_root: pathlib.Path, adapters_path: p
                 "cta": item["manifest"]["cta"],
                 "terminology": item["manifest"]["terminology"],
                 "publication_state": "ARTIFACT_READY_NOT_PUBLISHED",
-                "provider_write_authority": false
+                "provider_write_authority": False,
             }
             payload_path = out_dir / f"{channel}.json"
             evidence.atomic_write_json(payload_path, payload)
@@ -105,12 +111,16 @@ def dispatch(item_path: pathlib.Path, state_root: pathlib.Path, adapters_path: p
         if adapter["mutation_authority"] is not True:
             results.append({"channel": channel, "status": "HOLD", "reason": "PROVIDER_WRITE_NOT_CERTIFIED", "adapter_id": adapter["adapter_id"]})
             continue
-        # Live provider mutation is deliberately unreachable until an adapter-specific
-        # executor with read-after-write certification is registered and reviewed.
         results.append({"channel": channel, "status": "HOLD", "reason": "LIVE_EXECUTOR_NOT_BOUND", "adapter_id": adapter["adapter_id"]})
 
     overall = "ARTIFACT_DISPATCHED" if results and all(r["status"] == "ARTIFACT_READY" for r in results) else "PARTIAL_HOLD"
-    summary = {"schema_version": "1.0.0", "queue_id": item["queue_id"], "campaign_id": item["campaign_id"], "status": overall, "results": results}
+    summary = {
+        "schema_version": "1.0.0",
+        "queue_id": item["queue_id"],
+        "campaign_id": item["campaign_id"],
+        "status": overall,
+        "results": results,
+    }
     receipt = evidence.receipt(
         system="PentaMarketer",
         operation="bounded_dispatch",
@@ -143,14 +153,17 @@ def main(argv=None) -> int:
     state_root = pathlib.Path(args.state_root)
     try:
         if args.command == "enqueue":
-            if not args.campaign: raise ValueError("--campaign is required")
+            if not args.campaign:
+                raise ValueError("--campaign is required")
             print(enqueue(pathlib.Path(args.campaign), state_root, pathlib.Path(args.adapters), pathlib.Path(args.registry), pathlib.Path(args.policy)))
             return 0
         if args.command == "dispatch":
-            if not args.item: raise ValueError("--item is required")
+            if not args.item:
+                raise ValueError("--item is required")
             result = dispatch(pathlib.Path(args.item), state_root, pathlib.Path(args.adapters))
         else:
-            if not args.campaign: raise ValueError("--campaign is required")
+            if not args.campaign:
+                raise ValueError("--campaign is required")
             result = cycle(pathlib.Path(args.campaign), state_root, pathlib.Path(args.adapters), pathlib.Path(args.registry), pathlib.Path(args.policy))
     except (ValueError, FileNotFoundError) as exc:
         print(str(exc), file=sys.stderr)
@@ -161,4 +174,3 @@ def main(argv=None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-".replace("false
