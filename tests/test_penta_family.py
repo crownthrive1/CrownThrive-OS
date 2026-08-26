@@ -6,6 +6,7 @@ import copy
 import json
 import sys
 import tempfile
+import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -86,23 +87,17 @@ def test_live_repository_contract() -> None:
     assert snapshot["fail_closed"] is True
     assert snapshot["member_count"] >= 50
 
-    # Mature children may pass the family eligibility gate.
     scribe = member_dispatch_gate(snapshot, "penta.scribe")
     assert scribe["eligible"] is True
 
-    # Core members that are only specified remain fail-closed even though the
-    # umbrella family itself is in production.
     control = member_dispatch_gate(snapshot, "penta.control")
     assert control["eligible"] is False
     assert control["disposition"] == "hold_fail_closed"
 
-    # Newly implemented institutional services are not silently promoted.
     capital = member_dispatch_gate(snapshot, "penta.capital")
     assert capital["eligible"] is False
     assert "implemented" in capital["reason"]
 
-    # Newly institutionalized family members are registered but stay held at
-    # specified maturity until independent implementation/certification proof.
     for key in (
         "penta.mail",
         "penta.concierge",
@@ -256,22 +251,32 @@ def test_display_name_normalization_resolves_member() -> None:
         assert resolution["resolved_to"] == "penta.test"
 
 
+_DISCOVERABLE_TESTS = (
+    test_live_repository_contract,
+    test_all_control_plane_penta_refs_resolve,
+    test_every_member_has_portal_and_required_sections,
+    test_contract_cannot_disable_fail_closed,
+    test_portal_contract_cannot_drop_required_section,
+    test_missing_required_catalog_blocks_family_snapshot,
+    test_duplicate_machine_keys_block_composition,
+    test_unresolved_control_plane_reference_blocks_composition,
+    test_display_name_normalization_resolves_member,
+)
+
+
+def load_tests(loader: unittest.TestLoader, tests: unittest.TestSuite, pattern: str | None):
+    """Expose the existing function-style regression cases to unittest discovery."""
+    suite = unittest.TestSuite()
+    for test in _DISCOVERABLE_TESTS:
+        suite.addTest(unittest.FunctionTestCase(test, description=test.__name__))
+    return suite
+
+
 def run() -> None:
-    tests = [
-        test_live_repository_contract,
-        test_all_control_plane_penta_refs_resolve,
-        test_every_member_has_portal_and_required_sections,
-        test_contract_cannot_disable_fail_closed,
-        test_portal_contract_cannot_drop_required_section,
-        test_missing_required_catalog_blocks_family_snapshot,
-        test_duplicate_machine_keys_block_composition,
-        test_unresolved_control_plane_reference_blocks_composition,
-        test_display_name_normalization_resolves_member,
-    ]
-    for test in tests:
+    for test in _DISCOVERABLE_TESTS:
         test()
         print(f"PASS {test.__name__}")
-    print(f"PASS {len(tests)} Penta Family tests")
+    print(f"PASS {len(_DISCOVERABLE_TESTS)} Penta Family tests")
 
 
 if __name__ == "__main__":
