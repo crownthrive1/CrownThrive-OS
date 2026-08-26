@@ -1,0 +1,107 @@
+---
+title: "Melanated TV FAST + AdLuxe SSAI Monetization"
+description: "Institutional scheduler, SCTE-35, SSAI and AdLuxe VAST-zone standard for CrownThrive FAST channels."
+---
+
+# Melanated TV FAST + AdLuxe SSAI Monetization
+
+This page defines the production monetization contract for Viloud-backed CrownThrive FAST channels under the `Melanated TV Wirein Channels and etc` workflow.
+
+## Canonical profile
+
+The ThriveBase profile ID is `mtv-fast-adluxe-ssai-template-v1`.
+
+| Control | Production value |
+| --- | --- |
+| Scheduler | 7-day grid, 24/7 |
+| Repetition | Weekly |
+| SCTE-35 breaks | 8 per hour |
+| Break duration | 120 seconds |
+| Advertising inventory | 16 minutes/hour |
+| Programming inventory | 44 minutes/hour |
+| SSAI | Enabled |
+| SSAI provider | Viloud SSAI |
+| Ad network | AdLuxe Network |
+| Ad server | Adserve Online |
+| Zone policy | One AdLuxe zone per channel |
+
+## VAST contract
+
+The canonical channel-level pattern is:
+
+```text
+https://srv.aso1.net/vast?z={ADLUXE_CHANNEL_ZONE_ID}
+```
+
+The currently supplied AdLuxe/Adserve zone is registered as a **live seed/template zone**, not as a universal production zone. Every monetized channel should ultimately receive its own AdLuxe zone identifier and VAST tag so delivery, revenue, pacing, reporting and troubleshooting remain attributable by channel.
+
+The binding model is:
+
+```text
+channel asset
+  -> monetization profile
+  -> dedicated AdLuxe zone
+  -> channel VAST tag
+  -> Viloud SSAI
+  -> SCTE-35 ad opportunity
+```
+
+## Scheduler semantics
+
+A complete seven-day schedule is programmed continuously and repeats each week. This is the canonical playout model for eligible FAST channels. The schedule definition and the advertising model are separate controls: scheduling determines what programming is available; SCTE-35 markers identify advertising opportunities; SSAI resolves ads into those opportunities.
+
+## SCTE-35 math
+
+Eight breaks per hour at 120 seconds each yields:
+
+```text
+8 × 120 seconds = 960 seconds = 16 advertising minutes/hour
+60 - 16 = 44 programming minutes/hour
+```
+
+The database computes these values from the configured break count and duration rather than storing contradictory manual totals.
+
+## SSAI and AdLuxe responsibility split
+
+Viloud is the server-side ad insertion layer for channels configured to use its SSAI capability. AdLuxe Network, powered by Adserve Online, is the advertising demand/ad-serving layer. CrownThrive owns the channel, programming, rights, commercial policy, and channel-to-zone mapping.
+
+The institutional flow is:
+
+```text
+CrownThrive programming
+  -> Viloud playout
+  -> SCTE-35 markers
+  -> Viloud SSAI
+  -> channel-specific AdLuxe VAST endpoint
+  -> ad delivery
+  -> provider/ad-network measurement
+  -> CrownThrive analytics and reconciliation
+```
+
+## ThriveBase implementation
+
+Two restricted registry tables back the model:
+
+- `mtv_monetization_profiles` stores the reusable scheduler, SCTE-35, SSAI and AdLuxe contract.
+- `mtv_channel_monetization_bindings` binds individual channel assets to the profile and, later, to their dedicated AdLuxe zone/VAST endpoint.
+
+Both tables have RLS enabled and public/API-role access revoked. The public docs contain only the non-secret VAST pattern and governance semantics.
+
+## Current activation state
+
+At institutionalization, 12 Viloud dashboard assets classified as `FAST` were template-bound to `mtv-fast-adluxe-ssai-template-v1`. Their per-channel AdLuxe zone assignment remains `pending-dedicated-adluxe-zone` until a unique zone is supplied or provisioned for that channel.
+
+`template-bound` therefore means the channel has inherited the monetization contract; it does **not** mean the channel already has a dedicated AdLuxe zone or that ad delivery has been independently verified.
+
+## Evidence states
+
+Use these states distinctly:
+
+- `template-bound` — channel inherits the monetization policy.
+- `zone-assigned` — unique AdLuxe zone/VAST URL is registered.
+- `ssai-configured` — Viloud SSAI configuration is confirmed against the channel.
+- `markers-verified` — SCTE-35 opportunities are observed in output.
+- `ad-delivery-verified` — an ad response/delivery is evidenced.
+- `revenue-reconciled` — provider/ad-network reporting has been reconciled to CrownThrive records.
+
+No downstream state should be inferred merely because a prior state exists.
