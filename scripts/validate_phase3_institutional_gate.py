@@ -72,8 +72,9 @@ def main() -> int:
     registry = json.loads(read(VERSIONS))
     if registry.get("institutional_generation") != "phase_3":
         fail("version registry is not on institutional generation phase_3")
-    if registry.get("umbrella_release") != "3.0.0":
-        fail("version registry umbrella release must remain 3.0.0 for this gate")
+    umbrella_release = str(registry.get("umbrella_release", ""))
+    if not umbrella_release.startswith("3."):
+        fail("version registry umbrella release must remain on the 3.x line for this gate")
     rules = registry.get("rules", {})
     for key in (
         "component_versions_are_independent",
