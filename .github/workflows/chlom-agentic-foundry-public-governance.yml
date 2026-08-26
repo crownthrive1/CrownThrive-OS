@@ -1,0 +1,57 @@
+name: CHLOM Agentic Foundry Public Governance
+
+on:
+  pull_request:
+    paths:
+      - 'developers/manifests/chlom-agentic-foundry.v1.json'
+      - 'developers/contracts/chlom-agentic-foundry-production.v1.json'
+      - 'developers/certification/chlom-agentic-foundry-production-2026-08-24.mdx'
+      - 'developers/runbooks/chlom-agentic-foundry-production-activation.mdx'
+      - 'scripts/validate_chlom_agentic_foundry_public.py'
+      - '.github/workflows/chlom-agentic-foundry-public-governance.yml'
+  push:
+    branches:
+      - main
+      - 'admin-mcp/**'
+    paths:
+      - 'developers/manifests/chlom-agentic-foundry.v1.json'
+      - 'developers/contracts/chlom-agentic-foundry-production.v1.json'
+      - 'developers/certification/chlom-agentic-foundry-production-2026-08-24.mdx'
+      - 'developers/runbooks/chlom-agentic-foundry-production-activation.mdx'
+      - 'scripts/validate_chlom_agentic_foundry_public.py'
+      - '.github/workflows/chlom-agentic-foundry-public-governance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  public-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Validate public-safe foundry contract
+        run: python3 scripts/validate_chlom_agentic_foundry_public.py
+      - name: Validate JSON syntax
+        run: |
+          python3 -m json.tool developers/manifests/chlom-agentic-foundry.v1.json >/dev/null
+          python3 -m json.tool developers/contracts/chlom-agentic-foundry-production.v1.json >/dev/null
+      - name: Reject conflict markers
+        run: |
+          if grep -RInE '^(<<<<<<<|=======|>>>>>>>)' \
+            developers/manifests/chlom-agentic-foundry.v1.json \
+            developers/contracts/chlom-agentic-foundry-production.v1.json \
+            developers/certification/chlom-agentic-foundry-production-2026-08-24.mdx \
+            developers/runbooks/chlom-agentic-foundry-production-activation.mdx; then
+            exit 1
+          fi
+      - name: State summary
+        run: |
+          echo 'production_package_state=PASS'
+          echo 'runtime_activation_state=HOLD_MAINTENANCE'
+          echo 'runtime_activation_requires_maintenance_release=true'
+          echo 'external_scheduler_slots_added=0'
+          echo 'raw_secret_export=false'
+          echo 'd3_human_reserved=true'
