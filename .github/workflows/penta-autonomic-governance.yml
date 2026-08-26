@@ -1,0 +1,47 @@
+name: PENTA Autonomic Governance
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20260826185700_pentagreen_hourly_candidate_identity_fix_v1.sql'
+      - 'supabase/migrations/20260826190019_penta_autonomic_incident_response_suite_v1.sql'
+      - 'scripts/penta_autonomic_contract_test.py'
+      - 'docs/phase3/PENTA_AUTONOMIC_OPERATIONS.md'
+      - '.github/workflows/penta-autonomic-governance.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/20260826185700_pentagreen_hourly_candidate_identity_fix_v1.sql'
+      - 'supabase/migrations/20260826190019_penta_autonomic_incident_response_suite_v1.sql'
+      - 'scripts/penta_autonomic_contract_test.py'
+      - 'docs/phase3/PENTA_AUTONOMIC_OPERATIONS.md'
+      - '.github/workflows/penta-autonomic-governance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-autonomic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  autonomic-contract:
+    name: Validate PENTA autonomic safety contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Compile contract test
+        run: python -m py_compile scripts/penta_autonomic_contract_test.py
+
+      - name: Validate autonomic contracts
+        run: python scripts/penta_autonomic_contract_test.py
