@@ -1,0 +1,57 @@
+name: PentaScribe + PentaMarketer Production Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'penta/scribe/**'
+      - 'penta/marketer/**'
+      - 'penta/runtime/**'
+      - 'tests/test_penta_production_runtime.py'
+      - '.github/workflows/penta-scribe-marketer-production.yml'
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out governed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Compile production runtimes
+        run: |
+          python -m py_compile penta/runtime/evidence.py
+          python -m py_compile penta/scribe/runtime.py
+          python -m py_compile penta/marketer/runtime.py
+      - name: Verify production runtime contracts
+        run: python -m unittest discover -s tests -p 'test_penta_production_runtime.py' -v
+      - name: Run PentaScribe production reconciliation cycle
+        run: |
+          python penta/scribe/runtime.py cycle \
+            --state-root /tmp/pentascribe-production \
+            --authority-ref chlom:penta.scribe:production-control-plane
+      - name: Run PentaMarketer bounded production cycle
+        run: |
+          python penta/marketer/runtime.py cycle \
+            --campaign penta/marketer/campaign.example.json \
+            --state-root /tmp/pentamarketer-production
+      - name: Publish production evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-scribe-marketer-production-${{ github.run_id }}
+          path: |
+            /tmp/pentascribe-production/
+            /tmp/pentamarketer-production/
+          if-no-files-found: error
+          retention-days: 30
