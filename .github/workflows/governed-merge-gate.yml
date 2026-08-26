@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - "phase4/**"
   workflow_dispatch:
 
 permissions:
@@ -86,27 +87,46 @@ jobs:
             tests/test_penta_institutional_controls_family.py \
             tests/test_penta_self_build.py
 
-      - name: Hydrate exact immutable PR commits and merge-base ancestry
-        if: github.event_name == 'pull_request'
+      - name: Resolve exact governed diff range
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        shell: bash
         env:
-          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
         run: |
-          git fetch --no-tags --no-recurse-submodules --depth=256 origin "${CT_GIT_BASE_SHA}"
-          git fetch --no-tags --no-recurse-submodules --depth=256 origin "${CT_GIT_HEAD_SHA}"
-          git cat-file -e "${CT_GIT_BASE_SHA}^{commit}"
-          git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}"
-          if ! git merge-base "${CT_GIT_BASE_SHA}" "${CT_GIT_HEAD_SHA}" >/dev/null; then
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base="$PR_BASE_SHA"
+            head="$PR_HEAD_SHA"
+            git fetch --no-tags --no-recurse-submodules --depth=256 origin "$base"
+            git fetch --no-tags --no-recurse-submodules --depth=256 origin "$head"
+          else
+            head="$PUSH_HEAD_SHA"
+            git fetch --no-tags --no-recurse-submodules --depth=256 origin main
+            git fetch --no-tags --no-recurse-submodules --depth=256 origin "$head"
+            base="$(git merge-base origin/main "$head" || true)"
+            if [[ -z "$base" ]]; then
+              git fetch --no-tags --no-recurse-submodules --unshallow origin || \
+                git fetch --no-tags --no-recurse-submodules origin
+              base="$(git merge-base origin/main "$head")"
+            fi
+          fi
+          git cat-file -e "${base}^{commit}"
+          git cat-file -e "${head}^{commit}"
+          if ! git merge-base "$base" "$head" >/dev/null; then
             git fetch --no-tags --no-recurse-submodules --unshallow origin || \
               git fetch --no-tags --no-recurse-submodules origin
           fi
-          git merge-base "${CT_GIT_BASE_SHA}" "${CT_GIT_HEAD_SHA}" >/dev/null
+          merge_base="$(git merge-base "$base" "$head")"
+          test -n "$merge_base"
+          echo "CT_GIT_BASE_SHA=$base" >> "$GITHUB_ENV"
+          echo "CT_GIT_HEAD_SHA=$head" >> "$GITHUB_ENV"
+          echo "CT_GIT_MERGE_BASE_SHA=$merge_base" >> "$GITHUB_ENV"
 
       - name: Enforce PentaSerialized continuity in required merge perimeter
-        if: github.event_name == 'pull_request'
-        env:
-          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
         run: |
           python -m penta.runtime.serialized git-gate \
             --repo . \
@@ -115,10 +135,7 @@ jobs:
             --policy penta/registry/serialized-suite.json
 
       - name: Bind governed changed files to trusted Git diff
-        if: github.event_name == 'pull_request'
-        env:
-          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
         run: |
           python scripts/governed_merge_decision.py \
             --verify-git-diff \
@@ -189,10 +206,12 @@ jobs:
           echo "This check does not synthesize provider CodeQL findings."
 
       - name: Review dependency changes
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
+          base-ref: ${{ env.CT_GIT_BASE_SHA }}
+          head-ref: ${{ env.CT_GIT_HEAD_SHA }}
 
       - name: Check whitespace and conflict markers
         run: |
