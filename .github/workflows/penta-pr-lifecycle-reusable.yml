@@ -55,6 +55,22 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Preflight PentaTagger before terminal authority
+        if: ${{ env.PENTA_MODE == 'merge' || env.PENTA_MODE == 'closer' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 500 --no-comment)
+          if [[ -n "${PENTA_NUMBER:-}" ]]; then
+            args+=(--number "$PENTA_NUMBER")
+          fi
+          args+=(--receipt-path "$RUNNER_TEMP/penta-pr-lifecycle-tagger-preflight.json")
+          args+=(--summary-path "$RUNNER_TEMP/penta-pr-lifecycle-tagger-preflight.md")
+          python penta-control/scripts/penta_github_tagger.py "${args[@]}"
+
       - name: Run PentaPR, PentaMerge, or PentaCloser
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -68,7 +84,8 @@ jobs:
           fi
           python penta-control/scripts/penta_pr_lifecycle.py "${args[@]}"
 
-      - name: Project lifecycle through PentaTagger and verify provider readback
+      - name: Project final lifecycle through PentaTagger and verify provider readback
+        if: always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -83,7 +100,7 @@ jobs:
           args+=(--summary-path "$RUNNER_TEMP/penta-pr-lifecycle-tagger-summary.md")
           python penta-control/scripts/penta_github_tagger.py "${args[@]}"
 
-      - name: Publish lifecycle and tagger receipt
+      - name: Publish lifecycle and tagger receipts
         if: always()
         shell: bash
         run: |
@@ -92,12 +109,24 @@ jobs:
             echo
             echo "- Authority invoked: **${PENTA_MODE:-unknown}**"
             echo "- Target PR: **${PENTA_NUMBER:-repository sweep}**"
-            echo '- Chain: PentaPR → PentaTagger → PentaMerge/PentaCloser'
+            echo '- Terminal chain: PentaTagger preflight → PentaMerge/PentaCloser → PentaTagger terminal readback'
             echo
           } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -f "$RUNNER_TEMP/penta-pr-lifecycle-tagger-preflight.md" ]]; then
+            echo '### Preflight readback' >> "$GITHUB_STEP_SUMMARY"
+            cat "$RUNNER_TEMP/penta-pr-lifecycle-tagger-preflight.md" >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "${PENTA_MODE:-}" == "merge" || "${PENTA_MODE:-}" == "closer" ]]; then
+            echo '- PentaTagger preflight: **FAIL — receipt missing**' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          else
+            echo '- PentaTagger preflight: not required for classification-only mode' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
           if [[ -f "$RUNNER_TEMP/penta-pr-lifecycle-tagger-summary.md" ]]; then
+            echo '### Final readback' >> "$GITHUB_STEP_SUMMARY"
             cat "$RUNNER_TEMP/penta-pr-lifecycle-tagger-summary.md" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo '- PentaTagger readback: **FAIL — receipt missing**' >> "$GITHUB_STEP_SUMMARY"
+            echo '- PentaTagger final readback: **FAIL — receipt missing**' >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi

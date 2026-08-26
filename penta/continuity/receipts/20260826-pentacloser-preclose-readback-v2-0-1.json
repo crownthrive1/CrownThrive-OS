@@ -1,0 +1,61 @@
+{
+  "schema": "crownthrive.penta.serialized.git-receipt/v1",
+  "receipt_id": "ct.penta.serialized.pentacloser-preclose-readback.20260826.v2.0.1",
+  "created_at": "2026-08-26T21:59:55Z",
+  "actor": "PentaFactory GitHub control-plane operator",
+  "reason": "Correct PentaCloser so terminal closure cannot occur before fresh GitHub provider readback confirms PentaTagger identity, close-candidate labels, exact lifecycle head, open PR state, and absence of a late penta:hold override.",
+  "changes": [
+    {
+      "path": ".github/workflows/penta-pr-lifecycle-reusable.yml",
+      "operation": "modify",
+      "previous_blob_sha": "b1fdcd31cfc1b5cfa90058b02af68a2106d71071",
+      "new_blob_sha": "26e79b8a652f2004383d435b7dad2aee54bf055d",
+      "reason": "Run PentaTagger provider-readback preflight before PentaMerge or PentaCloser, preserve classification-only behavior for PentaPR, and run final PentaTagger projection even when terminal execution fails closed.",
+      "rollback_ref": "2edc24e4b2fa19dd9ed25f5f3ca1771f3237c6d9"
+    },
+    {
+      "path": "scripts/penta_pr_lifecycle.py",
+      "operation": "modify",
+      "previous_blob_sha": "3f5e936337eb234f1ac78910be026ad313115d6c",
+      "new_blob_sha": "9d6481d212392d31896418e3e278d77db213d286",
+      "reason": "Require fresh pre-close readback of PentaTagger and close-candidate labels, recheck exact head and open state, and block a hold introduced during the terminal window before issuing the close write.",
+      "rollback_ref": "2edc24e4b2fa19dd9ed25f5f3ca1771f3237c6d9"
+    },
+    {
+      "path": "tests/test_penta_pr_lifecycle.py",
+      "operation": "modify",
+      "previous_blob_sha": "a5a2278e3f6b9c1de8762121e81a2ff0e4afc091",
+      "new_blob_sha": "7b4eef9d59fe68573c074c31fce9abb9ad846298",
+      "reason": "Add regression coverage for hidden labels, missing PentaTagger preflight, late hold insertion, stale lifecycle head, exact open-head readback, and terminal workflow ordering.",
+      "rollback_ref": "2edc24e4b2fa19dd9ed25f5f3ca1771f3237c6d9"
+    }
+  ],
+  "continuity": {
+    "silent_replacement": false,
+    "silent_delete": false,
+    "tombstones": [],
+    "successors": [],
+    "os_umbrella_release_changed": false,
+    "rollback_preserved": true
+  },
+  "authority_boundaries": {
+    "PentaTagger": "semantic classification and provider readback before and after terminal authority",
+    "PentaPR": "lifecycle classification and exact-head deadline state",
+    "PentaMerge": "exact-head governed merge execution only",
+    "PentaCloser": "terminal close only after preflight, close-candidate write, fresh provider readback, exact-head recheck, and hold recheck"
+  },
+  "failure_contract": {
+    "missing_tagger_marker": "BLOCK_CLOSE",
+    "missing_close_candidate_label": "BLOCK_CLOSE",
+    "provider_label_eventual_consistency": "BLOCK_CLOSE_AND_RETRY_LATER",
+    "late_hold": "BLOCK_CLOSE",
+    "head_changed": "BLOCK_CLOSE_AND_RECLASSIFY",
+    "pr_not_open": "BLOCK_CLOSE"
+  },
+  "exclusions": [
+    "No governance or continuity gate was weakened.",
+    "No PR was closed to test this patch.",
+    "No provider credential or secret material was read or changed.",
+    "No money, licensing, rights, deployment, or database authority was exercised."
+  ]
+}
