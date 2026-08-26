@@ -1,0 +1,74 @@
+name: Penta Provider Control Plane
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'runtime/penta-provider-control-plane/**'
+      - 'scripts/validate_penta_provider_control_plane.py'
+      - '.github/workflows/penta-provider-control-plane.yml'
+      - 'developers/manifests/penta-provider-control-plane.v1.json'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/penta-provider-control-plane/**'
+      - 'scripts/validate_penta_provider_control_plane.py'
+      - '.github/workflows/penta-provider-control-plane.yml'
+      - 'developers/manifests/penta-provider-control-plane.v1.json'
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: penta-provider-control-plane-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  software-provider-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
+      MAILGUN_DOMAIN: ${{ secrets.MAILGUN_DOMAIN }}
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      PENTA_NURTURE_COOKIE_SIGNING_KEY: ${{ secrets.PENTA_NURTURE_COOKIE_SIGNING_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate Penta provider contracts
+        run: python3 scripts/validate_penta_provider_control_plane.py
+
+      - name: Build, bind, certify, nurture
+        run: |
+          set -euo pipefail
+          python3 runtime/penta-provider-control-plane/penta_control_plane.py \
+            --state .penta/provider-control-plane all \
+            | tee penta-provider-readiness.json
+
+      - name: Publish readiness summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Penta Provider Control Plane'
+            echo
+            echo '**Priority:** software'
+            echo
+            echo 'Missing credentials remain `HOLD_UNBOUND`; no provider authority is manufactured.'
+            echo
+            if [ -f .penta/provider-control-plane/readiness-matrix.json ]; then
+              echo '```json'
+              cat .penta/provider-control-plane/readiness-matrix.json
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
