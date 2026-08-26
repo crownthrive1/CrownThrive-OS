@@ -30,7 +30,7 @@ jobs:
   software-provider-control:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
+    env: &provider-env
       GITHUB_TOKEN: ${{ github.token }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -64,7 +64,7 @@ jobs:
             echo
             echo '**Priority:** software'
             echo
-            echo 'Missing credentials remain `HOLD_UNBOUND`; no provider authority is manufactured.'
+            echo 'Missing credentials remain `HOLD_UNBOUND`; bound credentials without successful live readback remain `AUTH_BOUND_PENDING_READBACK`.'
             echo
             if [ -f .penta/provider-control-plane/readiness-matrix.json ]; then
               echo '```json'
@@ -72,3 +72,74 @@ jobs:
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  provider-live-readback:
+    needs: software-provider-control
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [github, supabase, vercel, stripe, resend, mailgun, slack, elevenlabs]
+    env: *provider-env
+    name: certify / ${{ matrix.provider }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Live certify ${{ matrix.provider }}
+        id: certify
+        continue-on-error: true
+        shell: bash
+        env:
+          PROVIDER_ID: ${{ matrix.provider }}
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          root = Path.cwd()
+          module_path = root / 'runtime' / 'penta-provider-control-plane' / 'penta_control_plane.py'
+          registry_path = root / 'runtime' / 'penta-provider-control-plane' / 'providers.json'
+          spec = importlib.util.spec_from_file_location('penta_control_plane', module_path)
+          mod = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = mod
+          spec.loader.exec_module(mod)
+
+          provider_id = os.environ['PROVIDER_ID']
+          registry = mod.Registry(registry_path)
+          state = root / '.penta' / ('provider-' + provider_id)
+          binding = mod.PentaCredentials(registry, state).bind(provider_id)
+          build = mod.PentaBuild(registry, state).build(provider_id)
+          cert = mod.PentaCertify(registry, state).certify(provider_id)
+          nurture = mod.PentaNurture(registry, state).observe(provider_id)
+          probe_operation = registry.provider(provider_id)['certification_probe']['operation']
+          gate = mod.ProductionGate(registry, state).decide(provider_id, probe_operation)
+          result = {
+              'provider': provider_id,
+              'priority': 'software',
+              'credential': 'BOUND' if binding.bound else 'HOLD_UNBOUND',
+              'certification': cert.state,
+              'certified_operations': cert.certified_operations,
+              'health': nurture.health,
+              'probe_operation': probe_operation,
+              'probe_eligible': gate['eligible'],
+          }
+          print(json.dumps(result, sort_keys=True))
+          if cert.state not in {'CERTIFIED', 'WRITE_VERIFIED'}:
+              raise SystemExit(78)
+          PY
+
+      - name: Record provider disposition
+        if: always()
+        shell: bash
+        run: |
+          if [ '${{ steps.certify.outcome }}' = 'success' ]; then
+            echo '### ${{ matrix.provider }} — CERTIFIED' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Live read-only provider readback passed.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '### ${{ matrix.provider }} — HOLD' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Credential binding or live provider readback is not yet proven. No authority was manufactured.' >> "$GITHUB_STEP_SUMMARY"
+          fi
