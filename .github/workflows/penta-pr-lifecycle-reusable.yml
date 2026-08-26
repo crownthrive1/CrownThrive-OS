@@ -6,12 +6,21 @@ on:
       mode:
         required: true
         type: string
+      number:
+        description: Optional pull request number
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       mode:
         description: pr, merge, or closer
         required: true
         default: pr
+      number:
+        description: Optional pull request number
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -19,28 +28,76 @@ permissions:
   issues: write
   checks: read
   statuses: read
+  actions: read
 
 env:
   PENTA_MODE: ${{ inputs.mode || github.event.inputs.mode }}
+  PENTA_NUMBER: ${{ inputs.number || github.event.inputs.number }}
 
 jobs:
   lifecycle:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: penta-pr-lifecycle-${{ github.repository }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout canonical Penta control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: crownthrive1/CrownThrive-Support
           ref: main
           persist-credentials: false
           path: penta-control
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
-      - name: Run PENTA PR lifecycle
+
+      - name: Run PentaPR, PentaMerge, or PentaCloser
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python penta-control/scripts/penta_pr_lifecycle.py "$PENTA_MODE" --repo "$GITHUB_REPOSITORY"
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=("$PENTA_MODE" --repo "$GITHUB_REPOSITORY")
+          if [[ -n "${PENTA_NUMBER:-}" ]]; then
+            args+=(--number "$PENTA_NUMBER")
+          fi
+          python penta-control/scripts/penta_pr_lifecycle.py "${args[@]}"
+
+      - name: Project lifecycle through PentaTagger and verify provider readback
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 500 --no-comment)
+          if [[ -n "${PENTA_NUMBER:-}" ]]; then
+            args+=(--number "$PENTA_NUMBER")
+          fi
+          args+=(--receipt-path "$RUNNER_TEMP/penta-pr-lifecycle-tagger-receipt.json")
+          args+=(--summary-path "$RUNNER_TEMP/penta-pr-lifecycle-tagger-summary.md")
+          python penta-control/scripts/penta_github_tagger.py "${args[@]}"
+
+      - name: Publish lifecycle and tagger receipt
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Penta PR Lifecycle'
+            echo
+            echo "- Authority invoked: **${PENTA_MODE:-unknown}**"
+            echo "- Target PR: **${PENTA_NUMBER:-repository sweep}**"
+            echo '- Chain: PentaPR → PentaTagger → PentaMerge/PentaCloser'
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f "$RUNNER_TEMP/penta-pr-lifecycle-tagger-summary.md" ]]; then
+            cat "$RUNNER_TEMP/penta-pr-lifecycle-tagger-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '- PentaTagger readback: **FAIL — receipt missing**' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

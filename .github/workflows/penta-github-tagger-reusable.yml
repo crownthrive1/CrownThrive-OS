@@ -1,0 +1,95 @@
+name: PentaTagger GitHub Native Reusable
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: event, sweep, or verify
+        required: true
+        type: string
+      number:
+        description: Optional issue or PR number
+        required: false
+        type: string
+        default: ''
+      kind:
+        description: all, pr, or issue
+        required: false
+        type: string
+        default: all
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: event, sweep, or verify
+        required: true
+        default: sweep
+      number:
+        description: Optional issue or PR number
+        required: false
+        default: ''
+      kind:
+        description: all, pr, or issue
+        required: false
+        default: all
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  checks: read
+  statuses: read
+  actions: read
+
+jobs:
+  tag-and-readback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: penta-github-tagger-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout canonical Penta control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: crownthrive1/CrownThrive-Support
+          ref: main
+          persist-credentials: false
+          path: penta-control
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Execute PentaTagger with provider readback
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PENTA_MODE: ${{ inputs.mode || github.event.inputs.mode }}
+          PENTA_NUMBER: ${{ inputs.number || github.event.inputs.number }}
+          PENTA_KIND: ${{ inputs.kind || github.event.inputs.kind || 'all' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=("${PENTA_MODE:-sweep}" --repo "$GITHUB_REPOSITORY" --kind "${PENTA_KIND:-all}" --max-items 500)
+          if [[ -n "${PENTA_NUMBER:-}" ]]; then
+            args+=(--number "$PENTA_NUMBER")
+          fi
+          args+=(--receipt-path "$RUNNER_TEMP/penta-github-tagger-receipt.json")
+          args+=(--summary-path "$RUNNER_TEMP/penta-github-tagger-summary.md")
+          python penta-control/scripts/penta_github_tagger.py "${args[@]}"
+
+      - name: Publish PentaTagger receipt summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/penta-github-tagger-summary.md" ]]; then
+            cat "$RUNNER_TEMP/penta-github-tagger-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo '## PentaTagger GitHub Native'
+              echo
+              echo '- Readback status: **FAIL — summary receipt missing**'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

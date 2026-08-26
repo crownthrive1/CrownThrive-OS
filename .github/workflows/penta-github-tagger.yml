@@ -1,0 +1,64 @@
+name: PentaTagger GitHub Native
+
+on:
+  issues:
+    types: [opened, reopened, edited, closed]
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: event, sweep, or verify
+        required: false
+        default: sweep
+      number:
+        description: Optional issue or PR number
+        required: false
+        default: ''
+      kind:
+        description: all, pr, or issue
+        required: false
+        default: all
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  checks: read
+  statuses: read
+  actions: read
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      number: ${{ steps.select.outputs.number }}
+      kind: ${{ steps.select.outputs.kind }}
+    steps:
+      - id: select
+        shell: bash
+        env:
+          REQUESTED_MODE: ${{ github.event.inputs.mode }}
+          REQUESTED_NUMBER: ${{ github.event.inputs.number }}
+          REQUESTED_KIND: ${{ github.event.inputs.kind }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "issues" ]]; then
+            mode=event
+          else
+            mode="${REQUESTED_MODE:-sweep}"
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "number=${REQUESTED_NUMBER:-}" >> "$GITHUB_OUTPUT"
+          echo "kind=${REQUESTED_KIND:-all}" >> "$GITHUB_OUTPUT"
+
+  tagger:
+    needs: select
+    uses: ./.github/workflows/penta-github-tagger-reusable.yml
+    with:
+      mode: ${{ needs.select.outputs.mode }}
+      number: ${{ needs.select.outputs.number }}
+      kind: ${{ needs.select.outputs.kind }}
+    secrets: inherit

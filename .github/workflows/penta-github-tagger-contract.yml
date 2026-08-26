@@ -1,0 +1,76 @@
+name: PentaTagger GitHub Contract
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/penta_github_labels.py'
+      - 'scripts/penta_github_tagger.py'
+      - 'scripts/penta_pr_lifecycle.py'
+      - 'tests/test_penta_github_tagger.py'
+      - 'tests/test_penta_pr_lifecycle.py'
+      - '.github/workflows/penta-github-tagger.yml'
+      - '.github/workflows/penta-github-tagger-reusable.yml'
+      - '.github/workflows/penta-github-tagger-contract.yml'
+      - '.github/workflows/penta-pr-lifecycle.yml'
+      - '.github/workflows/penta-pr-lifecycle-reusable.yml'
+      - 'docs/penta/PENTA_GITHUB_TAGGER_PR_LIFECYCLE.md'
+      - 'supabase/migrations/20260826213000_penta_github_native_tagger_lifecycle_v2.sql'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/penta_github_labels.py'
+      - 'scripts/penta_github_tagger.py'
+      - 'scripts/penta_pr_lifecycle.py'
+      - 'tests/test_penta_github_tagger.py'
+      - 'tests/test_penta_pr_lifecycle.py'
+      - '.github/workflows/penta-github-tagger.yml'
+      - '.github/workflows/penta-github-tagger-reusable.yml'
+      - '.github/workflows/penta-github-tagger-contract.yml'
+      - '.github/workflows/penta-pr-lifecycle.yml'
+      - '.github/workflows/penta-pr-lifecycle-reusable.yml'
+      - 'docs/penta/PENTA_GITHUB_TAGGER_PR_LIFECYCLE.md'
+      - 'supabase/migrations/20260826213000_penta_github_native_tagger_lifecycle_v2.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Compile Penta GitHub control software
+        run: |
+          python -m py_compile \
+            scripts/penta_github_labels.py \
+            scripts/penta_github_tagger.py \
+            scripts/penta_pr_lifecycle.py
+
+      - name: Run PentaTagger classification and readback tests
+        run: python -m unittest discover -s tests -p 'test_penta_github_tagger.py' -v
+
+      - name: Run PentaPR terminal-authority tests
+        run: python -m unittest discover -s tests -p 'test_penta_pr_lifecycle.py' -v
+
+      - name: Enforce PentaTagger authority boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('scripts/penta_github_tagger.py').read_text(encoding='utf-8')
+          forbidden = ('def put(', '/merge', "{'state': 'closed'}", '{"state": "closed"}')
+          found = [token for token in forbidden if token in source]
+          if found:
+              raise SystemExit(f'PentaTagger terminal-authority violation: {found}')
+          print('PASS: PentaTagger contains no merge or close execution path')
+          PY
