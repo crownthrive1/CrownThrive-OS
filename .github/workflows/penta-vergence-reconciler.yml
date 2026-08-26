@@ -1,0 +1,84 @@
+name: PentaVergence Repository Worker
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Transport poll only. PentaBase owns substantive 4-hour/deep cadence.
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: penta-vergence-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Claim PentaBase convergence job
+        id: claim
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-vergence-bridge
+        run: |
+          set -euo pipefail
+          OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=penta-vergence" | jq -r .value)
+          printf '%s' "$OIDC" > oidc.token
+          chmod 600 oidc.token
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' -d '{"action":"claim"}' "$BRIDGE" > claim.json
+          jq '{ok,claimed:(.job.claimed // false),job_id:(.job.job_id // null),mode:(.job.mode // null),server}' claim.json
+          echo "claimed=$(jq -r '.job.claimed // false' claim.json)" >> "$GITHUB_OUTPUT"
+          echo "job_id=$(jq -r '.job.job_id // empty' claim.json)" >> "$GITHUB_OUTPUT"
+          echo "mode=$(jq -r '.job.mode // empty' claim.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile open pull requests
+        if: steps.claim.outputs.claimed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ steps.claim.outputs.mode }}
+        run: |
+          set -euo pipefail
+          LIMIT=5
+          if [ "$MODE" = "deep" ]; then LIMIT=15; fi
+          python3 scripts/penta_vergence_reconciler.py --repo "$GITHUB_REPOSITORY" --apply --max-mutations "$LIMIT" --output penta-vergence-report.json
+          sha256sum penta-vergence-report.json | awk '{print $1}' > report.sha256
+          jq '{repository,apply,mutations,summary}' penta-vergence-report.json
+
+      - name: Complete PentaBase job
+        if: steps.claim.outputs.claimed == 'true' && success()
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-vergence-bridge
+          JOB_ID: ${{ steps.claim.outputs.job_id }}
+        run: |
+          set -euo pipefail
+          OIDC=$(cat oidc.token)
+          DIGEST=$(cat report.sha256)
+          jq -n --arg job "$JOB_ID" --arg digest "$DIGEST" --slurpfile report penta-vergence-report.json '{action:"complete",job_id:$job,evidence_sha256:$digest,report:$report[0]}' > complete.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @complete.json "$BRIDGE" | jq .
+
+      - name: Release claimed job after failure
+        if: failure() && steps.claim.outputs.claimed == 'true'
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-vergence-bridge
+          JOB_ID: ${{ steps.claim.outputs.job_id }}
+        run: |
+          set -euo pipefail
+          OIDC=$(cat oidc.token)
+          jq -n --arg job "$JOB_ID" --arg err "PentaVergence worker ${GITHUB_RUN_ID} failed before completion" '{action:"release",job_id:$job,error:$err}' > release.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @release.json "$BRIDGE" | jq .
