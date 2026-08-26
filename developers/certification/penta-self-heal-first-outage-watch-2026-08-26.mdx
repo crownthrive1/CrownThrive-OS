@@ -1,0 +1,61 @@
+---
+title: PentaSELF Heal-First Outage Watch Production Proof
+description: Production evidence for the scheduler-gap outage watcher race repair deployed on 2026-08-26.
+---
+
+# PentaSELF Heal-First Outage Watch Production Proof
+
+## Incident
+
+At `2026-08-26T21:40:00Z`, the State Architecture outage watcher observed one required scheduler gap while `ct-penta-self-v1` was reconciling the same scheduler boundary. The concrete drift was `thivebase_self_diagnostic_v1`: its owned schedule is `3-58/5 * * * *`, while the observed schedule at detection was every minute. PentaSELF healed the drift in the same reconciliation cycle.
+
+The defect was not inability to heal. The defect was notification ordering: the outage watcher could sample the pre-heal state and enqueue an outage before the concurrent PentaSELF repair committed.
+
+## Production repair
+
+Provider migration: `20260826215358_penta_self_heal_first_outage_watch_v1_0_1`.
+
+The production repair:
+
+1. Makes `public.penta_mail_outage_watch_v1()` heal-first for scheduler gaps.
+2. Re-reads `public.penta_self_status_v1()` after the bounded PentaSELF reconciliation attempt.
+3. Declares `scheduler_gap` active only when the gap remains after reconciliation/readback.
+4. Preserves fail-closed behavior for persistent gaps; no authority is manufactured.
+5. Staggers `penta-mail-outage-watch-v1` to `1-55/6 * * * *` to reduce same-minute collisions with `ct-penta-self-v1` (`*/2 * * * *`).
+6. Adds the outage watcher itself to `penta_self.required_jobs_v1`, making it PentaSELF-owned and automatically repairable.
+7. Advances PentaSELF to `1.0.1` and PentaMail to `1.1.0` in the production system registry.
+
+## Controlled production replay
+
+At `2026-08-26T21:54:31Z`, the prior drift was deliberately replayed by changing `thivebase_self_diagnostic_v1` from `3-58/5 * * * *` to every minute and invoking the production outage watcher.
+
+Readback:
+
+- `pre_scheduler_gaps = 1`
+- PentaSELF scheduler reconcile: `checked = 13`, `drifted_or_inactive = 1`, `healed = 1`, `missing = 0`
+- `post_scheduler_gaps = 0`
+- watcher `enqueued = 0`
+- PentaSELF cycle state: `HEALTHY`
+- required jobs: `13`
+- healthy required jobs: `13`
+- unrecovered required-job failures: `0`
+- fabric state: `production`
+- mesh state: `production`
+
+This proves the watcher now invokes healing before outage notification and suppresses the false/transient scheduler-gap alert only after successful readback.
+
+## Natural scheduler readback
+
+The first natural run on the new watcher cadence started at `2026-08-26T21:55:00.246693Z` and completed successfully at `2026-08-26T21:55:00.873984Z`.
+
+The scheduler-gap incident state read back as:
+
+- `active = false`
+- `scheduler_gaps = 0`
+- `pre_reconcile_scheduler_gaps = 0`
+- `heal_first = true`
+- `heal_attempt.state = NOT_NEEDED`
+
+## Production verdict
+
+`PASS` for the scheduler-gap healing and outage-watcher path. PentaSELF remains fail-closed for persistent scheduler gaps while transient repairable drift is now healed and independently re-read before alerting.
