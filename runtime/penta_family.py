@@ -1,17 +1,19 @@
 """Production control-plane runtime for the CrownThrive Penta Family.
 
-The Penta Family is an umbrella registry and dispatch guard. A production family
-never promotes a child system automatically: each member retains its own
-maturity and may execute only when its own state and authority gates permit it.
+The Penta Family is an umbrella registry, census, portal contract and dispatch
+guard. A production family never promotes a child system automatically: each
+member retains its own maturity and may execute only when its own state and
+authority gates permit it.
 
 This module is dependency-free so it can run in CI, local operator checks, and
-minimal recovery environments.
+minimal recovery environments. It performs no provider side effects.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Tuple
@@ -26,6 +28,21 @@ REQUIRED_FAMILY_TRUE_FLAGS = {
     "duplicate_machine_keys_block_dispatch",
     "missing_required_catalogs_block_dispatch",
     "execution_requires_member_eligibility",
+}
+REQUIRED_PORTAL_SECTIONS = {
+    "overview",
+    "status",
+    "responsibilities",
+    "inputs_outputs",
+    "authority_boundary",
+    "dependencies",
+    "sops_slas",
+    "runbooks",
+    "guides",
+    "evidence",
+    "api_mcp",
+    "changelog",
+    "support",
 }
 
 
@@ -45,6 +62,16 @@ def _load_json(path: Path) -> Dict[str, Any]:
     if not isinstance(value, dict):
         raise PentaFamilyError(f"JSON root must be an object: {path}")
     return value
+
+
+def _name_token(value: str) -> str:
+    """Normalize display-name differences such as Penta Control/PentaControl."""
+    return re.sub(r"[^a-z0-9]", "", value.casefold())
+
+
+def _portal_route(machine_key: str, base_route: str = "/penta") -> str:
+    suffix = machine_key.split(".", 1)[1]
+    return f"{base_route.rstrip('/')}/{suffix}"
 
 
 def validate_family_registry(registry: Mapping[str, Any]) -> None:
@@ -88,6 +115,48 @@ def validate_family_registry(registry: Mapping[str, Any]) -> None:
         seen_ids.add(catalog_id)
         seen_paths.add(path)
 
+    control_validation = registry.get("control_plane_validation")
+    if not isinstance(control_validation, dict):
+        raise PentaFamilyError("control_plane_validation must be an object")
+    if control_validation.get("registered_penta_refs_required") is not True:
+        raise PentaFamilyError("registered_penta_refs_required must be true")
+    if control_validation.get("normalize_display_names") is not True:
+        raise PentaFamilyError("normalize_display_names must be true")
+    if control_validation.get("unresolved_reference_disposition") != "hold_fail_closed":
+        raise PentaFamilyError("unresolved control-plane references must fail closed")
+    external_refs = control_validation.get("external_refs_allowed")
+    if not isinstance(external_refs, list) or not all(isinstance(item, str) and item for item in external_refs):
+        raise PentaFamilyError("external_refs_allowed must be a string array")
+
+    control_planes = registry.get("control_planes")
+    if not isinstance(control_planes, dict) or not control_planes:
+        raise PentaFamilyError("control_planes must be a non-empty object")
+    for plane, refs in control_planes.items():
+        if not isinstance(plane, str) or not plane:
+            raise PentaFamilyError("control plane names must be non-empty strings")
+        if not isinstance(refs, list) or not refs or not all(isinstance(ref, str) and ref for ref in refs):
+            raise PentaFamilyError(f"control plane {plane!r} must contain string references")
+
+    portal = registry.get("portal_contract")
+    if not isinstance(portal, dict):
+        raise PentaFamilyError("portal_contract must be an object")
+    required_true = (
+        "every_registered_member_has_portal",
+        "portal_state_is_independent_from_maturity",
+        "portal_does_not_create_execution_authority",
+    )
+    for flag in required_true:
+        if portal.get(flag) is not True:
+            raise PentaFamilyError(f"portal_contract.{flag} must be true")
+    if portal.get("base_route") != "/penta":
+        raise PentaFamilyError("portal_contract.base_route must be /penta")
+    if portal.get("route_pattern") != "/penta/{machine_key_suffix}":
+        raise PentaFamilyError("unexpected portal route_pattern")
+    sections = set(portal.get("required_sections") or [])
+    missing_sections = sorted(REQUIRED_PORTAL_SECTIONS - sections)
+    if missing_sections:
+        raise PentaFamilyError("portal contract missing required sections: " + ", ".join(missing_sections))
+
 
 def _iter_systems(catalog: Mapping[str, Any], *, source: str) -> Iterable[Tuple[str, Dict[str, Any]]]:
     systems = catalog.get("systems")
@@ -108,6 +177,42 @@ def _iter_systems(catalog: Mapping[str, Any], *, source: str) -> Iterable[Tuple[
         yield machine_key, dict(system)
 
 
+def _resolve_control_planes(
+    registry: Mapping[str, Any], members: Mapping[str, Mapping[str, Any]]
+) -> Dict[str, List[Dict[str, str]]]:
+    validation = registry["control_plane_validation"]
+    external_refs = set(validation.get("external_refs_allowed") or [])
+
+    token_index: Dict[str, set[str]] = {}
+    for machine_key, system in members.items():
+        names = [machine_key, str(system.get("canonical_name", ""))]
+        aliases = system.get("aliases") or []
+        if isinstance(aliases, list):
+            names.extend(alias for alias in aliases if isinstance(alias, str))
+        for name in names:
+            token = _name_token(name)
+            if token:
+                token_index.setdefault(token, set()).add(machine_key)
+
+    resolved: Dict[str, List[Dict[str, str]]] = {}
+    for plane, refs in registry["control_planes"].items():
+        plane_resolved: List[Dict[str, str]] = []
+        for ref in refs:
+            if ref in external_refs:
+                plane_resolved.append({"reference": ref, "kind": "external_authority", "resolved_to": ref})
+                continue
+            matches = sorted(token_index.get(_name_token(ref), set()))
+            if not matches:
+                raise PentaFamilyError(f"unresolved control-plane reference {ref!r} in {plane!r}")
+            if len(matches) != 1:
+                raise PentaFamilyError(
+                    f"ambiguous control-plane reference {ref!r} in {plane!r}: {', '.join(matches)}"
+                )
+            plane_resolved.append({"reference": ref, "kind": "penta_member", "resolved_to": matches[0]})
+        resolved[plane] = plane_resolved
+    return resolved
+
+
 def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
     """Load required catalogs and return a deterministic family snapshot."""
     validate_family_registry(registry)
@@ -126,9 +231,7 @@ def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
         for machine_key, system in _iter_systems(catalog, source=rel):
             if machine_key in members:
                 first = member_sources[machine_key]
-                raise PentaFamilyError(
-                    f"duplicate machine_key {machine_key}: {first} and {rel}"
-                )
+                raise PentaFamilyError(f"duplicate machine_key {machine_key}: {first} and {rel}")
             members[machine_key] = system
             member_sources[machine_key] = rel
 
@@ -139,6 +242,9 @@ def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
     if not members:
         raise PentaFamilyError("family has no registered members")
 
+    control_plane_resolution = _resolve_control_planes(registry, members)
+    base_route = registry["portal_contract"]["base_route"]
+
     maturity_counts = Counter(system["maturity"] for system in members.values())
     execution_eligible = sorted(
         key for key, system in members.items() if system["maturity"] in EXECUTION_ELIGIBLE
@@ -146,6 +252,27 @@ def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
     held = sorted(
         key for key, system in members.items() if system["maturity"] in {"hold", "retired"}
     )
+
+    member_snapshot: Dict[str, Dict[str, Any]] = {}
+    portal_index: Dict[str, str] = {}
+    for key in sorted(members):
+        system = members[key]
+        route = _portal_route(key, base_route)
+        portal_index[key] = route
+        member_snapshot[key] = {
+            "canonical_name": system["canonical_name"],
+            "aliases": system.get("aliases", []),
+            "category": system.get("category"),
+            "purpose": system.get("purpose"),
+            "human_surface": system.get("human_surface"),
+            "authority_boundary": system.get("authority_boundary"),
+            "risk_ceiling": system.get("risk_ceiling"),
+            "maturity": system["maturity"],
+            "dependencies": system.get("dependencies", []),
+            "source": member_sources[key],
+            "portal_route": route,
+            "portal_state": "contracted",
+        }
 
     return {
         "family_registry_id": registry["registry_id"],
@@ -156,14 +283,9 @@ def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
         "maturity_counts": dict(sorted(maturity_counts.items())),
         "execution_eligible_members": execution_eligible,
         "held_members": held,
-        "members": {
-            key: {
-                "canonical_name": members[key]["canonical_name"],
-                "maturity": members[key]["maturity"],
-                "source": member_sources[key],
-            }
-            for key in sorted(members)
-        },
+        "control_plane_resolution": control_plane_resolution,
+        "portal_index": portal_index,
+        "members": member_snapshot,
     }
 
 
@@ -193,23 +315,97 @@ def member_dispatch_gate(snapshot: Mapping[str, Any], machine_key: str) -> Dict[
     }
 
 
+def member_portal(snapshot: Mapping[str, Any], registry: Mapping[str, Any], machine_key: str) -> Dict[str, Any]:
+    """Return the canonical portal payload for one registered family member."""
+    members = snapshot.get("members")
+    if not isinstance(members, dict) or machine_key not in members:
+        raise PentaFamilyError(f"cannot render portal for unknown member {machine_key!r}")
+    member = members[machine_key]
+    maturity = member.get("maturity")
+    required_sections = registry["portal_contract"]["required_sections"]
+    sections = {
+        "overview": {
+            "canonical_name": member.get("canonical_name"),
+            "category": member.get("category"),
+            "purpose": member.get("purpose"),
+        },
+        "status": {
+            "family_status": snapshot.get("family_status"),
+            "member_maturity": maturity,
+            "execution_eligible": maturity in EXECUTION_ELIGIBLE,
+            "portal_state": member.get("portal_state"),
+        },
+        "responsibilities": {
+            "human_surface": member.get("human_surface"),
+            "risk_ceiling": member.get("risk_ceiling"),
+        },
+        "inputs_outputs": {
+            "dependency_inputs": member.get("dependencies", []),
+            "output_contract": "bounded governed results plus verification/readback evidence",
+        },
+        "authority_boundary": member.get("authority_boundary"),
+        "dependencies": member.get("dependencies", []),
+        "sops_slas": {
+            "state": "required",
+            "rule": "System-specific SOP/SLA records must be versioned in PentaDocs before consequential production dispatch when policy requires them.",
+        },
+        "runbooks": {
+            "state": "required",
+            "rule": "Operational, failure, rollback and recovery procedures are required for production-scoped capabilities.",
+        },
+        "guides": {
+            "state": "required",
+            "rule": "Operator, developer and governance guides are part of the portal contract and must stay aligned to system maturity.",
+        },
+        "evidence": {
+            "source_catalog": member.get("source"),
+            "rule": "Claims and maturity changes require evidence; portal presence is not deployment evidence.",
+        },
+        "api_mcp": {
+            "rule": "Only registered/certified API, MCP, tool and provider bindings may be exposed as executable capabilities.",
+        },
+        "changelog": {
+            "rule": "Material identity, maturity, authority, provider, portal or behavior changes require versioned change evidence.",
+        },
+        "support": {
+            "owner": "CrownThrive LLC",
+            "family_registry_id": snapshot.get("family_registry_id"),
+        },
+    }
+    missing = [section for section in required_sections if section not in sections]
+    if missing:
+        raise PentaFamilyError("portal payload missing required sections: " + ", ".join(missing))
+    return {
+        "machine_key": machine_key,
+        "portal_route": member.get("portal_route"),
+        "portal_contract_state": "contracted",
+        "sections": sections,
+    }
+
+
 def load_family(root: Path) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     registry = _load_json(root / "data/penta/family.registry.json")
     return registry, compose_family(root, registry)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Verify and snapshot the CrownThrive Penta Family")
+    parser = argparse.ArgumentParser(description="Verify, snapshot and render the CrownThrive Penta Family")
     parser.add_argument("--root", default=".", help="repository root")
     parser.add_argument("--member", help="optionally evaluate one member dispatch gate")
+    parser.add_argument("--portal", action="store_true", help="render portal payload/index in addition to verification")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
     try:
-        _, snapshot = load_family(root)
+        registry, snapshot = load_family(root)
         output: Dict[str, Any] = {"ok": True, "snapshot": snapshot}
         if args.member:
             output["dispatch_gate"] = member_dispatch_gate(snapshot, args.member)
+        if args.portal:
+            if args.member:
+                output["portal"] = member_portal(snapshot, registry, args.member)
+            else:
+                output["portal_index"] = snapshot["portal_index"]
         print(json.dumps(output, indent=2, sort_keys=True))
         return 0
     except PentaFamilyError as exc:

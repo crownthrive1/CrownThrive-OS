@@ -15,7 +15,9 @@
     "authority_invariant",
     "production_contract",
     "catalogs",
+    "control_plane_validation",
     "control_planes",
+    "portal_contract",
     "dispatch_policy",
     "observability"
   ],
@@ -81,6 +83,26 @@
         }
       }
     },
+    "control_plane_validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registered_penta_refs_required",
+        "normalize_display_names",
+        "external_refs_allowed",
+        "unresolved_reference_disposition"
+      ],
+      "properties": {
+        "registered_penta_refs_required": {"const": true},
+        "normalize_display_names": {"const": true},
+        "external_refs_allowed": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "unresolved_reference_disposition": {"const": "hold_fail_closed"}
+      }
+    },
     "control_planes": {
       "type": "object",
       "minProperties": 1,
@@ -89,6 +111,31 @@
         "minItems": 1,
         "uniqueItems": true,
         "items": {"type": "string", "minLength": 1}
+      }
+    },
+    "portal_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "every_registered_member_has_portal",
+        "base_route",
+        "route_pattern",
+        "portal_state_is_independent_from_maturity",
+        "portal_does_not_create_execution_authority",
+        "required_sections"
+      ],
+      "properties": {
+        "every_registered_member_has_portal": {"const": true},
+        "base_route": {"const": "/penta"},
+        "route_pattern": {"const": "/penta/{machine_key_suffix}"},
+        "portal_state_is_independent_from_maturity": {"const": true},
+        "portal_does_not_create_execution_authority": {"const": true},
+        "required_sections": {
+          "type": "array",
+          "minItems": 10,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
       }
     },
     "dispatch_policy": {
