@@ -63,7 +63,26 @@ jobs:
           git config user.name 'pentaframework-factory[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add "generated/factory/${{ steps.claim.outputs.run_id }}"
-          if git diff --cached --quiet; then SHA=$(git rev-parse HEAD); else git commit -m "pentaframework: publish ${{ steps.claim.outputs.run_id }}"; git push origin HEAD:main; SHA=$(git rev-parse HEAD); fi
+          if git diff --cached --quiet; then
+            git fetch origin main
+            SHA=$(git rev-parse origin/main)
+          else
+            git commit -m "pentaframework: publish ${{ steps.claim.outputs.run_id }}"
+            PUSHED=false
+            for attempt in 1 2 3; do
+              if git push origin HEAD:main; then
+                PUSHED=true
+                break
+              fi
+              git fetch origin main
+              git rebase origin/main
+            done
+            if [ "$PUSHED" != "true" ]; then
+              echo "provider push failed after 3 attempts" >&2
+              exit 1
+            fi
+            SHA=$(git rev-parse HEAD)
+          fi
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "url=https://github.com/${GITHUB_REPOSITORY}/commit/$SHA" >> "$GITHUB_OUTPUT"
       - name: Complete provider job after readback
