@@ -1,0 +1,33 @@
+name: Penta Executable Family
+
+on:
+  pull_request:
+    paths: ["runtime/penta_exec.py", "runtime/penta_family.py", "runtime/penta_interop.py", "data/penta/**", "schemas/penta/**", "scripts/penta-family", "tests/test_penta_exec.py", "tests/test_penta_family.py", ".github/workflows/penta-executable-family.yml"]
+  push:
+    branches: [main]
+    paths: ["runtime/penta_exec.py", "runtime/penta_family.py", "runtime/penta_interop.py", "data/penta/**", "schemas/penta/**", "scripts/penta-family", "tests/test_penta_exec.py", "tests/test_penta_family.py", ".github/workflows/penta-executable-family.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  executable-family:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Compile runtime
+        run: python -m py_compile runtime/penta_exec.py runtime/penta_family.py runtime/penta_interop.py
+      - name: Validate executable family contract
+        run: python runtime/penta_exec.py --root . validate
+      - name: Run executable family tests
+        run: python tests/test_penta_exec.py
+      - name: Re-run existing family regression tests
+        run: python tests/test_penta_family.py
+      - name: Smoke-test CLI status and heartbeat
+        run: |
+          python scripts/penta-family status penta.mail
+          python scripts/penta-family invoke penta.status penta.beata heartbeat --risk D0 --evidence-ref ci:penta-executable-family
