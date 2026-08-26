@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "contract_id": "crownthrive.penta.member-runtime",
-  "status": "implemented",
+  "status": "production",
   "runtime": "runtime/penta_exec.py",
   "adapter_registry": "data/penta/execution-adapters.registry.json",
   "request_schema": "schemas/penta/execution-request.schema.json",
@@ -12,27 +12,34 @@
     "all_registered_members_status_addressable": true,
     "unknown_members_fail_closed": true,
     "member_invocation_requires_static_adapter": true,
+    "all_certified_and_production_members_require_adapter": true,
     "execution_eligible_adapter_targets_require_certified_or_production_maturity": true,
     "execute_effect_requires_certified_or_production_maturity": true,
     "interop_envelope_required_before_adapter_handler": true,
     "trace_and_idempotency_preserved": true,
     "evidence_reference_required_for_invocation": true,
-    "provider_effect_adapters_disabled_in_v1": true,
+    "provider_effect_adapters_disabled_in_v1_v2": true,
     "arbitrary_shell_execution_disabled": true,
-    "arbitrary_dynamic_import_disabled": true,
+    "user_selected_dynamic_import_disabled": true,
     "credential_material_never_accepted": true,
     "d3_authority_never_automatic": true,
     "member_maturity_never_auto_promoted": true
   },
-  "v1_builtin_adapters": [
+  "production_member_adapters": [
     "penta.fabric:family_snapshot",
     "penta.beata:heartbeat",
     "penta.mesh:route_check",
     "penta.error:normalize",
     "penta.logger:emit",
     "penta.trace:new_context",
-    "penta.metric:snapshot"
+    "penta.metric:snapshot",
+    "penta.heartbeat:control_plane_probe",
+    "penta.od:readiness_assess",
+    "penta.compliance:evaluate",
+    "penta.license:readiness",
+    "penta.scribe:reconcile_preview",
+    "penta.marketer:cycle_preview"
   ],
-  "observability_adapter_boundary": "PentaError, PentaLogger, PentaTrace and PentaMetric adapters execute only their existing local stdlib runtime primitives. They emit/return redacted local evidence and never persist externally, call a provider, expose credential material, or create governance authority.",
-  "promotion_rule": "Additional member operations become executable only after a bounded handler is implemented, tested, entered into the adapter registry, and any execute/provider path passes existing PentaCertify, CHLOM/DAIL, PentaHybrid, credential, readback, and evidence gates."
+  "execution_boundary": "V1/V2 member adapters are repository-local and provider-effect false. Readiness, observability, compliance, licensing, Scribe and Marketer operations execute bounded internal logic only. License readiness never issues a grant; Scribe/Marketer preview cycles use isolated temporary state and never publish externally.",
+  "promotion_rule": "A member cannot be represented as execution-operational merely by registry maturity. Certified/production maturity plus at least one tested bounded adapter is mandatory, and provider-effect operations remain separately gated by PentaCertify, CHLOM/DAIL, PentaHybrid, credentials, readback and evidence."
 }
