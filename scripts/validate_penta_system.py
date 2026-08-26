@@ -17,9 +17,15 @@ REQUIRED = {
 }
 AXES = {"truth", "authority", "execution", "interoperation", "continuity"}
 PENTAROUTE_PRIMITIVES = {
-    "PentaFetch", "PentaGet", "PentaQuery", "PentaSearch", "PentaParse", "PentaCache",
-    "PentaQueue", "PentaRetry", "PentaSync", "PentaResolve", "PentaStream", "PentaEvent",
-    "PentaHook", "PentaAuth", "PentaSign", "PentaAudit", "PentaTest", "PentaDeploy"
+    "PentaTun", "PentaBeata", "PentaFetch", "PentaGet", "PentaHead", "PentaOptions",
+    "PentaPost", "PentaPut", "PentaPatch", "PentaDelete", "PentaQuery", "PentaSearch",
+    "PentaRead", "PentaList", "PentaParse", "PentaTransform", "PentaValidate", "PentaResolve",
+    "PentaObserve", "PentaCache", "PentaSync", "PentaIngest", "PentaImport", "PentaExport",
+    "PentaSnapshot", "PentaCreate", "PentaUpdate", "PentaUpsert", "PentaQueue", "PentaRetry",
+    "PentaDispatch", "PentaSchedule", "PentaLock", "PentaReconcile", "PentaRollback", "PentaBind",
+    "PentaHook", "PentaEvent", "PentaStream", "PentaVault", "PentaAuth", "PentaSign",
+    "PentaCertify", "PentaAudit", "PentaTest", "PentaCompile", "PentaGenerate", "PentaDeploy",
+    "PentaRelease", "PentaDiscover"
 }
 
 
@@ -54,7 +60,7 @@ def main() -> int:
 
     route = by_name["PentaRoute"]
     assert route["contract"] == "ct.penta.route.v3"
-    assert not (PENTAROUTE_PRIMITIVES & set(route.get("aliases", []))), "PentaRoute primitives are distinct identities, not umbrella aliases"
+    assert not (PENTAROUTE_PRIMITIVES & set(route.get("aliases", []))), "PentaRoute primitives are distinct route-member identities, not umbrella aliases"
     assert set(route.get("primitives", [])) == PENTAROUTE_PRIMITIVES, "PentaRoute primitive membership drift"
 
     required_files = [
