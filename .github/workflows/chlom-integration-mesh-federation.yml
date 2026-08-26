@@ -4,9 +4,18 @@ on:
   schedule:
     - cron: "23 */6 * * *"
   workflow_dispatch:
-  push:
+  pull_request:
     paths:
       - "federation/CHLOM_INTEGRATION_MESH.md"
+      - "federation/penta-mesh.v1.json"
+      - "federation/penta-mesh-node.v1.json"
+      - ".github/workflows/chlom-integration-mesh-federation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "federation/CHLOM_INTEGRATION_MESH.md"
+      - "federation/penta-mesh.v1.json"
+      - "federation/penta-mesh-node.v1.json"
       - ".github/workflows/chlom-integration-mesh-federation.yml"
 
 permissions:
@@ -17,12 +26,38 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify local Penta mesh node contract
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          mesh = json.loads(Path("federation/penta-mesh.v1.json").read_text())
+          node = json.loads(Path("federation/penta-mesh-node.v1.json").read_text())
+          assert mesh.get("schema") == "ct.penta.repository-mesh.v1"
+          assert node.get("schema") == "ct.penta.repository-mesh-node.v1"
+          assert mesh.get("canonical_hub") == "crownthrive1/CrownThrive-Support"
+          assert mesh.get("protocol_registry") == "crownthrive1/chlom-protocol"
+          repos = {r["repository"]: r for r in mesh.get("repositories", [])}
+          assert set(repos) == {
+              "crownthrive1/CrownThrive-Support",
+              "crownthrive1/CrownThrive-CIE",
+              "crownthrive1/chlom-protocol",
+          }
+          assert node.get("repository") == "crownthrive1/CrownThrive-Support"
+          assert repos[node["repository"]]["node_manifest"] == "federation/penta-mesh-node.v1.json"
+          assert node.get("capabilities", {}).get("pentamail_transport") is True
+          assert node.get("capabilities", {}).get("exact_provider_readback") is True
+          print("Support Penta mesh node contract verified")
+
       - name: Verify canonical CHLOM integration mesh
         shell: python
         run: |
           import json, urllib.request
           url = "https://raw.githubusercontent.com/crownthrive1/chlom-protocol/main/registry/integrations.json"
-          req = urllib.request.Request(url, headers={"User-Agent":"CrownThrive-Mesh-Federation/1.0"})
+          req = urllib.request.Request(url, headers={"User-Agent":"CrownThrive-Mesh-Federation/2.0"})
           with urllib.request.urlopen(req, timeout=30) as r:
               data = json.load(r)
           assert data.get("registry_id") == "ct.mesh.integrations.v1"
