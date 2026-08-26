@@ -15,6 +15,7 @@ on:
       - 'tests/test_penta_scribe_marketer.py'
       - 'tests/test_penta_production_runtime.py'
       - 'tests/test_penta_federated_semantics.py'
+      - 'tests/test_penta_federation_governance.py'
       - '.github/workflows/penta-scribe-marketer-governance.yml'
       - '.github/workflows/penta-scribe-marketer-production.yml'
   pull_request:
@@ -30,6 +31,7 @@ on:
       - 'tests/test_penta_scribe_marketer.py'
       - 'tests/test_penta_production_runtime.py'
       - 'tests/test_penta_federated_semantics.py'
+      - 'tests/test_penta_federation_governance.py'
       - '.github/workflows/penta-scribe-marketer-governance.yml'
       - '.github/workflows/penta-scribe-marketer-production.yml'
   workflow_dispatch:
@@ -48,6 +50,7 @@ jobs:
       - name: Compile executable surfaces
         run: |
           python -m py_compile penta/scribe/pentascribe.py
+          python -m py_compile penta/scribe/federation_governance.py
           python -m py_compile penta/marketer/pentamarketer.py
           python -m py_compile penta/runtime/evidence.py
           python -m py_compile penta/scribe/runtime.py
@@ -55,12 +58,16 @@ jobs:
           python -m py_compile scripts/validate_penta_scribe_marketer_production.py
       - name: Validate PentaScribe registry and federation sources
         run: python penta/scribe/pentascribe.py validate
+      - name: Audit federated semantic authority
+        run: python penta/scribe/federation_governance.py audit --out /tmp/pentascribe/federation-audit.json
       - name: Reconcile PentaScribe seed registry
         run: python penta/scribe/pentascribe.py reconcile
       - name: Build federated semantic index
         run: python penta/scribe/pentascribe.py federate --out /tmp/pentascribe/federated-index.json
       - name: Discover terminology and mark-use candidates
         run: python penta/scribe/pentascribe.py discover --out /tmp/pentascribe/discovery.json
+      - name: Build governed candidate review queue
+        run: python penta/scribe/federation_governance.py triage --discovery /tmp/pentascribe/discovery.json --out /tmp/pentascribe/candidate-queue.json
       - name: Compile PentaScribe products
         run: python penta/scribe/pentascribe.py compile --out /tmp/pentascribe/products
       - name: Validate PentaMarketer reference campaign
@@ -72,6 +79,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_penta_scribe_marketer.py' -v
           python -m unittest discover -s tests -p 'test_penta_production_runtime.py' -v
           python -m unittest discover -s tests -p 'test_penta_federated_semantics.py' -v
+          python -m unittest discover -s tests -p 'test_penta_federation_governance.py' -v
       - name: Run bounded production smoke cycle
         run: |
           python penta/scribe/runtime.py cycle --state-root /tmp/pentascribe-production --authority-ref chlom:penta.scribe:ci-preflight

@@ -14,6 +14,8 @@ ADAPTERS = ROOT / "penta/marketer/adapters.registry.json"
 WORKFLOW = ROOT / ".github/workflows/penta-scribe-marketer-production.yml"
 DOC = ROOT / "docs/phase3/PENTASCRIBE_PENTAMARKETER_PRODUCTION.md"
 FEDERATION_DOC = ROOT / "docs/phase3/PENTASCRIBE_FEDERATION.md"
+FEDERATION_GOVERNANCE_DOC = ROOT / "docs/phase3/PENTASCRIBE_FEDERATION_GOVERNANCE.md"
+FEDERATION_GOVERNANCE = ROOT / "penta/scribe/federation_governance.py"
 
 
 def load(path: Path) -> dict:
@@ -28,6 +30,11 @@ def main() -> int:
     assert by_key["penta.scribe"]["contract"] == "ct.penta.scribe.v1"
     assert by_key["penta.marketer"]["state"] == "active"
     assert by_key["penta.marketer"]["contract"] == "ct.penta.marketer.v1"
+    route = by_key["penta.route"]
+    assert route["contract"] == "ct.penta.route.v3"
+    assert len(route.get("primitives", [])) == 50
+    assert "PentaBind" in route["primitives"]
+    assert "PentaBind" not in route.get("aliases", [])
 
     extension = load(EXTENSION)
     systems = {system["machine_key"]: system for system in extension.get("systems", [])}
@@ -54,6 +61,10 @@ def main() -> int:
     assert {"pentaos-components", "penta-institutional-systems", "pentascribe-marketer-extension", "pentaroute-primitives"}.issubset(source_ids)
     blocked = {item["name"] for item in sources.get("blocked_terms", [])}
     assert {"PentaCapital", "PentaImpact", "PentaOps"}.issubset(blocked)
+    equivalences = {item["equivalence_id"]: set(item["ids"]) for item in sources.get("equivalences", [])}
+    assert equivalences["pentascribe-seed-system-v1"] == {"pentascribe", "penta.scribe"}
+    assert equivalences["pentamarketer-seed-system-v1"] == {"pentamarketer", "penta.marketer"}
+    assert equivalences["pentabind-component-primitive-v1"] == {"penta.bind", "pentaroute-primitives:pentabind"}
 
     adapters = load(ADAPTERS)
     amap = {adapter["channel"]: adapter for adapter in adapters.get("adapters", [])}
@@ -70,24 +81,34 @@ def main() -> int:
     for fragment in (
         "cron: '23 * * * *'",
         "test_penta_federated_semantics.py",
+        "test_penta_federation_governance.py",
+        "federation_governance.py audit",
         "python penta/scribe/runtime.py cycle",
         "python penta/marketer/runtime.py cycle",
         "retention-days: 30",
     ):
         assert fragment in workflow, f"production workflow missing {fragment}"
+
     scribe_source = (ROOT / "penta/scribe/pentascribe.py").read_text(encoding="utf-8")
     marketer_source = (ROOT / "penta/marketer/pentamarketer.py").read_text(encoding="utf-8")
+    federation_governance_source = FEDERATION_GOVERNANCE.read_text(encoding="utf-8")
     assert "build_federated_vocabulary" in scribe_source
     assert "Federation only recognizes identities already admitted" in scribe_source
-    assert "pentascribe_federated_v1" in marketer_source
+    assert "pentascribe_federated_governed_v1" in marketer_source
+    assert "PentaScribe federation authority conflict" in marketer_source
+    assert "AMBIGUOUS_SEMANTIC_AUTHORITY" in federation_governance_source
+    assert "automatic_promotion" in federation_governance_source
     assert DOC.is_file()
     assert FEDERATION_DOC.is_file()
+    assert FEDERATION_GOVERNANCE_DOC.is_file()
 
     print(json.dumps({
         "status": "PASS",
         "systems": ["PentaScribe", "PentaMarketer"],
         "production_scope": "internal_control_plane",
-        "semantic_resolution": "federated",
+        "semantic_resolution": "federated_governed",
+        "semantic_authority_gate": "fail_closed",
+        "route_primitive_membership": 50,
         "first_verified_run_id": 32944441770,
         "external_provider_mutation": "capability_bound_per_adapter",
         "held_channels": ["email", "social", "paid"],
