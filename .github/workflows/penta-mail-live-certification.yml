@@ -1,5 +1,5 @@
 name: PentaMail Live Certification
-# activation-revision: 2026-08-26.4 — provider send/readback with sanitized evidence artifact.
+# activation-revision: 2026-08-26.5 — all-Penta convergence + workflow_run + signed provider proof.
 
 on:
   workflow_dispatch:
@@ -13,10 +13,18 @@ on:
     paths:
       - 'runtime/penta_mail.py'
       - 'runtime/penta_runtime_suite.py'
+      - 'runtime/penta_convergence_certifier.py'
+      - 'tests/test_penta_convergence_certifier.py'
       - '.github/workflows/penta-mail-live-certification.yml'
+  workflow_run:
+    workflows: ['CodeQL']
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 concurrency:
   group: pentamail-live-certification
@@ -24,23 +32,52 @@ concurrency:
 
 jobs:
   certify-send-readback:
-    # Current fail-closed runtime policy permits only the attested literal
-    # GitHub-hosted label. Never add pull_request to this secret-bearing workflow.
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[pentamail-live-certify]')
+    # Connector-originated merges have not reliably emitted repository push
+    # workflows. A successful GitHub-native CodeQL workflow_run is therefore
+    # the production bridge. The explicit founder activation token remains
+    # mandatory. Never add pull_request to this secret-bearing provider lane.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[pentamail-live-certify]')) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       contains(github.event.workflow_run.head_commit.message, '[pentamail-live-certify]'))
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       PENTAMAIL_FROM: ${{ secrets.PENTAMAIL_FROM }}
       PENTA_NURTURE_COOKIE_SIGNING_KEY: ${{ secrets.PENTA_NURTURE_COOKIE_SIGNING_KEY }}
       PENTAMAIL_RECIPIENT: ${{ github.event.inputs.recipient || 'jones.usmc.kj@gmail.com' }}
+      PENTAMAIL_SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ env.PENTAMAIL_SOURCE_SHA }}
           persist-credentials: false
 
-      - name: Run PentaMail unit tests
-        run: python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
+      - name: Compile Penta certification software
+        run: |
+          python3 -m py_compile \
+            runtime/penta_mail.py \
+            runtime/penta_runtime_suite.py \
+            runtime/penta_family.py \
+            runtime/penta_observability.py \
+            runtime/penta_convergence_certifier.py \
+            runtime/penta-provider-control-plane/penta_control_plane.py
+
+      - name: Run Penta regression suites
+        run: |
+          python3 -m unittest discover -s tests -p 'test_penta*.py' -v
+
+      - name: Invoke and certify every registered Penta
+        run: |
+          python3 runtime/penta_convergence_certifier.py \
+            --root . \
+            --output penta-convergence-certification.json \
+            --summary-output penta-convergence-summary.txt
+          sha256sum penta-convergence-certification.json > penta-convergence-certification.sha256
+          cat penta-convergence-summary.txt
 
       - name: Establish read-only Resend certification
         run: |
@@ -70,6 +107,7 @@ jobs:
               'certified_operations': cert.certified_operations,
               'health': nurture.health,
           }
+          Path('resend-read-certification.json').write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
           print(json.dumps(result, sort_keys=True))
           if not binding.bound:
               raise SystemExit('RESEND credential is HOLD_UNBOUND')
@@ -79,7 +117,7 @@ jobs:
               raise SystemExit('Resend domain_read lacks live readback evidence')
           PY
 
-      - name: Send owner report through PentaMail and exact-readback
+      - name: Send all-systems owner report through PentaMail and exact-readback
         run: |
           python3 - <<'PY'
           import importlib.util
@@ -101,32 +139,33 @@ jobs:
           prs = load('penta_runtime_suite_live', root / 'runtime' / 'penta_runtime_suite.py')
 
           snapshot = prs.build_snapshot(root)
-          report = prs.owner_summary(snapshot)
-          report += '\nGitHub commit: ' + os.environ['GITHUB_SHA']
-          report += '\nLive certification intent: explicit founder-directed D1 transport validation.'
-          report += '\nNo unrelated Penta maturity is promoted by this email.'
+          report = Path('penta-convergence-summary.txt').read_text().strip()
+          report += '\n\n' + prs.owner_summary(snapshot)
+          report += '\nGitHub source commit: ' + os.environ['PENTAMAIL_SOURCE_SHA']
+          report += '\nExecution authority: explicit Founding Member D1 transport certification directive.'
+          report += '\nAll child Penta maturity and downstream authority gates remain independently fail-closed.'
 
           sender = (os.environ.get('PENTAMAIL_FROM') or '').strip()
           if not sender:
               sender = 'CrownThrive PentaMail <contact@crownthrive.com>'
           recipient = os.environ['PENTAMAIL_RECIPIENT'].strip()
-          correlation = 'pentamail-live-' + os.environ['GITHUB_RUN_ID']
-          authority_ref = 'founder-directive-2026-08-26-pentamail-live-certification'
+          correlation = 'penta-all-systems-live-' + os.environ['GITHUB_RUN_ID']
+          authority_ref = 'founder-directive-2026-08-26-all-penta-live-certification'
 
           envelope = pm.build_envelope(
               origin_penta='penta.status',
-              purpose='owner_execution_report',
+              purpose='all_systems_certification_report',
               classification='internal',
               recipient=recipient,
               sender_identity=sender,
-              subject='[PentaMail Live Validation] Penta Runtime Suite Report — 2026-08-26',
+              subject='[CrownThrive Systems Certification] All-Penta + PentaMail Live Proof — 2026-08-26',
               body_text=report,
               correlation_id=correlation,
               authority_ref=authority_ref,
               authority_class='D1',
               priority='high',
               retention_classification='institutional_status',
-              idempotency_key='pentamail-live-' + os.environ['GITHUB_RUN_ID'],
+              idempotency_key='penta-all-systems-live-' + os.environ['PENTAMAIL_SOURCE_SHA'],
           )
           authorization = pm.AuthorizationContext(
               authorized=True,
@@ -186,7 +225,7 @@ jobs:
               raise SystemExit('email_send production gate did not pass after exact readback certification')
           PY
 
-      - name: Build sanitized attestation subject
+      - name: Build sanitized all-systems attestation subject
         run: |
           python3 - <<'PY'
           import hashlib
@@ -197,12 +236,26 @@ jobs:
 
           receipt = json.loads(Path('pentamail-live-receipt.json').read_text())
           cert = json.loads(Path('pentamail-certification-result.json').read_text())
+          convergence = json.loads(Path('penta-convergence-certification.json').read_text())
           exact_readback = bool(receipt.get('live_evidence')) and all(
               evidence.get('readback') is True for evidence in receipt['live_evidence']
           )
+          pass_state = (
+              convergence.get('disposition') == 'PASS'
+              and exact_readback
+              and cert.get('certification') == 'WRITE_VERIFIED'
+              and cert.get('email_send_gate', {}).get('eligible') is True
+          )
           evidence = {
-              'schema': 'crownthrive.pentamail.live-certification.v1',
-              'disposition': 'PASS' if exact_readback and cert.get('certification') == 'WRITE_VERIFIED' and cert.get('email_send_gate', {}).get('eligible') else 'HOLD',
+              'schema': 'crownthrive.penta.all-systems-live-certification.v1',
+              'disposition': 'PASS' if pass_state else 'HOLD',
+              'family_invocation': {
+                  'member_count': convergence.get('family', {}).get('member_count'),
+                  'invocation_count': convergence.get('family', {}).get('invocation_count'),
+                  'eligible_count': convergence.get('family', {}).get('eligible_count'),
+                  'held_count': convergence.get('family', {}).get('held_count'),
+                  'evidence_sha256': convergence.get('evidence_sha256'),
+              },
               'provider': receipt.get('provider'),
               'provider_message_id': receipt.get('provider_message_id'),
               'lifecycle_state': receipt.get('lifecycle_state'),
@@ -210,53 +263,67 @@ jobs:
               'exact_provider_readback': exact_readback,
               'certification': cert.get('certification'),
               'email_send_eligible': cert.get('email_send_gate', {}).get('eligible', False),
+              'self_hosted_runner_state': 'HOLD_UNTIL_NODE24_MACHINE_ATTESTATION_IS_VERIFIED',
               'repository': os.environ['GITHUB_REPOSITORY'],
-              'commit_sha': os.environ['GITHUB_SHA'],
+              'commit_sha': os.environ['PENTAMAIL_SOURCE_SHA'],
               'run_id': os.environ['GITHUB_RUN_ID'],
               'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
               'event': os.environ['GITHUB_EVENT_NAME'],
               'attested_at': datetime.now(timezone.utc).isoformat(),
           }
           if evidence['disposition'] != 'PASS':
-              raise SystemExit('refusing to publish unproven PentaMail provider evidence')
+              raise SystemExit('refusing to attest an unproven all-systems/provider result')
           payload = json.dumps(evidence, indent=2, sort_keys=True) + '\n'
-          Path('pentamail-live-evidence.json').write_text(payload)
+          Path('penta-system-certification-evidence.json').write_text(payload)
           digest = hashlib.sha256(payload.encode()).hexdigest()
-          Path('pentamail-live-evidence.sha256').write_text(
-              digest + '  pentamail-live-evidence.json\n'
+          Path('penta-system-certification-evidence.sha256').write_text(
+              digest + '  penta-system-certification-evidence.json\n'
           )
           print(payload)
           print('sha256=' + digest)
           PY
 
-      - name: Upload sanitized PentaMail proof
+      - name: Attest all-systems certification evidence
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: penta-system-certification-evidence.json
+
+      - name: Upload complete certification proof bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: pentamail-live-certification-${{ github.run_id }}
+          name: penta-all-systems-certification-${{ github.run_id }}
           path: |
-            pentamail-live-evidence.json
-            pentamail-live-evidence.sha256
+            penta-convergence-certification.json
+            penta-convergence-certification.sha256
+            penta-convergence-summary.txt
+            resend-read-certification.json
             pentamail-certification-result.json
+            penta-system-certification-evidence.json
+            penta-system-certification-evidence.sha256
           if-no-files-found: error
           retention-days: 30
 
       - name: Publish PentaStatus evidence summary
         if: always()
         run: |
-          if [ -f pentamail-certification-result.json ]; then
+          if [ -f penta-system-certification-evidence.json ]; then
             python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json
           from pathlib import Path
-          r = json.loads(Path('pentamail-certification-result.json').read_text())
-          print('## PentaMail Live Certification')
+          r = json.loads(Path('penta-system-certification-evidence.json').read_text())
+          f = r['family_invocation']
+          print('## CrownThrive All-Penta Systems Certification — ' + r.get('disposition', 'UNKNOWN'))
           print()
-          print('Provider: ' + r.get('email_send_gate', {}).get('provider_id', 'resend'))
-          print('Certification: ' + r.get('certification', 'UNKNOWN'))
-          print('Lifecycle at readback: ' + r.get('lifecycle_state', 'UNKNOWN'))
-          print('Provider message ID: ' + r.get('provider_message_id', 'UNKNOWN'))
-          print('email_send eligible: ' + str(r.get('email_send_gate', {}).get('eligible', False)))
-          print('Sanitized evidence artifact: ' + str(Path('pentamail-live-evidence.json').exists()))
+          print('Pentas invoked: ' + str(f.get('invocation_count')) + '/' + str(f.get('member_count')))
+          print('Execution-eligible: ' + str(f.get('eligible_count')))
+          print('Held without promotion: ' + str(f.get('held_count')))
+          print('Provider: ' + str(r.get('provider')))
+          print('Provider message ID: ' + str(r.get('provider_message_id')))
+          print('Lifecycle at exact readback: ' + str(r.get('lifecycle_state')))
+          print('email_send eligible: ' + str(r.get('email_send_eligible')))
+          print('Provenance subject: `penta-system-certification-evidence.json`')
+          print('Self-hosted PentaFabric: ' + r.get('self_hosted_runner_state', 'UNKNOWN'))
           PY
           else
-            echo '## PentaMail Live Certification — HOLD/FAILED' >> "$GITHUB_STEP_SUMMARY"
+            echo '## CrownThrive All-Penta Systems Certification — HOLD/FAILED' >> "$GITHUB_STEP_SUMMARY"
           fi
