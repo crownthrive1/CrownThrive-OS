@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Validate CrownThrive homepage control-plane and pull-propagation invariants.
 
-This validator is intentionally standard-library only. It keeps the public-safe
-homepage synchronized with the authoritative Phase 3 readiness decision and
-requires the governance standard / PR template to treat homepage propagation as
-part of every material change.
+This validator is intentionally standard-library only. It supports the current
+Phase 3 Production + Convergence homepage while preserving validation of the
+older readiness-projection shape for historical branches.
+
+A current production homepage must not be forced to re-project a superseded
+Phase 2.99/Phase 3-entry token. Instead it must explicitly declare the Phase 3
+production baseline, evidence-scoped promotion, and the fact that the old
+blanket NO-GO homepage posture is superseded.
 """
 
 from __future__ import annotations
@@ -20,9 +24,94 @@ DOCS_STANDARD = ROOT / "standards/documentation-source-of-truth-and-autonomous-g
 NON_NEGOTIABLES = ROOT / "standards/non-negotiables.mdx"
 PR_TEMPLATE = ROOT / ".github/pull_request_template.md"
 
+PRODUCTION_H1 = "# CrownThrive OS // Production \\+ Convergence"
+LEGACY_CONTROL_H1 = "# CrownThrive OS // Institutional Control Plane"
+
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def validate_markers(index: str, markers: dict[str, str], errors: list[str]) -> None:
+    for label, marker in markers.items():
+        if marker not in index:
+            errors.append(f"Homepage missing {label}: {marker!r}")
+
+
+def parse_readiness_decision(readiness: str, errors: list[str]) -> str | None:
+    decision_match = re.search(
+        r"\*\*Current decision:\s*(.+?)\*\*",
+        readiness,
+        flags=re.DOTALL,
+    )
+    if not decision_match:
+        errors.append("Phase 3 readiness gate does not expose a parseable current decision")
+        return None
+    return decision_match.group(1).strip()
+
+
+def validate_production_convergence(index: str, readiness: str, errors: list[str]) -> None:
+    required = {
+        "Production + Convergence H1": PRODUCTION_H1,
+        "current production posture": "CURRENT OPERATING STATE — PRODUCTION \\+ CONVERGENCE.",
+        "Penta operating model": "## The Penta Model",
+        "institutional pulse": "## Current institutional pulse",
+        "Phase 3 production baseline": "institutional_phase: phase_3_production_baseline",
+        "evidence-scoped status promotion": "status_promotion_rule: evidence_scoped_fail_closed",
+        "universal-activation warning": "**Production does not mean universal activation.**",
+        "Phase 3 bootstrap lineage": "/changelog/2026-08-26-phase3-entry-bootstrap-v2",
+        "superseded readiness posture": "old homepage posture that presented Phase 2.99 as the active state and Phase 3 as a blanket `NO-GO` is superseded",
+        "evidence-over-appearance section": "## Evidence over appearance",
+    }
+    validate_markers(index, required, errors)
+
+    # The old readiness artifact remains historical lineage and must stay
+    # parseable, but its old decision token is deliberately not projected as
+    # the live homepage state after Phase 3 production activation.
+    parse_readiness_decision(readiness, errors)
+
+    stale_for_production = {
+        "legacy control-plane H1": LEGACY_CONTROL_H1,
+        "obsolete live-pulse heading": "## Live institutional pulse",
+        "obsolete pull-propagation homepage section": "## Every pull updates the institution",
+    }
+    for label, marker in stale_for_production.items():
+        if marker in index:
+            errors.append(f"Production homepage contains superseded {label}: {marker!r}")
+
+
+def validate_legacy_projection(index: str, readiness: str, errors: list[str]) -> None:
+    required_homepage_markers = {
+        "control-plane H1": LEGACY_CONTROL_H1,
+        "live pulse": "## Live institutional pulse",
+        "pull propagation": "## Every pull updates the institution",
+        "source-flow model": "SOURCE PULL / PR / LIVE EVIDENCE / AUTHORIZED DECISION",
+        "docs impact contract": "docs_updated",
+        "Phase 2.99 plan link": "/changelog/phase-2-99-plan",
+        "Phase 3 readiness link": "/technology/phase-3-readiness-gate",
+        "governance standard link": "/standards/documentation-source-of-truth-and-autonomous-governance",
+    }
+    validate_markers(index, required_homepage_markers, errors)
+
+    decision_text = parse_readiness_decision(readiness, errors)
+    if decision_text is None:
+        return
+
+    state_tokens = re.findall(r"`([^`]+)`", decision_text)
+    if state_tokens:
+        for token in state_tokens:
+            if token not in index:
+                errors.append(
+                    "Homepage control state is stale: readiness gate decision token "
+                    f"{token!r} is not projected on index.mdx"
+                )
+    else:
+        decision_keyword = "PASS" if "PASS" in decision_text.upper() else "NO-GO"
+        if decision_keyword not in index.upper():
+            errors.append(
+                "Homepage control state does not reflect readiness-gate decision "
+                f"{decision_keyword!r}"
+            )
 
 
 def main() -> int:
@@ -44,19 +133,17 @@ def main() -> int:
     non_negotiables = read(NON_NEGOTIABLES)
     pr_template = read(PR_TEMPLATE)
 
-    required_homepage_markers = {
-        "control-plane H1": "# CrownThrive OS // Institutional Control Plane",
-        "live pulse": "## Live institutional pulse",
-        "pull propagation": "## Every pull updates the institution",
-        "source-flow model": "SOURCE PULL / PR / LIVE EVIDENCE / AUTHORIZED DECISION",
-        "docs impact contract": "docs_updated",
-        "Phase 2.99 plan link": "/changelog/phase-2-99-plan",
-        "Phase 3 readiness link": "/technology/phase-3-readiness-gate",
-        "governance standard link": "/standards/documentation-source-of-truth-and-autonomous-governance",
-    }
-    for label, marker in required_homepage_markers.items():
-        if marker not in index:
-            errors.append(f"Homepage missing {label}: {marker!r}")
+    if PRODUCTION_H1 in index:
+        mode = "phase_3_production_convergence"
+        validate_production_convergence(index, readiness, errors)
+    elif LEGACY_CONTROL_H1 in index:
+        mode = "legacy_readiness_projection"
+        validate_legacy_projection(index, readiness, errors)
+    else:
+        mode = "unknown"
+        errors.append(
+            "Homepage has neither the current Production + Convergence H1 nor the legacy control-plane H1"
+        )
 
     forbidden_stale_homepage_markers = {
         "obsolete Phase 2.97 landing state": "**Current maturity:** Phase 2.97.1",
@@ -65,31 +152,6 @@ def main() -> int:
     for label, marker in forbidden_stale_homepage_markers.items():
         if marker in index:
             errors.append(f"Homepage contains {label}: {marker!r}")
-
-    decision_match = re.search(
-        r"\*\*Current decision:\s*(.+?)\*\*",
-        readiness,
-        flags=re.DOTALL,
-    )
-    if not decision_match:
-        errors.append("Phase 3 readiness gate does not expose a parseable current decision")
-    else:
-        decision_text = decision_match.group(1).strip()
-        state_tokens = re.findall(r"`([^`]+)`", decision_text)
-        if state_tokens:
-            for token in state_tokens:
-                if token not in index:
-                    errors.append(
-                        "Homepage control state is stale: readiness gate decision token "
-                        f"{token!r} is not projected on index.mdx"
-                    )
-        else:
-            decision_keyword = "PASS" if "PASS" in decision_text.upper() else "NO-GO"
-            if decision_keyword not in index.upper():
-                errors.append(
-                    "Homepage control state does not reflect readiness-gate decision "
-                    f"{decision_keyword!r}"
-                )
 
     if "## Homepage control-plane projection rule" not in docs_standard:
         errors.append("Documentation governance standard lacks homepage projection rule")
@@ -117,10 +179,16 @@ def main() -> int:
         return 1
 
     print("CrownThrive homepage control-plane validation PASSED")
-    print("- homepage projects the authoritative readiness decision")
-    print("- pull/source propagation rules are present")
+    print(f"- homepage mode: {mode}")
+    if mode == "phase_3_production_convergence":
+        print("- current homepage declares Phase 3 Production + Convergence")
+        print("- legacy readiness decision remains historical lineage, not live homepage state")
+        print("- evidence-scoped fail-closed promotion remains explicit")
+    else:
+        print("- legacy homepage projects the authoritative readiness decision")
+    print("- pull/source propagation governance remains present")
     print("- PR template requires homepage and documentation impact")
-    print("- stale Phase 2.97 / Phase 3 bypass language is absent")
+    print("- stale Phase 2.97 / bypass language is absent")
     return 0
 
 
