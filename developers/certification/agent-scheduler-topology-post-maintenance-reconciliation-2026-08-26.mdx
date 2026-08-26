@@ -1,0 +1,108 @@
+---
+title: "Agent Scheduler Topology Post-Maintenance Reconciliation — 2026-08-26"
+sidebarTitle: "Scheduler Topology Reconciliation"
+description: "Current-state reconciliation of CrownThrive's production scheduler after targeted maintenance closure, including the two-clock external failure-domain model and retirement of stale PR-specific scheduling scaffolding."
+icon: "arrows-rotate"
+keywords: ["CrownThrive", "scheduler", "ThriveBase", "Penta", "CHLOM", "pg_cron", "maintenance", "wallet", "continuity"]
+---
+
+# Agent Scheduler Topology Post-Maintenance Reconciliation — 2026-08-26
+
+## Current decision
+
+The production scheduler remains `ct.scheduler-topology.production.v1`. ThriveBase is runtime-authoritative. This reconciliation updates source-controlled projection to the **post-maintenance** topology rather than rewriting the original August 24 certification.
+
+```text
+runtime topology semantic version   1.2.0 after migration
+maintenance                         CLOSED
+external clock target               2
+external failure domain #1          CrownThrive External Evidence Relay
+external failure domain #2          CrownThrive Communications Watch
+backup clock                        internal pg_cron
+backup connector work               subroute of External Evidence Relay
+maintenance coordinator             RETIRED_SCHEDULING_SCAFFOLDING
+legacy one-agent-one-clock model     RETIRED_SCHEDULING_SCAFFOLDING
+```
+
+The scheduler clock creates no authority. D3 remains human-reserved. No topology change authorizes provider writes, money movement, rights, entitlements, checkout, credential export, sovereign voting, or phase advancement.
+
+## Why this reconciliation exists
+
+The August 24 source projection still described the maintenance-era topology and a normal three-clock target. ThriveBase subsequently closed targeted maintenance and converged backup continuity so that midnight due generation and dedupe are owned by `pg_cron`, while the connector-only Google Drive portion is serviced by the canonical External Evidence Relay. The dedicated backup ChatGPT clock remains retired.
+
+The current external topology therefore has two clocks, not three:
+
+```text
+External Evidence Relay
+└─ due connector-only logical subroutes
+   ├─ midnight backup Drive evidence/readback/restore when a ThriveBase job is due
+   ├─ vendor/provider evidence that cannot run internally
+   └─ other explicitly bound connector-only duties
+
+Communications Watch
+└─ email/communications connector failure domain
+```
+
+Everything compatible with ThriveBase, pg_cron, queues, PentaFactory/PentaBuild, framework software, GitHub Actions, Mintlify workflows, Edge Functions, or another production-native executor stays internal.
+
+## Legacy Agent A portfolio fallback
+
+`ct.schedule.agent-a.portfolio-fallback.hourly` is superseded scheduling scaffolding. Its historical row and evidence are preserved, but it is no longer a live dispatch target. Portfolio execution belongs to the production software fabric and its governed queues rather than an Agent-A external wake-up route.
+
+This changes scheduler ownership only. It does not delete the historical Agent A identity or its prior evidence.
+
+## CHLOM Wallet PR #230 review scaffolding
+
+PR #230 is closed and unmerged. Its five independent-review schedules remain historically valuable but cannot continue as live current-head dispatch targets because their PR/head/evidence cohort is stale.
+
+The five schedule rows are therefore superseded as `SUPERSEDED_RETIRED_SCHEDULING_SCAFFOLDING`. Historical v1/v2 lane, heartbeat, receipt, and synthesis records remain untouched.
+
+Current Phase-3 Wallet continuity ownership is the Penta model merged through PR #476:
+
+- PentaNurture — continuity maintenance, drift, and recovery-plan stewardship;
+- PentaStatus — current-state projection and readback;
+- PentaCredentials — credential/server-binding readiness;
+- PentaCertify — exact-operation certification;
+- PentaFactory / PentaBuild — software, adapters, and candidates;
+- PentaTriage — incident routing;
+- CHLOM — authority boundary.
+
+No reviewer heartbeat, independent receipt, or synthesis is fabricated to make the historical PR #230 cohort look current.
+
+## Runtime migration
+
+The source-controlled migration is:
+
+`supabase/migrations/20260826203600_scheduler_topology_post_maintenance_reconciliation_v2.sql`
+
+It is intentionally bounded and non-destructive. It:
+
+1. advances the topology projection to semantic version `1.2.0` and a two-clock post-maintenance target;
+2. supersedes the legacy Agent-A portfolio fallback schedule;
+3. supersedes all five PR #230 Wallet independent-review schedules while preserving their histories;
+4. normalizes stale maintenance markers on still-active External Evidence Relay subroutes without changing their cadence or authority;
+5. binds backup continuity to internal `pg_cron` plus the connector-only relay subroute;
+6. refreshes the canonical External Evidence Relay binding metadata;
+7. fails closed if the intended supersessions or canonical relay invariants are not true.
+
+## Invariants
+
+- append/supersede, never silent delete;
+- no recurring external task is created;
+- no provider write authority is added;
+- no money-movement authority is added;
+- no credential material is read or exported;
+- no main branch is written directly;
+- no historical Wallet review receipt is promoted to current truth;
+- no scheduler identity becomes a sovereign voter or quorum member;
+- no D3 action is automated.
+
+## Source lineage
+
+```text
+original topology merge       e6195cd42c28c90d12797f4f755fae1dd548dff3
+Wallet Phase-3 successor      PR #476 / e6466e7a56c27b05b2ed15eb4fa1ae34ea490018
+main at reconciliation start  ffe7c1980806d29c26396bddd4e9de9dd94422d1
+```
+
+The original August 24 certification remains preserved as historical evidence. This page is its additive post-maintenance successor.
