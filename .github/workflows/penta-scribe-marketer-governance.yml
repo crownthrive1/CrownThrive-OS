@@ -10,6 +10,8 @@ on:
       - 'penta/scribe/**'
       - 'penta/marketer/**'
       - 'penta/runtime/**'
+      - 'penta/registry/penta-component-registry.v1.json'
+      - 'scripts/validate_penta_scribe_marketer_production.py'
       - 'tests/test_penta_scribe_marketer.py'
       - 'tests/test_penta_production_runtime.py'
       - '.github/workflows/penta-scribe-marketer-governance.yml'
@@ -22,6 +24,8 @@ on:
       - 'penta/scribe/**'
       - 'penta/marketer/**'
       - 'penta/runtime/**'
+      - 'penta/registry/penta-component-registry.v1.json'
+      - 'scripts/validate_penta_scribe_marketer_production.py'
       - 'tests/test_penta_scribe_marketer.py'
       - 'tests/test_penta_production_runtime.py'
       - '.github/workflows/penta-scribe-marketer-governance.yml'
@@ -46,6 +50,7 @@ jobs:
           python -m py_compile penta/runtime/evidence.py
           python -m py_compile penta/scribe/runtime.py
           python -m py_compile penta/marketer/runtime.py
+          python -m py_compile scripts/validate_penta_scribe_marketer_production.py
       - name: Validate PentaScribe registry
         run: python penta/scribe/pentascribe.py validate
       - name: Reconcile PentaScribe registry
@@ -66,6 +71,8 @@ jobs:
         run: |
           python penta/scribe/runtime.py cycle --state-root /tmp/pentascribe-production --authority-ref chlom:penta.scribe:ci-preflight
           python penta/marketer/runtime.py cycle --campaign penta/marketer/campaign.example.json --state-root /tmp/pentamarketer-production
+      - name: Validate production promotion invariants
+        run: python scripts/validate_penta_scribe_marketer_production.py
       - name: Publish evidence bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
