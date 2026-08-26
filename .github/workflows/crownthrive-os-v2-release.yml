@@ -1,0 +1,57 @@
+name: CrownThrive OS Release Publisher
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/release-requests/crownthrive-os-v2.0.1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crownthrive-os-v2.0.1-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          ref: os-v2/autonomous-runtime-20260825
+          fetch-depth: 0
+
+      - name: Validate package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f releases/v2.0.1/RELEASE_NOTES.md
+          test -f releases/v2.0.1/MANIFEST.json
+          test -f supabase/functions/crownthrive-os-v2-runtime/index.ts
+          python -m json.tool releases/v2.0.1/MANIFEST.json >/dev/null
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='v2.0.1'
+          TITLE='CrownThrive OS V2.0.1 — Founder Visibility & Autonomous Briefing'
+          TARGET='os-v2/autonomous-runtime-20260825'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TITLE" --notes-file releases/v2.0.1/RELEASE_NOTES.md --target "$TARGET"
+          else
+            gh release create "$TAG" --target "$TARGET" --title "$TITLE" --notes-file releases/v2.0.1/RELEASE_NOTES.md
+          fi
+
+      - name: Verify release readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view v2.0.1 --json tagName,name,url,isDraft,isPrerelease,targetCommitish
