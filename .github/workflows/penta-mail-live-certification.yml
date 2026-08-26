@@ -1,0 +1,202 @@
+name: PentaMail Live Certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipient:
+        description: 'Authorized PentaMail certification recipient'
+        required: false
+        default: 'jones.usmc.kj@gmail.com'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/penta_mail.py'
+      - 'runtime/penta_runtime_suite.py'
+      - '.github/workflows/penta-mail-live-certification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentamail-live-certification
+  cancel-in-progress: false
+
+jobs:
+  certify-send-readback:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[pentamail-live-certify]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      PENTAMAIL_FROM: ${{ secrets.PENTAMAIL_FROM }}
+      PENTA_NURTURE_COOKIE_SIGNING_KEY: ${{ secrets.PENTA_NURTURE_COOKIE_SIGNING_KEY }}
+      PENTAMAIL_RECIPIENT: ${{ github.event.inputs.recipient || 'jones.usmc.kj@gmail.com' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run PentaMail unit tests
+        run: python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
+
+      - name: Establish read-only Resend certification
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          from pathlib import Path
+          import sys
+
+          root = Path.cwd()
+          module_path = root / 'runtime' / 'penta-provider-control-plane' / 'penta_control_plane.py'
+          spec = importlib.util.spec_from_file_location('penta_control_plane_live_mail', module_path)
+          mod = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = mod
+          spec.loader.exec_module(mod)
+
+          registry = mod.Registry(root / 'runtime' / 'penta-provider-control-plane' / 'providers.json')
+          state = root / '.penta' / 'pentamail-provider-control'
+          binding = mod.PentaCredentials(registry, state).bind('resend')
+          build = mod.PentaBuild(registry, state).build('resend')
+          cert = mod.PentaCertify(registry, state).certify('resend')
+          nurture = mod.PentaNurture(registry, state).observe('resend')
+          result = {
+              'credential': 'BOUND' if binding.bound else 'HOLD_UNBOUND',
+              'build': build.state,
+              'certification': cert.state,
+              'certified_operations': cert.certified_operations,
+              'health': nurture.health,
+          }
+          print(json.dumps(result, sort_keys=True))
+          if not binding.bound:
+              raise SystemExit('RESEND credential is HOLD_UNBOUND')
+          if cert.state not in {'CERTIFIED', 'WRITE_VERIFIED'}:
+              raise SystemExit('Resend read-only live certification did not pass')
+          if 'domain_read' not in cert.certified_operations:
+              raise SystemExit('Resend domain_read lacks live readback evidence')
+          PY
+
+      - name: Send owner report through PentaMail and exact-readback
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          root = Path.cwd()
+
+          def load(name, path):
+              spec = importlib.util.spec_from_file_location(name, path)
+              mod = importlib.util.module_from_spec(spec)
+              sys.modules[spec.name] = mod
+              spec.loader.exec_module(mod)
+              return mod
+
+          pm = load('penta_mail_live', root / 'runtime' / 'penta_mail.py')
+          prs = load('penta_runtime_suite_live', root / 'runtime' / 'penta_runtime_suite.py')
+
+          snapshot = prs.build_snapshot(root)
+          report = prs.owner_summary(snapshot)
+          report += '\nGitHub commit: ' + os.environ['GITHUB_SHA']
+          report += '\nLive certification intent: explicit founder-directed D1 transport validation.'
+          report += '\nNo unrelated Penta maturity is promoted by this email.'
+
+          sender = (os.environ.get('PENTAMAIL_FROM') or '').strip()
+          if not sender:
+              sender = 'CrownThrive PentaMail <contact@crownthrive.com>'
+          recipient = os.environ['PENTAMAIL_RECIPIENT'].strip()
+          correlation = 'pentamail-live-' + os.environ['GITHUB_RUN_ID']
+          authority_ref = 'founder-directive-2026-08-26-pentamail-live-certification'
+
+          envelope = pm.build_envelope(
+              origin_penta='penta.status',
+              purpose='owner_execution_report',
+              classification='internal',
+              recipient=recipient,
+              sender_identity=sender,
+              subject='[PentaMail Live Validation] Penta Runtime Suite Report — 2026-08-26',
+              body_text=report,
+              correlation_id=correlation,
+              authority_ref=authority_ref,
+              authority_class='D1',
+              priority='high',
+              retention_classification='institutional_status',
+              idempotency_key='pentamail-live-' + os.environ['GITHUB_RUN_ID'],
+          )
+          authorization = pm.AuthorizationContext(
+              authorized=True,
+              authorized_by='Founding Member execution directive 2026-08-26',
+              authority_ref=authority_ref,
+              authority_class='D1',
+          )
+          receipt = pm.certification_send(
+              envelope=envelope,
+              authorization=authorization,
+              state_dir=root / '.penta' / 'pentamail',
+          )
+          Path('pentamail-live-receipt.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          print(json.dumps({
+              'provider': receipt['provider'],
+              'provider_message_id': receipt['provider_message_id'],
+              'lifecycle_state': receipt['lifecycle_state'],
+              'correlation_id': receipt['correlation_id'],
+              'exact_readback': all(e.get('readback') is True for e in receipt['live_evidence']),
+          }, sort_keys=True))
+          PY
+
+      - name: Certify exact email_send and verify production gate
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          from pathlib import Path
+          import sys
+
+          root = Path.cwd()
+          module_path = root / 'runtime' / 'penta-provider-control-plane' / 'penta_control_plane.py'
+          spec = importlib.util.spec_from_file_location('penta_control_plane_post_mail', module_path)
+          mod = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = mod
+          spec.loader.exec_module(mod)
+
+          receipt = json.loads(Path('pentamail-live-receipt.json').read_text())
+          registry = mod.Registry(root / 'runtime' / 'penta-provider-control-plane' / 'providers.json')
+          state = root / '.penta' / 'pentamail-provider-control'
+          cert = mod.PentaCertify(registry, state).certify('resend', live_evidence=receipt['live_evidence'])
+          nurture = mod.PentaNurture(registry, state).observe('resend')
+          gate = mod.ProductionGate(registry, state).decide('resend', 'email_send')
+          result = {
+              'certification': cert.state,
+              'certified_operations': cert.certified_operations,
+              'health': nurture.health,
+              'email_send_gate': gate,
+              'provider_message_id': receipt['provider_message_id'],
+              'lifecycle_state': receipt['lifecycle_state'],
+          }
+          Path('pentamail-certification-result.json').write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(result, sort_keys=True))
+          if cert.state != 'WRITE_VERIFIED':
+              raise SystemExit('email_send did not reach WRITE_VERIFIED')
+          if not gate.get('eligible'):
+              raise SystemExit('email_send production gate did not pass after exact readback certification')
+          PY
+
+      - name: Publish PentaStatus evidence summary
+        if: always()
+        run: |
+          if [ -f pentamail-certification-result.json ]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          r = json.loads(Path('pentamail-certification-result.json').read_text())
+          print('## PentaMail Live Certification')
+          print()
+          print('Provider: ' + r.get('email_send_gate', {}).get('provider_id', 'resend'))
+          print('Certification: ' + r.get('certification', 'UNKNOWN'))
+          print('Lifecycle at readback: ' + r.get('lifecycle_state', 'UNKNOWN'))
+          print('Provider message ID: ' + r.get('provider_message_id', 'UNKNOWN'))
+          print('email_send eligible: ' + str(r.get('email_send_gate', {}).get('eligible', False)))
+          PY
+          else
+            echo '## PentaMail Live Certification — HOLD/FAILED' >> "$GITHUB_STEP_SUMMARY"
+          fi

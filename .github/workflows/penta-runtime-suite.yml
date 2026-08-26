@@ -1,0 +1,92 @@
+name: Penta Runtime Suite
+
+on:
+  pull_request:
+    paths:
+      - 'runtime/penta_mail.py'
+      - 'runtime/penta_runtime_suite.py'
+      - 'tests/test_penta_mail.py'
+      - 'tests/test_penta_runtime_suite.py'
+      - 'runtime/penta-provider-control-plane/**'
+      - 'data/penta/**'
+      - 'developers/manifests/penta-runtime-suite.v1.json'
+      - '.github/workflows/penta-runtime-suite.yml'
+      - '.github/workflows/penta-mail-live-certification.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/penta_mail.py'
+      - 'runtime/penta_runtime_suite.py'
+      - 'tests/test_penta_mail.py'
+      - 'tests/test_penta_runtime_suite.py'
+      - 'runtime/penta-provider-control-plane/**'
+      - 'data/penta/**'
+      - 'developers/manifests/penta-runtime-suite.v1.json'
+      - '.github/workflows/penta-runtime-suite.yml'
+      - '.github/workflows/penta-mail-live-certification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-runtime-suite-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  runtime-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Compile Penta runtime software
+        run: |
+          python3 -m py_compile runtime/penta_mail.py runtime/penta_runtime_suite.py runtime/penta-provider-control-plane/penta_control_plane.py
+
+      - name: Run focused Penta runtime tests
+        run: |
+          python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
+          python3 -m unittest discover -s tests -p 'test_penta_runtime_suite.py' -v
+          python3 -m unittest discover -s tests -p 'test_penta_family.py' -v
+          python3 -m unittest discover -s tests -p 'test_penta_institutional_services.py' -v
+
+      - name: Validate provider contracts
+        run: python3 scripts/validate_penta_provider_control_plane.py
+
+      - name: Generate truth snapshot
+        run: |
+          python3 runtime/penta_runtime_suite.py --root . --output penta-runtime-suite-report.json
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          from pathlib import Path
+          import sys
+          path = Path('runtime/penta_runtime_suite.py')
+          spec = importlib.util.spec_from_file_location('penta_runtime_suite_ci', path)
+          mod = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = mod
+          spec.loader.exec_module(mod)
+          snapshot = json.loads(Path('penta-runtime-suite-report.json').read_text())
+          print(mod.owner_summary(snapshot))
+          if snapshot['provider_control_plane'].get('contract_errors'):
+              raise SystemExit('provider control contract errors detected')
+          if not snapshot['pentamail']['registered']:
+              raise SystemExit('PentaMail missing from Penta registry')
+          if not snapshot['pentamail']['resend_registered']:
+              raise SystemExit('Resend provider missing from Penta provider registry')
+          PY
+
+      - name: Publish suite summary
+        if: always()
+        run: |
+          {
+            echo '## Penta Runtime Suite'
+            echo
+            echo 'This workflow validates executable runtime assets. It does not promote registry maturity.'
+            echo
+            if [ -f penta-runtime-suite-report.json ]; then
+              echo 'Truth snapshot generated successfully.'
+            else
+              echo 'Truth snapshot was not generated.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
