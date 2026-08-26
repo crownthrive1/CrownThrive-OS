@@ -1,0 +1,103 @@
+name: Riverside Media Mesh Validate
+
+on:
+  pull_request:
+    paths:
+      - 'institutional/media/riverside/**'
+      - '.github/workflows/riverside-media-mesh-validate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'institutional/media/riverside/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Riverside asset registry invariants
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          registry_path = Path('institutional/media/riverside/riverside-asset-registry.v1.json')
+          endpoints_path = Path('institutional/media/riverside/media-provider-endpoints.v1.json')
+          data = json.loads(registry_path.read_text())
+          endpoints = json.loads(endpoints_path.read_text())
+
+          assert data['schema'] == 'ct.riverside.asset-registry.v1'
+          assert data['provider'] == 'Riverside'
+          assert data['production']['id']
+          studios = data['studios']
+          assert len(studios) >= 1
+
+          ids = [s['id'] for s in studios]
+          assert len(ids) == len(set(ids)), 'duplicate studio immutable IDs'
+
+          names = [s['canonical_name'] for s in studios]
+          assert len(names) == len(set(names)), 'duplicate canonical studio names'
+
+          forbidden_keys = {
+              'api_key', 'apikey', 'access_token', 'refresh_token',
+              'client_secret', 'password', 'preview_url', 'previewUrl',
+              'stream_key', 'streamKey'
+          }
+
+          def walk(v, path='root'):
+              if isinstance(v, dict):
+                  for k, child in v.items():
+                      assert k not in forbidden_keys, f'forbidden secret/token field at {path}.{k}'
+                      walk(child, f'{path}.{k}')
+              elif isinstance(v, list):
+                  for i, child in enumerate(v):
+                      walk(child, f'{path}[{i}]')
+              elif isinstance(v, str):
+                  lowered = v.lower()
+                  assert 'preview?' not in lowered, f'token-bearing preview-like URL at {path}'
+
+          walk(data)
+          walk(endpoints)
+
+          expected = {
+              '631e09dadf4a1d000a31b95b': 'FRONT PORCH SERMONS!',
+              '631e09c7df4a1d000a31b2b2': 'BUILT TO OUTLIVE US!',
+              '631e0971bd6683000cda2d49': 'RECEIPTS & REVELATIONS!',
+          }
+          actual = {s['id']: s['canonical_name'] for s in studios}
+          for sid, name in expected.items():
+              assert actual.get(sid) == name, f'canonical binding drift for {sid}'
+
+          assert endpoints['schema'] == 'ct.media.provider-endpoints.v1'
+          bindings = endpoints['bindings']
+          binding_ids = [b['binding_id'] for b in bindings]
+          assert len(binding_ids) == len(set(binding_ids)), 'duplicate endpoint binding IDs'
+
+          required = {
+              'riverside-hosting-rss-primary': ('Riverside', 'https', 'api.riverside.com'),
+              'riverside-crownthrive-studio-entrypoint': ('Riverside', 'https', 'riverside.com'),
+              'viloud-rtmp-ingest-primary': ('Viloud', 'rtmp', 'broadcast.viloud.tv'),
+          }
+          by_id = {b['binding_id']: b for b in bindings}
+          for binding_id, (provider, scheme, host) in required.items():
+              assert binding_id in by_id, f'missing required endpoint binding: {binding_id}'
+              item = by_id[binding_id]
+              assert item['provider'] == provider
+              parsed = urlparse(item['endpoint'])
+              assert parsed.scheme == scheme, f'wrong scheme for {binding_id}'
+              assert parsed.hostname == host, f'wrong host for {binding_id}'
+
+          viloud = by_id['viloud-rtmp-ingest-primary']
+          assert viloud.get('secret_ref') == 'VILOUD_RTMP_STREAM_KEY'
+          assert '4106577?' not in str(endpoints), 'stream-key-like value leaked into repository'
+
+          print('Riverside media mesh validation: PASS')
+          PY
