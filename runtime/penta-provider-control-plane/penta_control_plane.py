@@ -15,6 +15,8 @@ import re
 import secrets
 import sys
 from typing import Any
+import urllib.error
+import urllib.request
 
 UTC = dt.timezone.utc
 SOFTWARE_PRIORITY = "software"
@@ -51,6 +53,14 @@ def secret_fingerprint(value: str) -> str:
 def safe_env_present(name: str) -> bool:
     value = os.environ.get(name)
     return bool(value and value.strip())
+
+
+def redact(text: str) -> str:
+    out = text
+    for name, value in os.environ.items():
+        if value and len(value) >= 8 and any(token in name.upper() for token in ("KEY", "TOKEN", "SECRET", "PASSWORD")):
+            out = out.replace(value, "[REDACTED]")
+    return out[:500]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -237,12 +247,82 @@ def capabilities():
 
 
 class PentaCertify:
-    """Independently certify artifacts; writes require exact live readback evidence."""
+    """Independently certify artifacts and exact provider operations using live readback."""
 
     def __init__(self, registry: Registry, state_dir: Path, ttl_hours: int = 24):
         self.registry = registry
         self.state_dir = state_dir
         self.ttl_hours = ttl_hours
+
+    @staticmethod
+    def _expand_template(template: str) -> str:
+        names = re.findall(r"\{([A-Z][A-Z0-9_]*)\}", template)
+        value = template
+        for name in names:
+            if not safe_env_present(name):
+                raise ValueError(f"missing probe environment: {name}")
+            value = value.replace("{" + name + "}", os.environ[name].rstrip("/"))
+        return value
+
+    @staticmethod
+    def _auth_headers(auth: dict[str, Any]) -> dict[str, str]:
+        kind = auth.get("type")
+        if kind == "bearer":
+            return {"Authorization": "Bearer " + os.environ[auth["env"]]}
+        if kind == "header":
+            return {auth["header"]: os.environ[auth["env"]]}
+        if kind == "supabase":
+            key = os.environ[auth["env"]]
+            return {"apikey": key, "Authorization": "Bearer " + key}
+        if kind == "basic_env_username":
+            raw = (os.environ[auth["username_env"]] + ":" + auth.get("password", "")).encode("utf-8")
+            return {"Authorization": "Basic " + base64.b64encode(raw).decode("ascii")}
+        if kind == "basic_literal_username":
+            raw = (auth["username"] + ":" + os.environ[auth["password_env"]]).encode("utf-8")
+            return {"Authorization": "Basic " + base64.b64encode(raw).decode("ascii")}
+        if kind in (None, "none"):
+            return {}
+        raise ValueError(f"unsupported auth type: {kind}")
+
+    def _probe(self, provider_id: str, provider: dict[str, Any]) -> dict[str, Any]:
+        probe = provider.get("certification_probe")
+        if not probe:
+            return {"operation": None, "result": "SKIP", "readback": False, "reason": "no certification probe registered", "observed_at": now()}
+        operation = probe["operation"]
+        if os.environ.get("PENTA_DISABLE_NETWORK_PROBES") == "1":
+            return {"operation": operation, "result": "SKIP", "readback": False, "reason": "network probes disabled", "observed_at": now()}
+        missing = [name for name in probe.get("required_env", []) if not safe_env_present(name)]
+        if missing:
+            return {"operation": operation, "result": "HOLD", "readback": False, "reason": "missing non-secret probe environment: " + ",".join(missing), "observed_at": now()}
+        try:
+            url = self._expand_template(probe["url_template"])
+            headers = {"User-Agent": "CrownThrive-PentaCertify/1.1"}
+            headers.update(probe.get("headers", {}))
+            headers.update(self._auth_headers(probe.get("auth", {})))
+            body_value = probe.get("body")
+            body = body_value.encode("utf-8") if body_value is not None else None
+            request = urllib.request.Request(url, data=body, headers=headers, method=probe.get("method", "GET"))
+            with urllib.request.urlopen(request, timeout=12) as response:
+                status = int(response.status)
+                payload = response.read(1024 * 1024)
+            semantic_ok = True
+            expected_fields = probe.get("json_field_equals")
+            if expected_fields:
+                parsed = json.loads(payload.decode("utf-8"))
+                semantic_ok = all(parsed.get(key) == expected for key, expected in expected_fields.items())
+            passed = status in probe.get("success_http", [200]) and semantic_ok
+            return {
+                "operation": operation,
+                "result": "PASS" if passed else "FAIL",
+                "readback": bool(passed),
+                "http_status": status,
+                "semantic_check": bool(semantic_ok),
+                "observed_at": now(),
+            }
+        except urllib.error.HTTPError as exc:
+            return {"operation": operation, "result": "FAIL", "readback": False, "http_status": int(exc.code), "reason": redact(str(exc.reason)), "observed_at": now()}
+        except Exception as exc:
+            return {"operation": operation, "result": "FAIL", "readback": False, "reason": redact(f"{type(exc).__name__}: {exc}"), "observed_at": now()}
 
     def certify(self, provider_id: str, live_evidence: list[dict[str, Any]] | None = None) -> CertificationReceipt:
         provider = self.registry.provider(provider_id)
@@ -273,19 +353,26 @@ class PentaCertify:
             raise RuntimeError(f"{provider_id}: operation contract mismatch")
         tests.append("operation_contract_matches_registry")
         binding = read_json(self.state_dir / "credentials" / f"{provider_id}.json", None)
-        authenticated = bool(binding and binding.get("bound"))
-        if authenticated:
+        bound = bool(binding and binding.get("bound"))
+        if bound:
             tests.append("credential_binding_present")
-        live_evidence = list(live_evidence or [])
-        certified_operations = [
-            evidence["operation"] for evidence in live_evidence
-            if evidence.get("result") == "PASS"
-            and evidence.get("readback") is True
-            and evidence.get("operation") in expected_ops
-        ]
+        evidence = list(live_evidence or [])
+        if bound and provider.get("certification_probe"):
+            evidence.append(self._probe(provider_id, provider))
+        certified_operations = sorted({
+            item["operation"] for item in evidence
+            if item.get("operation") in expected_ops and item.get("result") == "PASS" and item.get("readback") is True
+        })
+        probe_operation = (provider.get("certification_probe") or {}).get("operation")
+        probe_passed = bool(probe_operation and probe_operation in certified_operations)
         side_effect_ops = {op["operation"] for op in adapter.get("operations", []) if op.get("side_effect")}
-        state = "CERTIFIED" if authenticated else "HOLD_UNBOUND"
-        if side_effect_ops and side_effect_ops.issubset(set(certified_operations)):
+        if not bound:
+            state = "HOLD_UNBOUND"
+        elif not probe_passed:
+            state = "AUTH_BOUND_PENDING_READBACK"
+        else:
+            state = "CERTIFIED"
+        if probe_passed and side_effect_ops and side_effect_ops.issubset(set(certified_operations)):
             state = "WRITE_VERIFIED"
         stamped = dt.datetime.now(UTC).replace(microsecond=0)
         expires = stamped + dt.timedelta(hours=self.ttl_hours)
@@ -294,9 +381,9 @@ class PentaCertify:
             "adapter_id": adapter["adapter_id"],
             "adapter_version": adapter["version"],
             "artifact_sha256": digest,
-            "certified_operations": sorted(certified_operations),
+            "certified_operations": certified_operations,
             "tests": tests,
-            "live_evidence": live_evidence,
+            "live_evidence": evidence,
             "certified_at": stamped.isoformat().replace("+00:00", "Z"),
             "expires_at": expires.isoformat().replace("+00:00", "Z"),
             "state": state,
@@ -308,9 +395,9 @@ class PentaCertify:
             adapter_version=adapter["version"],
             artifact_sha256=digest,
             certification_id=cert_id,
-            certified_operations=sorted(certified_operations),
+            certified_operations=certified_operations,
             contract_tests=tests,
-            live_evidence=live_evidence,
+            live_evidence=evidence,
             certified_at=material["certified_at"],
             expires_at=material["expires_at"],
             state=state,
@@ -387,8 +474,8 @@ class PentaNurture:
             drift.append("credential_unbound")
         if not cert:
             drift.append("certification_missing")
-        elif cert.get("state") == "HOLD_UNBOUND":
-            drift.append("certification_blocked_by_credentials")
+        elif cert.get("state") not in {"CERTIFIED", "WRITE_VERIFIED"}:
+            drift.append("certification_not_current:" + str(cert.get("state", "UNKNOWN")))
         elif self._expired(cert.get("expires_at")):
             drift.append("certification_expired")
         health = "HEALTHY" if not drift else "DEGRADED"
@@ -411,7 +498,7 @@ class PentaNurture:
 
 
 class ProductionGate:
-    """Fail-closed operation-level provider eligibility."""
+    """Fail-closed, operation-level provider eligibility."""
 
     def __init__(self, registry: Registry, state_dir: Path):
         self.registry = registry
@@ -432,13 +519,13 @@ class ProductionGate:
         if not build or build.get("state") != "BUILT_PENDING_INDEPENDENT_VERIFICATION":
             reasons.append("build_receipt_missing")
         if not cert or cert.get("state") not in {"CERTIFIED", "WRITE_VERIFIED"}:
-            reasons.append("adapter_not_certified")
+            reasons.append("adapter_not_live_certified")
         elif PentaNurture._expired(cert.get("expires_at")):
             reasons.append("certification_expired")
         if not nurture or nurture.get("health") != "HEALTHY":
             reasons.append("nurture_health_not_current")
-        if op and op.get("side_effect") and (not cert or operation not in cert.get("certified_operations", [])):
-            reasons.append("exact_write_operation_not_readback_verified")
+        if op and op.get("requires_readback") and (not cert or operation not in cert.get("certified_operations", [])):
+            reasons.append("exact_operation_not_readback_verified")
         eligible = not reasons
         state = "WRITE_ELIGIBLE" if eligible and op and op.get("side_effect") else ("EXECUTION_ELIGIBLE" if eligible else "HOLD")
         decision = {
@@ -475,6 +562,7 @@ def validate_registry(registry: Registry) -> list[str]:
         if not operations:
             errors.append(f"{provider_id}: at least one operation required")
         seen_ops: set[str] = set()
+        op_map: dict[str, dict[str, Any]] = {}
         for op in operations:
             name = op.get("operation")
             if not name:
@@ -483,10 +571,22 @@ def validate_registry(registry: Registry) -> list[str]:
             if name in seen_ops:
                 errors.append(f"{provider_id}: duplicate operation {name}")
             seen_ops.add(name)
+            op_map[name] = op
             if op.get("side_effect") and not op.get("requires_readback"):
                 errors.append(f"{provider_id}:{name}: side effects require readback")
             if op.get("authority_class") not in {"D0", "D1", "D2", "D3"}:
                 errors.append(f"{provider_id}:{name}: invalid authority class")
+        probe = provider.get("certification_probe")
+        if not probe:
+            errors.append(f"{provider_id}: live certification probe missing")
+        else:
+            probe_op = probe.get("operation")
+            if probe_op not in op_map:
+                errors.append(f"{provider_id}: certification probe operation not registered")
+            elif op_map[probe_op].get("side_effect"):
+                errors.append(f"{provider_id}:{probe_op}: certification probe must be read-only")
+            if not probe.get("url_template"):
+                errors.append(f"{provider_id}: certification probe URL missing")
     return errors
 
 
@@ -502,6 +602,7 @@ def matrix(registry: Registry, state_dir: Path) -> dict[str, Any]:
             "priority": provider.get("priority"),
             "credential": "BOUND" if credential.get("bound") else "HOLD_UNBOUND",
             "certification": cert.get("state", "MISSING"),
+            "certified_operations": cert.get("certified_operations", []),
             "health": nurture.get("health", "UNKNOWN"),
             "operations": {},
         }
