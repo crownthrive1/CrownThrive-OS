@@ -24,9 +24,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave1 as wave1
-import build_substantive_rebuild_wave6 as wave6
+import substantive_rebuild_current_snapshot as current_snapshot
 
 BATCH_SIZE_PER_LANE = 4
+CURRENT_WAVES_1_6_SELECTED_COUNT = 57
+HISTORICAL_WAVES_1_6_SELECTED_COUNT = 61
+P0_CANDIDATE_ESTATE = 449
+HISTORICAL_REMAP_REASON = (
+    "historical_or_superseded_anchor_is_not_eligible_as_a_current_"
+    "substantive_successor"
+)
 HIGH_RISK_TERMS = (
     "legal", "license", "licensing", "rights", "royalty", "economic",
     "investment", "securities", "patent", "trademark", "franchise",
@@ -42,13 +49,117 @@ def canonical_hash(value: Any) -> str:
 
 
 def prior_ids() -> set[str]:
-    _sets, union = wave6.prior_wave_sets()
-    w6 = wave6.build()
-    union = set(union)
-    union.update(str(r["inventory_id"]) for r in w6["selected_records"])
-    if len(union) != int(w6["cumulative_machine_qualified_p0_count"]):
-        raise ValueError("Waves 1-6 qualified-set count disagrees with Wave 6 cumulative count")
-    return union
+    """Return the immutable 61-record baseline used by historical Wave 7.
+
+    The current semantic Waves 1-6 view intentionally contains 57 identities.
+    Four historical Wave 1 selections are now held for remapping because their
+    former anchors are historical or superseded.  Wave 7 receipts predate that
+    editorial correction, so their count and identity continuity must be
+    reconstructed explicitly rather than changing either the current snapshot
+    or the immutable historical receipts.
+    """
+
+    snapshot = current_snapshot.load_snapshot()
+    if snapshot.get("schema") != current_snapshot.SNAPSHOT_SCHEMA:
+        raise ValueError("Wave 7 baseline requires the governed current-snapshot schema")
+    if snapshot.get("schema_version") != "1.0.0":
+        raise ValueError("Wave 7 baseline requires current-snapshot schema version 1.0.0")
+    if snapshot.get("selection_view_schema") != wave1.CURRENT_SELECTION_VIEW_SCHEMA:
+        raise ValueError("Wave 7 baseline selection-view schema drift")
+    if snapshot.get("current_view_authority") != (
+        "current_semantic_recomputation_only_not_a_rewrite_of_historical_receipts"
+    ):
+        raise ValueError("Wave 7 baseline current-view authority drift")
+    if snapshot.get("historical_receipt_authority") != (
+        "immutable_independent_evidence_verified_by_sprint_validators"
+    ):
+        raise ValueError("Wave 7 baseline historical-receipt authority drift")
+
+    without_sha = {key: value for key, value in snapshot.items() if key != "snapshot_sha256"}
+    if snapshot.get("snapshot_sha256") != current_snapshot.canonical_sha(without_sha):
+        raise ValueError("Wave 7 baseline current-snapshot digest drift")
+    if snapshot.get("historical_receipt_view") != current_snapshot.HISTORICAL_RECEIPT_VIEW:
+        raise ValueError("Wave 7 baseline historical Waves 1-6 receipt view drift")
+
+    current_ids: set[str] = set()
+    cumulative = 0
+    current_waves = snapshot.get("current_waves")
+    if not isinstance(current_waves, dict) or set(current_waves) != {
+        "1", "2", "3", "4", "5", "6"
+    }:
+        raise ValueError("Wave 7 baseline requires exactly six current wave records")
+    for wave_number in range(1, 7):
+        record = current_waves[str(wave_number)]
+        if not isinstance(record, dict):
+            raise ValueError(f"Wave 7 baseline current Wave {wave_number} record is invalid")
+        if record.get("selection_view") != wave1.current_selection_view(wave_number):
+            raise ValueError(f"Wave 7 baseline current Wave {wave_number} selection state drift")
+        selected = record.get("selected_inventory_ids")
+        if not isinstance(selected, list) or any(not isinstance(item, str) for item in selected):
+            raise ValueError(f"Wave 7 baseline current Wave {wave_number} identities are invalid")
+        selected_ids = set(selected)
+        if len(selected_ids) != len(selected):
+            raise ValueError(f"Wave 7 baseline current Wave {wave_number} identities repeat")
+        if len(selected_ids) != record.get("selected_count"):
+            raise ValueError(f"Wave 7 baseline current Wave {wave_number} count drift")
+        if current_ids & selected_ids:
+            raise ValueError("Wave 7 baseline current Waves 1-6 identities overlap")
+        current_ids |= selected_ids
+        cumulative += len(selected_ids)
+        if record.get("cumulative_machine_qualified_p0_count") != cumulative:
+            raise ValueError(f"Wave 7 baseline current Wave {wave_number} cumulative count drift")
+        if record.get("p0_outside_current_waves_count") != P0_CANDIDATE_ESTATE - cumulative:
+            raise ValueError(f"Wave 7 baseline current Wave {wave_number} pending count drift")
+    if len(current_ids) != CURRENT_WAVES_1_6_SELECTED_COUNT:
+        raise ValueError(
+            "Wave 7 baseline requires 57 current Waves 1-6 identities, "
+            f"found {len(current_ids)}"
+        )
+
+    remap_records = snapshot.get("historical_wave_1_current_remap_required")
+    if not isinstance(remap_records, list):
+        raise ValueError("Wave 7 baseline remap diagnostics are missing")
+    remap_ids: set[str] = set()
+    for record in remap_records:
+        if not isinstance(record, dict):
+            raise ValueError("Wave 7 baseline remap diagnostic is invalid")
+        inventory_id = record.get("inventory_id")
+        if not isinstance(inventory_id, str) or not inventory_id:
+            raise ValueError("Wave 7 baseline remap identity is invalid")
+        if record.get("historical_receipt_state") != "selected":
+            raise ValueError(f"{inventory_id}: historical receipt state drift")
+        if record.get("current_semantic_state") != "held_remap_required":
+            raise ValueError(f"{inventory_id}: current semantic remap state drift")
+        if record.get("reason") != HISTORICAL_REMAP_REASON:
+            raise ValueError(f"{inventory_id}: historical remap reason drift")
+        anchors = record.get("ineligible_anchor_routes")
+        reasons = record.get("editorial_eligibility_reasons")
+        if not isinstance(anchors, list) or not anchors:
+            raise ValueError(f"{inventory_id}: historical remap anchor evidence is missing")
+        if not isinstance(reasons, list) or not reasons:
+            raise ValueError(f"{inventory_id}: historical remap editorial evidence is missing")
+        if not set(reasons) & {
+            "primary_audience_historical",
+            "content_state_historical",
+            "content_state_superseded",
+        }:
+            raise ValueError(f"{inventory_id}: historical remap editorial state is invalid")
+        if inventory_id in remap_ids:
+            raise ValueError(f"{inventory_id}: historical remap identity repeats")
+        remap_ids.add(inventory_id)
+
+    if remap_ids != set(current_snapshot.HISTORICAL_WAVE1_REMAP_REQUIRED_IDS):
+        raise ValueError("Wave 7 baseline historical Wave 1 remap identity drift")
+    if current_ids & remap_ids:
+        raise ValueError("Wave 7 baseline remap identities overlap the current semantic view")
+
+    historical_ids = current_ids | remap_ids
+    if len(historical_ids) != HISTORICAL_WAVES_1_6_SELECTED_COUNT:
+        raise ValueError(
+            "Wave 7 baseline requires 61 immutable historical identities, "
+            f"found {len(historical_ids)}"
+        )
+    return historical_ids
 
 
 def normalized_text(row: dict[str, Any]) -> str:

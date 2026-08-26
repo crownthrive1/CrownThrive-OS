@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave1 as wave1
-import build_substantive_rebuild_wave6 as wave6
+import execute_docs_rebuild_quad_lane_batch as quad_lane
 
 RECEIPT_PATH = ROOT / "developers/manifests/docs-rebuild-quad-lane-batch-001.v1.json"
 CANONICAL_ROUTE = "/platforms/adluxe-network-institutional-registry"
@@ -87,13 +87,7 @@ def aggregate_by_id() -> dict[str, dict[str, Any]]:
 
 
 def prior_ids() -> set[str]:
-    _sets, union = wave6.prior_wave_sets()
-    w6 = wave6.build()
-    union = set(union)
-    union.update(str(r["inventory_id"]) for r in w6["selected_records"])
-    if len(union) != 61:
-        raise ValueError(f"expected 61 prior qualified records, found {len(union)}")
-    return union
+    return quad_lane.prior_ids()
 
 
 def build() -> dict[str, Any]:
