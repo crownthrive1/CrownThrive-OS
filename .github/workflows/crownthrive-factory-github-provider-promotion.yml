@@ -1,0 +1,179 @@
+name: PentaFactory GitHub Provider Promotion
+
+on:
+  workflow_run:
+    workflows: ["Governed Merge Gate"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  statuses: read
+  actions: read
+  id-token: write
+
+jobs:
+  prepare:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'workflow_dispatch' &&
+          startsWith(github.event.workflow_run.head_branch, 'factory/provider-job-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      ready: ${{ steps.wait.outputs.ready }}
+      pr_number: ${{ steps.pr.outputs.pr_number }}
+      job_id: ${{ steps.meta.outputs.job_id }}
+      branch: ${{ steps.meta.outputs.branch }}
+      head_sha: ${{ steps.meta.outputs.head_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 2
+
+      - id: meta
+        shell: bash
+        env:
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          job_id="${BRANCH#factory/provider-job-}"
+          test -n "$job_id"
+          [[ "$job_id" =~ ^[0-9a-fA-F-]{36}$ ]]
+          echo "job_id=$job_id" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+      - id: pr
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.meta.outputs.branch }}
+          HEAD_SHA: ${{ steps.meta.outputs.head_sha }}
+          JOB_ID: ${{ steps.meta.outputs.job_id }}
+          GATE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          remote_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${BRANCH}" --jq .object.sha)
+          test "$remote_sha" = "$HEAD_SHA"
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base main --state all --json number,state --jq '.[0].number // empty')
+          if [[ -z "$pr" ]]; then
+            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+              --title "PentaFactory provider source custody ${JOB_ID}" \
+              --body "Automated governed source-custody promotion for durable PentaFactory provider job \`${JOB_ID}\`.\n\nInitial branch gate: ${GATE_RUN_ID}.\n\nPentaMerge must independently re-read normal PR checks before terminal merge. Provider completion is recorded only after merged readback. No website, D3, money, rights, credential, or universal-delete authority is introduced.")
+            pr="${url##*/}"
+          fi
+          echo "pr_number=$pr" >> "$GITHUB_OUTPUT"
+
+      - id: wait
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          # Give pull_request checks time to register, then require all reported PR checks to pass.
+          sleep 20
+          if timeout 1500s gh pr checks "$PR" --repo "$GITHUB_REPOSITORY" --watch --interval 15; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  merge:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.ready == 'true' }}
+    uses: ./.github/workflows/penta-pr-lifecycle-reusable.yml
+    with:
+      mode: merge
+      number: ${{ needs.prepare.outputs.pr_number }}
+    secrets: inherit
+
+  finalize:
+    needs: [prepare, merge]
+    if: ${{ always() && needs.prepare.result == 'success' && needs.prepare.outputs.ready == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify exact merged provider PR
+        id: readback
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ needs.prepare.outputs.pr_number }}
+          EXPECTED_HEAD: ${{ needs.prepare.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json state,mergedAt,mergeCommit,headRefOid,url,files > pr.json
+          state=$(jq -r .state pr.json)
+          merged=$(jq -r '.mergedAt // empty' pr.json)
+          head=$(jq -r .headRefOid pr.json)
+          test "$head" = "$EXPECTED_HEAD"
+          if [[ "$state" != MERGED || -z "$merged" ]]; then
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          merge_sha=$(jq -r '.mergeCommit.oid' pr.json)
+          file_count=$(jq '.files|length' pr.json)
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+          echo "merge_sha=$merge_sha" >> "$GITHUB_OUTPUT"
+          echo "file_count=$file_count" >> "$GITHUB_OUTPUT"
+          echo "url=$(jq -r .url pr.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Complete durable provider job from merged readback
+        if: steps.readback.outputs.merged == 'true'
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-factory-github-bridge
+          JOB_ID: ${{ needs.prepare.outputs.job_id }}
+          HEAD_SHA: ${{ needs.prepare.outputs.head_sha }}
+          MERGE_SHA: ${{ steps.readback.outputs.merge_sha }}
+          FILE_COUNT: ${{ steps.readback.outputs.file_count }}
+          GATE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
+          URL="https://github.com/${GITHUB_REPOSITORY}/commit/${MERGE_SHA}"
+          jq -n \
+            --arg job "$JOB_ID" \
+            --arg commit "$MERGE_SHA" \
+            --arg head "$HEAD_SHA" \
+            --arg url "$URL" \
+            --arg gate "$GATE_RUN_ID" \
+            --argjson files "$FILE_COUNT" \
+            '{action:"complete",job_id:$job,commit_sha:$commit,head_sha:$head,commit_url:$url,branch:"main",file_count:$files,governance_gate_run_id:$gate,rollback_ref:("git:"+$commit+"^1")}' > complete.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @complete.json "$BRIDGE" | tee completion.json
+          test "$(jq -r '.ok' completion.json)" = true
+
+      - name: Release job when PentaMerge did not terminalize it
+        if: steps.readback.outputs.merged != 'true'
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-factory-github-bridge
+          JOB_ID: ${{ needs.prepare.outputs.job_id }}
+        run: |
+          set -euo pipefail
+          OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
+          jq -n --arg job "$JOB_ID" --arg err "PentaMerge did not produce merged readback after normal PR checks" '{action:"release",job_id:$job,error:$err}' > release.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @release.json "$BRIDGE" | jq .
+
+  release-on-check-failure:
+    needs: prepare
+    if: ${{ always() && needs.prepare.result == 'success' && needs.prepare.outputs.ready != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release provider job for later PentaHelper retry
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-factory-github-bridge
+          JOB_ID: ${{ needs.prepare.outputs.job_id }}
+          PR: ${{ needs.prepare.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
+          jq -n --arg job "$JOB_ID" --arg err "Provider promotion PR $PR has failed/incomplete checks; released for bounded retry" '{action:"release",job_id:$job,error:$err}' > release.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @release.json "$BRIDGE" | jq .
