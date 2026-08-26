@@ -1,0 +1,54 @@
+---
+title: "PentaOD + Hourly Penta Email Governance"
+description: "Production contract for on-demand readiness, hourly Penta reporting, source attribution, and append-only delivery evidence."
+---
+
+# PentaOD + Hourly Penta Email Governance
+
+## Production role
+
+**PentaOD™** is CrownThrive's on-demand readiness and dispatch state manager. It wakes an eligible component, requires a fresh PentaHeartbeat, preserves bounded wake grace across reconciliation, and records dispatch outcomes. PentaOD does not create provider credentials, certification, rights, spend authority, or D3 authority.
+
+The production scheduler currently reconciles PentaOD every two minutes, heartbeats every five minutes, and applies idle-sleep checks every fifteen minutes.
+
+## Wake/reconcile invariant
+
+A production test of the Mailgun relay exposed a race where a successful `wake` could be reset to `WARM` by the next service reconciliation before dispatch. The reconciliation function was repaired so a recently woken component stays `HOT` during its configured idle grace unless a stronger state (`HOLD`, `RETIRED`, or `DEGRADED`) applies.
+
+The repair was retested against the live Mailgun relay path with a fresh heartbeat and successful provider delivery.
+
+## Mandatory hourly updates
+
+CrownThrive sends the State Architecture Report to the founder's registered reporting inbox at the top of every hour. The policy is append-only and is checked every fifteen minutes by a policy enforcer. If the required cron is missing, disabled, or changed, the enforcer restores the required schedule and records an evidence receipt.
+
+Reporting attribution is dynamic. PentaStatus, PentaOD, PentaHeartbeat, PentaReports, PentaNotifs and PentaMail are core reporting participants. PentaCredentials, PentaCertify, PentaBuild, PentaFactory, PentaRelease, PentaTriage, PentaMation and other registered Pentas are added when observed changes in the reporting window implicate their lanes.
+
+## Continuity and anti-overwrite controls
+
+Hourly policy rows are append-only. Historical policy versions cannot be updated or deleted through normal application paths; a changed policy requires a superseding version.
+
+State Architecture Report lifecycle evidence is written to an append-only SHA-256 hash chain. PentaMail outbox lifecycle transitions are also projected into an append-only SHA-256 hash chain. The operational outbox row may transition from queued to sending to sent/failed, but those transitions cannot silently replace history because each material transition creates a separate receipt.
+
+These controls prevent silent overwrite through normal CrownThrive runtime paths. Database-owner/superuser authority remains a separate infrastructure trust boundary and is not described as cryptographic immutability.
+
+## Delivery proof
+
+The production verification exercised:
+
+1. PentaOD wake of the Mailgun relay.
+2. PentaOD reconciliation after wake.
+3. PentaHeartbeat freshness/readiness.
+4. PentaMail queue creation.
+5. Provider dispatch with HTTP success.
+6. Provider delivery readback through the founder's connected inbox.
+7. Append-only queued and sent receipts.
+8. PentaOD dispatch receipt after provider success.
+9. A full hourly State Architecture Report dispatch and inbox readback.
+
+The hourly report is designed to report adverse state rather than mask it. A `HIGH` report is therefore a successful reporting execution when production certification or other system lanes are degraded.
+
+## Crown Connect coupling
+
+Crown Connect's GitHub OAuth client secret is a PentaCredentials-managed server-side Vault binding. OAuth callbacks and OAuth user tokens do not enter the hourly email body. Hourly reports may include only sanitized readiness, state, and evidence identifiers.
+
+See `developers/manifests/crown-connect-github-oauth.v1.json` and `developers/manifests/penta-hourly-update-governance.v1.json`.
