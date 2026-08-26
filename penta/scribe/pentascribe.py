@@ -7,7 +7,10 @@ from collections import defaultdict
 ALLOWED_TERM_STATUS = {"draft", "canonical", "deprecated", "historical"}
 ALLOWED_TM_STATUS = {"unverified", "claimed_public_display", "filed", "registered", "abandoned", "not_applicable"}
 SCANNABLE_SUFFIXES = {".md", ".mdx", ".json", ".yml", ".yaml", ".py", ".txt"}
-PENTA_CANDIDATE_RE = re.compile(r"\b(Penta[A-Z][A-Za-z0-9]+|PENTA)([™®]?)\b")
+# The negative lookahead is intentional: ™/® are non-word characters, so a trailing
+# \b after an optional symbol drops the symbol from the match. Keep the boundary
+# before the Penta token and require a non-word/end after the optional mark instead.
+PENTA_CANDIDATE_RE = re.compile(r"\b(Penta[A-Z][A-Za-z0-9]+|PENTA)([™®]?)(?![A-Za-z0-9_])")
 
 def load_registry(path: pathlib.Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
