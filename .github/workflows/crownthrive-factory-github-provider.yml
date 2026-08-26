@@ -1,4 +1,4 @@
-name: PentaFramework Factory GitHub Provider
+name: PentaFactory GitHub Provider
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Claim PentaFramework Factory provider job
+      - name: Claim PentaFactory provider job
         id: claim
         shell: bash
         env:
@@ -56,7 +56,7 @@ jobs:
             mkdir -p "$ROOT/$(dirname "$path")"
             printf '%s' "$row" | jq -r .content > "$ROOT/$path"
           done
-          jq '{contract:"ct.factory.github.readback.v1",product_contract:"ct.pentaframework-factory.v1",canonical_name:"PentaFramework Factory™",job:.job,files:[.files[]|{path,sha256}]}' claim.json > "$ROOT/factory-manifest.json"
+          jq '{contract:"ct.factory.github.readback.v1",product_contract:"ct.pentaframework-factory.v1",canonical_name:"PentaFactory™",job:.job,files:[.files[]|{path,sha256}]}' claim.json > "$ROOT/factory-manifest.json"
 
       - name: Stage exact provider commit and dispatch governed gate
         if: steps.claim.outputs.claimed == 'true'
@@ -69,7 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           BRANCH="factory/provider-job-${JOB_ID}"
-          git config user.name 'pentaframework-factory[bot]'
+          git config user.name 'pentafactory[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add "generated/factory/${RUN_ID}"
 
@@ -82,7 +82,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "pentaframework: publish ${RUN_ID}"
+          git commit -m "pentafactory: publish ${RUN_ID}"
           git fetch origin main
           if ! git merge-base --is-ancestor origin/main HEAD; then
             git rebase origin/main
