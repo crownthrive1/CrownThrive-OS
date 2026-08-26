@@ -17,7 +17,8 @@ def main() -> None:
     suite = SUITE.read_text()
     doc = DOC.read_text()
 
-    require(fix, "case when v_snapshot->>'candidate_type'='proprietary_product_candidate'")
+    require(fix, "v_snapshot->>''candidate_type'',case when")
+    require(fix, "''proprietary_product_candidate''")
     require(fix, "else null end")
     require(fix, "run_thriveevergreen_hourly_product_cycle_v1")
 
