@@ -86,16 +86,33 @@ jobs:
             tests/test_penta_institutional_controls_family.py \
             tests/test_penta_self_build.py
 
-      - name: Hydrate exact immutable PR commits
+      - name: Hydrate exact immutable PR commits and merge-base ancestry
         if: github.event_name == 'pull_request'
         env:
           CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_BASE_SHA}"
-          git fetch --no-tags --no-recurse-submodules --depth=1 origin "${CT_GIT_HEAD_SHA}"
+          git fetch --no-tags --no-recurse-submodules --depth=256 origin "${CT_GIT_BASE_SHA}"
+          git fetch --no-tags --no-recurse-submodules --depth=256 origin "${CT_GIT_HEAD_SHA}"
           git cat-file -e "${CT_GIT_BASE_SHA}^{commit}"
           git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}"
+          if ! git merge-base "${CT_GIT_BASE_SHA}" "${CT_GIT_HEAD_SHA}" >/dev/null; then
+            git fetch --no-tags --no-recurse-submodules --unshallow origin || \
+              git fetch --no-tags --no-recurse-submodules origin
+          fi
+          git merge-base "${CT_GIT_BASE_SHA}" "${CT_GIT_HEAD_SHA}" >/dev/null
+
+      - name: Enforce PentaSerialized continuity in required merge perimeter
+        if: github.event_name == 'pull_request'
+        env:
+          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python -m penta.runtime.serialized git-gate \
+            --repo . \
+            --base "$CT_GIT_BASE_SHA" \
+            --head "$CT_GIT_HEAD_SHA" \
+            --policy penta/registry/serialized-suite.json
 
       - name: Bind governed changed files to trusted Git diff
         if: github.event_name == 'pull_request'
