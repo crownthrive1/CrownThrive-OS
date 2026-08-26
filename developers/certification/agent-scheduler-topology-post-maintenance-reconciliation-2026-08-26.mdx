@@ -13,7 +13,7 @@ keywords: ["CrownThrive", "scheduler", "ThriveBase", "Penta", "CHLOM", "pg_cron"
 The production scheduler remains `ct.scheduler-topology.production.v1`. ThriveBase is runtime-authoritative. This reconciliation updates source-controlled projection to the **post-maintenance** topology rather than rewriting the original August 24 certification.
 
 ```text
-runtime topology semantic version   1.2.0 after migration
+runtime topology semantic version   1.2.0
 maintenance                         CLOSED
 external clock target               2
 external failure domain #1          CrownThrive External Evidence Relay
@@ -69,13 +69,45 @@ Current Phase-3 Wallet continuity ownership is the Penta model merged through PR
 
 No reviewer heartbeat, independent receipt, or synthesis is fabricated to make the historical PR #230 cohort look current.
 
-## Runtime migration
+## Runtime migration and exact readback
 
 The source-controlled migration is:
 
 `supabase/migrations/20260826203600_scheduler_topology_post_maintenance_reconciliation_v2.sql`
 
-It is intentionally bounded and non-destructive. It:
+The production database recorded the applied migration as `20260826204425_scheduler_topology_post_maintenance_reconciliation_v2`.
+
+Exact post-apply readback:
+
+```text
+topology semantic version               1.2.0
+production topology ready               true
+maintenance active                       false
+post-maintenance external clock target   2
+enabled external bindings                2
+active pg_cron jobs                       101
+retired-but-enabled external clocks       0
+pending external dispositions             0
+unreconciled external schedules           0
+enabled D3 external clocks                0
+relay-bound rows still maintenance-held   0
+current due backup jobs                   0
+Wallet historical v2 lanes                5
+Wallet new v2 review receipts             0
+Wallet new v2 syntheses                    0
+```
+
+Read-only topology stress test result:
+
+```text
+decision                         PASS
+evidence_digest_sha256          bf40b188dd5c291db26d09eab5c81cc039934f29b8bdb65d8db68fe727eb5523
+persisted                        false
+```
+
+Every stress predicate passed, including duplicate-clock prevention, recursive-scheduler prohibition, D3 human reservation, authority-expansion false, retired clocks disabled, canonical relay binding, backup and communications failure-domain presence, and external-disposition reconciliation.
+
+The migration is intentionally bounded and non-destructive. It:
 
 1. advances the topology projection to semantic version `1.2.0` and a two-clock post-maintenance target;
 2. supersedes the legacy Agent-A portfolio fallback schedule;
@@ -84,6 +116,12 @@ It is intentionally bounded and non-destructive. It:
 5. binds backup continuity to internal `pg_cron` plus the connector-only relay subroute;
 6. refreshes the canonical External Evidence Relay binding metadata;
 7. fails closed if the intended supersessions or canonical relay invariants are not true.
+
+## Security-advisor disposition
+
+The post-apply Supabase security advisor reported existing `RLS enabled/no policy` informational findings on multiple private/service-only tables and a warning that `public.penta_pr_status_v1()` is a `SECURITY DEFINER` function executable by `anon` and `authenticated`. This scheduler migration did not create or alter that function. Its exposure remains a separate Penta security-hardening packet rather than being silently changed by scheduler reconciliation.
+
+Supabase remediation reference: https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable
 
 ## Invariants
 
@@ -103,6 +141,7 @@ It is intentionally bounded and non-destructive. It:
 original topology merge       e6195cd42c28c90d12797f4f755fae1dd548dff3
 Wallet Phase-3 successor      PR #476 / e6466e7a56c27b05b2ed15eb4fa1ae34ea490018
 main at reconciliation start  92f69e40d4cb595b05d22167537d5af763d5dcba
+runtime source packet          PR #514
 ```
 
 The original August 24 certification remains preserved as historical evidence. This page is its additive post-maintenance successor.
