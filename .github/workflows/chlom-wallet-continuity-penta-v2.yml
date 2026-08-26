@@ -1,0 +1,36 @@
+name: CHLOM Wallet Continuity Penta v2
+
+on:
+  pull_request:
+    paths:
+      - 'developers/reference/chlom-wallet/continuity/**'
+      - 'security/chlom-wallet-continuity-penta-v2-threat-model.mdx'
+      - 'skills/chlom-wallet-continuity/**'
+      - '.github/workflows/chlom-wallet-continuity-penta-v2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'developers/reference/chlom-wallet/continuity/**'
+      - 'security/chlom-wallet-continuity-penta-v2-threat-model.mdx'
+      - 'skills/chlom-wallet-continuity/**'
+      - '.github/workflows/chlom-wallet-continuity-penta-v2.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Penta continuity compatibility contract
+        run: node developers/reference/chlom-wallet/continuity/test-continuity-penta-v2.mjs
+      - name: Run deterministic continuity chaos suite
+        run: node developers/reference/chlom-wallet/continuity/continuity-chaos-v1.mjs
