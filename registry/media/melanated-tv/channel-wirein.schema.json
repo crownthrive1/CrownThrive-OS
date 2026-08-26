@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/ct.media.channel.v1.json",
+  "title": "CrownThrive Melanated TV Channel Wire-in Contract",
+  "type": "object",
+  "required": ["schema", "workflow", "channel_id", "title", "network_family", "provider", "ingest", "playback", "destinations", "security"],
+  "properties": {
+    "schema": {"const": "ct.media.channel.v1"},
+    "workflow": {"const": "Melanated TV Wirein Channels and etc"},
+    "channel_id": {"type": "string", "minLength": 3},
+    "title": {"type": "string", "minLength": 1},
+    "network_family": {"type": "string"},
+    "provider": {
+      "type": "object",
+      "required": ["name", "roles"],
+      "properties": {
+        "name": {"type": "string"},
+        "roles": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "ingest": {
+      "type": "object",
+      "required": ["protocol", "secret_ref", "raw_secret_committed"],
+      "properties": {
+        "protocol": {"type": "string"},
+        "endpoint": {"type": ["string", "null"]},
+        "secret_ref": {"type": "string"},
+        "raw_secret_committed": {"const": false}
+      }
+    },
+    "playback": {
+      "type": "object",
+      "required": ["protocol"],
+      "properties": {
+        "protocol": {"type": "string"},
+        "manifest": {"type": ["string", "null"], "format": "uri"},
+        "embed_url": {"type": ["string", "null"], "format": "uri"}
+      }
+    },
+    "destinations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "mode"],
+        "properties": {
+          "name": {"type": "string"},
+          "mode": {"enum": ["SYND", "OD", "LINEAR", "WEB", "APP", "OTHER"]}
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "required": ["secret_policy"],
+      "properties": {
+        "secret_policy": {"const": "runtime_vault_only"}
+      }
+    }
+  },
+  "additionalProperties": true
+}
