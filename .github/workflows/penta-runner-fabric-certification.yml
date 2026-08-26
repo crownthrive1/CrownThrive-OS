@@ -5,18 +5,16 @@ on:
 
 permissions:
   contents: read
-  id-token: write
-  attestations: write
 
 concurrency:
   group: penta-runner-fabric-certification
   cancel-in-progress: false
 
 jobs:
-  certify-pentafabric-rtc:
-    # SECURITY: this repository is public. This privileged self-hosted lane is
-    # intentionally workflow_dispatch-only. Never add pull_request here.
-    runs-on: [self-hosted, linux, x64, crownthrive, pentafabric, rtc, trusted]
+  evaluate-pentafabric-rtc:
+    # Current policy blocks self-hosted execution until Node 24 runner
+    # attestation is machine verified. This manual job records a HOLD diagnostic.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,12 +55,13 @@ jobs:
 
           evidence = {
               "schema": "crownthrive.pentafabric.runner-certification.v1",
-              "disposition": "PASS",
+              "disposition": "HOLD",
               "repository": os.environ["GITHUB_REPOSITORY"],
               "commit_sha": os.environ["GITHUB_SHA"],
               "run_id": os.environ["GITHUB_RUN_ID"],
               "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
               "event": os.environ["GITHUB_EVENT_NAME"],
+              "policy_state": "self_hosted_blocked_until_node24_runner_attestation_is_machine_verified",
               "runner": {
                   "name": os.environ.get("PENTA_RUNNER_NAME"),
                   "os": os.environ.get("PENTA_RUNNER_OS"),
@@ -78,7 +77,8 @@ jobs:
                       "pentafabric", "rtc", "trusted"
                   ],
                   "public_pr_execution_allowed": False,
-                  "provider_execution_class": "trusted",
+                  "provider_execution_class": "hold_unverified",
+                  "observed_runner_matches_required_labels": False,
               },
               "observed_at": datetime.now(timezone.utc).isoformat(),
           }
@@ -92,13 +92,8 @@ jobs:
           print("sha256=" + digest)
           PY
 
-      - name: Attest runner certification evidence
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
-        with:
-          subject-path: penta-runner-fabric-certification.json
-
       - name: Upload certification evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: penta-runner-fabric-certification-${{ github.run_id }}
           path: |
@@ -111,11 +106,11 @@ jobs:
         shell: bash
         run: |
           {
-            echo '## Penta Runner Fabric Certification — PASS'
+            echo '## Penta Runner Fabric Certification — HOLD'
             echo
             echo 'Runner: `${{ runner.name }}`'
             echo 'OS/arch: `${{ runner.os }}/${{ runner.arch }}`'
             echo 'Commit: `${{ github.sha }}`'
             echo 'Evidence: `penta-runner-fabric-certification.json`'
-            echo 'Provenance: GitHub artifact attestation generated.'
+            echo 'State: self-hosted runner certification remains blocked pending machine-verified Node 24 attestation.'
           } >> "$GITHUB_STEP_SUMMARY"
