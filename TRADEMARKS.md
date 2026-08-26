@@ -13,6 +13,7 @@ The portfolio includes, among other names and identities:
 - Thrive Flywheel™
 - Cultural Imprint Engine™
 - CHLOM™ — Compliance Hybrid Licensing and Ownership Model
+- PentaFramework Factory™ — CrownThrive's governed framework and software-production system
 - DAIL™, DLA™, and CHLOM LEX™ where adopted through current terminology records
 - CrownThrive ID™ and CrownThrive IO™
 - MM Suites™ / Melanin Magic Suites™ and Suite Pro™ where governed by current records
