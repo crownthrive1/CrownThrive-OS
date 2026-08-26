@@ -31,7 +31,7 @@ except ModuleNotFoundError:
     from runtime.penta_family import load_family, member_dispatch_gate
     from runtime.penta_interop import build_envelope, evaluate_handoff
 
-RUNTIME_VERSION = "1.2.0"
+RUNTIME_VERSION = "1.2.1"
 ADAPTER_REGISTRY = Path("data/penta/execution-adapters.registry.json")
 EXECUTION_ELIGIBLE = {"certified", "production"}
 VALID_EFFECTS = {"analyze", "prepare", "route", "execute", "verify", "preserve"}
@@ -54,15 +54,7 @@ def _seal(value: Mapping[str, Any]) -> str:
 
 
 def _receipt(kind: str, disposition: str, details: Mapping[str, Any]) -> dict[str, Any]:
-    value: dict[str, Any] = {
-        "schema": "ct.penta.execution-receipt.v1",
-        "runtime_version": RUNTIME_VERSION,
-        "receipt_id": f"pex-{uuid4().hex}",
-        "kind": kind,
-        "disposition": disposition,
-        "created_at": _utcnow(),
-        "details": dict(details),
-    }
+    value: dict[str, Any] = {"schema": "ct.penta.execution-receipt.v1", "runtime_version": RUNTIME_VERSION, "receipt_id": f"pex-{uuid4().hex}", "kind": kind, "disposition": disposition, "created_at": _utcnow(), "details": dict(details)}
     value["receipt_sha256"] = _seal(value)
     return value
 
@@ -78,7 +70,6 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _load_fixed_module(name: str, path: Path):
-    """Load one repository-owned fixed runtime path; never accepts user paths."""
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise PentaExecutionError(f"cannot load fixed runtime: {path}")
@@ -106,46 +97,15 @@ def family_list(snapshot: Mapping[str, Any]) -> dict[str, Any]:
     rows = []
     for key, member in sorted(_members(snapshot).items()):
         gate = member_dispatch_gate(snapshot, key)
-        rows.append({
-            "machine_key": key,
-            "canonical_name": member.get("canonical_name"),
-            "category": member.get("category"),
-            "maturity": member.get("maturity"),
-            "execution_eligible": bool(gate.get("eligible")),
-            "portal_route": member.get("portal_route"),
-        })
+        rows.append({"machine_key": key, "canonical_name": member.get("canonical_name"), "category": member.get("category"), "maturity": member.get("maturity"), "execution_eligible": bool(gate.get("eligible")), "portal_route": member.get("portal_route")})
     return _receipt("family_list", "completed_read_only", {"member_count": len(rows), "members": rows})
 
 
 def member_status(snapshot: Mapping[str, Any], machine_key: str) -> dict[str, Any]:
-    member = _member(snapshot, machine_key)
-    all_members = _members(snapshot)
-    deps = []
-    for dep in member.get("dependencies") or []:
-        deps.append({
-            "machine_key": dep,
-            "registered": dep in all_members,
-            "maturity": all_members.get(dep, {}).get("maturity") if dep in all_members else None,
-        })
+    member, all_members = _member(snapshot, machine_key), _members(snapshot)
+    deps = [{"machine_key": dep, "registered": dep in all_members, "maturity": all_members.get(dep, {}).get("maturity") if dep in all_members else None} for dep in member.get("dependencies") or []]
     missing = sorted(item["machine_key"] for item in deps if not item["registered"])
-    return _receipt(
-        "member_status",
-        "healthy_control_plane" if not missing else "degraded_control_plane",
-        {
-            "machine_key": machine_key,
-            "canonical_name": member.get("canonical_name"),
-            "category": member.get("category"),
-            "purpose": member.get("purpose"),
-            "authority_boundary": member.get("authority_boundary"),
-            "risk_ceiling": member.get("risk_ceiling"),
-            "maturity": member.get("maturity"),
-            "portal_route": member.get("portal_route"),
-            "execution_gate": member_dispatch_gate(snapshot, machine_key),
-            "dependencies": deps,
-            "missing_dependencies": missing,
-            "source": member.get("source"),
-        },
-    )
+    return _receipt("member_status", "healthy_control_plane" if not missing else "degraded_control_plane", {"machine_key": machine_key, "canonical_name": member.get("canonical_name"), "category": member.get("category"), "purpose": member.get("purpose"), "authority_boundary": member.get("authority_boundary"), "risk_ceiling": member.get("risk_ceiling"), "maturity": member.get("maturity"), "portal_route": member.get("portal_route"), "execution_gate": member_dispatch_gate(snapshot, machine_key), "dependencies": deps, "missing_dependencies": missing, "source": member.get("source")})
 
 
 def validate_adapter_registry(registry: Mapping[str, Any]) -> None:
@@ -156,52 +116,34 @@ def validate_adapter_registry(registry: Mapping[str, Any]) -> None:
     adapters = registry.get("adapters")
     if not isinstance(adapters, list):
         raise PentaExecutionError("adapters must be a list")
-    seen_ids: set[str] = set()
-    seen_routes: set[tuple[str, str]] = set()
+    seen_ids: set[str] = set(); seen_routes: set[tuple[str, str]] = set()
     for adapter in adapters:
-        if not isinstance(adapter, Mapping):
-            raise PentaExecutionError("adapter entry must be object")
+        if not isinstance(adapter, Mapping): raise PentaExecutionError("adapter entry must be object")
         required = {"adapter_id", "member", "operation", "handler", "requested_effect", "provider_effect", "requires_execution_eligible"}
         missing = required - set(adapter)
-        if missing:
-            raise PentaExecutionError(f"adapter missing fields: {sorted(missing)}")
+        if missing: raise PentaExecutionError(f"adapter missing fields: {sorted(missing)}")
         adapter_id, member, operation = adapter["adapter_id"], adapter["member"], adapter["operation"]
-        if not isinstance(adapter_id, str) or not adapter_id:
-            raise PentaExecutionError("adapter_id must be non-empty string")
-        if adapter_id in seen_ids:
-            raise PentaExecutionError(f"duplicate adapter_id: {adapter_id}")
+        if not isinstance(adapter_id, str) or not adapter_id: raise PentaExecutionError("adapter_id must be non-empty string")
+        if adapter_id in seen_ids: raise PentaExecutionError(f"duplicate adapter_id: {adapter_id}")
         seen_ids.add(adapter_id)
-        if not isinstance(member, str) or not member.startswith("penta."):
-            raise PentaExecutionError("adapter member must be exact penta.* key")
-        if not isinstance(operation, str) or not operation:
-            raise PentaExecutionError("adapter operation must be non-empty string")
+        if not isinstance(member, str) or not member.startswith("penta."): raise PentaExecutionError("adapter member must be exact penta.* key")
+        if not isinstance(operation, str) or not operation: raise PentaExecutionError("adapter operation must be non-empty string")
         route = (member, operation)
-        if route in seen_routes:
-            raise PentaExecutionError(f"duplicate member/operation adapter: {route}")
+        if route in seen_routes: raise PentaExecutionError(f"duplicate member/operation adapter: {route}")
         seen_routes.add(route)
-        if adapter["requested_effect"] not in VALID_EFFECTS:
-            raise PentaExecutionError("invalid requested_effect")
-        if adapter["handler"] not in BUILTIN_HANDLERS:
-            raise PentaExecutionError(f"unregistered builtin handler: {adapter['handler']!r}")
-        if not isinstance(adapter["provider_effect"], bool) or not isinstance(adapter["requires_execution_eligible"], bool):
-            raise PentaExecutionError("adapter booleans are invalid")
-        if adapter["provider_effect"]:
-            raise PentaExecutionError("builtin adapter registry does not permit provider-effect handlers")
-        if adapter["requested_effect"] == "execute" and adapter["requires_execution_eligible"] is not True:
-            raise PentaExecutionError("execute adapters must require execution-eligible maturity")
+        if adapter["requested_effect"] not in VALID_EFFECTS: raise PentaExecutionError("invalid requested_effect")
+        if adapter["handler"] not in BUILTIN_HANDLERS: raise PentaExecutionError(f"unregistered builtin handler: {adapter['handler']!r}")
+        if not isinstance(adapter["provider_effect"], bool) or not isinstance(adapter["requires_execution_eligible"], bool): raise PentaExecutionError("adapter booleans are invalid")
+        if adapter["provider_effect"]: raise PentaExecutionError("builtin adapter registry does not permit provider-effect handlers")
+        if adapter["requested_effect"] == "execute" and adapter["requires_execution_eligible"] is not True: raise PentaExecutionError("execute adapters must require execution-eligible maturity")
 
 
 def load_adapter_registry(root: Path) -> dict[str, Any]:
-    registry = _load_json(root / ADAPTER_REGISTRY)
-    validate_adapter_registry(registry)
-    return registry
+    registry = _load_json(root / ADAPTER_REGISTRY); validate_adapter_registry(registry); return registry
 
 
 def _find_adapter(registry: Mapping[str, Any], member: str, operation: str) -> Optional[Mapping[str, Any]]:
-    for adapter in registry.get("adapters") or []:
-        if adapter.get("member") == member and adapter.get("operation") == operation:
-            return adapter
-    return None
+    return next((adapter for adapter in registry.get("adapters") or [] if adapter.get("member") == member and adapter.get("operation") == operation), None)
 
 
 def _member_adapter_operations(registry: Mapping[str, Any], machine_key: str) -> list[str]:
@@ -223,14 +165,7 @@ class AdapterContext:
 
 
 def _family_snapshot(ctx: AdapterContext) -> dict[str, Any]:
-    return {
-        "family_status": ctx.snapshot.get("family_status"),
-        "production_scope": ctx.snapshot.get("production_scope"),
-        "member_count": ctx.snapshot.get("member_count"),
-        "maturity_counts": ctx.snapshot.get("maturity_counts"),
-        "execution_eligible_members": ctx.snapshot.get("execution_eligible_members"),
-        "held_members": ctx.snapshot.get("held_members"),
-    }
+    return {"family_status": ctx.snapshot.get("family_status"), "production_scope": ctx.snapshot.get("production_scope"), "member_count": ctx.snapshot.get("member_count"), "maturity_counts": ctx.snapshot.get("maturity_counts"), "execution_eligible_members": ctx.snapshot.get("execution_eligible_members"), "held_members": ctx.snapshot.get("held_members")}
 
 
 def _beata_heartbeat(ctx: AdapterContext) -> dict[str, Any]:
@@ -240,51 +175,41 @@ def _beata_heartbeat(ctx: AdapterContext) -> dict[str, Any]:
 
 def _mesh_route_check(ctx: AdapterContext) -> dict[str, Any]:
     candidate = ctx.payload.get("candidate_target")
-    if not isinstance(candidate, str) or not candidate.startswith("penta."):
-        raise PentaExecutionError("route_check payload.candidate_target must be exact penta.* machine key")
-    member = _member(ctx.snapshot, candidate)
-    gate = member_dispatch_gate(ctx.snapshot, candidate)
+    if not isinstance(candidate, str) or not candidate.startswith("penta."): raise PentaExecutionError("route_check payload.candidate_target must be exact penta.* machine key")
+    member, gate = _member(ctx.snapshot, candidate), member_dispatch_gate(ctx.snapshot, candidate)
     return {"candidate_target": candidate, "registered": True, "maturity": member.get("maturity"), "execution_eligible": bool(gate.get("eligible")), "portal_route": member.get("portal_route"), "dependency_count": len(member.get("dependencies") or [])}
 
 
 def _error_normalize(ctx: AdapterContext) -> dict[str, Any]:
     from runtime.penta_observability import normalize_error
     message, code, context = ctx.payload.get("message", "bounded PentaError normalization probe"), ctx.payload.get("code", "PENTA_EXEC_ADAPTER_ERROR"), ctx.payload.get("context") or {}
-    if not isinstance(message, str) or not message.strip() or not isinstance(code, str) or not code.strip():
-        raise PentaExecutionError("error_normalize message/code must be non-empty strings")
-    if not isinstance(context, Mapping):
-        raise PentaExecutionError("error_normalize context must be an object")
+    if not isinstance(message, str) or not message.strip() or not isinstance(code, str) or not code.strip(): raise PentaExecutionError("error_normalize message/code must be non-empty strings")
+    if not isinstance(context, Mapping): raise PentaExecutionError("error_normalize context must be an object")
     return normalize_error(RuntimeError(message), code=code, context=context).envelope(include_internal=False)
 
 
 def _logger_emit(ctx: AdapterContext) -> dict[str, Any]:
     from runtime.penta_observability import PentaLogger, Severity
-    service, message, event = ctx.payload.get("service", "penta-exec"), ctx.payload.get("message", "bounded executable-family log probe"), ctx.payload.get("event", "penta.exec.probe")
-    severity, context = ctx.payload.get("severity", "info"), ctx.payload.get("context") or {}
-    if not all(isinstance(v, str) and v.strip() for v in (service, message, event)) or not isinstance(context, Mapping):
-        raise PentaExecutionError("logger_emit payload is invalid")
+    service, message, event, severity, context = ctx.payload.get("service", "penta-exec"), ctx.payload.get("message", "bounded executable-family log probe"), ctx.payload.get("event", "penta.exec.probe"), ctx.payload.get("severity", "info"), ctx.payload.get("context") or {}
+    if not all(isinstance(v, str) and v.strip() for v in (service, message, event)) or not isinstance(context, Mapping): raise PentaExecutionError("logger_emit payload is invalid")
     lines: list[str] = []
     record = PentaLogger(service=service, penta_member="penta.logger", minimum_severity=Severity.DEBUG, sink=lines.append).emit(severity, message, event=event, context=context)
-    if record is None or not lines:
-        raise PentaExecutionError("logger_emit produced no record")
+    if record is None or not lines: raise PentaExecutionError("logger_emit produced no record")
     return {"record": record, "line_sha256": sha256(lines[-1].encode("utf-8")).hexdigest()}
 
 
 def _trace_new_context(ctx: AdapterContext) -> dict[str, Any]:
     from runtime.penta_observability import TraceContext
     parent = ctx.payload.get("parent_span_id")
-    if parent is not None and (not isinstance(parent, str) or not parent.strip()):
-        raise PentaExecutionError("trace_new_context parent_span_id must be null or non-empty")
+    if parent is not None and (not isinstance(parent, str) or not parent.strip()): raise PentaExecutionError("trace_new_context parent_span_id must be null or non-empty")
     return TraceContext(parent_span_id=parent).as_dict()
 
 
 def _metric_snapshot(ctx: AdapterContext) -> dict[str, Any]:
     from runtime.penta_observability import MetricRegistry
     counters, gauges, observations = ctx.payload.get("counters") or {}, ctx.payload.get("gauges") or {}, ctx.payload.get("observations") or {}
-    if not all(isinstance(v, Mapping) for v in (counters, gauges, observations)):
-        raise PentaExecutionError("metric_snapshot groups must be objects")
-    if len(counters) + len(gauges) + len(observations) > 100:
-        raise PentaExecutionError("metric_snapshot accepts at most 100 metric names")
+    if not all(isinstance(v, Mapping) for v in (counters, gauges, observations)): raise PentaExecutionError("metric_snapshot groups must be objects")
+    if len(counters) + len(gauges) + len(observations) > 100: raise PentaExecutionError("metric_snapshot accepts at most 100 metric names")
     metrics, observation_count = MetricRegistry(), 0
     for name, value in counters.items():
         if not isinstance(value, (int, float)): raise PentaExecutionError("counter values must be numeric")
@@ -303,67 +228,53 @@ def _metric_snapshot(ctx: AdapterContext) -> dict[str, Any]:
 
 
 def _heartbeat_control_plane_probe(ctx: AdapterContext) -> dict[str, Any]:
+    adapter_registry = load_adapter_registry(ctx.root)
     production = sorted(key for key, member in _members(ctx.snapshot).items() if member.get("maturity") == "production")
     rows = []
     for key in production:
         status = member_status(ctx.snapshot, key)["details"]
-        operations = _member_adapter_operations(ctx.registry, key)
+        operations = _member_adapter_operations(adapter_registry, key)
         rows.append({"machine_key": key, "maturity": status["maturity"], "registered": True, "dependency_gaps": status["missing_dependencies"], "adapter_operations": operations, "adapter_bound": bool(operations)})
-    healthy = all(row["adapter_bound"] and not row["dependency_gaps"] for row in rows)
-    return {"schema": "ct.penta.heartbeat.control-plane-probe.v1", "observed_at": _utcnow(), "production_member_count": len(rows), "healthy": healthy, "members": rows}
+    return {"schema": "ct.penta.heartbeat.control-plane-probe.v1", "observed_at": _utcnow(), "production_member_count": len(rows), "healthy": all(row["adapter_bound"] and not row["dependency_gaps"] for row in rows), "members": rows}
 
 
 def _od_readiness_assess(ctx: AdapterContext) -> dict[str, Any]:
     candidate = ctx.payload.get("candidate_target")
-    if not isinstance(candidate, str) or not candidate.startswith("penta."):
-        raise PentaExecutionError("readiness_assess requires payload.candidate_target")
-    member = _member(ctx.snapshot, candidate)
-    status = member_status(ctx.snapshot, candidate)["details"]
-    operations = _member_adapter_operations(ctx.registry, candidate)
-    gate = member_dispatch_gate(ctx.snapshot, candidate)
+    if not isinstance(candidate, str) or not candidate.startswith("penta."): raise PentaExecutionError("readiness_assess requires payload.candidate_target")
+    adapter_registry = load_adapter_registry(ctx.root)
+    member, status, gate = _member(ctx.snapshot, candidate), member_status(ctx.snapshot, candidate)["details"], member_dispatch_gate(ctx.snapshot, candidate)
+    operations = _member_adapter_operations(adapter_registry, candidate)
     ready = bool(gate.get("eligible")) and bool(operations) and not status["missing_dependencies"]
     return {"schema": "ct.penta.od.readiness.v1", "candidate_target": candidate, "maturity": member.get("maturity"), "execution_eligible": bool(gate.get("eligible")), "adapter_operations": operations, "dependency_gaps": status["missing_dependencies"], "ready_for_bounded_dispatch": ready, "authority_expanded": False, "observed_at": _utcnow()}
 
 
 def _compliance_evaluate(ctx: AdapterContext) -> dict[str, Any]:
     from runtime.penta_compliance_license import evaluate_compliance
-    obligations = ctx.payload.get("obligations")
-    jurisdictions = ctx.payload.get("jurisdictions")
-    scopes = ctx.payload.get("scopes")
-    evidence_index = ctx.payload.get("evidence_index")
-    as_of = ctx.payload.get("as_of")
-    if not isinstance(obligations, list) or not isinstance(jurisdictions, list) or not isinstance(scopes, list) or not isinstance(evidence_index, Mapping):
-        raise PentaExecutionError("compliance evaluate requires obligations/jurisdictions/scopes/evidence_index")
-    try:
-        as_of_date = date.fromisoformat(str(as_of))
-    except ValueError as exc:
-        raise PentaExecutionError("compliance as_of must be ISO date") from exc
+    obligations, jurisdictions, scopes, evidence_index, as_of = ctx.payload.get("obligations"), ctx.payload.get("jurisdictions"), ctx.payload.get("scopes"), ctx.payload.get("evidence_index"), ctx.payload.get("as_of")
+    if not isinstance(obligations, list) or not isinstance(jurisdictions, list) or not isinstance(scopes, list) or not isinstance(evidence_index, Mapping): raise PentaExecutionError("compliance evaluate requires obligations/jurisdictions/scopes/evidence_index")
+    try: as_of_date = date.fromisoformat(str(as_of))
+    except ValueError as exc: raise PentaExecutionError("compliance as_of must be ISO date") from exc
     return evaluate_compliance(obligations, jurisdictions=jurisdictions, scopes=scopes, evidence_index=evidence_index, as_of=as_of_date)
 
 
 def _license_readiness(ctx: AdapterContext) -> dict[str, Any]:
     from runtime.penta_compliance_license import evaluate_license_request
     asset, request = ctx.payload.get("asset"), ctx.payload.get("request")
-    if not isinstance(asset, Mapping) or not isinstance(request, Mapping):
-        raise PentaExecutionError("license readiness requires asset and request objects")
+    if not isinstance(asset, Mapping) or not isinstance(request, Mapping): raise PentaExecutionError("license readiness requires asset and request objects")
     decision = evaluate_license_request(asset, request)
-    decision["adapter_boundary"] = "readiness_only_no_license_grant_issued"
-    return decision
+    return {"decision": decision, "adapter_boundary": "readiness_only_no_license_grant_issued", "binding_action_performed": False}
 
 
 def _scribe_reconcile_preview(ctx: AdapterContext) -> dict[str, Any]:
     runtime = _load_fixed_module("penta_exec_scribe_runtime", ctx.root / "penta/scribe/runtime.py")
     scan_text = ctx.payload.get("scan_text", "PentaScribe production adapter health probe.")
-    if not isinstance(scan_text, str) or len(scan_text) > 100000:
-        raise PentaExecutionError("scribe scan_text must be a string <= 100000 chars")
+    if not isinstance(scan_text, str) or len(scan_text) > 100000: raise PentaExecutionError("scribe scan_text must be a string <= 100000 chars")
     authority_ref = ctx.payload.get("authority_ref") or f"penta-exec:{ctx.evidence_refs[0]}"
-    if not isinstance(authority_ref, str) or not authority_ref.strip():
-        raise PentaExecutionError("scribe authority_ref must be non-empty")
+    if not isinstance(authority_ref, str) or not authority_ref.strip(): raise PentaExecutionError("scribe authority_ref must be non-empty")
     with tempfile.TemporaryDirectory() as tmp:
-        state = Path(tmp) / "state"
-        source = Path(tmp) / "source.md"
+        state, source = Path(tmp) / "state", Path(tmp) / "source.md"
         source.write_text(scan_text, encoding="utf-8")
-        result = runtime.cycle(ctx.root / "penta/scribe/registry.json", state, [source], authority_ref, ctx.root / "penta/scribe/sources.registry.json")
+        result = runtime.cycle(ctx.root / "penta/scribe/registry.json", state, [source], authority_ref)
         return {"summary": result["summary"], "receipt": result["receipt"], "state_persisted": False, "provider_write": False}
 
 
@@ -372,38 +283,26 @@ def _marketer_cycle_preview(ctx: AdapterContext) -> dict[str, Any]:
     campaign = ctx.payload.get("campaign")
     with tempfile.TemporaryDirectory() as tmp:
         tmp_root = Path(tmp)
-        if campaign is None:
-            campaign_path = ctx.root / "penta/marketer/campaign.example.json"
+        if campaign is None: campaign_path = ctx.root / "penta/marketer/campaign.example.json"
         else:
-            if not isinstance(campaign, Mapping):
-                raise PentaExecutionError("marketer campaign must be an object")
-            campaign_path = tmp_root / "campaign.json"
-            campaign_path.write_text(json.dumps(dict(campaign), sort_keys=True), encoding="utf-8")
-        result = runtime.cycle(campaign_path, tmp_root / "state", ctx.root / "penta/marketer/adapters.registry.json", ctx.root / "penta/scribe/registry.json", ctx.root / "penta/marketer/policy.json", ctx.root / "penta/scribe/sources.registry.json")
+            if not isinstance(campaign, Mapping): raise PentaExecutionError("marketer campaign must be an object")
+            campaign_path = tmp_root / "campaign.json"; campaign_path.write_text(json.dumps(dict(campaign), sort_keys=True), encoding="utf-8")
+        result = runtime.cycle(campaign_path, tmp_root / "state", ctx.root / "penta/marketer/adapters.registry.json", ctx.root / "penta/scribe/registry.json", ctx.root / "penta/marketer/policy.json")
         return {"summary": result["summary"], "receipt": result["receipt"], "state_persisted": False, "provider_write": False}
 
 
 BUILTIN_HANDLERS: dict[str, Callable[[AdapterContext], dict[str, Any]]] = {
-    "family_snapshot": _family_snapshot,
-    "beata_heartbeat": _beata_heartbeat,
-    "mesh_route_check": _mesh_route_check,
-    "error_normalize": _error_normalize,
-    "logger_emit": _logger_emit,
-    "trace_new_context": _trace_new_context,
-    "metric_snapshot": _metric_snapshot,
-    "heartbeat_control_plane_probe": _heartbeat_control_plane_probe,
-    "od_readiness_assess": _od_readiness_assess,
-    "compliance_evaluate": _compliance_evaluate,
-    "license_readiness": _license_readiness,
-    "scribe_reconcile_preview": _scribe_reconcile_preview,
-    "marketer_cycle_preview": _marketer_cycle_preview,
+    "family_snapshot": _family_snapshot, "beata_heartbeat": _beata_heartbeat, "mesh_route_check": _mesh_route_check,
+    "error_normalize": _error_normalize, "logger_emit": _logger_emit, "trace_new_context": _trace_new_context, "metric_snapshot": _metric_snapshot,
+    "heartbeat_control_plane_probe": _heartbeat_control_plane_probe, "od_readiness_assess": _od_readiness_assess,
+    "compliance_evaluate": _compliance_evaluate, "license_readiness": _license_readiness,
+    "scribe_reconcile_preview": _scribe_reconcile_preview, "marketer_cycle_preview": _marketer_cycle_preview,
 }
 
 
 def family_validate(root: Path, registry: Mapping[str, Any], snapshot: Mapping[str, Any]) -> dict[str, Any]:
     members, adapters = _members(snapshot), load_adapter_registry(root)
-    blockers: list[dict[str, Any]] = []
-    warnings: list[dict[str, Any]] = []
+    blockers: list[dict[str, Any]] = []; warnings: list[dict[str, Any]] = []
     for key, member in members.items():
         for field in ("canonical_name", "maturity", "portal_route", "source"):
             if not member.get(field): blockers.append({"machine_key": key, "kind": "missing_member_field", "field": field})
@@ -411,52 +310,36 @@ def family_validate(root: Path, registry: Mapping[str, Any], snapshot: Mapping[s
             if dep not in members: warnings.append({"machine_key": key, "kind": "unresolved_dependency", "dependency": dep})
     adapter_members: set[str] = set()
     for adapter in adapters["adapters"]:
-        target = adapter["member"]
-        adapter_members.add(target)
-        if target not in members:
-            blockers.append({"adapter_id": adapter["adapter_id"], "kind": "unknown_adapter_member", "member": target})
-        elif adapter["requires_execution_eligible"] and members[target].get("maturity") not in EXECUTION_ELIGIBLE:
-            blockers.append({"adapter_id": adapter["adapter_id"], "kind": "adapter_targets_ineligible_member", "member": target, "maturity": members[target].get("maturity")})
+        target = adapter["member"]; adapter_members.add(target)
+        if target not in members: blockers.append({"adapter_id": adapter["adapter_id"], "kind": "unknown_adapter_member", "member": target})
+        elif adapter["requires_execution_eligible"] and members[target].get("maturity") not in EXECUTION_ELIGIBLE: blockers.append({"adapter_id": adapter["adapter_id"], "kind": "adapter_targets_ineligible_member", "member": target, "maturity": members[target].get("maturity")})
     eligible = sorted(key for key, member in members.items() if member.get("maturity") in EXECUTION_ELIGIBLE)
     missing_adapters = sorted(set(eligible) - adapter_members)
-    for key in missing_adapters:
-        blockers.append({"machine_key": key, "kind": "execution_eligible_member_missing_adapter", "maturity": members[key].get("maturity")})
+    for key in missing_adapters: blockers.append({"machine_key": key, "kind": "execution_eligible_member_missing_adapter", "maturity": members[key].get("maturity")})
     coverage = {"eligible_member_count": len(eligible), "eligible_members_with_adapter": len(set(eligible) & adapter_members), "missing_adapter_members": missing_adapters, "complete": not missing_adapters}
     return _receipt("family_validate", "pass" if not blockers else "fail_closed", {"family_registry_id": registry.get("registry_id"), "member_count": len(members), "adapter_count": len(adapters["adapters"]), "execution_adapter_coverage": coverage, "blockers": blockers, "warnings": warnings})
 
 
 def invoke_member(root: Path, *, source_member: str, target_member: str, operation: str, evidence_refs: Iterable[str], payload: Optional[Mapping[str, Any]] = None, risk_class: str = "D1", authority_trace: Optional[Mapping[str, Optional[str]]] = None, human_gate: Optional[Mapping[str, Any]] = None, provider_binding_ref: Optional[str] = None, readback_strategy: Optional[str] = None, idempotency_key: Optional[str] = None) -> dict[str, Any]:
-    registry, snapshot = load_family(root)
-    _member(snapshot, source_member)
-    target = _member(snapshot, target_member)
-    adapters = load_adapter_registry(root)
-    adapter = _find_adapter(adapters, target_member, operation)
-    if adapter is None:
-        return _receipt("member_invoke", "hold_fail_closed", {"source_member": source_member, "target_member": target_member, "operation": operation, "reason": "no registered executable adapter for member/operation"})
-    if adapter["requires_execution_eligible"] and target.get("maturity") not in EXECUTION_ELIGIBLE:
-        return _receipt("member_invoke", "hold_fail_closed", {"source_member": source_member, "target_member": target_member, "operation": operation, "reason": f"target maturity {target.get('maturity')!r} is not execution-eligible"})
+    registry, snapshot = load_family(root); _member(snapshot, source_member); target = _member(snapshot, target_member); adapters = load_adapter_registry(root); adapter = _find_adapter(adapters, target_member, operation)
+    if adapter is None: return _receipt("member_invoke", "hold_fail_closed", {"source_member": source_member, "target_member": target_member, "operation": operation, "reason": "no registered executable adapter for member/operation"})
+    if adapter["requires_execution_eligible"] and target.get("maturity") not in EXECUTION_ELIGIBLE: return _receipt("member_invoke", "hold_fail_closed", {"source_member": source_member, "target_member": target_member, "operation": operation, "reason": f"target maturity {target.get('maturity')!r} is not execution-eligible"})
     refs = tuple(dict.fromkeys(str(ref) for ref in evidence_refs if str(ref).strip()))
     if not refs: raise PentaExecutionError("at least one evidence reference is required")
     envelope = build_envelope(source_member=source_member, target_member=target_member, operation=operation, requested_effect=adapter["requested_effect"], evidence_refs=refs, risk_class=risk_class, authority_trace=authority_trace, human_gate=human_gate, provider_effect=adapter["provider_effect"], provider_binding_ref=provider_binding_ref, readback_strategy=readback_strategy, idempotency_key=idempotency_key, metadata={"adapter_id": adapter["adapter_id"], "runtime_version": RUNTIME_VERSION})
     decision = evaluate_handoff(snapshot, envelope)
-    if decision.get("eligible") is not True:
-        return _receipt("member_invoke", "hold_fail_closed", {"source_member": source_member, "target_member": target_member, "operation": operation, "adapter_id": adapter["adapter_id"], "handoff_decision": decision, "envelope_sha256": envelope.get("envelope_sha256")})
+    if decision.get("eligible") is not True: return _receipt("member_invoke", "hold_fail_closed", {"source_member": source_member, "target_member": target_member, "operation": operation, "adapter_id": adapter["adapter_id"], "handoff_decision": decision, "envelope_sha256": envelope.get("envelope_sha256")})
     ctx = AdapterContext(root, registry, snapshot, source_member, target_member, operation, dict(payload or {}), refs, envelope, decision)
-    try:
-        result = BUILTIN_HANDLERS[adapter["handler"]](ctx)
-    except PentaExecutionError:
-        raise
-    except Exception as exc:
-        return _receipt("member_invoke", "handler_failed", {"source_member": source_member, "target_member": target_member, "operation": operation, "adapter_id": adapter["adapter_id"], "error_type": type(exc).__name__, "error": str(exc)})
+    try: result = BUILTIN_HANDLERS[adapter["handler"]](ctx)
+    except PentaExecutionError: raise
+    except Exception as exc: return _receipt("member_invoke", "handler_failed", {"source_member": source_member, "target_member": target_member, "operation": operation, "adapter_id": adapter["adapter_id"], "error_type": type(exc).__name__, "error": str(exc)})
     return _receipt("member_invoke", "completed", {"source_member": source_member, "target_member": target_member, "operation": operation, "adapter_id": adapter["adapter_id"], "requested_effect": adapter["requested_effect"], "provider_effect": False, "handoff_disposition": decision.get("disposition"), "trace_id": envelope.get("trace_id"), "correlation_id": envelope.get("correlation_id"), "idempotency_key": envelope.get("idempotency_key"), "envelope_sha256": envelope.get("envelope_sha256"), "result": result})
 
 
 def build_handoff(root: Path, *, source_member: str, target_member: str, operation: str, requested_effect: str, evidence_refs: Iterable[str], risk_class: str = "D1", authority_trace: Optional[Mapping[str, Optional[str]]] = None, human_gate: Optional[Mapping[str, Any]] = None, provider_effect: bool = False, provider_binding_ref: Optional[str] = None, readback_strategy: Optional[str] = None) -> dict[str, Any]:
-    _, snapshot = load_family(root)
-    _member(snapshot, source_member); _member(snapshot, target_member)
+    _, snapshot = load_family(root); _member(snapshot, source_member); _member(snapshot, target_member)
     envelope = build_envelope(source_member=source_member, target_member=target_member, operation=operation, requested_effect=requested_effect, evidence_refs=evidence_refs, risk_class=risk_class, authority_trace=authority_trace, human_gate=human_gate, provider_effect=provider_effect, provider_binding_ref=provider_binding_ref, readback_strategy=readback_strategy)
-    decision = evaluate_handoff(snapshot, envelope)
-    return _receipt("handoff", str(decision.get("disposition")), {"envelope": envelope, "decision": decision})
+    decision = evaluate_handoff(snapshot, envelope); return _receipt("handoff", str(decision.get("disposition")), {"envelope": envelope, "decision": decision})
 
 
 def _json_arg(value: Optional[str]) -> dict[str, Any]:
@@ -468,17 +351,9 @@ def _json_arg(value: Optional[str]) -> dict[str, Any]:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Executable CrownThrive Penta Family control plane")
-    parser.add_argument("--root", default=".")
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("list")
-    status = sub.add_parser("status"); status.add_argument("machine_key")
-    sub.add_parser("validate")
-    handoff = sub.add_parser("handoff"); handoff.add_argument("source_member"); handoff.add_argument("target_member"); handoff.add_argument("operation")
-    handoff.add_argument("--effect", choices=sorted(VALID_EFFECTS), default="prepare"); handoff.add_argument("--risk", choices=["D0", "D1", "D2", "D3"], default="D1"); handoff.add_argument("--evidence-ref", action="append", required=True); handoff.add_argument("--authority-json"); handoff.add_argument("--human-gate-json"); handoff.add_argument("--provider-effect", action="store_true"); handoff.add_argument("--provider-binding-ref"); handoff.add_argument("--readback-strategy")
-    invoke = sub.add_parser("invoke"); invoke.add_argument("source_member"); invoke.add_argument("target_member"); invoke.add_argument("operation")
-    invoke.add_argument("--risk", choices=["D0", "D1", "D2", "D3"], default="D1"); invoke.add_argument("--evidence-ref", action="append", required=True); invoke.add_argument("--payload-json"); invoke.add_argument("--authority-json"); invoke.add_argument("--human-gate-json"); invoke.add_argument("--provider-binding-ref"); invoke.add_argument("--readback-strategy"); invoke.add_argument("--idempotency-key")
-    return parser
+    parser = argparse.ArgumentParser(description="Executable CrownThrive Penta Family control plane"); parser.add_argument("--root", default="."); sub = parser.add_subparsers(dest="command", required=True); sub.add_parser("list"); status = sub.add_parser("status"); status.add_argument("machine_key"); sub.add_parser("validate")
+    handoff = sub.add_parser("handoff"); handoff.add_argument("source_member"); handoff.add_argument("target_member"); handoff.add_argument("operation"); handoff.add_argument("--effect", choices=sorted(VALID_EFFECTS), default="prepare"); handoff.add_argument("--risk", choices=["D0", "D1", "D2", "D3"], default="D1"); handoff.add_argument("--evidence-ref", action="append", required=True); handoff.add_argument("--authority-json"); handoff.add_argument("--human-gate-json"); handoff.add_argument("--provider-effect", action="store_true"); handoff.add_argument("--provider-binding-ref"); handoff.add_argument("--readback-strategy")
+    invoke = sub.add_parser("invoke"); invoke.add_argument("source_member"); invoke.add_argument("target_member"); invoke.add_argument("operation"); invoke.add_argument("--risk", choices=["D0", "D1", "D2", "D3"], default="D1"); invoke.add_argument("--evidence-ref", action="append", required=True); invoke.add_argument("--payload-json"); invoke.add_argument("--authority-json"); invoke.add_argument("--human-gate-json"); invoke.add_argument("--provider-binding-ref"); invoke.add_argument("--readback-strategy"); invoke.add_argument("--idempotency-key"); return parser
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -491,11 +366,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         elif args.command == "handoff": result = build_handoff(root, source_member=args.source_member, target_member=args.target_member, operation=args.operation, requested_effect=args.effect, evidence_refs=args.evidence_ref, risk_class=args.risk, authority_trace=_json_arg(args.authority_json) or None, human_gate=_json_arg(args.human_gate_json) or None, provider_effect=args.provider_effect, provider_binding_ref=args.provider_binding_ref, readback_strategy=args.readback_strategy)
         else: result = invoke_member(root, source_member=args.source_member, target_member=args.target_member, operation=args.operation, evidence_refs=args.evidence_ref, payload=_json_arg(args.payload_json), risk_class=args.risk, authority_trace=_json_arg(args.authority_json) or None, human_gate=_json_arg(args.human_gate_json) or None, provider_binding_ref=args.provider_binding_ref, readback_strategy=args.readback_strategy, idempotency_key=args.idempotency_key)
     except Exception as exc:
-        result = _receipt("runtime_error", "hold_fail_closed", {"error_type": type(exc).__name__, "error": str(exc)})
-        print(json.dumps(result, indent=2, sort_keys=True)); return 2
-    print(json.dumps(result, indent=2, sort_keys=True))
-    return 0 if result.get("disposition") not in {"fail_closed", "hold_fail_closed", "handler_failed"} else 3
+        result = _receipt("runtime_error", "hold_fail_closed", {"error_type": type(exc).__name__, "error": str(exc)}); print(json.dumps(result, indent=2, sort_keys=True)); return 2
+    print(json.dumps(result, indent=2, sort_keys=True)); return 0 if result.get("disposition") not in {"fail_closed", "hold_fail_closed", "handler_failed"} else 3
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == "__main__": raise SystemExit(main())
