@@ -1,0 +1,132 @@
+# STAGED CANDIDATE — NOT AN ACTIVE GITHUB ACTIONS WORKFLOW.
+# Promote into .github/workflows only after CrownThrive's Node-24 self-hosted
+# runner attestation policy is machine-verified and the runtime policy is
+# explicitly reconciled. Public pull_request execution is prohibited.
+name: Penta Runner Fabric Certification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: penta-runner-fabric-certification
+  cancel-in-progress: false
+
+jobs:
+  certify-pentafabric-rtc:
+    runs-on: [self-hosted, linux, x64, crownthrive, pentafabric, rtc, trusted]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate runner prerequisites
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          command -v python3
+          command -v git
+          command -v curl
+          command -v sha256sum
+          command -v node
+          python3 --version
+          git --version
+          node --version
+          node_major="$(node --version | sed -E 's/^v([0-9]+).*/\1/')"
+          if [ "$node_major" -lt 24 ]; then
+            echo 'ERROR: PentaFabric runner requires Node 24 or newer.' >&2
+            exit 78
+          fi
+
+      - name: Build runner certification evidence
+        shell: bash
+        env:
+          PENTA_RUNNER_NAME: ${{ runner.name }}
+          PENTA_RUNNER_OS: ${{ runner.os }}
+          PENTA_RUNNER_ARCH: ${{ runner.arch }}
+          PENTA_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import platform
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          def command_version(*argv):
+              return subprocess.check_output(argv, text=True).strip()
+
+          evidence = {
+              "schema": "crownthrive.pentafabric.runner-certification.v1",
+              "disposition": "PASS",
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "commit_sha": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "event": os.environ["GITHUB_EVENT_NAME"],
+              "runner": {
+                  "name": os.environ.get("PENTA_RUNNER_NAME"),
+                  "os": os.environ.get("PENTA_RUNNER_OS"),
+                  "arch": os.environ.get("PENTA_RUNNER_ARCH"),
+                  "environment": os.environ.get("PENTA_RUNNER_ENVIRONMENT"),
+                  "hostname": platform.node(),
+                  "python": command_version("python3", "--version"),
+                  "git": command_version("git", "--version"),
+                  "node": command_version("node", "--version"),
+              },
+              "trust_contract": {
+                  "labels_required": [
+                      "self-hosted", "linux", "x64", "crownthrive",
+                      "pentafabric", "rtc", "trusted"
+                  ],
+                  "public_pr_execution_allowed": False,
+                  "provider_execution_class": "trusted",
+                  "node_runtime_floor": 24,
+              },
+              "observed_at": datetime.now(timezone.utc).isoformat(),
+          }
+          payload = json.dumps(evidence, indent=2, sort_keys=True) + "\n"
+          Path("penta-runner-fabric-certification.json").write_text(payload)
+          digest = hashlib.sha256(payload.encode()).hexdigest()
+          Path("penta-runner-fabric-certification.sha256").write_text(
+              digest + "  penta-runner-fabric-certification.json\n"
+          )
+          print(payload)
+          print("sha256=" + digest)
+          PY
+
+      - name: Attest runner certification evidence
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: penta-runner-fabric-certification.json
+
+      - name: Upload certification evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-runner-fabric-certification-${{ github.run_id }}
+          path: |
+            penta-runner-fabric-certification.json
+            penta-runner-fabric-certification.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish runner certification summary
+        shell: bash
+        run: |
+          {
+            echo '## Penta Runner Fabric Certification — PASS'
+            echo
+            echo 'Runner: `${{ runner.name }}`'
+            echo 'OS/arch: `${{ runner.os }}/${{ runner.arch }}`'
+            echo 'Commit: `${{ github.sha }}`'
+            echo 'Evidence: `penta-runner-fabric-certification.json`'
+            echo 'Provenance: GitHub artifact attestation generated.'
+          } >> "$GITHUB_STEP_SUMMARY"
