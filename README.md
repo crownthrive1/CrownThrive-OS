@@ -1,164 +1,208 @@
 # CrownThrive Operating System 👑
 
-**Phase 3 canonical institutional knowledge, governance, developer, licensing, release, and implementation map for CrownThrive, LLC.**
+**CrownThrive OS is CrownThrive's authoritative institutional source of truth.**
 
-**CrownThrive OS is CrownThrive's authoritative institutional source of truth.** It records the current institutional generation, governance, stable identities, versions, evidence boundaries, component state, release lineage, corrections, archives, and how CrownThrive doctrine, corridors, platforms, intellectual property, CHLOM, Cultural Imprint Engine (CIE), Thrive Flywheel, MM Suites, ThriveBase, **PentaGreen™** (legacy alias: ThriveEvergreen™), media, commerce, education, support, data, APIs, MCP servers, automation, factories, recovery, and governed provider integrations fit together.
+It records the current institutional generation, governance, stable identities, versions, evidence boundaries, component state, release lineage, corrections, archives, cultural doctrine, provider state, software factories, commercial systems, media systems, PentaDocs, CHLOM, Cultural Imprint Engine (CIE), ThriveBase, PentaGreen™, CrownThrive IO, APIs, MCPs, agents, automation, recovery, and the relationships that make CrownThrive operate as one convergent institution.
 
-Mintlify/PentaDocs, websites, help centers, storefronts, media surfaces, and other public properties are **downstream projections of the OS**. They may be reconciled on a later publication cadence and do not override OS state merely because an older statement remains publicly visible.
+**Institutional generation:** **Phase 3 — Execute**  
+**Institutional lifecycle:** **PENTA — Discover → Govern → Execute → Verify → Preserve**  
+**Current OS release family:** **3.x**  
+**Future institutional generations:** **Phase 4 — Verify; Phase 5 — Preserve**  
+**Contact:** contact@crownthrive.com
 
-**Institutional generation:** Phase 3 / OS 3.x  
-**Current release target:** v3.0.0  
-**Contact:** contact@crownthrive.com  
-**Repository:** https://github.com/crownthrive1/CrownThrive-Support
-
-> **Truth boundary:** Phase 3 is the current institutional operating generation. That statement does **not** mean every CrownThrive subsystem, provider adapter, commercial rail, API/MCP endpoint, autonomous workflow, or historical recovery lane is production-certified. Component state remains independently evidenced and fail-closed.
-
-## Source-of-truth hierarchy
-
-1. **CrownThrive OS canonical records** — institutional phase, version registry, adopted governance, current-state records, stable identities, effective policies, releases, corrections, and archive dispositions.
-2. **OS-bound evidence and operational state** — ThriveBase records, CHLOM/DAIL evidence, exact Git/release receipts, certified provider readbacks, and other evidence incorporated by the OS within its scope.
-3. **Component repositories** — CHLOM and CIE packages/contracts/schemas are authoritative for their exact component scope while remaining subordinate to the OS for institution-wide state.
-4. **PentaDocs** — public-safe documentation projection generated from OS state; Mintlify is the current underlying documentation provider.
-5. **Websites and other public surfaces** — downstream publication, commerce, media, and discovery projections; updated later as their own workstream.
-6. **Archive/history** — preserved prior truth, plans, versions, terminology, and evidence; never current merely because it remains accessible.
-
-A downstream projection can create a reconciliation task. It cannot demote, promote, or redefine the CrownThrive OS.
-
-## Phase 3 operating picture
-
-CrownThrive has moved from recovery and pre-entry convergence into the Phase 3 generation: institutional convergence, autonomous operations, software/factory execution, governed provider interoperability, certification, reconciliation, and evidence-backed release management.
-
-The current operating model preserves four distinct questions:
-
-1. **What generation governs the institution?** Phase 3.
-2. **What version is a specific component?** Its own independently versioned release/contract/schema version.
-3. **What maturity state is the component in?** For example `production`, `active`, `controlled_test`, `hold`, `historical`, `reserve`, or another evidence-backed state.
-4. **What authority may it exercise?** Only the authority proven by its current governance, credentials, provider certification, and evidence gates.
-
-A Phase 3 label never converts `HOLD` to `PASS`, never creates provider-write authority, never creates a license or entitlement, and never turns a historical design into current production truth.
-
-See [`docs/phase3/CURRENT_STATE.md`](docs/phase3/CURRENT_STATE.md).
-
-## Institutional architecture
-
-### CHLOM Pentafabric™
-
-CHLOM connects five governed layers:
-
-1. **Identity & Imprint** — identity, provenance, custody, authorship, ownership evidence, and Cultural Imprint context.
-2. **Rights & Conditions** — Rights, Rules, Roles, licensing authority, permissions, restrictions, revocation, and remedies.
-3. **Ledger & Assurance** — DAIL evidence, attestations, audits, disputes, corrections, holds, appeals, and certification.
-4. **Execution & Interoperability** — components, frameworks, skills, APIs, MCPs, SDKs, webhooks, agents, factories, verifiers, and mesh routes.
-5. **Economy & Distribution** — **PentaGreen/ECAC**, PentaCredits, PentaSKU, pricing, entitlements, payments, settlement, royalties, commissions, licensing, distribution, and support.
-
-Detailed lifecycle: [`chlom/architecture/pentafabric-autonomous-lifecycle.v1.md`](chlom/architecture/pentafabric-autonomous-lifecycle.v1.md).
-
-### Cultural Imprint Engine
-
-CIE governs cultural meaning, narrative continuity, representation, imprint identity, aesthetics, audience/canon constraints, and responsible reuse. CIE and CHLOM interoperate but do not collapse into one authority surface: CIE does not manufacture rights, and CHLOM does not manufacture cultural truth.
-
-### PentaGreen™
-
-**PentaGreen™ is CrownThrive's mandatory Commerce & Economic Activation Authority and CHLOM cross-pallet commerce/economic-execution subprotocol.** Its constitutional rule is: **“PentaGreen may optimize within authority. It may never manufacture authority.”** Economic activation resolves through `ECAC | HOLD | DENY`; provider success is execution evidence, not economic truth, until institutionally reconciled. `ThriveEvergreen™` remains a read-compatible legacy alias for provenance, immutable receipts, prior releases, and runtime migration.
-
-Canonical subsystem map and migration rules: [`PENTAGREEN.md`](PENTAGREEN.md).
-
-### Autonomous production fabric
-
-CrownThrive's Phase 3 direction is factory-based rather than chat-dependent: governed software, framework, documentation, commerce, integration, and evidence lanes generate candidates, validate them, bind them to institutional identity, route them through authority gates, deploy only where certified, and preserve receipts. Reserved decisions remain human-controlled.
-
-### PentaFramework Factory™
-
-CrownThrive defines **PentaFramework Factory** as a dedicated Phase 3 build/certification factory for frameworks, products, platforms, engines, universities, services, and similar institutional assets. It is complementary to `ct.system.framework-factory.v2` rather than a replacement: Framework Factory remains the generic framework compiler, while PentaFramework Factory adds an eight-stage institutionalization and certification path with deterministic preview candidate IDs and machine-readable parent evidence.
-
-Control plane: [`docs/framework-factory/pentaframework-factory.v1.md`](docs/framework-factory/pentaframework-factory.v1.md).
-
-Its production/certification behavior follows the same Phase 3 rule: factory or candidate existence does not by itself promote manufactured outputs into public, commercial, provider-write, or D3 authority.
-
-## Current-state discipline
-
-Every OS claim must distinguish among:
-
-- **source exists**;
-- **candidate built**;
-- **validation passed**;
-- **authority granted**;
-- **provider path certified**;
-- **deployed**;
-- **read back / independently evidenced**;
-- **commercially or legally activated**.
-
-A repository file, workflow definition, model output, vendor dashboard, screenshot, payment link, provider response, generated artifact, PentaDocs page, or website sentence is not independently sufficient proof of all downstream states.
-
-## Versioning and archive
-
-Phase 3 establishes a stronger current-canon / historical-record boundary.
-
-- Current operational guidance stays in active OS documentation and machine-readable registries.
-- Superseded, stale, historical, pre-entry, and prior-version material is preserved rather than silently erased.
-- Historical material is evidence of what CrownThrive knew, planned, or operated at that time; it is not current instruction unless an active OS record explicitly incorporates it.
-- Schema/API/contract versions such as v1/v2 remain valid when they are the current component-level contract. Institutional OS v3 does not force-renumber them.
-- Projection layers inherit archive/current-state classifications from the OS; they do not create competing history rules.
-
-Archive policy: [`docs/archive/README.md`](docs/archive/README.md).  
-Version registry: [`docs/versioning/VERSION_REGISTRY.json`](docs/versioning/VERSION_REGISTRY.json).
-
-## Licensing, IP, machine use, and brand protection
-
-This repository is public-safe and publicly viewable; it is **not open source by default**. CrownThrive reserves its applicable rights in its documentation, code and configuration where proprietary, compilations, schemas, taxonomies, ontologies, frameworks, methods, brands, media, training/evaluation corpora, prompts, agent systems, interfaces, CIE, CHLOM, Thrive Flywheel, MM Suites, ThriveBase public-safe specifications, **PentaGreen/PentaCredits/PentaSKU materials (including ThriveEvergreen legacy materials)**, and related institutional knowledge.
-
-Repository visibility does not create a general license to clone, resell, commercialize, train models on, bulk-extract, reconstruct protected methods from, impersonate, certify, or create confusingly similar CrownThrive systems.
-
-Read:
-
-- [`LICENSE`](LICENSE)
-- [`PHASE-3-LICENSING-AND-MACHINE-USE-ADDENDUM.md`](PHASE-3-LICENSING-AND-MACHINE-USE-ADDENDUM.md)
-- [`CHLOM-REPOSITORY-FAMILY-LICENSE-ADDENDUM.md`](CHLOM-REPOSITORY-FAMILY-LICENSE-ADDENDUM.md)
-- [`TRADEMARKS.md`](TRADEMARKS.md)
-- [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
-
-Nothing in these repository notices replaces jurisdiction-specific legal review, registrations, assignments, contributor instruments, or negotiated licenses.
-
-## Repository operating tabs
-
-- **README** — current institutional orientation and source-of-truth hierarchy.
-- **LICENSE / licensing addenda** — repository-use, machine-use, IP, and commercial permission boundaries.
-- **CODE_OF_CONDUCT** — participation, cultural stewardship, evidence, AI, privacy, and security conduct.
-- **CONTRIBUTING** — governed contribution and rights-intake requirements.
-- **SECURITY** — coordinated disclosure, secret handling, and protected-runtime boundaries.
-- **SUPPORT** — support routing and escalation.
-- **TRADEMARKS** — marks, naming, certification, and brand-use boundaries.
-- **AGENTS** — automated contributor and institutional-agent rules.
-- **Changelog / releases** — effective-dated institutional history.
+> **Institutional rule:** If CrownThrive cannot discover it, govern it, execute it, verify it, and preserve it, the institutional loop is incomplete.
 
 ## Start here
 
-- **Phase 3 Current State** — [`docs/phase3/CURRENT_STATE.md`](docs/phase3/CURRENT_STATE.md)
-- **PentaGreen Commerce Authority** — [`PENTAGREEN.md`](PENTAGREEN.md)
-- **CHLOM** — [`chlom/overview.mdx`](chlom/overview.mdx)
-- **Cultural Imprint Engine** — [`doctrine/cultural-imprint-engine.mdx`](doctrine/cultural-imprint-engine.mdx)
-- **Developer Platform** — [`developers/overview.mdx`](developers/overview.mdx)
-- **Institutional Archive** — [`docs/archive/README.md`](docs/archive/README.md)
-- **Licensing & IP** — [`support/licensing-and-ip-overview.mdx`](support/licensing-and-ip-overview.mdx)
-- **Support** — [`SUPPORT.md`](SUPPORT.md)
-- **Founder** — [`ABOUT_ME.md`](ABOUT_ME.md)
+1. **PENTA Doctrine** — [`docs/phase3/PENTA_DOCTRINE.md`](docs/phase3/PENTA_DOCTRINE.md)
+2. **PENTA Phase Model** — [`docs/phase-model/PENTA_PHASE_MODEL.md`](docs/phase-model/PENTA_PHASE_MODEL.md)
+3. **PENTA Dictionary & Glossary** — [`docs/phase3/PENTA_GLOSSARY.md`](docs/phase3/PENTA_GLOSSARY.md)
+4. **Current Phase 3 State** — [`docs/phase3/CURRENT_STATE.md`](docs/phase3/CURRENT_STATE.md)
+5. **Institutional Archive** — [`docs/archive/README.md`](docs/archive/README.md)
+6. **PentaGreen** — [`PENTAGREEN.md`](PENTAGREEN.md)
+7. **CHLOM** — [`chlom/overview.mdx`](chlom/overview.mdx)
+8. **Cultural Imprint Engine** — [`doctrine/cultural-imprint-engine.mdx`](doctrine/cultural-imprint-engine.mdx)
+9. **Developer Platform** — [`developers/overview.mdx`](developers/overview.mdx)
+
+## PENTA: one doctrine, five institutional functions
+
+The word **penta** derives from the Greek word for **five**. CrownThrive uses that meaning deliberately. PENTA is not a decorative prefix and it is not a collection of unrelated product names. It is the common operating grammar used to organize how the institution finds truth, applies authority, performs work, proves results, and preserves continuity.
+
+### Discover
+
+Discover what exists and what is real: providers, endpoints, repositories, assets, identities, participants, contracts, schemas, dependencies, versions, health, rights signals, risks, opportunities, history, and gaps.
+
+Discovery does not manufacture authority. A discovered provider feature is not automatically configured. A reachable endpoint is not automatically a certified write path. An old document is not current merely because it is indexed.
+
+### Govern
+
+Govern what is allowed. Determine rights, rules, roles, credentials, policies, capability ceilings, cultural constraints, risk classes, licensing requirements, evidence requirements, approval rules, and continuity obligations.
+
+CHLOM is the principal governance architecture for Rights, Rules, Roles, Revenue, Records, and Remedies. CIE governs cultural meaning, narrative coherence, representation, and imprint constraints within its scope. Vault, identity, certification, and evidence systems preserve the difference between technical possibility and institutional permission.
+
+### Execute
+
+Execute what is authorized through durable software: PentaRoute, PentaTun, Penta primitives, PentaFramework Factory, CrownThrive Software Factory, schedulers, queues, provider-native adapters, internal services, publication systems, media systems, PentaGreen commerce/economic activation, and governed automation.
+
+Execution remains bounded. PentaDelete does not imply universal delete. A generated artifact is not automatically accepted. A deployed endpoint does not automatically gain D3 authority.
+
+### Verify
+
+Verify what happened through provider readback, read-after-write checks, receipts, hashes, canaries, tests, signatures, reconciliation, heartbeats, release evidence, rollback checks, and independent proof surfaces.
+
+A request being sent is not proof that the intended state exists.
+
+### Preserve
+
+Preserve what must survive: versions, provenance, archives, receipts, stable identities, rights context, executable runbooks, recovery packages, PentaGeneration handoffs, Cultural Imprint continuity, and the knowledge required for future participants to continue correctly.
+
+## The canonical institutional phase model
+
+CrownThrive's roadmap is now aligned directly to the PENTA doctrine:
+
+| Phase | PENTA stage | Institutional question | State |
+| --- | --- | --- | --- |
+| **Phase 1** | **Discover** | What exists, what matters, and what is actually true? | Historical / consolidated |
+| **Phase 2** | **Govern** | What may happen, under whose authority, and under what conditions? | Historical / consolidated |
+| **Phase 3** | **Execute** | Can CrownThrive perform its work through durable governed software? | **Current** |
+| **Phase 4** | **Verify** | Can CrownThrive independently and continuously prove correctness, authority, effect, and resilience? | Future |
+| **Phase 5** | **Preserve** | Can CrownThrive survive provider, platform, repository, personnel, and generational change without losing itself? | Future |
+
+This is now the only institution-wide phase taxonomy.
+
+Historical Phase 2.5, 2.7, 2.8, 2.9, 2.95, 2.97, 2.98, 2.99, pre-entry convergence, and similar decimal labels are **retired as current roadmap language**. They remain preserved where historically accurate and resolve into the broader **Phase 2 — Govern** generation.
+
+CrownThrive will not create new decimal institutional phases. Precision belongs in OS releases, component versions, maturity states, certification states, risk/authority classes, waves, sprints, cohorts, or milestones.
+
+## Phase 3 — Execute: the current generation
+
+Phase 3 converts CrownThrive's institutional knowledge, provider access, governance, cultural doctrine, products, content systems, commerce, media, documentation, publishing, APIs, MCPs, factories, schedulers, evidence, and continuity into durable executable software.
+
+The objective is not simply 'more automation.' The objective is an institution that can continue performing priority work without requiring a founder, a single ChatGPT session, or one SaaS dashboard to manually push every recurring operation.
+
+The Phase 3 execution fabric includes PentaRoute, PentaTun, PentaBeata, the wider Penta primitive family, PentaFramework Factory, CrownThrive Software Factory, Penta Federation, PentaMedia, PentaBooks, PentaGeneration, PentaStudios, PentaDocs, PentaGreen, ThriveBase, CHLOM, CIE, CrownThrive IO, repository federation, provider-native adapters, queues, schedulers, proof surfaces, deployment lanes, publishing controls, and self-discovery/certification loops.
+
+Phase 3 is not complete because a repository says `v3`, because an Edge Function exists, or because an agent generated code. Priority functions must execute durably, have known ownership and source-of-truth, operate within bounded authority, create evidence when they fail, support recovery, and produce enough independent proof for assurance to become the dominant objective of Phase 4.
+
+## Phase 4 — Verify: the assurance refactor
+
+Phase 4 changes the primary institutional question from **Can it run?** to **Can CrownThrive prove it ran correctly, under the correct authority, produced the intended result, and remained recoverable?**
+
+Phase 4 will emphasize independent provider readback, cross-system proofs, conformance, reproducibility, red-team/adversarial testing, fault injection, provider-exit drills, rollback verification, security assurance, economic reconciliation, rights and licensing integrity, data quality, release provenance, certification renewal, and continuous drift detection.
+
+The target is an assurance-first institution in which material operational claims can be independently checked rather than accepted from the component that generated them.
+
+## Phase 5 — Preserve: continuity and inheritance
+
+Phase 5 asks whether CrownThrive can survive change without losing its institutional identity, authority, evidence, culture, rights, or operating knowledge.
+
+This phase centers PentaGeneration, seven-generation continuity, archives, succession, provider portability, repository portability, durable identities, rights custody, dependency replacement, data migration, provider exit, recovery packages, executable institutional memory, and knowledge inheritance.
+
+A mature CrownThrive should be able to replace a provider, lose a platform, change personnel, onboard a successor, or reconstruct a subsystem while preserving the information and authority required to continue.
+
+## PENTA is cyclical even though the phase model is sequential
+
+The institution progresses through five dominant generations, but every provider, asset, workflow, product, document, release, and participant may continuously run the PENTA loop inside any phase.
+
+A provider added during Phase 3 may be discovered, governed through CHLOM, executed through PentaRoute, verified through PentaBeata/readback, and preserved through receipts while the institution remains in Phase 3. The phase identifies the dominant institution-wide objective; it does not disable the other four functions.
+
+## Source-of-truth hierarchy
+
+1. **CrownThrive OS canonical records** — current phase, stable identity, effective policy, governance, releases, versions, corrections, and archive dispositions.
+2. **OS-bound operational evidence** — ThriveBase state, CHLOM/DAIL evidence, certified provider readbacks, exact Git/release receipts, and other incorporated evidence.
+3. **Component repositories** — CHLOM, CIE, and other component packages are authoritative within their exact scope while remaining subordinate to OS institution-wide state.
+4. **PentaDocs** — public-safe institutional knowledge projection. Mintlify is the current underlying documentation provider, not the institutional authority.
+5. **Websites, storefronts, media surfaces, and help centers** — downstream projections that may lag.
+6. **Archive/history** — evidence of what was previously true, planned, attempted, released, or operated; never current merely because it remains accessible.
+
+A downstream projection can create a reconciliation task. It cannot independently redefine institutional truth.
+
+## Institutional architecture
+
+### CrownThrive OS
+
+The OS is the institutional control and truth layer. It distinguishes phase, version, maturity, authority, evidence, current state, historical state, and public projection.
+
+### CHLOM
+
+**Compliance Hybrid Licensing and Ownership Model** governs Rights, Rules, Roles, Revenue, Records, and Remedies. CHLOM controls capability and authority boundaries; it does not manufacture cultural truth.
+
+### Cultural Imprint Engine
+
+CIE governs cultural meaning, narrative continuity, representation, imprint identity, aesthetics, canon/audience constraints, and responsible reuse. It interoperates with CHLOM without inheriting CHLOM's rights authority.
+
+### ThriveBase
+
+ThriveBase is CrownThrive's durable operational state, workflow, queue, evidence, registry, scheduling, and automation substrate.
+
+### PENTA execution family
+
+PENTA provides the shared human-and-machine vocabulary for institutional execution. PentaRoute, PentaTun, PentaBeata, PentaFetch, PentaGet, PentaQuery, PentaSearch, PentaQueue, PentaRetry, PentaBind, PentaVault, PentaAuth, PentaAudit, PentaTest, PentaDeploy, PentaReconcile and the wider primitive family make previously implicit software responsibilities explicit and governable.
+
+### PentaFramework Factory and CrownThrive Software Factory
+
+Factories generate, validate, package, bind, test, and deploy governed software/framework candidates through provider-native adapters. Generation is not acceptance; acceptance is not provider authority; provider authority is not D3 authority.
+
+### Penta Federation
+
+Penta Federation carries identities, bindings, events, proofs, routes, and cross-system/repository continuity without forcing each subsystem to maintain a competing copy of canonical state.
+
+### PentaGreen™
+
+PentaGreen is CrownThrive's governed commerce and economic activation authority, with ThriveEvergreen retained as a legacy read-compatible alias where required for provenance and migration. PentaGreen may optimize within authority; it may not manufacture authority.
+
+### PentaDocs
+
+PentaDocs is the institutional knowledge layer. It must explain the architecture to humans and project machine-readable doctrine, current state, glossary terms, histories, and successor links.
+
+### PentaGeneration
+
+PentaGeneration is the long-horizon handoff, succession, continuity, proof, and seven-generation stewardship layer and becomes increasingly central as CrownThrive approaches Phase 5.
+
+## Maturity is not phase
+
+Institutional phase and component maturity are different dimensions. A Phase 3 component may be `CANDIDATE`, `CONTROLLED_TEST`, `ACTIVE`, `PRODUCTION`, `WRITE_VERIFIED`, `RESERVE`, `HISTORICAL`, `SUPERSEDED`, or `RETIRED`.
+
+Similarly, a v1 or v2 API may remain the correct active component contract during OS 3.x. The PENTA phase model does not force-renumber every schema, API, migration, function, protocol, or runtime.
+
+## Authority is not phase
+
+A higher phase never creates legal, economic, provider, destructive, or D3 authority by itself.
+
+No phase label, document, AI output, generated artifact, successful HTTP response, repository merge, deployment, payment link, provider capability, or public statement independently creates ownership, licensing rights, entitlement, settlement, or universal mutation authority.
+
+## Archive and retirement
+
+CrownThrive now uses the rule:
+
+> **Preserve the evidence. Retire the obsolete instruction. Link to the successor.**
+
+Old phase timelines, stale roadmaps, superseded versions, renamed systems, duplicate architecture paths, and obsolete guidance are removed from active canon when a successor is established. Historical evidence remains available for provenance, audit, recovery, and institutional history.
+
+See [`docs/archive/README.md`](docs/archive/README.md) and [`docs/archive/PENTA_PHASE_RETIREMENT_MANIFEST.json`](docs/archive/PENTA_PHASE_RETIREMENT_MANIFEST.json).
+
+## Repository family
+
+The current canonical public-safe repository family includes `crownthrive1/CrownThrive-Support`, `crownthrive1/chlom-protocol`, and `crownthrive1/CrownThrive-CIE`, with other repositories and providers federated through the OS and PENTA control fabric according to their exact scope.
+
+## Licensing, intellectual property, and machine use
+
+Public visibility does not make CrownThrive proprietary material open source by default. CrownThrive reserves applicable rights in proprietary code, schemas, taxonomies, ontologies, methods, brands, documentation, prompts, agents, CIE, CHLOM, PENTA architectures, ThriveBase specifications, PentaGreen, factories, interfaces, and institutional knowledge.
+
+Repository visibility does not create permission to clone, resell, impersonate, commercialize, bulk-extract, reconstruct protected methods, or represent an implementation as CrownThrive-certified.
 
 ## Seven-generation continuity
 
-CrownThrive uses a seven-generation planning horizon for institutional continuity, architectural lineage, rights preservation, recoverability, stewardship, and maintainability. It is a planning and governance framework, not an automatic legal transfer mechanism. See [`standards/crownthrive-generational-continuity-charter.v1.md`](standards/crownthrive-generational-continuity-charter.v1.md).
+CrownThrive uses a seven-generation planning horizon for stewardship, architectural lineage, rights preservation, succession, portability, recoverability, and institutional memory. It is a governance and planning framework rather than an automatic legal transfer mechanism.
 
-## Institutional operating rule
+## The forward baseline
 
-> **CrownThrive OS governs institutional truth. Platforms perform the work. Corridors organize the work. CIE protects cultural coherence. CHLOM governs rights and authority. ThriveBase preserves operational state. PentaGreen governs economic activation without manufacturing authority. The institutional record proves what happened. Projections publish what the OS has authorized them to say.**
+CrownThrive no longer needs an endless staircase of decimal phases to describe where it is going.
 
-CrownThrive uses stable IDs, effective-dated versions, source authority, evidence classes, explicit rights, role/relationship access, approval gates, append-only corrections, DAIL events, tested recovery, and audience-specific projections.
+**Discover what is real. Govern what is allowed. Execute what is authorized. Verify what happened. Preserve what must outlive us.**
 
-## Ownership and contact
-
-**Institutional owner:** CrownThrive, LLC  
-**Founding Member:** Kavonte Jones Sr.  
-**Contact:** contact@crownthrive.com
+That is PENTA. That is the institutional lifecycle through Phase 5. Every future platform, provider, participant, agent, acquisition, framework, brand, corridor, or system should be able to locate itself inside that model without creating a competing roadmap.
 
 ---
 
-**Impact. Legacy. Cultural advancement. Governed convergence. Phase 3. 👑**
+**Impact. Legacy. Cultural advancement. Governed convergence. PENTA. 👑**
