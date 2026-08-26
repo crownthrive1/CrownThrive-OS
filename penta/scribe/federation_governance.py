@@ -140,6 +140,14 @@ def audit_federation(registry: dict, sources_config: dict | None, root: pathlib.
     }
 
 
+def conflict_line(conflict: dict) -> str:
+    claims = " | ".join(
+        f"{item['identity_id']}:{item['canonical']}@{item['source_id']}"
+        for item in conflict.get("claims", [])
+    )
+    return f"CONFLICT {conflict.get('semantic_key')}: {claims}"
+
+
 def candidate_id(observed: str) -> str:
     digest = hashlib.sha256(scribe.semantic_key(observed).encode("utf-8")).hexdigest()[:16]
     return f"pentascribe-candidate-{digest}"
@@ -217,7 +225,11 @@ def main(argv=None) -> int:
         else:
             write_json(pathlib.Path(args.out), result)
             print(args.out)
-        return 0 if result["result"] == "PASS" else 1
+        if result["result"] != "PASS":
+            for conflict in result["conflicts"]:
+                print(conflict_line(conflict), file=sys.stderr)
+            return 1
+        return 0
 
     if not args.discovery:
         print("--discovery is required for triage", file=sys.stderr)
