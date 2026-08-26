@@ -2,17 +2,19 @@
 
 **Effective date:** 2026-08-26  
 **Institutional generation:** Phase 3 / CrownThrive OS 3.x  
-**Document role:** Public-safe current-state orientation  
-**Authority:** Descriptive projection only; component/provider authority remains independently gated.
+**Document role:** Canonical OS current-state orientation  
+**Authority:** CrownThrive OS source-of-truth record; component/provider authority remains independently gated.
 
 ## Executive state
 
 CrownThrive is operating in **Phase 3**, the institutional convergence and autonomous-operations generation. Phase 3 is additive to prior production truth: it does not restart the ecosystem, discard earlier releases, or automatically promote every subsystem into production.
 
-The Phase 3 objective is to make the institution increasingly operable through governed software and durable infrastructure rather than relying on a single chat, operator, or provider. The operating pattern is:
+The Phase 3 objective is to make the institution increasingly operable through governed software and durable infrastructure rather than relying on a single chat, operator, website, documentation projection, or provider. The operating pattern is:
 
 ```text
 accepted source / governed directive
+            ↓
+CROWNTHRIVE OS — canonical institutional state
             ↓
 stable identity + version + evidence
             ↓
@@ -31,20 +33,38 @@ write / deploy / publish only within authority
 readback + DAIL / release / rollback evidence
             ↓
 reconciliation + documentation + archive
+            ↓
+Mintlify / websites / other public projections when scheduled
 ```
+
+## Source-of-truth hierarchy
+
+**CrownThrive OS is the authoritative institutional source of truth.** All other documentation and public surfaces are projections of OS-governed state and may lag without redefining the institution.
+
+The precedence model is:
+
+1. **CrownThrive OS canonical records** — current institutional phase, adopted governance, version registry, stable identities, current-state records, effective policies, release lineage, and governed corrections.
+2. **OS-bound operational/evidence records** — ThriveBase state, CHLOM/DAIL evidence, exact Git/release receipts, certified provider readbacks, and other records explicitly incorporated by the OS within their scope.
+3. **Repository-family component records** — CHLOM and CIE contracts, schemas, packages, and component documentation, subordinate to OS institutional state while remaining authoritative for their own exact component scope.
+4. **Mintlify** — public-safe documentation projection of the OS. Mintlify does not establish institutional state independently.
+5. **Websites and other public surfaces** — downstream publication/commerce/media projections. They may be reconciled later and never override the OS merely because they remain publicly visible.
+6. **Historical/archive records** — evidence of prior truth, plans, releases, states, or terminology; not current operating instruction unless explicitly inherited by an active OS record.
+
+A downstream projection can identify a reconciliation task, but it cannot demote, promote, or redefine canonical OS state.
 
 ## What Phase 3 means now
 
 Phase 3 work is concentrated on:
 
-- institutional convergence across CrownThrive repositories, documentation, services, brands, corridors, agents, factories, provider adapters, and evidence;
+- institutional convergence across CrownThrive repositories, services, brands, corridors, agents, factories, provider adapters, and evidence;
 - software and framework factories that produce governed production candidates and implementation packages;
 - autonomous operations through ThriveBase and bounded provider integrations;
 - provider-native adapters and explicit `write_verified`/deployment certification rather than assumed capability;
-- current-state reconciliation across GitHub, Mintlify, runtime/provider evidence, public websites, and historical records;
+- current-state reconciliation inside the OS across GitHub, runtime/provider evidence, component repositories, release records, and historical records;
 - documentation freshness, archive custody, version lineage, and machine-readable institutional knowledge;
 - security, rollback, observability, least privilege, and fail-closed authority;
-- commercialization and distribution only after rights, economic, provider, entitlement, and evidence gates are satisfied.
+- commercialization and distribution only after rights, economic, provider, entitlement, and evidence gates are satisfied;
+- downstream Mintlify and website projection only after the canonical OS state is settled for the relevant change.
 
 ## What Phase 3 does not mean
 
@@ -55,7 +75,7 @@ Phase 3 does **not** mean:
 - every provider supports a verified write path;
 - every API/MCP candidate is publicly deployed;
 - every payment, licensing, entitlement, distribution, or syndication rail is active;
-- every public website sentence is current;
+- every downstream public page has already caught up with OS state;
 - every older v1/v2 schema, contract, or runtime must be renamed v3;
 - a `HOLD`, `CONTROLLED_TEST`, `candidate`, `historical`, or `reserve` state becomes `PASS` merely because the institution entered Phase 3.
 
@@ -75,11 +95,11 @@ Phase 3 does **not** mean:
 
 ## Top-level system roles
 
-- **CrownThrive OS** — institutional control and convergence layer.
+- **CrownThrive OS** — authoritative institutional control, source-of-truth, version, convergence, and reconciliation layer.
 - **Convergent Ecosystem** — portfolio/corridor model connecting platforms, people, IP, services, distribution, and value flows.
 - **Cultural Imprint Engine (CIE)** — cultural meaning, narrative continuity, representation, imprint/canon, audience, aesthetics, and responsible reuse.
 - **CHLOM** — Compliance Hybrid Licensing and Ownership Model; Rights, Rules, Roles, Revenue, Records, and Remedies.
-- **ThriveBase** — durable operational state, evidence-linked workflows, queues, registries, and automation substrate.
+- **ThriveBase** — durable operational state, evidence-linked workflows, queues, registries, and automation substrate bound into the OS.
 - **Thrive Flywheel** — compounding movement of creation, participation, commerce, distribution, rewards, reinvestment, and renewed creation.
 - **ThriveEvergreen / ECAC** — governed commerce/economic activation layer within its certified authority.
 - **MM Suites** — interoperable suite/lane structure for governed product and service capabilities.
@@ -87,21 +107,19 @@ Phase 3 does **not** mean:
 
 ## Repository truth
 
-The connected canonical repository family for this Phase 3 documentation convergence consists of:
+The connected canonical repository family for this Phase 3 convergence consists of:
 
-1. `crownthrive1/CrownThrive-Support` — public-safe OS, institutional documentation, governance, release, support, and Mintlify projection.
-2. `crownthrive1/chlom-protocol` — public-safe CHLOM protocol, registry, schemas, services, evidence-oriented contracts, and integration governance.
+1. `crownthrive1/CrownThrive-Support` — CrownThrive OS public-safe source, institutional documentation, governance, release, support, version, archive, and downstream documentation projection source.
+2. `crownthrive1/chlom-protocol` — CHLOM public-safe protocol, registry, schemas, services, evidence-oriented contracts, and integration governance.
 3. `crownthrive1/CrownThrive-CIE` — CIE framework package, doctrine, contracts, profiles, engine, runtime/federation material, and controlled public/internal boundaries.
 
-A repository can be part of Phase 3 while a component inside it remains at a v1/v2 contract version or controlled-test maturity.
+A repository can be part of Phase 3 while a component inside it remains at a v1/v2 contract version or controlled-test maturity. The OS records that distinction rather than flattening it.
 
 ## Current documentation rule
 
-Current documents must state the **real life picture**: what exists, what is running, what is proven, what is intentionally bounded, what is still held, and which statement is historical. Where provider or runtime evidence is absent, documentation uses bounded language rather than converting design intent into production fact.
+Current OS documents must state the **real-life picture**: what exists, what is running, what is proven, what is intentionally bounded, what is still held, and which statement is historical. Where provider or runtime evidence is absent, the OS uses bounded language rather than converting design intent into production fact.
 
-## Public website drift
-
-Public web pages are reconciled as separate publication surfaces. A stale website claim does not override a newer governed current-state record, but it remains a correction obligation until the public page itself is updated and read back.
+Mintlify, websites, help centers, storefronts, media pages, and other downstream surfaces are updated from the OS on their own projection cadence. Their temporary lag is a documentation/publication delta, not an OS-state ambiguity.
 
 ## Release discipline
 
@@ -109,6 +127,6 @@ OS 3.x is the institutional Phase 3 release line. Component versions remain inde
 
 ## Authority boundary
 
-No documentation page, release number, generated file, workflow, AI/agent output, provider capability, successful HTTP response, checkout, or deployment artifact independently creates legal authority, ownership, licensing rights, D3/sovereign authority, payment settlement, entitlement, or provider-write permission.
+No documentation page, release number, generated file, workflow, AI/agent output, provider capability, successful HTTP response, checkout, website statement, or deployment artifact independently creates legal authority, ownership, licensing rights, D3/sovereign authority, payment settlement, entitlement, or provider-write permission.
 
-Phase 3 is operational. **Phase 3 completion remains subsystem-by-subsystem and evidence-by-evidence.**
+Phase 3 is operational. **Phase 3 completion remains subsystem-by-subsystem and evidence-by-evidence, under the CrownThrive OS source of truth.**
