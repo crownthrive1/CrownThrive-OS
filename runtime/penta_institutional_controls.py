@@ -2,7 +2,7 @@
 
 Dependency-free governance/runtime primitives for:
 PentaCompliance, PentaPrivacy, PentaIdentity, PentaData, PentaRecords,
-PentaProcure, PentaVendor, PentaContracts and PentaQuality.
+PentaProcure, PentaVendor, PentaContracts, PentaLicense and PentaQuality.
 
 This module is intentionally fail-closed. It may package, classify and route
 work at implemented maturity, but provider or consequential execution is
@@ -30,6 +30,7 @@ KNOWN_SYSTEMS = {
     "penta.procure",
     "penta.vendor",
     "penta.contracts",
+    "penta.license",
     "penta.quality",
 }
 
@@ -46,6 +47,7 @@ CONSEQUENTIAL_ACTIONS = {
     "penta.procure": {"submit_purchase_order", "place_order", "approve_requisition", "accept_quote"},
     "penta.vendor": {"approve_vendor", "suspend_vendor", "offboard_vendor", "renew_vendor"},
     "penta.contracts": {"send_for_signature", "sign_contract", "accept_terms", "amend_contract", "terminate_contract"},
+    "penta.license": {"issue_license", "amend_license", "renew_license", "suspend_license", "revoke_license"},
     "penta.quality": {"close_nonconformance", "approve_capa", "change_acceptance_criteria", "release_quality_hold"},
 }
 
@@ -66,6 +68,10 @@ FORBIDDEN_ACTIONS = {
     ("penta.vendor", "create_provider_credential"): "PentaCredentials owns protected credential lifecycle.",
     ("penta.contracts", "provide_legal_advice"): "PentaContracts is contract lifecycle management, not legal counsel.",
     ("penta.contracts", "self_sign_contract"): "Contract signature requires authorized signatory authority.",
+    ("penta.license", "fabricate_rights"): "PentaLicense cannot manufacture ownership, control or sublicensing authority.",
+    ("penta.license", "self_issue_license"): "Binding license issuance requires exact rights, terms, acceptance and accountable authority.",
+    ("penta.license", "overwrite_signed_grant"): "Signed license grants are immutable; changes must append an amendment or lifecycle event.",
+    ("penta.license", "sublicense_without_rights"): "Sublicensing is prohibited without exact delegated sublicensing authority.",
     ("penta.quality", "erase_nonconformance"): "Quality findings must be dispositioned and preserved.",
     ("penta.quality", "self_certify_release"): "PentaAssure/PentaCertify own independent release/capability certification.",
 }
@@ -77,11 +83,12 @@ INDEPENDENCE_ACTIONS = {
     ("penta.quality", "approve_capa"),
     ("penta.compliance", "submit_attestation"),
     ("penta.vendor", "approve_vendor"),
+    ("penta.license", "issue_license"),
 }
 
 PROVIDER_EFFECT_SYSTEMS = {
     "penta.identity", "penta.procure", "penta.vendor", "penta.contracts",
-    "penta.privacy", "penta.records", "penta.data",
+    "penta.privacy", "penta.records", "penta.data", "penta.license",
 }
 
 
@@ -279,6 +286,19 @@ def evaluate_control_request(packet: Dict[str, Any]) -> Dict[str, Any]:
             reasons.append("attestation requires authoritative obligation source")
         if not metadata.get("evidence_sufficiency_ref"):
             reasons.append("attestation requires evidence-sufficiency review")
+    if system == "penta.license" and action in {"issue_license", "amend_license", "renew_license", "suspend_license", "revoke_license"}:
+        if not metadata.get("rights_profile_ref"):
+            reasons.append("license lifecycle action requires an exact rights-control profile")
+        if not metadata.get("asset_version_ref"):
+            reasons.append("license lifecycle action requires an exact asset/version/hash reference")
+        if action == "issue_license":
+            if not metadata.get("terms_ref"):
+                reasons.append("license issuance requires exact adopted terms")
+            if not metadata.get("acceptance_ref"):
+                reasons.append("license issuance requires attributable acceptance evidence")
+        else:
+            if not metadata.get("immutable_grant_receipt"):
+                reasons.append("license lifecycle change requires the immutable prior grant receipt")
     if system == "penta.quality" and action in {"close_nonconformance", "approve_capa"} and not metadata.get("retest_evidence_ref"):
         reasons.append("quality closure requires re-test/effectiveness evidence")
     if reasons:

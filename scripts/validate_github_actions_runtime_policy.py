@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "developers/manifests/github-actions-runtime-policy.v1.json"
 WORKFLOW_DIR = ROOT / ".github/workflows"
 DEPENDABOT = ROOT / ".github/dependabot.yml"
+RUNNER_BOOTSTRAP = ROOT / "scripts/penta_runner_fabric_bootstrap.sh"
 
 USES_DIRECTIVE_RE = re.compile(
     r"^\s*(?:-\s*)?(?:uses|['\"]uses['\"])\s*:\s*(.*?)\s*$"
@@ -126,10 +127,24 @@ def parse_uses_line(line: str) -> Optional[tuple[str, Optional[str]]]:
     return decode_literal_scalar(match.group(1))
 
 
-def parse_runs_on_line(line: str) -> Optional[str]:
+def parse_runs_on_line(line: str) -> Optional[str | tuple[str, ...]]:
     match = RUNS_ON_DIRECTIVE_RE.match(line)
     if not match:
         return None
+    scalar, _comment = split_yaml_comment(match.group(1))
+    scalar = scalar.strip()
+    if scalar.startswith("["):
+        if not scalar.endswith("]"):
+            raise PolicyParseError("flow runner label list must end on the same YAML line")
+        raw_labels = scalar[1:-1].split(",")
+        labels = tuple(label.strip() for label in raw_labels)
+        if not labels or any(not label for label in labels):
+            raise PolicyParseError("flow runner label list contains an empty label")
+        if any(not re.fullmatch(r"[A-Za-z0-9_.-]+", label) for label in labels):
+            raise PolicyParseError("flow runner labels must be unquoted simple identifiers")
+        if len(set(labels)) != len(labels):
+            raise PolicyParseError("flow runner label list contains a duplicate")
+        return labels
     value, _comment = decode_literal_scalar(match.group(1))
     return value
 
@@ -149,6 +164,9 @@ def parser_self_test() -> None:
 
     assert parse_runs_on_line("    runs-on: ubuntu-latest") == "ubuntu-latest"
     assert parse_runs_on_line("    'runs-on': 'ubuntu-latest'") == "ubuntu-latest"
+    assert parse_runs_on_line("    runs-on: [self-hosted, linux, x64]") == (
+        "self-hosted", "linux", "x64"
+    )
 
     rejected = (
         "      - { uses: actions/checkout@" + sha + " }",
@@ -170,8 +188,8 @@ def parser_self_test() -> None:
 def main() -> int:
     parser_self_test()
     policy = load_policy()
-    if policy.get("manifest_version") != "1.0.2":
-        fail("GitHub Actions runtime policy must include provenance hardening version 1.0.2")
+    if policy.get("manifest_version") != "1.1.0":
+        fail("GitHub Actions runtime policy must include self-hosted bootstrap hardening version 1.1.0")
     if policy.get("status") != "active_fail_closed":
         fail("GitHub Actions runtime policy must remain active_fail_closed")
     if policy.get("target_runtime") != "node24" or policy.get("node20_status") != "prohibited":
@@ -185,10 +203,35 @@ def main() -> int:
     approved_runners = set(runner_policy.get("approved_github_hosted_labels", []))
     if approved_runners != {"ubuntu-latest"}:
         fail(f"Approved GitHub-hosted runner inventory drifted: {sorted(approved_runners)}")
-    if runner_policy.get("dynamic_runs_on_expressions") != "prohibited_until_runner_attestation_policy_supports_them":
+    if runner_policy.get("dynamic_runs_on_expressions") != "prohibited":
         fail("Dynamic runs-on expressions must remain prohibited")
-    if runner_policy.get("self_hosted") != "blocked_until_node24_runner_attestation_is_machine_verified":
-        fail("Self-hosted runners must remain blocked until Node 24 runner attestation is machine verified")
+    if runner_policy.get("self_hosted") != "bootstrap_certification_only_until_exact_head_attestation_is_verified":
+        fail("Self-hosted runners must remain restricted to the bootstrap certification lane")
+    if runner_policy.get("production_self_hosted") != "blocked_until_separate_policy_promotion_after_exact_head_attestation":
+        fail("Production self-hosted execution must remain blocked pending a separate evidenced promotion")
+
+    bootstrap_workflows = runner_policy.get("approved_self_hosted_bootstrap_workflows", [])
+    if not isinstance(bootstrap_workflows, list) or len(bootstrap_workflows) != 1:
+        fail("Exactly one self-hosted bootstrap certification workflow must be governed")
+    bootstrap = bootstrap_workflows[0]
+    expected_bootstrap = {
+        "path": ".github/workflows/penta-runner-fabric-certification.yml",
+        "event": "workflow_dispatch_only",
+        "ref": "refs/heads/main",
+        "repository": "crownthrive1/CrownThrive-Support",
+        "labels": [
+            "self-hosted", "linux", "x64", "crownthrive", "pentafabric",
+            "rtc", "trusted", "provider", "pentamail",
+        ],
+        "provider_secrets": "prohibited",
+        "provider_writes": "prohibited",
+        "public_pull_request_execution": "prohibited",
+        "result_authority": "runner_capability_only_not_production_workload_authority",
+    }
+    if bootstrap != expected_bootstrap:
+        fail("Self-hosted bootstrap workflow contract drifted")
+    bootstrap_path = expected_bootstrap["path"]
+    bootstrap_labels = tuple(expected_bootstrap["labels"])
 
     refs = policy.get("reference_policy", {})
     if refs.get("remote_actions_must_use_full_length_commit_sha") is not True:
@@ -232,6 +275,7 @@ def main() -> int:
     required_actions = {
         "actions/checkout",
         "actions/setup-python",
+        "actions/setup-node",
         "actions/dependency-review-action",
         "actions/upload-artifact",
         "actions/attest-build-provenance",
@@ -241,6 +285,7 @@ def main() -> int:
 
     seen = set()
     runner_count = 0
+    self_hosted_bootstrap_seen = set()
     for path in workflow_paths():
         text = path.read_text(encoding="utf-8")
         rel = path.relative_to(ROOT).as_posix()
@@ -255,10 +300,28 @@ def main() -> int:
                 fail(f"{rel}:{lineno} invalid runs-on directive: {exc}")
             if runner is not None:
                 runner_count += 1
-                if runner not in approved_runners:
+                if isinstance(runner, tuple):
+                    if rel != bootstrap_path:
+                        fail(f"{rel}:{lineno} self-hosted/multi-label runner is outside the approved bootstrap lane")
+                    if runner != bootstrap_labels:
+                        fail(f"{rel}:{lineno} self-hosted bootstrap labels drifted: {runner!r}")
+                    if not re.search(r"(?ms)^on:\n  workflow_dispatch:\s*\n\npermissions:", text):
+                        fail(f"{rel} must remain workflow_dispatch-only")
+                    if re.search(r"(?m)^\s{2}(?:pull_request|pull_request_target|push|schedule):", text):
+                        fail(f"{rel} contains a prohibited automatic or public-code event")
+                    guard = (
+                        "if: github.repository == 'crownthrive1/CrownThrive-Support' "
+                        "&& github.ref == 'refs/heads/main'"
+                    )
+                    if guard not in text:
+                        fail(f"{rel} must remain bound to the canonical repository exact main ref")
+                    if "${{ secrets." in text:
+                        fail(f"{rel} bootstrap certification lane must not consume repository secrets")
+                    self_hosted_bootstrap_seen.add(rel)
+                elif runner not in approved_runners:
                     fail(
                         f"{rel}:{lineno} runner {runner!r} is not an approved literal GitHub-hosted runner; "
-                        "dynamic, matrix, self-hosted, and unverified labels are fail-closed"
+                        "dynamic, matrix, and unverified labels are fail-closed"
                     )
 
             try:
@@ -291,8 +354,30 @@ def main() -> int:
 
     if runner_count == 0:
         fail("No literal runs-on directives were observed; runner policy cannot be considered enforced")
+    if self_hosted_bootstrap_seen != {bootstrap_path}:
+        fail(f"Self-hosted bootstrap coverage drifted: {sorted(self_hosted_bootstrap_seen)}")
     if seen != required_actions:
         fail(f"Workflow action coverage drifted; seen={sorted(seen)}")
+
+    if not RUNNER_BOOTSTRAP.is_file():
+        fail("PentaFabric runner bootstrap script is missing")
+    runner_bootstrap = RUNNER_BOOTSTRAP.read_text(encoding="utf-8")
+    bootstrap_fragments = (
+        'MINIMUM_RUNNER_VERSION="2.327.1"',
+        'asset_digest="$(jq -r',
+        'official GitHub release metadata lacks a governed SHA-256 digest',
+        'runner archive SHA-256 does not match official GitHub release metadata',
+        '"digest_verified": true',
+        'PENTA_RUNNER_ROOT must be a dedicated child of',
+        '--config -',
+    )
+    for fragment in bootstrap_fragments:
+        if fragment not in runner_bootstrap:
+            fail(f"PentaFabric runner bootstrap hardening missing {fragment!r}")
+    digest_gate = runner_bootstrap.find('if [[ "$archive_sha256" != "$expected_archive_sha256" ]]')
+    credential_request = runner_bootstrap.find('registration_json="$(api -X POST')
+    if digest_gate < 0 or credential_request < 0 or credential_request < digest_gate:
+        fail("Runner registration credential must be requested only after archive digest verification")
 
     dependabot = DEPENDABOT.read_text(encoding="utf-8") if DEPENDABOT.is_file() else ""
     for fragment in (
@@ -315,7 +400,7 @@ def main() -> int:
     print("GitHub Actions runtime and supply-chain policy passed.")
     print(f"Workflows scanned: {len(workflow_paths())}; literal runner directives: {runner_count}; remote actions: {', '.join(sorted(seen))}.")
     print("Runtime floor: Node 24; Node 20 and runtime warning-suppression escape hatches: prohibited.")
-    print("Runner policy: approved literal GitHub-hosted labels only; dynamic/matrix/self-hosted labels fail closed.")
+    print("Runner policy: literal GitHub-hosted labels plus one exact-main, secret-free self-hosted certification lane; production self-hosted execution remains blocked.")
     print("Remote actions: quoted/unquoted uses parsed, canonical root, full-SHA pinned; Dependabot daily proposals only.")
     print("Provenance: sanitized PASS evidence may be attested; attestation never promotes HOLD.")
     print("CodeQL: provider-managed default setup; duplicate advanced workflow action references: prohibited.")

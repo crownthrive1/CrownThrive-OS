@@ -48,7 +48,8 @@ def main() -> int:
         "manifest_version": "1.3.0",
         "manifest_id": "ct.manifest.repository-governance-enforcement.v1",
         "source_id": "S106",
-        "phase": "2.99",
+        "phase": "3",
+        "historical_origin_phase": "2.99",
         "repository": "crownthrive1/CrownThrive-Support",
         "branch": "main",
         "canonical_main_sha": "1a07a8755e3b18d01ec6720ec2522b1727780c01",
@@ -60,7 +61,7 @@ def main() -> int:
         "github_branch_protection_required_for_phase_3": True,
         "policy_transition_enforcement": "agent_sovereign_plus_required_provider_merge_perimeter",
         "docs_impact": "docs_updated",
-        "phase_3_entry_effect": "github_main_perimeter_verified; all_other_phase_2_99_hard_exit_requirements_remain_binding",
+        "phase_3_execution_effect": "github_main_perimeter_verified_and_active; component_and_provider_gates_remain_independently_binding",
     }
     for key, value in expected.items():
         if data.get(key) != value:
@@ -177,10 +178,12 @@ def main() -> int:
         fail("Provider activation must remain ruleset_enforced_behavior_verified")
     if target.get("bootstrap_pr") != 64 or target.get("bootstrap_merge_sha") != "1a07a8755e3b18d01ec6720ec2522b1727780c01":
         fail("Bootstrap PR/merge evidence drifted")
-    if target.get("phase_2_99_exit") != "github_main_perimeter_predicate_passed_other_hard_exit_requirements_remain":
-        fail("GitHub perimeter may pass only while other Phase 2.99 hard-exit requirements remain independently binding")
-    if target.get("phase_3_entry") != "github_main_perimeter_passed_but_phase3_still_blocked_pending_all_phase_2_99_hard_exit":
-        fail("Phase 3 must remain blocked by the full Phase 2.99 hard-exit contract")
+    if target.get("phase") != "3" or target.get("historical_origin_phase") != "2.99":
+        fail("GitHub main target must remain Phase 3 with explicit historical origin")
+    if target.get("historical_entry_result") != "github_main_perimeter_predicate_passed":
+        fail("GitHub perimeter historical entry result drifted")
+    if target.get("phase_3_execution") != "repository_merge_perimeter_active_and_continuously_revalidated":
+        fail("GitHub main target must remain an active Phase 3 merge perimeter")
     target_required = target.get("required_target", {})
     if target_required.get("required_status_check", {}).get("job") != "CrownThrive governed merge gate":
         fail("GitHub target required job drifted")
@@ -248,6 +251,7 @@ def main() -> int:
         "name: Validate institutional documentation",
         "pull_request:",
         "python scripts/validate_docs.py",
+        "python scripts/penta_gap_closure.py . --json",
         "python scripts/validate_github_actions_runtime_policy.py",
         "python scripts/validate_agent_sovereign_governance.py",
         "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
@@ -270,6 +274,7 @@ def main() -> int:
         "name: CrownThrive governed merge gate",
         "pull_request:",
         "python scripts/validate_docs.py",
+        "python scripts/penta_gap_closure.py . --json",
         "python scripts/validate_security_governance.py",
         "python scripts/validate_repository_governance_enforcement_state.py",
         "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0",
@@ -277,7 +282,6 @@ def main() -> int:
         require(MERGE_WORKFLOW, fragment)
 
     require(ADR, "# CT-ADR-GOV-011")
-    require(ADR, "Phase 3 therefore remains `blocked_pending_phase_2_99_hard_exit`")
     require(STANDARD_AMENDMENT, "required defense-in-depth merge perimeter")
     require(GATE_AMENDMENT, "GitHub main merge perimeter is a Phase 3 hard-entry dependency")
     require(GATE_AMENDMENT, "GitHub Actions runtime gate")
@@ -295,7 +299,7 @@ def main() -> int:
     print("GitHub main: protected by ruleset evidence; classic branch-protection API remains separately observed as off/no contexts.")
     print("Behavioral negative proof: exact CrownThrive governed merge gate failure produced provider mergeable_state=blocked.")
     print("Sovereign merge policy: CrownThrive agent fail-closed quorum + validation + reserved D3 human authority.")
-    print("Phase 3: GitHub main perimeter predicate passed; all other Phase 2.99 hard-exit gates remain binding.")
+    print("Phase 3: GitHub main perimeter is active; component and provider gates remain independently binding.")
     return 0
 
 

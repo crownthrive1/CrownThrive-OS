@@ -105,8 +105,10 @@ def main() -> int:
 
     if data.get("manifest_version") != "1.1.0":
         fail("Unexpected edge manifest version")
-    if data.get("phase") != "2.99" or data.get("workstream") != "3A":
-        fail("Unexpected phase/workstream identity")
+    if data.get("phase") != "3" or data.get("historical_origin_phase") != "2.99":
+        fail("Edge registry must remain Phase 3 with explicit historical origin")
+    if data.get("historical_source_workstream") != "3A":
+        fail("Historical source-workstream identity drifted")
     if data.get("baseline_commit") != "461fb7085510c29b4a605bdb1996903b534a7996":
         fail("Baseline commit drifted")
     if data.get("edge_state") != "source_relationship_only":

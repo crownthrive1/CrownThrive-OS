@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/penta/self-build-candidate.schema.json",
+  "title": "CrownThrive Penta Self-Build Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_id", "source_system", "gap_id", "gap_statement", "requested_stage",
+    "risk_class", "exact_source_ref", "idempotency_key", "requirements",
+    "acceptance_tests", "negative_tests", "stress_tests", "test_results",
+    "rollback_plan", "license_provenance_ref", "security_review_ref", "evidence_refs",
+    "builder_system", "certifier_system", "independent_certification_ref",
+    "exact_artifact_sha256", "exact_head_sha", "authority_trace", "human_gate",
+    "provider_effect", "provider_binding_ref", "readback_strategy"
+  ],
+  "properties": {
+    "candidate_id": {"type": "string", "minLength": 1},
+    "source_system": {"type": "string", "pattern": "^penta\\."},
+    "gap_id": {"type": "string", "minLength": 1},
+    "gap_statement": {"type": "string", "minLength": 10},
+    "requested_stage": {"enum": ["specify", "build", "test", "certify", "release"]},
+    "risk_class": {"enum": ["D0", "D1", "D2", "D3"]},
+    "exact_source_ref": {"type": "string", "minLength": 1},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "requirements": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+    "acceptance_tests": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+    "negative_tests": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+    "stress_tests": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+    "test_results": {"type": "object", "additionalProperties": {"type": "boolean"}},
+    "rollback_plan": {"type": "string", "minLength": 10},
+    "license_provenance_ref": {"type": "string", "minLength": 1},
+    "security_review_ref": {"type": "string", "minLength": 1},
+    "evidence_refs": {"$ref": "#/$defs/nonEmptyUniqueStrings"},
+    "builder_system": {"const": "penta.factory"},
+    "certifier_system": {"type": "string", "pattern": "^penta\\."},
+    "independent_certification_ref": {"type": ["string", "null"]},
+    "exact_artifact_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "exact_head_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+    "authority_trace": {
+      "type": "object",
+      "required": ["chlom_ref", "accountable_owner"],
+      "properties": {
+        "chlom_ref": {"type": ["string", "null"]},
+        "accountable_owner": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "human_gate": {
+      "type": "object",
+      "required": ["required", "satisfied", "approver_refs"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "satisfied": {"type": "boolean"},
+        "approver_refs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    },
+    "provider_effect": {"type": "boolean"},
+    "provider_binding_ref": {"type": ["string", "null"]},
+    "readback_strategy": {"type": ["string", "null"]}
+  },
+  "$defs": {
+    "nonEmptyUniqueStrings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

@@ -83,6 +83,8 @@ def implementation_signals(root: Path, machine_key: str) -> list[str]:
         for path in base.rglob("*"):
             if not path.is_file():
                 continue
+            if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
+                continue
             normalized = re.sub(r"[^a-z0-9]", "", path.name.casefold())
             if compact and compact in normalized:
                 candidates.append(path)

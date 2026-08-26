@@ -15,6 +15,7 @@ RUNNER_ROOT="${PENTA_RUNNER_ROOT:-/opt/crownthrive/actions-runner}"
 RUNNER_USER="${PENTA_RUNNER_USER:-github-runner}"
 RUNNER_LABELS="${PENTA_RUNNER_LABELS:-crownthrive,pentafabric,rtc,trusted,provider,pentamail}"
 RUNNER_ARCH="${PENTA_RUNNER_ARCH:-x64}"
+MINIMUM_RUNNER_VERSION="2.327.1"
 GITHUB_API_URL="${GITHUB_API_URL:-https://api.github.com}"
 GITHUB_SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}"
 
@@ -23,7 +24,7 @@ if [[ -z "${GH_TOKEN:-}" ]]; then
   exit 64
 fi
 
-for command in curl jq tar sha256sum; do
+for command in curl jq tar sha256sum sort head; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "ERROR: required command '$command' is not installed." >&2
     exit 69
@@ -38,12 +39,27 @@ case "$RUNNER_ARCH" in
     ;;
 esac
 
+case "$RUNNER_ROOT" in
+  /opt/crownthrive/*|/srv/crownthrive/*|/var/lib/crownthrive/*) ;;
+  *)
+    echo "ERROR: PENTA_RUNNER_ROOT must be a dedicated child of /opt/crownthrive, /srv/crownthrive, or /var/lib/crownthrive." >&2
+    exit 64
+    ;;
+esac
+
+if [[ "$RUNNER_ROOT" == */../* || "$RUNNER_ROOT" == */.. || "$RUNNER_ROOT" == *//* ]]; then
+  echo "ERROR: PENTA_RUNNER_ROOT must be a normalized absolute path." >&2
+  exit 64
+fi
+
 api() {
-  curl --fail --silent --show-error \
+  # Read the bearer header from stdin so the token is not copied into curl's
+  # process arguments. The token remains environment/in-memory only.
+  printf 'header = "Authorization: Bearer %s"\n' "$GH_TOKEN" | curl --fail --silent --show-error \
     --retry 3 \
     -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${GH_TOKEN}" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
+    --config - \
     "$@"
 }
 
@@ -51,21 +67,25 @@ release_json="$(api "${GITHUB_API_URL}/repos/actions/runner/releases/latest")"
 runner_tag="$(jq -r '.tag_name' <<<"$release_json")"
 runner_version="${runner_tag#v}"
 asset_name="actions-runner-linux-${RUNNER_ARCH}-${runner_version}.tar.gz"
-asset_url="$(jq -r --arg name "$asset_name" '.assets[] | select(.name == $name) | .browser_download_url' <<<"$release_json" | head -n1)"
+asset_json="$(jq -c --arg name "$asset_name" '.assets[] | select(.name == $name)' <<<"$release_json" | head -n1)"
+asset_url="$(jq -r '.browser_download_url // empty' <<<"$asset_json")"
+asset_digest="$(jq -r '.digest // empty' <<<"$asset_json")"
 
-if [[ -z "$runner_tag" || "$runner_tag" == "null" || -z "$asset_url" || "$asset_url" == "null" ]]; then
+if [[ -z "$runner_tag" || "$runner_tag" == "null" || -z "$asset_url" ]]; then
   echo "ERROR: could not resolve the official actions/runner Linux ${RUNNER_ARCH} release asset." >&2
   exit 70
 fi
 
-registration_json="$(api -X POST "${GITHUB_API_URL}/repos/${REPOSITORY}/actions/runners/registration-token")"
-registration_token="$(jq -r '.token' <<<"$registration_json")"
-registration_expiry="$(jq -r '.expires_at' <<<"$registration_json")"
-
-if [[ -z "$registration_token" || "$registration_token" == "null" ]]; then
-  echo "ERROR: GitHub did not issue a runner registration token." >&2
-  exit 77
+if [[ "$(printf '%s\n%s\n' "$MINIMUM_RUNNER_VERSION" "$runner_version" | sort -V | head -n1)" != "$MINIMUM_RUNNER_VERSION" ]]; then
+  echo "ERROR: official runner release $runner_version is below governed minimum $MINIMUM_RUNNER_VERSION." >&2
+  exit 70
 fi
+
+if [[ ! "$asset_digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+  echo "ERROR: official GitHub release metadata lacks a governed SHA-256 digest for $asset_name." >&2
+  exit 70
+fi
+expected_archive_sha256="${asset_digest#sha256:}"
 
 install_root() {
   mkdir -p "$RUNNER_ROOT"
@@ -89,6 +109,21 @@ trap cleanup EXIT
 archive="${tmp_dir}/${asset_name}"
 curl --fail --location --silent --show-error --retry 3 "$asset_url" -o "$archive"
 archive_sha256="$(sha256sum "$archive" | awk '{print $1}')"
+if [[ "$archive_sha256" != "$expected_archive_sha256" ]]; then
+  echo "ERROR: runner archive SHA-256 does not match official GitHub release metadata." >&2
+  exit 70
+fi
+
+# Request the short-lived registration credential only after the downloaded
+# runner payload has passed official digest and minimum-version verification.
+registration_json="$(api -X POST "${GITHUB_API_URL}/repos/${REPOSITORY}/actions/runners/registration-token")"
+registration_token="$(jq -r '.token' <<<"$registration_json")"
+registration_expiry="$(jq -r '.expires_at' <<<"$registration_json")"
+
+if [[ -z "$registration_token" || "$registration_token" == "null" ]]; then
+  echo "ERROR: GitHub did not issue a runner registration token." >&2
+  exit 77
+fi
 
 if [[ "$(id -u)" -eq 0 ]]; then
   run_as_runner=(runuser -u "$RUNNER_USER" --)
@@ -146,9 +181,12 @@ cat > "$RUNNER_ROOT/_penta_evidence/bootstrap.json" <<JSON
   "repository": "${REPOSITORY}",
   "runner_name": "${RUNNER_NAME}",
   "runner_release": "${runner_tag}",
+  "minimum_runner_version": "${MINIMUM_RUNNER_VERSION}",
   "runner_arch": "${RUNNER_ARCH}",
   "runner_labels": "${RUNNER_LABELS}",
   "download_sha256": "${archive_sha256}",
+  "official_release_sha256": "${expected_archive_sha256}",
+  "digest_verified": true,
   "registration_token_expires_at": "${registration_expiry}",
   "security_scope": "trusted-main-dispatch-schedule-only"
 }

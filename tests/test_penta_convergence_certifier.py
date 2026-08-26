@@ -28,17 +28,13 @@ class PentaConvergenceCertifierTests(unittest.TestCase):
         keys = [item["machine_key"] for item in self.evidence["invocations"]]
         self.assertEqual(len(keys), len(set(keys)))
 
-    def test_runtime_observability_spine_is_explicit(self):
+    def test_observability_spine_is_part_of_family_census(self):
         family = self.evidence["family"]
         extensions = set(family["runtime_extensions"])
-        self.assertEqual(
-            extensions,
-            {"penta.error", "penta.logger", "penta.metric", "penta.trace"},
-        )
-        for invocation in self.evidence["invocations"]:
-            if invocation["machine_key"] in extensions:
-                self.assertEqual(invocation["registry_scope"], "runtime_spine_extension")
-                self.assertIsNone(invocation["family_gate"]["eligible"])
+        self.assertEqual(extensions, set())
+        by_key = {item["machine_key"]: item for item in self.evidence["invocations"]}
+        for key in ("penta.error", "penta.logger", "penta.metric", "penta.trace"):
+            self.assertEqual(by_key[key]["registry_scope"], "family_and_runtime")
 
     def test_preserves_held_members_without_promotion(self):
         family = self.evidence["family"]
@@ -61,6 +57,10 @@ class PentaConvergenceCertifierTests(unittest.TestCase):
         self.assertTrue(checks["provider_contract_clean"])
         self.assertTrue(checks["pentamail_registered"])
         self.assertTrue(checks["resend_registered"])
+        self.assertTrue(checks["penta_compliance_registered_production"])
+        self.assertTrue(checks["penta_license_registered_production"])
+        self.assertTrue(checks["compliance_license_runtime_self_test"])
+        self.assertTrue(checks["self_build_all_members_covered"])
         self.assertEqual(self.evidence["disposition"], "PASS")
 
     def test_evidence_is_hash_bound(self):

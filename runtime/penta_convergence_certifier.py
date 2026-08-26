@@ -45,9 +45,15 @@ def certify(root: Path) -> dict[str, Any]:
     family_mod = _load_module("penta_family_convergence", root / "runtime" / "penta_family.py")
     runtime_mod = _load_module("penta_runtime_suite_convergence", root / "runtime" / "penta_runtime_suite.py")
     obs_mod = _load_module("penta_observability_convergence", root / "runtime" / "penta_observability.py")
+    compliance_license_mod = _load_module(
+        "penta_compliance_license_convergence", root / "runtime" / "penta_compliance_license.py"
+    )
+    self_build_mod = _load_module("penta_self_build_convergence", root / "runtime" / "penta_self_build.py")
 
     family_registry, family_snapshot = family_mod.load_family(root)
     runtime_snapshot = runtime_mod.build_snapshot(root)
+    compliance_license_self_test = compliance_license_mod.self_test()
+    self_build_coverage = self_build_mod.coverage_report(root)
 
     family_members = family_snapshot.get("members", {})
     if not isinstance(family_members, dict) or not family_members:
@@ -148,6 +154,10 @@ def certify(root: Path) -> dict[str, Any]:
             "provider_contract_clean": not provider.get("contract_errors"),
             "pentamail_registered": runtime_snapshot.get("pentamail", {}).get("registered") is True,
             "resend_registered": runtime_snapshot.get("pentamail", {}).get("resend_registered") is True,
+            "penta_compliance_registered_production": family_members.get("penta.compliance", {}).get("maturity") == "production",
+            "penta_license_registered_production": family_members.get("penta.license", {}).get("maturity") == "production",
+            "compliance_license_runtime_self_test": compliance_license_self_test.get("ok") is True,
+            "self_build_all_members_covered": self_build_coverage.get("disposition") == "PASS" and self_build_coverage.get("member_count") == self_build_coverage.get("covered_member_count"),
         }
         passed = all(critical_checks.values())
         metrics.gauge("penta.convergence.family_pass", 1.0 if passed else 0.0)
@@ -174,6 +184,8 @@ def certify(root: Path) -> dict[str, Any]:
             "control_plane_resolution": family_snapshot.get("control_plane_resolution", {}),
             "provider_control_plane": provider,
             "pentamail": runtime_snapshot.get("pentamail", {}),
+            "penta_compliance_license": compliance_license_self_test,
+            "penta_self_build": self_build_coverage,
             "invocations": invocations,
             "observability": {
                 "trace": trace.as_dict(),

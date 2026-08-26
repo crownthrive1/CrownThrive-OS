@@ -32,6 +32,8 @@ def fail(message: str) -> None:
 def main() -> int:
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     actions_policy = json.loads(ACTIONS_POLICY.read_text(encoding="utf-8"))
+    if policy.get("phase") != "3" or policy.get("historical_origin_phase") != "2.99":
+        fail("security policy must remain bound to Phase 3 with explicit historical origin")
     if policy.get("control_model") != "continuous_detect_triage_repair_revalidate_independent_verify":
         fail("security control model drifted")
     if policy["severity_policy"].get("critical") != "block_and_escalate":
@@ -42,8 +44,11 @@ def main() -> int:
         fail("D3 security healing must remain human-reserved")
     if "rerun_github_actions_runtime_policy" not in policy["self_heal"].get("post_heal_requirements", []):
         fail("post-heal validation must rerun the GitHub Actions runtime policy")
-    if policy["crypto_blockchain_guardrails"].get("phase_9_dependency") is not True:
-        fail("advanced crypto/blockchain activation must remain Phase 9-gated")
+    crypto = policy["crypto_blockchain_guardrails"]
+    if crypto.get("activation_gate") != "independent_legal_financial_security_and_reserved_authority_review":
+        fail("advanced crypto/blockchain activation must retain independent specialist gates")
+    if crypto.get("institutional_phase_shortcut") is not False:
+        fail("no institutional phase may shortcut crypto/token activation gates")
 
     github_evidence = policy.get("github_security_evidence", {})
     if github_evidence.get("codeql") != "required_when_applicable":
