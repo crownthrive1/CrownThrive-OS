@@ -34,7 +34,7 @@ readback + DAIL / release / rollback evidence
             ↓
 reconciliation + documentation + archive
             ↓
-Mintlify / websites / other public projections when scheduled
+PentaDocs / websites / other public projections when scheduled
 ```
 
 ## Source-of-truth hierarchy
@@ -46,7 +46,7 @@ The precedence model is:
 1. **CrownThrive OS canonical records** — current institutional phase, adopted governance, version registry, stable identities, current-state records, effective policies, release lineage, and governed corrections.
 2. **OS-bound operational/evidence records** — ThriveBase state, CHLOM/DAIL evidence, exact Git/release receipts, certified provider readbacks, and other records explicitly incorporated by the OS within their scope.
 3. **Repository-family component records** — CHLOM and CIE contracts, schemas, packages, and component documentation, subordinate to OS institutional state while remaining authoritative for their own exact component scope.
-4. **Mintlify** — public-safe documentation projection of the OS. Mintlify does not establish institutional state independently.
+4. **PentaDocs** — CrownThrive's public-safe institutional documentation layer and OS projection. Mintlify may be used as an underlying provider implementation, but provider state does not establish institutional state independently.
 5. **Websites and other public surfaces** — downstream publication/commerce/media projections. They may be reconciled later and never override the OS merely because they remain publicly visible.
 6. **Historical/archive records** — evidence of prior truth, plans, releases, states, or terminology; not current operating instruction unless explicitly inherited by an active OS record.
 
@@ -64,7 +64,7 @@ Phase 3 work is concentrated on:
 - documentation freshness, archive custody, version lineage, and machine-readable institutional knowledge;
 - security, rollback, observability, least privilege, and fail-closed authority;
 - commercialization and distribution only after rights, economic, provider, entitlement, and evidence gates are satisfied;
-- downstream Mintlify and website projection only after the canonical OS state is settled for the relevant change.
+- downstream PentaDocs and website projection only after the canonical OS state is settled for the relevant change.
 
 ## What Phase 3 does not mean
 
@@ -119,7 +119,7 @@ A repository can be part of Phase 3 while a component inside it remains at a v1/
 
 Current OS documents must state the **real-life picture**: what exists, what is running, what is proven, what is intentionally bounded, what is still held, and which statement is historical. Where provider or runtime evidence is absent, the OS uses bounded language rather than converting design intent into production fact.
 
-Mintlify, websites, help centers, storefronts, media pages, and other downstream surfaces are updated from the OS on their own projection cadence. Their temporary lag is a documentation/publication delta, not an OS-state ambiguity.
+PentaDocs, websites, help centers, storefronts, media pages, and other downstream surfaces are updated from the OS on their own projection cadence. The Mintlify provider implementation may serve PentaDocs where configured, but provider reachability or editor state is a separate state dimension. Temporary projection lag is a documentation/publication delta, not an OS-state ambiguity.
 
 ## Release discipline
 
