@@ -47,6 +47,7 @@ jobs:
           set -euo pipefail
           python3 -m json.tool .pentarelease/policy.json >/dev/null
           python3 -m py_compile scripts/pentarelease/release_surface.py
+          python3 -m unittest tests.test_pentarelease_release_surface tests.test_pentarelease_workflow_contract
           test "$(jq -r '.release_surface.enabled' .pentarelease/policy.json)" = "true"
           test "$(jq -r '.release_surface.max_repository_surfaces' .pentarelease/policy.json)" -le 7
           test "$(jq -r '.release_surface.repository_surfaces | length' .pentarelease/policy.json)" -le 7
@@ -67,7 +68,84 @@ jobs:
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName,name,url,targetCommitish,isDraft,isPrerelease | jq .
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
+      - name: Determine reconciliation need
+        id: preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$TAG" <<'PY' > /tmp/pentarelease-local-health.json
+          import json, sys
+          from pathlib import Path
+
+          tag=sys.argv[1]
+          result={"healthy":False,"reason":"unknown"}
+          try:
+              policy=json.load(open('.pentarelease/policy.json'))
+              cfg=policy['release_surface']
+              state=json.load(open(cfg.get('state_file','.pentarelease/state/release-surface.json')))
+              if state.get('last_release') != tag:
+                  raise RuntimeError('last_release_mismatch')
+              surfaces=cfg.get('repository_surfaces') or []
+              if len(surfaces) > int(cfg.get('max_repository_surfaces',7)):
+                  raise RuntimeError('repository_surface_limit_exceeded')
+              start=cfg.get('managed_block_start','<!-- pentarelease:managed-release-surface:start -->')
+              end=cfg.get('managed_block_end','<!-- pentarelease:managed-release-surface:end -->')
+              for surface in surfaces:
+                  p=Path(surface['path'])
+                  if not p.is_file():
+                      raise RuntimeError(f'missing_surface:{p}')
+                  text=p.read_text(encoding='utf-8')
+                  if start not in text or end not in text:
+                      raise RuntimeError(f'missing_managed_block:{p}')
+              docs=json.load(open((cfg.get('pentadocs') or {}).get('config','docs.json')))
+              tabs=(docs.get('navigation') or {}).get('tabs') or []
+              if len(tabs) > int(cfg.get('max_pentadocs_tabs',7)):
+                  raise RuntimeError('pentadocs_tab_limit_exceeded')
+              tab_name=(cfg.get('pentadocs') or {}).get('tab','Releases & Evidence')
+              matches=[x for x in tabs if isinstance(x,dict) and x.get('tab') == tab_name]
+              if len(matches) != 1:
+                  raise RuntimeError('release_tab_missing_or_duplicate')
+              expected=list((cfg.get('pentadocs') or {}).get('pages') or [])
+              groups=matches[0].get('groups') or []
+              penta_group=next((g for g in groups if isinstance(g,dict) and g.get('group')=='PentaRelease'),None)
+              if not penta_group or list(penta_group.get('pages') or []) != expected:
+                  raise RuntimeError('release_tab_pages_mismatch')
+              for page in expected:
+                  if not Path(page + '.mdx').is_file():
+                      raise RuntimeError(f'missing_pentadocs_page:{page}')
+              result={"healthy":True,"reason":"current_release_surface_present"}
+          except Exception as exc:
+              result={"healthy":False,"reason":str(exc)[:240]}
+          print(json.dumps(result,separators=(',',':')))
+          PY
+
+          LOCAL_READY=$(jq -r '.healthy' /tmp/pentarelease-local-health.json)
+          LOCAL_REASON=$(jq -r '.reason' /tmp/pentarelease-local-health.json)
+          READBACK=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body,url)
+          PROVIDER_READY=$(jq -r '
+            (((.body // "") | contains("pentarelease:comprehensive-release:start"))) and
+            ([.assets[].name] as $n |
+              ["PENTARELEASE_COMPREHENSIVE_RELEASE.md","PENTARELEASE_RELEASE_RECORD.json","PENTARELEASE_COSTS.json","PENTARELEASE_CIE_SCORE.json","PENTARELEASE_DATA_CATALOG.json","PENTARELEASE_EVIDENCE.json","PENTARELEASE_FAQ.md","PENTARELEASE_CHANGELOG.md"]
+              | all(. as $x | (($n | index($x)) != null)))
+          ' <<<"$READBACK")
+
+          NEEDS_SYNC=true
+          if [ "$LOCAL_READY" = "true" ] && [ "$PROVIDER_READY" = "true" ]; then
+            NEEDS_SYNC=false
+          fi
+          echo "local_ready=$LOCAL_READY" >> "$GITHUB_OUTPUT"
+          echo "provider_ready=$PROVIDER_READY" >> "$GITHUB_OUTPUT"
+          echo "needs_sync=$NEEDS_SYNC" >> "$GITHUB_OUTPUT"
+          echo "local_reason=$LOCAL_REASON" >> "$GITHUB_OUTPUT"
+          echo "Local surface ready: $LOCAL_READY ($LOCAL_REASON)"
+          echo "Provider release ready: $PROVIDER_READY"
+          echo "Reconciliation required: $NEEDS_SYNC"
+
       - name: Recover existing release inputs
+        if: steps.preflight.outputs.needs_sync == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
@@ -81,19 +159,26 @@ jobs:
           done
 
       - name: Materialize comprehensive release + bounded surfaces
+        if: steps.preflight.outputs.needs_sync == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
+          LOCAL_READY: ${{ steps.preflight.outputs.local_ready }}
         shell: bash
         run: |
           set -euo pipefail
           rm -rf dist/pentarelease-surface
+          EXTRA=()
+          if [ "$LOCAL_READY" = "true" ]; then
+            EXTRA+=(--no-sync-repository)
+          fi
           python3 scripts/pentarelease/release_surface.py \
             --repository "$GITHUB_REPOSITORY" \
             --tag "$TAG" \
             --policy .pentarelease/policy.json \
             --source-dir /tmp/pentarelease-source \
-            --outdir dist/pentarelease-surface
+            --outdir dist/pentarelease-surface \
+            "${EXTRA[@]}"
 
           for JSON in PENTARELEASE_RELEASE_RECORD.json PENTARELEASE_COSTS.json PENTARELEASE_CIE_SCORE.json PENTARELEASE_DATA_CATALOG.json PENTARELEASE_EVIDENCE.json; do
             python3 -m json.tool "dist/pentarelease-surface/$JSON" >/dev/null
@@ -101,6 +186,7 @@ jobs:
           test "$(find dist/pentarelease-surface -maxdepth 1 -type f | wc -l)" -eq 8
 
       - name: Publish comprehensive release assets and notes
+        if: steps.preflight.outputs.needs_sync == 'true' && steps.preflight.outputs.provider_ready != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
@@ -119,6 +205,7 @@ jobs:
           done
 
       - name: Validate ownership and tab ceilings
+        if: steps.preflight.outputs.needs_sync == 'true' && steps.preflight.outputs.local_ready != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -150,6 +237,7 @@ jobs:
 
       - name: Commit synchronized repository + PentaDocs surfaces
         id: commit
+        if: steps.preflight.outputs.needs_sync == 'true' && steps.preflight.outputs.local_ready != 'true'
         env:
           TAG: ${{ steps.release.outputs.tag }}
         shell: bash
@@ -158,9 +246,21 @@ jobs:
           git config user.name 'PentaRelease'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           BASE_SHA=$(git rev-parse HEAD)
-          BRANCH="pentarelease/surface-${TAG//\//-}-${GITHUB_RUN_ID}"
-          git checkout -b "$BRANCH"
+          SAFE_TAG=$(printf '%s' "$TAG" | tr '/' '-')
+          BRANCH="pentarelease/surface-${SAFE_TAG}-${BASE_SHA:0:12}"
 
+          REMOTE_SHA=$(git ls-remote --heads origin "$BRANCH" | awk '{print $1}')
+          if [ -n "$REMOTE_SHA" ]; then
+            echo "Reusing PentaRelease-owned pending branch $BRANCH at $REMOTE_SHA"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "existing_pending=true" >> "$GITHUB_OUTPUT"
+            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$REMOTE_SHA" >> "$GITHUB_OUTPUT"
+            echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git checkout -b "$BRANCH"
           git add \
             .pentarelease/state/release-surface.json \
             docs.json \
@@ -170,6 +270,7 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "existing_pending=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -177,18 +278,19 @@ jobs:
           HEAD_SHA=$(git rev-parse HEAD)
           git push origin "$BRANCH"
           echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "existing_pending=false" >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
           echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Govern and merge synchronized surfaces
+      - name: Govern and promote synchronized surfaces
+        id: promote
         if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
           BRANCH: ${{ steps.commit.outputs.branch }}
           HEAD_SHA: ${{ steps.commit.outputs.head_sha }}
-          BASE_SHA: ${{ steps.commit.outputs.base_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -198,7 +300,7 @@ jobs:
             sleep 10
             STATE=$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
               --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
-            echo "Governed merge gate: $STATE"
+            echo "Governed branch gate: $STATE"
             if [ "$STATE" = "completed:success" ]; then success=true; break; fi
             if [[ "$STATE" == completed:* ]] && [ "$STATE" != "completed:success" ]; then
               echo "PentaRelease surface HOLD: governed merge gate did not pass ($STATE)." >&2
@@ -207,47 +309,96 @@ jobs:
           done
           test "$success" = true
 
-          PR_URL=""
-          if PR_URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
-              --title "PentaRelease comprehensive surface $TAG" \
-              --body "Synchronizes the bounded seven-file release surface, PentaDocs Release & Evidence tab, canonical release URL, comprehensive release notes, CIE/cost/data disclosure, FAQ, changelog, and evidence. Only PentaRelease-owned files/blocks are removable." 2>/tmp/pentarelease-pr.err); then
-            echo "Created governed surface PR: $PR_URL"
-            gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --squash --delete-branch
-          else
-            cat /tmp/pentarelease-pr.err || true
-            echo "GitHub Actions PR creation unavailable; evaluating exact-head fast-forward fallback."
-            git fetch origin main
-            CURRENT_MAIN=$(git rev-parse origin/main)
-            if [ "$CURRENT_MAIN" != "$BASE_SHA" ]; then
-              echo "PentaRelease surface HOLD: main moved from $BASE_SHA to $CURRENT_MAIN; refusing stale fast-forward fallback." >&2
-              exit 45
+          PR_URL=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" --state open --limit 1 --json url --jq '.[0].url // empty')
+          if [ -z "$PR_URL" ]; then
+            if ! PR_URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+                --title "PentaRelease comprehensive surface $TAG" \
+                --body "Synchronizes the bounded seven-file release surface, PentaDocs Release & Evidence tab, canonical release URL, comprehensive release notes, CIE/cost/data disclosure, FAQ, changelog, and evidence. Only PentaRelease-owned files/blocks are removable." 2>/tmp/pentarelease-pr.err); then
+              cat /tmp/pentarelease-pr.err || true
+              echo "::warning title=PentaRelease provider promotion HOLD::GitHub Actions cannot create the protected-main PR. The exact gated PentaRelease-owned branch is preserved for an authorized PR provider identity."
+              echo "promotion_state=HOLD_PR_PROVIDER_IDENTITY" >> "$GITHUB_OUTPUT"
+              echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+              exit 0
             fi
-            STATE=$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
-              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
-            test "$STATE" = "completed:success"
-            git push origin "$HEAD_SHA":refs/heads/main
-            git push origin --delete "$BRANCH" || true
-            echo "Published synchronized surfaces by governed exact-head fast-forward."
+          fi
+          echo "Governed surface PR: $PR_URL"
+          PR_NUMBER=${PR_URL##*/}
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
+
+          pr_success=false
+          for i in $(seq 1 60); do
+            sleep 10
+            RUN_JSON=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow governed-merge-gate.yml --branch "$BRANCH" --event pull_request --limit 1 \
+              --json databaseId,headSha,status,conclusion 2>/dev/null || echo '[]')
+            RUN_HEAD=$(jq -r '.[0].headSha // empty' <<<"$RUN_JSON")
+            RUN_STATUS=$(jq -r '.[0].status // "missing"' <<<"$RUN_JSON")
+            RUN_CONCLUSION=$(jq -r '.[0].conclusion // "pending"' <<<"$RUN_JSON")
+            echo "Governed PR gate: head=${RUN_HEAD:-missing} state=$RUN_STATUS:$RUN_CONCLUSION"
+            if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" = "success" ]; then
+              pr_success=true
+              break
+            fi
+            if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" != "success" ]; then
+              echo "PentaRelease surface HOLD: PR-specific governed gate did not pass ($RUN_CONCLUSION)." >&2
+              exit 46
+            fi
+          done
+          test "$pr_success" = true
+
+          if gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --squash --delete-branch; then
+            echo "promotion_state=MERGED" >> "$GITHUB_OUTPUT"
+            echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=PentaRelease merge identity HOLD::The PR is gated and ready, but the workflow token cannot perform the protected-main merge."
+            echo "promotion_state=HOLD_PR_MERGE_IDENTITY" >> "$GITHUB_OUTPUT"
+            echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Production proof
+        if: always() && !cancelled()
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
+          NEEDS_SYNC: ${{ steps.preflight.outputs.needs_sync }}
+          LOCAL_READY: ${{ steps.preflight.outputs.local_ready }}
+          PROVIDER_READY_BEFORE: ${{ steps.preflight.outputs.provider_ready }}
+          REPOSITORY_CHANGED: ${{ steps.commit.outputs.changed }}
+          PROMOTION_STATE: ${{ steps.promote.outputs.promotion_state }}
+          PENDING_BRANCH: ${{ steps.promote.outputs.branch }}
+          PR_URL: ${{ steps.promote.outputs.pr_url }}
         shell: bash
         run: |
           set -euo pipefail
           URL=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq '.url')
+          READBACK=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body)
+          PROVIDER_READY=$(jq -r '
+            (((.body // "") | contains("pentarelease:comprehensive-release:start"))) and
+            ([.assets[].name] as $n |
+              ["PENTARELEASE_COMPREHENSIVE_RELEASE.md","PENTARELEASE_RELEASE_RECORD.json","PENTARELEASE_COSTS.json","PENTARELEASE_CIE_SCORE.json","PENTARELEASE_DATA_CATALOG.json","PENTARELEASE_EVIDENCE.json","PENTARELEASE_FAQ.md","PENTARELEASE_CHANGELOG.md"]
+              | all(. as $x | (($n | index($x)) != null)))
+          ' <<<"$READBACK")
+          test "$PROVIDER_READY" = "true"
+
+          STATE="$PROMOTION_STATE"
+          if [ "$NEEDS_SYNC" != "true" ]; then STATE="ALREADY_SYNCHRONIZED"; fi
+          if [ -z "$STATE" ] && [ "$LOCAL_READY" = "true" ]; then STATE="PROVIDER_REPAIRED_REPOSITORY_CURRENT"; fi
+          if [ -z "$STATE" ] && [ "$REPOSITORY_CHANGED" = "false" ]; then STATE="NO_REPOSITORY_CHANGE"; fi
+          if [ -z "$STATE" ]; then STATE="RECONCILED_WITHOUT_PROMOTION"; fi
+
           {
             echo '## PentaRelease comprehensive surface proof'
             echo
             echo "- Release: $TAG"
             echo "- Official URL: $URL"
+            echo "- State: $STATE"
+            echo "- Provider comprehensive release readback: verified"
             echo "- Repository surfaces: 7 maximum / policy-enforced"
             echo "- PentaDocs tabs: <=7 / policy-enforced"
             echo "- Cost disclosure: explicit; unknown values never fabricated"
             echo "- CIE disclosure: explicit; missing scores remain unavailable"
-            echo "- Deletion boundary: only PentaRelease-created files/tabs; unmanaged content preserved"
-            echo "- Provider release readback: verified"
-            echo "- Merge resilience: governed PR preferred; exact-head fast-forward only when PR creation is unavailable, main is unchanged, and the required gate is successful"
+            echo "- Deletion boundary: only PentaRelease-created files/blocks are removable; unmanaged content preserved"
+            echo "- Protected main: no direct-push fallback; normal PR path only"
+            if [ -n "$PENDING_BRANCH" ]; then echo "- Pending governed branch: $PENDING_BRANCH"; fi
+            if [ -n "$PR_URL" ]; then echo "- Promotion PR: $PR_URL"; fi
           } >> "$GITHUB_STEP_SUMMARY"
