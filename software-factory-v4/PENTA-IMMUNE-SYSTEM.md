@@ -2,94 +2,78 @@
 
 ## Status
 
-**Candidate implementation.** Production/active status is not claimed until the exact governed head is tested, independently certified, merged through repository policy, and verified on `main`.
+**Production — governed repository-local autonomic maintenance and evidence construction.**
+
+Initial implementation merged through PR #533. The pre-merge head `1fb79c7130f3a039da82a488bc3e13f6cffde621` passed the required CrownThrive governed merge gate plus the dedicated PentaImmune assurance/evidence/certification/hunt workflow. The merged `main` SHA `0ad7aff61027be9913f84852a1286fb6a4f1c429` then passed PentaImmune deterministic assurance, independent exact-head certification, and the live read-only hunt. Production status is limited to the capabilities and boundaries documented here; it is not a grant of D3, provider, credential, economic, legal, rights, security or other authority.
 
 ## Purpose
 
-PentaImmune is CrownThrive's bounded autonomic maintenance layer for authorized repository-local weaknesses. PentaEVIBuilder is its deterministic evidence-construction engine. Together they close the loop from observed weakness to repair evidence without allowing the repair system to manufacture authority, certification, or production state.
+PentaImmune is CrownThrive's bounded autonomic maintenance layer for authorized repository-local weaknesses. PentaEVIBuilder is its deterministic evidence-construction engine.
 
-The operating loop is:
+Operating loop:
 
-`observe -> hunt -> rank -> work candidate -> PentaFactory repair -> exact-head tests -> PentaEVIBuilder evidence -> independent PentaCertify/PentaAssure -> governed PentaPR merge -> readback -> advisory repair memory`
+`observe -> hunt -> rank -> work candidate -> PentaFactory/PentaPR repair -> exact-head tests -> PentaEVIBuilder evidence -> independent PentaCertify/PentaAssure -> governed merge -> main readback -> advisory repair memory`
 
 ## Hunting perimeter
 
-PentaImmune may hunt only CrownThrive-owned or explicitly authorized repository-local signals:
+PentaImmune may inspect CrownThrive-owned or explicitly authorized repository-local signals: failed CI/workflow runs, failed/stale tests, evidence gaps and SHA drift, stale automation, explicitly admitted governed defects, and documentation/registry drift.
 
-- failed CI/workflow runs;
-- failed or stale tests;
-- evidence gaps and SHA drift;
-- stale automation;
-- known governed defects explicitly admitted to the repair queue;
-- documentation and registry drift.
-
-It does **not** scan third-party targets, conduct offensive security activity, run arbitrary issue-supplied commands, or interpret untrusted text as execution authority.
-
-The scheduled hunter is intentionally read-only. It ranks live failed workflow runs and issues explicitly labeled `penta-immune-ready`. Repair execution remains a separate PentaFactory/PentaPR action under the existing authority contract.
+It does not scan third-party targets, conduct offensive security activity, run arbitrary issue-supplied commands, or interpret untrusted text as execution authority. The scheduled hunter is read-only; repair mutation stays separated through PentaFactory/PentaPR and repository governance.
 
 ## Autonomy and throttles
 
-Default autonomy is bounded to D0-D2/A2 reversible work. D3 remains human-reserved. The default throttle is one repair per cycle, two attempts per candidate, and a one-hour cooldown. A kill switch can move the loop to HOLD immediately.
+Default autonomy is A2 with reversible D0-D2 candidates. D3 is human-reserved. Default throttle is one repair per cycle, two attempts per candidate, one-hour cooldown, and an armed kill switch.
 
-Every repair plan must emit both:
+Every repair plan emits:
 
-1. **Rollback / throwback** — a deterministic way to reverse the candidate repair, normally a Git revert or known-good restoration.
-2. **Fallback / redundancy** — the operational alternative used if the repair cannot be certified, normally fail-closed HOLD plus known-good `main` or another certified path.
+1. **Rollback / throwback** — deterministic reversal, normally Git revert or known-good restoration.
+2. **Fallback / redundancy** — fail-closed HOLD plus known-good `main` or another certified route.
 
-The retry cap prevents self-competition from becoming an infinite repair loop.
+Retry caps prevent self-competition from becoming an infinite repair loop.
 
 ## PentaEVIBuilder evidence contract
 
-PentaEVIBuilder binds proof to an exact 40-character Git head SHA and emits a SHA-256 receipt over a canonical JSON payload. The evidence bundle records:
+PentaEVIBuilder binds proof to an exact 40-character Git SHA and emits a SHA-256 receipt over canonical JSON. Evidence includes work/source identity, repository/head SHA, observations/claims, test receipts, evidence references, rollback, fallback/redundancy, provenance, autonomy envelope, producer and target state.
 
-- work-order and source identity;
-- repository and exact head SHA;
-- observations and scoped claims;
-- test receipts and evidence references;
-- rollback and fallback/redundancy;
-- provenance and autonomy envelope;
-- producer identity;
-- target state.
-
-Evidence is emitted as `UNVERIFIED`. PentaEVIBuilder may not certify its own bundle. The certification gate fails closed on producer/verifier identity collision, evidence digest tampering, SHA drift, missing evidence, failed tests, missing rollback/fallback, forbidden autonomy flags, or an ungated D3 decision.
-
-A PASS certification still does not itself authorize production promotion; governed merge/release policy remains authoritative.
+Evidence starts `UNVERIFIED`. PentaEVIBuilder cannot certify itself. Certification fails closed on receipt tampering, producer/verifier collision, SHA drift, missing evidence/tests/rollback/fallback, forbidden autonomy flags or ungated D3. A PASS evidence decision still does not itself authorize production promotion; repository/release policy remains authoritative.
 
 ## Repair memory
 
-Successful repair memory stores a weakness fingerprint, recipe references, evidence receipt, rollback/fallback, and successful head. Memory is **advisory only**. It grants no authority and no certification, and every reuse requires prerequisite matching plus fresh tests on the new exact head.
-
-Failed or held repairs cannot be learned as successful recipes.
+Successful repairs may enter advisory memory with weakness fingerprint, recipe reference, evidence receipt, rollback/fallback and successful head. Memory grants no authority or certification and always requires prerequisite matching plus fresh exact-head retesting. Failed/HOLD repairs cannot be learned as successes.
 
 ## Creating new Pentas
 
-PentaImmune may generate a subsystem proposal when repeated evidence indicates a missing capability. Such output is always `CANDIDATE`, requires external governance, and cannot self-register, self-activate, self-certify, or expand its own authority.
+PentaImmune may propose a missing subsystem when repeated evidence supports the need. Proposals are always `CANDIDATE`, require external governance, and cannot self-register, self-activate, self-certify or expand authority.
 
 ## 24/7 operation
 
-`.github/workflows/penta-immune-assurance.yml` is designed to run an hourly read-only hunt from trusted repository code after merge. Pull requests run only deterministic code/test/evidence assurance; the live GitHub hunt is suppressed for pull-request code so an untrusted PR cannot receive a repository token through the hunter.
+`.github/workflows/penta-immune-assurance.yml` schedules the trusted read-only hunt at minute 17 of every hour and also supports `workflow_dispatch`. PR code gets deterministic tests/evidence only; the tokenized live hunt is suppressed on pull-request execution.
 
-The loop may be disabled for maintenance or by kill switch. "Always on" never means "always writing."
+"Always on" never means "always writing." Maintenance, kill switch, governance HOLD, retry caps and exact-head certification remain effective at all times.
 
-## Evidence and certification
+## Production evidence
 
-The dedicated workflow has separate jobs for:
+Initial production evidence:
 
-1. deterministic compile/unit assurance;
-2. PentaEVIBuilder exact-head evidence construction;
-3. independent PentaCertify-style evidence verification on a separate job/runner;
-4. live read-only hunting on trusted non-PR execution.
+- PR: `#533`
+- pre-merge exact head: `1fb79c7130f3a039da82a488bc3e13f6cffde621`
+- pre-merge dedicated run: `33021239591` — SUCCESS
+- evidence receipt SHA-256: `ecf54d83d5be0d906d48bb859a0500e5d1c2633f2910f37a1d2e24701b778e3e`
+- independent certification decision SHA-256: `d62feeaf450bdc04fddc3f5f58ff53ff2dff9c93471beba7f1487b0886b278ea`
+- governed merge gate on pre-merge head: SUCCESS
+- merge/main SHA: `0ad7aff61027be9913f84852a1286fb6a4f1c429`
+- main dedicated run: `33021479616`
+- main deterministic assurance: SUCCESS
+- main independent exact-head certification: SUCCESS
+- main live read-only hunt: SUCCESS
 
-Production evidence must come from observed GitHub results for the exact head. Local test results and historical evidence are useful development input but are not production certification.
+Historical or branch evidence never substitutes for new exact-head evidence after a code change.
 
-## First-hunt behavior
+## First prey and first repair
 
-The first connected hunt found two classes of signal:
+The first controlled repair was issue #121. Current code already contained the bounded evidence-data classifier fix and a fresh governed self-test passed, so PentaImmune treated the ticket as stale-open state rather than manufacturing duplicate code. The issue received an evidence closure record and was closed `completed`. Reopening remains the rollback if its acceptance criteria regress.
 
-- issue #121's evidence-data classifier is already implemented by the current v2 classifier and has a passing self-test, so PentaImmune must not invent a duplicate code patch merely because the issue is still open;
-- a fresh governed-merge failure exposed an unlisted generated provider documentation page and a duplicate stable contract ID during the Phase-3 baseline audit. Those are live repair candidates because they are objective validator failures; the validators themselves must not be weakened to make them disappear.
-
-This distinction is intentional: PentaImmune is expected to compete on correctness, not on the number of changes it can manufacture.
+The live hunter also surfaced failed workflow runs as current prey. A prior governed-merge failure exposed an unlisted generated provider documentation page and duplicate stable contract ID. Those remain repair candidates; the validators are not weakened to make them disappear.
 
 ## Invariants
 
@@ -99,5 +83,5 @@ This distinction is intentional: PentaImmune is expected to compete on correctne
 - Never reuse stale evidence as new evidence.
 - Never promote a different SHA than the SHA tested and evidenced.
 - Never learn a failed repair as a successful recipe.
-- Never bypass required GitHub review, status checks, specialist gates, or human-reserved D3 controls.
+- Never bypass required GitHub status/security/governance gates.
 - Never delete history to make a failure disappear.
