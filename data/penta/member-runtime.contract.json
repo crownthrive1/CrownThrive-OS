@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "contract_id": "crownthrive.penta.member-runtime",
   "status": "implemented",
   "runtime": "runtime/penta_exec.py",
@@ -12,6 +12,7 @@
     "all_registered_members_status_addressable": true,
     "unknown_members_fail_closed": true,
     "member_invocation_requires_static_adapter": true,
+    "execution_eligible_adapter_targets_require_certified_or_production_maturity": true,
     "execute_effect_requires_certified_or_production_maturity": true,
     "interop_envelope_required_before_adapter_handler": true,
     "trace_and_idempotency_preserved": true,
@@ -23,6 +24,15 @@
     "d3_authority_never_automatic": true,
     "member_maturity_never_auto_promoted": true
   },
-  "v1_builtin_adapters": ["penta.fabric:family_snapshot", "penta.beata:heartbeat", "penta.mesh:route_check"],
+  "v1_builtin_adapters": [
+    "penta.fabric:family_snapshot",
+    "penta.beata:heartbeat",
+    "penta.mesh:route_check",
+    "penta.error:normalize",
+    "penta.logger:emit",
+    "penta.trace:new_context",
+    "penta.metric:snapshot"
+  ],
+  "observability_adapter_boundary": "PentaError, PentaLogger, PentaTrace and PentaMetric adapters execute only their existing local stdlib runtime primitives. They emit/return redacted local evidence and never persist externally, call a provider, expose credential material, or create governance authority.",
   "promotion_rule": "Additional member operations become executable only after a bounded handler is implemented, tested, entered into the adapter registry, and any execute/provider path passes existing PentaCertify, CHLOM/DAIL, PentaHybrid, credential, readback, and evidence gates."
 }

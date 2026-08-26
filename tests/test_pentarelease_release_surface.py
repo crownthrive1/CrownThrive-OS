@@ -46,6 +46,14 @@ class ReleaseSurfaceTests(unittest.TestCase):
         self.assertNotIn("\nold\n", new)
         self.assertIn("\nnew\n", new)
 
+    def test_docs_page_injects_h1_when_body_starts_at_h2(self):
+        page = rs.docs_page("Latest Release — v9.9.9", "## PentaRelease Comprehensive Release Record\n\nBody", "desc")
+        self.assertIn("\n# Latest Release — v9.9.9\n\n## PentaRelease Comprehensive Release Record", page)
+
+    def test_docs_page_preserves_existing_h1_without_duplicate(self):
+        page = rs.docs_page("Release FAQ", "# Release FAQ — v9.9.9\n\nBody", "desc")
+        self.assertEqual(page.count("# Release FAQ"), 1)
+
     def test_rejects_more_than_seven_repository_surfaces(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
