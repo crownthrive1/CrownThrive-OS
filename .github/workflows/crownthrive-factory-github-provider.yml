@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
   id-token: write
 
 concurrency:
@@ -19,7 +20,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,7 +34,7 @@ jobs:
           set -euo pipefail
           OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
           curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' -d '{"action":"claim"}' "$BRIDGE" > claim.json
-          jq '{ok,claimed,job:(.job // null),file_count:(.files|length // 0)}' claim.json
+          jq '{ok,claimed,job:(.job // null),file_count:(.files|length // 0),factory}' claim.json
           echo "claimed=$(jq -r '.claimed // false' claim.json)" >> "$GITHUB_OUTPUT"
           echo "job_id=$(jq -r '.job.id // empty' claim.json)" >> "$GITHUB_OUTPUT"
           echo "run_id=$(jq -r '.job.build_run_id // empty' claim.json)" >> "$GITHUB_OUTPUT"
@@ -54,38 +55,71 @@ jobs:
             printf '%s' "$row" | jq -r .content > "$ROOT/$path"
           done
           jq '{contract:"ct.factory.github.readback.v1",product_contract:"ct.pentaframework-factory.v1",canonical_name:"PentaFramework Factory™",job:.job,files:[.files[]|{path,sha256}]}' claim.json > "$ROOT/factory-manifest.json"
-      - name: Commit provider-native production write
+      - name: Govern and promote provider-native production write
         if: steps.claim.outputs.claimed == 'true'
         id: commit
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          RUN='${{ steps.claim.outputs.run_id }}'
+          BRANCH="factory/provider-${RUN}"
           git config user.name 'pentaframework-factory[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "generated/factory/${{ steps.claim.outputs.run_id }}"
+          git add "generated/factory/${RUN}"
+
           if git diff --cached --quiet; then
             git fetch origin main
             SHA=$(git rev-parse origin/main)
+            GATE_RUN=""
           else
-            git commit -m "pentaframework: publish ${{ steps.claim.outputs.run_id }}"
-            PUSHED=false
+            git commit -m "pentaframework: publish ${RUN}"
+            PROMOTED=false
+            GATE_RUN=""
+
             for attempt in 1 2 3; do
+              git fetch origin main
+              if ! git merge-base --is-ancestor origin/main HEAD; then
+                git rebase origin/main
+              fi
+
+              SHA=$(git rev-parse HEAD)
+              git push --force-with-lease origin HEAD:"refs/heads/${BRANCH}"
+
+              gh workflow run governed-merge-gate.yml --ref "$BRANCH"
+              GATE_RUN=""
+              for lookup in $(seq 1 30); do
+                sleep 2
+                GATE_RUN=$(gh run list --workflow governed-merge-gate.yml --branch "$BRANCH" --event workflow_dispatch --limit 20 --json databaseId,headSha | jq -r --arg sha "$SHA" '[.[] | select(.headSha == $sha)][0].databaseId // empty')
+                if [ -n "$GATE_RUN" ]; then break; fi
+              done
+              if [ -z "$GATE_RUN" ]; then
+                echo "governed merge gate run not found for $SHA" >&2
+                exit 1
+              fi
+
+              gh run watch "$GATE_RUN" --exit-status
+
               if git push origin HEAD:main; then
-                PUSHED=true
+                PROMOTED=true
                 break
               fi
-              git fetch origin main
-              git rebase origin/main
             done
-            if [ "$PUSHED" != "true" ]; then
-              echo "provider push failed after 3 attempts" >&2
+
+            if [ "$PROMOTED" != "true" ]; then
+              echo "governed provider promotion failed after 3 attempts" >&2
               exit 1
             fi
+
             SHA=$(git rev-parse HEAD)
+            git push origin --delete "$BRANCH" || true
           fi
+
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "gate_run_id=$GATE_RUN" >> "$GITHUB_OUTPUT"
           echo "url=https://github.com/${GITHUB_REPOSITORY}/commit/$SHA" >> "$GITHUB_OUTPUT"
-      - name: Complete provider job after readback
+      - name: Complete provider job after governed readback
         if: steps.claim.outputs.claimed == 'true'
         shell: bash
         env:
@@ -93,9 +127,21 @@ jobs:
           JOB_ID: ${{ steps.claim.outputs.job_id }}
           COMMIT_SHA: ${{ steps.commit.outputs.sha }}
           COMMIT_URL: ${{ steps.commit.outputs.url }}
+          GOVERNANCE_GATE_RUN: ${{ steps.commit.outputs.gate_run_id }}
         run: |
           set -euo pipefail
           OIDC=$(cat oidc.token)
           COUNT=$(jq '.files|length' claim.json)
-          jq -n --arg job "$JOB_ID" --arg sha "$COMMIT_SHA" --arg url "$COMMIT_URL" --argjson count "$COUNT" '{action:"complete",job_id:$job,commit_sha:$sha,head_sha:$sha,commit_url:$url,branch:"main",file_count:$count,rollback_ref:("git:"+$sha+"^1")}' > complete.json
+          jq -n --arg job "$JOB_ID" --arg sha "$COMMIT_SHA" --arg url "$COMMIT_URL" --arg gate "$GOVERNANCE_GATE_RUN" --argjson count "$COUNT" '{action:"complete",job_id:$job,commit_sha:$sha,head_sha:$sha,commit_url:$url,branch:"main",file_count:$count,governance_gate_run_id:$gate,rollback_ref:("git:"+$sha+"^1")}' > complete.json
           curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @complete.json "$BRIDGE" | jq .
+      - name: Release claimed job on workflow failure
+        if: failure() && steps.claim.outputs.claimed == 'true'
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-factory-github-bridge
+          JOB_ID: ${{ steps.claim.outputs.job_id }}
+        run: |
+          set -euo pipefail
+          OIDC=$(cat oidc.token)
+          jq -n --arg job "$JOB_ID" --arg err "GitHub provider workflow ${GITHUB_RUN_ID} failed before governed implementation readback" '{action:"release",job_id:$job,error:$err}' > release.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @release.json "$BRIDGE" | jq .
