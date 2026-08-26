@@ -1,0 +1,55 @@
+{
+  "schema": "ct.crm.outreach-control-plane.v1",
+  "version": "1.0.0",
+  "environment": "production",
+  "scheduler_topology": "ct.scheduler-topology.production.v1",
+  "binding": "ct.ops.agent.email-attention",
+  "provider_route": "PentaMailer/PentaMail",
+  "cold_outreach": {
+    "enabled": true,
+    "monthly_cap": 20,
+    "research_required": true,
+    "minimum_legitimacy_score": 70,
+    "minimum_fit_score": 60,
+    "claimable_profile_required": true,
+    "physical_postal_address_required": true,
+    "single_cold_attempt_per_contact": true,
+    "offer_ref": "locticians.claimmonth50.v1",
+    "safe_offer_copy": [
+      "50% off eligible recurring membership payments",
+      "verify your eligible plan at checkout"
+    ]
+  },
+  "nurture": {
+    "global_monthly_cap": null,
+    "unlimited": true,
+    "relationship_gated": true,
+    "eligible_relationship_states": [
+      "engaged",
+      "consented",
+      "subscriber",
+      "customer",
+      "partner",
+      "former_customer"
+    ],
+    "minimum_interval_hours": 72
+  },
+  "automatic_stop_conditions": [
+    "opt_out",
+    "wrong_person",
+    "hard_bounce",
+    "complaint",
+    "risk_hold",
+    "conversion"
+  ],
+  "maintenance_policy": "read_only_no_commercial_send",
+  "archive_policy": "provider_message_and_thread_ids_plus_minimal_operational_metadata_only",
+  "internal_schedulers": [
+    "pg_cron:ct-outreach-daily-planner-v1",
+    "pg_cron:ct-outreach-scheduler-tick-v1"
+  ],
+  "external_clock_created": false,
+  "d3_human_reserved": true,
+  "no_self_approval": true,
+  "no_authority_from_clock": true
+}
