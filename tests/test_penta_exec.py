@@ -31,7 +31,8 @@ def test_specified_member_has_real_status_without_fake_execution_promotion() -> 
 
 def test_execution_adapter_registry_is_static_and_fail_closed() -> None:
     registry = load_adapter_registry(ROOT)
-    assert registry["fail_closed"] is True and len(registry["adapters"]) >= 3
+    assert registry["fail_closed"] is True and registry["version"] == "1.1.0"
+    assert len(registry["adapters"]) == 7
     assert all(adapter["provider_effect"] is False for adapter in registry["adapters"])
 
 
@@ -49,6 +50,7 @@ def test_family_execution_contract_validates() -> None:
     registry, snapshot = load_family(ROOT); result = family_validate(ROOT, registry, snapshot)
     assert result["disposition"] == "pass", result
     assert result["details"]["blockers"] == []
+    assert result["details"]["adapter_count"] == 7
 
 
 def test_beata_heartbeat_is_executable_and_evidence_sealed() -> None:
@@ -63,6 +65,42 @@ def test_mesh_route_check_can_inspect_specified_target_without_invoking_it() -> 
     assert result["disposition"] == "completed", result
     route = result["details"]["result"]
     assert route["registered"] is True and route["maturity"] == "specified" and route["execution_eligible"] is False
+
+
+def test_penta_error_normalize_redacts_context() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.error", operation="normalize", evidence_refs=["test:penta-exec:error"], payload={"message": "internal failure", "context": {"api_key": "secret-value", "safe": "ok"}}, risk_class="D0")
+    assert result["disposition"] == "completed", result
+    envelope = result["details"]["result"]
+    assert envelope["schema"] == "ct.penta.error.v1"
+    assert envelope["context"]["api_key"] == "[REDACTED]"
+    assert envelope["context"]["safe"] == "ok"
+    assert "internal" not in envelope
+
+
+def test_penta_logger_emit_is_redacted_and_sealed() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.logger", operation="emit", evidence_refs=["test:penta-exec:logger"], payload={"message": "adapter live", "context": {"token": "do-not-leak", "safe": 1}}, risk_class="D0")
+    assert result["disposition"] == "completed", result
+    emitted = result["details"]["result"]
+    assert emitted["record"]["schema"] == "ct.penta.log.v1"
+    assert emitted["record"]["context"]["token"] == "[REDACTED]"
+    assert len(emitted["line_sha256"]) == 64
+
+
+def test_penta_trace_creates_bounded_context() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.trace", operation="new_context", evidence_refs=["test:penta-exec:trace"], payload={"parent_span_id": "parent-1"}, risk_class="D0")
+    assert result["disposition"] == "completed", result
+    trace = result["details"]["result"]
+    assert len(trace["trace_id"]) == 32 and len(trace["span_id"]) == 16
+    assert trace["parent_span_id"] == "parent-1"
+
+
+def test_penta_metric_builds_local_snapshot() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.metric", operation="snapshot", evidence_refs=["test:penta-exec:metric"], payload={"counters": {"penta.exec.calls": 2}, "gauges": {"penta.exec.ready": 1}, "observations": {"penta.exec.duration": [0.1, 0.3]}}, risk_class="D0")
+    assert result["disposition"] == "completed", result
+    metrics = result["details"]["result"]
+    assert metrics["schema"] == "ct.penta.metrics.v1"
+    assert metrics["counters"]["penta.exec.calls"] == 2.0
+    assert metrics["observations"]["penta.exec.duration"]["count"] == 2
 
 
 def test_unimplemented_mail_send_fails_closed() -> None:
