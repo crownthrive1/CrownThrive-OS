@@ -72,9 +72,9 @@ def main() -> int:
     registry = json.loads(read(VERSIONS))
     if registry.get("institutional_generation") != "phase_3":
         fail("version registry is not on institutional generation phase_3")
-    umbrella = str(registry.get("umbrella_release", ""))
-    if not umbrella.startswith("3."):
-        fail(f"version registry umbrella release must remain on the 3.x line for this gate; got {umbrella!r}")
+    umbrella_release = str(registry.get("umbrella_release", ""))
+    if not umbrella_release.startswith("3."):
+        fail("version registry umbrella release must remain on the 3.x line for this gate")
     rules = registry.get("rules", {})
     for key in (
         "component_versions_are_independent",
@@ -87,12 +87,9 @@ def main() -> int:
         if rules.get(key) is not True:
             fail(f"version registry Phase 3 rule must remain true: {key}")
 
-    # v3.0.0 is the immutable Phase-3 entry manifest. Later 3.x umbrella
-    # releases may advance independently without rewriting that historical
-    # release identity or weakening the Phase-3 institutional boundary.
     release = json.loads(read(RELEASE))
     if release.get("version") != "3.0.0" or release.get("tag") != "v3.0.0":
-        fail("Phase 3 entry release manifest identity drift")
+        fail("Phase 3 release manifest identity drift")
 
     require(CURRENT, "**Institutional generation:** Phase 3 / CrownThrive OS 3.x")
     require(CURRENT, "CrownThrive is operating in **Phase 3**")
@@ -122,7 +119,6 @@ def main() -> int:
         "status": "PASS",
         "institutional_generation": "phase_3",
         "os_release_line": "3.x",
-        "umbrella_release": umbrella,
         "component_certification": "independent",
         "holds_preserved": True,
         "d3_human_reserved": True,

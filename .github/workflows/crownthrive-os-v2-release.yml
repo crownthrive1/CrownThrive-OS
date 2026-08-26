@@ -1,4 +1,4 @@
-name: CrownThrive OS Release Publisher
+name: PentaRelease — CrownThrive OS Release Publisher
 
 on:
   push:
@@ -10,13 +10,13 @@ on:
       request_file:
         description: Release request JSON path
         required: true
-        default: .github/release-requests/crownthrive-os-v2.1.0.json
+        default: .github/release-requests/crownthrive-os-v3.1.1.9.json
 
 permissions:
   contents: write
 
 concurrency:
-  group: crownthrive-os-release-publisher
+  group: pentarelease-crownthrive-os
   cancel-in-progress: false
 
 jobs:
@@ -41,16 +41,25 @@ jobs:
           test -n "$REQUEST"
           test -f "$REQUEST"
           python -m json.tool "$REQUEST" >/dev/null
+
           TAG=$(jq -r '.tag' "$REQUEST")
           TARGET=$(jq -r '.target' "$REQUEST")
           TITLE=$(jq -r '.title' "$REQUEST")
           PACKAGE=$(jq -r '.package' "$REQUEST")
-          for V in TAG TARGET TITLE PACKAGE; do test -n "${!V}" && test "${!V}" != "null"; done
+          DRAFT=$(jq -r '.draft // false' "$REQUEST")
+          PRERELEASE=$(jq -r '.prerelease // false' "$REQUEST")
+
+          for V in TAG TARGET TITLE PACKAGE; do
+            test -n "${!V}" && test "${!V}" != "null"
+          done
+
           echo "REQUEST=$REQUEST" >> "$GITHUB_ENV"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "TARGET=$TARGET" >> "$GITHUB_ENV"
           echo "TITLE=$TITLE" >> "$GITHUB_ENV"
           echo "PACKAGE=$PACKAGE" >> "$GITHUB_ENV"
+          echo "DRAFT=$DRAFT" >> "$GITHUB_ENV"
+          echo "PRERELEASE=$PRERELEASE" >> "$GITHUB_ENV"
 
       - name: Checkout requested release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,7 +67,7 @@ jobs:
           ref: ${{ env.TARGET }}
           fetch-depth: 0
 
-      - name: Validate package
+      - name: Validate PentaRelease package contract
         shell: bash
         run: |
           set -euo pipefail
@@ -68,22 +77,97 @@ jobs:
           test "$(jq -r '.tag' "$PACKAGE/MANIFEST.json")" = "$TAG"
           test "$(jq -r '.target_ref' "$PACKAGE/MANIFEST.json")" = "$TARGET"
 
-      - name: Publish GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TITLE" --notes-file "$PACKAGE/RELEASE_NOTES.md" --target "$TARGET"
-          else
-            gh release create "$TAG" --target "$TARGET" --title "$TITLE" --notes-file "$PACKAGE/RELEASE_NOTES.md"
+          # Fail closed on common secret-bearing files in the release package.
+          if find "$PACKAGE" -type f \( \
+              -name '.env' -o -name '.env.*' -o -name '*.pem' -o \
+              -name '*.p12' -o -name '*.pfx' -o -iname '*private_key*' -o \
+              -iname '*credential*' -o -iname '*secret*' \
+            \) | grep -q .; then
+            echo 'Prohibited secret-like file detected in release package.' >&2
+            exit 1
           fi
 
-      - name: Verify release readback
+      - name: Build governed downloadable artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/pentarelease
+          SAFE_TAG=$(printf '%s' "$TAG" | tr '/' '-')
+          ZIP="dist/pentarelease/CrownThrive-OS-${SAFE_TAG}-package.zip"
+          TGZ="dist/pentarelease/CrownThrive-OS-${SAFE_TAG}-package.tar.gz"
+
+          (cd "$PACKAGE" && zip -qr "$GITHUB_WORKSPACE/$ZIP" .)
+          tar -C "$PACKAGE" -czf "$TGZ" .
+          cp "$PACKAGE/MANIFEST.json" "dist/pentarelease/MANIFEST.json"
+          cp "$PACKAGE/RELEASE_NOTES.md" "dist/pentarelease/RELEASE_NOTES.md"
+          (cd dist/pentarelease && sha256sum * > SHA256SUMS)
+
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+          echo "TGZ=$TGZ" >> "$GITHUB_ENV"
+
+      - name: Publish or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release view "$TAG" --json tagName,name,url,isDraft,isPrerelease,targetCommitish
+
+          FLAGS=()
+          [ "$DRAFT" = "true" ] && FLAGS+=(--draft)
+          [ "$PRERELEASE" = "true" ] && FLAGS+=(--prerelease)
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "$TITLE" \
+              --notes-file "$PACKAGE/RELEASE_NOTES.md" \
+              --target "$TARGET"
+          else
+            gh release create "$TAG" \
+              --target "$TARGET" \
+              --title "$TITLE" \
+              --notes-file "$PACKAGE/RELEASE_NOTES.md" \
+              "${FLAGS[@]}"
+          fi
+
+          gh release upload "$TAG" \
+            "$ZIP" \
+            "$TGZ" \
+            dist/pentarelease/SHA256SUMS \
+            dist/pentarelease/MANIFEST.json \
+            dist/pentarelease/RELEASE_NOTES.md \
+            --clobber
+
+      - name: Verify provider release and downloadable asset readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          READBACK=$(gh release view "$TAG" --json tagName,name,url,isDraft,isPrerelease,targetCommitish,assets)
+          echo "$READBACK" | jq .
+
+          test "$(echo "$READBACK" | jq -r '.tagName')" = "$TAG"
+          test "$(echo "$READBACK" | jq -r '.name')" = "$TITLE"
+          test "$(echo "$READBACK" | jq -r '.targetCommitish')" = "$TARGET"
+
+          for EXPECTED in \
+            "$(basename "$ZIP")" \
+            "$(basename "$TGZ")" \
+            SHA256SUMS MANIFEST.json RELEASE_NOTES.md; do
+            echo "$READBACK" | jq -e --arg n "$EXPECTED" '.assets[] | select(.name == $n)' >/dev/null
+          done
+
+      - name: Write PentaRelease evidence summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## PentaRelease provider proof
+          - Tag: $TAG
+          - Target: $TARGET
+          - Package: $PACKAGE
+          - ZIP: $(basename "$ZIP")
+          - TAR.GZ: $(basename "$TGZ")
+          - Checksums: SHA256SUMS
+          - Provider readback: verified
+          EOF
