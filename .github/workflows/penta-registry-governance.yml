@@ -5,7 +5,9 @@ on:
     paths:
       - 'data/penta/**'
       - 'tools/penta_registry.py'
+      - 'scripts/pentamation_runtime.py'
       - 'docs/phase3/PENTA_*.md'
+      - 'docs/phase3/PENTA*.md'
       - '.github/workflows/penta-registry-governance.yml'
   push:
     branches:
@@ -13,7 +15,9 @@ on:
     paths:
       - 'data/penta/**'
       - 'tools/penta_registry.py'
+      - 'scripts/pentamation_runtime.py'
       - 'docs/phase3/PENTA_*.md'
+      - 'docs/phase3/PENTA*.md'
       - '.github/workflows/penta-registry-governance.yml'
   workflow_dispatch:
 
@@ -38,6 +42,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Compile PENTA software
+        run: |
+          python -m py_compile tools/penta_registry.py
+          python -m py_compile scripts/pentamation_runtime.py
+
       - name: Validate registry
         run: python tools/penta_registry.py --json
 
@@ -50,3 +59,6 @@ jobs:
           python tools/penta_registry.py --system PentaSignal --closure --json
           python tools/penta_registry.py --system PentaAssure --closure --json
           python tools/penta_registry.py --system PentaFederation --closure --json
+
+      - name: Validate PentaMation runtime
+        run: python scripts/pentamation_runtime.py --self-test
