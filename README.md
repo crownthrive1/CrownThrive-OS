@@ -61,6 +61,14 @@ CIE governs cultural meaning, narrative continuity, representation, imprint iden
 
 CrownThrive's Phase 3 direction is factory-based rather than chat-dependent: governed software, framework, documentation, commerce, integration, and evidence lanes generate candidates, validate them, bind them to institutional identity, route them through authority gates, deploy only where certified, and preserve receipts. Reserved decisions remain human-controlled.
 
+### PentaFramework Factory™
+
+CrownThrive defines **PentaFramework Factory** as a dedicated Phase 3 build/certification factory for frameworks, products, platforms, engines, universities, services, and similar institutional assets. It is complementary to `ct.system.framework-factory.v2` rather than a replacement: Framework Factory remains the generic framework compiler, while PentaFramework Factory adds an eight-stage institutionalization and certification path with deterministic preview candidate IDs and machine-readable parent evidence.
+
+Control plane: [`docs/framework-factory/pentaframework-factory.v1.md`](docs/framework-factory/pentaframework-factory.v1.md).
+
+Its production/certification behavior follows the same Phase 3 rule: factory or candidate existence does not by itself promote manufactured outputs into public, commercial, provider-write, or D3 authority.
+
 ## Current-state discipline
 
 Every OS claim must distinguish among:
