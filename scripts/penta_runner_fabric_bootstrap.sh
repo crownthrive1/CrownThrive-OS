@@ -96,13 +96,19 @@ else
   run_as_runner=()
 fi
 
-# Replace the runner application payload, preserving only GitHub's own service
-# metadata if this node is being reprovisioned. config.sh --replace handles the
-# server-side runner identity safely.
-find "$RUNNER_ROOT" -mindepth 1 -maxdepth 1 \
-  ! -name '.runner' ! -name '.credentials' ! -name '.credentials_rsaparams' \
-  ! -name '.service' ! -name '_diag' ! -name '_work' \
-  -exec rm -rf {} +
+# Reprovision deterministically. Stop/uninstall an existing local service first,
+# then remove local runner identity and payload. --replace below reconciles any
+# same-name server-side registration without retaining stale local credentials.
+if [[ -x "$RUNNER_ROOT/svc.sh" && -f "$RUNNER_ROOT/.service" ]]; then
+  if [[ "$(id -u)" -eq 0 ]]; then
+    (cd "$RUNNER_ROOT" && ./svc.sh stop || true)
+    (cd "$RUNNER_ROOT" && ./svc.sh uninstall || true)
+  elif command -v sudo >/dev/null 2>&1; then
+    (cd "$RUNNER_ROOT" && sudo ./svc.sh stop || true)
+    (cd "$RUNNER_ROOT" && sudo ./svc.sh uninstall || true)
+  fi
+fi
+find "$RUNNER_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
 tar -xzf "$archive" -C "$RUNNER_ROOT"
 chown -R "${RUNNER_USER}:${RUNNER_USER}" "$RUNNER_ROOT" 2>/dev/null || true
