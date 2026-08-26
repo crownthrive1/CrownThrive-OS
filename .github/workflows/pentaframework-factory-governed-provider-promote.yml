@@ -17,11 +17,8 @@ concurrency:
 
 jobs:
   release-rejected:
-    if: >-
-      github.event.workflow_run.event == 'workflow_dispatch' &&
-      startsWith(github.event.workflow_run.head_branch, 'factory/provider-job-') &&
-      github.event.workflow_run.head_repository.full_name == github.repository &&
-      github.event.workflow_run.conclusion != 'success'
+    # Emergency fail-closed containment; preserve the workflow as evidence.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -44,11 +41,8 @@ jobs:
           curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @release.json "$BRIDGE" | jq .
 
   promote-approved:
-    if: >-
-      github.event.workflow_run.event == 'workflow_dispatch' &&
-      startsWith(github.event.workflow_run.head_branch, 'factory/provider-job-') &&
-      github.event.workflow_run.head_repository.full_name == github.repository &&
-      github.event.workflow_run.conclusion == 'success'
+    # Emergency fail-closed containment; provider promotion is disabled.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
