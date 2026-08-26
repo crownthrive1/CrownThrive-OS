@@ -1,12 +1,13 @@
 {
   "schema": "ct.penta.provider-control-plane.v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "institutional_phase": "phase_3",
   "priority": "software",
   "policy": {
     "fail_closed": true,
     "credential_values_in_state": false,
     "credential_values_in_cookies": false,
+    "certification_requires_live_provider_readback": true,
     "write_requires_exact_operation_readback": true,
     "certification_ttl_hours": 24,
     "cookie_role": "signed_non_sensitive_priority_health_pointer_only"
@@ -16,37 +17,48 @@
       "provider_id": "github",
       "provider_class": "vendor",
       "priority": "software",
-      "auth_model": "github_token_or_actions_oidc",
-      "credential_sets": [
-        {"all_of": ["GITHUB_TOKEN"]},
-        {"all_of": ["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"]}
-      ],
+      "auth_model": "github_token",
+      "credential_sets": [{"all_of": ["GITHUB_TOKEN"]}],
+      "certification_probe": {
+        "operation": "repository_read",
+        "method": "GET",
+        "url_template": "https://api.github.com/repos/{GITHUB_REPOSITORY}",
+        "required_env": ["GITHUB_REPOSITORY"],
+        "auth": {"type": "bearer", "env": "GITHUB_TOKEN"},
+        "headers": {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2026-03-10"},
+        "success_http": [200]
+      },
       "adapter": {
         "adapter_id": "ct.adapter.github.v1",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "operations": [
-          {"operation": "repository_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "repository_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
           {"operation": "contents_write", "side_effect": true, "authority_class": "D1", "requires_readback": true},
           {"operation": "branch_write", "side_effect": true, "authority_class": "D1", "requires_readback": true},
           {"operation": "workflow_dispatch", "side_effect": true, "authority_class": "D1", "requires_readback": true}
         ]
       },
-      "evidence_hints": [".github/workflows/crownthrive-factory-github-provider.yml"]
+      "evidence_hints": [".github/workflows/crownthrive-factory-github-provider.yml", "https://docs.github.com/en/rest/repos/repos#get-a-repository"]
     },
     {
       "provider_id": "supabase",
       "provider_class": "vendor",
       "priority": "software",
-      "auth_model": "service_role_or_oidc_bridge",
-      "credential_sets": [
-        {"all_of": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]},
-        {"all_of": ["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"]}
-      ],
+      "auth_model": "service_role",
+      "credential_sets": [{"all_of": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]}],
+      "certification_probe": {
+        "operation": "health_read",
+        "method": "GET",
+        "url_template": "{SUPABASE_URL}/rest/v1/",
+        "required_env": ["SUPABASE_URL"],
+        "auth": {"type": "supabase", "env": "SUPABASE_SERVICE_ROLE_KEY"},
+        "success_http": [200]
+      },
       "adapter": {
         "adapter_id": "ct.adapter.supabase.v1",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "operations": [
-          {"operation": "health_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "health_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
           {"operation": "function_invoke", "side_effect": true, "authority_class": "D1", "requires_readback": true},
           {"operation": "state_write", "side_effect": true, "authority_class": "D1", "requires_readback": true}
         ]
@@ -59,15 +71,23 @@
       "priority": "software",
       "auth_model": "bearer_token",
       "credential_sets": [{"all_of": ["VERCEL_TOKEN"]}],
+      "certification_probe": {
+        "operation": "deployment_read",
+        "method": "GET",
+        "url_template": "https://api.vercel.com/v2/user",
+        "required_env": [],
+        "auth": {"type": "bearer", "env": "VERCEL_TOKEN"},
+        "success_http": [200]
+      },
       "adapter": {
         "adapter_id": "ct.adapter.vercel.v1",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "operations": [
-          {"operation": "deployment_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "deployment_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
           {"operation": "deployment_create", "side_effect": true, "authority_class": "D1", "requires_readback": true}
         ]
       },
-      "evidence_hints": []
+      "evidence_hints": ["https://vercel.com/docs/integrations/create-integration/vercel-api-integrations"]
     },
     {
       "provider_id": "stripe",
@@ -75,16 +95,24 @@
       "priority": "software",
       "auth_model": "secret_key",
       "credential_sets": [{"all_of": ["STRIPE_SECRET_KEY"]}],
+      "certification_probe": {
+        "operation": "balance_read",
+        "method": "GET",
+        "url_template": "https://api.stripe.com/v1/balance",
+        "required_env": [],
+        "auth": {"type": "basic_env_username", "username_env": "STRIPE_SECRET_KEY", "password": ""},
+        "success_http": [200]
+      },
       "adapter": {
         "adapter_id": "ct.adapter.stripe.v1",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "operations": [
-          {"operation": "account_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "balance_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
           {"operation": "product_write", "side_effect": true, "authority_class": "D2", "requires_readback": true},
           {"operation": "price_write", "side_effect": true, "authority_class": "D2", "requires_readback": true}
         ]
       },
-      "evidence_hints": ["developers/certification/stripe-crown-credits-chlom-thriveevergreen-production-2026-08-23.mdx"]
+      "evidence_hints": ["developers/certification/stripe-crown-credits-chlom-thriveevergreen-production-2026-08-23.mdx", "https://docs.stripe.com/api/balance/balance_retrieve"]
     },
     {
       "provider_id": "resend",
@@ -92,15 +120,23 @@
       "priority": "software",
       "auth_model": "api_key",
       "credential_sets": [{"all_of": ["RESEND_API_KEY"]}],
+      "certification_probe": {
+        "operation": "domain_read",
+        "method": "GET",
+        "url_template": "https://api.resend.com/domains",
+        "required_env": [],
+        "auth": {"type": "bearer", "env": "RESEND_API_KEY"},
+        "success_http": [200]
+      },
       "adapter": {
         "adapter_id": "ct.adapter.resend.v1",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "operations": [
-          {"operation": "domain_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "domain_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
           {"operation": "email_send", "side_effect": true, "authority_class": "D1", "requires_readback": true}
         ]
       },
-      "evidence_hints": []
+      "evidence_hints": ["https://resend.com/docs/api-reference/domains/list-domains"]
     },
     {
       "provider_id": "mailgun",
@@ -108,15 +144,23 @@
       "priority": "software",
       "auth_model": "api_key",
       "credential_sets": [{"all_of": ["MAILGUN_API_KEY", "MAILGUN_DOMAIN"]}],
+      "certification_probe": {
+        "operation": "domain_read",
+        "method": "GET",
+        "url_template": "https://api.mailgun.net/v4/domains",
+        "required_env": [],
+        "auth": {"type": "basic_literal_username", "username": "api", "password_env": "MAILGUN_API_KEY"},
+        "success_http": [200]
+      },
       "adapter": {
         "adapter_id": "ct.adapter.mailgun.v1",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "operations": [
-          {"operation": "domain_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "domain_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
           {"operation": "email_send", "side_effect": true, "authority_class": "D1", "requires_readback": true}
         ]
       },
-      "evidence_hints": []
+      "evidence_hints": ["https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/domains"]
     },
     {
       "provider_id": "slack",
@@ -124,15 +168,26 @@
       "priority": "software",
       "auth_model": "bot_token",
       "credential_sets": [{"all_of": ["SLACK_BOT_TOKEN"]}],
+      "certification_probe": {
+        "operation": "auth_read",
+        "method": "POST",
+        "url_template": "https://slack.com/api/auth.test",
+        "required_env": [],
+        "auth": {"type": "bearer", "env": "SLACK_BOT_TOKEN"},
+        "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+        "body": "",
+        "success_http": [200],
+        "json_field_equals": {"ok": true}
+      },
       "adapter": {
         "adapter_id": "ct.adapter.slack.v1",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "operations": [
-          {"operation": "auth_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "auth_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
           {"operation": "message_write", "side_effect": true, "authority_class": "D1", "requires_readback": true}
         ]
       },
-      "evidence_hints": []
+      "evidence_hints": ["https://docs.slack.dev/reference/methods/auth.test/"]
     },
     {
       "provider_id": "elevenlabs",
@@ -140,15 +195,23 @@
       "priority": "software",
       "auth_model": "api_key",
       "credential_sets": [{"all_of": ["ELEVENLABS_API_KEY"]}],
+      "certification_probe": {
+        "operation": "account_read",
+        "method": "GET",
+        "url_template": "https://api.elevenlabs.io/v1/user",
+        "required_env": [],
+        "auth": {"type": "header", "header": "xi-api-key", "env": "ELEVENLABS_API_KEY"},
+        "success_http": [200]
+      },
       "adapter": {
         "adapter_id": "ct.adapter.elevenlabs.v1",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "operations": [
-          {"operation": "account_read", "side_effect": false, "authority_class": "D0", "requires_readback": false},
+          {"operation": "account_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
           {"operation": "generation_create", "side_effect": true, "authority_class": "D1", "requires_readback": true}
         ]
       },
-      "evidence_hints": []
+      "evidence_hints": ["https://elevenlabs.io/docs/api-reference/user/get"]
     }
   ]
 }
