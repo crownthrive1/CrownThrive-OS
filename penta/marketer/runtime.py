@@ -33,19 +33,27 @@ def read_json(path: pathlib.Path) -> dict:
 
 
 def adapter_map(registry: dict) -> dict[str, dict]:
-    return {a["channel"]: a for a in registry.get("adapters", [])}
+    return {adapter["channel"]: adapter for adapter in registry.get("adapters", [])}
 
 
 def queue_id(campaign_id: str, manifest_sha: str) -> str:
     return f"{campaign_id}-{manifest_sha[:12]}"
 
 
-def enqueue(campaign_path: pathlib.Path, state_root: pathlib.Path, adapters_path: pathlib.Path, registry_path: pathlib.Path, policy_path: pathlib.Path) -> pathlib.Path:
+def enqueue(
+    campaign_path: pathlib.Path,
+    state_root: pathlib.Path,
+    adapters_path: pathlib.Path,
+    registry_path: pathlib.Path,
+    policy_path: pathlib.Path,
+    sources_path: pathlib.Path | None = None,
+) -> pathlib.Path:
     campaign = read_json(campaign_path)
     registry = read_json(registry_path)
     policy = read_json(policy_path)
     adapters = read_json(adapters_path)
-    manifest = marketer.compile_manifest(campaign, registry, policy)
+    sources = read_json(sources_path) if sources_path and sources_path.is_file() else None
+    manifest = marketer.compile_manifest(campaign, registry, policy, sources)
     amap = adapter_map(adapters)
     routes, holds = [], []
     for channel in manifest["channels"]:
@@ -65,7 +73,7 @@ def enqueue(campaign_path: pathlib.Path, state_root: pathlib.Path, adapters_path
             holds.append({"channel": channel, "reason": "HOLD_UNBOUND"})
     qid = queue_id(manifest["campaign_id"], manifest["manifest_sha256"])
     item = {
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "queue_id": qid,
         "campaign_id": manifest["campaign_id"],
         "manifest": manifest,
@@ -93,7 +101,7 @@ def dispatch(item_path: pathlib.Path, state_root: pathlib.Path, adapters_path: p
             continue
         if adapter["execution_mode"] == "artifact_only" and not adapter["mutation_authority"]:
             payload = {
-                "schema_version": "1.0.0",
+                "schema_version": "1.1.0",
                 "queue_id": item["queue_id"],
                 "campaign_id": item["campaign_id"],
                 "channel": channel,
@@ -101,24 +109,41 @@ def dispatch(item_path: pathlib.Path, state_root: pathlib.Path, adapters_path: p
                 "message": item["manifest"]["message"],
                 "cta": item["manifest"]["cta"],
                 "terminology": item["manifest"]["terminology"],
+                "semantic_resolution": item["manifest"].get("semantic_resolution"),
                 "publication_state": "ARTIFACT_READY_NOT_PUBLISHED",
                 "provider_write_authority": False,
             }
             payload_path = out_dir / f"{channel}.json"
             evidence.atomic_write_json(payload_path, payload)
-            results.append({"channel": channel, "status": "ARTIFACT_READY", "path": payload_path.as_posix(), "adapter_id": adapter["adapter_id"]})
+            results.append({
+                "channel": channel,
+                "status": "ARTIFACT_READY",
+                "path": payload_path.as_posix(),
+                "adapter_id": adapter["adapter_id"],
+            })
             continue
         if adapter["mutation_authority"] is not True:
-            results.append({"channel": channel, "status": "HOLD", "reason": "PROVIDER_WRITE_NOT_CERTIFIED", "adapter_id": adapter["adapter_id"]})
+            results.append({
+                "channel": channel,
+                "status": "HOLD",
+                "reason": "PROVIDER_WRITE_NOT_CERTIFIED",
+                "adapter_id": adapter["adapter_id"],
+            })
             continue
-        results.append({"channel": channel, "status": "HOLD", "reason": "LIVE_EXECUTOR_NOT_BOUND", "adapter_id": adapter["adapter_id"]})
+        results.append({
+            "channel": channel,
+            "status": "HOLD",
+            "reason": "LIVE_EXECUTOR_NOT_BOUND",
+            "adapter_id": adapter["adapter_id"],
+        })
 
-    overall = "ARTIFACT_DISPATCHED" if results and all(r["status"] == "ARTIFACT_READY" for r in results) else "PARTIAL_HOLD"
+    overall = "ARTIFACT_DISPATCHED" if results and all(result["status"] == "ARTIFACT_READY" for result in results) else "PARTIAL_HOLD"
     summary = {
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "queue_id": item["queue_id"],
         "campaign_id": item["campaign_id"],
         "status": overall,
+        "semantic_resolution": item["manifest"].get("semantic_resolution"),
         "results": results,
     }
     receipt = evidence.receipt(
@@ -131,31 +156,48 @@ def dispatch(item_path: pathlib.Path, state_root: pathlib.Path, adapters_path: p
     )
     evidence.atomic_write_json(out_dir / "summary.json", summary)
     evidence.atomic_write_json(out_dir / "receipt.json", receipt)
-    evidence.atomic_write_json(state_root / "latest.json", {"queue_id": item["queue_id"], "status": overall, "receipt_sha256": receipt["receipt_sha256"]})
+    evidence.atomic_write_json(state_root / "latest.json", {
+        "queue_id": item["queue_id"],
+        "status": overall,
+        "semantic_resolution": item["manifest"].get("semantic_resolution"),
+        "receipt_sha256": receipt["receipt_sha256"],
+    })
     return {"summary": summary, "receipt": receipt}
 
 
-def cycle(campaign_path: pathlib.Path, state_root: pathlib.Path, adapters_path: pathlib.Path, registry_path: pathlib.Path, policy_path: pathlib.Path) -> dict:
-    item = enqueue(campaign_path, state_root, adapters_path, registry_path, policy_path)
+def cycle(
+    campaign_path: pathlib.Path,
+    state_root: pathlib.Path,
+    adapters_path: pathlib.Path,
+    registry_path: pathlib.Path,
+    policy_path: pathlib.Path,
+    sources_path: pathlib.Path | None = None,
+) -> dict:
+    item = enqueue(campaign_path, state_root, adapters_path, registry_path, policy_path, sources_path)
     return dispatch(item, state_root, adapters_path)
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser()
-    p.add_argument("command", choices=["enqueue", "dispatch", "cycle"])
-    p.add_argument("--campaign")
-    p.add_argument("--item")
-    p.add_argument("--state-root", default="var/pentamarketer")
-    p.add_argument("--adapters", default="penta/marketer/adapters.registry.json")
-    p.add_argument("--registry", default="penta/scribe/registry.json")
-    p.add_argument("--policy", default="penta/marketer/policy.json")
-    args = p.parse_args(argv)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=["enqueue", "dispatch", "cycle"])
+    parser.add_argument("--campaign")
+    parser.add_argument("--item")
+    parser.add_argument("--state-root", default="var/pentamarketer")
+    parser.add_argument("--adapters", default="penta/marketer/adapters.registry.json")
+    parser.add_argument("--registry", default="penta/scribe/registry.json")
+    parser.add_argument("--sources", default="penta/scribe/sources.registry.json")
+    parser.add_argument("--policy", default="penta/marketer/policy.json")
+    args = parser.parse_args(argv)
     state_root = pathlib.Path(args.state_root)
+    sources_path = pathlib.Path(args.sources) if args.sources else None
     try:
         if args.command == "enqueue":
             if not args.campaign:
                 raise ValueError("--campaign is required")
-            print(enqueue(pathlib.Path(args.campaign), state_root, pathlib.Path(args.adapters), pathlib.Path(args.registry), pathlib.Path(args.policy)))
+            print(enqueue(
+                pathlib.Path(args.campaign), state_root, pathlib.Path(args.adapters),
+                pathlib.Path(args.registry), pathlib.Path(args.policy), sources_path,
+            ))
             return 0
         if args.command == "dispatch":
             if not args.item:
@@ -164,7 +206,10 @@ def main(argv=None) -> int:
         else:
             if not args.campaign:
                 raise ValueError("--campaign is required")
-            result = cycle(pathlib.Path(args.campaign), state_root, pathlib.Path(args.adapters), pathlib.Path(args.registry), pathlib.Path(args.policy))
+            result = cycle(
+                pathlib.Path(args.campaign), state_root, pathlib.Path(args.adapters),
+                pathlib.Path(args.registry), pathlib.Path(args.policy), sources_path,
+            )
     except (ValueError, FileNotFoundError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
