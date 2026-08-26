@@ -348,6 +348,18 @@ def main() -> int:
     institution = section(data, "institutionalization")
     require_equal(institution, "subagents_spawned", 3, "institutionalization")
     require_equal(institution, "autonomous_publication_agents", 0, "institutionalization")
+    require_equal(
+        institution,
+        "drive_execution_receipt_state",
+        "private_upload_completed",
+        "institutionalization",
+    )
+    require_equal(
+        institution,
+        "private_drive_evidence_receipt_is_product_master",
+        False,
+        "institutionalization",
+    )
     if len(institution.get("subagent_runs", [])) != 3:
         fail("three bounded advisory subagent run records are required")
     for key, expected_path in (
