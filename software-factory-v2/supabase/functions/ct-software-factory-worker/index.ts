@@ -1,63 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-const respond=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json","cache-control":"no-store"}});
-
-async function complete(id:string,status:"passed"|"failed"|"hold"|"skipped",output:Record<string,unknown>){
-  const {data,error}=await db.rpc("ct_factory_complete_work",{p_work_unit_id:id,p_status:status,p_output:output});
-  if(error) throw error; return data;
-}
-
-async function adapter(url:string,payload:unknown){
-  const bearer=Deno.env.get("CT_FACTORY_ADAPTER_BEARER");
-  const r=await fetch(url,{method:"POST",headers:{"content-type":"application/json",...(bearer?{authorization:`Bearer ${bearer}`}:{})},body:JSON.stringify(payload)});
-  const text=await r.text(); if(!r.ok) throw new Error(`adapter ${r.status}: ${text.slice(0,500)}`);
-  try{return JSON.parse(text)}catch{return text}
-}
-
-Deno.serve(async(req)=>{
-  if(req.method!=="POST") return respond({error:"POST required"},405);
-  const {data,error}=await db.rpc("ct_factory_claim_work",{p_worker:"ct-software-factory-worker",p_lease_seconds:600});
-  if(error) return respond({error:error.message},500);
-  const work=data?.[0]; if(!work) return respond({ok:true,claimed:false});
-  const base={work_unit_id:work.work_unit_id,build_run_id:work.build_run_id,project_id:work.project_id,build_request_id:work.build_request_id,objective:work.objective,requirements:work.requirements,lane:work.lane};
-  try{
-    if(work.lane==="discover"){
-      const [{data:project},{data:targets}]=await Promise.all([
-        db.from("ct_factory_projects").select("project_key,name,repo_full_name,asset_scope,build_contract,deployment_contract,production_enabled").eq("id",work.project_id).single(),
-        db.from("ct_factory_deployment_targets").select("target_key,target_type,endpoint,production,enabled").eq("project_id",work.project_id)
-      ]);
-      return respond({ok:true,result:await complete(work.work_unit_id,"passed",{project,targets:targets??[],discovered_at:new Date().toISOString()})});
-    }
-    if(work.lane==="architect") return respond({ok:true,result:await complete(work.work_unit_id,"passed",{architecture:"contract-first modular package",invariant:"one production package per successful build run",required_evidence:["source","tests","security","rights_authority","deployment","rollback","sha256"]})});
-    if(work.lane==="generate"){
-      const url=Deno.env.get("CT_FACTORY_GENERATOR_URL");
-      if(!url) return respond({ok:true,result:await complete(work.work_unit_id,"hold",{code:"GENERATOR_NOT_BOUND",required_env:"CT_FACTORY_GENERATOR_URL"})});
-      return respond({ok:true,result:await complete(work.work_unit_id,"passed",{generated:await adapter(url,base)})});
-    }
-    if(work.lane==="security") return respond({ok:true,result:await complete(work.work_unit_id,"passed",{baseline:["fail_closed","no_secrets_in_artifacts","rls_required","least_privilege","rollback_required"]})});
-    if(work.lane==="test"){
-      const url=Deno.env.get("CT_FACTORY_TEST_URL");
-      if(!url) return respond({ok:true,result:await complete(work.work_unit_id,"hold",{code:"TEST_RUNNER_NOT_BOUND",required_env:"CT_FACTORY_TEST_URL"})});
-      return respond({ok:true,result:await complete(work.work_unit_id,"passed",{tested:await adapter(url,base)})});
-    }
-    if(work.lane==="package") return respond({ok:true,result:await complete(work.work_unit_id,"passed",{package_contract:"ct.factory.v2",production_limit:1})});
-    if(work.lane==="deploy"){
-      const {data:project}=await db.from("ct_factory_projects").select("production_enabled").eq("id",work.project_id).single();
-      if(!project?.production_enabled) return respond({ok:true,result:await complete(work.work_unit_id,"hold",{code:"PRODUCTION_NOT_ENABLED"})});
-      const url=Deno.env.get("CT_FACTORY_DEPLOYER_URL");
-      if(!url) return respond({ok:true,result:await complete(work.work_unit_id,"hold",{code:"DEPLOYER_NOT_BOUND",required_env:"CT_FACTORY_DEPLOYER_URL"})});
-      return respond({ok:true,result:await complete(work.work_unit_id,"passed",{deployed:await adapter(url,base)})});
-    }
-    if(work.lane==="assurance"){
-      const {data:units}=await db.from("ct_factory_work_units").select("lane,status,output").eq("build_run_id",work.build_run_id).order("ordinal");
-      const blocked=(units??[]).filter((u)=>["failed","hold"].includes(u.status));
-      return respond({ok:true,result:await complete(work.work_unit_id,blocked.length?"hold":"passed",{lanes:units,blocked})});
-    }
-    return respond({ok:false,result:await complete(work.work_unit_id,"failed",{code:"UNKNOWN_LANE",lane:work.lane})},500);
-  }catch(e){
-    const message=e instanceof Error?e.message:String(e); try{await complete(work.work_unit_id,"failed",{code:"WORKER_EXCEPTION",message})}catch{}
-    return respond({ok:false,error:message,work:base},500);
-  }
-});
+const supabaseUrl=Deno.env.get("SUPABASE_URL")!,serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;const db=createClient(supabaseUrl,serviceKey,{auth:{persistSession:false}});const j=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:{"content-type":"application/json","cache-control":"no-store"}});
+async function auth(req:Request){const bearer=(req.headers.get("authorization")??"").replace(/^Bearer\s+/i,"");if(bearer&&bearer===serviceKey)return true;const {data,error}=await db.rpc("ct_factory_authorize_worker",{p_token:req.headers.get("x-ct-factory-token")});return !error&&data===true}
+async function complete(id:string,status:"passed"|"failed"|"hold"|"skipped",output:Record<string,unknown>){const {data,error}=await db.rpc("ct_factory_complete_work",{p_work_unit_id:id,p_status:status,p_output:output});if(error)throw error;return data}
+async function adapter(slug:string,payload:unknown){const r=await fetch(`${supabaseUrl}/functions/v1/${slug}`,{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${serviceKey}`},body:JSON.stringify(payload)});const text=await r.text();let body:any=text;try{body=JSON.parse(text)}catch{}if(!r.ok)throw new Error(`${slug} ${r.status}: ${text.slice(0,500)}`);return body}
+async function one(){const {data,error}=await db.rpc("ct_factory_claim_work",{p_worker:"ct-software-factory-worker-v6",p_lease_seconds:600});if(error)throw error;const w=data?.[0];if(!w)return {claimed:false};const base={work_unit_id:w.work_unit_id,build_run_id:w.build_run_id,project_id:w.project_id,build_request_id:w.build_request_id,objective:w.objective,requirements:w.requirements,lane:w.lane};try{let out:any;if(w.lane==="discover"){const [{data:project},{data:targets}]=await Promise.all([db.from("ct_factory_projects").select("project_key,name,repo_full_name,asset_scope,build_contract,deployment_contract,production_enabled").eq("id",w.project_id).single(),db.from("ct_factory_deployment_targets").select("target_key,target_type,endpoint,production,enabled").eq("project_id",w.project_id)]);out={project,targets:targets??[],discovered_at:new Date().toISOString()};}
+else if(w.lane==="architect")out={architecture:"contract-first modular package",invariant:"one production package per successful build run",required_evidence:["source","tests","security","rights_authority","deployment","rollback","sha256"],adapter_chain:["ct-factory-generator","ct-factory-test-runner","ct-factory-deployer"]};
+else if(w.lane==="generate")out={generated:await adapter("ct-factory-generator",base)};
+else if(w.lane==="security")out={baseline:["fail_closed","no_secrets_in_artifacts","rls_required","least_privilege","rollback_required","test_before_deploy"],rights_owner:"CrownThrive, LLC"};
+else if(w.lane==="test")out={tested:await adapter("ct-factory-test-runner",base)};
+else if(w.lane==="package"){const [{data:arts},{data:run}]=await Promise.all([db.from("ct_factory_artifacts").select("artifact_type,asset_key,uri,sha256,metadata").eq("build_run_id",w.build_run_id),db.from("ct_factory_build_runs").select("run_no").eq("id",w.build_run_id).single()]);const pkg={contract:"ct.factory.v2",build_run_id:w.build_run_id,artifacts:arts??[],rights:{owner:"CrownThrive, LLC",notice:"CrownThrive™ Autonomous Software Factory; ThriveBase™; CHLOM™",registration_claim:false},created_at:new Date().toISOString()};const enc=new TextEncoder().encode(JSON.stringify(pkg));const d=await crypto.subtle.digest("SHA-256",enc);const digest=[...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,"0")).join("");const releaseVersion=`2.0.${run?.run_no??1}`;const {data:rp,error:pe}=await db.from("ct_factory_release_packages").upsert({build_run_id:w.build_run_id,release_version:releaseVersion,channel:"production",status:"candidate",manifest:pkg,sha256:digest,package_uri:`thrivebase://factory/${w.build_run_id}/release/${releaseVersion}`},{onConflict:"build_run_id,release_version,channel"}).select("id").single();if(pe)throw pe;out={release_package_id:rp.id,release_version:releaseVersion,channel:"production",status:"candidate",sha256:digest,production_limit:1};}
+else if(w.lane==="deploy"){const {data:project}=await db.from("ct_factory_projects").select("production_enabled").eq("id",w.project_id).single();if(!project?.production_enabled)return {claimed:true,lane:w.lane,result:await complete(w.work_unit_id,"hold",{code:"PRODUCTION_NOT_ENABLED"})};out={deployed:await adapter("ct-factory-deployer",base)};}
+else if(w.lane==="assurance"){const [{data:units},{data:deploys}]=await Promise.all([db.from("ct_factory_work_units").select("lane,status,output").eq("build_run_id",w.build_run_id).order("ordinal"),db.from("ct_factory_deployments").select("state,evidence").eq("build_run_id",w.build_run_id)]);const blocked=(units??[]).filter(u=>["failed","hold"].includes(u.status));const ok=!blocked.length&&(deploys??[]).length>0&&(deploys??[]).every(d=>d.state==="implemented");await db.from("ct_factory_release_packages").update({status:ok?"implemented":"hold",implemented_at:ok?new Date().toISOString():null}).eq("build_run_id",w.build_run_id);return {claimed:true,lane:w.lane,result:await complete(w.work_unit_id,ok?"passed":"hold",{lanes:units,deployments:deploys,blocked})};}
+else return {claimed:true,lane:w.lane,result:await complete(w.work_unit_id,"failed",{code:"UNKNOWN_LANE",lane:w.lane})};return {claimed:true,lane:w.lane,result:await complete(w.work_unit_id,"passed",out)};}catch(e){const message=e instanceof Error?e.message:String(e);try{await complete(w.work_unit_id,"failed",{code:"WORKER_EXCEPTION",message})}catch{}return {claimed:true,lane:w.lane,error:message}}}
+Deno.serve(async req=>{if(req.method!=="POST")return j({error:"POST required"},405);if(!(await auth(req)))return j({error:"unauthorized"},401);let limit=8;try{const b=await req.json();limit=Math.max(1,Math.min(Number(b?.limit??8),16))}catch{}const results=[];for(let i=0;i<limit;i++){const r=await one();results.push(r);if(!r.claimed||r.error)break}return j({ok:!results.some((r:any)=>r.error),worker:"ct-software-factory-worker-v6",drained:results.filter((r:any)=>r.claimed).length,results})});
