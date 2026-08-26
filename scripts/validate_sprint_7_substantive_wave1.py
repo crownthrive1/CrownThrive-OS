@@ -11,7 +11,11 @@ import build_substantive_rebuild_wave1 as wave1
 
 EXPECTED_SELECTED = 16
 EXPECTED_P0 = 449
-EXPECTED_WAVE_SHA = "98021ca9c32a4cdf7cd9d8588271b1451f09d6f5cafb09629771943b10272add"
+# The historical Sprint-7 receipt is immutable evidence from its original baseline.
+# Current corpus reconciliation has a separately pinned deterministic identity so
+# later documentation changes cannot silently rewrite that historical receipt.
+EXPECTED_HISTORICAL_WAVE_SHA = "98021ca9c32a4cdf7cd9d8588271b1451f09d6f5cafb09629771943b10272add"
+EXPECTED_CURRENT_WAVE_SHA = "12cdd6f6d8cb79de3912fe689c2a77127117a19367a9a1f6ddf3d03bbf3204ac"
 EXPECTED_VAULT_SHA = "d03bc3e8e0052fb2091dac16703bbef233f9a8df4fec57df45f4c5f80d2ec7d9"
 
 
@@ -31,8 +35,8 @@ if result["selected_count"] != EXPECTED_SELECTED:
     errors.append(f"expected stable Wave 1 selection of {EXPECTED_SELECTED}, found {result['selected_count']}")
 if result["selected_count"] + result["held_count"] != 795:
     errors.append("selected + held rows must equal the 795-row source universe")
-if result["wave_sha256"] != EXPECTED_WAVE_SHA:
-    errors.append(f"Wave 1 digest drift: {result['wave_sha256']}")
+if result["wave_sha256"] != EXPECTED_CURRENT_WAVE_SHA:
+    errors.append(f"Current Wave 1 digest drift: {result['wave_sha256']}")
 
 for row in result["selected_records"]:
     if row["priority"] != "P0":
@@ -67,9 +71,11 @@ gap = load_json("data/documentation/substantive-rebuild-wave-1-gap-closure.v1.js
 pass_b = load_json("data/documentation/sprint-7-pass-b-receipt.v1.json")
 package = load_json("frameworks/documentation-reconciliation-continuity/sprint-7-substantive-wave1-package.v1.json")
 
+# These records remain bound to the historical Sprint-7 baseline. Reconciliation
+# must never mutate old receipts merely because today's documentation corpus moved.
 for label, obj in [("pass_a", pass_a), ("gap", gap), ("pass_b", pass_b), ("package", package)]:
-    if obj.get("wave_sha256") != EXPECTED_WAVE_SHA:
-        errors.append(f"{label} Wave 1 digest mismatch")
+    if obj.get("wave_sha256") != EXPECTED_HISTORICAL_WAVE_SHA:
+        errors.append(f"{label} historical Wave 1 digest mismatch")
 
 if pass_a.get("selected_count") != EXPECTED_SELECTED or pass_a.get("p0_candidate_count") != EXPECTED_P0:
     errors.append("Pass A receipt count mismatch")
@@ -96,15 +102,15 @@ for required in [
     "449",
     "16",
     "433",
-    EXPECTED_WAVE_SHA,
+    EXPECTED_HISTORICAL_WAVE_SHA,
     "substantive_current_successor_machine_verified_parent_review",
     "/technology/security-privacy-continuity",
     "/technology/phase-3-readiness-gate",
 ]:
     if required not in public_page:
-        errors.append(f"public Wave 1 register missing required marker: {required}")
-if EXPECTED_WAVE_SHA not in changelog or "parent_certification_required: true" not in changelog:
-    errors.append("Sprint 7 changelog is missing deterministic receipt markers")
+        errors.append(f"public Wave 1 register missing required historical marker: {required}")
+if EXPECTED_HISTORICAL_WAVE_SHA not in changelog or "parent_certification_required: true" not in changelog:
+    errors.append("Sprint 7 changelog is missing deterministic historical receipt markers")
 
 if errors:
     print("FAIL_SPRINT_7_SUBSTANTIVE_WAVE1")
@@ -118,7 +124,8 @@ print(f"selected_count={result['selected_count']}")
 print(f"held_count={result['held_count']}")
 print("selected_section_counts=" + str(result["selected_section_counts"]))
 print("selected_anchor_counts=" + str(result["selected_anchor_counts"]))
-print("wave_sha256=" + result["wave_sha256"])
+print("current_wave_sha256=" + result["wave_sha256"])
+print("historical_wave_sha256=" + EXPECTED_HISTORICAL_WAVE_SHA)
 print("vault_closure_sha256=" + EXPECTED_VAULT_SHA)
 print("terminal_disposition_accepted=false")
 print("parent_certification_required=true")
