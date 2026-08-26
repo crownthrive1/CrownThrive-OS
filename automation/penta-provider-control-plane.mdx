@@ -1,0 +1,43 @@
+---
+title: "PentaCredentials, PentaBuild, PentaCertify & PentaNurture"
+description: "Phase 3 software-provider credential, adapter build, certification, maintenance and production-eligibility plane."
+---
+
+# Penta Provider Control Plane
+
+The Phase 3 provider lane is divided into four stable CrownThrive subsystems.
+
+| System | Responsibility | It may not do |
+| --- | --- | --- |
+| **PentaCredentials™** | Resolve server-side credential requirements, secret-store bindings, readiness and credential health. | Expose raw credentials, place secrets in cookies, or treat credential presence as provider authority. |
+| **PentaBuild™** | Build, package, version and maintain adapters, plugins and provider-facing software assets. | Certify its own consequential output or promote a build merely because it compiles. |
+| **PentaCertify™** | Independently certify adapter artifacts and exact provider operations using evidence and readback. | Infer one operation's write authority from another or manufacture missing live evidence. |
+| **PentaNurture™** | Nurse deployed software, detect drift/degradation, keep software work prioritized, and route remediation back to Credentials/Build/Certify. | Hide failures, auto-waive gates, or use cookies as a secret/audit database. |
+
+## Combined gate
+
+```text
+PentaBuild artifact + receipt
+          ↓
+PentaCredentials bound
+          ↓
+PentaCertify contract evidence
+          ↓
+exact live readback for each side-effecting operation
+          ↓
+PentaNurture health current
+          ↓
+PRODUCTION / WRITE ELIGIBILITY
+```
+
+Any missing gate yields `HOLD`.
+
+## Cookie tracking
+
+PentaNurture uses cookies only as signed non-sensitive state pointers for browser/session continuity: provider ID, `priority=software`, health state, correlation ID and expiry. Full audit/nurture events stay server-side and provider credentials never enter cookies.
+
+## Maintenance loop
+
+The repository workflow executes hourly and on relevant source changes. It rebuilds deterministic adapters, resolves configured credential aliases without disclosing values, performs independent structural certification, records nurture health, and emits a provider readiness matrix.
+
+Live provider writes remain operation-specific. If the workflow does not possess the required secret or live readback evidence, the corresponding provider/operation remains `HOLD_UNBOUND` or `HOLD`.
