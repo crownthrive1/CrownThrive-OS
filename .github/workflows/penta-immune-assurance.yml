@@ -1,0 +1,197 @@
+name: PentaImmune Assurance + Hunt
+
+on:
+  pull_request:
+    paths:
+      - "runtime/penta_evi_builder.py"
+      - "runtime/penta_immune.py"
+      - "scripts/penta_immune_hunt.py"
+      - "tests/test_penta_evi_builder.py"
+      - "tests/test_penta_immune.py"
+      - "tests/test_penta_immune_hunt.py"
+      - "data/penta/systems.extensions.penta-immune.json"
+      - "software-factory-v4/PENTA-IMMUNE-SYSTEM.md"
+      - ".github/workflows/penta-immune-assurance.yml"
+  push:
+    branches:
+      - main
+      - "penta/**"
+    paths:
+      - "runtime/penta_evi_builder.py"
+      - "runtime/penta_immune.py"
+      - "scripts/penta_immune_hunt.py"
+      - "tests/test_penta_evi_builder.py"
+      - "tests/test_penta_immune.py"
+      - "tests/test_penta_immune_hunt.py"
+      - "data/penta/systems.extensions.penta-immune.json"
+      - "software-factory-v4/PENTA-IMMUNE-SYSTEM.md"
+      - ".github/workflows/penta-immune-assurance.yml"
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: read
+
+concurrency:
+  group: penta-immune-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  assure:
+    name: PentaImmune deterministic assurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate machine-readable contract
+        run: python -m json.tool data/penta/systems.extensions.penta-immune.json >/dev/null
+
+      - name: Compile PentaImmune software
+        run: |
+          python -m py_compile runtime/penta_evi_builder.py
+          python -m py_compile runtime/penta_immune.py
+          python -m py_compile scripts/penta_immune_hunt.py
+
+      - name: Run evidence, immunity and hunt boundary tests
+        run: |
+          python -m unittest -v \
+            tests/test_penta_evi_builder.py \
+            tests/test_penta_immune.py \
+            tests/test_penta_immune_hunt.py
+
+  build-evidence:
+    name: PentaEVIBuilder exact-head evidence
+    needs: assure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      bundle_b64: ${{ steps.export.outputs.bundle_b64 }}
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Construct evidence bundle for tested head
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          from runtime.penta_evi_builder import TestReceipt, build_bundle
+
+          head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          bundle = build_bundle(
+              work_order_id=f"penta-immune-{head[:12]}",
+              subject="PentaImmune and PentaEVIBuilder governed assurance",
+              source_ref="github-actions:penta-immune-assurance",
+              repo="${{ github.repository }}",
+              head_sha=head,
+              target_state="CONTROLLED_TEST",
+              authority_level="D2",
+              observations=[{"kind": "exact_head_assurance", "result": "PASS"}],
+              claims=[{"claim": "dedicated PentaImmune assurance job passed", "scope": "exact checked-out head"}],
+              evidence_refs=["github-actions:${{ github.run_id }}:assure"],
+              test_receipts=[TestReceipt("penta-immune-boundary-suite", "PASS", "GitHub Actions assure job")],
+              rollback={"method": "git_revert", "target": head},
+              fallback={"method": "hold", "redundancy": "known-good-main"},
+          )
+          Path("penta-immune-evidence.json").write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps({"receipt_sha256": bundle["receipt_sha256"], "head_sha": head}, sort_keys=True))
+          PY
+
+      - name: Export evidence to independent verifier job
+        id: export
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import base64
+          from pathlib import Path
+          raw = Path("penta-immune-evidence.json").read_bytes()
+          print("bundle_b64=" + base64.b64encode(raw).decode("ascii"))
+          PY
+
+  certify:
+    name: Independent PentaCertify exact-head gate
+    needs: build-evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BUNDLE_B64: ${{ needs.build-evidence.outputs.bundle_b64 }}
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify evidence independently against this head
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import subprocess
+          from runtime.penta_evi_builder import certify_bundle
+
+          bundle = json.loads(base64.b64decode(os.environ["BUNDLE_B64"]).decode("utf-8"))
+          current_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          decision = certify_bundle(
+              bundle,
+              verifier="penta.certify.github-actions",
+              current_head_sha=current_head,
+              human_gate=False,
+          )
+          print(json.dumps(decision, indent=2, sort_keys=True))
+          if decision["status"] != "PASS":
+              raise SystemExit("PentaCertify exact-head decision is HOLD")
+          PY
+
+  hunt:
+    name: PentaImmune live read-only hunt
+    needs: certify
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+    steps:
+      - name: Checkout trusted source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Hunt authorized repo-local weakness signals
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/penta_immune_hunt.py --output penta-immune-hunt.json
+
+      - name: Confirm hunter remains read-only
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("penta-immune-hunt.json").read_text(encoding="utf-8"))
+          assert payload["mutation_performed"] is False
+          assert payload["production_promotion_authorized"] is False
+          print(json.dumps({"candidate_count": payload["candidate_count"], "selected": payload["selected"]}, sort_keys=True))
+          PY
