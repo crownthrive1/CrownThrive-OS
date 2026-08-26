@@ -1,5 +1,5 @@
 name: PentaMail Live Certification
-# activation-revision: 2026-08-26.3 — attested provider send/readback with PentaFabric routing.
+# activation-revision: 2026-08-26.4 — GitHub-native workflow_run bridge for connector-originated merges.
 
 on:
   workflow_dispatch:
@@ -22,6 +22,10 @@ on:
       - 'runtime/penta_mail.py'
       - 'runtime/penta_runtime_suite.py'
       - '.github/workflows/penta-mail-live-certification.yml'
+  workflow_run:
+    workflows: ['CodeQL']
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -34,20 +38,29 @@ concurrency:
 
 jobs:
   certify-send-readback:
-    # A tagged trusted main push uses GitHub-hosted bootstrap capacity. Manual
-    # production certification defaults to the isolated PentaFabric/RTC runner.
-    # Never add pull_request to this secret-bearing provider workflow.
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[pentamail-live-certify]')
+    # Connector-originated merges have not reliably emitted repository push
+    # workflows. workflow_run therefore bridges from GitHub's own successful
+    # CodeQL execution. The one-time activation token is still mandatory.
+    # Public pull_request code never enters this secret-bearing provider lane.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[pentamail-live-certify]')) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.run_attempt == 1 &&
+       contains(github.event.workflow_run.head_commit.message, '[pentamail-live-certify]'))
     runs-on: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.runner_mode == 'self-hosted') && '["self-hosted","linux","x64","crownthrive","pentafabric","rtc","trusted","pentamail"]' || '["ubuntu-latest"]') }}
     timeout-minutes: 10
     env:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       PENTAMAIL_FROM: ${{ secrets.PENTAMAIL_FROM }}
       PENTA_NURTURE_COOKIE_SIGNING_KEY: ${{ secrets.PENTA_NURTURE_COOKIE_SIGNING_KEY }}
-      PENTAMAIL_RECIPIENT: ${{ github.event.inputs.recipient || 'jones.usmc.kj@gmail.com' }}
+      PENTAMAIL_RECIPIENT: ${{ inputs.recipient || 'jones.usmc.kj@gmail.com' }}
+      PENTAMAIL_SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ env.PENTAMAIL_SOURCE_SHA }}
           persist-credentials: false
 
       - name: Run PentaMail unit tests
@@ -113,7 +126,7 @@ jobs:
 
           snapshot = prs.build_snapshot(root)
           report = prs.owner_summary(snapshot)
-          report += '\nGitHub commit: ' + os.environ['GITHUB_SHA']
+          report += '\nGitHub commit: ' + os.environ['PENTAMAIL_SOURCE_SHA']
           report += '\nLive certification intent: explicit founder-directed D1 transport validation.'
           report += '\nNo unrelated Penta maturity is promoted by this email.'
 
@@ -137,7 +150,7 @@ jobs:
               authority_class='D1',
               priority='high',
               retention_classification='institutional_status',
-              idempotency_key='pentamail-live-' + os.environ['GITHUB_RUN_ID'],
+              idempotency_key='pentamail-live-' + os.environ['PENTAMAIL_SOURCE_SHA'],
           )
           authorization = pm.AuthorizationContext(
               authorized=True,
@@ -222,7 +235,7 @@ jobs:
               'certification': cert.get('certification'),
               'email_send_eligible': cert.get('email_send_gate', {}).get('eligible', False),
               'repository': os.environ['GITHUB_REPOSITORY'],
-              'commit_sha': os.environ['GITHUB_SHA'],
+              'commit_sha': os.environ['PENTAMAIL_SOURCE_SHA'],
               'run_id': os.environ['GITHUB_RUN_ID'],
               'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
               'event': os.environ['GITHUB_EVENT_NAME'],
