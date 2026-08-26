@@ -6,12 +6,17 @@ from collections import defaultdict
 
 ALLOWED_TERM_STATUS = {"draft", "canonical", "deprecated", "historical"}
 ALLOWED_TM_STATUS = {"unverified", "claimed_public_display", "filed", "registered", "abandoned", "not_applicable"}
+SCANNABLE_SUFFIXES = {".md", ".mdx", ".json", ".yml", ".yaml", ".py", ".txt"}
+PENTA_CANDIDATE_RE = re.compile(r"\b(Penta[A-Z][A-Za-z0-9]+|PENTA)([™®]?)\b")
 
 def load_registry(path: pathlib.Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 def normalize(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+def semantic_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.casefold().replace("™", "").replace("®", ""))
 
 def validate_registry(data: dict) -> list[str]:
     errors = []
@@ -49,6 +54,53 @@ def reconcile(data: dict) -> dict:
             if prev and prev != term["id"]: conflicts.append({"normalized": key, "left": prev, "right": term["id"]})
             alias_map[key] = term["id"]
     return {"registry_id": data.get("registry_id"), "schema_version": data.get("schema_version"), "term_count": len(terms), "canonical_count": sum(t.get("status") == "canonical" for t in terms), "conflicts": conflicts, "result": "PASS" if not conflicts and not validate_registry(data) else "FAIL"}
+
+def known_semantic_keys(data: dict) -> dict[str, str]:
+    known = {}
+    for term in data.get("terms", []):
+        for name in [term.get("canonical", ""), *(term.get("aliases") or [])]:
+            if name: known[semantic_key(name)] = term["id"]
+    return known
+
+def scan_files(roots: list[pathlib.Path]):
+    seen = set()
+    for root in roots:
+        if root.is_file(): candidates = [root]
+        elif root.is_dir(): candidates = root.rglob("*")
+        else: continue
+        for path in candidates:
+            if not path.is_file() or path.suffix.lower() not in SCANNABLE_SUFFIXES: continue
+            if any(part in {".git", "node_modules", ".venv", "venv"} for part in path.parts): continue
+            resolved = path.resolve()
+            if resolved in seen: continue
+            seen.add(resolved); yield path
+
+def discover_candidates(data: dict, roots: list[pathlib.Path]) -> dict:
+    known = known_semantic_keys(data)
+    observed = defaultdict(lambda: {"count": 0, "sources": set(), "symbols": set()})
+    files_scanned = 0
+    for path in scan_files(roots):
+        files_scanned += 1
+        try: text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError): continue
+        for match in PENTA_CANDIDATE_RE.finditer(text):
+            name, symbol = match.group(1), match.group(2)
+            item = observed[name]
+            item["count"] += 1
+            if len(item["sources"]) < 8: item["sources"].add(path.as_posix())
+            if symbol: item["symbols"].add(symbol)
+    candidates, mark_observations, known_observations = [], [], []
+    for name in sorted(observed, key=str.casefold):
+        item = observed[name]
+        record = {"observed": name, "count": item["count"], "sources": sorted(item["sources"]), "symbols": sorted(item["symbols"])}
+        owner = known.get(semantic_key(name))
+        if owner:
+            record["term_id"] = owner; known_observations.append(record)
+        else:
+            record["proposed_id"] = normalize(name); record["status"] = "candidate_only"; candidates.append(record)
+        if item["symbols"]:
+            mark_observations.append({"observed": name, "symbols": sorted(item["symbols"]), "term_id": owner, "note": "Observed symbol use is evidence for review only; it does not establish filing or registration."})
+    return {"schema_version": "1.0.0", "discovery_id": "crownthrive.pentascribe.discovery", "files_scanned": files_scanned, "candidate_count": len(candidates), "candidates": candidates, "known_observations": known_observations, "mark_observations": mark_observations, "authority_note": "Discovery never promotes a term or trademark status. Governance must admit candidates into the canonical registry."}
 
 def render_glossary(terms):
     lines = ["# PentaScribe Canonical Glossary", "", "Generated from `penta/scribe/registry.json`. Do not hand-edit.", ""]
@@ -102,7 +154,7 @@ def compile_registry(data: dict, out_dir: pathlib.Path) -> list[pathlib.Path]:
     return paths
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(); p.add_argument("command", choices=["validate", "reconcile", "compile"]); p.add_argument("--registry", default="penta/scribe/registry.json"); p.add_argument("--out", default="docs/generated/pentascribe"); args = p.parse_args(argv)
+    p = argparse.ArgumentParser(); p.add_argument("command", choices=["validate", "reconcile", "discover", "compile"]); p.add_argument("--registry", default="penta/scribe/registry.json"); p.add_argument("--out", default="docs/generated/pentascribe"); p.add_argument("--scan", nargs="*", default=["README.md", "docs", "data", "penta"]); args = p.parse_args(argv)
     data = load_registry(pathlib.Path(args.registry))
     if args.command == "validate":
         errors = validate_registry(data)
@@ -110,6 +162,13 @@ def main(argv=None) -> int:
         print(f"PASS: {len(data['terms'])} terms"); return 0
     if args.command == "reconcile":
         result = reconcile(data); print(json.dumps(result, indent=2)); return 0 if result["result"] == "PASS" else 1
+    if args.command == "discover":
+        result = discover_candidates(data, [pathlib.Path(item) for item in args.scan])
+        text = json.dumps(result, indent=2) + "\n"
+        if args.out == "-": print(text, end="")
+        else:
+            out = pathlib.Path(args.out); out.parent.mkdir(parents=True, exist_ok=True); out.write_text(text, encoding="utf-8"); print(out)
+        return 0
     try: paths = compile_registry(data, pathlib.Path(args.out))
     except ValueError as exc: print(str(exc), file=sys.stderr); return 1
     print("compiled:", ", ".join(str(p) for p in paths)); return 0
