@@ -1,0 +1,91 @@
+name: CrownThrive Factory GitHub Provider
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: crownthrive-factory-github-provider
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claim factory provider job
+        id: claim
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-factory-github-bridge
+        run: |
+          set -euo pipefail
+          OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' -d '{"action":"claim"}' "$BRIDGE" > claim.json
+          cat claim.json | jq '{ok,claimed,job:(.job // null),file_count:(.files|length // 0)}'
+          echo "claimed=$(jq -r '.claimed // false' claim.json)" >> "$GITHUB_OUTPUT"
+          echo "job_id=$(jq -r '.job.id // empty' claim.json)" >> "$GITHUB_OUTPUT"
+          echo "run_id=$(jq -r '.job.build_run_id // empty' claim.json)" >> "$GITHUB_OUTPUT"
+          printf '%s' "$OIDC" > oidc.token
+          chmod 600 oidc.token
+
+      - name: Materialize generated source bundle
+        if: steps.claim.outputs.claimed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN='${{ steps.claim.outputs.run_id }}'
+          ROOT="generated/factory/${RUN}"
+          mkdir -p "$ROOT"
+          jq -c '.files[]' claim.json | while read -r row; do
+            path=$(printf '%s' "$row" | jq -r .path)
+            case "$path" in
+              /*|*..*) echo "unsafe path: $path" >&2; exit 2;;
+            esac
+            mkdir -p "$ROOT/$(dirname "$path")"
+            printf '%s' "$row" | jq -r .content > "$ROOT/$path"
+          done
+          jq '{contract:"ct.factory.github.readback.v1",job:.job,files:[.files[]|{path,sha256}]}' claim.json > "$ROOT/factory-manifest.json"
+
+      - name: Commit provider-native production write
+        if: steps.claim.outputs.claimed == 'true'
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'crownthrive-factory[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "generated/factory/${{ steps.claim.outputs.run_id }}"
+          if git diff --cached --quiet; then
+            SHA=$(git rev-parse HEAD)
+          else
+            git commit -m "factory: publish ${{ steps.claim.outputs.run_id }}"
+            git push origin HEAD:main
+            SHA=$(git rev-parse HEAD)
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "url=https://github.com/${GITHUB_REPOSITORY}/commit/$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Complete provider job after readback
+        if: steps.claim.outputs.claimed == 'true'
+        shell: bash
+        env:
+          BRIDGE: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-factory-github-bridge
+          JOB_ID: ${{ steps.claim.outputs.job_id }}
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          COMMIT_URL: ${{ steps.commit.outputs.url }}
+        run: |
+          set -euo pipefail
+          OIDC=$(cat oidc.token)
+          COUNT=$(jq '.files|length' claim.json)
+          jq -n --arg job "$JOB_ID" --arg sha "$COMMIT_SHA" --arg url "$COMMIT_URL" --argjson count "$COUNT" '{action:"complete",job_id:$job,commit_sha:$sha,head_sha:$sha,commit_url:$url,branch:"main",file_count:$count,rollback_ref:("git:"+$sha+"^1")}' > complete.json
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @complete.json "$BRIDGE" | jq .
