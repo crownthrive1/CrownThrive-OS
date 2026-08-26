@@ -7,6 +7,7 @@ on:
       - 'runtime/penta-provider-control-plane/**'
       - 'tests/test_penta*.py'
       - 'scripts/run_function_tests.py'
+      - 'scripts/penta-family'
       - 'data/penta/**'
       - 'schemas/penta/**'
       - 'developers/manifests/penta-runtime-suite.v1.json'
@@ -21,6 +22,7 @@ on:
       - 'runtime/penta-provider-control-plane/**'
       - 'tests/test_penta*.py'
       - 'scripts/run_function_tests.py'
+      - 'scripts/penta-family'
       - 'data/penta/**'
       - 'schemas/penta/**'
       - 'developers/manifests/penta-runtime-suite.v1.json'
@@ -57,6 +59,7 @@ jobs:
             runtime/penta_runtime_suite.py \
             runtime/penta_interop.py \
             runtime/penta_family.py \
+            runtime/penta_exec.py \
             runtime/penta_institutional_services.py \
             runtime/penta_institutional_controls.py \
             runtime/penta_compliance_license.py \
@@ -67,6 +70,7 @@ jobs:
             runtime/penta_trace.py \
             runtime/penta_metric.py \
             runtime/penta-provider-control-plane/penta_control_plane.py \
+            scripts/penta-family \
             scripts/run_function_tests.py
 
       - name: Run focused Penta runtime tests
@@ -76,10 +80,33 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_penta_interop.py' -v
           python3 scripts/run_function_tests.py tests/test_penta_compliance_license.py tests/test_penta_self_build.py
           python3 tests/test_penta_family.py
+          python3 tests/test_penta_exec.py
           python3 tests/test_penta_institutional_services.py
           python3 tests/test_penta_institutional_controls.py
           python3 tests/test_penta_institutional_controls_family.py
           python3 -m unittest discover -s tests -p 'test_penta_observability.py' -v
+
+      - name: Validate executable member control plane
+        run: |
+          python3 -m json.tool data/penta/execution-adapters.registry.json >/dev/null
+          python3 -m json.tool data/penta/member-runtime.contract.json >/dev/null
+          python3 -m json.tool schemas/penta/execution-request.schema.json >/dev/null
+          python3 -m json.tool schemas/penta/execution-receipt.schema.json >/dev/null
+          python3 runtime/penta_exec.py --root . validate
+
+      - name: Smoke-test executable Penta family
+        run: |
+          python3 scripts/penta-family status penta.mail
+          python3 scripts/penta-family invoke penta.status penta.beata heartbeat --risk D0 --evidence-ref ci:penta-runtime-suite
+          python3 scripts/penta-family invoke penta.status penta.mesh route_check --risk D0 --evidence-ref ci:penta-runtime-suite --payload-json '{"candidate_target":"penta.mail"}'
+          set +e
+          python3 scripts/penta-family invoke penta.status penta.mail send --risk D1 --evidence-ref ci:penta-runtime-suite
+          code=$?
+          set -e
+          if [ "$code" -ne 3 ]; then
+            echo "Expected unimplemented PentaMail.send to fail closed with exit 3; got $code"
+            exit 1
+          fi
 
       - name: Validate provider contracts
         run: python3 scripts/validate_penta_provider_control_plane.py
@@ -109,7 +136,7 @@ jobs:
 
       - name: Certify interoperability snapshot
         run: |
-          python3 runtime/penta_interop.py             --root .             --certify             --output penta-interoperability-certification.json
+          python3 runtime/penta_interop.py --root . --certify --output penta-interoperability-certification.json
 
       - name: Publish suite summary
         if: always()
@@ -117,7 +144,7 @@ jobs:
           {
             echo '## Penta Runtime Suite'
             echo
-            echo 'Executable runtime, provider-contract, family, observability, and interoperability verification.'
+            echo 'Executable runtime, member-control-plane, provider-contract, family, observability, and interoperability verification.'
             echo
             if [ -f penta-runtime-suite-report.json ]; then
               echo '- Truth snapshot: generated'
