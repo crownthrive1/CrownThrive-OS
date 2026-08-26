@@ -1,131 +1,322 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, datetime as dt, json, os, re, sys, urllib.error, urllib.parse, urllib.request
 
-API='https://api.github.com'
-MARKER='<!-- penta-pr-lifecycle:'
-DISP_LABELS={'MERGE':'penta:merge','RESTACK':'penta:restack','NURTURE':'penta:nurture','CLOSE':'penta:close'}
-ALL_LABELS=list(DISP_LABELS.values())+['penta:deadline-12h']
+import argparse
+import datetime as dt
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+from typing import Any
+
+from penta_github_labels import (
+    DISPOSITION_LABELS,
+    DISPOSITION_STAGE,
+    STAGE_PREFIXES,
+    TERMINAL_PREFIXES,
+    add_labels,
+    ensure_labels,
+    read_labels,
+    reconcile_group,
+    remove_label,
+)
+
+API = "https://api.github.com"
+MARKER = "<!-- penta-pr-lifecycle:"
+
 
 class GH:
-  def __init__(self, repo):
-    self.repo=repo; self.token=os.environ['GITHUB_TOKEN']
-  def req(self, method, path, body=None):
-    data=None if body is None else json.dumps(body).encode()
-    r=urllib.request.Request(API+path,data=data,method=method,headers={'Authorization':'Bearer '+self.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'PentaPR/1.0'})
-    try:
-      with urllib.request.urlopen(r,timeout=30) as x:
-        raw=x.read(); return json.loads(raw or b'null')
-    except urllib.error.HTTPError as e:
-      raw=e.read().decode(errors='replace')
-      raise RuntimeError(f'{method} {path} -> {e.code}: {raw[:300]}')
-  def get(self,p): return self.req('GET',p)
-  def post(self,p,b): return self.req('POST',p,b)
-  def patch(self,p,b): return self.req('PATCH',p,b)
-  def put(self,p,b): return self.req('PUT',p,b)
-  def delete(self,p):
-    try:return self.req('DELETE',p)
-    except RuntimeError as e:
-      if '404' in str(e): return None
-      raise
+    def __init__(self, repo: str) -> None:
+        self.repo = repo
+        self.token = os.environ["GITHUB_TOKEN"]
 
-def iso(t): return t.astimezone(dt.timezone.utc).isoformat().replace('+00:00','Z')
-def parse_iso(s): return dt.datetime.fromisoformat(s.replace('Z','+00:00'))
+    def req(self, method: str, path: str, body: Any | None = None) -> Any:
+        data = None if body is None else json.dumps(body).encode()
+        request = urllib.request.Request(
+            API + path,
+            data=data,
+            method=method,
+            headers={
+                "Authorization": "Bearer " + self.token,
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "PentaPR/2.0",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read()
+                return json.loads(raw or b"null")
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode(errors="replace")
+            raise RuntimeError(f"{method} {path} -> {exc.code}: {raw[:500]}") from exc
 
-def ensure_labels(gh):
-  existing={x['name'] for x in gh.get(f'/repos/{gh.repo}/labels?per_page=100')}
-  palette={'penta:merge':'0e8a16','penta:restack':'fbca04','penta:nurture':'1d76db','penta:close':'b60205','penta:deadline-12h':'5319e7'}
-  for name in ALL_LABELS:
-    if name not in existing:
-      gh.post(f'/repos/{gh.repo}/labels',{'name':name,'color':palette[name],'description':'PENTA PR lifecycle control'})
+    def get(self, path: str) -> Any:
+        return self.req("GET", path)
 
-def checks(gh, sha):
-  runs=gh.get(f'/repos/{gh.repo}/commits/{sha}/check-runs?per_page=100').get('check_runs',[])
-  statuses=gh.get(f'/repos/{gh.repo}/commits/{sha}/status')
-  bad={'failure','cancelled','timed_out','action_required','stale','startup_failure'}
-  pending=any(x.get('status')!='completed' for x in runs) or statuses.get('state')=='pending'
-  failed=any(x.get('conclusion') in bad for x in runs) or statuses.get('state') in {'failure','error'}
-  governed=[x for x in runs if 'governed merge gate' in (x.get('name') or '').lower()]
-  governed_ok=any(x.get('status')=='completed' and x.get('conclusion')=='success' for x in governed)
-  return {'failed':failed,'pending':pending,'governed_ok':governed_ok,'count':len(runs)}
+    def post(self, path: str, body: Any) -> Any:
+        return self.req("POST", path, body)
 
-def lifecycle_comment(gh,n):
-  cs=gh.get(f'/repos/{gh.repo}/issues/{n}/comments?per_page=100')
-  for c in cs:
-    b=c.get('body') or ''
-    if MARKER in b:
-      m=re.search(r'<!-- penta-pr-lifecycle:(\{.*?\}) -->',b,re.S)
-      if m:
-        try:return c,json.loads(m.group(1))
-        except json.JSONDecodeError: pass
-  return None,None
+    def patch(self, path: str, body: Any) -> Any:
+        return self.req("PATCH", path, body)
 
-def save_state(gh,n,state):
-  body=f"{MARKER}{json.dumps(state,separators=(',',':'))} -->\n\nPentaPR lifecycle control. Hard terminal deadline: **{state['deadline_at']}**. Current disposition: **{state['disposition']}**."
-  c,_=lifecycle_comment(gh,n)
-  if c: gh.patch(f"/repos/{gh.repo}/issues/comments/{c['id']}",{'body':body})
-  else: gh.post(f'/repos/{gh.repo}/issues/{n}/comments',{'body':body})
+    def put(self, path: str, body: Any) -> Any:
+        return self.req("PUT", path, body)
 
-def set_labels(gh,n,disp):
-  issue=gh.get(f'/repos/{gh.repo}/issues/{n}')
-  names={x['name'] for x in issue.get('labels',[])}
-  for old in DISP_LABELS.values():
-    if old in names and old!=DISP_LABELS[disp]: gh.delete(f'/repos/{gh.repo}/issues/{n}/labels/{urllib.parse.quote(old,safe="")}')
-  for name in [DISP_LABELS[disp],'penta:deadline-12h']:
-    if name not in names: gh.post(f'/repos/{gh.repo}/issues/{n}/labels',{'labels':[name]})
+    def delete(self, path: str) -> Any:
+        return self.req("DELETE", path)
 
-def classify(gh,pr):
-  p=gh.get(f"/repos/{gh.repo}/pulls/{pr['number']}")
-  text=((p.get('title') or '')+'\n'+(p.get('body') or '')).lower()
-  if 'superseded by' in text or 'represented-zero-delta' in text: return 'CLOSE','superseded_or_represented'
-  if p.get('draft'): return 'NURTURE','draft'
-  if p.get('mergeable') is False or p.get('mergeable_state') in {'dirty','behind'}: return 'RESTACK',p.get('mergeable_state') or 'not_mergeable'
-  c=checks(gh,p['head']['sha'])
-  if c['failed']: return 'NURTURE','checks_failed'
-  if c['pending']: return 'NURTURE','checks_pending'
-  if p.get('mergeable') is True and c['governed_ok']: return 'MERGE','mergeable_governed_green'
-  return 'NURTURE','awaiting_governed_merge_gate'
+    def paginate(self, path: str, *, list_key: str | None = None, max_pages: int = 10) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        separator = "&" if "?" in path else "?"
+        for page in range(1, max_pages + 1):
+            payload = self.get(f"{path}{separator}page={page}")
+            batch = payload.get(list_key, []) if list_key else payload
+            if not isinstance(batch, list):
+                raise RuntimeError(f"pagination_expected_list:{path}")
+            items.extend(batch)
+            if len(batch) < 100:
+                break
+        return items
 
-def pentapr(gh):
-  ensure_labels(gh); now=dt.datetime.now(dt.timezone.utc)
-  prs=gh.get(f'/repos/{gh.repo}/pulls?state=open&per_page=100&sort=created&direction=asc')
-  for pr in prs:
-    _,st=lifecycle_comment(gh,pr['number'])
-    if not st:
-      st={'first_seen_at':iso(now),'deadline_at':iso(now+dt.timedelta(hours=12)),'disposition':'NURTURE','reason':'first_seen','head_sha':pr['head']['sha']}
-    disp,reason=classify(gh,pr); st.update({'disposition':disp,'reason':reason,'head_sha':pr['head']['sha'],'updated_at':iso(now)})
-    set_labels(gh,pr['number'],disp); save_state(gh,pr['number'],st)
-    print(f"PentaPR #{pr['number']} {disp} {reason} deadline={st['deadline_at']}")
 
-def attempt_merge(gh,n):
-  p=gh.get(f'/repos/{gh.repo}/pulls/{n}'); c=checks(gh,p['head']['sha'])
-  if p.get('draft') or p.get('mergeable') is not True or c['failed'] or c['pending'] or not c['governed_ok']:
-    return False,'not_currently_merge_eligible'
-  r=gh.put(f'/repos/{gh.repo}/pulls/{n}/merge',{'merge_method':'squash','sha':p['head']['sha'],'commit_title':f"PentaMerge: {p['title']}"})
-  return bool(r.get('merged')),r.get('message','merge_attempted')
+def iso(value: dt.datetime) -> str:
+    return value.astimezone(dt.timezone.utc).isoformat().replace("+00:00", "Z")
 
-def pentamerge(gh):
-  prs=gh.get(f'/repos/{gh.repo}/pulls?state=open&per_page=100')
-  for pr in prs:
-    labels={x['name'] for x in gh.get(f"/repos/{gh.repo}/issues/{pr['number']}").get('labels',[])}
-    if 'penta:merge' not in labels: continue
-    ok,msg=attempt_merge(gh,pr['number']); print(f'PentaMerge #{pr["number"]} merged={ok} {msg}')
 
-def pentacloser(gh):
-  now=dt.datetime.now(dt.timezone.utc); prs=gh.get(f'/repos/{gh.repo}/pulls?state=open&per_page=100')
-  for pr in prs:
-    _,st=lifecycle_comment(gh,pr['number'])
-    if not st: continue
-    if now < parse_iso(st['deadline_at']): continue
-    merged,msg=attempt_merge(gh,pr['number'])
-    if merged: print(f'PentaCloser #{pr["number"]} terminal=MERGED'); continue
-    gh.post(f"/repos/{gh.repo}/issues/{pr['number']}/comments",{'body':f"PentaCloser terminal disposition at the 12-hour hard limit. This PR did not satisfy current exact-head merge requirements and is being closed, not force-merged. Last PentaPR disposition: `{st.get('disposition')}`. Merge attempt: `{msg}`. History and branch provenance remain preserved."})
-    gh.patch(f"/repos/{gh.repo}/pulls/{pr['number']}",{'state':'closed'})
-    print(f'PentaCloser #{pr["number"]} terminal=CLOSED')
+def parse_iso(value: str) -> dt.datetime:
+    return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
 
-def main():
-  ap=argparse.ArgumentParser(); ap.add_argument('mode',choices=['pr','merge','closer']); ap.add_argument('--repo',default=os.getenv('GITHUB_REPOSITORY')); a=ap.parse_args()
-  if not a.repo: raise SystemExit('repo_required')
-  gh=GH(a.repo)
-  {'pr':pentapr,'merge':pentamerge,'closer':pentacloser}[a.mode](gh)
-if __name__=='__main__': main()
+
+def checks(gh: GH, sha: str) -> dict[str, Any]:
+    runs = gh.get(f"/repos/{gh.repo}/commits/{sha}/check-runs?per_page=100").get("check_runs", [])
+    statuses = gh.get(f"/repos/{gh.repo}/commits/{sha}/status")
+    bad = {"failure", "cancelled", "timed_out", "action_required", "stale", "startup_failure"}
+    pending = any(item.get("status") != "completed" for item in runs) or statuses.get("state") == "pending"
+    failed = any(item.get("conclusion") in bad for item in runs) or statuses.get("state") in {"failure", "error"}
+    governed = [item for item in runs if "governed merge gate" in (item.get("name") or "").lower()]
+    governed_ok = any(item.get("status") == "completed" and item.get("conclusion") == "success" for item in governed)
+    return {"failed": failed, "pending": pending, "governed_ok": governed_ok, "count": len(runs)}
+
+
+def lifecycle_comment(gh: GH, number: int) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    comments = gh.paginate(f"/repos/{gh.repo}/issues/{number}/comments?per_page=100")
+    for comment in comments:
+        body = comment.get("body") or ""
+        if MARKER not in body:
+            continue
+        match = re.search(r"<!-- penta-pr-lifecycle:(\{.*?\}) -->", body, re.S)
+        if match:
+            try:
+                return comment, json.loads(match.group(1))
+            except json.JSONDecodeError:
+                pass
+    return None, None
+
+
+def save_state(gh: GH, number: int, state: dict[str, Any]) -> None:
+    body = (
+        f"{MARKER}{json.dumps(state, separators=(',', ':'))} -->\n\n"
+        f"PentaPR lifecycle control. Hard terminal deadline: **{state['deadline_at']}**. "
+        f"Current disposition: **{state['disposition']}**. "
+        "PentaTagger supplies semantic labels; PentaMerge/PentaCloser retain terminal authority."
+    )
+    comment, _ = lifecycle_comment(gh, number)
+    if comment:
+        gh.patch(f"/repos/{gh.repo}/issues/comments/{comment['id']}", {"body": body})
+    else:
+        gh.post(f"/repos/{gh.repo}/issues/{number}/comments", {"body": body})
+
+
+def set_labels(gh: GH, number: int, disposition: str) -> set[str]:
+    current = read_labels(gh, number)
+    desired_disposition = DISPOSITION_LABELS[disposition]
+    for old in DISPOSITION_LABELS.values():
+        if old in current and old != desired_disposition:
+            remove_label(gh, number, old)
+            current.discard(old)
+
+    current = reconcile_group(
+        gh,
+        number,
+        current,
+        [DISPOSITION_STAGE[disposition]],
+        STAGE_PREFIXES,
+    )
+    additive = {desired_disposition, "penta:deadline-12h", "penta:authority:pr"}
+    missing = additive.difference(current)
+    if missing:
+        add_labels(gh, number, missing)
+        current.update(missing)
+    return current
+
+
+def mark_terminal(gh: GH, number: int, terminal: str, authority: str) -> None:
+    current = read_labels(gh, number)
+    current = reconcile_group(gh, number, current, [], STAGE_PREFIXES)
+    current = reconcile_group(gh, number, current, [terminal], TERMINAL_PREFIXES)
+    if authority not in current:
+        add_labels(gh, number, [authority])
+    readback = read_labels(gh, number)
+    required = {terminal, authority}
+    missing = required.difference(readback)
+    if missing:
+        raise RuntimeError(f"terminal_label_readback_failed:{number}:{','.join(sorted(missing))}")
+
+
+def classify(gh: GH, pr: dict[str, Any]) -> tuple[str, str]:
+    number = pr["number"]
+    pull = gh.get(f"/repos/{gh.repo}/pulls/{number}")
+    labels = read_labels(gh, number)
+    if "penta:hold" in labels:
+        return "NURTURE", "operator_hold"
+    text = ((pull.get("title") or "") + "\n" + (pull.get("body") or "")).lower()
+    if "superseded by" in text or "represented-zero-delta" in text:
+        return "CLOSE", "superseded_or_represented"
+    if pull.get("draft"):
+        return "NURTURE", "draft"
+    if pull.get("mergeable") is False or pull.get("mergeable_state") in {"dirty", "behind"}:
+        return "RESTACK", pull.get("mergeable_state") or "not_mergeable"
+    check_state = checks(gh, pull["head"]["sha"])
+    if check_state["failed"]:
+        return "NURTURE", "checks_failed"
+    if check_state["pending"]:
+        return "NURTURE", "checks_pending"
+    if pull.get("mergeable") is True and check_state["governed_ok"]:
+        return "MERGE", "mergeable_governed_green"
+    return "NURTURE", "awaiting_governed_merge_gate"
+
+
+def open_pull_requests(gh: GH, number: int | None = None) -> list[dict[str, Any]]:
+    if number is not None:
+        pull = gh.get(f"/repos/{gh.repo}/pulls/{number}")
+        return [pull] if pull.get("state") == "open" else []
+    return gh.paginate(f"/repos/{gh.repo}/pulls?state=open&per_page=100&sort=created&direction=asc")
+
+
+def pentapr(gh: GH, number: int | None = None) -> None:
+    now = dt.datetime.now(dt.timezone.utc)
+    pull_requests = open_pull_requests(gh, number)
+    for pr in pull_requests:
+        _, state = lifecycle_comment(gh, pr["number"])
+        if not state:
+            state = {
+                "first_seen_at": iso(now),
+                "deadline_at": iso(now + dt.timedelta(hours=12)),
+                "disposition": "NURTURE",
+                "reason": "first_seen",
+                "head_sha": pr["head"]["sha"],
+            }
+        disposition, reason = classify(gh, pr)
+        state.update(
+            {
+                "disposition": disposition,
+                "reason": reason,
+                "head_sha": pr["head"]["sha"],
+                "updated_at": iso(now),
+            }
+        )
+        set_labels(gh, pr["number"], disposition)
+        save_state(gh, pr["number"], state)
+        print(f"PentaPR #{pr['number']} {disposition} {reason} deadline={state['deadline_at']}")
+
+
+def attempt_merge(gh: GH, number: int) -> tuple[bool, str]:
+    pull = gh.get(f"/repos/{gh.repo}/pulls/{number}")
+    labels = read_labels(gh, number)
+    if "penta:hold" in labels:
+        return False, "operator_hold"
+    check_state = checks(gh, pull["head"]["sha"])
+    if (
+        pull.get("draft")
+        or pull.get("mergeable") is not True
+        or check_state["failed"]
+        or check_state["pending"]
+        or not check_state["governed_ok"]
+    ):
+        return False, "not_currently_merge_eligible"
+    result = gh.put(
+        f"/repos/{gh.repo}/pulls/{number}/merge",
+        {
+            "merge_method": "squash",
+            "sha": pull["head"]["sha"],
+            "commit_title": f"PentaMerge: {pull['title']}",
+        },
+    )
+    merged = bool(result.get("merged"))
+    if merged:
+        mark_terminal(gh, number, "penta:terminal:merged", "penta:authority:merge")
+    return merged, result.get("message", "merge_attempted")
+
+
+def pentamerge(gh: GH, number: int | None = None) -> None:
+    pull_requests = open_pull_requests(gh, number)
+    for pr in pull_requests:
+        labels = read_labels(gh, pr["number"])
+        if "penta:merge" not in labels:
+            continue
+        merged, message = attempt_merge(gh, pr["number"])
+        print(f"PentaMerge #{pr['number']} merged={merged} {message}")
+
+
+def pentacloser(gh: GH, number: int | None = None) -> None:
+    now = dt.datetime.now(dt.timezone.utc)
+    pull_requests = open_pull_requests(gh, number)
+    for pr in pull_requests:
+        labels = read_labels(gh, pr["number"])
+        if "penta:hold" in labels:
+            print(f"PentaCloser #{pr['number']} terminal=HELD")
+            continue
+        _, state = lifecycle_comment(gh, pr["number"])
+        if not state or now < parse_iso(state["deadline_at"]):
+            continue
+
+        merged, message = attempt_merge(gh, pr["number"])
+        if merged:
+            print(f"PentaCloser #{pr['number']} terminal=MERGED")
+            continue
+
+        state.update(
+            {
+                "disposition": "CLOSE",
+                "reason": "hard_deadline_expired",
+                "updated_at": iso(now),
+            }
+        )
+        set_labels(gh, pr["number"], "CLOSE")
+        save_state(gh, pr["number"], state)
+        gh.post(
+            f"/repos/{gh.repo}/issues/{pr['number']}/comments",
+            {
+                "body": (
+                    "PentaCloser terminal disposition at the 12-hour hard limit. "
+                    "This PR did not satisfy current exact-head merge requirements and is being closed, "
+                    "not force-merged. The `penta:close` and `penta:stage:close-candidate` labels were "
+                    f"read back before closure. Merge attempt: `{message}`. "
+                    "History and branch provenance remain preserved."
+                )
+            },
+        )
+        gh.patch(f"/repos/{gh.repo}/pulls/{pr['number']}", {"state": "closed"})
+        mark_terminal(gh, pr["number"], "penta:terminal:closed", "penta:authority:closer")
+        print(f"PentaCloser #{pr['number']} terminal=CLOSED")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mode", choices=["pr", "merge", "closer"])
+    parser.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY"))
+    parser.add_argument("--number", type=int)
+    args = parser.parse_args()
+    if not args.repo:
+        raise SystemExit("repo_required")
+    gh = GH(args.repo)
+    ensure_labels(gh)
+    {"pr": pentapr, "merge": pentamerge, "closer": pentacloser}[args.mode](gh, args.number)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
