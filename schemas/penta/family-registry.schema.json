@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/penta/family-registry.schema.json",
+  "title": "CrownThrive Penta Family Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "canonical_name",
+    "owner",
+    "status",
+    "production_scope",
+    "doctrine",
+    "authority_invariant",
+    "production_contract",
+    "catalogs",
+    "control_planes",
+    "dispatch_policy",
+    "observability"
+  ],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "registry_id": {"const": "crownthrive.penta.family"},
+    "canonical_name": {"const": "Penta Family"},
+    "mark": {"type": "string"},
+    "updated": {"type": "string", "format": "date"},
+    "owner": {"type": "string", "minLength": 1},
+    "status": {"const": "production"},
+    "production_scope": {"const": "institutional_control_plane"},
+    "doctrine": {"const": "Discover -> Govern -> Execute -> Verify -> Preserve"},
+    "authority_invariant": {"type": "string", "minLength": 40},
+    "production_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fail_closed",
+        "member_status_is_independent",
+        "production_family_does_not_promote_members",
+        "unknown_members_block_dispatch",
+        "duplicate_machine_keys_block_dispatch",
+        "missing_required_catalogs_block_dispatch",
+        "execution_requires_member_eligibility",
+        "execution_eligible_maturity",
+        "non_execution_maturity"
+      ],
+      "properties": {
+        "fail_closed": {"const": true},
+        "member_status_is_independent": {"const": true},
+        "production_family_does_not_promote_members": {"const": true},
+        "unknown_members_block_dispatch": {"const": true},
+        "duplicate_machine_keys_block_dispatch": {"const": true},
+        "missing_required_catalogs_block_dispatch": {"const": true},
+        "execution_requires_member_eligibility": {"const": true},
+        "execution_eligible_maturity": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["certified", "production"]}
+        },
+        "non_execution_maturity": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["specified", "implemented", "hold", "retired"]}
+        }
+      }
+    },
+    "catalogs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["catalog_id", "path", "required", "role"],
+        "properties": {
+          "catalog_id": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "pattern": "^data/penta/.+\\.json$"},
+          "required": {"type": "boolean"},
+          "role": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "control_planes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {"type": "string", "minLength": 1}
+      }
+    },
+    "dispatch_policy": {
+      "type": "object",
+      "required": [
+        "resolve_member_by_machine_key",
+        "require_registered_member",
+        "require_member_maturity",
+        "require_authority_trace_for_consequential_actions",
+        "require_certified_provider_binding_when_provider_action",
+        "require_human_gate_when_policy_demands",
+        "require_readback_receipt",
+        "preserve_evidence"
+      ],
+      "properties": {
+        "resolve_member_by_machine_key": {"const": true},
+        "require_registered_member": {"const": true},
+        "require_member_maturity": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["certified", "production"]}
+        },
+        "require_authority_trace_for_consequential_actions": {"const": true},
+        "require_certified_provider_binding_when_provider_action": {"const": true},
+        "require_human_gate_when_policy_demands": {"const": true},
+        "require_readback_receipt": {"const": true},
+        "preserve_evidence": {"const": true}
+      },
+      "additionalProperties": false
+    },
+    "observability": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "boolean"}
+    }
+  }
+}
