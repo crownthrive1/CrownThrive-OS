@@ -1,6 +1,6 @@
 {
   "policy_id": "ct.pentarelease.autonomous.v2",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "enabled": true,
   "mode": "production",
   "decision_interval_minutes": 15,
@@ -32,7 +32,8 @@
     "services/",
     "src/",
     "api/",
-    "mcp/"
+    "mcp/",
+    "penta/runtime/"
   ],
   "integration_paths": [
     ".github/workflows/",
@@ -67,6 +68,34 @@
       "requires_human_authority": false
     }
   },
+  "human_release_authority": {
+    "enabled": true,
+    "directory": ".pentarelease/authority",
+    "accepted_authority_types": ["interactive_explicit_directive"],
+    "accepted_issuer_classes": ["founder_human"],
+    "require_exact_tag": true,
+    "require_exact_target": true,
+    "required_target": "main",
+    "require_one_shot": true,
+    "require_no_scope_widening": true,
+    "required_scope_keys": ["release", "phase_closeout"],
+    "authority_never_grants": [
+      "provider_credentials",
+      "money_movement",
+      "rights_transfer",
+      "security_override",
+      "legal_conclusion",
+      "child_system_production_maturity",
+      "unrelated_d3_authority"
+    ]
+  },
+  "proprietary_assurance": {
+    "enabled": true,
+    "policy_file": "data/penta/proprietary-software-policy.json",
+    "gate_script": "scripts/penta_proprietary_gate.py",
+    "required_before_release_materialization": true,
+    "required_on_materialized_package": true
+  },
   "published_release_reconciliation": {
     "enabled": true,
     "max_releases": 20,
@@ -91,6 +120,7 @@
     "require_manifest": true,
     "require_sha256": true,
     "require_provider_readback": true,
+    "require_proprietary_assurance": true,
     "d3_human_reserved": true,
     "hold_never_promoted_by_version_only": true
   }
