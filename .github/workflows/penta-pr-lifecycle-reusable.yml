@@ -1,0 +1,46 @@
+name: Penta PR Lifecycle Reusable
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: pr, merge, or closer
+        required: true
+        default: pr
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  statuses: read
+
+env:
+  PENTA_MODE: ${{ inputs.mode || github.event.inputs.mode }}
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: penta-pr-lifecycle-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: crownthrive1/CrownThrive-Support
+          ref: main
+          persist-credentials: false
+          path: penta-control
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run PENTA PR lifecycle
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python penta-control/scripts/penta_pr_lifecycle.py "$PENTA_MODE" --repo "$GITHUB_REPOSITORY"
