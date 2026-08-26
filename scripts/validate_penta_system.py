@@ -16,6 +16,11 @@ REQUIRED = {
     "PentaRoute", "PentaFederation", "PentaGeneration", "PentaStudios", "PentaBooks"
 }
 AXES = {"truth", "authority", "execution", "interoperation", "continuity"}
+PENTAROUTE_PRIMITIVES = {
+    "PentaFetch", "PentaGet", "PentaQuery", "PentaSearch", "PentaParse", "PentaCache",
+    "PentaQueue", "PentaRetry", "PentaSync", "PentaResolve", "PentaStream", "PentaEvent",
+    "PentaHook", "PentaAuth", "PentaSign", "PentaAudit", "PentaTest", "PentaDeploy"
+}
 
 
 def main() -> int:
@@ -47,11 +52,17 @@ def main() -> int:
     assert by_name["PentaMarketer"]["axis"] == "execution"
     assert by_name["PentaMarketer"]["contract"] == "ct.penta.marketer.v1"
 
+    route = by_name["PentaRoute"]
+    assert route["contract"] == "ct.penta.route.v3"
+    assert not (PENTAROUTE_PRIMITIVES & set(route.get("aliases", []))), "PentaRoute primitives are distinct identities, not umbrella aliases"
+    assert set(route.get("primitives", [])) == PENTAROUTE_PRIMITIVES, "PentaRoute primitive membership drift"
+
     required_files = [
         ROOT / "penta" / "README.md",
         ROOT / "penta" / "runtime" / "penta_vergence.ts",
         ROOT / "penta" / "runtime" / "evidence.py",
         ROOT / "penta" / "scribe" / "pentascribe.py",
+        ROOT / "penta" / "scribe" / "federation_governance.py",
         ROOT / "penta" / "scribe" / "runtime.py",
         ROOT / "penta" / "marketer" / "pentamarketer.py",
         ROOT / "penta" / "marketer" / "runtime.py",
@@ -83,7 +94,7 @@ def main() -> int:
     assert "close_represented" in reconciler
     assert "preserve_hold" in reconciler
 
-    print(f"PASS PentaOS registry={len(components)} components axes=5 required={len(REQUIRED)}")
+    print(f"PASS PentaOS registry={len(components)} components axes=5 required={len(REQUIRED)} route_primitives={len(PENTAROUTE_PRIMITIVES)}")
     return 0
 
 
