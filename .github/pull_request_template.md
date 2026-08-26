@@ -28,7 +28,15 @@ Describe the exact outcome and why this change is required.
 - `HOLD`/candidate/controlled-test/write-verified/production changes:
 - Release/deployment/readback impact:
 - Historical/archive disposition required: `yes | no`
-- Projection impact: `none | Mintlify | website_later | other`
+- Projection impact: `none | PentaDocs | website_later | other`
+
+### Homepage, propagation, and control-plane state
+
+- Homepage impact: `updated | no_change | delta_opened`
+- Documentation impact: `docs_updated | docs_no_change | docs_delta_opened`
+- [ ] Homepage control-state invariant passes
+
+Phase 3 changes must keep the control-plane projection contract explicit. A source-of-truth correction may proceed independently of a downstream projection availability issue, but any resulting projection delta must remain recorded and reconciled.
 
 ## Changes
 
@@ -44,7 +52,7 @@ Describe the exact outcome and why this change is required.
 - [ ] Phase 3 is not used as blanket production certification
 - [ ] `HOLD` is not converted to `PASS` by prose or version promotion alone
 - [ ] Historical records are preserved and clearly separated from current instruction
-- [ ] Downstream Mintlify/web projections do not override OS state
+- [ ] Downstream PentaDocs/web projections do not override OS state
 - [ ] D3/new sovereign or equivalent reserved authority remains separately governed
 
 ## Rights, IP, culture, and canon
@@ -83,7 +91,7 @@ Describe the exact outcome and why this change is required.
 
 - [ ] Superseded/deprecated/historical material has a recorded disposition and successor where known
 - [ ] Historical bodies were not rewritten to manufacture current truth
-- [ ] Mintlify/docs-site changes are treated as downstream OS projection work
+- [ ] PentaDocs/docs-site changes are treated as downstream OS projection work
 - [ ] Website/storefront/media projection work is deferred unless explicitly in scope
 
 ## Validation
