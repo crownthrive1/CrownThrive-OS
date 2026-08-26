@@ -45,7 +45,7 @@ INTENT_RULES: dict[str, dict[str, Any]] = {
             "Melanin Magic must be governed as a product/brand system",
             "Consumer, professional and wholesale separation",
             "Wholesale access does not transfer trademarks",
-            "brand and product marketplace",
+            "digital/brand/product marketplace",
         ],
     },
     "HC-0110": {
