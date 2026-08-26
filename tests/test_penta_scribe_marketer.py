@@ -21,6 +21,17 @@ class PentaScribeTests(unittest.TestCase):
     def test_registered_symbol_requires_evidence(self):
         bad = json.loads(json.dumps(self.registry)); bad["terms"][0]["trademark"]["symbol"] = "®"
         self.assertTrue(any("® prohibited" in e for e in scribe.validate_registry(bad)))
+    def test_discovery_surfaces_candidates_without_promoting_them(self):
+        with tempfile.TemporaryDirectory() as d:
+            sample = pathlib.Path(d)/"sample.md"
+            sample.write_text("PentaScribe is known. PentaFuture™ is only a candidate. PentaFuture™ appears twice.", encoding="utf-8")
+            result = scribe.discover_candidates(self.registry, [pathlib.Path(d)])
+            self.assertEqual(1, result["candidate_count"])
+            self.assertEqual("PentaFuture", result["candidates"][0]["observed"])
+            self.assertEqual("candidate_only", result["candidates"][0]["status"])
+            self.assertEqual(["™"], result["candidates"][0]["symbols"])
+            self.assertTrue(any(item["observed"] == "PentaFuture" for item in result["mark_observations"]))
+            self.assertFalse(any(term.get("canonical") == "PentaFuture" for term in self.registry["terms"]))
 
 class PentaMarketerTests(unittest.TestCase):
     def setUp(self):
