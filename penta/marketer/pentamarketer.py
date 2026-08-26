@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 SCRIBE_PATH = SCRIPT_DIR.parent / "scribe" / "pentascribe.py"
+FEDERATION_GOVERNANCE_PATH = SCRIPT_DIR.parent / "scribe" / "federation_governance.py"
 
 
 def load_module(name: str, path: pathlib.Path):
@@ -24,6 +25,7 @@ def load_module(name: str, path: pathlib.Path):
 
 
 scribe = load_module("pentascribe_for_marketer", SCRIBE_PATH)
+federation_governance = load_module("pentascribe_federation_governance_for_marketer", FEDERATION_GOVERNANCE_PATH)
 
 
 def read_json(path):
@@ -77,6 +79,14 @@ def validate_campaign(campaign, registry, policy, sources: dict | None = None):
     for key in ("campaign_id", "objective", "audience", "message", "cta", "channels", "terms", "cie_imprint", "chlom_authority_ref"):
         if not campaign.get(key):
             errors.append(f"missing {key}")
+    if sources:
+        try:
+            audit = federation_governance.audit_federation(registry, sources)
+        except (ValueError, FileNotFoundError) as exc:
+            errors.append(f"PentaScribe federation audit unavailable: {exc}")
+            audit = None
+        if audit and audit["result"] != "PASS":
+            errors.append(f"PentaScribe federation authority conflict: {audit['conflict_count']} unresolved semantic collision(s)")
     bad_channels = sorted(set(campaign.get("channels", [])) - set(policy.get("channels", [])))
     if bad_channels:
         errors.append(f"unsupported channels: {', '.join(bad_channels)}")
@@ -97,7 +107,7 @@ def compile_manifest(campaign, registry, policy, sources: dict | None = None):
     if errors:
         raise ValueError("\n".join(errors))
     payload = {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "campaign_id": campaign["campaign_id"],
         "objective": campaign["objective"],
         "audience": campaign["audience"],
@@ -105,7 +115,8 @@ def compile_manifest(campaign, registry, policy, sources: dict | None = None):
         "cta": campaign["cta"],
         "channels": campaign["channels"],
         "terminology": resolved,
-        "semantic_resolution": "pentascribe_federated_v1" if sources else "pentascribe_seed_v1",
+        "semantic_resolution": "pentascribe_federated_governed_v1" if sources else "pentascribe_seed_v1",
+        "semantic_authority_gate": "PASS" if sources else "SEED_ONLY",
         "cie_imprint": campaign["cie_imprint"],
         "chlom_authority_ref": campaign["chlom_authority_ref"],
         "publication_state": "PLAN_ONLY",
