@@ -12,6 +12,8 @@ Penta Family v1.2 expands CrownThrive's institutional control surface beyond aut
 
 The Penta Family umbrella remains a production control plane. Registration of a child system does not promote that child to production. Every child remains independently classified as `specified`, `implemented`, `certified`, `production`, `hold` or `retired`. Only `certified` and `production` members may pass the family execution-eligibility gate, and all consequential work remains subject to CHLOM/DAIL authority, accountable ownership, PentaHybrid human gates where required, certified provider bindings, readback and preserved receipts.
 
+The nine v1.2 institutional-control members are now **implemented** at the source/runtime layer. That promotion is backed by `runtime/penta_institutional_controls.py`, authority-boundary regression tests, family-integration tests and the PENTA Institutional Services + Family CI lane. `implemented` does not mean provider-certified or production-executable: the Penta Family dispatch gate still holds all nine until exact capability evidence promotes each independently to `certified` or `production`.
+
 ## Added institutional controls
 
 ### PentaCompliance
@@ -50,6 +52,24 @@ PentaContracts manages contract lifecycle mechanics: intake, templates, clause m
 
 PentaQuality owns quality plans, acceptance criteria, nonconformances, root-cause analysis, corrective/preventive actions and continuous-improvement evidence. It cannot lower acceptance criteria after a failure, erase a nonconformance or self-certify a consequential release. PentaAssure and PentaAudit preserve independent verification.
 
+## Executable governance runtime
+
+`runtime/penta_institutional_controls.py` provides a dependency-free control-request engine shared by the nine members. It validates exact system identity, action class, requested effect, evidence references, maturity, risk, CHLOM/DAIL authority trace, accountable owner, PentaHybrid gate state, separation-of-duties evidence, provider binding, readback strategy and domain-specific requirements.
+
+The runtime emits four bounded dispositions:
+
+```text
+advisory_ready
+workflow_ready
+governance_required
+execution_ready
+hold_fail_closed
+```
+
+`execution_ready` can only be produced when the request itself carries `certified` or `production` maturity and all action-specific gates are represented. The runtime does not perform the provider side effect; PentaRoute/PentaMation/provider adapters still own the exact authorized execution path.
+
+Hard invariants include: consent cannot be fabricated; identity cannot self-grant privilege; records under hold cannot be destroyed; procurement cannot self-authorize spend; vendor governance cannot self-certify provider adapters; contracts cannot self-sign or replace legal review; compliance cannot invent obligations; and quality criteria cannot be lowered after failure to manufacture a pass.
+
 ## Expanded control planes
 
 v1.2 adds three explicit cross-functional control planes to the existing Penta Family topology:
@@ -64,16 +84,30 @@ These are composition planes, not new sovereign authorities. Each participating 
 
 Every newly registered member inherits the Penta Family portal contract at `/penta/{machine_key_suffix}` with overview, status, responsibilities, inputs/outputs, authority boundary, dependencies, SOP/SLA, runbooks, guides, evidence, API/MCP, changelog and support sections. `portal_state=contracted` or a generated portal payload is not evidence that a public frontend route has been deployed.
 
-The family runtime must resolve every control-plane member to exactly one registered machine key. Unknown, duplicate or ambiguous members fail closed. API/MCP tools for these systems must be read-only until the specific write capability has an authority trace, eligible member maturity, certified provider binding and required human gate.
+The family runtime must resolve every control-plane member to exactly one registered machine key. Unknown, duplicate or ambiguous members fail closed. API/MCP tools for these systems must remain non-consequential/read-only until a specific write capability has an authority trace, eligible member maturity, certified provider binding, required human gate and defined readback.
 
 ## Database continuity
 
-The repository now source-controls the two production migration versions used to establish the original PentaMation/PentaHybrid/PentaAlumni/PentaInstitute/PentaSignal/PentaAssure institutional persistence layer and its explicit authenticated fail-closed policies:
+The repository source-controls the two production migration versions used to establish the original PentaMation/PentaHybrid/PentaAlumni/PentaInstitute/PentaSignal/PentaAssure institutional persistence layer and its explicit authenticated fail-closed policies:
 
 - `20260826062657_penta_institutional_layers_v1.sql`
 - `20260826063331_penta_institutional_sensitive_fail_closed.sql`
 
-These files preserve reproducible migration lineage. They do not imply the nine v1.2 systems have been promoted to provider-bound database execution. Their present registry maturity remains conservative until implementation/certification evidence exists.
+These files preserve reproducible migration lineage. They do not imply the nine v1.2 systems have provider-bound database execution. Their current registry maturity is `implemented`; database/provider promotion remains independently evidence-gated.
+
+## Verification evidence
+
+The v1.2 implementation evidence set is:
+
+- `data/penta/systems.extensions.institutional-controls.json`
+- `runtime/penta_institutional_controls.py`
+- `tests/test_penta_institutional_controls.py`
+- `tests/test_penta_institutional_controls_family.py`
+- `.github/workflows/penta-institutional-services.yml`
+- `automation/penta-family-institutional-controls.mdx`
+- `automation/penta-family-portals.mdx`
+
+CI validates JSON, compiles the governance runtimes, smoke-tests the institutional-controls runtime, composes the family census, renders representative portals, exercises domain-specific authority boundaries and confirms that all nine implemented members remain fail-closed at the family execution gate.
 
 ## Constitutional invariant
 
