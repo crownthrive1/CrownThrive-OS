@@ -2,9 +2,9 @@
 
 **Phase 3 canonical institutional knowledge, governance, developer, licensing, release, and implementation map for CrownThrive, LLC.**
 
-**CrownThrive OS is CrownThrive's authoritative institutional source of truth.** It records the current institutional generation, governance, stable identities, versions, evidence boundaries, component state, release lineage, corrections, archives, and how CrownThrive doctrine, corridors, platforms, intellectual property, CHLOM, Cultural Imprint Engine (CIE), Thrive Flywheel, MM Suites, ThriveBase, ThriveEvergreen, media, commerce, education, support, data, APIs, MCP servers, automation, factories, recovery, and governed provider integrations fit together.
+**CrownThrive OS is CrownThrive's authoritative institutional source of truth.** It records the current institutional generation, governance, stable identities, versions, evidence boundaries, component state, release lineage, corrections, archives, and how CrownThrive doctrine, corridors, platforms, intellectual property, CHLOM, Cultural Imprint Engine (CIE), Thrive Flywheel, MM Suites, ThriveBase, **PentaGreen™** (legacy alias: ThriveEvergreen™), media, commerce, education, support, data, APIs, MCP servers, automation, factories, recovery, and governed provider integrations fit together.
 
-Mintlify, websites, help centers, storefronts, media surfaces, and other public properties are **downstream projections of the OS**. They may be reconciled on a later publication cadence and do not override OS state merely because an older statement remains publicly visible.
+Mintlify/PentaDocs, websites, help centers, storefronts, media surfaces, and other public properties are **downstream projections of the OS**. They may be reconciled on a later publication cadence and do not override OS state merely because an older statement remains publicly visible.
 
 **Institutional generation:** Phase 3 / OS 3.x  
 **Current release target:** v3.0.0  
@@ -18,7 +18,7 @@ Mintlify, websites, help centers, storefronts, media surfaces, and other public 
 1. **CrownThrive OS canonical records** — institutional phase, version registry, adopted governance, current-state records, stable identities, effective policies, releases, corrections, and archive dispositions.
 2. **OS-bound evidence and operational state** — ThriveBase records, CHLOM/DAIL evidence, exact Git/release receipts, certified provider readbacks, and other evidence incorporated by the OS within its scope.
 3. **Component repositories** — CHLOM and CIE packages/contracts/schemas are authoritative for their exact component scope while remaining subordinate to the OS for institution-wide state.
-4. **Mintlify** — public-safe documentation projection generated from OS state.
+4. **PentaDocs** — public-safe documentation projection generated from OS state; Mintlify is the current underlying documentation provider.
 5. **Websites and other public surfaces** — downstream publication, commerce, media, and discovery projections; updated later as their own workstream.
 6. **Archive/history** — preserved prior truth, plans, versions, terminology, and evidence; never current merely because it remains accessible.
 
@@ -49,13 +49,19 @@ CHLOM connects five governed layers:
 2. **Rights & Conditions** — Rights, Rules, Roles, licensing authority, permissions, restrictions, revocation, and remedies.
 3. **Ledger & Assurance** — DAIL evidence, attestations, audits, disputes, corrections, holds, appeals, and certification.
 4. **Execution & Interoperability** — components, frameworks, skills, APIs, MCPs, SDKs, webhooks, agents, factories, verifiers, and mesh routes.
-5. **Economy & Distribution** — ThriveEvergreen/ECAC, SKUs, pricing, entitlements, payments, settlement, royalties, commissions, licensing, distribution, and support.
+5. **Economy & Distribution** — **PentaGreen/ECAC**, PentaCredits, PentaSKU, pricing, entitlements, payments, settlement, royalties, commissions, licensing, distribution, and support.
 
 Detailed lifecycle: [`chlom/architecture/pentafabric-autonomous-lifecycle.v1.md`](chlom/architecture/pentafabric-autonomous-lifecycle.v1.md).
 
 ### Cultural Imprint Engine
 
 CIE governs cultural meaning, narrative continuity, representation, imprint identity, aesthetics, audience/canon constraints, and responsible reuse. CIE and CHLOM interoperate but do not collapse into one authority surface: CIE does not manufacture rights, and CHLOM does not manufacture cultural truth.
+
+### PentaGreen™
+
+**PentaGreen™ is CrownThrive's mandatory Commerce & Economic Activation Authority and CHLOM cross-pallet commerce/economic-execution subprotocol.** Its constitutional rule is: **“PentaGreen may optimize within authority. It may never manufacture authority.”** Economic activation resolves through `ECAC | HOLD | DENY`; provider success is execution evidence, not economic truth, until institutionally reconciled. `ThriveEvergreen™` remains a read-compatible legacy alias for provenance, immutable receipts, prior releases, and runtime migration.
+
+Canonical subsystem map and migration rules: [`PENTAGREEN.md`](PENTAGREEN.md).
 
 ### Autonomous production fabric
 
@@ -82,7 +88,7 @@ Every OS claim must distinguish among:
 - **read back / independently evidenced**;
 - **commercially or legally activated**.
 
-A repository file, workflow definition, model output, vendor dashboard, screenshot, payment link, provider response, generated artifact, Mintlify page, or website sentence is not independently sufficient proof of all downstream states.
+A repository file, workflow definition, model output, vendor dashboard, screenshot, payment link, provider response, generated artifact, PentaDocs page, or website sentence is not independently sufficient proof of all downstream states.
 
 ## Versioning and archive
 
@@ -99,7 +105,7 @@ Version registry: [`docs/versioning/VERSION_REGISTRY.json`](docs/versioning/VERS
 
 ## Licensing, IP, machine use, and brand protection
 
-This repository is public-safe and publicly viewable; it is **not open source by default**. CrownThrive reserves its applicable rights in its documentation, code and configuration where proprietary, compilations, schemas, taxonomies, ontologies, frameworks, methods, brands, media, training/evaluation corpora, prompts, agent systems, interfaces, CIE, CHLOM, Thrive Flywheel, MM Suites, ThriveBase public-safe specifications, ThriveEvergreen materials, and related institutional knowledge.
+This repository is public-safe and publicly viewable; it is **not open source by default**. CrownThrive reserves its applicable rights in its documentation, code and configuration where proprietary, compilations, schemas, taxonomies, ontologies, frameworks, methods, brands, media, training/evaluation corpora, prompts, agent systems, interfaces, CIE, CHLOM, Thrive Flywheel, MM Suites, ThriveBase public-safe specifications, **PentaGreen/PentaCredits/PentaSKU materials (including ThriveEvergreen legacy materials)**, and related institutional knowledge.
 
 Repository visibility does not create a general license to clone, resell, commercialize, train models on, bulk-extract, reconstruct protected methods from, impersonate, certify, or create confusingly similar CrownThrive systems.
 
@@ -128,6 +134,7 @@ Nothing in these repository notices replaces jurisdiction-specific legal review,
 ## Start here
 
 - **Phase 3 Current State** — [`docs/phase3/CURRENT_STATE.md`](docs/phase3/CURRENT_STATE.md)
+- **PentaGreen Commerce Authority** — [`PENTAGREEN.md`](PENTAGREEN.md)
 - **CHLOM** — [`chlom/overview.mdx`](chlom/overview.mdx)
 - **Cultural Imprint Engine** — [`doctrine/cultural-imprint-engine.mdx`](doctrine/cultural-imprint-engine.mdx)
 - **Developer Platform** — [`developers/overview.mdx`](developers/overview.mdx)
@@ -142,7 +149,7 @@ CrownThrive uses a seven-generation planning horizon for institutional continuit
 
 ## Institutional operating rule
 
-> **CrownThrive OS governs institutional truth. Platforms perform the work. Corridors organize the work. CIE protects cultural coherence. CHLOM governs rights and authority. ThriveBase preserves operational state. The institutional record proves what happened. Projections publish what the OS has authorized them to say.**
+> **CrownThrive OS governs institutional truth. Platforms perform the work. Corridors organize the work. CIE protects cultural coherence. CHLOM governs rights and authority. ThriveBase preserves operational state. PentaGreen governs economic activation without manufacturing authority. The institutional record proves what happened. Projections publish what the OS has authorized them to say.**
 
 CrownThrive uses stable IDs, effective-dated versions, source authority, evidence classes, explicit rights, role/relationship access, approval gates, append-only corrections, DAIL events, tested recovery, and audience-specific projections.
 
