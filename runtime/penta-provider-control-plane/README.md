@@ -15,6 +15,10 @@ A provider operation is executable only when the runtime can prove the required 
 
 `HOLD_UNBOUND` and `AUTH_BOUND_PENDING_READBACK` are intentional. Missing credentials or failed/unavailable provider probes are never converted into passing states.
 
+## Lifecycle integration
+
+This control plane is complementary to the production provider-lifecycle surface documented at `software-factory-v4/PENTA-PROVIDER-LIFECYCLE.md`. The control plane evaluates exact provider/credential/build/certification readiness; the ThriveBase/Supabase lifecycle persists governed evidence, maintenance state, and PentaNurture continuity. Neither surface may infer or expand authority from the other.
+
 ## Cookies
 
 PentaNurture can emit `ct_penta_nurture` as a signed, one-hour, non-sensitive priority/health pointer. It contains a provider ID, `priority=software`, health, opaque correlation ID, and expiry.
