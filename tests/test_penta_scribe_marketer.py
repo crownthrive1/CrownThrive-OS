@@ -37,5 +37,14 @@ class PentaMarketerTests(unittest.TestCase):
     def test_manifest_is_plan_only(self):
         m = marketer.compile_manifest(self.campaign, self.registry, self.policy)
         self.assertEqual("PLAN_ONLY", m["publication_state"]); self.assertEqual(64, len(m["manifest_sha256"]))
+    def test_registered_symbol_is_bound_to_exact_mark(self):
+        registry = json.loads(json.dumps(self.registry))
+        registry["terms"][0]["trademark"] = {"status": "registered", "symbol": "®", "jurisdiction": "US", "registration": "TEST-REGISTRATION-EVIDENCE"}
+        allowed = dict(self.campaign); allowed["message"] = "CrownThrive® uses governed institutional terminology."
+        errors, _ = marketer.validate_campaign(allowed, registry, self.policy)
+        self.assertFalse(any("® used" in e for e in errors))
+        blocked = dict(self.campaign); blocked["message"] = "PentaScribe® uses governed institutional terminology."
+        errors, _ = marketer.validate_campaign(blocked, registry, self.policy)
+        self.assertTrue(any("® used" in e for e in errors))
 
 if __name__ == "__main__": unittest.main()
