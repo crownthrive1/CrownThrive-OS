@@ -1,0 +1,82 @@
+# PentaOS™ — CrownThrive Technical Namespace
+
+PentaOS is the canonical human-facing technical namespace for the CrownThrive operating system. It does **not** destructively rename stable machine contracts, database objects, provider identifiers, event schemas, or historical artifacts. Instead, it binds them through explicit aliases so existing production paths continue to work while the institution presents one coherent Penta* architecture.
+
+## Five-axis kernel
+
+The Penta prefix is made architectural rather than decorative through five invariant axes:
+
+1. **Truth** — canon, documentation, assets, data, evidence, contracts, IP provenance.
+2. **Authority** — governance, security, policy, rights, bounds, approvals, custody.
+3. **Execution** — software, agents, algorithms, workflows, tools, scripts, factories.
+4. **Interoperation** — APIs, MCP, routing, topology, bindings, wires, federation.
+5. **Continuity** — convergence, recovery, versioning, lineage, generation, rollback.
+
+Every Penta component declares at least one primary axis and may participate in multiple axes.
+
+## Canonical component family
+
+| Canonical name | Technical role |
+|---|---|
+| PentaOS | operating-system umbrella and namespace |
+| PentaVergence | convergence, reconciliation, stale-state repair and supersession |
+| PentaTechture | architecture definitions, ADRs and system decomposition |
+| PentaPology | topology graph, dependencies, routes and reachability |
+| PentaPlanes | execution/control/data/knowledge/interface plane abstractions |
+| PentaOrchestrator | governed orchestration and sequencing |
+| PentaFlows | workflows, state machines and runbooks |
+| PentaFlex | API/MCP/adapter framework and interface registry |
+| PentaInterOps | interoperability contracts and certification |
+| PentaWire | transport, event and connection fabric |
+| PentaBind | explicit service/platform/asset/agent bindings |
+| PentaBound | policy, authority and capability boundaries |
+| PentaSecure | security, trust, identity, secrets-boundary and assurance layer |
+| PentaAgents | executable agent layer and agent registry |
+| PentaMCL | machine-learning lifecycle, evaluation and advisory models; `PentaML` is an accepted shorthand alias |
+| PentaLLM | LLM provider/model/prompt/routing contracts |
+| PentaRithms | deterministic and model-assisted algorithm registry |
+| PentaBoxes | plugin/capability packages and installable extension containers |
+| PentaStars | contracts, schemas, invariants, SLAs and interface guarantees |
+| PentaSets | governed assets, datasets, corpora, model assets and creative assets |
+| PentaSkills | reusable skill packages |
+| PentaTools | executable tools and tool contracts |
+| PentaScripts | scripts, maintenance utilities and reproducible operators |
+| PentaMaps | architecture diagrams, topology projections, Mermaid/ASCII/Canva-ready visualization specs |
+| PentaIP | IP classification, provenance, disclosure, licensing and commercialization controls |
+| PentaBase | canonical human name for the ThriveBase data/control-plane substrate |
+| PentaFactory | governed software/component production factory |
+| PentaDocs | documentation and institutional-knowledge projection |
+| PentaRoute | routing and delivery primitives |
+| PentaFederation | repository/platform/system federation |
+| PentaFabric | runtime/federation fabric compatibility name |
+| PentaGeneration | seven-generation continuity and succession |
+| PentaStudios | media production/runtime integration |
+| PentaBooks | governed book/canon/publishing production |
+
+## Compatibility rule
+
+`Penta* canonical name -> stable machine contract(s) -> implementation(s) -> evidence`.
+
+A Penta rename may change presentation and registry aliases. It may **not** silently mutate a stable contract that another runtime depends on. Contract replacement requires a versioned successor, compatibility mapping, migration path, readback, rollback, and supersession record.
+
+## Runtime ownership
+
+PentaBase stores the canonical Penta component registry, topology edges, agent registry, convergence jobs and receipts. PentaVergence schedules reconciliation in PentaBase; repository workers merely execute jobs that PentaBase has already authorized and queued.
+
+The normal cadence is:
+
+- **continuity convergence:** every 4 hours;
+- **deep convergence:** once per local day at 11:00 PM America/New_York, DST-safe through a PentaBase local-time gate;
+- provider-worker polling may occur more frequently but performs no convergence work unless a PentaBase job exists.
+
+## Safety and continuity
+
+PentaVergence is preservation-first:
+
+- explicit DRAFT/HOLD or independently gated work is preserved;
+- a PR may be automatically closed only when its head contributes no unique change relative to current `main`, or when a recorded supersession proves the replacement;
+- an automatic merge requires the governed merge gate to be successful on the exact head, no HOLD marker, no draft state, no failed check, no unresolved base drift and no D3/human-reserved effect;
+- force-push, branch deletion, history rewriting and fabricated evidence are prohibited;
+- missing capability becomes a build/repair work item rather than an invented PASS.
+
+PentaOS is therefore a rebrand **and** a versioned institutional ontology: one discoverable family for architecture, execution, interfaces, intelligence, IP and continuity without sacrificing backward compatibility.
