@@ -97,6 +97,18 @@ jobs:
           git cat-file -e "${CT_GIT_BASE_SHA}^{commit}"
           git cat-file -e "${CT_GIT_HEAD_SHA}^{commit}"
 
+      - name: Enforce PentaSerialized continuity in required merge perimeter
+        if: github.event_name == 'pull_request'
+        env:
+          CT_GIT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CT_GIT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python -m penta.runtime.serialized git-gate \
+            --repo . \
+            --base "$CT_GIT_BASE_SHA" \
+            --head "$CT_GIT_HEAD_SHA" \
+            --policy penta/registry/serialized-suite.json
+
       - name: Bind governed changed files to trusted Git diff
         if: github.event_name == 'pull_request'
         env:
