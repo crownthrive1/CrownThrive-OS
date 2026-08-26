@@ -1,0 +1,54 @@
+name: Penta Organic Control Plane
+
+on:
+  pull_request:
+    paths:
+      - 'penta/organic/**'
+      - 'tests/test_penta_organic_control_plane.py'
+      - '.github/workflows/penta-organic-control-plane.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'penta/organic/**'
+      - 'tests/test_penta_organic_control_plane.py'
+      - '.github/workflows/penta-organic-control-plane.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-certify-project:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Validate Actions supply chain
+        run: python3 scripts/validate_github_actions_runtime_policy.py
+      - name: Test organic control plane and load
+        run: python3 -m unittest tests.test_penta_organic_control_plane
+      - name: Produce public-safe certification artifact
+        run: |
+          mkdir -p evidence
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from penta.organic.body import OrganicControlPlane
+          contract=json.loads(Path('penta/organic/contract.v1.json').read_text())
+          signal=json.loads(Path('penta/organic/signal.example.json').read_text())
+          body=OrganicControlPlane(contract)
+          body.ingest(signal)
+          Path('evidence/penta-organic-command-center.json').write_text(json.dumps(body.command_center_snapshot(),indent=2,sort_keys=True)+'\n')
+          PY
+          sha256sum evidence/penta-organic-command-center.json > evidence/penta-organic-command-center.sha256
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-organic-control-plane-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
