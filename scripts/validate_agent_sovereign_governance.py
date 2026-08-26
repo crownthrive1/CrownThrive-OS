@@ -46,16 +46,18 @@ def main() -> int:
     repo = data(REPO_STATE)
     github_target = data(GITHUB_TARGET)
 
-    if agent.get("decision_id") != "CT-ADR-GOV-011" or agent.get("phase") != "2.99":
-        fail("CT-ADR-GOV-011 / Phase 2.99 identity drifted")
+    if agent.get("decision_id") != "CT-ADR-GOV-011" or agent.get("phase") != "3":
+        fail("CT-ADR-GOV-011 must remain bound to current institutional Phase 3")
+    if agent.get("historical_origin_phase") != "2.99":
+        fail("Agent-governance historical origin must remain explicit")
     if agent.get("authority_model") != "agent_sovereign_fail_closed_with_provider_merge_perimeter":
         fail("Agent authority model must remain fail-closed with provider merge perimeter")
     if agent.get("repository_provider_role") != "required_technical_enforcement_evidence_ci_scan_and_transport_not_sovereign_authority":
         fail("GitHub role drifted from required technical perimeter/evidence/transport")
     if agent.get("github_branch_protection_dependency") is not True:
         fail("GitHub main enforcement is now required defense-in-depth for Phase 3")
-    if agent.get("canonical_roadmap_generation") != "ten_phase_v1":
-        fail("Canonical roadmap must remain ten_phase_v1")
+    if agent.get("canonical_phase_model") != "penta_v1":
+        fail("Canonical institutional phase model must remain PENTA v1")
 
     voters = [item for item in agent.get("voter_pool", []) if item.get("vote_eligible") is True]
     if len(voters) != 5:
@@ -127,6 +129,8 @@ def main() -> int:
         fail("Votes must remain one-agent/one-vote")
 
     recipients = notify.get("recipient_policy", {})
+    if notify.get("phase") != "3" or notify.get("historical_origin_phase") != "2.99":
+        fail("PM notification routing must remain Phase 3 with explicit historical origin")
     if set(recipients) != {
         "founder_tracking", "institutional_tracking", "collab_portal_fallback_tracking"
     }:
@@ -152,8 +156,13 @@ def main() -> int:
     github_security = security.get("github_security_evidence", {})
     if security.get("crypto_blockchain_guardrails", {}).get("production_token_or_currency_status") != "research_target_not_activated":
         fail("CHLOM crypto/token status must remain research_target_not_activated")
-    if security.get("crypto_blockchain_guardrails", {}).get("phase_9_dependency") is not True:
-        fail("Advanced blockchain/crypto activation must remain Phase 9-gated")
+    crypto = security.get("crypto_blockchain_guardrails", {})
+    if crypto.get("activation_gate") != "independent_legal_financial_security_and_reserved_authority_review":
+        fail("Advanced blockchain/crypto activation must retain independent specialist gates")
+    if crypto.get("institutional_phase_shortcut") is not False:
+        fail("No institutional phase may shortcut crypto/token activation gates")
+    if security.get("phase") != "3" or security.get("historical_origin_phase") != "2.99":
+        fail("Security self-healing policy must remain Phase 3 with explicit historical origin")
     if github_security.get("github_blocking") != "not_relied_upon_as_sovereign_merge_authority":
         fail("GitHub security evidence must not become sovereign merge authority")
     if github_security.get("codeql_execution_mode") != "github_default_setup_provider_managed":
@@ -180,8 +189,10 @@ def main() -> int:
         fail("GitHub enforcement must not become sovereign authority")
 
     target = github_target.get("required_target", {})
-    if github_target.get("phase_3_entry") != "github_main_perimeter_passed_but_phase3_still_blocked_pending_all_phase_2_99_hard_exit":
-        fail("GitHub main target must record perimeter passed while preserving the overall Phase 2.99 hard gate")
+    if github_target.get("phase") != "3" or github_target.get("historical_origin_phase") != "2.99":
+        fail("GitHub main target must remain bound to Phase 3 with explicit historical origin")
+    if github_target.get("phase_3_execution") != "repository_merge_perimeter_active_and_continuously_revalidated":
+        fail("GitHub main target must remain an active Phase 3 merge perimeter")
     if github_target.get("activation_state") != "ruleset_enforced_behavior_verified":
         fail("GitHub ruleset enforcement must be behaviorally verified before this state can pass")
     if target.get("pull_request_required") is not True:
@@ -213,6 +224,8 @@ def main() -> int:
 
     if repo.get("agent_merge_policy") != "fail_closed_quorum_and_validation":
         fail("Repository state must register the agent fail-closed merge policy")
+    if repo.get("phase") != "3" or repo.get("historical_origin_phase") != "2.99":
+        fail("Repository governance state must remain Phase 3 with explicit historical origin")
     if repo.get("github_merge_gate_enforced") is not True:
         fail("Ruleset-based GitHub merge gate must remain enforced after behavioral verification")
     if repo.get("github_branch_protection_required_for_phase_3") is not True:
@@ -228,6 +241,7 @@ def main() -> int:
     for fragment in (
         "python scripts/validate_github_actions_runtime_policy.py",
         "python scripts/validate_agent_sovereign_governance.py",
+        "python scripts/penta_gap_closure.py . --json",
         "python scripts/governed_merge_decision.py --self-test",
         "python scripts/resolve_pm_notification_recipients.py --self-test",
         "python scripts/security_self_heal_plan.py --self-test",
@@ -259,6 +273,7 @@ def main() -> int:
         "CT_GIT_BASE_SHA",
         "CT_GIT_HEAD_SHA",
         "python scripts/validate_docs.py",
+        "python scripts/penta_gap_closure.py . --json",
         "python scripts/validate_security_governance.py",
         "python scripts/validate_repository_governance_enforcement_state.py",
         "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0",

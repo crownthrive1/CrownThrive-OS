@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the ten-phase namespace and sanitized API/MCP control-plane snapshot."""
+"""Validate preserved phase lineage and the sanitized API/MCP snapshot."""
 
 from __future__ import annotations
 
@@ -66,16 +66,21 @@ def require(condition: bool, message: str) -> None:
 
 
 def validate_phase_namespace(data: dict[str, Any]) -> None:
-    require(data.get("state") == "current", "Phase namespace must be current")
+    require(data.get("state") == "historical_superseded_snapshot", "Ten-phase namespace must be a historical snapshot")
+    require(data.get("record_state") == "historical_evidence", "Ten-phase namespace must be classified as historical evidence")
+    require(data.get("historical_origin_phase") == "2.99", "Historical namespace origin must remain Phase 2.99")
+    require(data.get("current_institutional_phase") == 3, "Current overlay must point to Phase 3")
+    require(data.get("current_institutional_phase_name") == "Phase 3 — Execute", "Current overlay Phase 3 name drifted")
+    require(data.get("current_successor") == "docs/phase-model/PENTA_PHASE_MODEL.md", "PENTA phase model must be the current successor")
     require(data.get("decision_id") == "CT-ADR-ROADMAP-010", "Ten-phase roadmap decision ID must remain CT-ADR-ROADMAP-010")
     require(data.get("top_level_phase_count") == 10, "Exactly ten top-level institutional phases are required")
     phases = data.get("phases")
     require(isinstance(phases, list) and len(phases) == 10, "Phase manifest must contain ten phase records")
     require([row.get("number") for row in phases] == list(range(1, 11)), "Phase numbers must be 1 through 10")
     require([row.get("name") for row in phases] == EXPECTED_PHASES, "Phase names do not match ten_phase_v1")
-    require(data.get("current_phase") == 2, "Current institutional phase must remain Phase 2")
-    require(data.get("current_subphase") == "2.99", "Current institutional subphase must remain 2.99")
-    require(data.get("phase_3_entry") == "blocked_pending_phase_2_99_hard_exit", "Phase 3 must remain blocked")
+    require(data.get("current_phase") == 2, "Historical snapshot phase must remain Phase 2")
+    require(data.get("current_subphase") == "2.99", "Historical snapshot subphase must remain 2.99")
+    require(data.get("phase_3_entry") == "blocked_pending_phase_2_99_hard_exit", "Historical Phase 3 gate evidence drifted")
 
     rules = data.get("rules", {})
     require(rules.get("future_phase_propagation_scope") == list(range(3, 11)), "Future propagation must cover Phases 3-10")
@@ -92,13 +97,19 @@ def validate_phase_namespace(data: dict[str, Any]) -> None:
     require(five_phase_snapshot.get("preserve_history") is True, "Five-phase transient history must be preserved")
 
     docs = data.get("documentation_reconciliation", {})
-    require(docs.get("state") == "docs_updated", "Namespace conflict must remain reconciled")
+    require(docs.get("state") == "historical_snapshot_superseded_by_penta", "Namespace must remain superseded by PENTA")
 
 
 def validate_api_control(data: dict[str, Any]) -> None:
+    require(data.get("record_state") == "historical_operational_snapshot", "API control evidence must be a historical snapshot")
+    require(data.get("historical_origin_phase") == "2.99", "API control historical origin must remain 2.99")
+    require(data.get("current_institutional_phase") == 3, "API control current overlay must point to Phase 3")
+    require(data.get("current_successor") == "docs/phase3/CURRENT_STATE.md", "API control current successor drifted")
+    require(data.get("source_class") == "dated_operational_control_plane_snapshot", "API source class must be dated evidence")
     phase = data.get("phase", {})
-    require(phase.get("current_phase") == 2 and phase.get("current_subphase") == "2.99", "API snapshot must remain scoped to Phase 2 / 2.99")
-    require(phase.get("phase_3_entry") == "blocked_pending_phase_2_99_hard_exit", "API evidence must not advance Phase 3")
+    require(phase.get("snapshot_semantics") == "historical_as_observed_2026_08_19", "API snapshot semantics drifted")
+    require(phase.get("current_phase") == 2 and phase.get("current_subphase") == "2.99", "API historical snapshot must remain scoped to Phase 2 / 2.99")
+    require(phase.get("phase_3_entry") == "blocked_pending_phase_2_99_hard_exit", "API historical gate evidence drifted")
 
     control = data.get("crownthrive_api_control", {})
     require(control.get("runtime_version") == 2, "API control runtime must be version 2")
@@ -136,7 +147,7 @@ def validate_api_control(data: dict[str, Any]) -> None:
     require(not forbidden, "Raw credential-shaped field names are prohibited in public-safe manifest: " + ", ".join(forbidden))
 
     docs = data.get("docs_impact", {})
-    require(docs.get("state") == "docs_delta_opened", "API/MCP prose/conformance delta must remain explicit")
+    require(docs.get("state") == "historical_snapshot_with_current_delta_open", "API/MCP historical/current boundary must remain explicit")
 
 
 def main() -> int:
@@ -152,10 +163,10 @@ def main() -> int:
     require("PR #62 five-phase machine assertion is superseded" in checkpoint, "Checkpoint must preserve and supersede the transient five-phase assertion")
     require("Phases 3–10" in checkpoint, "Checkpoint must propagate the ten-phase roadmap")
 
-    print("Ten-phase namespace and API/MCP control-plane validation: PASS")
-    print("- top-level institutional phases: 10")
-    print("- current phase: 2 / 2.99")
-    print("- Phase 3 entry: blocked")
+    print("Historical namespace and API/MCP control-plane validation: PASS")
+    print("- preserved ten-phase snapshot: 10 phases")
+    print("- historical phase snapshot: 2 / 2.99")
+    print("- current institutional phase: 3 / Execute")
     print("- PR #62 five-phase snapshot: preserved as superseded lineage")
     print("- CrownThrive API/MCP provider writes: disabled")
     print("- CrownThrive IO: read_verified / writes closed")

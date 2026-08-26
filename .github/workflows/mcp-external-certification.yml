@@ -16,10 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
       - name: Verify security hold and negative controls
         run: node contracts/mcp/test-external-certification-security-hold.mjs
       - name: Type-check public-safe fail-closed reference
-        run: npx --yes deno@2.9.5 check reference/mcp/crownthrive-api-control.v4.1.0.release.ts
+        run: node --experimental-strip-types --check reference/mcp/crownthrive-api-control.v4.1.0.release.ts
       - name: Reject prohibited public projection classes
         shell: bash
         run: |
@@ -38,4 +42,3 @@ jobs:
             contracts/mcp/external-certification-auth-proxy.mjs \
             contracts/mcp/test-external-certification-security-hold.mjs \
             reference/mcp/crownthrive-api-control.v4.1.0.release.ts
-

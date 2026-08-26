@@ -18,6 +18,7 @@ import os
 import subprocess
 import urllib.request
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -141,7 +142,10 @@ def thivebase(path: Path | None, git_head: str) -> tuple[bool, dict[str, Any], l
     if live.get("phase3_activation_state") != "GO_ELIGIBLE_BOOTSTRAP_NOT_COMMITTED":
         why.append("phase3_live_gate_activation_state_invalid")
 
-    gates = live.get("gates", {}) if isinstance(live, dict) else {}
+    gates_value = live.get("gates") if isinstance(live, dict) else None
+    gates = gates_value if isinstance(gates_value, dict) else {}
+    if not isinstance(gates_value, dict):
+        why.append("phase3_live_gate_gates_invalid")
     required = {f"CT-P299-GATE-{i:03d}" for i in range(1, 9)}
     if set(gates) != required:
         why.append("phase3_live_gate_ids_incomplete")
@@ -194,7 +198,8 @@ def evaluate(branch: dict[str, Any], snapshot_path: Path | None) -> dict[str, An
 
     snap = tb.get("snapshot", {}) if tb else {}
     live = snap.get("thivebase", {}).get("phase3_live_gate", {}).get("data", {}) if snap else {}
-    gates = live.get("gates", {}) if isinstance(live, dict) else {}
+    gates_value = live.get("gates") if isinstance(live, dict) else None
+    gates = gates_value if isinstance(gates_value, dict) else {}
 
     remote_main_sha = str(branch.get("commit", {}).get("sha") or "").lower()
     snapshot_main_sha = str(snap.get("github_main", {}).get("sha") or "").lower()
@@ -316,6 +321,32 @@ def self_test() -> None:
         pass
     else:
         raise AssertionError("bootstrap must reject non-current-main GO")
+    with TemporaryDirectory() as temporary_directory:
+        snapshot_path = Path(temporary_directory) / "snapshot.json"
+        snapshot_path.write_text(json.dumps({
+            "ok": True,
+            "snapshot_sha256": "a" * 64,
+            "snapshot": {
+                "source_head_sha": "b" * 40,
+                "thivebase": {
+                    "required_reads_complete": True,
+                    "chlom_gen6": {"ok": True},
+                    "commercial_release_factory": {"ok": True},
+                    "phase3_live_gate": {"ok": True, "data": {"gates": None}},
+                    "phase3_live_gate_exact_head_bound": True,
+                },
+                "side_effects": {
+                    "database_mutation": False,
+                    "commerce_activation": False,
+                    "money_movement": False,
+                    "phase_transition": False,
+                    "sovereign_vote_effect": False,
+                },
+            },
+        }))
+        ok, _, why = thivebase(snapshot_path, "b" * 40)
+        assert ok is False
+        assert "phase3_live_gate_gates_invalid" in why
     print("PASS_CT_P299_MACHINE_HARD_EXIT_V2_SELF_TEST")
 
 

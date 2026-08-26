@@ -76,6 +76,19 @@ def base_registry(catalogs: list[dict], refs: list[str] | None = None) -> dict:
                 "support",
             ],
         },
+        "self_build_contract": {
+            "contract_path": "data/penta/self-build.contract.json",
+            "candidate_schema_path": "schemas/penta/self-build-candidate.schema.json",
+            "runtime_path": "runtime/penta_self_build.py",
+            "applies_to_all_registered_members": True,
+            "typed_gap_required": True,
+            "penta_factory_builder_required": True,
+            "independent_certification_required": True,
+            "negative_and_stress_tests_required": True,
+            "rollback_required": True,
+            "authority_never_manufactured": True,
+            "d3_human_reserved": True,
+        },
     }
 
 
@@ -173,6 +186,13 @@ def test_portal_contract_cannot_drop_required_section() -> None:
     expect_error(lambda: validate_family_registry(broken), "portal contract missing required sections")
 
 
+def test_self_build_contract_cannot_manufacture_authority() -> None:
+    registry = json.loads((ROOT / "data/penta/family.registry.json").read_text(encoding="utf-8"))
+    broken = copy.deepcopy(registry)
+    broken["self_build_contract"]["authority_never_manufactured"] = False
+    expect_error(lambda: validate_family_registry(broken), "authority_never_manufactured")
+
+
 def test_missing_required_catalog_blocks_family_snapshot() -> None:
     registry = base_registry(
         [
@@ -257,17 +277,7 @@ def test_display_name_normalization_resolves_member() -> None:
 
 
 def run() -> None:
-    tests = [
-        test_live_repository_contract,
-        test_all_control_plane_penta_refs_resolve,
-        test_every_member_has_portal_and_required_sections,
-        test_contract_cannot_disable_fail_closed,
-        test_portal_contract_cannot_drop_required_section,
-        test_missing_required_catalog_blocks_family_snapshot,
-        test_duplicate_machine_keys_block_composition,
-        test_unresolved_control_plane_reference_blocks_composition,
-        test_display_name_normalization_resolves_member,
-    ]
+    tests = [obj for name, obj in sorted(globals().items()) if name.startswith("test_") and callable(obj)]
     for test in tests:
         test()
         print(f"PASS {test.__name__}")

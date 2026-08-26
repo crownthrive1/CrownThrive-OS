@@ -18,6 +18,7 @@ from typing import Any, Iterable
 TEXT_SUFFIXES = {".md", ".mdx", ".json", ".svg", ".yml", ".yaml", ".py", ".txt"}
 SKIP_DIRECTORIES = {".git", ".venv", "venv", "node_modules", ".mintlify", "__pycache__"}
 ALLOWED_TEMPLATE_NOTICE_PATHS = {Path("THIRD_PARTY_NOTICES.md")}
+UNLISTED_DISPOSITIONS = Path("developers/manifests/pentadocs-unlisted-page-dispositions.v1.json")
 
 # Strict enough to identify credential-shaped values rather than ordinary prose.
 SECRET_PATTERNS: dict[str, re.Pattern[str]] = {
@@ -153,6 +154,8 @@ def validate(root: Path) -> tuple[list[str], list[str], dict[str, int]]:
         "mdx_pages": 0,
         "text_files_scanned": 0,
         "internal_links_checked": 0,
+        "governed_unlisted_pages": 0,
+        "json_files_parsed": 0,
     }
 
     if not root.exists():
@@ -230,9 +233,54 @@ def validate(root: Path) -> tuple[list[str], list[str], dict[str, int]]:
 
     mdx_files = [path for path in root.rglob("*.mdx") if not any(part in SKIP_DIRECTORIES for part in path.relative_to(root).parts)]
     stats["mdx_pages"] = len(mdx_files)
-    for path in sorted(mdx_files):
-        if path.resolve() not in navigated_files:
-            warnings.append(f"Unlisted MDX page: {path.relative_to(root)}")
+    unlisted_pages = {
+        path.relative_to(root).as_posix()
+        for path in mdx_files
+        if path.resolve() not in navigated_files
+    }
+    disposition_path = root / UNLISTED_DISPOSITIONS
+    registered_unlisted: list[str] = []
+    if not disposition_path.is_file():
+        errors.append(f"Missing governed unlisted-page disposition manifest: {UNLISTED_DISPOSITIONS}")
+    else:
+        try:
+            disposition_manifest = json.loads(read_text(disposition_path))
+        except (ValueError, json.JSONDecodeError) as exc:
+            errors.append(f"Invalid {UNLISTED_DISPOSITIONS}: {exc}")
+            disposition_manifest = {}
+        if disposition_manifest.get("schema_version") != "1.0.0":
+            errors.append("Unlisted-page disposition manifest schema must remain 1.0.0")
+        if disposition_manifest.get("owner") != "penta_docs_governance":
+            errors.append("Unlisted-page disposition manifest must retain an accountable owner")
+        expected_categories = {
+            "historical_change_evidence",
+            "certification_evidence",
+            "generated_build_evidence",
+            "specialist_reconciliation_evidence",
+            "operational_reference_direct_link",
+        }
+        category_policy = disposition_manifest.get("category_policy", {})
+        dispositions = disposition_manifest.get("dispositions", {})
+        if set(category_policy) != expected_categories or set(dispositions) != expected_categories:
+            errors.append("Unlisted-page disposition categories or category policies drifted")
+        for category in sorted(expected_categories):
+            pages = dispositions.get(category, [])
+            if not isinstance(pages, list) or any(not isinstance(page, str) for page in pages):
+                errors.append(f"Unlisted-page disposition category must be a string list: {category}")
+                continue
+            registered_unlisted.extend(pages)
+
+    duplicate_dispositions = sorted(
+        path for path, count in Counter(registered_unlisted).items() if count > 1
+    )
+    for duplicate in duplicate_dispositions:
+        errors.append(f"Unlisted page has multiple dispositions: {duplicate}")
+    registered_set = set(registered_unlisted)
+    for page in sorted(unlisted_pages - registered_set):
+        errors.append(f"Unlisted MDX page lacks an explicit governed disposition: {page}")
+    for page in sorted(registered_set - unlisted_pages):
+        errors.append(f"Stale unlisted-page disposition (page is navigated or missing): {page}")
+    stats["governed_unlisted_pages"] = len(unlisted_pages & registered_set)
 
     for relative in sorted(ROOT_TEMPLATE_FILES):
         path = root / relative
@@ -283,6 +331,14 @@ def validate(root: Path) -> tuple[list[str], list[str], dict[str, int]]:
             errors.append(str(exc))
             continue
 
+        if path.suffix.lower() == ".json":
+            try:
+                json.loads(text)
+            except json.JSONDecodeError as exc:
+                errors.append(f"Invalid JSON in {relative}: {exc}")
+            else:
+                stats["json_files_parsed"] += 1
+
         if relative not in ALLOWED_TEMPLATE_NOTICE_PATHS:
             for label, pattern in SECRET_PATTERNS.items():
                 if pattern.search(text):
@@ -319,7 +375,9 @@ def main() -> int:
         "Scanned "
         f"{stats['navigation_pages']} navigation entries, "
         f"{stats['mdx_pages']} MDX files, "
-        f"{stats['text_files_scanned']} text files, and "
+        f"{stats['text_files_scanned']} text files, "
+        f"{stats['json_files_parsed']} JSON files, "
+        f"{stats['governed_unlisted_pages']} governed unlisted pages, and "
         f"{stats['internal_links_checked']} internal links."
     )
 

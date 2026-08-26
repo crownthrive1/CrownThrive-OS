@@ -1,7 +1,7 @@
 {
-  "manifest_version": "1.0.2",
+  "manifest_version": "1.1.0",
   "manifest_id": "ct.manifest.github-actions-runtime-policy.v1",
-  "phase": "2.99",
+  "phase": "3",
   "status": "active_fail_closed",
   "target_runtime": "node24",
   "node20_status": "prohibited",
@@ -11,8 +11,32 @@
     "approved_github_hosted_labels": [
       "ubuntu-latest"
     ],
-    "dynamic_runs_on_expressions": "prohibited_until_runner_attestation_policy_supports_them",
-    "self_hosted": "blocked_until_node24_runner_attestation_is_machine_verified",
+    "dynamic_runs_on_expressions": "prohibited",
+    "self_hosted": "bootstrap_certification_only_until_exact_head_attestation_is_verified",
+    "production_self_hosted": "blocked_until_separate_policy_promotion_after_exact_head_attestation",
+    "approved_self_hosted_bootstrap_workflows": [
+      {
+        "path": ".github/workflows/penta-runner-fabric-certification.yml",
+        "event": "workflow_dispatch_only",
+        "ref": "refs/heads/main",
+        "repository": "crownthrive1/CrownThrive-Support",
+        "labels": [
+          "self-hosted",
+          "linux",
+          "x64",
+          "crownthrive",
+          "pentafabric",
+          "rtc",
+          "trusted",
+          "provider",
+          "pentamail"
+        ],
+        "provider_secrets": "prohibited",
+        "provider_writes": "prohibited",
+        "public_pull_request_execution": "prohibited",
+        "result_authority": "runner_capability_only_not_production_workload_authority"
+      }
+    ],
     "unsupported_node24_targets": [
       "macos_13_4_or_older",
       "arm32_self_hosted"
@@ -51,6 +75,15 @@
       "upstream_evidence": "official_signed_commit_and_action_yml_node24_verified_2026-08-19"
     },
     {
+      "uses": "actions/setup-node",
+      "sha": "249970729cb0ef3589644e2896645e5dc5ba9c38",
+      "version": "v6.5.0",
+      "runtime": "node24",
+      "purpose": "node24_toolchain",
+      "compatibility": "approved",
+      "upstream_evidence": "official_signed_v6_5_0_release_and_action_yml_node24_verified_2026-08-26"
+    },
+    {
       "uses": "actions/dependency-review-action",
       "sha": "a1d282b36b6f3519aa1f3fc636f609c47dddb294",
       "version": "v5.0.0",
@@ -73,9 +106,9 @@
       "sha": "0f67c3f4856b2e3261c31976d6725780e5e4c373",
       "version": "v4.1.1",
       "runtime": "node24",
-      "purpose": "artifact_build_provenance_attestation",
+      "purpose": "artifact_provenance_attestation",
       "compatibility": "approved",
-      "upstream_evidence": "official_v4_1_1_composite_action_and_actions_attest_node24_verified_2026-08-26"
+      "upstream_evidence": "official_composite_action_pins_actions_attest_v4_1_1_whose_action_yml_declares_node24_verified_2026-08-26"
     }
   ],
   "provider_managed_actions": {
@@ -110,7 +143,8 @@
   },
   "gates": {
     "applies_to": "all_github_actions_workflows",
-    "phase_2_99_exit": "blocking",
+    "historical_phase_2_99_exit": "preserved_noncurrent",
+    "phase_3_execution": "blocking_on_runtime_or_supply_chain_drift",
     "phase_3_entry": "blocking_on_runtime_or_supply_chain_drift",
     "merge": "blocking",
     "no_warning_suppression_as_fix": true
@@ -119,9 +153,11 @@
     "github_actions_node20_to_node24_migration_2026",
     "official_actions_checkout_v7_action_metadata",
     "official_actions_setup_python_v7_action_metadata",
+    "official_actions_setup_node_v6_5_0_node24_action_metadata",
     "official_dependency_review_action_v5_node24_release",
     "official_actions_upload_artifact_v7_node24_action_metadata",
-    "official_actions_attest_build_provenance_v4_1_1_and_actions_attest_node24_metadata_2026-08-26",
+    "official_actions_attest_build_provenance_v4_1_1_composite_metadata",
+    "official_actions_attest_v4_1_1_node24_action_metadata",
     "github_secure_use_full_length_commit_sha_guidance",
     "github_dependabot_github_actions_updates",
     "non_voting_pr64_parser_bypass_audit_2026-08-19",

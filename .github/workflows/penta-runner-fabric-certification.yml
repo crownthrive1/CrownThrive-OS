@@ -11,10 +11,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  evaluate-pentafabric-rtc:
-    # Current policy blocks self-hosted execution until Node 24 runner
-    # attestation is machine verified. This manual job records a HOLD diagnostic.
-    runs-on: ubuntu-latest
+  certify-pentafabric-rtc:
+    # SECURITY: this repository is public. This privileged self-hosted lane is
+    # workflow_dispatch-only, exact-main only, and carries no provider secrets.
+    # Never add pull_request or production provider operations here.
+    if: github.repository == 'crownthrive1/CrownThrive-Support' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, crownthrive, pentafabric, rtc, trusted, provider, pentamail]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -29,8 +31,17 @@ jobs:
           command -v git
           command -v curl
           command -v sha256sum
+          command -v sort
           python3 --version
           git --version
+          runner_root="$(dirname "$(dirname "$RUNNER_TEMP")")"
+          runner_version="$($runner_root/bin/Runner.Listener --version)"
+          minimum_version='2.327.1'
+          if [[ "$(printf '%s\n%s\n' "$minimum_version" "$runner_version" | sort -V | head -n1)" != "$minimum_version" ]]; then
+            echo "ERROR: Actions runner $runner_version is below governed minimum $minimum_version" >&2
+            exit 1
+          fi
+          echo "PENTA_ACTIONS_RUNNER_VERSION=$runner_version" >> "$GITHUB_ENV"
 
       - name: Build runner certification evidence
         shell: bash
@@ -70,11 +81,12 @@ jobs:
                   "hostname": platform.node(),
                   "python": command_version("python3", "--version"),
                   "git": command_version("git", "--version"),
+                  "actions_runner_version": os.environ["PENTA_ACTIONS_RUNNER_VERSION"],
               },
               "trust_contract": {
                   "labels_required": [
                       "self-hosted", "linux", "x64", "crownthrive",
-                      "pentafabric", "rtc", "trusted"
+                      "pentafabric", "rtc", "trusted", "provider", "pentamail"
                   ],
                   "public_pr_execution_allowed": False,
                   "provider_execution_class": "hold_unverified",

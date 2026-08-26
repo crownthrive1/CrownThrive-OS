@@ -1,48 +1,221 @@
 #!/usr/bin/env python3
-"""PENTA institutional gap classifier.
+"""Fail closed on unmanaged retired institutional phase aliases.
 
-Fail-closed scanner for stale institutional phase claims. Historical/archive material is
-preserved; active material that still presents retired decimal phases as current is flagged.
-No provider writes or destructive mutation are performed by this utility.
+Historical evidence is preserved. Every surviving decimal-phase reference must
+match an exact governed path and expected hit count so new or changed usage
+cannot silently become current instruction.
 """
-from __future__ import annotations
-import argparse, json, pathlib, re, sys
 
-RETIRED = re.compile(r"\bPhase\s+2\.(?:5|7|8|9|95|97|98|99)\b", re.I)
-CURRENT_STALE = re.compile(r"(?:current institutional phase|phase remains|remains current|current state)[^\n]{0,100}Phase\s+2\.(?:5|7|8|9|95|97|98|99)", re.I)
-HISTORICAL_HINTS = ("archive/", "changelog/", "historical", "superseded", "retired", "lineage", "recovery")
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import re
+import sys
+
+RETIRED = re.compile(
+    r"\bPhase(?:(?:\*\*)?[ \t]*:[ \t]*(?:\*\*)?[ \t]*|[ \t]+)"
+    r"2\.(?:5|7|8|9|95|97|98|99)\b",
+    re.I,
+)
+CURRENT_STALE = re.compile(
+    r"(?:"
+    r"(?:current institutional phase|phase remains|remains current|current state)"
+    r"[^\n]{0,100}Phase\s+2\.(?:5|7|8|9|95|97|98|99)"
+    r"|^[ \t]*(?:[-*][ \t]+)?(?:\*\*Phase:\*\*|(?:\*\*)?Phase(?:\*\*)?[ \t]*:)[ \t]*"
+    r"(?:\*\*)?2\.(?:5|7|8|9|95|97|98|99)\b"
+    r"|\b(?:evaluates?|evaluation)[^\n]{0,60}Phase\s+2\."
+    r"(?:5|7|8|9|95|97|98|99)\b"
+    r")",
+    re.I | re.M,
+)
+HISTORICAL_HINTS = (
+    "archive/",
+    "changelog/",
+    "historical",
+    "superseded",
+    "retired",
+    "lineage",
+    "recovery",
+)
+TEXT_SUFFIXES = {".md", ".mdx", ".json", ".yml", ".yaml", ".py", ".sql"}
+SKIP_PARTS = {".git", "__pycache__", ".venv", "venv", "node_modules"}
+REGISTRY = pathlib.Path("developers/manifests/penta-phase-alias-dispositions.v1.json")
+CATEGORIES = {"historical_alias_evidence", "current_record_contextual_reference"}
 
 
 def classify(path: pathlib.Path, text: str) -> dict:
     rel = path.as_posix()
-    hits = [m.group(0) for m in RETIRED.finditer(text)]
-    stale = [m.group(0) for m in CURRENT_STALE.finditer(text)]
-    historical = any(h in rel.lower() or h in text[:1200].lower() for h in HISTORICAL_HINTS)
-    if stale and not historical:
-        disposition = "REPAIR_REQUIRED"
-    elif hits:
-        disposition = "PRESERVE_HISTORICAL_ALIAS" if historical else "REVIEW_CONTEXT"
-    else:
-        disposition = "PASS"
-    return {"path": rel, "disposition": disposition, "retired_alias_hits": len(hits), "stale_current_claim_hits": len(stale)}
+    hits = [match.group(0) for match in RETIRED.finditer(text)]
+    stale = [match.group(0) for match in CURRENT_STALE.finditer(text)]
+    historical = any(
+        hint in rel.lower() or hint in text[:1200].lower()
+        for hint in HISTORICAL_HINTS
+    )
+    return {
+        "path": rel,
+        "retired_alias_hits": len(hits),
+        "stale_current_claim_hits": len(stale),
+        "historical_context": historical,
+    }
+
+
+def load_registry(root: pathlib.Path) -> tuple[dict[str, dict], list[str]]:
+    path = root / REGISTRY
+    errors: list[str] = []
+    if not path.is_file():
+        return {}, [f"missing governed phase-alias registry: {REGISTRY}"]
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return {}, [f"invalid governed phase-alias registry: {exc}"]
+    if manifest.get("schema_version") != "1.0.0":
+        errors.append("phase-alias registry schema must remain 1.0.0")
+    if manifest.get("owner") != "crownthrive_os_convergence":
+        errors.append("phase-alias registry must retain an accountable owner")
+    category_policy = manifest.get("category_policy", {})
+    dispositions = manifest.get("dispositions", {})
+    if set(category_policy) != CATEGORIES or set(dispositions) != CATEGORIES:
+        errors.append("phase-alias registry category inventory drifted")
+
+    expected: dict[str, dict] = {}
+    for category in sorted(CATEGORIES):
+        entries = dispositions.get(category, [])
+        if not isinstance(entries, list):
+            errors.append(f"phase-alias category must be a list: {category}")
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                errors.append(f"phase-alias entry must be an object: {category}")
+                continue
+            rel = entry.get("path")
+            if not isinstance(rel, str) or not rel:
+                errors.append(f"phase-alias entry lacks path: {category}")
+                continue
+            if rel in expected:
+                errors.append(f"duplicate phase-alias disposition: {rel}")
+                continue
+            if not isinstance(entry.get("retired_alias_hits"), int) or not isinstance(
+                entry.get("stale_current_claim_hits"), int
+            ):
+                errors.append(f"phase-alias entry lacks integer hit counts: {rel}")
+                continue
+            expected[rel] = {**entry, "category": category}
+    return expected, errors
+
+
+def scan(root: pathlib.Path) -> tuple[dict, int]:
+    expected, registry_errors = load_registry(root)
+    observed: dict[str, dict] = {}
+    for path in root.rglob("*"):
+        if (
+            not path.is_file()
+            or path.suffix.lower() not in TEXT_SUFFIXES
+            or any(part in SKIP_PARTS for part in path.relative_to(root).parts)
+        ):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        row = classify(path.relative_to(root), text)
+        if row["retired_alias_hits"]:
+            observed[row["path"]] = row
+
+    findings: list[dict] = []
+    governed_counts = {category: 0 for category in CATEGORIES}
+    for rel, row in sorted(observed.items()):
+        registered = expected.get(rel)
+        if not registered:
+            findings.append(
+                {**row, "disposition": "REVIEW_CONTEXT", "reason": "unregistered_alias_use"}
+            )
+            continue
+        expected_counts = (
+            registered["retired_alias_hits"],
+            registered["stale_current_claim_hits"],
+        )
+        observed_counts = (row["retired_alias_hits"], row["stale_current_claim_hits"])
+        if observed_counts != expected_counts:
+            findings.append(
+                {
+                    **row,
+                    "disposition": "REVIEW_CONTEXT",
+                    "reason": "registered_hit_count_drift",
+                    "expected_retired_alias_hits": expected_counts[0],
+                    "expected_stale_current_claim_hits": expected_counts[1],
+                }
+            )
+            continue
+        category = registered["category"]
+        if row["stale_current_claim_hits"] and category != "historical_alias_evidence":
+            findings.append(
+                {
+                    **row,
+                    "disposition": "REPAIR_REQUIRED",
+                    "reason": "stale_current_claim_in_active_record",
+                }
+            )
+            continue
+        if category == "historical_alias_evidence" and not row["historical_context"]:
+            findings.append(
+                {
+                    **row,
+                    "disposition": "REPAIR_REQUIRED",
+                    "reason": "historical_overlay_missing",
+                }
+            )
+            continue
+        governed_counts[category] += 1
+
+    for rel in sorted(set(expected) - set(observed)):
+        findings.append(
+            {
+                "path": rel,
+                "disposition": "STALE_REGISTRATION",
+                "reason": "registered_alias_use_no_longer_present_or_file_missing",
+            }
+        )
+
+    counts = {
+        name: sum(item.get("disposition") == name for item in findings)
+        for name in ("REPAIR_REQUIRED", "REVIEW_CONTEXT", "STALE_REGISTRATION")
+    }
+    summary = {
+        "service": "ct.penta.gap-closure.v2",
+        "rule": "retired phase aliases may remain only at exact governed paths and hit counts",
+        "registry": REGISTRY.as_posix(),
+        "observed_alias_paths": len(observed),
+        "governed_counts": governed_counts,
+        "counts": counts,
+        "registry_errors": registry_errors,
+        "findings": findings,
+    }
+    return summary, 2 if registry_errors or any(counts.values()) else 0
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("root", nargs="?", default=".")
-    ap.add_argument("--json", action="store_true")
-    args = ap.parse_args()
-    root = pathlib.Path(args.root)
-    rows=[]
-    for p in root.rglob("*"):
-        if p.is_file() and p.suffix.lower() in {".md", ".mdx", ".json", ".yml", ".yaml", ".py", ".sql"} and ".git" not in p.parts:
-            try: text=p.read_text(encoding="utf-8")
-            except UnicodeDecodeError: continue
-            row=classify(p.relative_to(root), text)
-            if row["disposition"] != "PASS": rows.append(row)
-    summary={"service":"ct.penta.gap-closure.v1","rule":"retired phase aliases may remain as history but not current instruction","counts":{k:sum(r["disposition"]==k for r in rows) for k in ("REPAIR_REQUIRED","REVIEW_CONTEXT","PRESERVE_HISTORICAL_ALIAS")},"findings":rows}
-    print(json.dumps(summary, indent=2) if args.json else "\n".join(f"{r['disposition']}: {r['path']}" for r in rows))
-    return 2 if summary["counts"]["REPAIR_REQUIRED"] else 0
+    parser = argparse.ArgumentParser()
+    parser.add_argument("root", nargs="?", default=".")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args()
+    summary, status = scan(pathlib.Path(args.root).resolve())
+    if args.json:
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    elif status:
+        for finding in summary["findings"]:
+            print(f"{finding['disposition']}: {finding['path']} ({finding['reason']})")
+        for error in summary["registry_errors"]:
+            print(f"REGISTRY_ERROR: {error}")
+    else:
+        print(
+            "PASS: "
+            f"{summary['observed_alias_paths']} retired-alias paths are exact-count governed; "
+            "no stale current claims escaped historical custody."
+        )
+    return status
+
 
 if __name__ == "__main__":
     sys.exit(main())

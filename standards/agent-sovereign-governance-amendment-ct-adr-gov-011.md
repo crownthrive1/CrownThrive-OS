@@ -1,7 +1,7 @@
 # Governance Standard Amendment — CT-ADR-GOV-011
 
 **Effective:** 2026-08-19  
-**Applies to:** `ct.standard.docs-autonomy.v1`, repository automation, agent relay, CI/security evidence and Phase 2.99-to-3 transition.
+**Applies to:** `ct.standard.docs-autonomy.v1`, repository automation, agent relay, CI/security evidence and current Phase 3 execution. Historical origin: Phase 2.99-to-3 transition.
 
 This amendment preserves CrownThrive's agent-sovereign authority model while restoring GitHub `main` protection as a required technical enforcement perimeter. GitHub remains infrastructure and evidence, not CrownThrive's sovereign authority.
 
@@ -33,7 +33,7 @@ An automatic D0–D2-eligible merge requires:
 - no deny/block vote;
 - rollback/recovery;
 - documentation impact;
-- downstream Phase 3–10 reconciliation.
+- downstream PENTA Phase 4 — Verify and Phase 5 — Preserve reconciliation.
 
 D3 is never auto-authorized by quorum.
 
@@ -67,4 +67,4 @@ Where GitHub already operates a provider-managed security capability such as Cod
 
 ## Roadmap rule
 
-This amendment does not open Phase 3. Phase 3 remains `blocked_pending_phase_2_99_hard_exit` until GitHub `main` required-check enforcement is enabled and provider-verified **and** every other Phase 2.99 hard-exit requirement passes.
+Phase 3 — Execute is current. This amendment does not blanket-certify any subsystem: repository enforcement, provider behavior, CI evidence and post-promotion readback remain independently gated. The current GitHub ruleset perimeter is behaviorally verified at the repository level; exact-head CI and any provider-side change still require their own evidence, and D3 remains human-reserved.

@@ -50,6 +50,14 @@ class PentaRuntimeSuiteTests(unittest.TestCase):
         self.assertTrue(gate["eligible"])
         self.assertIn("downstream", gate["reason"])
 
+    def test_generated_bytecode_is_not_an_implementation_signal(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            cache = root / "runtime" / "__pycache__"
+            cache.mkdir(parents=True)
+            (cache / "penta_mail.cpython-312.pyc").write_bytes(b"generated")
+            self.assertEqual(prs.implementation_signals(root, "penta.mail"), [])
+
 
 if __name__ == "__main__":
     unittest.main()

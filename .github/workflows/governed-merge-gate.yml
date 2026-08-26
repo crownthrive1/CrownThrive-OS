@@ -33,6 +33,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24"
+
       - name: Verify governed validator syntax
         run: |
           python -m py_compile scripts/validate_docs.py
@@ -49,13 +54,32 @@ jobs:
           python -m py_compile scripts/validate_agent_sovereign_governance.py
           python -m py_compile scripts/validate_security_governance.py
           python -m py_compile scripts/validate_github_actions_runtime_policy.py
+          python -m py_compile scripts/penta_gap_closure.py
           python -m py_compile scripts/governed_merge_decision.py
           python -m py_compile scripts/governed_current_pr_preflight.py
+          python -m py_compile scripts/governed_current_pr_preflight_v2.py
           python -m py_compile scripts/resolve_pm_notification_recipients.py
           python -m py_compile scripts/security_self_heal_plan.py
+          python -m py_compile scripts/run_function_tests.py
 
       - name: Validate GitHub Actions runtime and supply-chain policy
         run: python scripts/validate_github_actions_runtime_policy.py
+
+      - name: Validate evidence-data classifier negative vectors
+        run: python scripts/governed_current_pr_preflight_v2.py --self-test
+
+      - name: Run complete local Phase 3 convergence audit
+        run: python scripts/run_phase3_convergence_audit.py
+
+      - name: Run function-style Penta control tests
+        run: |
+          python scripts/run_function_tests.py \
+            tests/test_governed_evidence_data_classification.py \
+            tests/test_penta_compliance_license.py \
+            tests/test_penta_family.py \
+            tests/test_penta_institutional_controls.py \
+            tests/test_penta_institutional_controls_family.py \
+            tests/test_penta_self_build.py
 
       - name: Hydrate exact immutable PR commits
         if: github.event_name == 'pull_request'
@@ -78,7 +102,7 @@ jobs:
             --verify-git-diff \
             --git-base "$CT_GIT_BASE_SHA" \
             --git-head "$CT_GIT_HEAD_SHA"
-          python scripts/governed_current_pr_preflight.py \
+          python scripts/governed_current_pr_preflight_v2.py \
             --git-base "$CT_GIT_BASE_SHA" \
             --git-head "$CT_GIT_HEAD_SHA"
 
@@ -87,6 +111,9 @@ jobs:
 
       - name: Validate Phase 3 institutional gate
         run: python scripts/validate_phase3_institutional_gate.py
+
+      - name: Validate exact retired-phase alias dispositions
+        run: python scripts/penta_gap_closure.py . --json
 
       - name: Validate homepage control-plane projection
         run: |
