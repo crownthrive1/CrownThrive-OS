@@ -1,17 +1,19 @@
-# Penta Provider Control Plane v1
+# Penta Provider Control Plane v1.1
 
 This runtime package closes the Phase 3 software-provider gap through four independently governed subsystems:
 
 - **PentaCredentials™** — binds provider credentials from server/runtime secret stores and records only presence plus non-reversible fingerprints.
 - **PentaBuild™** — materializes deterministic adapter/plugin assets and appendable build receipts.
-- **PentaCertify™** — independently validates artifact digest, contract shape, secret leakage, credential binding, and exact operation readback evidence.
+- **PentaCertify™** — independently validates artifact digest, contract shape, secret leakage, credential binding, and live provider readback for the exact operation being certified.
 - **PentaNurture™** — continuously checks binding/certification health, records drift, and sets **software** as the priority lane.
 
 ## Production eligibility
 
-A provider operation is executable only when the runtime can prove the required credential binding, build receipt, current certification, current nurture health, and—when the operation mutates provider state—operation-specific readback evidence.
+Credential presence is not live authentication. An adapter is not `CERTIFIED` until PentaCertify receives a successful live, read-only provider response for its registered certification probe.
 
-`HOLD_UNBOUND` is intentional. Missing credentials are never invented and are never converted into a passing state.
+A provider operation is executable only when the runtime can prove the required credential binding, build receipt, live certification, current nurture health, and exact-operation readback when the operation contract requires it. All initial operation contracts require readback.
+
+`HOLD_UNBOUND` and `AUTH_BOUND_PENDING_READBACK` are intentional. Missing credentials or failed/unavailable provider probes are never converted into passing states.
 
 ## Cookies
 
@@ -33,8 +35,8 @@ Generated state defaults to `.penta/provider-control-plane/` and is evidence/out
 
 The initial registry can bind these runtime aliases when present:
 
-- GitHub: `GITHUB_TOKEN` or GitHub Actions OIDC request variables
-- Supabase: `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, or GitHub Actions OIDC for the governed bridge
+- GitHub: `GITHUB_TOKEN`
+- Supabase native REST: `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
 - Vercel: `VERCEL_TOKEN`
 - Stripe: `STRIPE_SECRET_KEY`
 - Resend: `RESEND_API_KEY`
@@ -42,19 +44,35 @@ The initial registry can bind these runtime aliases when present:
 - Slack: `SLACK_BOT_TOKEN`
 - ElevenLabs: `ELEVENLABS_API_KEY`
 
-These aliases are contract names, not claims that the corresponding secret is currently configured. PentaCredentials resolves that truth at runtime.
+The existing PentaFactory GitHub→Supabase OIDC bridge remains a separately evidenced provider path; generic GitHub Actions OIDC availability is not treated as proof that the native Supabase adapter authenticated.
+
+These aliases are contract names, not claims that the corresponding secret is currently configured. PentaCredentials resolves that truth at runtime and PentaCertify separately proves authentication with a live read-only provider probe.
+
+## Initial certification probes
+
+- GitHub — repository metadata read.
+- Supabase — REST/OpenAPI root read using service-role authentication.
+- Vercel — authenticated current-user read.
+- Stripe — authenticated balance read.
+- Resend — authenticated domain list read.
+- Mailgun — authenticated domain list read.
+- Slack — authenticated `auth.test`.
+- ElevenLabs — authenticated current-user read.
+
+Probe response bodies are not persisted. Certification evidence contains only the operation, PASS/FAIL/readback state, status/semantic result where applicable, and timestamp.
 
 ## State progression
 
-`UNINSPECTED → DISCOVERED → DOCUMENTED → AUTHENTICATED → SANDBOX_TESTED → INTEGRATION_TESTED → CERTIFIED → WRITE_VERIFIED → PRODUCTION_MONITORED`
+`UNINSPECTED → DISCOVERED → DOCUMENTED → AUTH_BOUND_PENDING_READBACK → CERTIFIED → WRITE_VERIFIED → PRODUCTION_MONITORED`
 
 PentaBuild alone stops at `BUILT_PENDING_INDEPENDENT_VERIFICATION`.
 
 ## Safety invariants
 
 - Provider capability is not CrownThrive authority.
-- Credential presence is not write certification.
+- Credential presence is not provider certification.
 - Adapter compilation is not live-provider proof.
+- Read certification does not grant write authority.
 - A write operation is never inherited from a different certified operation.
 - Certification expires and must be renewed.
 - D3/reserved authority is not self-created.
