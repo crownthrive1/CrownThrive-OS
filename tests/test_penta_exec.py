@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from runtime.penta_exec import PentaExecutionError, family_list, family_validate, invoke_member, load_adapter_registry, member_status, validate_adapter_registry  # noqa: E402
 from runtime.penta_family import load_family  # noqa: E402
+from runtime.penta_compliance_license import verify_receipt  # noqa: E402
 
 
 def expect_error(fn, contains: str) -> None:
@@ -118,21 +119,14 @@ def test_penta_od_reports_bounded_dispatch_readiness() -> None:
 
 
 def _compliance_payload() -> dict:
-    return {
-        "obligations": [{
-            "obligation_id": "obl.test", "title": "Test adopted obligation", "source_ref": "test:source", "owner_ref": "test:owner", "status": "active",
-            "jurisdictions": ["US"], "scopes": ["license"], "evidence_requirements": ["ctrl.test"],
-            "controls": [{"control_id": "ctrl.test", "requirement": "evidence exists"}], "effective_from": "2026-01-01", "source_sha256": "a" * 64
-        }],
-        "jurisdictions": ["US"], "scopes": ["license"], "evidence_index": {"ctrl.test": ["evidence:test"]}, "as_of": "2026-08-26"
-    }
+    return {"obligations": [{"obligation_id": "obl.test", "title": "Test adopted obligation", "source_ref": "test:source", "owner_ref": "test:owner", "status": "active", "jurisdictions": ["US"], "scopes": ["license"], "evidence_requirements": ["ctrl.test"], "controls": [{"control_id": "ctrl.test", "requirement": "evidence exists"}], "effective_from": "2026-01-01", "source_sha256": "a" * 64}], "jurisdictions": ["US"], "scopes": ["license"], "evidence_index": {"ctrl.test": ["evidence:test"]}, "as_of": "2026-08-26"}
 
 
 def test_penta_compliance_executes_deterministic_evaluation() -> None:
     result = invoke_member(ROOT, source_member="penta.status", target_member="penta.compliance", operation="evaluate", evidence_refs=["test:penta-exec:compliance"], payload=_compliance_payload(), risk_class="D0")
     assert result["disposition"] == "completed", result
     evaluation = result["details"]["result"]
-    assert evaluation["schema"] == "ct.penta.compliance-evaluation.v1" and evaluation["disposition"] == "PASS_EVIDENCE_SATISFIED" and len(evaluation["receipt_sha256"]) == 64
+    assert evaluation["schema"] == "ct.penta.compliance-evaluation.v1" and evaluation["disposition"] == "PASS_EVIDENCE_SATISFIED" and verify_receipt(evaluation)
 
 
 def test_penta_license_evaluates_readiness_without_issuing_grant() -> None:
@@ -141,9 +135,9 @@ def test_penta_license_evaluates_readiness_without_issuing_grant() -> None:
     request = {"request_id": "req.test", "asset_id": "asset.test", "asset_version": "1.0.0", "asset_sha256": "b" * 64, "licensee_ref": "licensee:test", "use_case": "test", "lane": "self_serve", "risk_class": "D1", "valid_from": "2026-08-26", "valid_until": "2027-08-26", "template_ref": "template:test", "acceptance_ref": "accept:test", "idempotency_key": "idem:test", "requested_rights": ["display"], "territories": ["US"], "media": ["digital"], "authority_trace": {"chlom_ref": "chlom:test", "accountable_owner": "owner:test"}, "compliance_receipt": compliance, "commercial_terms_ref": "terms:test", "provider_effect": False}
     result = invoke_member(ROOT, source_member="penta.status", target_member="penta.license", operation="readiness", evidence_refs=["test:penta-exec:license"], payload={"asset": asset, "request": request}, risk_class="D0")
     assert result["disposition"] == "completed", result
-    decision = result["details"]["result"]
-    assert decision["schema"] == "ct.penta.license-decision.v1" and decision["disposition"] == "ISSUE_READY_INTERNAL" and decision["binding_action_performed"] is False
-    assert decision["adapter_boundary"] == "readiness_only_no_license_grant_issued"
+    readiness = result["details"]["result"]; decision = readiness["decision"]
+    assert decision["schema"] == "ct.penta.license-decision.v1" and decision["disposition"] == "ISSUE_READY_INTERNAL" and decision["binding_action_performed"] is False and verify_receipt(decision)
+    assert readiness["adapter_boundary"] == "readiness_only_no_license_grant_issued" and readiness["binding_action_performed"] is False
 
 
 def test_penta_scribe_runs_real_isolated_reconciliation_cycle() -> None:
