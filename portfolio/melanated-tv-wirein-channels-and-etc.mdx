@@ -1,11 +1,11 @@
 ---
 title: "Melanated TV Wirein Channels and etc"
-description: "Institutional live-channel wire-in standard for Melanated TV, MVP, syndication and on-demand distribution assets."
+description: "Institutional live-channel wire-in standard for Melanated TV, MVP, syndication, FAST and on-demand distribution assets."
 ---
 
 # Melanated TV Wirein Channels and etc
 
-This page is the institutional intake and operating standard for Melanated TV live channels, linear feeds, syndicated programs, on-demand destinations, playback manifests, embeds, and provider-backed streaming assets.
+This page is the institutional intake and operating standard for Melanated TV live channels, linear feeds, FAST channels, syndicated programs, on-demand destinations, playback manifests, embeds, provider capabilities, and account-level distribution infrastructure.
 
 ## Canonical asset: Bless the Mic
 
@@ -19,6 +19,8 @@ This page is the institutional intake and operating standard for Melanated TV li
 | Playback | HLS (`m3u8`) |
 | Public embed | Viloud iframe player |
 | Registry | ThriveBase `mtv_channel_assets` |
+| Account snapshots | ThriveBase `mtv_provider_account_snapshots` |
+| Channel inventory | ThriveBase `mtv_channel_inventory_snapshots` |
 | Workflow | Melanated TV Wirein Channels and etc |
 
 ### Distribution destinations
@@ -30,15 +32,69 @@ This page is the institutional intake and operating standard for Melanated TV li
 - Behind the Beat (SYND)
 - Barbershop Talk (SYND)
 
-This means `Bless the Mic` is not treated as an isolated stream. It is a Melanated TV program asset that can act as a source node for syndication, linear programming, on-demand distribution, and web playback across the CrownThrive media mesh.
+`Bless the Mic` is therefore not treated as an isolated stream. It is a Melanated TV program asset that can act as a source node for syndication, linear programming, on-demand distribution, web playback, and future third-party OTT/FAST delivery.
 
-## Powered-by mapping
+## Provider control-plane context
 
-Viloud is recorded as the current provider for live ingest, playback, iframe embedding, and configured destination distribution. Melanated TV remains the CrownThrive-owned network/brand layer; MVP and the named SYND/OD destinations are distribution surfaces. Provider identity must never replace network ownership or program identity in the institutional registry.
+Viloud is the current cloud video/playout provider for this media mesh. The provider supports linear, on-demand, live, player embedding, HLS/M3U8 delivery, analytics, and advertising/FAST capabilities. CrownThrive retains network, brand, content, rights, and distribution-governance identity; Viloud is the transport/playout/provider layer.
+
+The public Viloud Delivery API exposes channel metadata, schedule data, and XMLTV EPG endpoints. The provider documentation describes the management API as forthcoming, so automation must currently distinguish **delivery/read integration** from **dashboard-only management actions**.
+
+Provider documentation also supports M3U8/HLS output for delivery to web players, mobile/TV apps and OTT platforms. Provider announcements captured by the founder further identify Castlify as the path for sending linear M3U8 channels to RTMP or SRT destinations.
+
+## Captured account operating envelope
+
+The August 25, 2026 founder dashboard capture is registered as an operational snapshot, not as an eternal plan definition.
+
+| Capability / limit | Captured state |
+| --- | ---: |
+| Provider-reported channel views | 52,925 |
+| Visible per-channel subtotal | 52,577 |
+| Visible inventory rows | 71 |
+| Stored minutes | 153 / 3,000 |
+| Viewed minutes this month | 7 / 100,000 |
+| Channel count entitlement | Unlimited |
+| Branded websites | 50 |
+| Team seats | 2 / 10 |
+| Simultaneous live streams | 5 |
+| FAST entitlement | 1 channel |
+| Linear M3U8 links | Enabled |
+| Ads monetization | Enabled |
+| AppSumo codes redeemed | 10 |
+
+The **348-view difference** between the provider headline total and the visible per-channel subtotal is preserved as a reconciliation delta. Neither number is silently overwritten.
+
+The raw redeemed AppSumo codes are classified as restricted entitlement material. Only the logical secret reference `VILOUD_APPSUMO_REDEEMED_CODES` and the count are allowed in the institutional registry.
+
+## Team and workspace state
+
+The capture shows two of ten team seats in use or allocated: one joined identity with all-workspace access and one invitation awaiting acceptance for the Default Workspace. Public documentation records only the governance state and counts; personal account addresses remain out of the public docs surface.
+
+Viloud now supports separate Workspaces and team-member management. CrownThrive should use workspaces as provider-level isolation boundaries while preserving one institutional media registry in ThriveBase.
+
+## Channel portfolio snapshot
+
+The captured provider inventory spans FAST, linear, syndication, and on-demand surfaces across the CrownThrive media ecosystem. Important families include Melanated TV/MVTV, MVP/MVP BLACK+, Melanated Vault Network, Melanated Stock Channel, Virality Music, ThriveHope, ThriveGaming, ThriveHealth, ThriveFinance, ThriveCulture, ThriveBusiness, Locticians, CrownThriveU, Melanated Messages, VOICES+, VOYAGE+, CULTURE360, TASTE+TABLE, STREETLUXE, Luxperiences TV, and related syndication/program channels.
+
+The complete normalized snapshot is stored in ThriveBase `mtv_channel_inventory_snapshots` with channel class and visible view count where provided. FAST entries without visible view counts remain `NULL`, not zero.
+
+### Highest visible channel counts in this capture
+
+- ThriveGaming OD — 6,113
+- ThriveHealth OD — 5,877
+- ThriveFinance OD — 5,637
+- Locticians OD — 5,164
+- ThriveBusiness OD — 4,771
+- ThriveHope OD — 4,730
+- ThriveCulture OD — 4,203
+- MVTV SYND — 4,060
+- True Crime Depot SYND — 3,404
+- Virality Music SYND — 2,620
+- MVP FAMILY SYND — 2,518
+
+These figures are provider-dashboard snapshots, not lifetime guarantees or independently audited audience metrics.
 
 ## Public embed
-
-The public-safe embed is:
 
 ```html
 <div style="position: relative; padding-bottom: 56.25%; height: 0;">
@@ -73,43 +129,60 @@ export function BlessTheMicLive() {
 
 ## Direct HLS playback
 
-The institutional registry also records the public HLS manifest for player integrations that support HLS. Applications should prefer the iframe embed when the provider player is desired and the HLS manifest when CrownThrive controls the player surface.
-
 ```text
 https://571561.gvideo.io/mpegts/571561_4106577/master_mpegts.m3u8
 ```
+
+Applications should prefer the iframe embed when Viloud's managed player is desired and the HLS manifest when CrownThrive controls the player surface or supplies an OTT/TV integration.
+
+## Delivery API integration contract
+
+Current public provider documentation exposes read-side delivery endpoints using a Viloud channel ID:
+
+```text
+GET https://deliver.viloud.tv/channel/{channel_id}
+GET https://deliver.viloud.tv/channel/{channel_id}/schedule
+GET https://deliver.viloud.tv/channel/{channel_id}/epg?format=xmltv
+```
+
+The channel response can support standard JSON and Roku-oriented output where documented. The EPG endpoint supplies XMLTV. Integrations must tolerate additive response attributes because Viloud's API versioning guidance treats new attributes and endpoints as backward-compatible additions.
+
+## Castlify distribution lane
+
+The provider dashboard announcement identifies Castlify as a distribution path for taking a Viloud linear-channel M3U8 feed and sending it onward to RTMP or SRT destinations. Institutional meaning:
+
+`CrownThrive content/rights → Viloud playout → HLS/M3U8 → Castlify distribution → RTMP/SRT destination`
+
+This lane is **available capability**, not evidence that every CrownThrive channel has already been configured to an external RTMP/SRT destination.
 
 ## Secret handling
 
 The RTMP stream key is a restricted runtime credential. It must **never** appear in Git, public documentation, logs, screenshots, client-side JavaScript, analytics payloads, issue bodies, or public configuration. ThriveBase stores only the logical secret reference `VILOUD_BLESS_THE_MIC_STREAM_KEY`; the raw credential belongs in the authorized runtime secret/vault layer.
 
-The RTMP ingest endpoint itself is not sufficient to publish without the secret and may be documented internally where useful.
-
-## Current captured provider state
-
-At founder capture, the Viloud account reported 153 stored minutes out of 3,000 included minutes and no recorded live streams yet for this asset. These are operational snapshot values, not permanent entitlements; future automation should refresh provider state instead of treating these values as constants.
+The same rule applies to redeemed plan/license codes and any future API token, workspace token, webhook credential, or provider management credential.
 
 ## Institutional asset roles
 
-`Bless the Mic` is registered as all of the following:
+`Bless the Mic` is registered as:
 
 - Melanated TV live program asset
 - syndication source
 - linear-feed source
 - on-demand distribution source
 - embeddable web playback asset
+- OTT/TV integration candidate through HLS
 - provider-backed media node governed through the CrownThrive media mesh
 
 ## Intake contract for every channel supplied next
 
-Every future channel/live-stream record supplied under this workflow should be normalized into the same fields: canonical asset ID, network/brand owner, program title, provider, ingest protocol and endpoint, **secret reference only**, public playback URL, embed URL, destination set, asset roles, storage/plan snapshot, current status, provenance, and evidence timestamp.
+Every future channel/live-stream record supplied under this workflow should normalize into: canonical asset ID, network/brand owner, program title, provider, channel class, ingest protocol and endpoint, **secret reference only**, public playback URL, embed URL, destination set, asset roles, provider/account snapshot, view metrics, current status, provenance, and evidence timestamp.
 
-Duplicate source text must reconcile into one canonical asset record rather than generating duplicate institutional assets. New destinations extend the destination set; changed provider values create an auditable update event.
+Duplicate source text reconciles into one canonical asset record rather than creating duplicate assets. New destinations extend the destination set. Changed provider values create an auditable update event. Snapshot metrics append; they do not overwrite historical evidence.
 
 ## Governance boundary
 
-This record institutionalizes configuration and ownership topology. It does not claim that every downstream destination is currently broadcasting unless runtime evidence confirms it. “Configured destination,” “registered asset,” “verified playback,” and “verified live carriage” are separate evidence states.
+“Listed in provider dashboard,” “registered asset,” “configured destination,” “verified playback,” “verified scheduled content,” “verified live carriage,” and “verified external distribution” are distinct evidence states. An empty channel or zero-view channel remains a valid registered distribution surface but must not be represented as actively programmed or viewed.
 
 ## Verification
 
-ThriveBase currently contains the canonical `mtv-bless-the-mic-live` record with Viloud as provider, HLS as playback protocol, six configured destinations, and vault-reference-only secret handling. The audit ledger is `mtv_channel_wirein_events`.
+ThriveBase contains the canonical `mtv-bless-the-mic-live` record, the provider-account snapshot, the 71-row visible channel inventory snapshot, and an audit event linking the account context to the channel. Public-safe documentation and runtime-secret boundaries are maintained separately.
