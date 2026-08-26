@@ -4,34 +4,69 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/release-requests/crownthrive-os-v2.0.1.json'
+      - '.github/release-requests/crownthrive-os-*.json'
   workflow_dispatch:
+    inputs:
+      request_file:
+        description: Release request JSON path
+        required: true
+        default: .github/release-requests/crownthrive-os-v2.1.0.json
 
 permissions:
   contents: write
 
 concurrency:
-  group: crownthrive-os-v2.0.1-release
+  group: crownthrive-os-release-publisher
   cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout release source
+      - name: Checkout control branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: os-v2/autonomous-runtime-20260825
+          ref: main
+          fetch-depth: 2
+
+      - name: Resolve release request
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REQUEST='${{ inputs.request_file }}'
+          else
+            REQUEST=$(git diff --name-only HEAD^ HEAD | grep '^.github/release-requests/crownthrive-os-.*\.json$' | tail -1)
+          fi
+          test -n "$REQUEST"
+          test -f "$REQUEST"
+          python -m json.tool "$REQUEST" >/dev/null
+          TAG=$(jq -r '.tag' "$REQUEST")
+          TARGET=$(jq -r '.target' "$REQUEST")
+          TITLE=$(jq -r '.title' "$REQUEST")
+          PACKAGE=$(jq -r '.package' "$REQUEST")
+          for V in TAG TARGET TITLE PACKAGE; do test -n "${!V}" && test "${!V}" != "null"; done
+          echo "REQUEST=$REQUEST" >> "$GITHUB_ENV"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "TARGET=$TARGET" >> "$GITHUB_ENV"
+          echo "TITLE=$TITLE" >> "$GITHUB_ENV"
+          echo "PACKAGE=$PACKAGE" >> "$GITHUB_ENV"
+
+      - name: Checkout requested release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TARGET }}
           fetch-depth: 0
 
       - name: Validate package
         shell: bash
         run: |
           set -euo pipefail
-          test -f releases/v2.0.1/RELEASE_NOTES.md
-          test -f releases/v2.0.1/MANIFEST.json
-          test -f supabase/functions/crownthrive-os-v2-runtime/index.ts
-          python -m json.tool releases/v2.0.1/MANIFEST.json >/dev/null
+          test -f "$PACKAGE/RELEASE_NOTES.md"
+          test -f "$PACKAGE/MANIFEST.json"
+          python -m json.tool "$PACKAGE/MANIFEST.json" >/dev/null
+          test "$(jq -r '.tag' "$PACKAGE/MANIFEST.json")" = "$TAG"
+          test "$(jq -r '.target_ref' "$PACKAGE/MANIFEST.json")" = "$TARGET"
 
       - name: Publish GitHub Release
         env:
@@ -39,13 +74,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG='v2.0.1'
-          TITLE='CrownThrive OS V2.0.1 — Founder Visibility & Autonomous Briefing'
-          TARGET='os-v2/autonomous-runtime-20260825'
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TITLE" --notes-file releases/v2.0.1/RELEASE_NOTES.md --target "$TARGET"
+            gh release edit "$TAG" --title "$TITLE" --notes-file "$PACKAGE/RELEASE_NOTES.md" --target "$TARGET"
           else
-            gh release create "$TAG" --target "$TARGET" --title "$TITLE" --notes-file releases/v2.0.1/RELEASE_NOTES.md
+            gh release create "$TAG" --target "$TARGET" --title "$TITLE" --notes-file "$PACKAGE/RELEASE_NOTES.md"
           fi
 
       - name: Verify release readback
@@ -54,4 +86,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release view v2.0.1 --json tagName,name,url,isDraft,isPrerelease,targetCommitish
+          gh release view "$TAG" --json tagName,name,url,isDraft,isPrerelease,targetCommitish
