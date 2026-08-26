@@ -121,7 +121,7 @@ jobs:
           set -euo pipefail
           OIDC=$(curl -fsSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-factory-github" | jq -r .value)
           jq -n --arg job "$JOB_ID" --arg sha "$COMMIT_SHA" --arg url "$COMMIT_URL" --arg gate "$GATE_RUN_ID" --argjson count "$FILE_COUNT" '{action:"complete",job_id:$job,commit_sha:$sha,head_sha:$sha,commit_url:$url,branch:"main",file_count:$count,governance_gate_run_id:$gate,rollback_ref:("git:"+$sha+"^1")}' > complete.json
-          curl -fsSL -H "Authorization: Bearer ${OIDIDC}" -H 'Content-Type: application/json' --data-binary @complete.json "$BRIDGE" | jq .
+          curl -fsSL -H "Authorization: Bearer ${OIDC}" -H 'Content-Type: application/json' --data-binary @complete.json "$BRIDGE" | jq .
 
       - name: Delete governed staging branch
         if: success()
