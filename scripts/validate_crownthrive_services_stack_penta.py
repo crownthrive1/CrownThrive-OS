@@ -49,7 +49,9 @@ def main() -> None:
     require(css["phase"] == "3", "Phase 3 binding required")
     require(set(css["service_ids"]) == EXPECTED and css["service_count"] == 14, "stable service inventory drift")
     authority = css["authority"]
-    require(authority["orchestration_owner"] == "PentaFabric", "PentaFabric ownership required")
+    require(authority["orchestration_owner"] == "PentaMation", "PentaMation ownership required")
+    require(authority["routing_owner"] == "PentaRoute", "PentaRoute ownership required")
+    require(authority["federation_owner"] == "PentaFederation", "PentaFederation ownership required")
     require(authority["credential_owner"] == "PentaCredentials", "PentaCredentials ownership required")
     require(authority["certification_owner"] == "PentaCertify", "PentaCertify ownership required")
     require(authority["standalone_governance_authority"] is False, "CSS cannot become authority")
@@ -70,7 +72,7 @@ def main() -> None:
     require(inv["provider_write"] is False and inv["money_movement"] is False and inv["rights_grant"] is False, "precompile side-effect boundary widened")
 
     require("hard-coded privileged identity" in doc, "legacy Edge security disposition missing")
-    require("PentaCredentials" in skill and "PentaCertify" in skill, "current execution binding missing")
+    require(all(name in skill for name in ("PentaCredentials", "PentaCertify", "PentaRoute", "PentaMation")), "current execution binding missing")
     require("Parallelize preparation" in PRECOMPILE_DOC.read_text(encoding="utf-8"), "precompile invariant missing")
     print("CrownThrive Services Stack Phase-3 Penta compatibility: PASS")
 
