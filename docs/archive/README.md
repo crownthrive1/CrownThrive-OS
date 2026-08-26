@@ -40,7 +40,9 @@ If the original body must be preserved exactly, CrownThrive should add metadata 
 
 ## Current-vs-history precedence
 
-When historical and current material conflict, current adopted registries, current verified production/provider evidence, current effective policy, and current founder/governance adjudications control within their scope. Historical records remain evidence of what was true, intended, or believed at their effective time.
+When historical and current material conflict, **CrownThrive OS current effective records control institution-wide state**, with OS-bound verified production/provider evidence, current effective policy, and current founder/governance adjudications controlling within their exact scope. Historical records remain evidence of what was true, intended, or believed at their effective time.
+
+Mintlify, websites, storefronts, media surfaces, and other public properties are downstream projections. Their temporary lag does not redefine current OS state.
 
 ## Machine and search behavior
 
@@ -75,4 +77,4 @@ Git tags, GitHub releases, changelogs, historical registries, and archive pages 
 
 ## Current canon
 
-For current Phase 3 orientation, use [`../phase3/CURRENT_STATE.md`](../phase3/CURRENT_STATE.md) and the active Mintlify homepage rather than an archived phase page.
+For current Phase 3 orientation, use [`../phase3/CURRENT_STATE.md`](../phase3/CURRENT_STATE.md), the root `README.md`, the current version registry, and other active CrownThrive OS records. Downstream Mintlify and website projections inherit this state when their publication workstream runs; they are not alternate sources of truth.
