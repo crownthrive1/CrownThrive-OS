@@ -1,21 +1,26 @@
 ---
 title: CHLOM Agentic Foundry Production Package Certification
-description: Public-safe certification of the CHLOM Agentic Foundry seven-plane production package, maintenance activation boundary, sidecar factory, protected asset factory, Vault custody, interoperability and patch control.
+description: Public-safe certification of the CHLOM Agentic Foundry seven-plane production package, source acceptance, post-maintenance runtime-apply boundary, sidecar factory, protected asset factory, Vault custody, interoperability and patch control.
 icon: industry
 ---
 
 # CHLOM Agentic Foundry Production Package Certification
 
-**Certification date:** 2026-08-24  
+**Original certification date:** 2026-08-24  
+**Current-state reconciliation:** 2026-08-26  
 **System:** `ct.system.chlom-agentic-foundry.v1`  
 **Version:** `1.0.0`  
 **Founder authority:** `founder-directive:2026-08-24:agentic-foundry-production`  
 **Production package:** `PASS`  
-**Live ThriveBase activation:** `HOLD_MAINTENANCE`
+**Runtime source:** `PASS_SOURCE_ACCEPTED`  
+**Maintenance event:** `closed`  
+**Live ThriveBase activation:** `HOLD_RUNTIME_APPLY_PENDING`
 
 The CHLOM Agentic Foundry is CrownThrive's governed software plane for reusable agent sidecars, protected institutional assets, Vault-bound capabilities, MCP/API/plugin/skill interoperability, ThriveBase optimization, bounded patch automation and relay reuse.
 
-The current source package is production-targeted and founder-authorized. It is **not yet a claim that its migration is live in ThriveBase**. Targeted maintenance `ct.maintenance.2026-08-24.targeted-quiescence.v1` currently blocks ordinary foundry mutation. The package may be merged after exact-head CI; the existing Maintenance Coordinator must perform the eventual governed apply/readback in the correct reactivation wave.
+The source package is production-targeted, founder-authorized, and accepted on `crownthrive1/CrownThrive-CIE` `main` through merged PR #24. Targeted maintenance `ct.maintenance.2026-08-24.targeted-quiescence.v1` closed on August 26, 2026. Maintenance therefore no longer blocks the foundry. **The remaining activation gap is the runtime apply itself:** the accepted migration has not yet been applied and certified in ThriveBase.
+
+Source acceptance and maintenance release do not equal live activation. The exact accepted migration must be applied through the governed Supabase migration path, then second-read, stress-tested, privilege-checked, scheduler-checked, Vault-checked and DAIL-certified before `PASS_PRODUCTION_RUNTIME` is allowed.
 
 ## Seven planes
 
@@ -54,7 +59,7 @@ Supported initial candidate kinds are `algorithm`, `skill`, `prompt`, `script`, 
 
 ## VaultBridge
 
-The protected runtime migration creates the Vault alias `chlom_agentic_foundry_control_v1` only inside Supabase Vault if it does not already exist. No secret value belongs in GitHub, Mintlify, Drive or this certification.
+The protected runtime migration creates the Vault alias `chlom_agentic_foundry_control_v1` only inside Supabase Vault if it does not already exist. No secret value belongs in GitHub, PentaDocs, Drive or this certification.
 
 The corresponding protected control identity is `ct.package.chlom-agentic-foundry.control.v1`. Foundry Vault capabilities return sanitized outputs and set body exposure to false.
 
@@ -84,18 +89,20 @@ Every patch candidate begins with `apply_authorized=false`. D3 candidates remain
 
 ## Scheduler topology
 
-Database-native foundry work is assigned to internal pg_cron at minutes 11 and 41. Connector-heavy work reuses the existing CrownThrive External Evidence Relay. **External scheduler slots added: 0.**
+The accepted design assigns database-native foundry work to internal pg_cron at minutes 11 and 41. Connector-heavy work reuses the existing CrownThrive External Evidence Relay. **External scheduler slots added: 0.**
 
-The relay remains maintenance-suspended until the existing release plan restores the applicable execution wave.
+Those foundry-specific runtime registrations are not claimed active until the migration is applied and read back. The broader maintenance event is closed; the remaining gate is exact runtime installation and certification, not time or maintenance release.
 
 ## Source and verification
 
 Protected runtime source:
 
 - repository: `crownthrive1/CrownThrive-CIE`
-- PR: `#24`
-- branch: `foundry/chlom-agentic-foundry-v1-20260824`
+- merged PR: `#24`
+- accepted head: `10fbc32b84a2b1ee37f7407c40ab01dddaff5deb`
+- merge commit: `ba008b3cf4018266e9d626a03d86be11e6efa7b4`
 - migration: `factory/migrations/chlom_agentic_foundry_production_v1.sql`
+- accepted migration SHA-256: `5c24cfad8deeee658e1b9fca7fa12e5c21200bf2cbebde8419f75df4051e80e9`
 - deterministic validator: `factory/scripts/validate_chlom_agentic_foundry_v1.py`
 - workflow: `.github/workflows/chlom-agentic-foundry-governance.yml`
 
@@ -103,12 +110,13 @@ Public-safe institutional source:
 
 - `developers/manifests/chlom-agentic-foundry.v1.json`
 - `developers/contracts/chlom-agentic-foundry-production.v1.json`
+- source-acceptance receipt
 - this certification
 - production activation runbook
 
 ## Certification boundary
 
-This certification establishes that the **source-controlled production package** exists with the required governance design. Final runtime certification requires the Maintenance Coordinator to apply the exact accepted migration after maintenance release, then prove:
+This certification establishes that the **source-controlled production package is accepted** and the prior maintenance blocker is released. Final runtime certification still requires applying the exact accepted migration and proving:
 
 1. seven active planes;
 2. at least thirteen bounded sidecar classes;
@@ -123,4 +131,4 @@ This certification establishes that the **source-controlled production package**
 11. RLS/FORCE-RLS and function privileges match the contract;
 12. DAIL records the exact runtime activation and evidence digest.
 
-Until those runtime predicates are proven, the correct state remains **`PASS_PACKAGE / HOLD_MAINTENANCE_RUNTIME`**.
+Until those runtime predicates are proven, the correct state is **`PASS_PACKAGE / HOLD_RUNTIME_APPLY_PENDING`**.
