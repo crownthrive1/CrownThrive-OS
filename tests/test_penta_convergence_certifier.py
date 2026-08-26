@@ -20,12 +20,25 @@ class PentaConvergenceCertifierTests(unittest.TestCase):
     def setUpClass(cls):
         cls.evidence = module.certify(ROOT)
 
-    def test_invokes_complete_registered_family(self):
+    def test_invokes_complete_registered_universe(self):
         family = self.evidence["family"]
         self.assertGreater(family["member_count"], 0)
         self.assertEqual(family["member_count"], family["invocation_count"])
+        self.assertGreaterEqual(family["runtime_registered_count"], family["family_child_count"])
         keys = [item["machine_key"] for item in self.evidence["invocations"]]
         self.assertEqual(len(keys), len(set(keys)))
+
+    def test_runtime_observability_spine_is_explicit(self):
+        family = self.evidence["family"]
+        extensions = set(family["runtime_extensions"])
+        self.assertEqual(
+            extensions,
+            {"penta.error", "penta.logger", "penta.metric", "penta.trace"},
+        )
+        for invocation in self.evidence["invocations"]:
+            if invocation["machine_key"] in extensions:
+                self.assertEqual(invocation["registry_scope"], "runtime_spine_extension")
+                self.assertIsNone(invocation["family_gate"]["eligible"])
 
     def test_preserves_held_members_without_promotion(self):
         family = self.evidence["family"]
@@ -41,8 +54,9 @@ class PentaConvergenceCertifierTests(unittest.TestCase):
         checks = self.evidence["critical_checks"]
         self.assertTrue(checks["family_status_production"])
         self.assertTrue(checks["family_fail_closed"])
-        self.assertTrue(checks["full_member_census_invoked"])
-        self.assertTrue(checks["runtime_member_census_matches"])
+        self.assertTrue(checks["all_family_members_present_in_runtime"])
+        self.assertTrue(checks["full_registered_universe_invoked"])
+        self.assertTrue(checks["runtime_extension_inventory_explicit"])
         self.assertTrue(checks["provider_control_plane_present"])
         self.assertTrue(checks["provider_contract_clean"])
         self.assertTrue(checks["pentamail_registered"])
