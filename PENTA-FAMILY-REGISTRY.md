@@ -97,6 +97,7 @@ CrownThrive IO is the operating/control surface; PentaDocs is the authoritative 
 | PentaSLAs™ | governed SLA/SLO registry, effective targets, escalation ownership, measurement lineage, and service-commitment continuity | `/io/pentas/slas` |
 | PentaTime™ | canonical scheduling, temporal policy, clock, TTL, deadline, and scheduler authority | `/io/pentas/time` |
 | PentaDocs™ | institutional documentation, knowledge, navigation, glossary, and documentation governance | `/io/pentas/docs` |
+| PentaContext™ | scoped context ingestion, provenance, redaction, retrieval, retention, and operational-memory plane; context is never authority | `/io/pentas/context` |
 | PentaScribe™ | terms, glossaries, indexes, FAQs, dictionary, trademark and institutional record maintenance | `/io/pentas/scribe` |
 | PentaMail™ | canonical email communications, delivery, queueing, templates, retries, bounce/complaint handling, and communication audit rail | `/io/pentas/mail` |
 | PentaStatus™ | self-status/introspection and owner-reporting authority for Penta/system health and readiness | `/io/pentas/status` |
