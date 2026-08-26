@@ -1,0 +1,49 @@
+{
+  "schema": "ct.penta.github-execution-fabric.v1",
+  "version": "1.0.0",
+  "components": {
+    "PentaRunners": "validates and inventories execution pools",
+    "PentaPunters": "routes a bounded request to an eligible runner",
+    "PentaActions": "defines immutable shell-free executable contracts",
+    "PentaResults": "seals execution evidence with SHA-256 digests"
+  },
+  "runners": [
+    {
+      "id": "ct.runner.github-hosted.ubuntu.v1",
+      "labels": ["github-hosted", "linux", "x64", "node24"],
+      "state": "production",
+      "priority": 10,
+      "allowed_actions": ["ct.action.fabric-smoke.v1", "ct.action.fabric-unit-tests.v1", "ct.action.runtime-policy.v1"]
+    },
+    {
+      "id": "ct.runner.self-hosted.pentafabric.v1",
+      "labels": ["self-hosted", "linux", "x64", "crownthrive", "pentafabric", "rtc", "trusted"],
+      "state": "certification_only",
+      "priority": 50,
+      "allowed_actions": []
+    }
+  ],
+  "actions": [
+    {
+      "id": "ct.action.fabric-smoke.v1",
+      "argv": ["python3", "-c", "print('penta-github-fabric-ready')"],
+      "shell": false,
+      "timeout_seconds": 30,
+      "state": "production"
+    },
+    {
+      "id": "ct.action.fabric-unit-tests.v1",
+      "argv": ["python3", "-m", "unittest", "tests.test_penta_github_fabric"],
+      "shell": false,
+      "timeout_seconds": 120,
+      "state": "production"
+    },
+    {
+      "id": "ct.action.runtime-policy.v1",
+      "argv": ["python3", "scripts/validate_github_actions_runtime_policy.py"],
+      "shell": false,
+      "timeout_seconds": 120,
+      "state": "production"
+    }
+  ]
+}

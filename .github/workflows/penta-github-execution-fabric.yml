@@ -1,0 +1,54 @@
+name: Penta GitHub Execution Fabric
+
+on:
+  pull_request:
+    paths:
+      - 'penta/github_fabric/**'
+      - 'tests/test_penta_github_fabric.py'
+      - '.github/workflows/penta-github-execution-fabric.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'penta/github_fabric/**'
+      - 'tests/test_penta_github_fabric.py'
+      - '.github/workflows/penta-github-execution-fabric.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-github-execution-fabric-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Validate GitHub Actions runtime policy
+        run: python3 scripts/validate_github_actions_runtime_policy.py
+      - name: Test execution fabric
+        run: python3 -m unittest tests.test_penta_github_fabric
+      - name: Produce PentaResults receipt
+        run: |
+          python3 -m penta.github_fabric.cli \
+            --contract penta/github_fabric/contract.v1.json \
+            --request penta/github_fabric/request.example.json \
+            --receipt penta-github-execution-result.json
+          sha256sum penta-github-execution-result.json > penta-github-execution-result.sha256
+      - name: Upload certification evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-github-execution-result-${{ github.run_id }}
+          path: |
+            penta-github-execution-result.json
+            penta-github-execution-result.sha256
+          if-no-files-found: error
+          retention-days: 30
