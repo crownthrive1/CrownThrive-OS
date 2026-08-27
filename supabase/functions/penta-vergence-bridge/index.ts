@@ -5,10 +5,12 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 const ISSUER = "https://token.actions.githubusercontent.com";
 const AUDIENCE = "penta-vergence";
-const ALLOWED_REPOS = new Set(["crownthrive1/CrownThrive-Support", "crownthrive1/CrownThrive-CIE", "crownthrive1/chlom-protocol"]);
+const ALLOWED_REPOS = new Set(["crownthrive1/CrownThrive-OS", "crownthrive1/CrownThrive-CIE", "crownthrive1/chlom-protocol"]);
+const CANONICAL_OS_REPOSITORY_ID = "1336348391";
+const CANONICAL_OWNER_ID = "315660018";
 const ALLOWED_EVENTS = new Set(["schedule", "workflow_dispatch", "push", "workflow_run"]);
 const JWKS = createRemoteJWKSet(new URL(`${ISSUER}/.well-known/jwks`));
-const SERVER = { name: "PentaVergence", version: "1.0.0", contract: "ct.penta.vergence.bridge.v1" };
+const SERVER = { name: "PentaVergence", version: "1.0.1", contract: "ct.penta.vergence.bridge.v1" };
 const j = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
 async function actor(req: Request) {
@@ -17,10 +19,24 @@ async function actor(req: Request) {
   if (!token) throw new Error("oidc_required");
   const { payload } = await jwtVerify(token, JWKS, { issuer: ISSUER, audience: AUDIENCE, algorithms: ["RS256"], clockTolerance: 10 });
   const repository = String(payload.repository ?? "");
+  const repositoryId = String(payload.repository_id ?? "");
+  const repositoryOwnerId = String(payload.repository_owner_id ?? "");
   const eventName = String(payload.event_name ?? "");
   if (!ALLOWED_REPOS.has(repository)) throw new Error("repository_not_allowed");
+  if (repository === "crownthrive1/CrownThrive-OS" && (repositoryId !== CANONICAL_OS_REPOSITORY_ID || repositoryOwnerId !== CANONICAL_OWNER_ID)) {
+    throw new Error("canonical_os_repository_identity_not_allowed");
+  }
   if (!ALLOWED_EVENTS.has(eventName)) throw new Error("event_not_allowed");
-  return { repository, event_name: eventName, run_id: String(payload.run_id ?? ""), sha: String(payload.sha ?? ""), ref: String(payload.ref ?? ""), actor: String(payload.actor ?? "") };
+  return {
+    repository,
+    repository_id: repositoryId,
+    repository_owner_id: repositoryOwnerId,
+    event_name: eventName,
+    run_id: String(payload.run_id ?? ""),
+    sha: String(payload.sha ?? ""),
+    ref: String(payload.ref ?? ""),
+    actor: String(payload.actor ?? ""),
+  };
 }
 
 Deno.serve(async (req: Request) => {
