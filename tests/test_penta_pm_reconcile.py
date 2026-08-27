@@ -46,6 +46,17 @@ class PentaPMTests(unittest.TestCase):
     def test_policy_has_eight_initial_milestones(self):
         self.assertEqual(len(POLICY["milestones"]), 8)
 
+    def test_graphql_queries_have_balanced_braces(self):
+        for query in (pm.OWNER_PROJECT_QUERY, pm.PROJECT_STATE_QUERY):
+            depth = 0
+            for char in query:
+                if char == "{":
+                    depth += 1
+                elif char == "}":
+                    depth -= 1
+                    self.assertGreaterEqual(depth, 0)
+            self.assertEqual(depth, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
