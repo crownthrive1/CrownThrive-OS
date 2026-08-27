@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MIGRATION = ROOT / "supabase/migrations/20260824073728_cie_post_activation_assurance_watch_v1.sql"
+MIGRATION = ROOT / "supabase/migration_lineage/legacy_local_timestamp_drift/local_only_versions/20260824073728_cie_post_activation_assurance_watch_v1.sql"
 MANIFEST = ROOT / "developers/manifests/cie-post-activation-assurance-watch.v1.json"
 LIVE_RECEIPT = ROOT / "developers/manifests/cie-post-activation-assurance-watch-live-receipt-20260824.v1.json"
 DOC = ROOT / "standards/cie-post-activation-assurance-watch.md"

@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MIGRATION = ROOT / "supabase/migrations/20260824011626_cie_production_certification_bridge_v1.sql"
+MIGRATION = ROOT / "supabase/migration_lineage/legacy_local_timestamp_drift/local_only_versions/20260824011626_cie_production_certification_bridge_v1.sql"
 MANIFEST = ROOT / "developers/manifests/cie-production-certification-bridge.v1.json"
 LIVE_RECEIPT = ROOT / "developers/manifests/cie-production-certification-bridge-live-receipt-20260823.v1.json"
 DOC = ROOT / "standards/cie-production-certification-bridge.md"
