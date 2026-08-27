@@ -1,0 +1,57 @@
+---
+title: "Penta Provider + PentaMail Remediation — 2026-08-26"
+sidebarTitle: "Penta Provider/Mail Remediation"
+description: "Evidence-backed remediation of pull-request provider-credential exposure risk and PentaMail hourly digest body overflow under CrownThrive scheduler topology v1.2.0."
+icon: "shield-check"
+---
+
+# Penta Provider + PentaMail Remediation — 2026-08-26
+
+## Scope
+
+This packet repairs two production-observed issues without creating a new scheduler clock or expanding authority.
+
+### 1. Penta Provider Control Plane pull-request authority exposure
+
+Current `main` at detection was `96c8656c66dbbf8a6b2c2de24147f4ae66402c1a`.
+
+The workflow `.github/workflows/penta-provider-control-plane.yml` combined a `pull_request` trigger with workflow-level `id-token: write`, and provider-secret environment bindings were reachable by jobs that also ran on pull-request events. No unauthorized token use or credential disclosure was observed, but the configuration violated least-privilege separation.
+
+Remediation:
+
+- remove workflow-level `id-token: write`;
+- add a pull-request-only validation job with no provider credential environment;
+- gate provider credential binding and live provider readback jobs to non-`pull_request` events;
+- retain provider/live execution only for trusted push, schedule, and explicit dispatch paths;
+- keep repository contents permission read-only at workflow scope.
+
+This does not create OIDC authority elsewhere. If a future exact job requires OIDC, that permission must be added at that job only and conditioned to a trusted event/ref.
+
+### 2. PentaMail hourly system-change digest overflow
+
+`cron.job` `penta-mail-system-change-digest-hourly-v1` failed three consecutive hourly runs with `PENTAMAIL_INVALID_BODY`. The queue enforces a 12,000-character body ceiling, while the old digest attempted to inline as many as 200 event records per message. A high-volume window contained more than 3,000 recorded change events, making overflow deterministic.
+
+Remediation migration:
+
+`supabase/migrations/20260827003500_pentamail_digest_body_bounding_v2.sql`
+
+The replacement digest function:
+
+- preserves the complete append-only event stream in ThriveBase;
+- emits one bounded operational digest per window;
+- summarizes the top 30 source/event/severity groups;
+- includes at most 10 recent representative events;
+- hard-bounds the final body below the PentaMail transport ceiling;
+- passes the currently governed recipient explicitly rather than silently falling back to the function default;
+- preserves body SHA-256 and append-only digest-chain receipts;
+- remains service-role-only.
+
+A read-only projection against the live high-volume window produced a 4,054-character body for more than 3,400 events, safely below the 11,500-character internal bound and 12,000-character transport limit.
+
+## Scheduler relationship
+
+`ct.scheduler-topology.production.v1` remains the canonical production scheduler topology. No external clock was added. PentaMail delivery remains owned by production-native pg_cron/PentaMail/PentaOD execution. The External Evidence Relay owns connector-only evidence and reconciliation, not PentaMail provider dispatch.
+
+## Authority boundary
+
+This remediation creates no provider-write expansion, money movement, rights or entitlement grant, credential export, sovereign vote, quorum effect, D3 authority, force-push, direct-main write, or self-merge.
