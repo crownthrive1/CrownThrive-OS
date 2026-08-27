@@ -7,6 +7,7 @@ on:
       - ".github/workflows/penta-wave3-ect-mainline.yml"
       - "scripts/penta_wave3_ect_pipeline.py"
       - "scripts/penta_wave3_ect_pipeline_v2.py"
+      - "scripts/penta_wave3_ect_pipeline_v3.py"
 
 permissions:
   contents: write
@@ -18,7 +19,7 @@ concurrency:
 jobs:
   ect-mainline-production:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Checkout Wave 3 history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -42,10 +43,12 @@ jobs:
           cp scripts/penta_wave3_mainline_integrate.py /tmp/penta_wave3_mainline_integrate.py
           cp scripts/penta_wave3_ect_pipeline.py /tmp/penta_wave3_ect_pipeline.py
           cp scripts/penta_wave3_ect_pipeline_v2.py /tmp/penta_wave3_ect_pipeline_v2.py
+          cp scripts/penta_wave3_ect_pipeline_v3.py /tmp/penta_wave3_ect_pipeline_v3.py
           chmod +x \
             /tmp/penta_wave3_mainline_integrate.py \
             /tmp/penta_wave3_ect_pipeline.py \
-            /tmp/penta_wave3_ect_pipeline_v2.py
+            /tmp/penta_wave3_ect_pipeline_v2.py \
+            /tmp/penta_wave3_ect_pipeline_v3.py
           git fetch origin main
           MAIN_SHA=$(git rev-parse origin/main)
           echo "MAIN_SHA=$MAIN_SHA" >> "$GITHUB_ENV"
@@ -56,11 +59,12 @@ jobs:
         env:
           TRANSFORMER_PATH: /tmp/penta_wave3_mainline_integrate.py
           BASE_PIPELINE_PATH: /tmp/penta_wave3_ect_pipeline.py
+          V2_PIPELINE_PATH: /tmp/penta_wave3_ect_pipeline_v2.py
           OLD_HEAD: "105460c828e8baf0d034d43689b278b47d2f9833"
           MAIN_SHA: ${{ env.MAIN_SHA }}
           ECT_RUN_ID: ${{ github.run_id }}
           ECT_RUN_ATTEMPT: ${{ github.run_attempt }}
-        run: python /tmp/penta_wave3_ect_pipeline_v2.py
+        run: python /tmp/penta_wave3_ect_pipeline_v3.py
 
       - name: Commit certified candidate and force-restack PR branch
         shell: bash
@@ -104,4 +108,5 @@ jobs:
             echo '- Provider-effect adapters: 0'
             echo '- PentaEVIBuilder: UNVERIFIED evidence preview only'
             echo '- PentaImmune: bounded repair-plan preview only'
+            echo '- Supabase provider ledger: exact readback captured; repository-history gap remains explicit HOLD'
           } >> "$GITHUB_STEP_SUMMARY"
