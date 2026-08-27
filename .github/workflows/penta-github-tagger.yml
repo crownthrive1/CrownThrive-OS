@@ -6,7 +6,8 @@ on:
   issues:
     types: [opened, reopened, edited, closed]
   schedule:
-    - cron: '17 */6 * * *'
+    # Bounded replay lane for quota-deferred or interrupted events.
+    - cron: '11,41 * * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -21,6 +22,18 @@ on:
         description: all, pr, or issue
         required: false
         default: all
+      max_items:
+        description: Bounded sweep entity count
+        required: false
+        default: '75'
+      request_budget:
+        description: Maximum GitHub API calls per run
+        required: false
+        default: '180'
+      sweep_since_hours:
+        description: Recent open/closed replay window
+        required: false
+        default: '72'
 
 permissions:
   contents: read
@@ -31,7 +44,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: penta-github-tagger-${{ github.repository }}-${{ github.event.pull_request.number || github.event.issue.number || 'sweep' }}
+  group: penta-github-tagger-trigger-${{ github.repository }}-${{ github.event.pull_request.number || github.event.issue.number || 'sweep' }}
   cancel-in-progress: true
 
 jobs:
@@ -41,6 +54,9 @@ jobs:
       mode: ${{ steps.select.outputs.mode }}
       number: ${{ steps.select.outputs.number }}
       kind: ${{ steps.select.outputs.kind }}
+      max_items: ${{ steps.select.outputs.max_items }}
+      request_budget: ${{ steps.select.outputs.request_budget }}
+      sweep_since_hours: ${{ steps.select.outputs.sweep_since_hours }}
     steps:
       - id: select
         shell: bash
@@ -48,6 +64,9 @@ jobs:
           REQUESTED_MODE: ${{ github.event.inputs.mode }}
           REQUESTED_NUMBER: ${{ github.event.inputs.number }}
           REQUESTED_KIND: ${{ github.event.inputs.kind }}
+          REQUESTED_MAX_ITEMS: ${{ github.event.inputs.max_items }}
+          REQUESTED_REQUEST_BUDGET: ${{ github.event.inputs.request_budget }}
+          REQUESTED_SWEEP_SINCE_HOURS: ${{ github.event.inputs.sweep_since_hours }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
           EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -57,18 +76,36 @@ jobs:
             mode=event
             number="${EVENT_PR_NUMBER:-}"
             kind=pr
+            max_items=1
+            request_budget=30
+            sweep_since_hours=72
           elif [[ "$EVENT_NAME" == "issues" ]]; then
             mode=event
             number="${EVENT_ISSUE_NUMBER:-}"
             kind=issue
+            max_items=1
+            request_budget=20
+            sweep_since_hours=72
           else
             mode="${REQUESTED_MODE:-sweep}"
             number="${REQUESTED_NUMBER:-}"
             kind="${REQUESTED_KIND:-all}"
+            max_items="${REQUESTED_MAX_ITEMS:-75}"
+            request_budget="${REQUESTED_REQUEST_BUDGET:-180}"
+            sweep_since_hours="${REQUESTED_SWEEP_SINCE_HOURS:-72}"
           fi
+          [[ "$max_items" =~ ^[0-9]+$ ]] || { echo "invalid max_items" >&2; exit 2; }
+          [[ "$request_budget" =~ ^[0-9]+$ ]] || { echo "invalid request_budget" >&2; exit 2; }
+          [[ "$sweep_since_hours" =~ ^[0-9]+$ ]] || { echo "invalid sweep_since_hours" >&2; exit 2; }
+          (( max_items >= 1 && max_items <= 500 )) || { echo "max_items out of range" >&2; exit 2; }
+          (( request_budget >= 10 && request_budget <= 500 )) || { echo "request_budget out of range" >&2; exit 2; }
+          (( sweep_since_hours >= 1 && sweep_since_hours <= 720 )) || { echo "sweep_since_hours out of range" >&2; exit 2; }
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "number=$number" >> "$GITHUB_OUTPUT"
           echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "max_items=$max_items" >> "$GITHUB_OUTPUT"
+          echo "request_budget=$request_budget" >> "$GITHUB_OUTPUT"
+          echo "sweep_since_hours=$sweep_since_hours" >> "$GITHUB_OUTPUT"
 
   tagger:
     needs: select
@@ -77,4 +114,7 @@ jobs:
       mode: ${{ needs.select.outputs.mode }}
       number: ${{ needs.select.outputs.number }}
       kind: ${{ needs.select.outputs.kind }}
+      max_items: ${{ needs.select.outputs.max_items }}
+      request_budget: ${{ needs.select.outputs.request_budget }}
+      sweep_since_hours: ${{ needs.select.outputs.sweep_since_hours }}
     secrets: inherit
