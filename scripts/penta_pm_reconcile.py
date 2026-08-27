@@ -77,35 +77,74 @@ def ensure_milestones(api, token, policy, apply):
 
 
 def owner_project_context(token, owner, repo):
-    q = """
+    """Resolve the Projects-v2 host through the authenticated principal.
+
+    Fine-grained PATs can legitimately access a user's own Projects v2 surface
+    through ``viewer`` while GitHub rejects the same project traversal through
+    ``repository.owner.projectsV2``. Resolve identity first, then query the
+    canonical host explicitly. Organization-owned projects continue to use the
+    organization Projects v2 surface.
+    """
+    identity_q = """
     query($owner:String!,$repo:String!){
+      viewer{id login}
       repository(owner:$owner,name:$repo){
-        id
-        owner{
-          __typename
-          login
-          ... on User{
-            id
-            projectsV2(first:100){nodes{id title number}}
-          }
-          ... on Organization{
-            id
-            projectsV2(first:100){nodes{id title number}}
-          }
-        }
+        owner{__typename id login}
       }
     }
     """
-    return graphql(token, q, {"owner": owner, "repo": repo})["repository"]
+    identity = graphql(token, identity_q, {"owner": owner, "repo": repo})
+    repo_owner = identity["repository"]["owner"]
+    viewer = identity["viewer"]
+
+    if repo_owner["__typename"] == "User":
+        if repo_owner["login"].lower() != viewer["login"].lower():
+            raise RuntimeError(
+                "PentaPM Projects v2 user-owner mismatch: "
+                f"repository owner={repo_owner['login']} authenticated viewer={viewer['login']}"
+            )
+        q = """
+        query{
+          viewer{
+            id
+            login
+            projectsV2(first:100){nodes{id title number}}
+          }
+        }
+        """
+        return {
+            "repository_owner": repo_owner,
+            "project_host": graphql(token, q)["viewer"],
+            "access_path": "viewer.projectsV2",
+        }
+
+    if repo_owner["__typename"] == "Organization":
+        q = """
+        query($login:String!){
+          organization(login:$login){
+            id
+            login
+            projectsV2(first:100){nodes{id title number}}
+          }
+        }
+        """
+        host = graphql(token, q, {"login": repo_owner["login"]})["organization"]
+        return {
+            "repository_owner": repo_owner,
+            "project_host": host,
+            "access_path": "organization.projectsV2",
+        }
+
+    raise RuntimeError(f"Unsupported GitHub repository owner type: {repo_owner['__typename']}")
 
 
 def ensure_project(token, owner, repo, title, apply):
     ctx = owner_project_context(token, owner, repo)
-    host = ctx["owner"]
+    host = ctx["project_host"]
     for p in host.get("projectsV2", {}).get("nodes", []):
         if p["title"] == title:
             return p, []
-    action = {"action": "create_project", "title": title}
+    action = {"action": "create_project", "title": title, "access_path": ctx["access_path"]}
     if not apply:
         return None, [action]
     q = """mutation($owner:ID!,$title:String!){createProjectV2(input:{ownerId:$owner,title:$title}){projectV2{id title number}}}"""
