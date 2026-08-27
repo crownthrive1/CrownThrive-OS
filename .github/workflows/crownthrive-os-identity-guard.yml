@@ -17,7 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
       - name: Enforce CrownThrive OS identity
         shell: bash
@@ -40,27 +42,44 @@ jobs:
           if identity.get('canonical_url') != expected_url:
               raise SystemExit(f'Canonical URL mismatch: expected {expected_url}')
 
-          legacy_slug = 'CrownThrive-' + 'Support'
+          # Historical, changelog, legal, test-vector, generated-evidence, and migration
+          # references remain immutable evidence. The identity guard enforces only live
+          # execution/configuration surfaces where an obsolete repository target could run.
+          live_prefixes = (
+              '.github/workflows/',
+              '.github/ISSUE_TEMPLATE/',
+              'infra/github-runners/',
+              'supabase/functions/',
+              'software-factory-v3/supabase/functions/',
+          )
+          excluded = {'.github/workflows/crownthrive-os-identity-guard.yml'}
+          legacy_repo = 'crownthrive1/' + 'CrownThrive-' + 'Support'
+          legacy_url = 'https://github.com/' + legacy_repo
+
           tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0')
           hits = []
           for filename in tracked:
-              if not filename or filename == '.github/workflows/crownthrive-os-identity-guard.yml':
+              if not filename or filename in excluded or not filename.startswith(live_prefixes):
                   continue
               path = Path(filename)
               try:
                   text = path.read_text(encoding='utf-8')
               except (UnicodeDecodeError, OSError):
                   continue
-              if legacy_slug in text:
-                  lines = [i for i, line in enumerate(text.splitlines(), 1) if legacy_slug in line]
+              lines = [
+                  i for i, line in enumerate(text.splitlines(), 1)
+                  if legacy_repo in line or legacy_url in line
+              ]
+              if lines:
                   hits.append((filename, lines[:20]))
 
           if hits:
-              print('Legacy CrownThrive repository identity detected:')
+              print('Legacy repository target detected on a live execution/configuration surface:')
               for filename, lines in hits:
                   print(f'  {filename}: lines {lines}')
-              print(f'Replace live references with {expected_url}')
+              print(f'Replace live targets with {expected_url}; preserve historical evidence outside the live perimeter.')
               raise SystemExit(1)
 
-          print(f'Canonical CrownThrive OS identity verified: {expected_url}')
+          print(f'Canonical CrownThrive OS live identity verified: {expected_url}')
+          print('Historical references remain preserved outside the live execution perimeter.')
           PY
