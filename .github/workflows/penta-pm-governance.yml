@@ -43,14 +43,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
-      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Require dedicated PentaPM credential
+        shell: bash
+        run: |
+          if [[ -z "${PENTA_PM_GITHUB_TOKEN}" ]]; then
+            echo "::error::PENTA_PM_GITHUB_TOKEN is unavailable to GitHub Actions. A Codespaces user secret is not an Actions secret. Rotate the exposed PAT, store the replacement as an Actions secret, and rerun."
+            exit 78
+          fi
 
       - name: Validate PentaPM policy and unit tests
         run: |
@@ -91,12 +99,19 @@ jobs:
     needs: reconcile
     runs-on: ubuntu-latest
     env:
-      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
-      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Require dedicated PentaPM credential
+        shell: bash
+        run: |
+          if [[ -z "${PENTA_PM_GITHUB_TOKEN}" ]]; then
+            echo "::error::PENTA_PM_GITHUB_TOKEN is unavailable to GitHub Actions. Rotate and bind the replacement credential as an Actions secret."
+            exit 78
+          fi
       - name: Fail closed on unexplained metadata drift
         run: python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --check
