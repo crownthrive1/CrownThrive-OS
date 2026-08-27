@@ -1,59 +1,31 @@
-name: "CodeQL Advanced"
+name: "CodeQL Advanced — Retired Provider-Duplicate"
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
-  schedule:
-    - cron: "18 11 * * 6"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: codeql-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  group: retired-codeql-advanced-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  analyze:
-    name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
-    timeout-minutes: 45
-    permissions:
-      security-events: write
-      packages: read
-      actions: read
-      contents: read
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: actions
-            build-mode: none
-          - language: javascript-typescript
-            build-mode: none
-          - language: python
-            build-mode: none
-
+  retired-provider-duplicate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-
-      - name: Run manual build steps
-        if: matrix.build-mode == 'manual'
+      - name: Historical retirement receipt
         shell: bash
         run: |
-          echo 'Manual CodeQL build mode was selected, but no governed build command is configured.'
-          echo 'Add the repository-specific build command before enabling manual mode.'
-          exit 1
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+          set -euo pipefail
+          {
+            echo '## Advanced CodeQL workflow retired'
+            echo
+            echo '- Current authority: GitHub provider-managed CodeQL default setup'
+            echo '- Prior local advanced workflow: superseded historical configuration'
+            echo '- Local CodeQL init/analyze action execution: disabled'
+            echo '- Security findings authority: provider-managed CodeQL readback'
+            echo '- Authority expansion: false'
+            echo '- Provider write: false'
+          } >> "$GITHUB_STEP_SUMMARY"
