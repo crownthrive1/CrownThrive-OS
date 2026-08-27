@@ -1,9 +1,9 @@
-"""Bounded runtime operations for evidence-promoted Penta systems.
+"""Bounded runtime operations for evidence-promoted and evidence-backed Penta systems.
 
-These operations make promoted control-plane members callable without exposing
+These operations make production control-plane members callable without exposing
 secret material or manufacturing provider authority. Provider network probes and
 provider writes are disabled here; already-executed production evidence remains
-separate and explicitly referenced by the promotion manifest.
+separate and explicitly referenced by source manifests and institutional records.
 """
 from __future__ import annotations
 
@@ -20,6 +20,14 @@ REPAIR_MANIFEST = Path("developers/manifests/pentaod-pentacertify-repair.v1.json
 PROMOTIONS = Path("data/penta/production-promotions.v1.json")
 PROVIDERS = Path("runtime/penta-provider-control-plane/providers.json")
 PROVIDER_RUNTIME = Path("runtime/penta-provider-control-plane/penta_control_plane.py")
+CONTEXT_RUNTIME = Path("runtime/penta_context.py")
+CONTEXT_DOC = Path("PENTACONTEXT.md")
+CONTEXT_TEST = Path("tests/test_penta_context.py")
+CONTEXT_CI = Path(".github/workflows/penta-context-ci.yml")
+CONTEXT_EDGE = Path("supabase/functions/penta-context/index.ts")
+CONTEXT_BASE_RECEIPT = "1e47ec8fd0a190a663c0c6b1cf17490d87c798e3281022dc2d2553e2f090a01e"
+CONTEXT_AUTOMATION_RECEIPT = "b05577014efc06fa2f07f7ea9c175e14b5d43f2b45b3c61cd464a2cad2579dd5"
+CONTEXT_EDGE_SHA256 = "4b8902e1d639e9a80d3e9f028cac2bb26662658ff5a547af210514f76fc3d212"
 
 
 class PromotedOperationError(ValueError):
@@ -33,15 +41,18 @@ def _json(path: Path) -> dict[str, Any]:
     return value
 
 
-def _provider_module(root: Path):
-    path = root / PROVIDER_RUNTIME
-    spec = importlib.util.spec_from_file_location("penta_promoted_provider_control", path)
+def _load_fixed_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
-        raise PromotedOperationError(f"cannot load provider runtime: {path}")
+        raise PromotedOperationError(f"cannot load runtime: {path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _provider_module(root: Path):
+    return _load_fixed_module("penta_promoted_provider_control", root / PROVIDER_RUNTIME)
 
 
 def _promotion(root: Path, machine_key: str) -> dict[str, Any]:
@@ -57,6 +68,38 @@ def _repair(root: Path) -> dict[str, Any]:
     if manifest.get("state") != "PRODUCTION_REPAIRS_APPLIED_AND_RETESTED":
         raise PromotedOperationError("production repair evidence is not in retested state")
     return manifest
+
+
+def context_contract_probe(ctx: Any) -> dict[str, Any]:
+    required = [CONTEXT_RUNTIME, CONTEXT_DOC, CONTEXT_TEST, CONTEXT_CI, CONTEXT_EDGE]
+    missing = [path.as_posix() for path in required if not (ctx.root / path).is_file()]
+    if missing:
+        raise PromotedOperationError("PentaContext contract surface missing: " + ", ".join(missing))
+    runtime = _load_fixed_module("penta_context_contract_probe", ctx.root / CONTEXT_RUNTIME)
+    if getattr(runtime, "SYSTEM_KEY", None) != "penta.context" or getattr(runtime, "VERSION", None) != "1.1.0":
+        raise PromotedOperationError("PentaContext runtime identity/version mismatch")
+    member = (ctx.snapshot.get("members") or {}).get("penta.context") or {}
+    if member.get("maturity") != "production":
+        raise PromotedOperationError("PentaContext effective maturity is not production")
+    return {
+        "schema": "ct.penta.context.contract-probe.v1",
+        "system_key": runtime.SYSTEM_KEY,
+        "version": runtime.VERSION,
+        "effective_maturity": member.get("maturity"),
+        "runtime_present": True,
+        "contract_tests_present": True,
+        "ci_present": True,
+        "edge_runtime_present": True,
+        "documentation_evidence_present": True,
+        "production_evidence": {
+            "v1_base_receipt_sha256": CONTEXT_BASE_RECEIPT,
+            "v1_1_automation_receipt_sha256": CONTEXT_AUTOMATION_RECEIPT,
+            "edge_v2_artifact_sha256": CONTEXT_EDGE_SHA256,
+        },
+        "provider_call_performed": False,
+        "credential_material_accessed": False,
+        "authority_expanded": False,
+    }
 
 
 def mail_production_status(ctx: Any) -> dict[str, Any]:
@@ -80,6 +123,8 @@ def mail_production_status(ctx: Any) -> dict[str, Any]:
 
 
 def status_owner_snapshot(ctx: Any) -> dict[str, Any]:
+    if getattr(ctx, "target_member", None) == "penta.context":
+        return context_contract_probe(ctx)
     repair = _repair(ctx.root)
     adapter_registry = _json(ctx.root / "data/penta/execution-adapters.registry.json")
     members = ctx.snapshot.get("members") or {}
