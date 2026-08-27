@@ -397,11 +397,11 @@ begin
   select public.crownthrive_scheduler_topology_status_v1()
   into v_status;
 
-  if coalesce((v_status->>'ready_for_production')::boolean, false) is not true then
+  if coalesce((v_status->>'production_topology_ready')::boolean, false) is not true then
     raise exception 'legacy scheduler archival verification failed: topology is not production-ready';
   end if;
 
-  if jsonb_array_length(coalesce(v_status->'duplicate_clock_rows', '[]'::jsonb)) <> 0 then
+  if coalesce((v_status->>'no_duplicate_clocks')::boolean, false) is not true then
     raise exception 'legacy scheduler archival verification failed: duplicate clock detected';
   end if;
 
