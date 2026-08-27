@@ -85,7 +85,7 @@ grant select,insert,update,delete on table penta_runtime.vergence_jobs_v1 to ser
 grant select,insert on table penta_runtime.vergence_receipts_v1 to service_role;
 grant select,insert,update,delete on table penta_runtime.vergence_repairs_v1 to service_role;
 
--- Current canonical repository identity. Legacy Support is preserved as disabled lineage only.
+-- Current canonical repository identity. Any competing root authority is preserved as disabled lineage only.
 insert into penta_runtime.repository_registry_v1(repository_full_name,canonical_role,enabled,mutation_policy,metadata)
 values (
   'crownthrive1/CrownThrive-OS',
@@ -123,7 +123,9 @@ set enabled=false,
       'lineage_reconciled_at',now()
     ),
     updated_at=now()
-where repository_full_name='crownthrive1/CrownThrive-Support';
+where repository_full_name <> 'crownthrive1/CrownThrive-OS'
+  and canonical_role='canonical PentaOS institutional source and PentaDocs authority'
+  and enabled;
 
 create or replace function penta_runtime.penta_vergence_enqueue_v1(p_mode text default 'continuity')
 returns jsonb
