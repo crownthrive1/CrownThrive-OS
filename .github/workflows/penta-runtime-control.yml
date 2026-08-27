@@ -1,0 +1,61 @@
+name: Penta Runtime Control
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "config/penta_runtime_control.json"
+      - "skills/penta-bind-runtime/**"
+      - "skills/penta-vault-runtime/**"
+      - "skills/penta-bound-runtime/**"
+      - "skills/penta-route-runtime/**"
+      - ".github/workflows/penta-runtime-control.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "config/penta_runtime_control.json"
+      - "skills/penta-bind-runtime/**"
+      - "skills/penta-vault-runtime/**"
+      - "skills/penta-bound-runtime/**"
+      - "skills/penta-route-runtime/**"
+      - ".github/workflows/penta-runtime-control.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-runtime-control-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Validate runtime manifest
+        run: |
+          python -m json.tool config/penta_runtime_control.json >/dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('config/penta_runtime_control.json').read_text())
+          assert p['maturity'] == 'production'
+          assert p['risk_ceiling'] == 'D2'
+          assert p['provider']['edge_function'] == 'penta-runtime-control'
+          assert p['provider']['edge_function_verify_jwt'] is True
+          assert p['secret_policy']['material_in_repository'] is False
+          assert {'PentaBind','PentaVault','PentaBound','PentaRoute','PentaPM','PentaAudit','PentaRetry','PentaQueue','PentaAuth'}.issubset(p['pentas'])
+          assert {r['class'] for r in p['routes']} == {'hot','cold'}
+          PY
+      - name: Validate capability skills
+        run: |
+          test -s skills/penta-bind-runtime/SKILL.md
+          test -s skills/penta-vault-runtime/SKILL.md
+          test -s skills/penta-bound-runtime/SKILL.md
+          test -s skills/penta-route-runtime/SKILL.md
+          ! grep -REn 'github_pat_|ghp_|gho_|ghu_|ghs_|ghr_' config/penta_runtime_control.json skills/penta-*-runtime || exit 1
