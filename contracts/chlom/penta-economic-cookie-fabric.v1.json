@@ -1,0 +1,51 @@
+{
+  "schema": "ct.chlom.oracle-cookie-economic-fabric.v1",
+  "version": "1.0.0",
+  "state": "IMPLEMENTED",
+  "purpose": "Canonical connection contract joining Oracle execution identity, CHLOM authorization, Penta economic metering, SmartTreasury authority, DAIL evidence and PentaRelease.",
+  "flow": [
+    "OracleCookie",
+    "CHLOM",
+    "PentaMeter",
+    "PentaGas",
+    "PentaPay",
+    "SmartTreasury",
+    "PentaCost",
+    "DAIL",
+    "PentaRelease"
+  ],
+  "cookie": {
+    "required_claims": ["cookie_id","node_did","workload_id","release_id","treasury_account","policy_version","scopes","issued_at","expires_at","nonce","signature"],
+    "credentials_embedded": false,
+    "vault_references_only": true,
+    "fail_closed_on": ["missing","expired","revoked","invalid_signature","wrong_node","wrong_scope","replayed_nonce"]
+  },
+  "metering": {
+    "event_types": ["route","query","storage","compute","model_inference","api","queue","retry","database","bandwidth","build","deploy","penta_execution"],
+    "rate_authority": "SmartTreasury",
+    "market_evidence": "PentaMarket",
+    "unknown_rate_behavior": "cost_status:not_available"
+  },
+  "settlement": {
+    "quote": "PentaQuote",
+    "reservation": "PentaReserve",
+    "measurement": "PentaMeter",
+    "gas": "PentaGas",
+    "atomic_price": "PentaPay",
+    "aggregate_actual": "PentaCost",
+    "receipt": "PentaReceipt",
+    "ledger": "DAIL"
+  },
+  "dail_receipt_required_fields": ["previous_hash","cookie_id","node_did","operation","meter_evidence","rate_card_version","cost","treasury_reservation","treasury_settlement","policy_decision","release_id","workload_id","timestamp","external_attestations","receipt_hash"],
+  "release_gate": {
+    "requires_valid_cookie": true,
+    "requires_meter_evidence": true,
+    "requires_treasury_authority": true,
+    "requires_dail_receipt": true,
+    "requires_verified_economic_provenance": true
+  },
+  "compatibility": {
+    "economic_fabric": "ct.penta.economic-fabric.v2",
+    "existing_components": ["PentaMarket","PentaTreasury","PentaCosts","PentaPay","PentaLedger","PentaRelease"]
+  }
+}
