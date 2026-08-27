@@ -78,7 +78,25 @@ def ensure_milestones(api, token, policy, apply):
 
 
 def owner_project_context(token, owner, repo):
-    q = """query($owner:String!,$repo:String!){repository(owner:$owner,name:$repo){id owner{__typename login ... on User{id projectsV2(first:100){nodes{id title number}}} ... on Organization{id projectsV2(first:100){nodes{id title number}}}}}}}"""
+    q = """
+    query($owner:String!,$repo:String!){
+      repository(owner:$owner,name:$repo){
+        id
+        owner{
+          __typename
+          login
+          ... on User{
+            id
+            projectsV2(first:100){nodes{id title number}}
+          }
+          ... on Organization{
+            id
+            projectsV2(first:100){nodes{id title number}}
+          }
+        }
+      }
+    }
+    """
     return graphql(token, q, {"owner": owner, "repo": repo})["repository"]
 
 
