@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -40,23 +41,54 @@ def api(method: str, path: str, data: dict[str, Any] | None = None) -> Any:
         return json.load(response)
 
 
-def resolve_pr(event: dict[str, Any], repo: str) -> int | None:
+def resolve_pr(event: dict[str, Any], repo: str) -> tuple[int, dict[str, Any]] | None:
     pr = event.get("pull_request")
     if isinstance(pr, dict):
-        return int(pr["number"])
+        return int(pr["number"]), pr
+
     run = event.get("workflow_run")
     if isinstance(run, dict):
         prs = run.get("pull_requests") or []
         if prs:
-            return int(prs[0]["number"])
+            candidate = prs[0]
+            return int(candidate["number"]), candidate
+
         head_sha = run.get("head_sha")
         if head_sha:
             owner, name = repo.split("/", 1)
             candidates = api("GET", f"/repos/{owner}/{name}/commits/{head_sha}/pulls?per_page=10")
             open_prs = [item for item in candidates if item.get("state") == "open"]
             if open_prs:
-                return int(open_prs[0]["number"])
+                candidate = open_prs[0]
+                return int(candidate["number"]), candidate
     return None
+
+
+def enrich_pr(repo: str, pr_number: int, snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Prefer the full PR object, but retain an event/API snapshot if token policy blocks it.
+
+    workflow_run tokens can be permission-constrained by repository/provider policy even
+    when the workflow declares pull-request read/write scope. The commit-to-PR and event
+    payload snapshots are sufficient for exact-head/base observability and do not weaken
+    any merge or institutional governance gate.
+    """
+    owner, name = repo.split("/", 1)
+    try:
+        return api("GET", f"/repos/{owner}/{name}/pulls/{pr_number}")
+    except urllib.error.HTTPError as exc:
+        if exc.code not in {403, 404}:
+            raise
+        print(
+            json.dumps(
+                {
+                    "warning": "PR_DETAIL_READBACK_RESTRICTED_USING_TRUSTED_SNAPSHOT",
+                    "pr": pr_number,
+                    "http_status": exc.code,
+                },
+                sort_keys=True,
+            )
+        )
+        return snapshot
 
 
 def latest_workflows(repo: str, head_sha: str) -> dict[str, dict[str, str | None]]:
@@ -86,17 +118,24 @@ def evidence_state(runs: dict[str, dict[str, str | None]]) -> str:
     return "PARTIAL_OR_NOT_YET_OBSERVED"
 
 
+def _ref_line(pr: dict[str, Any], side: str) -> tuple[str, str]:
+    obj = pr.get(side) or {}
+    sha = str(obj.get("sha") or "unknown")
+    ref = str(obj.get("ref") or "unknown")
+    return sha, ref
+
+
 def build_comment(pr: dict[str, Any], runs: dict[str, dict[str, str | None]]) -> str:
-    head = pr["head"]
-    base = pr["base"]
+    head_sha, head_ref = _ref_line(pr, "head")
+    base_sha, base_ref = _ref_line(pr, "base")
     lines = [
         MARKER,
         "## Penta governance observability readback",
         "",
         f"- Updated UTC: `{datetime.now(timezone.utc).isoformat()}`",
         f"- PR transport state: `{'DRAFT' if pr.get('draft') else pr.get('state', 'unknown').upper()}`",
-        f"- Exact head: `{head['sha']}` (`{head['ref']}`)",
-        f"- Exact base: `{base['sha']}` (`{base['ref']}`)",
+        f"- Exact head: `{head_sha}` (`{head_ref}`)",
+        f"- Exact base: `{base_sha}` (`{base_ref}`)",
         f"- Mergeable readback: `{pr.get('mergeable')}`",
         f"- CI evidence state: `{evidence_state(runs)}`",
         "- Institutional disposition: `NOT_DERIVED_FROM_CI`",
@@ -137,13 +176,20 @@ def upsert(repo: str, pr_number: int, body: str) -> None:
 def main() -> int:
     repo = os.environ["GITHUB_REPOSITORY"]
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
-    pr_number = resolve_pr(event, repo)
-    if pr_number is None:
+    resolved = resolve_pr(event, repo)
+    if resolved is None:
         print("No open pull request resolved for governance readback; no mutation performed.")
         return 0
-    owner, name = repo.split("/", 1)
-    pr = api("GET", f"/repos/{owner}/{name}/pulls/{pr_number}")
-    head_sha = pr["head"]["sha"]
+
+    pr_number, snapshot = resolved
+    pr = enrich_pr(repo, pr_number, snapshot)
+    head_sha, _ = _ref_line(pr, "head")
+    if head_sha == "unknown":
+        run = event.get("workflow_run") or {}
+        head_sha = str(run.get("head_sha") or "unknown")
+    if head_sha == "unknown":
+        raise RuntimeError("Unable to establish exact PR head SHA for governance readback")
+
     runs = latest_workflows(repo, head_sha)
     upsert(repo, pr_number, build_comment(pr, runs))
     print(json.dumps({"result": "PASS_PENTA_GOVERNANCE_PR_READBACK_UPSERT", "pr": pr_number, "head_sha": head_sha}, sort_keys=True))
