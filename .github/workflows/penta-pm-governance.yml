@@ -1,0 +1,100 @@
+name: PentaPM Governance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "config/penta_pm_policy.json"
+      - "scripts/penta_pm_reconcile.py"
+      - ".github/workflows/penta-pm-governance.yml"
+      - "tests/test_penta_pm_reconcile.py"
+  pull_request:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
+  issues:
+    types: [opened, reopened, edited, labeled, unlabeled]
+  release:
+    types: [published, edited]
+  repository_dispatch:
+    types: [penta-pm-reconcile]
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply provider reconciliation"
+        type: boolean
+        required: false
+        default: false
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  repository-projects: write
+
+concurrency:
+  group: penta-pm-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: PentaPM reconcile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate PentaPM policy and unit tests
+        run: |
+          python -m json.tool config/penta_pm_policy.json >/dev/null
+          python -m unittest tests.test_penta_pm_reconcile -v
+
+      - name: Determine reconciliation mode
+        id: mode
+        shell: bash
+        run: |
+          APPLY=false
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.apply }}" == "true" ]]; then APPLY=true; fi
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "repository_dispatch" || "${{ github.event_name }}" == "push" ]]; then APPLY=true; fi
+          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "issues" || "${{ github.event_name }}" == "release" ]]; then APPLY=true; fi
+          echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile GitHub Projects, milestones and Development state
+        run: |
+          if [[ "${{ steps.mode.outputs.apply }}" == "true" ]]; then
+            python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --apply
+          else
+            python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}"
+          fi
+
+      - name: Upload immutable-style PentaPM receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-pm-receipt-${{ github.run_id }}
+          path: artifacts/penta-pm/latest.json
+          if-no-files-found: error
+          retention-days: 90
+
+  gate:
+    name: PentaPM governed metadata gate
+    if: github.event_name == 'pull_request'
+    needs: reconcile
+    runs-on: ubuntu-latest
+    env:
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Fail closed on unexplained metadata drift
+        run: python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --check

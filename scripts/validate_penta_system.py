@@ -6,6 +6,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "penta" / "registry" / "penta-component-registry.v1.json"
+PENTA_OS_MIGRATION = (
+    ROOT
+    / "supabase"
+    / "migration_lineage"
+    / "legacy_local_timestamp_drift"
+    / "noncanonical"
+    / "20260826_penta_os_vergence_v1.sql"
+)
 REQUIRED = {
     "PentaOS", "PentaVergence", "PentaTechture", "PentaPology", "PentaFlex",
     "PentaPlanes", "PentaAgents", "PentaMCL", "PentaLLM", "PentaBoxes",
@@ -74,7 +82,7 @@ def main() -> int:
         ROOT / "penta" / "marketer" / "runtime.py",
         ROOT / "penta" / "marketer" / "adapters.registry.json",
         ROOT / "penta" / "maps" / "PENTAMAP-001.md",
-        ROOT / "supabase" / "migrations" / "20260826_penta_os_vergence_v1.sql",
+        PENTA_OS_MIGRATION,
         ROOT / "supabase" / "functions" / "penta-flex" / "index.ts",
         ROOT / "supabase" / "functions" / "penta-vergence-bridge" / "index.ts",
         ROOT / "scripts" / "penta_vergence_reconciler.py",
@@ -82,7 +90,7 @@ def main() -> int:
     absent = [str(p.relative_to(ROOT)) for p in required_files if not p.exists()]
     assert not absent, f"missing implementation files: {absent}"
 
-    migration = (ROOT / "supabase" / "migrations" / "20260826_penta_os_vergence_v1.sql").read_text(encoding="utf-8")
+    migration = PENTA_OS_MIGRATION.read_text(encoding="utf-8")
     for invariant in [
         "force row level security",
         "penta-vergence-continuity-4h-v1",
