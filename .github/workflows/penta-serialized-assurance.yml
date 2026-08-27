@@ -113,7 +113,7 @@ jobs:
           echo '- Hard delete API: disabled/absent' >> "$GITHUB_STEP_SUMMARY"
           echo '- Mutation model: expected-revision + append-only hash chain + tombstones' >> "$GITHUB_STEP_SUMMARY"
           echo '- Git gate: deletions, renames, and protected modifications require continuity receipts' >> "$GITHUB_STEP_SUMMARY"
-          if [ -f "${RUNNER_TEMP}/verify.json" ]; then
+          if [ -s "${RUNNER_TEMP}/verify.json" ]; then
             python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json, os
           from pathlib import Path
@@ -125,7 +125,7 @@ jobs:
           print(f"- Last event hash: `{d['last_event_hash']}`")
           PY
           fi
-          if [ -f "${RUNNER_TEMP}/git-gate.json" ]; then
+          if [ -s "${RUNNER_TEMP}/git-gate.json" ]; then
             python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json, os
           from pathlib import Path
@@ -134,4 +134,6 @@ jobs:
           print(f"- Git continuity gate: {d['status']}")
           print(f"- Continuity-controlled changes: {d['continuity_checked']}")
           PY
+          else
+            echo '- Git continuity gate: **HOLD/FAIL — no nonempty gate receipt emitted; inspect the gate step**' >> "$GITHUB_STEP_SUMMARY"
           fi
