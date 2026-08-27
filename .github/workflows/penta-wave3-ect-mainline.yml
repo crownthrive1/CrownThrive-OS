@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/penta-wave3-ect-mainline.yml"
       - "scripts/penta_wave3_ect_pipeline.py"
+      - "scripts/penta_wave3_ect_pipeline_v2.py"
 
 permissions:
   contents: write
@@ -38,81 +39,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("scripts/penta_wave3_ect_pipeline.py")
-          text = path.read_text(encoding="utf-8")
-
-          old_checksum = '    run(["sha256sum", "-c", "penta-os-v1-1.5.0.sha256"], env={"PWD": str(ROOT / build_a)})'
-          new_checksum = '    subprocess.run(["sha256sum", "-c", "penta-os-v1-1.5.0.sha256"], cwd=ROOT / build_a, check=True)'
-          if old_checksum in text:
-              text = text.replace(old_checksum, new_checksum, 1)
-          elif new_checksum not in text:
-              raise SystemExit("package checksum cwd repair target missing")
-
-          replacement_lines = [
-              '    production_dependencies = (',
-              '        \'            current["dependency_assessed"] = incoming.get("dependency_assessed") is True\\n\'',
-              '        \'            current["dependencies"] = sorted(set(incoming.get("dependencies", [])))\\n\'',
-              '    )',
-              '    dependency_probe = \'current["dependency_assessed"] = incoming.get("dependency_assessed") is True\'',
-              '    if dependency_probe not in builder:',
-              '        if incoming_axis not in builder:',
-              '            raise PipelineError("PentaOS production-family axis insertion missing")',
-              '        builder = builder.replace(incoming_axis, incoming_axis + production_dependencies, 1)',
-              '',
-              '    institutional_old = (',
-              '        \'        elif incoming.get("source_kind") == "institutional_registry":\\n\'',
-              '        \'            current["operator_route"] = incoming["operator_route"]\\n\'',
-              '        \'            current["axis"] = incoming.get("axis", current["axis"])\\n\'',
-              '    )',
-              '    institutional_new = (',
-              '        \'        elif incoming.get("source_kind") == "institutional_registry":\\n\'',
-              '        \'            current["operator_route"] = incoming["operator_route"]\\n\'',
-              '        \'            if "production_family_catalog" not in current["source_kinds"]:\\n\'',
-              '        \'                current["axis"] = incoming.get("axis", current["axis"])\\n\'',
-              '    )',
-              '    if institutional_old in builder:',
-              '        builder = builder.replace(institutional_old, institutional_new, 1)',
-              '    elif institutional_new not in builder:',
-              '        raise PipelineError("PentaOS institutional-axis guard insertion missing")',
-              '',
-              '    component_axis_old = \'        if incoming.get("axis") in AXES and "component_registry" in {incoming.get("source_kind"), *current["source_kinds"]} and not (\\n\'',
-              '    component_axis_new = \'        if "production_family_catalog" not in current["source_kinds"] and incoming.get("axis") in AXES and "component_registry" in {incoming.get("source_kind"), *current["source_kinds"]} and not (\\n\'',
-              '    if component_axis_old in builder:',
-              '        builder = builder.replace(component_axis_old, component_axis_new, 1)',
-              '    elif component_axis_new not in builder:',
-              '        raise PipelineError("PentaOS component-axis guard insertion missing")',
-              '',
-          ]
-
-          source_lines = text.splitlines()
-          output = []
-          skipping = False
-          replaced = False
-          for line in source_lines:
-              if line.startswith('    post_marker = '):
-                  output.extend(replacement_lines)
-                  skipping = True
-                  replaced = True
-                  continue
-              if skipping:
-                  if line.strip() == 'builder = builder.replace(post_marker, post_block + post_marker, 1)':
-                      skipping = False
-                  continue
-              output.append(line)
-          if skipping or not replaced:
-              raise SystemExit("obsolete grouped-merge patch block was not replaced")
-          text = "\n".join(output) + "\n"
-          path.write_text(text, encoding="utf-8")
-          PY
           cp scripts/penta_wave3_mainline_integrate.py /tmp/penta_wave3_mainline_integrate.py
           cp scripts/penta_wave3_ect_pipeline.py /tmp/penta_wave3_ect_pipeline.py
-          chmod +x /tmp/penta_wave3_mainline_integrate.py /tmp/penta_wave3_ect_pipeline.py
-          git restore --source=HEAD --worktree \
-            scripts/penta_wave3_mainline_integrate.py \
-            scripts/penta_wave3_ect_pipeline.py
+          cp scripts/penta_wave3_ect_pipeline_v2.py /tmp/penta_wave3_ect_pipeline_v2.py
+          chmod +x \
+            /tmp/penta_wave3_mainline_integrate.py \
+            /tmp/penta_wave3_ect_pipeline.py \
+            /tmp/penta_wave3_ect_pipeline_v2.py
           git fetch origin main
           MAIN_SHA=$(git rev-parse origin/main)
           echo "MAIN_SHA=$MAIN_SHA" >> "$GITHUB_ENV"
@@ -122,11 +55,12 @@ jobs:
       - name: Execute complete exact-main ECT pipeline
         env:
           TRANSFORMER_PATH: /tmp/penta_wave3_mainline_integrate.py
+          BASE_PIPELINE_PATH: /tmp/penta_wave3_ect_pipeline.py
           OLD_HEAD: "105460c828e8baf0d034d43689b278b47d2f9833"
           MAIN_SHA: ${{ env.MAIN_SHA }}
           ECT_RUN_ID: ${{ github.run_id }}
           ECT_RUN_ATTEMPT: ${{ github.run_attempt }}
-        run: python /tmp/penta_wave3_ect_pipeline.py
+        run: python /tmp/penta_wave3_ect_pipeline_v2.py
 
       - name: Commit certified candidate and force-restack PR branch
         shell: bash
