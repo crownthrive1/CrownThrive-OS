@@ -1,0 +1,51 @@
+{
+  "schema": "ct.penta.runtime-control.v1",
+  "version": "1.0.0",
+  "maturity": "production",
+  "risk_ceiling": "D2",
+  "provider": {
+    "name": "CrownThrive ThriveBase Supabase",
+    "project_ref": "tzajnzshmtzjenqulehq",
+    "edge_function": "penta-runtime-control",
+    "edge_function_verify_jwt": true
+  },
+  "secret_policy": {
+    "material_in_repository": false,
+    "references_only": true,
+    "canonical_refs": [
+      "supabase-vault:PENTA_PM_GITHUB_TOKEN"
+    ]
+  },
+  "pentas": {
+    "PentaBind": {"state": "active", "role": "binding reconciliation"},
+    "PentaVault": {"state": "active", "role": "credential custody verification"},
+    "PentaBound": {"state": "active", "role": "binding and consumer boundary enforcement"},
+    "PentaRoute": {"state": "active", "role": "hot/cold route dispatch"},
+    "PentaPM": {"state": "active", "role": "project and metadata governance"},
+    "PentaAudit": {"state": "active", "role": "non-secret receipts and observability"},
+    "PentaRetry": {"state": "active", "role": "bounded retry"},
+    "PentaQueue": {"state": "active", "role": "deferred cold-route queue"},
+    "PentaAuth": {"state": "active", "role": "provider authentication boundary"},
+    "PentaSign": {"state": "standby", "role": "signing only when signing material is configured"}
+  },
+  "routes": [
+    {"id": "ct.route.hot.github.pentapm", "class": "hot", "source": "GitHub Actions", "target": "PentaPM", "trigger": "pull_request|issues|push|workflow_dispatch"},
+    {"id": "ct.route.cold.github.pentapm", "class": "cold", "source": "GitHub Actions", "target": "PentaPM", "trigger": "schedule|repository_dispatch"},
+    {"id": "ct.route.hot.pentabind", "class": "hot", "source": "PentaBind", "target": "runtime-bindings", "trigger": "binding_change"},
+    {"id": "ct.route.cold.pentavault", "class": "cold", "source": "PentaVault", "target": "runtime-bindings", "trigger": "credential_audit"}
+  ],
+  "skills": [
+    "ct.skill.pentabind.reconcile",
+    "ct.skill.pentavault.verify",
+    "ct.skill.pentabound.enforce",
+    "ct.skill.pentaroute.dispatch",
+    "ct.skill.pentaaudit.receipt"
+  ],
+  "hard_boundaries": [
+    "never expose secret values",
+    "never bypass provider authorization",
+    "never self-approve D3",
+    "never mark provider HOLD as PASS",
+    "all runtime mutations require authoritative provider readback"
+  ]
+}
