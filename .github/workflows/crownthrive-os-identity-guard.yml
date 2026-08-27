@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Enforce CrownThrive OS identity
         shell: bash
@@ -25,42 +27,65 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import json
+          import re
           import subprocess
           from pathlib import Path
 
           identity_path = Path('.crownthrive/canonical-os.json')
+          archive_path = Path('config/retired_identity_archive.json')
           if not identity_path.exists():
               raise SystemExit('Missing required .crownthrive/canonical-os.json binding')
+          if not archive_path.exists():
+              raise SystemExit('Missing governed retired-identity archive boundary')
 
           identity = json.loads(identity_path.read_text(encoding='utf-8'))
+          archive = json.loads(archive_path.read_text(encoding='utf-8'))
           expected_repo = 'crownthrive1/CrownThrive-OS'
           expected_url = 'https://github.com/crownthrive1/CrownThrive-OS'
           if identity.get('canonical_control_repository') != expected_repo:
               raise SystemExit(f'Canonical repository mismatch: expected {expected_repo}')
           if identity.get('canonical_url') != expected_url:
               raise SystemExit(f'Canonical URL mismatch: expected {expected_url}')
+          if archive.get('schema') != 'ct.archive.retired-identity-boundary.20260827.v1':
+              raise SystemExit('Retired-identity archive schema mismatch')
 
           legacy_slug = 'CrownThrive-' + 'Support'
-          tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0')
+          pattern = re.compile(re.escape(legacy_slug), re.IGNORECASE)
+          tracked = [v for v in subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0') if v]
+          tracked_set = set(tracked)
+          allowed = set(map(str, archive.get('allowed_paths') or []))
+          if not allowed:
+              raise SystemExit('Retired-identity archive allowlist may not be empty')
+          for filename in sorted(allowed):
+              path = Path(filename)
+              if not filename.startswith('supabase/migrations/') or filename not in tracked_set or not path.is_file():
+                  raise SystemExit(f'Invalid retired-identity archive path: {filename}')
+              try:
+                  historical_text = path.read_text(encoding='utf-8')
+              except (UnicodeDecodeError, OSError) as exc:
+                  raise SystemExit(f'Unreadable retired-identity archive path: {filename}: {exc}')
+              if not pattern.search(historical_text):
+                  raise SystemExit(f'Stale retired-identity archive path no longer contains historical identity: {filename}')
+
           hits = []
           for filename in tracked:
-              if not filename or filename == '.github/workflows/crownthrive-os-identity-guard.yml':
+              if filename == '.github/workflows/crownthrive-os-identity-guard.yml' or filename in allowed:
                   continue
               path = Path(filename)
               try:
                   text = path.read_text(encoding='utf-8')
               except (UnicodeDecodeError, OSError):
                   continue
-              if legacy_slug in text:
-                  lines = [i for i, line in enumerate(text.splitlines(), 1) if legacy_slug in line]
+              if pattern.search(text):
+                  lines = [i for i, line in enumerate(text.splitlines(), 1) if pattern.search(line)]
                   hits.append((filename, lines[:20]))
 
           if hits:
-              print('Legacy CrownThrive repository identity detected:')
+              print('Retired CrownThrive repository identity detected on a live surface:')
               for filename, lines in hits:
                   print(f'  {filename}: lines {lines}')
-              print(f'Replace live references with {expected_url}')
+              print(f'Replace live references with {expected_url}; historical exceptions require an explicit governed archive receipt.')
               raise SystemExit(1)
 
-          print(f'Canonical CrownThrive OS identity verified: {expected_url}')
+          print(f'Canonical CrownThrive OS identity verified: {expected_url}; {len(allowed)} historical migration sources preserved under an exact archive boundary.')
           PY

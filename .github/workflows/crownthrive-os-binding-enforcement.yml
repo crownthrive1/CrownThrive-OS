@@ -23,14 +23,28 @@ jobs:
           from pathlib import Path
           expected='crownthrive1/CrownThrive-OS'
           identity=json.loads(Path('.crownthrive/canonical-os.json').read_text(encoding='utf-8'))
+          archive_path=Path('config/retired_identity_archive.json')
+          if not archive_path.exists(): raise SystemExit('Missing governed retired-identity archive boundary')
+          archive=json.loads(archive_path.read_text(encoding='utf-8'))
+          if archive.get('schema')!='ct.archive.retired-identity-boundary.20260827.v1': raise SystemExit('Retired-identity archive schema mismatch')
           if os.environ['GITHUB_REPOSITORY'] != expected: raise SystemExit('Canonical workflow executed outside CrownThrive-OS')
           if identity.get('canonical_control_repository') != expected: raise SystemExit('Canonical repository binding mismatch')
           if identity.get('canonical_url') != 'https://github.com/crownthrive1/CrownThrive-OS': raise SystemExit('Canonical URL binding mismatch')
           if identity.get('canonical_default_branch') != 'main': raise SystemExit('Canonical branch binding mismatch')
           legacy='CrownThrive-'+'Support'; pattern=re.compile(re.escape(legacy),re.IGNORECASE)
-          files=subprocess.check_output(['git','ls-files','-z']).decode().split('\0'); changed=[]; count_total=0
+          files=[v for v in subprocess.check_output(['git','ls-files','-z']).decode().split('\0') if v]
+          file_set=set(files); allowed=set(map(str,archive.get('allowed_paths') or []))
+          if not allowed: raise SystemExit('Retired-identity archive allowlist may not be empty')
+          for filename in sorted(allowed):
+              path=Path(filename)
+              if not filename.startswith('supabase/migrations/') or filename not in file_set or not path.is_file():
+                  raise SystemExit('Invalid retired-identity archive path: '+filename)
+              try: historical=path.read_text(encoding='utf-8')
+              except (UnicodeDecodeError,OSError) as exc: raise SystemExit(f'Unreadable retired-identity archive path: {filename}: {exc}')
+              if not pattern.search(historical): raise SystemExit('Stale retired-identity archive path: '+filename)
+          changed=[]; count_total=0
           for filename in files:
-              if not filename or filename=='.github/workflows/crownthrive-os-binding-enforcement.yml': continue
+              if filename=='.github/workflows/crownthrive-os-binding-enforcement.yml' or filename in allowed: continue
               p=Path(filename)
               try: before=p.read_text(encoding='utf-8')
               except (UnicodeDecodeError,OSError): continue
@@ -39,12 +53,12 @@ jobs:
                   p.write_text(after,encoding='utf-8'); changed.append(filename); count_total+=count
           remaining=[]
           for filename in files:
-              if not filename or filename=='.github/workflows/crownthrive-os-binding-enforcement.yml': continue
+              if filename=='.github/workflows/crownthrive-os-binding-enforcement.yml' or filename in allowed: continue
               try: text=Path(filename).read_text(encoding='utf-8')
               except (UnicodeDecodeError,OSError): continue
               if pattern.search(text): remaining.append(filename)
-          if remaining: raise SystemExit('Retired OS identity remains: '+', '.join(remaining))
-          print(f'Canonical CrownThrive-OS identity verified; auto-healed {count_total} reference(s) across {len(changed)} file(s).')
+          if remaining: raise SystemExit('Retired OS identity remains on live surfaces: '+', '.join(remaining))
+          print(f'Canonical CrownThrive-OS identity verified; auto-healed {count_total} live reference(s) across {len(changed)} file(s); preserved {len(allowed)} exact historical migration source(s).')
           PY
           if ! git diff --quiet; then
             git config user.name 'CrownThrive PentaUpdate'
@@ -59,18 +73,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Reject retired OS identity
+        with:
+          persist-credentials: false
+      - name: Reject retired OS identity outside governed history
         shell: python
         run: |
           import json,os,re,subprocess
           from pathlib import Path
           expected='crownthrive1/CrownThrive-OS'; identity=json.loads(Path('.crownthrive/canonical-os.json').read_text(encoding='utf-8'))
+          archive_path=Path('config/retired_identity_archive.json')
+          if not archive_path.exists(): raise SystemExit('Missing governed retired-identity archive boundary')
+          archive=json.loads(archive_path.read_text(encoding='utf-8'))
+          assert archive['schema']=='ct.archive.retired-identity-boundary.20260827.v1'
           assert os.environ['GITHUB_REPOSITORY']==expected; assert identity['canonical_control_repository']==expected; assert identity['canonical_url']=='https://github.com/crownthrive1/CrownThrive-OS'
           pattern=re.compile(re.escape('CrownThrive-'+'Support'),re.IGNORECASE); hits=[]
-          for filename in subprocess.check_output(['git','ls-files','-z']).decode().split('\0'):
-              if not filename or filename=='.github/workflows/crownthrive-os-binding-enforcement.yml': continue
+          files=[v for v in subprocess.check_output(['git','ls-files','-z']).decode().split('\0') if v]
+          file_set=set(files); allowed=set(map(str,archive.get('allowed_paths') or []))
+          if not allowed: raise SystemExit('Retired-identity archive allowlist may not be empty')
+          for filename in sorted(allowed):
+              path=Path(filename)
+              if not filename.startswith('supabase/migrations/') or filename not in file_set or not path.is_file(): raise SystemExit('Invalid retired-identity archive path: '+filename)
+              try: historical=path.read_text(encoding='utf-8')
+              except (UnicodeDecodeError,OSError) as exc: raise SystemExit(f'Unreadable retired-identity archive path: {filename}: {exc}')
+              if not pattern.search(historical): raise SystemExit('Stale retired-identity archive path: '+filename)
+          for filename in files:
+              if filename=='.github/workflows/crownthrive-os-binding-enforcement.yml' or filename in allowed: continue
               try: text=Path(filename).read_text(encoding='utf-8')
               except (UnicodeDecodeError,OSError): continue
               if pattern.search(text): hits.append(filename)
-          if hits: raise SystemExit('Retired OS identity is forbidden: '+', '.join(hits))
-          print('Canonical CrownThrive-OS identity verified.')
+          if hits: raise SystemExit('Retired OS identity is forbidden on live surfaces: '+', '.join(hits))
+          print(f'Canonical CrownThrive-OS identity verified; {len(allowed)} exact historical migration source(s) remain archive-bound.')
