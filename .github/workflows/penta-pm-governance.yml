@@ -62,8 +62,6 @@ jobs:
         run: |
           APPLY=false
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.apply }}" == "true" ]]; then APPLY=true; fi
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "repository_dispatch" || "${{ github.event_name }}" == "push" ]]; then APPLY=true; fi
-          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "issues" || "${{ github.event_name }}" == "release" ]]; then APPLY=true; fi
           echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
 
       - name: Reconcile GitHub Projects, milestones and Development state
@@ -97,4 +95,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Fail closed on unexplained metadata drift
-        run: python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --check
+        run: >-
+          python scripts/penta_pm_reconcile.py
+          --repo "${GITHUB_REPOSITORY}"
+          --check
+          --artifact-number "${{ github.event.pull_request.number }}"

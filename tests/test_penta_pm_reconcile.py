@@ -46,6 +46,12 @@ class PentaPMTests(unittest.TestCase):
     def test_policy_has_eight_initial_milestones(self):
         self.assertEqual(len(POLICY["milestones"]), 8)
 
+    def test_pr_gate_is_scoped_and_provider_read_only(self):
+        workflow = (ROOT / ".github" / "workflows" / "penta-pm-governance.yml").read_text()
+        self.assertIn('--artifact-number "${{ github.event.pull_request.number }}"', workflow)
+        self.assertNotIn('"${{ github.event_name }}" == "pull_request" ||', workflow)
+        self.assertIn("artifact_scoped_check", (ROOT / "scripts" / "penta_pm_reconcile.py").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

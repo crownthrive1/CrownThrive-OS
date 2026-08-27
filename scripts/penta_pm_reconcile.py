@@ -16,7 +16,6 @@ import re
 import sys
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -163,7 +162,8 @@ def ensure_project_item(token, project_id, content_id, existing, number, apply):
 
 
 def ensure_milestone(api, token, artifact, milestone, current, apply):
-    if artifact.get("milestone", {}).get("title") == milestone:
+    existing = artifact.get("milestone") or {}
+    if existing.get("title") == milestone:
         return []
     spec = current.get(milestone)
     if not spec:
@@ -193,6 +193,7 @@ def main():
     ap.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY"))
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--artifact-number", type=int)
     args = ap.parse_args()
     if not args.repo or "/" not in args.repo:
         raise SystemExit("--repo owner/name required")
@@ -203,27 +204,50 @@ def main():
     api = f"https://api.github.com/repos/{owner}/{repo}"
     policy = json.loads(POLICY.read_text())
     actions, holds = [], []
+    provider_hold = False
 
-    milestones, a = ensure_milestones(api, token, policy, args.apply)
-    actions += a
-    project, a = ensure_project(token, owner, repo, policy["canonical_project"], args.apply)
-    actions += a
-    if project:
-        actions += ensure_project_fields(token, project["id"], policy["project_fields"], args.apply)
-        pstate = project_items_and_fields(token, project["id"])
-        existing = {n["content"]["number"] for n in pstate["items"]["nodes"] if n.get("content") and n["content"].get("number")}
+    artifact_scoped_check = args.check and args.artifact_number is not None
+    if artifact_scoped_check:
+        # A pull-request gate validates only that artifact's governance metadata.
+        # It never asks for Projects write authority or plans unrelated mutations.
+        milestones, project, existing = {}, None, set()
     else:
+        milestones, a = ensure_milestones(api, token, policy, args.apply)
+        actions += a
+        project = None
         existing = set()
+        try:
+            project, a = ensure_project(token, owner, repo, policy["canonical_project"], args.apply)
+            actions += a
+            if project:
+                actions += ensure_project_fields(token, project["id"], policy["project_fields"], args.apply)
+                pstate = project_items_and_fields(token, project["id"])
+                existing = {n["content"]["number"] for n in pstate["items"]["nodes"] if n.get("content") and n["content"].get("number")}
+        except RuntimeError as exc:
+            provider_hold = True
+            holds.append({
+                "type": "projects_v2_provider_authority",
+                "provider": "github",
+                "required_secret": "PENTA_PM_GITHUB_TOKEN",
+                "message": str(exc),
+            })
 
     for artifact in get_open_artifacts(api, token):
+        if args.artifact_number is not None and artifact.get("number") != args.artifact_number:
+            continue
         labels = artifact.get("labels", [])
         governed = any((x.get("name", "") if isinstance(x, dict) else str(x)).startswith("penta:") for x in labels)
         if not governed:
             continue
         c = classify(labels, policy)
         if project:
-            actions += ensure_project_item(token, project["id"], artifact["node_id"], existing, artifact["number"], args.apply)
-        actions += ensure_milestone(api, token, artifact, c["milestone"], milestones, args.apply)
+            try:
+                actions += ensure_project_item(token, project["id"], artifact["node_id"], existing, artifact["number"], args.apply)
+            except RuntimeError as exc:
+                provider_hold = True
+                holds.append({"type": "project_item_provider_authority", "number": artifact["number"], "message": str(exc)})
+        if not artifact_scoped_check:
+            actions += ensure_milestone(api, token, artifact, c["milestone"], milestones, args.apply)
         if "pull_request" in artifact and not LINK_RE.search(artifact.get("body") or ""):
             holds.append({"type": "missing_development_link", "number": artifact["number"]})
         if c["owner"] == "unassigned" or not c["lanes"] or c["risk"] == "unclassified" or c["stage"] == "unclassified":
@@ -234,6 +258,8 @@ def main():
     path = RECEIPT_DIR / "latest.json"
     path.write_text(json.dumps(out, indent=2) + "\n")
     print(json.dumps(out, indent=2))
+    if provider_hold:
+        return 3
     if args.check and (actions or holds):
         return 2
     return 0
