@@ -208,14 +208,14 @@ That is PENTA. That is the institutional lifecycle through Phase 5. Every future
 **Impact. Legacy. Cultural advancement. Governed convergence. PENTA. 👑**
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.12.0.0
+## Latest PentaRelease — v3.24.0.0
 
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.12.0.0
-- **Release title:** CrownThrive OS 3.12.0.0 — Autonomous PentaRelease
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.24.0.0
+- **Release title:** CrownThrive OS 3.24.0.0 — Autonomous PentaRelease
 - **Why:** new executable capability or runtime delta
-- **Changed paths:** 5
-- **Penta components:** PentaRelease, PentaSerialized.Institutionalization, PentaSerializedInstitutionalOperations, PentaSerializedV1.0.0
+- **Changed paths:** 20
+- **Penta components:** PentaRelease
 - **Direct USD payload cost:** not available
 - **CIE score:** not available
 - **Data/evidence:** comprehensive record, FAQ, changelog, costs, CIE status, data catalog, and evidence are attached to the official release.
