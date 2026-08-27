@@ -1,6 +1,6 @@
 {
   "schema": "ct.penta.vercel.execution-fabric.manifest.20260827.v1",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "status": "production_bound",
   "provider": "vercel",
   "team_id": "team_v4xkGtBZSrZXnJtLEJhra5nd",
@@ -69,11 +69,17 @@
       "name": "chlom-protocol",
       "project_id": "prj_HewLgMjUiVBNCl0FADFbSggSp2QN",
       "repository": "crownthrive1/chlom-protocol",
-      "health": "https://chlom-protocol.vercel.app/health"
+      "health": "https://chlom-protocol.vercel.app/health",
+      "provider_liveness": "required",
+      "data_plane_readiness": "independent_fail_closed_gate"
     }
   ],
   "contracts": {
-    "provider_health": "ct.penta.vercel.*.health.20260827.v1",
+    "provider_health": [
+      "ct.penta.vercel.health.20260827.v1",
+      "ct.penta.vercel.private-plane-health.20260827.v1",
+      "ct.chlom.chain-evidence-fabric.health.v2"
+    ],
     "aggregate_fabric": "ct.penta.vercel.execution-fabric.20260827.v1",
     "mcp": {
       "protocol_version": "2026-07-28",
@@ -83,10 +89,20 @@
     "penta_event": "crownthrive.penta.event.v1",
     "evidence_digest": "sha256"
   },
+  "vault_custody": {
+    "repository": "crownthrive1/PRIVATE-PentaOS",
+    "commit": "00dff9f06ebf25cd532640c2e845554d98a93841",
+    "path": "vault/provider-bindings/vercel",
+    "classification": "internal_restricted",
+    "contains_secret_material": false
+  },
   "provider_write_binding": {
     "state": "gated_credential_required",
-    "credential_reference": "runtime_env:VERCEL_AUTOMATION_TOKEN",
+    "credential_references": [
+      "github_actions_secret:VERCEL_TOKEN",
+      "runtime_env:VERCEL_AUTOMATION_TOKEN"
+    ],
     "secret_value_recorded": false
   },
-  "observed_at": "2026-08-27"
+  "observed_at": "2026-08-27T23:47:13Z"
 }
