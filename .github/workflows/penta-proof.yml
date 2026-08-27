@@ -1,0 +1,110 @@
+name: PentaProof Evidence Automation
+on:
+  workflow_run:
+    workflows:
+      - Penta Cookie Runtime Certification
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Existing successful certification workflow run ID to verify
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: pentaproof-${{ github.event.workflow_run.id || inputs.source_run_id || github.run_id }}
+  cancel-in-progress: false
+jobs:
+  verify-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out canonical PentaProof runtime
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Resolve source workflow run
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
+          EVENT_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          INPUT_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            RUN_ID="$EVENT_RUN_ID"
+            CONCLUSION="$EVENT_CONCLUSION"
+          else
+            RUN_ID="$INPUT_RUN_ID"
+            CONCLUSION="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}" --jq '.conclusion')"
+          fi
+          [[ -n "$RUN_ID" ]] || { echo 'PentaProof HOLD: missing source run id'; exit 1; }
+          [[ "$CONCLUSION" == "success" ]] || { echo "PentaProof HOLD: source run conclusion is $CONCLUSION"; exit 1; }
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+      - name: Read source artifact metadata
+        id: artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.source.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" > source-artifacts.json
+          COUNT="$(jq '[.artifacts[] | select(.name | startswith("penta-cookie-certification-")) | select(.expired == false)] | length' source-artifacts.json)"
+          [[ "$COUNT" == "1" ]] || { echo "PentaProof HOLD: expected exactly one live certification artifact, found $COUNT"; exit 1; }
+          ARTIFACT_ID="$(jq -r '.artifacts[] | select(.name | startswith("penta-cookie-certification-")) | select(.expired == false) | .id' source-artifacts.json)"
+          ARTIFACT_DIGEST="$(jq -r '.artifacts[] | select(.name | startswith("penta-cookie-certification-")) | select(.expired == false) | .digest // ""' source-artifacts.json)"
+          [[ -n "$ARTIFACT_ID" ]] || { echo 'PentaProof HOLD: artifact id missing'; exit 1; }
+          [[ "$ARTIFACT_DIGEST" == sha256:* ]] || { echo 'PentaProof HOLD: GitHub artifact digest missing'; exit 1; }
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+          echo "artifact_digest=$ARTIFACT_DIGEST" >> "$GITHUB_OUTPUT"
+      - name: Download source certification evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.source.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p source-evidence
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" -p 'penta-cookie-certification-*' --dir source-evidence
+          EVIDENCE="$(find source-evidence -type f -name 'penta-cookie-evidence.json' -print -quit)"
+          [[ -n "$EVIDENCE" ]] || { echo 'PentaProof HOLD: cookie evidence JSON missing from artifact'; exit 1; }
+          cp "$EVIDENCE" penta-cookie-evidence.json
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+      - name: Generate PentaProof envelope
+        env:
+          PENTAPROOF_SOURCE_RUN_ID: ${{ steps.source.outputs.run_id }}
+          PENTAPROOF_SOURCE_ARTIFACT_ID: ${{ steps.artifact.outputs.artifact_id }}
+          PENTAPROOF_SOURCE_ARTIFACT_DIGEST: ${{ steps.artifact.outputs.artifact_digest }}
+        run: node scripts/penta-proof.mjs penta-cookie-evidence.json penta-proof-envelope.json
+      - name: Verify proof envelope
+        run: node -e "const e=require('./penta-proof-envelope.json'); if(e.penta!=='PentaProof'||e.verdict!=='PASS'||e.state!=='CERTIFIED_EVIDENCE'||!e.envelope_sha256) process.exit(1)"
+      - name: Publish PentaProof evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pentaproof-${{ steps.source.outputs.run_id }}
+          path: |
+            penta-cookie-evidence.json
+            penta-proof-envelope.json
+            source-artifacts.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Project proof into job summary
+        shell: bash
+        run: |
+          {
+            echo '## PentaProof™'
+            echo
+            echo "Source run: ${{ steps.source.outputs.run_id }}"
+            echo "Artifact: ${{ steps.artifact.outputs.artifact_id }}"
+            echo "Artifact digest: ${{ steps.artifact.outputs.artifact_digest }}"
+            echo
+            jq -r '"Verdict: **\(.verdict)**\n\nTests: **\(.source.passed)/\(.source.test_count)**\n\nSource SHA-256: `\(.source.sha256)`\n\nEnvelope SHA-256: `\(.envelope_sha256)`"' penta-proof-envelope.json
+          } >> "$GITHUB_STEP_SUMMARY"
