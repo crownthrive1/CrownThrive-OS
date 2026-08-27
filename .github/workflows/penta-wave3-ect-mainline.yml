@@ -34,6 +34,49 @@ jobs:
       - name: Install deterministic validators
         run: python -m pip install --disable-pip-version-check jsonschema==4.23.0
 
+      - name: Harden transformer for current Penta Family shape
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/penta_wave3_mainline_integrate.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''    if 'member_snapshot[key]["maturity_promotion"]' not in text:
+                  lines = text.splitlines()
+                  output: list[str] = []
+                  inside_member = False
+                  inserted = False
+                  for line in lines:
+                      output.append(line)
+                      if line == "        member_snapshot[key] = {":
+                          inside_member = True
+                          continue
+                      if inside_member and line == "        }":
+                          output.append("        if key in promotions:")
+                          output.append('            member_snapshot[key]["maturity_promotion"] = promotions[key]')
+                          inside_member = False
+                          inserted = True
+                  if not inserted:
+                      raise IntegrationError("penta_family member promotion projection insertion failed")
+                  text = "\\n".join(output) + "\\n"
+          '''
+          new = '''    if 'member_snapshot[key]["maturity_promotion"]' not in text:
+                  marker = '    return {\\n        "family_registry_id":'
+                  replacement = (
+                      '    for key, promotion in promotions.items():\\n'
+                      '        member_snapshot[key]["maturity_promotion"] = promotion\\n\\n'
+                      '    return {\\n'
+                      '        "family_registry_id":'
+                  )
+                  if marker not in text:
+                      raise IntegrationError("penta_family promotion projection return marker missing")
+                  text = text.replace(marker, replacement, 1)
+          '''
+          if old not in text:
+              raise SystemExit("fragile promotion-projection block was not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
       - name: Preserve transformer and restack onto exact current main
         shell: bash
         run: |
@@ -87,7 +130,7 @@ jobs:
           python runtime/penta_families.py --root . --portal-index > /tmp/penta-families.json
           python runtime/penta_exec.py --root . validate > /tmp/penta-exec-validation.json
           python runtime/penta_runtime_suite.py --root . --output /tmp/penta-runtime-suite.json
-          python runtime/penta_interop.py --root . certify --output /tmp/penta-interoperability.json
+          python runtime/penta_interop.py --root . --certify --output /tmp/penta-interoperability.json
           python runtime/penta_os_v1.py --root . validate
 
       - name: Run ECT regression and negative-safety cohort
