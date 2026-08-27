@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "config/penta_pm_policy.json"
+      - "config/penta_credential_bindings.json"
       - "scripts/penta_pm_reconcile.py"
       - ".github/workflows/penta-pm-governance.yml"
       - "tests/test_penta_pm_reconcile.py"
@@ -42,8 +43,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
-      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
     steps:
       - uses: actions/checkout@v4
 
@@ -54,6 +55,7 @@ jobs:
       - name: Validate PentaPM policy and unit tests
         run: |
           python -m json.tool config/penta_pm_policy.json >/dev/null
+          python -m json.tool config/penta_credential_bindings.json >/dev/null
           python -m unittest tests.test_penta_pm_reconcile -v
 
       - name: Determine reconciliation mode
@@ -89,8 +91,8 @@ jobs:
     needs: reconcile
     runs-on: ubuntu-latest
     env:
-      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
-      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
