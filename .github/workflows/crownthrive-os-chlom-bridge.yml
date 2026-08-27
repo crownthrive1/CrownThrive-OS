@@ -1,0 +1,62 @@
+name: CrownThrive OS CHLOM Bridge Certification
+
+on:
+  pull_request:
+    paths:
+      - ".mcp.json"
+      - "apps/crownthrive-os-control-plane/api/chlom.js"
+      - "apps/crownthrive-os-control-plane/api/health.js"
+      - "apps/crownthrive-os-control-plane/api/mcp.js"
+      - "apps/crownthrive-os-control-plane/lib/chlom-fabric.js"
+      - "apps/crownthrive-os-control-plane/contracts/chlom-chain-evidence-bridge.v1.json"
+      - "apps/crownthrive-os-control-plane/tests/chlom-bridge.test.mjs"
+      - "apps/crownthrive-os-control-plane/package.json"
+      - "apps/crownthrive-os-control-plane/vercel.json"
+      - ".github/workflows/crownthrive-os-chlom-bridge.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".mcp.json"
+      - "apps/crownthrive-os-control-plane/api/chlom.js"
+      - "apps/crownthrive-os-control-plane/api/health.js"
+      - "apps/crownthrive-os-control-plane/api/mcp.js"
+      - "apps/crownthrive-os-control-plane/lib/chlom-fabric.js"
+      - "apps/crownthrive-os-control-plane/contracts/chlom-chain-evidence-bridge.v1.json"
+      - "apps/crownthrive-os-control-plane/tests/chlom-bridge.test.mjs"
+      - "apps/crownthrive-os-control-plane/package.json"
+      - "apps/crownthrive-os-control-plane/vercel.json"
+      - ".github/workflows/crownthrive-os-chlom-bridge.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crownthrive-os-chlom-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/crownthrive-os-control-plane
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Syntax, protocol, and governance certification
+        run: npm run certify
+      - name: Verify fail-closed authority boundaries
+        run: |
+          grep -q "CHLOM_PRODUCTION_BASE_URL = 'https://chlom-protocol.vercel.app'" lib/chlom-fabric.js
+          grep -q "eth_sendRawTransaction" tests/chlom-bridge.test.mjs
+          grep -q '"broadcast_tool_exposed": false' contracts/chlom-chain-evidence-bridge.v1.json
+          grep -q '"private_key_custody": false' contracts/chlom-chain-evidence-bridge.v1.json
+          grep -q "2026-07-28" api/mcp.js
+          test -f ../../.mcp.json
