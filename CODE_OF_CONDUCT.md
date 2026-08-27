@@ -108,14 +108,14 @@ For a public-safe moderation issue, reference the relevant issue/PR and request 
 This conduct standard does not replace `LICENSE`, licensing addenda, `CONTRIBUTING.md`, `SECURITY.md`, `AGENTS.md`, applicable law, binding agreements, or governing CrownThrive records. Participation does not create ownership, a license, compensation, partnership, employment, certification, governance authority, or other institutional rights not separately granted.
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.12.0.0
+## Latest PentaRelease — v3.14.0.0
 
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-Support/releases/tag/v3.12.0.0
-- **Release title:** CrownThrive OS 3.12.0.0 — Autonomous PentaRelease
+- **Official release:** https://github.com/crownthrive1/CrownThrive-Support/releases/tag/v3.14.0.0
+- **Release title:** CrownThrive OS 3.14.0.0 — Autonomous PentaRelease
 - **Why:** new executable capability or runtime delta
-- **Changed paths:** 5
-- **Penta components:** PentaRelease, PentaSerialized.Institutionalization, PentaSerializedInstitutionalOperations, PentaSerializedV1.0.0
+- **Changed paths:** 672
+- **Penta components:** PentaApiMcpCurrentControlState, PentaComplianceLicense, PentaContext, PentaContextCi, PentaContextRecordV1.Schema, PentaCredits, PentaDesignControlPlane, PentaDocsAudienceAndComponentStandard, PentaDocsAudienceComponentStandard.V1, PentaDocsAuthoringAndReviewPlaybook, PentaDocsNamingMigration20260826, PentaDocsPageProfile.Schema, PentaDocsPageProfiles.V1, PentaDocsQuality, PentaDocsUnlistedPageDispositions.V1, PentaExec, PentaExecutableFamily, PentaFabric, PentaFabricContinuityAndRuntimeFabric, PentaFabricGeneration61, PentaFactoryParallelPrecompile, PentaFamilies, PentaFamilies.Schema, PentaFamilies.V1, PentaFamily, PentaFamilyInstitutionalControls, PentaFamilyOfFamilies, PentaFamilyOfFamiliesProductionContractV1.0, PentaFamilyPortals, PentaFamilyRegistry, PentaGapClosure, PentaGeneration, PentaGlossary, PentaGreen, PentaGreenNamingRuntimeMigration20260826, PentaImmuneAssurance, PentaImmuneSystem, PentaInteroperabilityFabric, PentaInteroperabilityProduction, PentaMedia, PentaOdHourlyEmailGovernance, PentaOsV1, PentaOsV1.V1, PentaOsV150ProductionBuild20260826, PentaPhaseAliasDispositions.V1, PentaPhaseModel, PentaPrProductionCanary20260826, PentaProviderControlPlane, PentaRelease, PentaReleaseComprehensiveReleaseSurface, PentaRuntimeSuite, PentaRuntimeSuite.V1, PentaSelfHealFirstOutageWatch20260826
 - **Direct USD payload cost:** not available
 - **CIE score:** not available
 - **Data/evidence:** comprehensive record, FAQ, changelog, costs, CIE status, data catalog, and evidence are attached to the official release.
