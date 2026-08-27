@@ -37,27 +37,53 @@ jobs:
           from pathlib import Path
 
           path = Path("scripts/penta_wave3_gap_closure.py")
-          text = path.read_text(encoding="utf-8")
-          old_write = 'mesh = mesh.replace("../SECURITY.md", "/SECURITY").replace("/SECURITY.md", "/SECURITY")'
-          new_write = '''mesh = (
-              mesh.replace("../SECURITY.md", "/technology/security-privacy-continuity")
-              .replace("/SECURITY.md", "/technology/security-privacy-continuity")
-              .replace("/SECURITY", "/technology/security-privacy-continuity")
-          )'''
-          if old_write not in text:
-              raise SystemExit("expected security-route write transform was not found")
-          text = text.replace(old_write, new_write, 1)
+          lines = path.read_text(encoding="utf-8").splitlines()
+          output: list[str] = []
+          write_found = False
+          check_found = False
+          insert_after_raise = False
+          check_indent = ""
 
-          old_check = '''    if "../SECURITY.md" in mesh or "/SECURITY.md" in mesh:
-              raise GapClosureError("noncanonical security documentation link remains")'''
-          new_check = '''    if any(value in mesh for value in ("../SECURITY.md", "/SECURITY.md", "/SECURITY")):
-              raise GapClosureError("noncanonical security documentation link remains")
-          if "/technology/security-privacy-continuity" not in mesh:
-              raise GapClosureError("governed security documentation route is missing")'''
-          if old_check not in text:
-              raise SystemExit("expected security-route check transform was not found")
-          text = text.replace(old_check, new_check, 1)
-          path.write_text(text, encoding="utf-8")
+          for line in lines:
+              stripped = line.strip()
+              indent = line[: len(line) - len(line.lstrip())]
+
+              if stripped == 'mesh = mesh.replace("../SECURITY.md", "/SECURITY").replace("/SECURITY.md", "/SECURITY")':
+                  output.append(
+                      indent
+                      + 'mesh = mesh.replace("../SECURITY.md", "/technology/security-privacy-continuity").replace("/SECURITY.md", "/technology/security-privacy-continuity").replace("/SECURITY", "/technology/security-privacy-continuity")'
+                  )
+                  write_found = True
+                  continue
+
+              if stripped == 'if "../SECURITY.md" in mesh or "/SECURITY.md" in mesh:':
+                  output.append(
+                      indent
+                      + 'if any(value in mesh for value in ("../SECURITY.md", "/SECURITY.md", "/SECURITY")):'
+                  )
+                  check_found = True
+                  insert_after_raise = True
+                  check_indent = indent
+                  continue
+
+              output.append(line)
+              if insert_after_raise and stripped == 'raise GapClosureError("noncanonical security documentation link remains")':
+                  output.append(
+                      check_indent
+                      + 'if "/technology/security-privacy-continuity" not in mesh:'
+                  )
+                  output.append(
+                      check_indent
+                      + '    raise GapClosureError("governed security documentation route is missing")'
+                  )
+                  insert_after_raise = False
+
+          if not write_found:
+              raise SystemExit("security-route write line was not found")
+          if not check_found or insert_after_raise:
+              raise SystemExit("security-route validation block was not repaired")
+
+          path.write_text("\n".join(output) + "\n", encoding="utf-8")
           PY
 
       - name: Produce bounded runtime and reconcile canonical state
