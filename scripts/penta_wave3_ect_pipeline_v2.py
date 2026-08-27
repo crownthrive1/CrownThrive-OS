@@ -3,7 +3,8 @@
 
 The base pipeline remains responsible for integration, projection generation,
 validation, tests, ECT sealing, and cleanup. This wrapper replaces only the
-current-main-sensitive builder reconciliation and package checksum functions.
+current-main-sensitive builder reconciliation, provider-custody evidence, and
+package checksum functions.
 """
 from __future__ import annotations
 
@@ -18,6 +19,28 @@ from typing import Any
 BASE_PIPELINE = Path(os.environ.get("BASE_PIPELINE_PATH", "/tmp/penta_wave3_ect_pipeline.py"))
 ROOT = Path.cwd()
 
+PROVIDER_PROJECT_ID = "tzajnzshmtzjenqulehq"
+PROVIDER_PROJECT_NAME = "CrownThrive"
+PROVIDER_PROJECT_REGION = "us-west-2"
+PROVIDER_POSTGRES_VERSION = "17.6.1.155"
+PROVIDER_MIGRATION_COUNT = 1006
+PROVIDER_LAST_MIGRATION_VERSION = "20260827175750"
+PROVIDER_LAST_MIGRATION_NAME = "pentafactory_final_production_proof_v1"
+PROVIDER_LEDGER_MD5 = "74e4e2e22478e375af8662f4bbe5fa51"
+PROVIDER_OBSERVED_AT_UTC = "2026-08-27T18:23:10.602519Z"
+PROVIDER_TAIL = [
+    {"version": "20260827175750", "name": "pentafactory_final_production_proof_v1"},
+    {"version": "20260827175124", "name": "cie_authority_delegate_v1"},
+    {"version": "20260827174900", "name": "cie_founder_direct_authority_compatibility_v1"},
+    {"version": "20260827174622", "name": "os20_readiness_accept_certified_cie_v1"},
+    {"version": "20260827174609", "name": "pentafactory_github_oidc_dispatch_receipts_v1"},
+    {"version": "20260827174511", "name": "control_plane_explicit_rls_deny_policies_v1"},
+    {"version": "20260827173935", "name": "developer_marketplace_surface_replica_certification_v1"},
+    {"version": "20260827172622", "name": "canonical_os_repository_function_rebind"},
+    {"version": "20260827172606", "name": "os20_release_cost_binding_v2"},
+    {"version": "20260827172449", "name": "pentamarket_certified_rate_cards_v1"},
+]
+
 
 def load_base():
     spec = importlib.util.spec_from_file_location("penta_wave3_ect_pipeline_base", BASE_PIPELINE)
@@ -30,6 +53,48 @@ def load_base():
 
 
 base = load_base()
+base_seal_ect = base.seal_ect
+
+
+def provider_ledger_evidence(repository_migration_count: int) -> dict[str, Any]:
+    if repository_migration_count <= 0:
+        raise base.PipelineError("repository migration inventory is empty")
+    if PROVIDER_MIGRATION_COUNT <= repository_migration_count:
+        raise base.PipelineError(
+            "provider custody hold cannot be closed by count inference; expected provider ledger to exceed repository inventory"
+        )
+    return {
+        "schema": "ct.supabase.migration-ledger-readback.v1",
+        "evidence_id": "ct.supabase.migration-ledger-readback.20260827",
+        "project": {
+            "project_ref": PROVIDER_PROJECT_ID,
+            "name": PROVIDER_PROJECT_NAME,
+            "region": PROVIDER_PROJECT_REGION,
+            "status": "ACTIVE_HEALTHY",
+            "postgres_version": PROVIDER_POSTGRES_VERSION,
+        },
+        "observed_at": PROVIDER_OBSERVED_AT_UTC,
+        "source": "supabase_migrations.schema_migrations",
+        "provider_readback": True,
+        "provider_migration_count": PROVIDER_MIGRATION_COUNT,
+        "provider_last_migration_version": PROVIDER_LAST_MIGRATION_VERSION,
+        "provider_last_migration_name": PROVIDER_LAST_MIGRATION_NAME,
+        "provider_ledger_md5": PROVIDER_LEDGER_MD5,
+        "provider_tail": PROVIDER_TAIL,
+        "repository_migration_file_count": repository_migration_count,
+        "provider_repository_count_delta": PROVIDER_MIGRATION_COUNT - repository_migration_count,
+        "repository_history_reconciled": False,
+        "migration_apply_performed": False,
+        "provider_write_performed": False,
+        "external_state_mutated": False,
+        "authority_expanded": False,
+        "status": "PROVIDER_LEDGER_READBACK_VERIFIED_REPOSITORY_HISTORY_HOLD",
+        "gate": "HOLD",
+        "required_resolution": (
+            "Recover the authoritative provider migration history into a reviewed repository baseline, "
+            "prove clean replay on a non-production environment, and only then rerun branch synchronization."
+        ),
+    }
 
 
 def reconcile_context_and_builder() -> None:
@@ -64,9 +129,7 @@ def reconcile_context_and_builder() -> None:
         raise base.PipelineError("PentaOS explicit-axis normalization contract missing")
 
     # A production-family row is the canonical semantic source for role, risk,
-    # axis, and dependencies. These assignments are order-independent because
-    # later institutional/component rows are explicitly prevented from
-    # overriding production-family axis state.
+    # axis, and dependencies. Later institutional/component rows cannot erase it.
     production_marker = (
         '            current["risk_ceiling"] = incoming.get("risk_ceiling", current["risk_ceiling"])\n'
     )
@@ -112,19 +175,57 @@ def reconcile_context_and_builder() -> None:
 
     builder_path.write_text(builder, encoding="utf-8")
 
-    # Provider custody evidence is a repository-exact statement. Reconcile the
-    # recorded migration count to the exact current-main inventory before the
-    # convergence validator runs; do not infer provider application state.
+    # Record exact point-in-time provider readback while preserving the
+    # repository/provider history HOLD. No migration is applied by this pipeline.
     convergence_path = ROOT / "developers/manifests/supabase-production-convergence-state.v1.json"
     convergence = base.load_json(convergence_path)
     custody = convergence.get("migration_custody")
     if not isinstance(custody, dict):
         raise base.PipelineError("Supabase convergence migration_custody must be an object")
-    migration_count = len(list((ROOT / "supabase/migrations").glob("*.sql")))
-    if migration_count <= 0:
-        raise base.PipelineError("repository migration inventory is empty")
-    custody["repository_migration_file_count"] = migration_count
+    repository_migration_count = len(list((ROOT / "supabase/migrations").glob("*.sql")))
+    evidence = provider_ledger_evidence(repository_migration_count)
+
+    convergence["observed_at"] = PROVIDER_OBSERVED_AT_UTC
+    project = convergence.get("project")
+    if not isinstance(project, dict):
+        raise base.PipelineError("Supabase convergence project must be an object")
+    project.update(evidence["project"])
+
+    custody.update(
+        {
+            "observed_at": PROVIDER_OBSERVED_AT_UTC,
+            "inventory_observed_at": PROVIDER_OBSERVED_AT_UTC,
+            "provider_readback_scope": evidence["source"],
+            "provider_migration_count": PROVIDER_MIGRATION_COUNT,
+            "provider_last_migration_version": PROVIDER_LAST_MIGRATION_VERSION,
+            "provider_last_migration_name": PROVIDER_LAST_MIGRATION_NAME,
+            "repository_migration_file_count": repository_migration_count,
+            "default_branch_status": "MIGRATIONS_FAILED",
+            "last_observed_error": (
+                "Remote provider migration versions are not found in local migrations directory: "
+                f"provider ledger has {PROVIDER_MIGRATION_COUNT} applied entries while the exact default-branch "
+                f"repository has {repository_migration_count} SQL migration files. No migration was applied and "
+                "no production migration history was rewritten by this ECT run."
+            ),
+            "gate": "HOLD",
+            "provider_ledger_readback": {
+                "observed_at": PROVIDER_OBSERVED_AT_UTC,
+                "provider_migration_count": PROVIDER_MIGRATION_COUNT,
+                "provider_last_migration_version": PROVIDER_LAST_MIGRATION_VERSION,
+                "provider_last_migration_name": PROVIDER_LAST_MIGRATION_NAME,
+                "provider_ledger_md5": PROVIDER_LEDGER_MD5,
+                "provider_tail": PROVIDER_TAIL,
+                "readback": True,
+                "repository_history_reconciled": False,
+                "provider_write_performed": False,
+            },
+        }
+    )
     base.write_json(convergence_path, convergence)
+    base.write_json(
+        ROOT / "evidence/supabase/supabase-migration-ledger-readback-20260827.json",
+        evidence,
+    )
 
 
 def verify_package() -> None:
@@ -162,8 +263,29 @@ def verify_package() -> None:
     )
 
 
+def seal_ect() -> dict[str, Any]:
+    receipt = base_seal_ect()
+    provider_evidence = base.load_json(
+        ROOT / "evidence/supabase/supabase-migration-ledger-readback-20260827.json"
+    )
+    receipt["supabase_provider_ledger"] = {
+        "evidence_ref": "evidence/supabase/supabase-migration-ledger-readback-20260827.json",
+        "provider_migration_count": provider_evidence["provider_migration_count"],
+        "provider_last_migration_version": provider_evidence["provider_last_migration_version"],
+        "provider_last_migration_name": provider_evidence["provider_last_migration_name"],
+        "provider_ledger_md5": provider_evidence["provider_ledger_md5"],
+        "repository_migration_file_count": provider_evidence["repository_migration_file_count"],
+        "repository_history_reconciled": False,
+        "migration_apply_performed": False,
+        "gate": "HOLD",
+    }
+    base.write_json(ROOT / "evidence/penta/penta-wave3-ect-20260827.json", receipt)
+    return receipt
+
+
 base.reconcile_context_and_builder = reconcile_context_and_builder
 base.verify_package = verify_package
+base.seal_ect = seal_ect
 
 
 if __name__ == "__main__":
