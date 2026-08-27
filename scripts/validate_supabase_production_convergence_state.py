@@ -28,7 +28,11 @@ def main() -> int:
 
     migration = data.get("migration_custody", {})
     local_count = len(list((ROOT / "supabase/migrations").glob("*.sql")))
-    require(local_count == migration.get("repository_migration_file_count"), "Repository migration count changed; refresh provider custody evidence")
+    recorded_count = migration.get("repository_migration_file_count")
+    require(
+        local_count == recorded_count,
+        f"Repository migration count changed; refresh local custody projection (actual={local_count}, recorded={recorded_count})",
+    )
     require(migration.get("provider_migration_count", 0) > local_count, "Migration custody hold must not be closed by count inference")
     require(migration.get("default_branch_status") == "MIGRATIONS_FAILED", "Default branch status changed without accepted readback")
     require(migration.get("gate") == "HOLD", "Migration custody must remain held")
@@ -66,6 +70,8 @@ def main() -> int:
         "status": "PASS",
         "project_health": "ACTIVE_HEALTHY",
         "sacred_history_reads": "PASS_OBSERVED",
+        "repository_migration_file_count": local_count,
+        "provider_migration_file_count": migration.get("provider_migration_count"),
         "migration_custody": "HOLD",
         "security_warnings": 0,
         "security_policy_intent": "HOLD",
