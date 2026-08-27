@@ -29,18 +29,40 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
+
       - name: Evaluate candidate against a before/after-bound snapshot
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          COLLISION_REPOSITORY: ${{ github.repository }}
+          COLLISION_BRANCH: ${{ github.event.pull_request.base.ref }}
+          COLLISION_CANDIDATE: ${{ github.event.pull_request.number }}
         shell: bash
-        run: >-
-          python3 scripts/governed_collision_agent_v2.py
-          --repository "${{ github.repository }}"
-          --branch "${{ github.event.pull_request.base.ref }}"
-          --candidate "${{ github.event.pull_request.number }}"
-          --output collision-governance-v2-report.json
-          --fail-on-severity 2
+        run: |
+          set -euo pipefail
+          run_collision() {
+            python3 scripts/governed_collision_agent_v2.py \
+              --repository "$COLLISION_REPOSITORY" \
+              --branch "$COLLISION_BRANCH" \
+              --candidate "$COLLISION_CANDIDATE" \
+              --output collision-governance-v2-report.json \
+              --fail-on-severity 2
+          }
+          set +e
+          run_collision
+          rc=$?
+          set -e
+          if [[ "$rc" -ne 0 ]] && [[ -s collision-governance-v2-report.json ]]; then
+            reason=$(jq -r '.reason_code // empty' collision-governance-v2-report.json)
+            error=$(jq -r '.error // empty' collision-governance-v2-report.json)
+            if [[ "$reason" == "COLLISION_OBSERVER_FAILED_CLOSED" && "$error" == *"HTTP Error 403"* ]]; then
+              echo 'Authenticated GitHub installation read is rate-limited; retrying the same read-only public-repository observer without Authorization.' >> "$GITHUB_STEP_SUMMARY"
+              export GITHUB_TOKEN=''
+              run_collision
+              rc=$?
+            fi
+          fi
+          exit "$rc"
 
   trusted-main-reconciliation:
     name: Trusted main — continuous awareness and reaction
@@ -53,13 +75,33 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+
       - name: Recompute the open collision graph
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          COLLISION_REPOSITORY: ${{ github.repository }}
         shell: bash
-        run: >-
-          python3 scripts/governed_collision_agent_v2.py
-          --repository "${{ github.repository }}"
-          --branch main
-          --output collision-governance-v2-report.json
-          --fail-on-severity 6
+        run: |
+          set -euo pipefail
+          run_collision() {
+            python3 scripts/governed_collision_agent_v2.py \
+              --repository "$COLLISION_REPOSITORY" \
+              --branch main \
+              --output collision-governance-v2-report.json \
+              --fail-on-severity 6
+          }
+          set +e
+          run_collision
+          rc=$?
+          set -e
+          if [[ "$rc" -ne 0 ]] && [[ -s collision-governance-v2-report.json ]]; then
+            reason=$(jq -r '.reason_code // empty' collision-governance-v2-report.json)
+            error=$(jq -r '.error // empty' collision-governance-v2-report.json)
+            if [[ "$reason" == "COLLISION_OBSERVER_FAILED_CLOSED" && "$error" == *"HTTP Error 403"* ]]; then
+              echo 'Authenticated GitHub installation read is rate-limited; retrying the same read-only public-repository observer without Authorization.' >> "$GITHUB_STEP_SUMMARY"
+              export GITHUB_TOKEN=''
+              run_collision
+              rc=$?
+            fi
+          fi
+          exit "$rc"
