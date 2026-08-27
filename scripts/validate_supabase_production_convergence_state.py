@@ -35,14 +35,14 @@ def main() -> int:
     require("not found in local migrations directory" in migration.get("last_observed_error", ""), "Migration failure cause drifted")
 
     security = data.get("security_advisors", {})
-    require(security.get("warn") == 2, "Security warning count changed without snapshot reconciliation")
-    require(security.get("gate") == "HOLD_PENDING_INTENT_AND_SECURITY_DISPOSITION", "Security warnings must remain held")
+    require(security.get("total") == 173, "Security advisor count changed without snapshot reconciliation")
+    require(security.get("info") == 173, "Security INFO count changed without snapshot reconciliation")
+    require(security.get("warn") == 0, "Security warning count changed without snapshot reconciliation")
+    require(security.get("info_lint") == "rls_enabled_no_policy", "Expected RLS policy-intent INFO set drifted")
+    require(security.get("gate") == "HOLD_PENDING_RLS_POLICY_INTENT_REVIEW", "RLS policy intent must remain held")
     require(security.get("accepted_exception_evidence") is None, "No accepted security exception is recorded")
     lints = {item.get("lint") for item in security.get("warnings", [])}
-    require(lints == {
-        "anon_security_definer_function_executable",
-        "authenticated_security_definer_function_executable",
-    }, "Expected SECURITY DEFINER warning set drifted")
+    require(lints == set(), "No security WARN advisories were observed in the refreshed provider snapshot")
 
     sacred = data.get("sacred_history_api", {})
     require(sacred.get("function_version") == 3, "Sacred History observed function version drifted")
@@ -67,7 +67,8 @@ def main() -> int:
         "project_health": "ACTIVE_HEALTHY",
         "sacred_history_reads": "PASS_OBSERVED",
         "migration_custody": "HOLD",
-        "security_warnings": "HOLD",
+        "security_warnings": 0,
+        "security_policy_intent": "HOLD",
         "external_mutation": False,
     }, sort_keys=True))
     return 0

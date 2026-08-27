@@ -42,8 +42,8 @@ PENTA naming does not erase CrownThrive's existing institutional ownership bound
 - **DAIL** owns durable evidence/audit lineage.
 - **ThriveBase** is a primary operational state/evidence control plane where bound.
 - **CrownLytics / CrownPulse** remain analytics/intelligence/measurement systems; PentaSignal consumes and interprets signals rather than replacing them.
-- **CII / ThriveFund** retain impact/reinvestment responsibilities; no redundant PentaImpact is created by default.
-- **CrownThrive Holdings** retains portfolio stewardship/capital-allocation responsibilities; no redundant PentaCapital is created by default.
+- **CII / ThriveFund** retain impact/reinvestment responsibilities. The registered PentaImpact service supplies bounded measurement and evidence coordination without replacing those owners.
+- **CrownThrive Holdings** retains portfolio stewardship/capital-allocation responsibilities. The registered PentaCapital service supplies bounded capital-governance coordination without replacing Holdings authority.
 - **OpsOasis / Penta Control** retain operations/control responsibilities; no decorative PentaOps layer is needed merely to expand the namespace.
 
 ## PentaRoute primitives

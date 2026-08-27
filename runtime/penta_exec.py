@@ -15,7 +15,9 @@ from datetime import date, datetime, timezone
 from hashlib import sha256
 import importlib.util
 import json
+import math
 from pathlib import Path
+import re
 import sys
 import tempfile
 from typing import Any, Callable, Iterable, Mapping, Optional
@@ -31,7 +33,7 @@ except ModuleNotFoundError:
     from runtime.penta_family import load_family, member_dispatch_gate
     from runtime.penta_interop import build_envelope, evaluate_handoff
 
-RUNTIME_VERSION = "1.2.1"
+RUNTIME_VERSION = "1.3.0"
 ADAPTER_REGISTRY = Path("data/penta/execution-adapters.registry.json")
 EXECUTION_ELIGIBLE = {"certified", "production"}
 VALID_EFFECTS = {"analyze", "prepare", "route", "execute", "verify", "preserve"}
@@ -111,8 +113,8 @@ def member_status(snapshot: Mapping[str, Any], machine_key: str) -> dict[str, An
 def validate_adapter_registry(registry: Mapping[str, Any]) -> None:
     if registry.get("registry_id") != "crownthrive.penta.execution-adapters":
         raise PentaExecutionError("unexpected adapter registry_id")
-    if registry.get("version") != "1.2.0" or registry.get("fail_closed") is not True:
-        raise PentaExecutionError("adapter registry must be v1.2.0 and fail closed")
+    if registry.get("version") != "1.3.0" or registry.get("fail_closed") is not True:
+        raise PentaExecutionError("adapter registry must be v1.3.0 and fail closed")
     adapters = registry.get("adapters")
     if not isinstance(adapters, list):
         raise PentaExecutionError("adapters must be a list")
@@ -291,12 +293,184 @@ def _marketer_cycle_preview(ctx: AdapterContext) -> dict[str, Any]:
         return {"summary": result["summary"], "receipt": result["receipt"], "state_persisted": False, "provider_write": False}
 
 
+def _reject_secret_fields(value: Any, path: str = "payload") -> None:
+    forbidden = ("token", "secret", "password", "credential", "authorization", "api_key", "private_key")
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            if not isinstance(key, str):
+                raise PentaExecutionError(f"JSON object keys must be strings: {path}")
+            normalized = str(key).casefold().replace("-", "_").replace(" ", "_")
+            if any(fragment in normalized for fragment in forbidden):
+                raise PentaExecutionError(f"credential material is not accepted: {path}.{key}")
+            _reject_secret_fields(child, f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            _reject_secret_fields(child, f"{path}[{index}]")
+    elif isinstance(value, float) and not math.isfinite(value):
+        raise PentaExecutionError(f"non-finite JSON numbers are not accepted: {path}")
+    elif not isinstance(value, (str, int, float, bool, type(None))):
+        raise PentaExecutionError(f"non-JSON value is not accepted: {path}")
+    elif isinstance(value, str) and re.search(
+        r"(?i)(?:\bbearer\s+\S{8,}|\b(?:sk-|ghp_|github_pat_|sb_secret_)[A-Za-z0-9_-]{8,})",
+        value,
+    ):
+        raise PentaExecutionError(f"credential-like string is not accepted: {path}")
+
+
+def _bounded_text(value: Any, field: str, *, maximum: int = 512) -> str:
+    if not isinstance(value, str) or not value.strip() or value != value.strip() or len(value) > maximum:
+        raise PentaExecutionError(f"{field} must be a non-empty trimmed string <= {maximum} characters")
+    if any(ord(character) < 32 for character in value):
+        raise PentaExecutionError(f"{field} contains control characters")
+    return value
+
+
+def _repo_local_ref(value: Any, field: str) -> str:
+    ref = _bounded_text(value, field, maximum=256)
+    prefixes = ("workflow-run:", "github-actions:", "ci:", "issue:", "test:", "evidence:", "docs:", "registry:", "automation:", "repo:", "git:")
+    if not ref.startswith(prefixes) or "://" in ref or ".." in ref:
+        raise PentaExecutionError(f"{field} must be a bounded repository-local reference")
+    return ref
+
+
+def _recovery_contracts(rollback: Any, fallback: Any, *, head_sha: str | None = None) -> tuple[dict[str, str], dict[str, str]]:
+    if not isinstance(rollback, Mapping) or not isinstance(fallback, Mapping):
+        raise PentaExecutionError("rollback and fallback must be objects")
+    expected_rollback = {"method", "target_head_sha"} if head_sha is not None else {"method", "scope"}
+    if set(rollback) != expected_rollback or rollback.get("method") != "git_revert":
+        raise PentaExecutionError(f"rollback must have exact fields {sorted(expected_rollback)} and method git_revert")
+    if head_sha is not None:
+        target = _bounded_text(rollback.get("target_head_sha"), "rollback.target_head_sha", maximum=40)
+        if target != head_sha:
+            raise PentaExecutionError("rollback.target_head_sha must equal the evidence head_sha")
+        normalized_rollback = {"method": "git_revert", "target_head_sha": target}
+    else:
+        normalized_rollback = {"method": "git_revert", "scope": _bounded_text(rollback.get("scope"), "rollback.scope", maximum=256)}
+    if set(fallback) != {"method", "redundancy"} or fallback.get("method") != "hold":
+        raise PentaExecutionError("fallback must have exact fields method=hold and redundancy")
+    normalized_fallback = {"method": "hold", "redundancy": _bounded_text(fallback.get("redundancy"), "fallback.redundancy", maximum=256)}
+    return normalized_rollback, normalized_fallback
+
+
+def _evi_bundle_preview(ctx: AdapterContext) -> dict[str, Any]:
+    from runtime.penta_evi_builder import TestReceipt, build_bundle
+    required = {
+        "work_order_id", "subject", "source_ref", "repo", "head_sha", "target_state",
+        "authority_level", "observations", "claims", "test_receipts", "rollback",
+        "fallback", "created_at",
+    }
+    unknown, missing = set(ctx.payload) - required, required - set(ctx.payload)
+    if unknown or missing:
+        raise PentaExecutionError(f"evidence preview payload fields invalid; missing={sorted(missing)} unknown={sorted(unknown)}")
+    _reject_secret_fields(ctx.payload)
+    if len(_canonical(ctx.payload).encode("utf-8")) > 100_000:
+        raise PentaExecutionError("evidence preview payload exceeds 100000 bytes")
+    observations, claims, receipt_rows = ctx.payload["observations"], ctx.payload["claims"], ctx.payload["test_receipts"]
+    if not isinstance(observations, list) or not 1 <= len(observations) <= 50 or any(not isinstance(row, Mapping) or set(row) != {"kind", "result"} for row in observations):
+        raise PentaExecutionError("observations must contain 1..50 exact {kind,result} objects")
+    if not isinstance(claims, list) or not 1 <= len(claims) <= 50 or any(not isinstance(row, Mapping) or set(row) != {"claim", "scope"} for row in claims):
+        raise PentaExecutionError("claims must contain 1..50 exact {claim,scope} objects")
+    if not isinstance(receipt_rows, list) or not 1 <= len(receipt_rows) <= 50 or any(not isinstance(row, Mapping) for row in receipt_rows):
+        raise PentaExecutionError("test_receipts must contain 1..50 objects")
+    risk_class = ctx.envelope.get("risk_class")
+    authority_level = _bounded_text(ctx.payload["authority_level"], "authority_level", maximum=2)
+    if authority_level not in {"D0", "D1", "D2"} or authority_level != risk_class:
+        raise PentaExecutionError("evidence authority_level must equal the governed envelope risk_class")
+    created_at = ctx.payload["created_at"]
+    if not isinstance(created_at, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", created_at):
+        raise PentaExecutionError("created_at must be exact UTC YYYY-MM-DDTHH:MM:SSZ")
+    try: datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc: raise PentaExecutionError("created_at is not a real UTC timestamp") from exc
+    repo = _bounded_text(ctx.payload["repo"], "repo", maximum=113)
+    if not re.fullmatch(r"crownthrive1/[A-Za-z0-9_.-]{1,100}", repo) or ".." in repo:
+        raise PentaExecutionError("repo must be a crownthrive1 repository slug")
+    head_sha = _bounded_text(ctx.payload["head_sha"], "head_sha", maximum=40)
+    if not re.fullmatch(r"[0-9a-f]{40}", head_sha):
+        raise PentaExecutionError("head_sha must be a lowercase 40-character Git SHA")
+    target_state = _bounded_text(ctx.payload["target_state"], "target_state", maximum=32)
+    if target_state not in {"CONTROLLED_TEST", "BUILD_CANDIDATE", "RELEASE_CANDIDATE", "HOLD"}:
+        raise PentaExecutionError("target_state is outside the non-production preview vocabulary")
+    normalized_observations = [{"kind": _bounded_text(row["kind"], "observation.kind"), "result": _bounded_text(row["result"], "observation.result", maximum=2000)} for row in observations]
+    normalized_claims = [{"claim": _bounded_text(row["claim"], "claim.claim", maximum=2000), "scope": _bounded_text(row["scope"], "claim.scope")} for row in claims]
+    receipts = []
+    for row in receipt_rows:
+        allowed = {"name", "status", "source", "details"}
+        if set(row) - allowed or not {"name", "status", "source"}.issubset(row):
+            raise PentaExecutionError("test receipt fields are invalid")
+        status = _bounded_text(row["status"], "test_receipt.status", maximum=5).upper()
+        if status not in {"PASS", "FAIL", "HOLD", "ERROR"}:
+            raise PentaExecutionError("test receipt status is outside PASS/FAIL/HOLD/ERROR")
+        details = row.get("details", "")
+        if not isinstance(details, str) or len(details) > 2000:
+            raise PentaExecutionError("test receipt details must be a string <= 2000 characters")
+        receipts.append(TestReceipt(name=_bounded_text(row["name"], "test_receipt.name"), status=status, source=_repo_local_ref(row["source"], "test_receipt.source"), details=details))
+    rollback, fallback = _recovery_contracts(ctx.payload["rollback"], ctx.payload["fallback"], head_sha=head_sha)
+    try:
+        bundle = build_bundle(
+            work_order_id=_bounded_text(ctx.payload["work_order_id"], "work_order_id"), subject=_bounded_text(ctx.payload["subject"], "subject"),
+            source_ref=_repo_local_ref(ctx.payload["source_ref"], "source_ref"), repo=repo,
+            head_sha=head_sha, target_state=target_state,
+            authority_level=authority_level, observations=normalized_observations,
+            claims=normalized_claims, evidence_refs=ctx.evidence_refs, test_receipts=receipts,
+            rollback=rollback, fallback=fallback, created_at=created_at,
+        )
+    except (TypeError, ValueError) as exc:
+        raise PentaExecutionError(f"invalid evidence preview: {exc}") from exc
+    return {"bundle": bundle, "adapter_boundary": "evidence_construction_only_unverified", "state_persisted": False, "independent_certification_performed": False, "provider_write": False, "production_promotion_authorized": False}
+
+
+def _immune_repair_plan_preview(ctx: AdapterContext) -> dict[str, Any]:
+    from runtime.penta_immune import WeaknessCandidate, build_repair_plan
+    required = {
+        "id", "kind", "source_ref", "authority_level", "handler", "severity",
+        "recurrence", "confidence", "reversibility", "testability", "blast_radius",
+        "rollback", "fallback", "metadata",
+    }
+    unknown, missing = set(ctx.payload) - required, required - set(ctx.payload)
+    if unknown or missing:
+        raise PentaExecutionError(f"repair preview payload fields invalid; missing={sorted(missing)} unknown={sorted(unknown)}")
+    _reject_secret_fields(ctx.payload)
+    if len(_canonical(ctx.payload).encode("utf-8")) > 50_000:
+        raise PentaExecutionError("repair preview payload exceeds 50000 bytes")
+    authority_level = _bounded_text(ctx.payload["authority_level"], "authority_level", maximum=2)
+    if authority_level not in {"D0", "D1", "D2", "D3"} or authority_level != ctx.envelope.get("risk_class"):
+        raise PentaExecutionError("candidate authority_level must equal the governed envelope risk_class")
+    metadata = ctx.payload["metadata"]
+    allowed_metadata = {"scope", "category", "component", "path", "failure_code", "test_name", "owner_ref", "description"}
+    if not isinstance(metadata, Mapping) or len(metadata) > 16 or set(metadata) - allowed_metadata:
+        raise PentaExecutionError("metadata must contain at most 16 allowlisted scalar fields")
+    if any(not isinstance(value, (str, int, float, bool, type(None))) or isinstance(value, float) and not math.isfinite(value) for value in metadata.values()):
+        raise PentaExecutionError("metadata values must be finite JSON scalars")
+    if len(_canonical(metadata).encode("utf-8")) > 8_192:
+        raise PentaExecutionError("metadata exceeds 8192 bytes")
+    for field in ("severity", "recurrence", "confidence", "reversibility", "testability", "blast_radius"):
+        if type(ctx.payload[field]) is not int or not 0 <= ctx.payload[field] <= 5:
+            raise PentaExecutionError(f"{field} must be an integer from 0 through 5")
+    rollback, fallback = _recovery_contracts(ctx.payload["rollback"], ctx.payload["fallback"])
+    try:
+        candidate = WeaknessCandidate(
+            id=_bounded_text(ctx.payload["id"], "id", maximum=128),
+            kind=_bounded_text(ctx.payload["kind"], "kind", maximum=64),
+            source_ref=_repo_local_ref(ctx.payload["source_ref"], "source_ref"),
+            authority_level=authority_level,
+            handler=_bounded_text(ctx.payload["handler"], "handler", maximum=64),
+            severity=ctx.payload["severity"], recurrence=ctx.payload["recurrence"], confidence=ctx.payload["confidence"],
+            reversibility=ctx.payload["reversibility"], testability=ctx.payload["testability"], blast_radius=ctx.payload["blast_radius"],
+            rollback=rollback, fallback=fallback, metadata=dict(metadata),
+        )
+        plan = build_repair_plan(candidate)
+    except (TypeError, ValueError) as exc:
+        raise PentaExecutionError(f"invalid repair preview: {exc}") from exc
+    return {"plan": plan, "adapter_boundary": "bounded_plan_only_no_repair_execution", "state_persisted": False, "repair_executed": False, "provider_write": False, "production_promotion_authorized": False}
+
+
 BUILTIN_HANDLERS: dict[str, Callable[[AdapterContext], dict[str, Any]]] = {
     "family_snapshot": _family_snapshot, "beata_heartbeat": _beata_heartbeat, "mesh_route_check": _mesh_route_check,
     "error_normalize": _error_normalize, "logger_emit": _logger_emit, "trace_new_context": _trace_new_context, "metric_snapshot": _metric_snapshot,
     "heartbeat_control_plane_probe": _heartbeat_control_plane_probe, "od_readiness_assess": _od_readiness_assess,
     "compliance_evaluate": _compliance_evaluate, "license_readiness": _license_readiness,
     "scribe_reconcile_preview": _scribe_reconcile_preview, "marketer_cycle_preview": _marketer_cycle_preview,
+    "evi_bundle_preview": _evi_bundle_preview, "immune_repair_plan_preview": _immune_repair_plan_preview,
 }
 
 
@@ -324,8 +498,12 @@ def invoke_member(root: Path, *, source_member: str, target_member: str, operati
     registry, snapshot = load_family(root); _member(snapshot, source_member); target = _member(snapshot, target_member); adapters = load_adapter_registry(root); adapter = _find_adapter(adapters, target_member, operation)
     if adapter is None: return _receipt("member_invoke", "hold_fail_closed", {"source_member": source_member, "target_member": target_member, "operation": operation, "reason": "no registered executable adapter for member/operation"})
     if adapter["requires_execution_eligible"] and target.get("maturity") not in EXECUTION_ELIGIBLE: return _receipt("member_invoke", "hold_fail_closed", {"source_member": source_member, "target_member": target_member, "operation": operation, "reason": f"target maturity {target.get('maturity')!r} is not execution-eligible"})
-    refs = tuple(dict.fromkeys(str(ref) for ref in evidence_refs if str(ref).strip()))
-    if not refs: raise PentaExecutionError("at least one evidence reference is required")
+    raw_refs = list(evidence_refs)
+    if not 1 <= len(raw_refs) <= 50 or any(not isinstance(ref, str) for ref in raw_refs):
+        raise PentaExecutionError("evidence_refs must contain 1..50 strings")
+    refs = tuple(_repo_local_ref(ref, "evidence_ref") for ref in raw_refs)
+    if len(refs) != len(set(refs)):
+        raise PentaExecutionError("duplicate evidence_refs are not accepted")
     envelope = build_envelope(source_member=source_member, target_member=target_member, operation=operation, requested_effect=adapter["requested_effect"], evidence_refs=refs, risk_class=risk_class, authority_trace=authority_trace, human_gate=human_gate, provider_effect=adapter["provider_effect"], provider_binding_ref=provider_binding_ref, readback_strategy=readback_strategy, idempotency_key=idempotency_key, metadata={"adapter_id": adapter["adapter_id"], "runtime_version": RUNTIME_VERSION})
     decision = evaluate_handoff(snapshot, envelope)
     if decision.get("eligible") is not True: return _receipt("member_invoke", "hold_fail_closed", {"source_member": source_member, "target_member": target_member, "operation": operation, "adapter_id": adapter["adapter_id"], "handoff_decision": decision, "envelope_sha256": envelope.get("envelope_sha256")})

@@ -30,6 +30,8 @@ A Penta is **institutionalized** only when the required registry, portal, docume
 Canonical family index: `/io/pentas`  
 Canonical per-system route: `/io/pentas/{slug}`
 
+The authenticated CrownThrive IO route is the operator/control surface. The complementary public-safe PentaDocs/status contract uses `/penta/{machine_key_suffix}` as declared by `data/penta/family.registry.json`. Both routes resolve the same canonical machine identity; neither route grants execution authority or promotes maturity.
+
 Every portal SHALL expose, when applicable: **Overview · Operate · Status · Docs · Integrations · Access · Audit · Releases · Incidents · Costs · Dependencies**.
 
 CrownThrive IO is the operating/control surface; PentaDocs is the authoritative documentation surface. A portal may deep-link into PentaDocs but may not replace the documentation record.

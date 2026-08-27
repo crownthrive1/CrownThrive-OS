@@ -41,6 +41,19 @@ class PentaRuntimeSuiteTests(unittest.TestCase):
             with self.assertRaises(prs.PentaRuntimeSuiteError):
                 prs.collect_members(root)
 
+    def test_derived_os_v1_census_is_not_reingested(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            data = root / "data" / "penta"
+            data.mkdir(parents=True)
+            payload = {"systems": [{"machine_key": "penta.mail", "canonical_name": "PentaMail", "maturity": "specified"}]}
+            (data / "systems.registry.json").write_text(json.dumps(payload), encoding="utf-8")
+            (data / "os-v1.discoveries.json").write_text(json.dumps(payload), encoding="utf-8")
+            (data / "os-v1.registry.json").write_text(json.dumps(payload), encoding="utf-8")
+            members = prs.collect_members(root)
+            self.assertEqual(set(members), {"penta.mail"})
+            self.assertEqual(members["penta.mail"]["source"], "data/penta/systems.registry.json")
+
     def test_registered_member_can_pass_registry_signal_gate(self):
         snapshot = {"members": [{
             "machine_key": "penta.mail", "maturity": "certified", "execution_eligible_by_registry": True,

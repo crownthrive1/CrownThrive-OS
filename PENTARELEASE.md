@@ -1,6 +1,6 @@
 # PentaRelease™
 
-Status: Production
+Status: Implemented software; registry maturity `specified`; production certification `HOLD`
 Component ID: `ct.pentarelease`
 Version: `2.1.0`
 Canonical role: CrownThrive autonomous release intelligence, packaging, publication, repair, reconciliation, and release-evidence subsystem.
@@ -64,7 +64,9 @@ Secret-bearing files, credentials, vault content, private keys, `.env` material,
 
 PentaRelease may recognize and package authority already established elsewhere. It may never manufacture new authority. D3/breaking decisions remain human-reserved unless a later governing contract explicitly grants narrower authority. Self-approval of restricted gates is prohibited. Historical releases remain preserved.
 
-## Production implementation
+## Current implementation
+
+The files below are executable implementation signals. They do not by themselves prove an exact-head production deployment or promote the `penta.release` family member. The current Penta OS V1 release gate remains HOLD until exact-head governed CI, packaging, publication, provider readback, and the wider release blockers are resolved.
 
 - Policy: `.pentarelease/policy.json`
 - Activation state: `.pentarelease/state/activation.json`
