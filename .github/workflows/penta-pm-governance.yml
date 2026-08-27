@@ -55,6 +55,7 @@ jobs:
 
       - name: Validate PentaPM policy and unit tests
         run: |
+          set -euo pipefail
           python -m json.tool config/penta_pm_policy.json >/dev/null
           python -m json.tool config/penta_credential_bindings.json >/dev/null
           python -m unittest tests.test_penta_pm_reconcile -v
@@ -70,17 +71,44 @@ jobs:
           echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
           echo "Provider mutation on pull_request/issues/release events: false" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Reconcile GitHub Projects, milestones and Development state
+      - name: Reconcile trusted provider state
+        if: steps.mode.outputs.apply == 'true'
         env:
-          PENTA_PM_GITHUB_TOKEN: ${{ steps.mode.outputs.apply == 'true' && (secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token) || github.token }}
-          GH_TOKEN: ${{ steps.mode.outputs.apply == 'true' && (secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token) || github.token }}
+          PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
+          GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || secrets.PENTA || github.token }}
         run: |
           set -euo pipefail
-          if [[ "${{ steps.mode.outputs.apply }}" == "true" ]]; then
-            python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --apply
-          else
-            python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}"
-          fi
+          python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --apply
+
+      - name: Emit provider-independent PR/event validation receipt
+        if: steps.mode.outputs.apply != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/penta-pm
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          policy=json.loads(Path('config/penta_pm_policy.json').read_text(encoding='utf-8'))
+          credentials=json.loads(Path('config/penta_credential_bindings.json').read_text(encoding='utf-8'))
+          receipt={
+            'schema':'ct.penta.pm.pr-safe-validation.v1',
+            'state':'PASS_PR_SAFE_SOURCE_VALIDATION',
+            'repository':os.environ['GITHUB_REPOSITORY'],
+            'sha':os.environ['GITHUB_SHA'],
+            'event':os.environ['GITHUB_EVENT_NAME'],
+            'provider_readback':'DEFERRED_TO_TRUSTED_AUTONOMOUS_LANE',
+            'provider_mutation':False,
+            'provider_api_called':False,
+            'policy_sha256':hashlib.sha256(json.dumps(policy,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
+            'credential_contract_sha256':hashlib.sha256(json.dumps(credentials,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
+            'money_movement':False,
+            'checkout_activation':False,
+          }
+          receipt['receipt_sha256']=hashlib.sha256(json.dumps(receipt,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+          Path('artifacts/penta-pm/latest.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print(json.dumps(receipt,sort_keys=True))
+          PY
 
       - name: Upload immutable-style PentaPM receipt
         if: always()
@@ -105,7 +133,11 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-      - name: Fail closed on unexplained metadata drift
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --check
+      - name: Verify source contract without provider calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool config/penta_pm_policy.json >/dev/null
+          python -m json.tool config/penta_credential_bindings.json >/dev/null
+          python -m unittest tests.test_penta_pm_reconcile -v
+          echo 'PentaPM PR gate PASS: provider API/readback is intentionally deferred to the trusted autonomous main/schedule lane.' >> "$GITHUB_STEP_SUMMARY"
