@@ -34,8 +34,10 @@ jobs:
       - name: Install deterministic validators
         run: python -m pip install --disable-pip-version-check jsonschema==4.23.0
 
-      - name: Harden transformer for current Penta Family shape
+      - name: Harden transformer and restack onto exact current main
+        shell: bash
         run: |
+          set -euo pipefail
           python - <<'PY'
           from pathlib import Path
 
@@ -76,11 +78,6 @@ jobs:
               raise SystemExit("fragile promotion-projection block was not found")
           path.write_text(text.replace(old, new, 1), encoding="utf-8")
           PY
-
-      - name: Preserve transformer and restack onto exact current main
-        shell: bash
-        run: |
-          set -euo pipefail
           cp scripts/penta_wave3_mainline_integrate.py /tmp/penta_wave3_mainline_integrate.py
           chmod +x /tmp/penta_wave3_mainline_integrate.py
           git restore --source=HEAD --worktree scripts/penta_wave3_mainline_integrate.py
@@ -89,58 +86,58 @@ jobs:
           git checkout -B penta-wave3-ect-integration origin/main
           git clean -fdx
 
-      - name: Additively integrate Wave 3 into PentaOS V1.5
+      - name: Additively integrate Wave 3 and reconcile promotion regressions
         env:
           OLD_HEAD: "105460c828e8baf0d034d43689b278b47d2f9833"
-        run: python /tmp/penta_wave3_mainline_integrate.py
-
-      - name: Reconcile evidence-promoted portal regression
         run: |
+          python /tmp/penta_wave3_mainline_integrate.py
           python - <<'PY'
           from pathlib import Path
 
           path = Path("tests/test_penta_family.py")
           text = path.read_text(encoding="utf-8")
-          old = '    assert mail["sections"]["status"]["member_maturity"] == "specified"'
-          new = '    assert mail["sections"]["status"]["member_maturity"] == "production"'
-          if old in text:
-              text = text.replace(old, new, 1)
-          elif new not in text:
-              raise SystemExit("PentaMail portal maturity assertion was not found")
+          for key in ("penta.mail", "penta.status", "penta.credentials", "penta.build", "penta.certify"):
+              needle = f'        "{key}",\n'
+              index = text.find(needle)
+              if index < 0:
+                  raise SystemExit(f"stale held-member entry was not found: {key}")
+              text = text[:index] + text[index + len(needle):]
+          replacements = {
+              '    assert mail["sections"]["status"]["member_maturity"] == "specified"':
+                  '    assert mail["sections"]["status"]["member_maturity"] == "production"',
+              '    assert mail["sections"]["status"]["execution_eligible"] is False':
+                  '    assert mail["sections"]["status"]["execution_eligible"] is True',
+          }
+          for old, new in replacements.items():
+              if old in text:
+                  text = text.replace(old, new, 1)
+              elif new not in text:
+                  raise SystemExit(f"promotion assertion was not found: {old}")
           path.write_text(text, encoding="utf-8")
           PY
 
-      - name: Regenerate canonical PentaOS and PentaDocs projections
+      - name: Regenerate and validate canonical projections
         run: |
+          set -euo pipefail
           python scripts/build_penta_os_v1.py --write
           python scripts/pentadocs_quality.py --apply
           python scripts/build_penta_os_v1.py --check
           python scripts/pentadocs_quality.py --check
-
-      - name: Compile all affected production software
-        run: |
           python -m py_compile \
-            runtime/penta_family.py \
-            runtime/penta_exec.py \
-            runtime/penta_interop.py \
-            runtime/penta_runtime_suite.py \
-            runtime/penta_wave3_operations.py \
-            runtime/penta_context.py \
-            runtime/penta_evi_builder.py \
-            runtime/penta_immune.py \
-            runtime/penta_os_v1.py \
-            runtime/penta-provider-control-plane/penta_control_plane.py \
-            scripts/build_penta_os_v1.py \
-            scripts/package_penta_os_v1.py
-
-      - name: Validate contracts registries provider boundaries and documentation
-        run: |
-          python -m json.tool data/penta/family.registry.json >/dev/null
-          python -m json.tool data/penta/execution-adapters.registry.json >/dev/null
-          python -m json.tool data/penta/member-runtime.contract.json >/dev/null
-          python -m json.tool data/penta/production-promotions.v1.json >/dev/null
-          python -m json.tool data/penta/systems.extensions.context.json >/dev/null
-          python -m json.tool penta/registry/penta-families.v1.json >/dev/null
+            runtime/penta_family.py runtime/penta_exec.py runtime/penta_interop.py \
+            runtime/penta_runtime_suite.py runtime/penta_wave3_operations.py \
+            runtime/penta_context.py runtime/penta_evi_builder.py runtime/penta_immune.py \
+            runtime/penta_os_v1.py runtime/penta-provider-control-plane/penta_control_plane.py \
+            scripts/build_penta_os_v1.py scripts/package_penta_os_v1.py
+          for file in \
+            data/penta/family.registry.json \
+            data/penta/execution-adapters.registry.json \
+            data/penta/member-runtime.contract.json \
+            data/penta/production-promotions.v1.json \
+            data/penta/systems.extensions.context.json \
+            penta/registry/penta-families.v1.json; do
+            python -m json.tool "$file" >/dev/null
+          done
           python scripts/validate_penta_provider_control_plane.py
           python scripts/validate_supabase_production_convergence_state.py
           python scripts/validate_docs.py
@@ -150,8 +147,9 @@ jobs:
           python runtime/penta_interop.py --root . --certify --output /tmp/penta-interoperability.json
           python runtime/penta_os_v1.py --root . validate
 
-      - name: Run ECT regression and negative-safety cohort
+      - name: Run complete ECT regression and negative-safety cohort
         run: |
+          set -euo pipefail
           python tests/test_penta_family.py
           python tests/test_penta_exec.py
           python -m unittest -v tests.test_penta_runtime_suite
@@ -191,10 +189,10 @@ jobs:
 
           root = Path('.')
           spec = importlib.util.spec_from_file_location('penta_family_ect', root / 'runtime/penta_family.py')
-          mod = importlib.util.module_from_spec(spec)
-          sys.modules[spec.name] = mod
-          spec.loader.exec_module(mod)
-          _, snapshot = mod.load_family(root)
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = module
+          spec.loader.exec_module(module)
+          _, snapshot = module.load_family(root)
           adapters = json.loads((root / 'data/penta/execution-adapters.registry.json').read_text())
           runtime_suite = json.loads(Path('/tmp/penta-runtime-suite.json').read_text())
           interop = json.loads(Path('/tmp/penta-interoperability.json').read_text())
@@ -233,14 +231,11 @@ jobs:
           path.parent.mkdir(parents=True, exist_ok=True)
           path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
           print(json.dumps(receipt, indent=2, sort_keys=True))
-          if receipt['promotion_count'] != 5:
-              raise SystemExit('ECT requires exactly five evidence promotions')
-          if receipt['bounded_executable_adapters'] != receipt['execution_eligible_members']:
-              raise SystemExit('ECT adapter coverage is incomplete')
-          if receipt['provider_effect_adapters'] != 0:
-              raise SystemExit('local provider-effect adapter detected')
-          if receipt['interoperability_status'] != 'PASS' or receipt['interoperability_blockers'] != 0:
-              raise SystemExit('interoperability ECT is not PASS')
+          assert receipt['promotion_count'] == 5
+          assert receipt['bounded_executable_adapters'] == receipt['execution_eligible_members']
+          assert receipt['provider_effect_adapters'] == 0
+          assert receipt['interoperability_status'] == 'PASS'
+          assert receipt['interoperability_blockers'] == 0
           PY
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
