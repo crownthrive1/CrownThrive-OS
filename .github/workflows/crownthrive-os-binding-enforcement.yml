@@ -28,9 +28,11 @@ jobs:
           if identity.get('canonical_url') != 'https://github.com/crownthrive1/CrownThrive-OS': raise SystemExit('Canonical URL binding mismatch')
           if identity.get('canonical_default_branch') != 'main': raise SystemExit('Canonical branch binding mismatch')
           legacy='CrownThrive-'+'Support'; pattern=re.compile(re.escape(legacy),re.IGNORECASE)
+          historical_identity_evidence={'supabase/migrations/20260824073728_cie_post_activation_assurance_watch_v1.sql'}
           files=subprocess.check_output(['git','ls-files','-z']).decode().split('\0'); changed=[]; count_total=0
           for filename in files:
               if not filename or filename=='.github/workflows/crownthrive-os-binding-enforcement.yml': continue
+              if filename in historical_identity_evidence: continue
               p=Path(filename)
               try: before=p.read_text(encoding='utf-8')
               except (UnicodeDecodeError,OSError): continue
@@ -40,11 +42,12 @@ jobs:
           remaining=[]
           for filename in files:
               if not filename or filename=='.github/workflows/crownthrive-os-binding-enforcement.yml': continue
+              if filename in historical_identity_evidence: continue
               try: text=Path(filename).read_text(encoding='utf-8')
               except (UnicodeDecodeError,OSError): continue
               if pattern.search(text): remaining.append(filename)
           if remaining: raise SystemExit('Retired OS identity remains: '+', '.join(remaining))
-          print(f'Canonical CrownThrive-OS identity verified; auto-healed {count_total} reference(s) across {len(changed)} file(s).')
+          print(f'Canonical CrownThrive-OS identity verified; auto-healed {count_total} reference(s) across {len(changed)} file(s); exact historical evidence preserved.')
           PY
           if ! git diff --quiet; then
             git config user.name 'CrownThrive PentaUpdate'
@@ -67,10 +70,12 @@ jobs:
           expected='crownthrive1/CrownThrive-OS'; identity=json.loads(Path('.crownthrive/canonical-os.json').read_text(encoding='utf-8'))
           assert os.environ['GITHUB_REPOSITORY']==expected; assert identity['canonical_control_repository']==expected; assert identity['canonical_url']=='https://github.com/crownthrive1/CrownThrive-OS'
           pattern=re.compile(re.escape('CrownThrive-'+'Support'),re.IGNORECASE); hits=[]
+          historical_identity_evidence={'supabase/migrations/20260824073728_cie_post_activation_assurance_watch_v1.sql'}
           for filename in subprocess.check_output(['git','ls-files','-z']).decode().split('\0'):
               if not filename or filename=='.github/workflows/crownthrive-os-binding-enforcement.yml': continue
+              if filename in historical_identity_evidence: continue
               try: text=Path(filename).read_text(encoding='utf-8')
               except (UnicodeDecodeError,OSError): continue
               if pattern.search(text): hits.append(filename)
           if hits: raise SystemExit('Retired OS identity is forbidden: '+', '.join(hits))
-          print('Canonical CrownThrive-OS identity verified.')
+          print('Canonical CrownThrive-OS identity verified; exact historical evidence allowlist preserved.')

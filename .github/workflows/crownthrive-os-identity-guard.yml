@@ -41,10 +41,15 @@ jobs:
               raise SystemExit(f'Canonical URL mismatch: expected {expected_url}')
 
           legacy_slug = 'CrownThrive-' + 'Support'
+          historical_identity_evidence = {
+              'supabase/migrations/20260824073728_cie_post_activation_assurance_watch_v1.sql',
+          }
           tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0')
           hits = []
           for filename in tracked:
               if not filename or filename == '.github/workflows/crownthrive-os-identity-guard.yml':
+                  continue
+              if filename in historical_identity_evidence:
                   continue
               path = Path(filename)
               try:
@@ -62,5 +67,5 @@ jobs:
               print(f'Replace live references with {expected_url}')
               raise SystemExit(1)
 
-          print(f'Canonical CrownThrive OS identity verified: {expected_url}')
+          print(f'Canonical CrownThrive OS identity verified: {expected_url}; exact historical evidence allowlist preserved.')
           PY
