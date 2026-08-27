@@ -1,0 +1,232 @@
+name: Penta Wave 3 ECT Mainline Production
+
+on:
+  push:
+    branches:
+      - penta-production-promotion-wave3-restack-20260826-v2
+    paths:
+      - ".github/workflows/penta-wave3-ect-mainline.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: penta-wave3-ect-mainline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ect-mainline-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout Wave 3 history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: penta-production-promotion-wave3-restack-20260826-v2
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic validators
+        run: python -m pip install --disable-pip-version-check jsonschema==4.23.0
+
+      - name: Preserve transformer and restack onto exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp scripts/penta_wave3_mainline_integrate.py /tmp/penta_wave3_mainline_integrate.py
+          chmod +x /tmp/penta_wave3_mainline_integrate.py
+          git fetch origin main
+          echo "MAIN_SHA=$(git rev-parse origin/main)" >> "$GITHUB_ENV"
+          git checkout -B penta-wave3-ect-integration origin/main
+          git clean -fdx
+
+      - name: Additively integrate Wave 3 into PentaOS V1.5
+        env:
+          OLD_HEAD: "105460c828e8baf0d034d43689b278b47d2f9833"
+        run: python /tmp/penta_wave3_mainline_integrate.py
+
+      - name: Regenerate canonical PentaOS and PentaDocs projections
+        run: |
+          python scripts/build_penta_os_v1.py --write
+          python scripts/pentadocs_quality.py --apply
+          python scripts/build_penta_os_v1.py --check
+          python scripts/pentadocs_quality.py --check
+
+      - name: Compile all affected production software
+        run: |
+          python -m py_compile \
+            runtime/penta_family.py \
+            runtime/penta_exec.py \
+            runtime/penta_interop.py \
+            runtime/penta_runtime_suite.py \
+            runtime/penta_wave3_operations.py \
+            runtime/penta_context.py \
+            runtime/penta_evi_builder.py \
+            runtime/penta_immune.py \
+            runtime/penta_os_v1.py \
+            runtime/penta-provider-control-plane/penta_control_plane.py \
+            scripts/build_penta_os_v1.py \
+            scripts/package_penta_os_v1.py
+
+      - name: Validate contracts registries provider boundaries and documentation
+        run: |
+          python -m json.tool data/penta/family.registry.json >/dev/null
+          python -m json.tool data/penta/execution-adapters.registry.json >/dev/null
+          python -m json.tool data/penta/member-runtime.contract.json >/dev/null
+          python -m json.tool data/penta/production-promotions.v1.json >/dev/null
+          python -m json.tool data/penta/systems.extensions.context.json >/dev/null
+          python -m json.tool penta/registry/penta-families.v1.json >/dev/null
+          python scripts/validate_penta_provider_control_plane.py
+          python scripts/validate_supabase_production_convergence_state.py
+          python scripts/validate_docs.py
+          python runtime/penta_families.py --root . --portal-index > /tmp/penta-families.json
+          python runtime/penta_exec.py --root . validate > /tmp/penta-exec-validation.json
+          python runtime/penta_runtime_suite.py --root . --output /tmp/penta-runtime-suite.json
+          python runtime/penta_interop.py --root . certify --output /tmp/penta-interoperability.json
+          python runtime/penta_os_v1.py --root . validate
+
+      - name: Run ECT regression and negative-safety cohort
+        run: |
+          python tests/test_penta_family.py
+          python tests/test_penta_exec.py
+          python -m unittest -v tests.test_penta_runtime_suite
+          python -m unittest -v tests.test_penta_interop
+          python -m unittest -v tests.test_penta_observability
+          python -m unittest -v tests.test_penta_context
+          python -m unittest -v tests.test_penta_evi_builder tests.test_penta_immune
+          python -m unittest -v tests.test_penta_os_v1
+          python -m unittest discover -s tests -p 'test_penta_mail.py' -v
+          python -m unittest discover -s tests -p 'test_penta_institutional_services.py' -v
+          python -m unittest discover -s tests -p 'test_penta_institutional_controls.py' -v
+          python scripts/run_function_tests.py tests/test_penta_compliance_license.py tests/test_penta_self_build.py
+
+      - name: Verify reproducible PentaOS package
+        run: |
+          set -euo pipefail
+          python scripts/package_penta_os_v1.py --output dist/penta-os-v1/build-a --source-revision "$MAIN_SHA"
+          python scripts/package_penta_os_v1.py --output dist/penta-os-v1/build-b --source-revision "$MAIN_SHA"
+          python scripts/package_penta_os_v1.py \
+            --output dist/penta-os-v1/build-a \
+            --verify \
+            --compare-output dist/penta-os-v1/build-b \
+            > /tmp/penta-os-package-verification.json
+          (cd dist/penta-os-v1/build-a && sha256sum -c penta-os-v1-1.5.0.sha256)
+
+      - name: Seal exact ECT evidence and remove generated artifacts
+        env:
+          ECT_RUN_ID: ${{ github.run_id }}
+          ECT_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          python - <<'PY'
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          root = Path('.')
+          spec = importlib.util.spec_from_file_location('penta_family_ect', root / 'runtime/penta_family.py')
+          mod = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = mod
+          spec.loader.exec_module(mod)
+          _, snapshot = mod.load_family(root)
+          adapters = json.loads((root / 'data/penta/execution-adapters.registry.json').read_text())
+          runtime_suite = json.loads(Path('/tmp/penta-runtime-suite.json').read_text())
+          interop = json.loads(Path('/tmp/penta-interoperability.json').read_text())
+          receipt = {
+              'schema': 'ct.penta.ect.v1',
+              'ect_id': 'ct.penta.ect.production-promotion-wave3.20260827',
+              'canonical_name': 'Execution Certification and Testing',
+              'repository': 'crownthrive1/CrownThrive-OS',
+              'pull_request': 552,
+              'base_main_sha': os.environ['MAIN_SHA'],
+              'workflow_run_id': int(os.environ['ECT_RUN_ID']),
+              'workflow_run_attempt': int(os.environ['ECT_RUN_ATTEMPT']),
+              'status': 'PASS_EXACT_MAINLINE_CANDIDATE',
+              'runtime_version': '1.4.0',
+              'registered_penta_members': snapshot['member_count'],
+              'execution_eligible_members': len(snapshot['execution_eligible_members']),
+              'promotion_count': snapshot.get('promotion_count', 0),
+              'promoted_members': snapshot.get('promoted_members', []),
+              'bounded_executable_adapters': len(adapters['adapters']),
+              'provider_effect_adapters': sum(1 for row in adapters['adapters'] if row.get('provider_effect')),
+              'interoperability_status': interop.get('status'),
+              'interoperability_blockers': interop.get('blocker_count'),
+              'runtime_suite_schema': runtime_suite.get('schema'),
+              'invariants': {
+                  'authority_expanded': False,
+                  'd3_automatic_authority': False,
+                  'provider_write_performed_by_local_adapters': False,
+                  'production_promotion_automatic': False,
+                  'penta_evi_builder_self_certification': False,
+                  'penta_immune_autonomous_repair_execution': False,
+                  'secret_values_returned': False,
+                  'fail_closed': True,
+              },
+          }
+          path = root / 'evidence/penta/penta-wave3-ect-20260827.json'
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          if receipt['promotion_count'] != 5:
+              raise SystemExit('ECT requires exactly five evidence promotions')
+          if receipt['bounded_executable_adapters'] != receipt['execution_eligible_members']:
+              raise SystemExit('ECT adapter coverage is incomplete')
+          if receipt['provider_effect_adapters'] != 0:
+              raise SystemExit('local provider-effect adapter detected')
+          if receipt['interoperability_status'] != 'PASS' or receipt['interoperability_blockers'] != 0:
+              raise SystemExit('interoperability ECT is not PASS')
+          PY
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+          rm -rf .pytest_cache .mypy_cache .ruff_cache dist
+
+      - name: Commit exact certified candidate and force-restack PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "crownthrive1"
+          git config user.email "jones.usmc.kj@gmail.com"
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No integrated production delta was generated."
+            exit 1
+          fi
+          git commit -m "feat(ect): integrate Wave 3 into PentaOS V1.5 production"
+          CANDIDATE_SHA=$(git rev-parse HEAD)
+          python - <<PY
+          import json
+          from pathlib import Path
+          path = Path('evidence/penta/penta-wave3-ect-20260827.json')
+          data = json.loads(path.read_text())
+          data['candidate_sha'] = '$CANDIDATE_SHA'
+          data['candidate_binding'] = 'This ECT receipt is committed in and binds the exact candidate SHA through the containing amended commit.'
+          path.write_text(json.dumps(data, indent=2, sort_keys=True) + '\n')
+          PY
+          git add evidence/penta/penta-wave3-ect-20260827.json
+          git commit --amend --no-edit
+          FINAL_SHA=$(git rev-parse HEAD)
+          python -m json.tool evidence/penta/penta-wave3-ect-20260827.json >/dev/null
+          git diff --check HEAD^
+          git push --force-with-lease origin "HEAD:penta-production-promotion-wave3-restack-20260826-v2"
+          echo "FINAL_SHA=$FINAL_SHA" >> "$GITHUB_ENV"
+
+      - name: Publish ECT summary
+        run: |
+          {
+            echo '## Penta Wave 3 ECT Mainline Production'
+            echo
+            echo "- Current main base: $MAIN_SHA"
+            echo "- Exact certified candidate: $FINAL_SHA"
+            echo '- ECT: PASS'
+            echo '- Promotion model: explicit evidence-bound; no automatic authority'
+            echo '- Provider-effect adapters: 0'
+            echo '- PentaEVIBuilder: UNVERIFIED evidence preview only'
+            echo '- PentaImmune: bounded repair-plan preview only'
+          } >> "$GITHUB_STEP_SUMMARY"
