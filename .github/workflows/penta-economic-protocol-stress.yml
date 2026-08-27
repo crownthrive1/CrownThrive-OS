@@ -1,0 +1,36 @@
+name: Penta Economic Protocol Stress
+on:
+  pull_request:
+    paths:
+      - 'protocols/penta-economic/**'
+      - '.github/workflows/penta-economic-protocol-stress.yml'
+  workflow_dispatch:
+    inputs:
+      transactions:
+        description: Stress transaction count
+        required: false
+        default: '25000'
+concurrency:
+  group: penta-economic-stress-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  stress-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Stress Penta economic protocol
+        env:
+          PENTA_STRESS_N: ${{ inputs.transactions || '25000' }}
+        run: node protocols/penta-economic/stress.mjs | tee penta-economic-stress.json
+      - name: Publish certification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: penta-economic-stress-evidence
+          path: penta-economic-stress.json
+          if-no-files-found: error
