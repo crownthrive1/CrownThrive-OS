@@ -30,23 +30,24 @@ def main() -> int:
     local_count = len(list((ROOT / "supabase/migrations").glob("*.sql")))
     expected_count = migration.get("repository_migration_file_count")
     provider_count = migration.get("provider_migration_count", 0)
+    parity = provider_count == local_count
     require(
         local_count == expected_count,
         f"Repository migration count changed; refresh repository inventory evidence (expected={expected_count}, actual={local_count})",
     )
     require(
-        provider_count >= local_count,
-        f"Repository migration inventory exceeds the last provider snapshot (provider={provider_count}, repository={local_count})",
-    )
-    require(
         migration.get("count_parity_is_not_custody_proof") is True,
         "Migration-count parity must never be treated as replay, synchronization, or custody proof",
     )
-    if provider_count == local_count:
-        require(
-            migration.get("count_parity_observed") is True,
-            "Observed provider/repository migration-count parity is not recorded",
-        )
+    require(
+        migration.get("count_parity_observed") is parity,
+        f"Migration count-parity evidence drifted (provider={provider_count}, repository={local_count}, parity={parity})",
+    )
+    # Count direction is evidence, not authority. A governed repository may legitimately
+    # lead the last provider snapshot while new migrations await deployment/readback,
+    # or trail it while historical provider lineage is being recovered. Neither case
+    # may manufacture custody. Provider reconciliation and the explicit HOLD state are
+    # the authority boundary.
     require(migration.get("default_branch_status") == "MIGRATIONS_FAILED", "Default branch status changed without accepted readback")
     require(migration.get("gate") == "HOLD", "Migration custody must remain held")
     require("not found in local migrations directory" in migration.get("last_observed_error", ""), "Migration failure cause drifted")
@@ -85,8 +86,9 @@ def main() -> int:
         "sacred_history_reads": "PASS_OBSERVED",
         "repository_migrations": local_count,
         "provider_snapshot_migrations": provider_count,
-        "count_parity": provider_count == local_count,
+        "count_parity": parity,
         "count_parity_is_custody_proof": False,
+        "migration_count_direction": "equal" if parity else ("repository_ahead" if local_count > provider_count else "provider_ahead"),
         "migration_custody": "HOLD",
         "security_warnings": 0,
         "security_policy_intent": "HOLD",
