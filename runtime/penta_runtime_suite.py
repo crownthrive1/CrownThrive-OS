@@ -48,6 +48,12 @@ def collect_members(root: Path) -> dict[str, dict[str, Any]]:
     data = root / "data" / "penta"
     members: dict[str, dict[str, Any]] = {}
     for path in sorted(data.glob("*.json")):
+        # Penta OS V1 is a reconciled census generated from these source
+        # registries.  Feeding either its discovery overlay or generated output
+        # back into the legacy runtime inventory would double-count identities
+        # and turn a derived artifact into a second authority source.
+        if path.name in {"os-v1.discoveries.json", "os-v1.registry.json"}:
+            continue
         raw = _load_json(path)
         systems = raw.get("systems")
         if not isinstance(systems, list):

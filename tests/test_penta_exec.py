@@ -32,8 +32,8 @@ def test_specified_member_has_real_status_without_fake_execution_promotion() -> 
 
 def test_execution_adapter_registry_is_static_and_fail_closed() -> None:
     registry = load_adapter_registry(ROOT)
-    assert registry["fail_closed"] is True and registry["version"] == "1.2.0"
-    assert len(registry["adapters"]) == 13
+    assert registry["fail_closed"] is True and registry["version"] == "1.3.0"
+    assert len(registry["adapters"]) == 15
     assert all(adapter["provider_effect"] is False for adapter in registry["adapters"])
 
 
@@ -51,11 +51,11 @@ def test_family_execution_contract_validates_and_covers_all_production_members()
     registry, snapshot = load_family(ROOT); result = family_validate(ROOT, registry, snapshot)
     assert result["disposition"] == "pass", result
     assert result["details"]["blockers"] == []
-    assert result["details"]["adapter_count"] == 13
+    assert result["details"]["adapter_count"] == 15
     coverage = result["details"]["execution_adapter_coverage"]
     assert coverage["complete"] is True
-    assert coverage["eligible_member_count"] == 13
-    assert coverage["eligible_members_with_adapter"] == 13
+    assert coverage["eligible_member_count"] == 15
+    assert coverage["eligible_members_with_adapter"] == 15
     assert coverage["missing_adapter_members"] == []
 
 
@@ -106,7 +106,7 @@ def test_penta_heartbeat_probes_all_production_members() -> None:
     assert result["disposition"] == "completed", result
     probe = result["details"]["result"]
     assert probe["schema"] == "ct.penta.heartbeat.control-plane-probe.v1"
-    assert probe["production_member_count"] == 13
+    assert probe["production_member_count"] == 15
     assert all(row["adapter_bound"] for row in probe["members"])
 
 
@@ -154,6 +154,122 @@ def test_penta_marketer_runs_real_isolated_bounded_cycle() -> None:
     cycle = result["details"]["result"]
     assert cycle["summary"]["status"] in {"ARTIFACT_DISPATCHED", "PARTIAL_HOLD"}
     assert len(cycle["receipt"]["receipt_sha256"]) == 64 and cycle["state_persisted"] is False and cycle["provider_write"] is False
+
+
+def test_penta_evi_builder_constructs_unverified_exact_head_bundle_only() -> None:
+    payload = {
+        "work_order_id": "wo-penta-v15",
+        "subject": "Penta OS V1.5",
+        "source_ref": "git:exact-head",
+        "repo": "crownthrive1/CrownThrive-Support",
+        "head_sha": "a" * 40,
+        "target_state": "BUILD_CANDIDATE",
+        "authority_level": "D1",
+        "observations": [{"kind": "test", "result": "PASS"}],
+        "claims": [{"claim": "bounded evidence preview", "scope": "repository-local"}],
+        "test_receipts": [{"name": "focused", "status": "PASS", "source": "test:tests/test_penta_exec.py"}],
+        "rollback": {"method": "git_revert", "target_head_sha": "a" * 40},
+        "fallback": {"method": "hold", "redundancy": "retain the known parent"},
+        "created_at": "2026-08-27T00:00:00Z",
+    }
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.evi-builder", operation="bundle_preview", evidence_refs=["test:penta-exec:evi"], payload=payload, risk_class="D1")
+    assert result["disposition"] == "completed", result
+    preview = result["details"]["result"]
+    assert preview["bundle"]["schema"] == "ct.penta.evidence-bundle.v1"
+    assert preview["bundle"]["certification_state"] == "UNVERIFIED"
+    assert preview["bundle"]["production_promotion"] is False
+    assert preview["provider_write"] is False and preview["production_promotion_authorized"] is False
+
+
+def test_penta_immune_builds_bounded_plan_without_executing_repair() -> None:
+    payload = {
+        "id": "weakness-doc-drift",
+        "kind": "docs_drift",
+        "source_ref": "git:exact-head",
+        "authority_level": "D1",
+        "handler": "reconcile_docs",
+        "severity": 2,
+        "recurrence": 1,
+        "confidence": 5,
+        "reversibility": 5,
+        "testability": 5,
+        "blast_radius": 1,
+        "rollback": {"method": "git_revert", "scope": "repository-local registry patch"},
+        "fallback": {"method": "hold", "redundancy": "retain the current registry"},
+        "metadata": {"scope": "repository-local"},
+    }
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.immune", operation="repair_plan_preview", evidence_refs=["test:penta-exec:immune"], payload=payload, risk_class="D1")
+    assert result["disposition"] == "completed", result
+    preview = result["details"]["result"]
+    assert preview["plan"]["schema"] == "ct.penta.immune-repair-plan.v1"
+    assert preview["plan"]["status"] == "READY"
+    assert preview["plan"]["arbitrary_command_execution_authorized"] is False
+    assert preview["provider_write"] is False and preview["production_promotion_authorized"] is False
+
+
+def test_new_preview_adapters_reject_authority_mismatch_and_secret_fields() -> None:
+    payload = {
+        "id": "weakness-secret",
+        "kind": "docs_drift",
+        "source_ref": "git:exact-head",
+        "authority_level": "D2",
+        "handler": "reconcile_docs",
+        "severity": 1,
+        "recurrence": 1,
+        "confidence": 1,
+        "reversibility": 1,
+        "testability": 1,
+        "blast_radius": 1,
+        "rollback": {"method": "git_revert", "scope": "exact repository patch"},
+        "fallback": {"method": "hold", "redundancy": "known parent"},
+        "metadata": {"scope": "repository-local"},
+    }
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.immune", operation="repair_plan_preview", evidence_refs=["test:penta-exec:reject-authority"], payload=payload, risk_class="D1"), "authority_level must equal")
+    payload["authority_level"] = "D1"
+    payload["metadata"] = {"access_token": "never-accepted"}
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.immune", operation="repair_plan_preview", evidence_refs=["test:penta-exec:reject-secret"], payload=payload, risk_class="D1"), "credential material is not accepted")
+
+
+def test_immune_preview_rejects_external_sources_and_boolean_scores() -> None:
+    payload = {
+        "id": "weakness-invalid", "kind": "docs_drift", "source_ref": "https://external.example",
+        "authority_level": "D1", "handler": "reconcile_docs", "severity": 1,
+        "recurrence": 1, "confidence": 1, "reversibility": 1, "testability": 1, "blast_radius": 1,
+        "rollback": {"method": "git_revert", "scope": "exact repository patch"},
+        "fallback": {"method": "hold", "redundancy": "known parent"}, "metadata": {},
+    }
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.immune", operation="repair_plan_preview", evidence_refs=["test:penta-exec:reject-source"], payload=payload, risk_class="D1"), "repository-local reference")
+    payload["source_ref"] = "git:exact-head"
+    payload["severity"] = True
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.immune", operation="repair_plan_preview", evidence_refs=["test:penta-exec:reject-score"], payload=payload, risk_class="D1"), "severity must be an integer")
+
+
+def test_execution_evidence_refs_match_the_bounded_schema_contract() -> None:
+    import json
+    schema = json.loads((ROOT / "schemas/penta/execution-request.schema.json").read_text(encoding="utf-8"))
+    refs = schema["properties"]["evidence_refs"]
+    assert refs["minItems"] == 1 and refs["maxItems"] == 50 and refs["uniqueItems"] is True
+    assert refs["items"]["maxLength"] == 256 and refs["items"]["pattern"]
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.beata", operation="heartbeat", evidence_refs=["test:duplicate", "test:duplicate"], risk_class="D0"), "duplicate evidence_refs")
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.beata", operation="heartbeat", evidence_refs=["https://external.example"], risk_class="D0"), "repository-local reference")
+
+
+def test_evi_preview_rejects_production_and_incomplete_evidence_contracts() -> None:
+    payload = {
+        "work_order_id": "wo-invalid", "subject": "Invalid preview", "source_ref": "git:exact-head",
+        "repo": "crownthrive1/CrownThrive-Support", "head_sha": "b" * 40,
+        "target_state": "PRODUCTION", "authority_level": "D1", "observations": [], "claims": [],
+        "test_receipts": [{"name": "focused", "status": "NOPE", "source": "test:invalid"}],
+        "rollback": {"method": "git_revert", "target_head_sha": "c" * 40},
+        "fallback": {"method": "hold", "redundancy": "known parent"},
+        "created_at": "2026-08-27T00:00:00Z",
+    }
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.evi-builder", operation="bundle_preview", evidence_refs=["test:penta-exec:evi-negative"], payload=payload, risk_class="D1"), "observations must contain")
+    payload["observations"] = [{"kind": "test", "result": "PASS"}]
+    payload["claims"] = [{"claim": "bounded", "scope": "repository-local"}]
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.evi-builder", operation="bundle_preview", evidence_refs=["test:penta-exec:evi-production"], payload=payload, risk_class="D1"), "target_state is outside")
+    payload["target_state"] = "BUILD_CANDIDATE"
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.evi-builder", operation="bundle_preview", evidence_refs=["test:penta-exec:evi-receipt"], payload=payload, risk_class="D1"), "status is outside")
 
 
 def test_unimplemented_mail_send_fails_closed() -> None:

@@ -11,6 +11,10 @@ on:
       - 'data/penta/**'
       - 'schemas/penta/**'
       - 'developers/manifests/penta-runtime-suite.v1.json'
+      - 'developers/manifests/penta-os-v1.v1.json'
+      - 'scripts/build_penta_os_v1.py'
+      - 'scripts/package_penta_os_v1.py'
+      - 'automation/penta-os-v1.mdx'
       - '.github/workflows/penta-runtime-suite.yml'
       - '.github/workflows/penta-interoperability-production.yml'
       - '.github/workflows/penta-mail-live-certification.yml'
@@ -26,6 +30,10 @@ on:
       - 'data/penta/**'
       - 'schemas/penta/**'
       - 'developers/manifests/penta-runtime-suite.v1.json'
+      - 'developers/manifests/penta-os-v1.v1.json'
+      - 'scripts/build_penta_os_v1.py'
+      - 'scripts/package_penta_os_v1.py'
+      - 'automation/penta-os-v1.mdx'
       - '.github/workflows/penta-runtime-suite.yml'
       - '.github/workflows/penta-interoperability-production.yml'
       - '.github/workflows/penta-mail-live-certification.yml'
@@ -57,9 +65,12 @@ jobs:
           python3 -m py_compile \
             runtime/penta_mail.py \
             runtime/penta_runtime_suite.py \
+            runtime/penta_os_v1.py \
             runtime/penta_interop.py \
             runtime/penta_family.py \
             runtime/penta_exec.py \
+            runtime/penta_evi_builder.py \
+            runtime/penta_immune.py \
             runtime/penta_institutional_services.py \
             runtime/penta_institutional_controls.py \
             runtime/penta_compliance_license.py \
@@ -71,6 +82,8 @@ jobs:
             runtime/penta_metric.py \
             runtime/penta-provider-control-plane/penta_control_plane.py \
             scripts/penta-family \
+            scripts/build_penta_os_v1.py \
+            scripts/package_penta_os_v1.py \
             scripts/run_function_tests.py
 
       - name: Run focused Penta runtime tests
@@ -81,10 +94,18 @@ jobs:
           python3 scripts/run_function_tests.py tests/test_penta_compliance_license.py tests/test_penta_self_build.py
           python3 tests/test_penta_family.py
           python3 tests/test_penta_exec.py
+          python3 -m unittest tests.test_penta_evi_builder tests.test_penta_immune -v
           python3 tests/test_penta_institutional_services.py
           python3 tests/test_penta_institutional_controls.py
           python3 tests/test_penta_institutional_controls_family.py
           python3 -m unittest discover -s tests -p 'test_penta_observability.py' -v
+          python3 -m unittest tests.test_penta_os_v1 -v
+
+      - name: Validate and package Penta OS V1
+        run: |
+          python3 scripts/build_penta_os_v1.py --check
+          python3 runtime/penta_os_v1.py --root . validate
+          python3 scripts/package_penta_os_v1.py --output penta-os-v1-dist
 
       - name: Validate executable member control plane
         run: |

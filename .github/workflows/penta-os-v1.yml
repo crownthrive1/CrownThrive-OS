@@ -1,0 +1,126 @@
+name: Penta OS V1.5 Build Verification Gate
+
+on:
+  pull_request:
+    paths:
+      - 'PENTA-FAMILY-REGISTRY.md'
+      - 'PENTAGREEN.md'
+      - 'LICENSE'
+      - 'automation/penta-os-v1.mdx'
+      - 'changelog/penta-os-v1-5-0-production-build-2026-08-26.md'
+      - 'commerce/pentagreen.mdx'
+      - 'data/penta/**'
+      - 'developers/manifests/penta-os-v1.v1.json'
+      - 'developers/manifests/penta-runtime-suite.v1.json'
+      - 'docs/versioning/VERSION_REGISTRY.json'
+      - 'penta/registry/**'
+      - 'penta-family/**'
+      - 'releases/penta-os-v1.5.0/**'
+      - 'runtime/penta_os_v1.py'
+      - 'schemas/penta/os-v1-*.schema.json'
+      - 'scripts/build_penta_os_v1.py'
+      - 'scripts/package_penta_os_v1.py'
+      - 'scripts/validate_docs.py'
+      - 'tests/test_penta_os_v1.py'
+      - '.github/workflows/penta-os-v1.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'PENTA-FAMILY-REGISTRY.md'
+      - 'PENTAGREEN.md'
+      - 'LICENSE'
+      - 'automation/penta-os-v1.mdx'
+      - 'changelog/penta-os-v1-5-0-production-build-2026-08-26.md'
+      - 'commerce/pentagreen.mdx'
+      - 'data/penta/**'
+      - 'developers/manifests/penta-os-v1.v1.json'
+      - 'developers/manifests/penta-runtime-suite.v1.json'
+      - 'docs/versioning/VERSION_REGISTRY.json'
+      - 'penta/registry/**'
+      - 'penta-family/**'
+      - 'releases/penta-os-v1.5.0/**'
+      - 'runtime/penta_os_v1.py'
+      - 'schemas/penta/os-v1-*.schema.json'
+      - 'scripts/build_penta_os_v1.py'
+      - 'scripts/package_penta_os_v1.py'
+      - 'scripts/validate_docs.py'
+      - 'tests/test_penta_os_v1.py'
+      - '.github/workflows/penta-os-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-os-v1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-test-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Install deterministic schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.23.0
+
+      - name: Validate repository registry and docs before packaging
+        run: |
+          python3 scripts/build_penta_os_v1.py --check
+          python3 scripts/validate_docs.py
+
+      - name: Compile and test the V1.5 kernel
+        run: |
+          python3 -m py_compile runtime/penta_os_v1.py scripts/build_penta_os_v1.py scripts/package_penta_os_v1.py
+          python3 -m unittest tests.test_penta_os_v1 -v
+          python3 runtime/penta_os_v1.py --root . validate
+
+      - name: Build V1.5 twice from the exact source
+        run: |
+          set -euo pipefail
+          python3 scripts/package_penta_os_v1.py \
+            --output dist/penta-os-v1/build-a \
+            --source-revision '${{ github.sha }}'
+          python3 scripts/package_penta_os_v1.py \
+            --output dist/penta-os-v1/build-b \
+            --source-revision '${{ github.sha }}'
+
+      - name: Verify checksums archives equivalence and extracted runtimes
+        run: |
+          set -euo pipefail
+          python3 scripts/package_penta_os_v1.py \
+            --output dist/penta-os-v1/build-a \
+            --verify \
+            --compare-output dist/penta-os-v1/build-b \
+            | tee dist/penta-os-v1/penta-os-v1-1.5.0.verification.json
+          (cd dist/penta-os-v1/build-a && sha256sum -c penta-os-v1-1.5.0.sha256)
+
+      - name: Publish build-verification summary
+        run: |
+          {
+            echo '## Penta OS V1.5 build verification'
+            echo
+            echo '- State: built_unreleased / certification HOLD'
+            echo '- Source: ${{ github.sha }}'
+            echo '- Reproducibility: two byte-identical builds required'
+            echo '- Archive safety and ZIP/TAR equivalence: verified by the package gate'
+            echo '- Extracted ZIP and TAR.GZ runtime validation: required'
+            echo '- Provider release/readback: not performed by this workflow'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload governed build candidate artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-os-v1-1.5.0-${{ github.sha }}
+          path: |
+            dist/penta-os-v1/build-a/
+            dist/penta-os-v1/penta-os-v1-1.5.0.verification.json
+          if-no-files-found: error
+          retention-days: 30

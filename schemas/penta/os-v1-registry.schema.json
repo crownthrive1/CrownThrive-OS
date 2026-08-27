@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/penta/os-v1-registry.schema.json",
+  "title": "CrownThrive Penta OS V1.5 Union Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "registry_id", "version", "effective_date",
+    "release_state", "scope", "doctrine", "authority_invariant", "phase_truth",
+    "operations", "control_plane_operations", "axes", "production_certification",
+    "release_gate_codes", "counts", "source_digests_sha256", "systems_sha256",
+    "dependency_graph", "dependency_graph_sha256", "operation_policy",
+    "operation_policy_sha256", "systems", "aliases", "registry_sha256"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "1.1.0"},
+    "registry_id": {"const": "crownthrive.penta.os-v1"},
+    "version": {"const": "1.5.0"},
+    "effective_date": {"type": "string", "format": "date"},
+    "release_state": {"enum": ["built_unreleased", "released", "superseded"]},
+    "scope": {"type": "string", "minLength": 20},
+    "doctrine": {"const": "Discover -> Govern -> Execute -> Verify -> Preserve"},
+    "authority_invariant": {"type": "string", "minLength": 80},
+    "phase_truth": {"type": "string", "minLength": 30},
+    "operations": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {"enum": ["describe", "status", "readiness", "validate", "verify", "plan", "dispatch"]}
+    },
+    "control_plane_operations": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {"enum": ["batch-plan", "verify-batch-plan", "verify-plan", "verify-receipt"]}
+    },
+    "axes": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {"enum": ["truth", "authority", "execution", "interoperation", "continuity"]}
+    },
+    "production_certification": {"const": "HOLD"},
+    "release_gate_codes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]{7,127}$"}
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total", "systems", "layers", "subcomponents", "primitives",
+        "execution_eligible_by_registry",
+        "dependency_assessed_members",
+        "dependency_unassessed_members", "members_with_declared_edges",
+        "penta_dependency_edges", "external_dependency_edges",
+        "unresolved_penta_dependencies", "cyclic_sccs", "cyclic_members",
+        "strict_readiness_ready", "by_maturity", "by_registration_state",
+        "by_axis", "by_strict_readiness"
+      ],
+      "properties": {
+        "total": {"type": "integer", "minimum": 1},
+        "systems": {"type": "integer", "minimum": 0},
+        "layers": {"type": "integer", "minimum": 0},
+        "subcomponents": {"type": "integer", "minimum": 0},
+        "primitives": {"type": "integer", "minimum": 0},
+        "execution_eligible_by_registry": {"type": "integer", "minimum": 0},
+        "dependency_assessed_members": {"type": "integer", "minimum": 0},
+        "dependency_unassessed_members": {"type": "integer", "minimum": 0},
+        "members_with_declared_edges": {"type": "integer", "minimum": 0},
+        "penta_dependency_edges": {"type": "integer", "minimum": 0},
+        "external_dependency_edges": {"type": "integer", "minimum": 0},
+        "unresolved_penta_dependencies": {"const": 0},
+        "cyclic_sccs": {"type": "integer", "minimum": 0},
+        "cyclic_members": {"type": "integer", "minimum": 0},
+        "strict_readiness_ready": {"type": "integer", "minimum": 0},
+        "by_maturity": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "by_registration_state": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "by_axis": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "by_strict_readiness": {"$ref": "#/$defs/readinessPartition"}
+      }
+    },
+    "source_digests_sha256": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"},
+      "additionalProperties": {"$ref": "#/$defs/sha256"}
+    },
+    "systems_sha256": {"$ref": "#/$defs/sha256"},
+    "dependency_graph": {"$ref": "#/$defs/dependencyGraph"},
+    "dependency_graph_sha256": {"$ref": "#/$defs/sha256"},
+    "operation_policy": {"$ref": "#/$defs/operationPolicy"},
+    "operation_policy_sha256": {"$ref": "#/$defs/sha256"},
+    "systems": {
+      "type": "array",
+      "minItems": 100,
+      "items": {"$ref": "#/$defs/member"}
+    },
+    "aliases": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/alias"}
+    },
+    "registry_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "machineKey": {"type": "string", "pattern": "^penta\\.[a-z0-9]+(?:[._-][a-z0-9]+)*$"},
+    "readinessState": {
+      "enum": [
+        "HOLD_DEPENDENCY_INVENTORY_UNASSESSED",
+        "HOLD_EXTERNAL_DEPENDENCY_UNBOUND",
+        "HOLD_UNCLASSIFIED_DEPENDENCY_CYCLE",
+        "HOLD_MEMBER_MATURITY",
+        "HOLD_DEPENDENCY_MATURITY",
+        "READY"
+      ]
+    },
+    "readinessPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "HOLD_DEPENDENCY_INVENTORY_UNASSESSED",
+        "HOLD_EXTERNAL_DEPENDENCY_UNBOUND",
+        "HOLD_UNCLASSIFIED_DEPENDENCY_CYCLE",
+        "HOLD_MEMBER_MATURITY",
+        "HOLD_DEPENDENCY_MATURITY",
+        "READY"
+      ],
+      "properties": {
+        "HOLD_DEPENDENCY_INVENTORY_UNASSESSED": {"type": "integer", "minimum": 0},
+        "HOLD_EXTERNAL_DEPENDENCY_UNBOUND": {"type": "integer", "minimum": 0},
+        "HOLD_UNCLASSIFIED_DEPENDENCY_CYCLE": {"type": "integer", "minimum": 0},
+        "HOLD_MEMBER_MATURITY": {"type": "integer", "minimum": 0},
+        "HOLD_DEPENDENCY_MATURITY": {"type": "integer", "minimum": 0},
+        "READY": {"type": "integer", "minimum": 0}
+      }
+    },
+    "cycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cycle_id", "members", "internal_edges", "cycle_sha256", "classification"],
+      "properties": {
+        "cycle_id": {"type": "string", "pattern": "^penta-scc-[a-f0-9]{16}$"},
+        "members": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/machineKey"}},
+        "internal_edges": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [{"$ref": "#/$defs/machineKey"}, {"$ref": "#/$defs/machineKey"}],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "cycle_sha256": {"$ref": "#/$defs/sha256"},
+        "classification": {"const": "untyped_unclassified"}
+      }
+    },
+    "dependencyGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_state", "strict_readiness_is_diagnostic",
+        "operation_specific_verification_required", "dependency_assessed_member_count",
+        "dependency_unassessed_member_count", "members_with_declared_dependencies",
+        "internal_edge_count", "external_edge_count", "external_refs",
+        "cyclic_scc_count", "cyclic_member_count", "cyclic_internal_edge_count",
+        "condensed_component_count", "condensed_edge_count",
+        "transitive_membership_count", "maximum_transitive_closure", "cycles",
+        "readiness_partition", "graph_payload_sha256"
+      ],
+      "properties": {
+        "semantic_state": {"const": "diagnostic_untyped"},
+        "strict_readiness_is_diagnostic": {"const": true},
+        "operation_specific_verification_required": {"const": true},
+        "dependency_assessed_member_count": {"type": "integer", "minimum": 0},
+        "dependency_unassessed_member_count": {"type": "integer", "minimum": 0},
+        "members_with_declared_dependencies": {"type": "integer", "minimum": 0},
+        "internal_edge_count": {"type": "integer", "minimum": 0},
+        "external_edge_count": {"type": "integer", "minimum": 0},
+        "external_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9.-]{1,127}$"}},
+        "cyclic_scc_count": {"type": "integer", "minimum": 0},
+        "cyclic_member_count": {"type": "integer", "minimum": 0},
+        "cyclic_internal_edge_count": {"type": "integer", "minimum": 0},
+        "condensed_component_count": {"type": "integer", "minimum": 0},
+        "condensed_edge_count": {"type": "integer", "minimum": 0},
+        "transitive_membership_count": {"type": "integer", "minimum": 0},
+        "maximum_transitive_closure": {"type": "integer", "minimum": 0},
+        "cycles": {"type": "array", "items": {"$ref": "#/$defs/cycle"}},
+        "readiness_partition": {"$ref": "#/$defs/readinessPartition"},
+        "graph_payload_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "operationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "policy_version", "default_disposition", "authority_trace_pattern", "policies"],
+      "properties": {
+        "schema": {"const": "crownthrive.penta.os-v1.operation-policies.v1"},
+        "policy_version": {"const": "1.5.0"},
+        "default_disposition": {"const": "HOLD_UNKNOWN_OPERATION"},
+        "authority_trace_pattern": {"type": "string"},
+        "policies": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operation", "scope", "machine_keys", "effect", "risk_class",
+              "minimum_authority", "dependency_ready_required",
+              "human_approval_required", "provider_binding_required", "readback_required"
+            ],
+            "properties": {
+              "operation": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$"},
+              "scope": {"enum": ["all_members", "machine_keys"]},
+              "machine_keys": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/machineKey"}},
+              "effect": {"enum": ["read", "local_compute", "local_write_handoff", "provider_write", "destructive_handoff"]},
+              "risk_class": {"enum": ["D0", "D1", "D2", "D3"]},
+              "minimum_authority": {"enum": ["A0", "A1", "A2", "A3"]},
+              "dependency_ready_required": {"type": "boolean"},
+              "human_approval_required": {"type": "boolean"},
+              "provider_binding_required": {"type": "boolean"},
+              "readback_required": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "machine_key", "canonical_name", "kind", "role", "axis", "maturity",
+        "risk_ceiling", "registration_state", "execution_eligible_by_registry",
+        "operator_route", "public_status_route", "docs_route",
+        "addressable_operations", "registry_sources", "source_kinds", "aliases",
+        "contracts", "evidence_paths", "dependency_assessed", "dependencies",
+        "external_dependencies", "dependency_state", "external_dependency_state",
+        "transitive_dependencies", "strict_readiness_state", "strict_readiness_blockers"
+      ],
+      "properties": {
+        "machine_key": {"$ref": "#/$defs/machineKey"},
+        "canonical_name": {"type": "string", "pattern": "^Penta"},
+        "kind": {"enum": ["system", "primitive", "layer", "subcomponent"]},
+        "role": {"type": "string", "minLength": 5},
+        "axis": {"enum": ["truth", "authority", "execution", "interoperation", "continuity"]},
+        "maturity": {"enum": ["specified", "implemented", "certified", "production", "hold", "retired"]},
+        "risk_ceiling": {"enum": ["D0", "D1", "D2", "D3"]},
+        "registration_state": {"enum": ["family_registered", "institutional_registered", "discovered_implemented", "documented_subcomponent", "macro_layer", "candidate"]},
+        "execution_eligible_by_registry": {"type": "boolean"},
+        "operator_route": {"type": "string", "pattern": "^/io/pentas/"},
+        "public_status_route": {"type": "string", "pattern": "^/penta/"},
+        "docs_route": {"const": "/automation/penta-os-v1"},
+        "addressable_operations": {"type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": {"enum": ["describe", "status", "readiness", "validate", "verify", "plan", "dispatch"]}},
+        "registry_sources": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "source_kinds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "aliases": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "contracts": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "evidence_paths": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "dependency_assessed": {"type": "boolean"},
+        "dependencies": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/machineKey"}},
+        "external_dependencies": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9.-]{1,127}$"}},
+        "dependency_state": {"enum": ["unassessed", "assessed_no_dependencies", "assessed_with_dependencies"]},
+        "external_dependency_state": {"enum": ["not_declared", "declared_unverified"]},
+        "transitive_dependencies": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/machineKey"}},
+        "dependency_cycle_id": {"type": "string", "pattern": "^penta-scc-[a-f0-9]{16}$"},
+        "strict_readiness_state": {"$ref": "#/$defs/readinessState"},
+        "strict_readiness_blockers": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "parent_machine_key": {"$ref": "#/$defs/machineKey"},
+        "intake_state": {"type": "string"},
+        "relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "name"],
+            "properties": {"type": {"type": "string"}, "name": {"type": "string"}}
+          }
+        },
+        "facets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "parent_machine_key", "contracts"],
+            "properties": {
+              "kind": {"const": "subcomponent"},
+              "parent_machine_key": {"$ref": "#/$defs/machineKey"},
+              "contracts": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        }
+      }
+    },
+    "alias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias", "canonical_machine_key", "reason"],
+      "properties": {
+        "alias": {"type": "string", "minLength": 1},
+        "canonical_machine_key": {"$ref": "#/$defs/machineKey"},
+        "reason": {"type": "string", "minLength": 5}
+      }
+    }
+  }
+}

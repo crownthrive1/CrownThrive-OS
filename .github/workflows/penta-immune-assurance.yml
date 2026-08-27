@@ -5,11 +5,18 @@ on:
     paths:
       - "runtime/penta_evi_builder.py"
       - "runtime/penta_immune.py"
+      - "runtime/penta_exec.py"
+      - "runtime/penta_family.py"
+      - "runtime/penta_interop.py"
       - "scripts/penta_immune_hunt.py"
       - "tests/test_penta_evi_builder.py"
       - "tests/test_penta_immune.py"
       - "tests/test_penta_immune_hunt.py"
+      - "tests/test_penta_exec.py"
       - "data/penta/systems.extensions.penta-immune.json"
+      - "data/penta/family.registry.json"
+      - "data/penta/execution-adapters.registry.json"
+      - "data/penta/member-runtime.contract.json"
       - "software-factory-v4/PENTA-IMMUNE-SYSTEM.md"
       - ".github/workflows/penta-immune-assurance.yml"
   push:
@@ -19,11 +26,18 @@ on:
     paths:
       - "runtime/penta_evi_builder.py"
       - "runtime/penta_immune.py"
+      - "runtime/penta_exec.py"
+      - "runtime/penta_family.py"
+      - "runtime/penta_interop.py"
       - "scripts/penta_immune_hunt.py"
       - "tests/test_penta_evi_builder.py"
       - "tests/test_penta_immune.py"
       - "tests/test_penta_immune_hunt.py"
+      - "tests/test_penta_exec.py"
       - "data/penta/systems.extensions.penta-immune.json"
+      - "data/penta/family.registry.json"
+      - "data/penta/execution-adapters.registry.json"
+      - "data/penta/member-runtime.contract.json"
       - "software-factory-v4/PENTA-IMMUNE-SYSTEM.md"
       - ".github/workflows/penta-immune-assurance.yml"
   schedule:
@@ -54,12 +68,17 @@ jobs:
           python-version: "3.12"
 
       - name: Validate machine-readable contract
-        run: python -m json.tool data/penta/systems.extensions.penta-immune.json >/dev/null
+        run: |
+          python -m json.tool data/penta/systems.extensions.penta-immune.json >/dev/null
+          python -m json.tool data/penta/family.registry.json >/dev/null
+          python -m json.tool data/penta/execution-adapters.registry.json >/dev/null
+          python -m json.tool data/penta/member-runtime.contract.json >/dev/null
 
       - name: Compile PentaImmune software
         run: |
           python -m py_compile runtime/penta_evi_builder.py
           python -m py_compile runtime/penta_immune.py
+          python -m py_compile runtime/penta_exec.py runtime/penta_family.py runtime/penta_interop.py
           python -m py_compile scripts/penta_immune_hunt.py
 
       - name: Run evidence, immunity and hunt boundary tests
@@ -68,6 +87,7 @@ jobs:
             tests/test_penta_evi_builder.py \
             tests/test_penta_immune.py \
             tests/test_penta_immune_hunt.py
+          python tests/test_penta_exec.py
 
   build-evidence:
     name: PentaEVIBuilder exact-head evidence
