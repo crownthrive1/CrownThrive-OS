@@ -1,0 +1,217 @@
+name: PentaRelease — Visible Repository Tabs
+
+on:
+  workflow_run:
+    workflows: ["PentaRelease — Comprehensive Release Surface"]
+    types: [completed]
+  schedule:
+    - cron: '19 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  checks: read
+
+concurrency:
+  group: pentarelease-visible-tabs
+  cancel-in-progress: false
+
+jobs:
+  synchronize:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout institutional source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate visible-tab contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool .pentarelease/visible-tabs.json >/dev/null
+          python3 -m py_compile scripts/pentarelease/sync_visible_tabs.py
+          python3 -m unittest tests.test_pentarelease_visible_tabs
+          test "$(jq -r '.enabled' .pentarelease/visible-tabs.json)" = "true"
+          test "$(jq -r '.mode' .pentarelease/visible-tabs.json)" = "managed_blocks_only"
+          test "$(jq -r '.surfaces | length' .pentarelease/visible-tabs.json)" -eq 2
+          test "$(jq -r '[.surfaces[].path] | index("CONTRIBUTING.md") != null' .pentarelease/visible-tabs.json)" = "true"
+          test "$(jq -r '[.surfaces[].path] | index("SECURITY.md") != null' .pentarelease/visible-tabs.json)" = "true"
+
+      - name: Resolve canonical PentaRelease
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          test -n "$TAG"
+          URL=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq '.url')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Recover authoritative release record
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/pentarelease-visible-tabs
+          mkdir -p /tmp/pentarelease-visible-tabs
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern PENTARELEASE_RELEASE_RECORD.json \
+            --dir /tmp/pentarelease-visible-tabs --clobber
+          python3 -m json.tool /tmp/pentarelease-visible-tabs/PENTARELEASE_RELEASE_RECORD.json >/dev/null
+
+      - name: Incrementally synchronize visible tabs
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/pentarelease/sync_visible_tabs.py \
+            --config .pentarelease/visible-tabs.json \
+            --release-record /tmp/pentarelease-visible-tabs/PENTARELEASE_RELEASE_RECORD.json
+
+          for SURFACE in CONTRIBUTING.md SECURITY.md; do
+            test -f "$SURFACE"
+            test "$(grep -c '<!-- pentarelease:managed-release-surface:start -->' "$SURFACE")" -eq 1
+            test "$(grep -c '<!-- pentarelease:managed-release-surface:end -->' "$SURFACE")" -eq 1
+            grep -F "Latest PentaRelease — $TAG" "$SURFACE" >/dev/null
+          done
+          python3 -m json.tool .pentarelease/state/visible-tabs.json >/dev/null
+          test "$(jq -r '.release' .pentarelease/state/visible-tabs.json)" = "$TAG"
+
+      - name: Commit bounded tab delta
+        id: commit
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'PentaRelease'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add CONTRIBUTING.md SECURITY.md .pentarelease/state/visible-tabs.json
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_SHA=$(git rev-parse HEAD)
+          SAFE_TAG=$(printf '%s' "$TAG" | tr '/' '-')
+          BRANCH="pentarelease/tabs-${SAFE_TAG}-${BASE_SHA:0:12}"
+          REMOTE_SHA=$(git ls-remote --heads origin "$BRANCH" | awk '{print $1}')
+          if [ -n "$REMOTE_SHA" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$REMOTE_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git checkout -b "$BRANCH"
+          git commit -m "docs(pentarelease): synchronize visible tabs $TAG"
+          HEAD_SHA=$(git rev-parse HEAD)
+          git push origin "$BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Govern and promote tab delta
+        id: promote
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          BRANCH: ${{ steps.commit.outputs.branch }}
+          HEAD_SHA: ${{ steps.commit.outputs.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run governed-merge-gate.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+          success=false
+          for i in $(seq 1 60); do
+            sleep 10
+            STATE=$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
+            echo "Governed branch gate: $STATE"
+            if [ "$STATE" = "completed:success" ]; then success=true; break; fi
+            if [[ "$STATE" == completed:* ]] && [ "$STATE" != "completed:success" ]; then
+              echo "PentaRelease visible-tab HOLD: governed branch gate failed ($STATE)." >&2
+              exit 44
+            fi
+          done
+          test "$success" = true
+
+          PR_URL=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" --state open --limit 1 --json url --jq '.[0].url // empty')
+          if [ -z "$PR_URL" ]; then
+            if ! PR_URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+              --title "PentaRelease visible tabs $TAG" \
+              --body "Incrementally updates only PentaRelease-managed blocks in Contributing and Security for $TAG. Unmanaged content is preserved; no whole-file rewrite semantics are used by the synchronizer." 2>/tmp/pentarelease-tabs-pr.err); then
+              cat /tmp/pentarelease-tabs-pr.err || true
+              echo "promotion_state=HOLD_PR_PROVIDER_IDENTITY" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          PR_NUMBER=${PR_URL##*/}
+
+          pr_success=false
+          for i in $(seq 1 60); do
+            sleep 10
+            RUN_JSON=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow governed-merge-gate.yml --branch "$BRANCH" --event pull_request --limit 1 \
+              --json headSha,status,conclusion 2>/dev/null || echo '[]')
+            RUN_HEAD=$(jq -r '.[0].headSha // empty' <<<"$RUN_JSON")
+            RUN_STATUS=$(jq -r '.[0].status // "missing"' <<<"$RUN_JSON")
+            RUN_CONCLUSION=$(jq -r '.[0].conclusion // "pending"' <<<"$RUN_JSON")
+            echo "Governed PR gate: head=${RUN_HEAD:-missing} state=$RUN_STATUS:$RUN_CONCLUSION"
+            if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" = "success" ]; then
+              pr_success=true; break
+            fi
+            if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" != "success" ]; then
+              echo "PentaRelease visible-tab HOLD: PR gate failed ($RUN_CONCLUSION)." >&2
+              exit 46
+            fi
+          done
+          test "$pr_success" = true
+
+          if gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --squash --delete-branch; then
+            echo "promotion_state=MERGED" >> "$GITHUB_OUTPUT"
+            echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          else
+            echo "promotion_state=HOLD_PR_MERGE_IDENTITY" >> "$GITHUB_OUTPUT"
+            echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Production proof
+        if: always() && !cancelled()
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          URL: ${{ steps.release.outputs.url }}
+          CHANGED: ${{ steps.commit.outputs.changed }}
+          PROMOTION_STATE: ${{ steps.promote.outputs.promotion_state }}
+          PR_URL: ${{ steps.promote.outputs.pr_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATE="$PROMOTION_STATE"
+          if [ "$CHANGED" != "true" ]; then STATE="ALREADY_SYNCHRONIZED"; fi
+          if [ -z "$STATE" ]; then STATE="RECONCILED"; fi
+          {
+            echo '## PentaRelease visible-tab continuity proof'
+            echo
+            echo "- Release: $TAG"
+            echo "- Official URL: $URL"
+            echo "- State: $STATE"
+            echo "- Surfaces: CONTRIBUTING.md, SECURITY.md"
+            echo "- Mutation model: managed block only"
+            echo "- Unmanaged tab content: preserved"
+            echo "- Missing surface/release record: fail closed"
+            echo "- Reconciliation: release-triggered plus hourly"
+            if [ -n "$PR_URL" ]; then echo "- Promotion PR: $PR_URL"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
