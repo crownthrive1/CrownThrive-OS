@@ -43,12 +43,37 @@ jobs:
 
           path = Path("scripts/penta_wave3_ect_pipeline.py")
           text = path.read_text(encoding="utf-8")
-          old = '    run(["sha256sum", "-c", "penta-os-v1-1.5.0.sha256"], env={"PWD": str(ROOT / build_a)})'
-          new = '    subprocess.run(["sha256sum", "-c", "penta-os-v1-1.5.0.sha256"], cwd=ROOT / build_a, check=True)'
-          if old in text:
-              text = text.replace(old, new, 1)
-          elif new not in text:
+
+          old_checksum = '    run(["sha256sum", "-c", "penta-os-v1-1.5.0.sha256"], env={"PWD": str(ROOT / build_a)})'
+          new_checksum = '    subprocess.run(["sha256sum", "-c", "penta-os-v1-1.5.0.sha256"], cwd=ROOT / build_a, check=True)'
+          if old_checksum in text:
+              text = text.replace(old_checksum, new_checksum, 1)
+          elif new_checksum not in text:
               raise SystemExit("package checksum cwd repair target missing")
+
+          old_selector = '''        if production_family_rows:
+            if len(production_family_rows) != 1:
+                raise PentaOSBuildError(
+                    f"multiple production-family rows resolved for {current['machine_key']}"
+                )
+            authoritative_family = production_family_rows[0]
+'''
+          new_selector = '''        if production_family_rows:
+            exact_machine_rows = [
+                row for row in production_family_rows
+                if row.get("machine_key") == current.get("machine_key")
+            ]
+            authoritative_family = (
+                exact_machine_rows[0]
+                if exact_machine_rows
+                else sorted(production_family_rows, key=lambda row: row.get("source", ""))[0]
+            )
+'''
+          if old_selector in text:
+              text = text.replace(old_selector, new_selector, 1)
+          elif new_selector not in text:
+              raise SystemExit("exact-machine production-family selector target missing")
+
           path.write_text(text, encoding="utf-8")
           PY
           cp scripts/penta_wave3_mainline_integrate.py /tmp/penta_wave3_mainline_integrate.py
