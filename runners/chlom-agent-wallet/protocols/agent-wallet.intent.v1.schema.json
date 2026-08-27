@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ct.protocol.chlom-agent-wallet.intent.v1",
+  "title": "CHLOM Agent Wallet Intent v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema","intent_id","idempotency_key","operation","risk_class","chain","asset","amount_minor","destination","requested_by","purpose","created_at","expires_at"],
+  "properties": {
+    "schema": {"const": "ct.protocol.chlom-agent-wallet.intent.v1"},
+    "intent_id": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"},
+    "idempotency_key": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"},
+    "operation": {"enum":["OBSERVE","SIMULATE_TRANSFER","TRANSFER_ERC20"]},
+    "risk_class": {"enum":["D0","D1","D2","D3"]},
+    "chain": {"type":"object","additionalProperties":false,"required":["namespace","chain_id"],"properties":{"namespace":{"const":"eip155"},"chain_id":{"const":8453}}},
+    "asset": {"type":"object","additionalProperties":false,"required":["symbol","contract","decimals"],"properties":{"symbol":{"const":"USDC"},"contract":{"type":"string","pattern":"^0x[a-fA-F0-9]{40}$"},"decimals":{"const":6}}},
+    "amount_minor":{"type":"integer","minimum":0},
+    "destination":{"type":["string","null"]},
+    "requested_by":{"type":"object","additionalProperties":false,"required":["principal","kind"],"properties":{"principal":{"type":"string","minLength":1,"maxLength":200},"kind":{"enum":["human","penta","service","system"]}}},
+    "purpose":{"type":"string","minLength":1,"maxLength":500},
+    "compensation_ref":{"type":["string","null"],"maxLength":500},
+    "created_at":{"type":"string","format":"date-time"},
+    "expires_at":{"type":"string","format":"date-time"}
+  }
+}
