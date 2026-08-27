@@ -27,6 +27,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Verify local Penta mesh node contract
         shell: python
@@ -38,19 +40,19 @@ jobs:
           node = json.loads(Path("federation/penta-mesh-node.v1.json").read_text())
           assert mesh.get("schema") == "ct.penta.repository-mesh.v1"
           assert node.get("schema") == "ct.penta.repository-mesh-node.v1"
-          assert mesh.get("canonical_hub") == "crownthrive1/CrownThrive-Support"
+          assert mesh.get("canonical_hub") == "crownthrive1/CrownThrive-OS"
           assert mesh.get("protocol_registry") == "crownthrive1/chlom-protocol"
           repos = {r["repository"]: r for r in mesh.get("repositories", [])}
           assert set(repos) == {
-              "crownthrive1/CrownThrive-Support",
+              "crownthrive1/CrownThrive-OS",
               "crownthrive1/CrownThrive-CIE",
               "crownthrive1/chlom-protocol",
           }
-          assert node.get("repository") == "crownthrive1/CrownThrive-Support"
+          assert node.get("repository") == "crownthrive1/CrownThrive-OS"
           assert repos[node["repository"]]["node_manifest"] == "federation/penta-mesh-node.v1.json"
           assert node.get("capabilities", {}).get("pentamail_transport") is True
           assert node.get("capabilities", {}).get("exact_provider_readback") is True
-          print("Support Penta mesh node contract verified")
+          print("CrownThrive OS Penta mesh node contract verified")
 
       - name: Verify canonical CHLOM integration mesh
         shell: python
