@@ -28,6 +28,7 @@ PREDICATE_ROUTES = {
 
 REQUIRED_PREDICATES = tuple(PREDICATE_ROUTES)
 FINAL_STATES = {"PASS", "HOLD", "FAIL", "UNKNOWN"}
+PENTA_LAYERS = ("DISCOVER", "GOVERN", "EXECUTE", "VERIFY", "PRESERVE")
 
 
 def _canonical(value: Any) -> str:
@@ -153,3 +154,94 @@ def evaluate_hold(packet: Mapping[str, Any]) -> dict[str, Any]:
     result["decision_sha256"] = _digest(result)
     return result
 
+
+def evaluate_agentic_case(packet: Mapping[str, Any]) -> dict[str, Any]:
+    """Evaluate PentaAgentic layer receipts without manufacturing authority.
+
+    The five PENTA layers are approval dimensions, not the retired A/B/C/D/S
+    scheduler identities.  A successful evaluation authorizes only an additive
+    HOLD-resolution receipt; certification and runtime activation remain
+    separate governed effects.
+    """
+
+    case_id = _required_text(packet, "case_id")
+    exact_head_sha = _required_text(packet, "exact_head_sha").lower()
+    content_sha256 = _required_text(packet, "content_sha256").lower()
+    originator_id = _required_text(packet, "originator_id")
+    risk_class = _required_text(packet, "risk_class").upper()
+    if len(exact_head_sha) != 40 or any(c not in "0123456789abcdef" for c in exact_head_sha):
+        raise HoldHandError("exact_head_sha must be lowercase Git SHA-1")
+    if len(content_sha256) != 64 or any(c not in "0123456789abcdef" for c in content_sha256):
+        raise HoldHandError("content_sha256 must be lowercase SHA-256")
+    if risk_class not in {"D1", "D2", "D3"}:
+        raise HoldHandError("risk_class must be D1, D2, or D3")
+
+    receipts = packet.get("layer_receipts")
+    if not isinstance(receipts, list):
+        raise HoldHandError("layer_receipts must be a list")
+    accepted: dict[str, Mapping[str, Any]] = {}
+    reasons: list[str] = []
+    for receipt in receipts:
+        if not isinstance(receipt, Mapping):
+            raise HoldHandError("each layer receipt must be an object")
+        layer = _required_text(receipt, "layer").upper()
+        if layer not in PENTA_LAYERS:
+            raise HoldHandError(f"unsupported PENTA layer: {layer}")
+        agent_id = _required_text(receipt, "agent_id")
+        disposition = _required_text(receipt, "disposition").upper()
+        if disposition not in {"PASS", "HOLD", "DENY", "UNKNOWN"}:
+            raise HoldHandError(f"invalid layer disposition: {disposition}")
+        receipt_head = _required_text(receipt, "exact_head_sha").lower()
+        receipt_content = _required_text(receipt, "content_sha256").lower()
+        if receipt_head != exact_head_sha or receipt_content != content_sha256:
+            reasons.append(f"{layer}: stale or mismatched evidence")
+            continue
+        if agent_id == originator_id:
+            reasons.append(f"{layer}: originator self-approval rejected")
+            continue
+        if receipt.get("agent_active") is not True or receipt.get("self_approval") is not False:
+            reasons.append(f"{layer}: agent registry authority is invalid")
+            continue
+        if layer == "VERIFY" and receipt.get("independent") is not True:
+            reasons.append("VERIFY: independent verifier required")
+            continue
+        accepted[layer] = receipt
+
+    layer_states = {
+        layer: str(accepted.get(layer, {}).get("disposition", "UNKNOWN")).upper()
+        for layer in PENTA_LAYERS
+    }
+    approvers = {str(receipt["agent_id"]) for receipt in accepted.values()}
+    if len(approvers) < 3:
+        reasons.append("at least three distinct PentaAgentic identities are required")
+    if accepted.get("GOVERN", {}).get("agent_id") == accepted.get("VERIFY", {}).get("agent_id"):
+        reasons.append("GOVERN and VERIFY must be produced by distinct agents")
+    if risk_class == "D3" and packet.get("active_founder_authority") is not True:
+        reasons.append("D3 requires an active founder authority binding")
+    if packet.get("verified_baseline") is not True:
+        reasons.append("independent exact-head rollback baseline is absent")
+    if packet.get("hold_predicates_ready") is not True:
+        reasons.append("HOLD predicate crawler is not resolution-ready")
+
+    layer_pass = all(state == "PASS" for state in layer_states.values())
+    eligible = layer_pass and len(approvers) >= 3 and not reasons
+    missing_layers = [layer for layer, state in layer_states.items() if state != "PASS"]
+    result = {
+        "schema": "ct.penta.agentic-hold-decision.v1",
+        "case_id": case_id,
+        "exact_head_sha": exact_head_sha,
+        "layer_states": layer_states,
+        "missing_layers": missing_layers,
+        "distinct_approvers": len(approvers),
+        "reasons": reasons,
+        "hand_state": "AGENTIC_RESOLUTION_READY" if eligible else "RAISED",
+        "resolution_eligible": eligible,
+        "historical_hold_preserved": True,
+        "certified": False,
+        "runtime_activated": False,
+        "provider_effect": False,
+        "paid_cost_minor": 0,
+        "legacy_abcds_authority_used": False,
+    }
+    result["decision_sha256"] = _digest(result)
+    return result

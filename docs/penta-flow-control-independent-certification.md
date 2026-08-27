@@ -35,3 +35,5 @@ This software verifies evidence. It does not create an independent receipt, enab
 ## Persistent hand-raise successor
 
 `docs/phase3/PENTA_HOLD_HAND.md` defines the additive PentaHoldHand/PentaCrawler/PentaHelp contract. A HOLD remains visibly raised while those systems discover and route missing evidence. They may make a resolution receipt eligible only after every exact-head independent predicate passes; they do not self-certify or delete the historical HOLD.
+
+The successor `ct.penta.agentic.hold-governance.v1` routes each raised hand through DISCOVER, GOVERN, EXECUTE, VERIFY, and PRESERVE receipts from active Penta agents. It prospectively supersedes the legacy A/B/C/D/S scheduler topology for HOLD resolution while retaining all historical records. The originator cannot approve itself, VERIFY remains independent, D3 remains bound to active founder authority, and agentic approval alone has no certification or runtime-activation effect.

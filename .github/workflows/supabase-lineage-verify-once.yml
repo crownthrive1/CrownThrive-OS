@@ -1,0 +1,97 @@
+name: Supabase Lineage Verify Once
+
+on:
+  push:
+    branches:
+      - repair/supabase-migration-lineage-20260827
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Verify local migration timestamp parity and marker safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import re
+
+          migration_dir = Path('supabase/migrations')
+          lineage_dir = Path('supabase/migration_lineage')
+          expected_count = 992
+          expected_sha = 'f07af5388cf9474cb76aa603fb2a868aeeb78665752ebe8c88bd15c1d58f366a'
+
+          remote = []
+          for path in sorted((lineage_dir / 'remote_versions').glob('*.txt')):
+              remote.extend(v.strip() for v in path.read_text().splitlines() if v.strip())
+          remote = sorted(remote)
+          assert len(remote) == expected_count, (len(remote), expected_count)
+          assert len(set(remote)) == expected_count
+
+          active = []
+          marker_count = 0
+          exact_source_count = 0
+          for path in sorted(migration_dir.glob('*.sql')):
+              match = re.match(r'^(\d{14})_(.+)\.sql$', path.name)
+              assert match, f'noncanonical active migration: {path.name}'
+              active.append(match.group(1))
+              if path.name.endswith('_remote_applied_lineage.sql'):
+                  marker_count += 1
+                  for line in path.read_text().splitlines():
+                      assert not line.strip() or line.lstrip().startswith('--'), f'executable marker content: {path}'
+              else:
+                  exact_source_count += 1
+
+          active = sorted(active)
+          assert active == remote, 'active migration versions differ from remote manifest'
+          assert len(active) == expected_count
+          manifest = '\n'.join(active) + '\n'
+          local_sha = hashlib.sha256(manifest.encode()).hexdigest()
+          assert local_sha == expected_sha, (local_sha, expected_sha)
+
+          (lineage_dir / 'active_versions_20260827_v2.txt').write_text(manifest)
+          (lineage_dir / 'active_versions_20260827_v2.sha256').write_text(
+              f'{local_sha}  active_versions_20260827_v2.txt\n'
+          )
+          evidence = {
+              'schema': 'crownthrive.supabase.migration-lineage-verification/v2',
+              'verification_id': 'ct.supabase.migration-lineage.verify.20260827.v2',
+              'active_migration_count': len(active),
+              'remote_manifest_count': len(remote),
+              'lineage_marker_count': marker_count,
+              'exact_source_migration_count': exact_source_count,
+              'local_versions_sha256': local_sha,
+              'remote_versions_sha256': expected_sha,
+              'timestamp_parity': 'PASS',
+              'marker_executable_content': false,
+              'production_history_mutated': false,
+              'supabase_pr_preview': 'SKIPPED_DISABLED_BY_PROJECT_INTEGRATION_SETTING'
+          }
+          (lineage_dir / 'verification_20260827_v2.json').write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + '\n'
+          )
+          print(json.dumps(evidence, sort_keys=True))
+          PY
+
+      - name: Retire one-time verifier and commit evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'CrownThrive Migration Lineage Verification'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/supabase-lineage-verify-once.yml
+          git add supabase/migration_lineage
+          git diff --cached --check
+          git commit -m 'test(supabase): certify 992-version lineage parity'
+          git push origin HEAD:repair/supabase-migration-lineage-20260827
