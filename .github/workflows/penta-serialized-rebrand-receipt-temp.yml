@@ -1,0 +1,150 @@
+name: TEMP PentaSerialized Rebrand Continuity Receipt
+
+on:
+  push:
+    branches:
+      - chore/crownthrive-os-rebrand
+    paths:
+      - '.github/workflows/penta-serialized-rebrand-receipt-temp.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-receipt:
+    if: github.repository == 'crownthrive1/CrownThrive-OS'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out rebrand branch with full lineage
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: chore/crownthrive-os-rebrand
+          fetch-depth: 0
+
+      - name: Generate and validate continuity receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import datetime as dt
+          import fnmatch
+          import json
+          import subprocess
+          from pathlib import Path
+
+          base = subprocess.check_output(['git', 'merge-base', 'origin/main', 'HEAD'], text=True).strip()
+          head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          policy = json.loads(Path('penta/registry/serialized-suite.json').read_text(encoding='utf-8'))
+          protected = tuple(policy['protected_patterns'])
+
+          def is_protected(path: str) -> bool:
+              return any(fnmatch.fnmatch(path, pattern) for pattern in protected)
+
+          def blob(rev: str, path: str) -> str:
+              return subprocess.check_output(['git', 'rev-parse', f'{rev}:{path}'], text=True).strip()
+
+          raw = subprocess.check_output(
+              ['git', 'diff', '--name-status', '-M', base, head], text=True
+          ).splitlines()
+          changes = []
+          tombstones = []
+          successors = []
+
+          for line in raw:
+              fields = line.split('\t')
+              status = fields[0]
+              code = status[0]
+              if code == 'A':
+                  continue
+              if code == 'R':
+                  old_path, path = fields[1], fields[2]
+                  if not (is_protected(old_path) or is_protected(path)):
+                      # All renames are continuity-controlled by policy even outside protected paths.
+                      pass
+                  entry = {
+                      'path': path,
+                      'old_path': old_path,
+                      'operation': 'rename',
+                      'previous_blob_sha': blob(base, old_path),
+                      'new_blob_sha': blob(head, path),
+                      'successor': path,
+                      'reason': 'Preserve canonical lineage while migrating the CrownThrive OS repository identity.',
+                      'rollback_ref': base,
+                  }
+                  changes.append(entry)
+                  successors.append({'from': old_path, 'to': path})
+                  continue
+              path = fields[1]
+              if code == 'M' and not is_protected(path):
+                  continue
+              if code not in {'M', 'D'}:
+                  continue
+              entry = {
+                  'path': path,
+                  'operation': 'modify' if code == 'M' else 'delete',
+                  'previous_blob_sha': blob(base, path),
+                  'reason': (
+                      'Retire one-time CrownThrive OS migration machinery after canonical cutover; '
+                      'permanent identity enforcement remains active.'
+                      if code == 'D'
+                      else 'Migrate the retired CrownThrive repository identity to CrownThrive-OS while preserving authority, semantics, evidence, and rollback lineage.'
+                  ),
+                  'rollback_ref': base,
+              }
+              if code == 'M':
+                  entry['new_blob_sha'] = blob(head, path)
+              else:
+                  entry['tombstone'] = True
+                  tombstones.append(path)
+              changes.append(entry)
+
+          if not changes:
+              raise SystemExit('No continuity-controlled rebrand changes were detected.')
+
+          receipt = {
+              'schema': 'crownthrive.penta.serialized.git-receipt/v1',
+              'receipt_id': 'ct.penta.serialized.crownthrive-os-canonical-rebrand.20260827.v1',
+              'created_at': dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+              'actor': 'CrownThrive OS governed migration operator',
+              'reason': 'Institutionalize crownthrive1/CrownThrive-OS as the canonical repository identity and preserve exact Git lineage for every continuity-controlled rebrand change.',
+              'changes': changes,
+              'continuity': {
+                  'silent_replacement': False,
+                  'silent_delete': False,
+                  'tombstones': tombstones,
+                  'successors': successors,
+                  'rollback_preserved': True,
+                  'canonical_repository': 'crownthrive1/CrownThrive-OS',
+              },
+              'exclusions': [
+                  'Repository renaming does not manufacture provider, D3, licensing, settlement, or production-money authority.',
+                  'Historical Git objects remain reachable through rollback_ref and repository history.'
+              ],
+          }
+          out = Path('penta/continuity/receipts/20260827-crownthrive-os-canonical-rebrand-v1.json')
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(f'base={base}')
+          print(f'head={head}')
+          print(f'continuity_changes={len(changes)}')
+          print(f'tombstones={len(tombstones)}')
+          PY
+
+          base="$(git merge-base origin/main HEAD)"
+          head="$(git rev-parse HEAD)"
+          python -m penta.runtime.serialized git-gate \
+            --repo . \
+            --base "$base" \
+            --head "$head" \
+            --policy penta/registry/serialized-suite.json
+
+      - name: Commit continuity receipt to governed branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt='penta/continuity/receipts/20260827-crownthrive-os-canonical-rebrand-v1.json'
+          git config user.name 'CrownThrive OS Automation'
+          git config user.email 'contact@crownthrive.com'
+          git add -- "$receipt"
+          git commit -m 'chore(os): serialize canonical rebrand continuity'
+          git push origin HEAD:chore/crownthrive-os-rebrand
