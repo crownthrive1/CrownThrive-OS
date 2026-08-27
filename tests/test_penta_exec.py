@@ -16,6 +16,16 @@ def expect_error(fn, contains: str) -> None:
     else: raise AssertionError(f"expected PentaExecutionError containing {contains!r}")
 
 
+def _execution_eligible_count() -> int:
+    _, snapshot = load_family(ROOT)
+    return sum(1 for member in snapshot["members"].values() if member.get("maturity") in {"certified", "production"})
+
+
+def _production_member_count() -> int:
+    _, snapshot = load_family(ROOT)
+    return sum(1 for member in snapshot["members"].values() if member.get("maturity") == "production")
+
+
 def test_every_registered_member_is_control_plane_addressable() -> None:
     _, snapshot = load_family(ROOT); result = family_list(snapshot)
     assert result["disposition"] == "completed_read_only"
@@ -33,7 +43,7 @@ def test_specified_member_has_real_status_without_fake_execution_promotion() -> 
 def test_execution_adapter_registry_is_static_and_fail_closed() -> None:
     registry = load_adapter_registry(ROOT)
     assert registry["fail_closed"] is True and registry["version"] == "1.2.0"
-    assert len(registry["adapters"]) == 13
+    assert len(registry["adapters"]) == _execution_eligible_count()
     assert all(adapter["provider_effect"] is False for adapter in registry["adapters"])
 
 
@@ -51,11 +61,12 @@ def test_family_execution_contract_validates_and_covers_all_production_members()
     registry, snapshot = load_family(ROOT); result = family_validate(ROOT, registry, snapshot)
     assert result["disposition"] == "pass", result
     assert result["details"]["blockers"] == []
-    assert result["details"]["adapter_count"] == 13
+    eligible = _execution_eligible_count()
+    assert result["details"]["adapter_count"] == eligible
     coverage = result["details"]["execution_adapter_coverage"]
     assert coverage["complete"] is True
-    assert coverage["eligible_member_count"] == 13
-    assert coverage["eligible_members_with_adapter"] == 13
+    assert coverage["eligible_member_count"] == eligible
+    assert coverage["eligible_members_with_adapter"] == eligible
     assert coverage["missing_adapter_members"] == []
 
 
@@ -106,7 +117,7 @@ def test_penta_heartbeat_probes_all_production_members() -> None:
     assert result["disposition"] == "completed", result
     probe = result["details"]["result"]
     assert probe["schema"] == "ct.penta.heartbeat.control-plane-probe.v1"
-    assert probe["production_member_count"] == 13
+    assert probe["production_member_count"] == _production_member_count()
     assert all(row["adapter_bound"] for row in probe["members"])
 
 
@@ -116,6 +127,22 @@ def test_penta_od_reports_bounded_dispatch_readiness() -> None:
     readiness = result["details"]["result"]
     assert readiness["schema"] == "ct.penta.od.readiness.v1"
     assert readiness["execution_eligible"] is True and readiness["adapter_operations"] == ["snapshot"] and readiness["authority_expanded"] is False
+
+
+def test_penta_immune_has_bounded_non_provider_control_plane_adapter() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.immune", operation="family_snapshot", evidence_refs=["test:penta-exec:immune"], risk_class="D0")
+    assert result["disposition"] == "completed", result
+    assert result["details"]["adapter_id"] == "builtin.immune.control-plane-status"
+    assert result["details"]["provider_effect"] is False
+    assert result["details"]["result"]["member_count"] >= _production_member_count()
+
+
+def test_penta_evi_builder_has_bounded_non_provider_control_plane_adapter() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.evi-builder", operation="family_snapshot", evidence_refs=["test:penta-exec:evi-builder"], risk_class="D0")
+    assert result["disposition"] == "completed", result
+    assert result["details"]["adapter_id"] == "builtin.evi-builder.control-plane-status"
+    assert result["details"]["provider_effect"] is False
+    assert result["details"]["result"]["member_count"] >= _production_member_count()
 
 
 def _compliance_payload() -> dict:
