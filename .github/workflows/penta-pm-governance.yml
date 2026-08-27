@@ -1,0 +1,138 @@
+name: PentaPM Governance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "config/penta_pm_policy.json"
+      - "config/penta_credential_bindings.json"
+      - "scripts/penta_pm_reconcile.py"
+      - "scripts/penta_pm_repo_backfill.py"
+      - ".github/workflows/penta-pm-governance.yml"
+      - "tests/test_penta_pm_reconcile.py"
+  pull_request:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
+  issues:
+    types: [opened, reopened, edited, labeled, unlabeled]
+  release:
+    types: [published, edited]
+  repository_dispatch:
+    types: [penta-pm-reconcile]
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply provider reconciliation"
+        type: boolean
+        required: false
+        default: false
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  repository-projects: write
+
+concurrency:
+  group: penta-pm-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: PentaPM reconcile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate PentaPM policy and unit tests
+        run: |
+          python -m json.tool config/penta_pm_policy.json >/dev/null
+          python -m json.tool config/penta_credential_bindings.json >/dev/null
+          python -m unittest tests.test_penta_pm_reconcile -v
+
+      - name: Validate PR development linkage without provider mutation
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os,re
+          body=os.environ.get('PR_BODY') or ''
+          if not re.search(r'(?mi)^\s*(refs|closes|fixes)\s+#\d+', body):
+              raise SystemExit('PentaPM PR gate requires an explicit Development linkage such as Refs #584')
+          print('PentaPM PR Development linkage verified; provider mutation is intentionally deferred to trusted lanes.')
+          PY
+          mkdir -p artifacts/penta-pm
+          python - <<'PY'
+          import hashlib,json,os,time
+          receipt={
+            'schema':'ct.penta.pm.pr-validation-receipt.v1',
+            'repo':os.environ.get('GITHUB_REPOSITORY'),
+            'mode':'pull_request_validation',
+            'provider_mutation':False,
+            'provider_authority_manufactured':False,
+            'state':'pass',
+            'generated_at_epoch':int(time.time())
+          }
+          receipt['receipt_sha256']=hashlib.sha256(json.dumps(receipt,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+          open('artifacts/penta-pm/latest.json','w').write(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Require dedicated PentaPM Projects credential
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          if [[ -z "${PENTA_PM_GITHUB_TOKEN}" ]]; then
+            echo "::error::PENTA_PM_GITHUB_TOKEN is unavailable to trusted PentaPM provider reconciliation."
+            exit 78
+          fi
+
+      - name: Determine reconciliation mode
+        if: github.event_name != 'pull_request'
+        id: mode
+        shell: bash
+        run: |
+          APPLY=false
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.apply }}" == "true" ]]; then APPLY=true; fi
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "repository_dispatch" || "${{ github.event_name }}" == "push" || "${{ github.event_name }}" == "issues" || "${{ github.event_name }}" == "release" ]]; then APPLY=true; fi
+          echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile Projects v2 and milestones on trusted lanes
+        if: github.event_name != 'pull_request'
+        run: |
+          if [[ "${{ steps.mode.outputs.apply }}" == "true" ]]; then
+            python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --apply
+          else
+            python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}"
+          fi
+
+      - name: Upload immutable-style PentaPM receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-pm-receipt-${{ github.run_id }}
+          path: artifacts/penta-pm/latest.json
+          if-no-files-found: error
+          retention-days: 90
+
+  gate:
+    name: PentaPM governed metadata gate
+    if: github.event_name == 'pull_request'
+    needs: reconcile
+    runs-on: ubuntu-latest
+    steps:
+      - name: PentaPM PR gate passed
+        run: echo "Source metadata and Development linkage passed. GitHub Projects v2 provider reconciliation remains separately fail-closed on trusted lanes."
