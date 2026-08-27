@@ -1,5 +1,8 @@
 import { emitPenta, fabricState, verifyPenta } from '../lib/pentafabric.js';
-import { resolveVercelOidcToken } from '../lib/vercel-oidc.js';
+import {
+  requestQueryParam,
+  resolveVercelOidcToken,
+} from '../lib/vercel-oidc.js';
 
 const MAX_BODY_BYTES = 262144;
 const DEFAULT_PENTAFABRIC_INGEST_URL =
@@ -182,7 +185,7 @@ export default async function handler(request, response) {
   if (request.method === 'GET') {
     try {
       const selfTestRequested =
-        String(request.query?.selftest || '') === '1';
+        requestQueryParam(request, 'selftest') === '1';
       return send(response, 200, {
         schema: 'ct.penta.vercel.fabric.20260827.v1',
         service: 'crownthrive-os-control-plane',

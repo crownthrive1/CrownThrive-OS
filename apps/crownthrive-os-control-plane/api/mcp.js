@@ -5,6 +5,7 @@ import {
 import {
   hasVercelOidcToken,
   requestHeader,
+  requestQueryParam,
 } from '../lib/vercel-oidc.js';
 
 const MODERN_VERSION = '2026-07-28';
@@ -409,7 +410,7 @@ export default async function handler(request, response) {
 
   if (request.method === 'GET') {
     const selfTestRequested =
-      String(request.query?.selftest || '') === '1';
+      requestQueryParam(request, 'selftest') === '1';
     if (!selfTestRequested) {
       return sendJson(response, 200, descriptor());
     }
