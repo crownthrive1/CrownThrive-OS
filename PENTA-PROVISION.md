@@ -37,6 +37,10 @@ Use `--apply` only after a dry-run succeeds. `--allow-fetch` permits fetching on
 - PentaRelease reruns the exact gate that originally failed.
 - Any remaining provider-state or D3 decision remains independently gated.
 
+## Governance tracking
+
+Development linkage: Refs #584. Provider-state reconciliation remains independent and fail-closed.
+
 ## Initial production proof
 
 `ct.penta.provision.phase3-baseline-recovery.20260827.v1` restores the four exact historical migrations reported missing by the Governed Merge Gate on PentaFactory replenishment release 1.2.1. Those artifacts are recovered by preserved Git blob identity, not recreated from memory.
