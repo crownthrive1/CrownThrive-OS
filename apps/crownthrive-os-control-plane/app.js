@@ -1,5 +1,6 @@
 const routes = {
   overview: 'Institutional Now',
+  fabric: 'Vercel Execution Fabric',
   'release-gates': 'Release Gates',
   topology: 'Convergent Topology',
   receipts: 'DAIL Receipts',
@@ -21,7 +22,9 @@ const lanes = [
 const gates = [
   ['Repository contract', 'D1', 'PASS', 'PentaGate → PentaHeal'],
   ['Exact-head required checks', 'D2', 'PENDING', 'PentaRanger → PentaCertify'],
-  ['Provider deployment readback', 'D2', 'HOLD', 'PentaDeploy → PentaVercel'],
+  ['Provider deployment readback', 'D2', 'PENDING', 'PentaDeploy → PentaVercel'],
+  ['Platform API / MCP exposure', 'D1', 'PENDING', 'CrownThrive IO → PentaVercel'],
+  ['Vercel provider write credential', 'D2', 'HOLD', 'PentaVault → PentaCredentials'],
   ['DAIL receipt chain', 'D1', 'PASS', 'PentaRG → DAIL'],
   ['CHLOM rights and consent', 'D2', 'PENDING', 'CHLOM → PentaPolice'],
   ['D3 founder authority lease', 'D3', 'PASS', 'PentaGovernance'],
@@ -58,19 +61,55 @@ const interop = [
   ['Evidence', 'Everything → DAIL', 'Audit, plan, apply, deployment, rollback, and governance events become hash-chained institutional evidence.']
 ];
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[character]));
+}
+
+function stateClass(state) {
+  const normalized = String(state || '').toLowerCase();
+  if (['pass', 'operational', 'bound', 'production'].includes(normalized)) return 'pass';
+  if (['hold', 'degraded', 'error', 'gated'].includes(normalized)) return 'hold';
+  return 'pending';
+}
+
+function setGate(name, state) {
+  const gate = gates.find((entry) => entry[0] === name);
+  if (gate) gate[2] = state;
+}
+
+function renderGates() {
+  document.querySelector('#gate-table').innerHTML = gates
+    .map(([gate, authority, state, route]) => `<tr><td><strong>${escapeHtml(gate)}</strong></td><td>${escapeHtml(authority)}</td><td><span class="state ${stateClass(state)}">${escapeHtml(state)}</span></td><td>${escapeHtml(route)}</td></tr>`)
+    .join('');
+}
+
 function render() {
-  document.querySelector('#lane-grid').innerHTML = lanes.map(([lane, title, text]) => `<article class="lane-card"><span>${lane}</span><h3>${title}</h3><p>${text}</p></article>`).join('');
-  document.querySelector('#gate-table').innerHTML = gates.map(([gate, authority, state, route]) => `<tr><td><strong>${gate}</strong></td><td>${authority}</td><td><span class="state ${state.toLowerCase()}">${state}</span></td><td>${route}</td></tr>`).join('');
-  document.querySelector('#topology-map').innerHTML = nodes.map(([layer, name, text]) => `<article class="node" role="listitem"><span>${layer}</span><h3>${name}</h3><p>${text}</p></article>`).join('');
-  document.querySelector('#receipt-list').innerHTML = receipts.map(([kind, title, text], index) => `<article class="receipt"><code>${String(index + 1).padStart(2, '0')} · ${kind}</code><div><strong>${title}</strong><p>${text}</p></div><span class="state pass">CHAINED</span></article>`).join('');
-  document.querySelector('#interop-grid').innerHTML = interop.map(([lane, title, text]) => `<article class="interop-card"><span>${lane}</span><strong>${title}</strong><p>${text}</p></article>`).join('');
+  document.querySelector('#lane-grid').innerHTML = lanes
+    .map(([lane, title, text]) => `<article class="lane-card"><span>${escapeHtml(lane)}</span><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></article>`)
+    .join('');
+  renderGates();
+  document.querySelector('#topology-map').innerHTML = nodes
+    .map(([layer, name, text]) => `<article class="node" role="listitem"><span>${escapeHtml(layer)}</span><h3>${escapeHtml(name)}</h3><p>${escapeHtml(text)}</p></article>`)
+    .join('');
+  document.querySelector('#receipt-list').innerHTML = receipts
+    .map(([kind, title, text], index) => `<article class="receipt"><code>${String(index + 1).padStart(2, '0')} · ${escapeHtml(kind)}</code><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></div><span class="state pass">CHAINED</span></article>`)
+    .join('');
+  document.querySelector('#interop-grid').innerHTML = interop
+    .map(([lane, title, text]) => `<article class="interop-card"><span>${escapeHtml(lane)}</span><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></article>`)
+    .join('');
 }
 
 function activateRoute() {
   const route = location.hash.slice(1) || 'overview';
   const safe = routes[route] ? route : 'overview';
-  document.querySelectorAll('[data-page]').forEach(el => el.classList.toggle('active', el.dataset.page === safe));
-  document.querySelectorAll('[data-route]').forEach(el => el.classList.toggle('active', el.dataset.route === safe));
+  document.querySelectorAll('[data-page]').forEach((element) => element.classList.toggle('active', element.dataset.page === safe));
+  document.querySelectorAll('[data-route]').forEach((element) => element.classList.toggle('active', element.dataset.route === safe));
   document.querySelector('#page-title').textContent = routes[safe];
   document.title = `${routes[safe]} · CrownThrive OS`;
 }
@@ -82,14 +121,13 @@ async function readHealth() {
     if (!response.ok) throw new Error(`health ${response.status}`);
     const data = await response.json();
     badge.textContent = data.status;
-    badge.className = `badge ${String(data.status).toLowerCase() === 'operational' ? 'pass' : 'hold'}`;
+    badge.className = `badge ${stateClass(data.status)}`;
     document.querySelector('#health-release').textContent = data.release;
     document.querySelector('#health-vercel').textContent = data.vercel_provider_state;
     document.querySelector('#health-time').textContent = new Date(data.observed_at).toLocaleString();
-    document.querySelector('#rail-status').textContent = `Control plane ${data.status.toLowerCase()}`;
-    document.querySelector('#provider-vercel-state').textContent = data.vercel_provider_state;
-    document.querySelector('#footer-build').textContent = `Build ${data.build_sha.slice(0, 12)}`;
-  } catch (error) {
+    document.querySelector('#rail-status').textContent = `Control plane ${String(data.status).toLowerCase()}`;
+    document.querySelector('#footer-build').textContent = `Build ${String(data.build_sha).slice(0, 12)}`;
+  } catch {
     badge.textContent = 'HOLD';
     badge.className = 'badge hold';
     document.querySelector('#rail-status').textContent = 'Provider readback unavailable';
@@ -97,8 +135,94 @@ async function readHealth() {
   }
 }
 
+function renderFabricProjects(projects) {
+  const target = document.querySelector('#fabric-projects');
+  target.innerHTML = projects
+    .map((project) => {
+      const health = project.health || {};
+      const capabilities = Array.isArray(health.capabilities) && health.capabilities.length
+        ? health.capabilities.slice(0, 3).join(' · ')
+        : 'Provider health and deployment evidence';
+      return `<article class="fabric-project">
+        <div class="signal-head">
+          <span>${escapeHtml(project.service)}</span>
+          <span class="state ${stateClass(project.state)}">${escapeHtml(project.state)}</span>
+        </div>
+        <strong>${escapeHtml(project.project_id)}</strong>
+        <p>${escapeHtml(capabilities)}</p>
+        <dl class="fabric-meta">
+          <div><dt>Release</dt><dd>${escapeHtml(health.release || 'unknown')}</dd></div>
+          <div><dt>Provider</dt><dd>${escapeHtml(health.provider_state || 'unknown')}</dd></div>
+          <div><dt>Latency</dt><dd>${escapeHtml(project.latency_ms)} ms</dd></div>
+          <div><dt>Build</dt><dd class="mono">${escapeHtml(String(health.build_sha || '—').slice(0, 12))}</dd></div>
+        </dl>
+      </article>`;
+    })
+    .join('');
+}
+
+async function readFabric() {
+  const badge = document.querySelector('#fabric-badge');
+  try {
+    const response = await fetch('/api/fabric', { cache: 'no-store' });
+    const data = await response.json();
+    const fabricPass = data.status === 'OPERATIONAL';
+
+    badge.textContent = data.status;
+    badge.className = `badge ${stateClass(data.status)}`;
+    document.querySelector('#fabric-required').textContent = data.required_project_count;
+    document.querySelector('#fabric-operational').textContent = data.operational_project_count;
+    document.querySelector('#fabric-write-state').textContent = data.provider_operations?.promote_and_rollback || 'UNKNOWN';
+    document.querySelector('#fabric-receipt').textContent = String(data.evidence?.digest || '—').slice(0, 16);
+    document.querySelector('#provider-vercel-state').textContent = `${data.operational_project_count}/${data.required_project_count} production planes`;
+    document.querySelector('#mcp-state').textContent = data.mcp?.status || 'UNKNOWN';
+    document.querySelector('#mcp-version').textContent = data.mcp?.protocol_version || '—';
+    document.querySelector('#mcp-profile').textContent = data.mcp?.profile || '—';
+    document.querySelector('#fabric-observed').textContent = new Date(data.observed_at).toLocaleString();
+
+    renderFabricProjects(Array.isArray(data.projects) ? data.projects : []);
+
+    setGate('Provider deployment readback', fabricPass ? 'PASS' : 'HOLD');
+    setGate('Platform API / MCP exposure', data.mcp?.status === 'OPERATIONAL' ? 'PASS' : 'HOLD');
+    setGate(
+      'Vercel provider write credential',
+      data.provider_operations?.promote_and_rollback === 'BOUND_GOVERNED' ? 'PASS' : 'HOLD'
+    );
+    renderGates();
+
+    const gaps = document.querySelector('#fabric-gaps');
+    if (data.provider_operations?.promote_and_rollback === 'BOUND_GOVERNED') {
+      gaps.innerHTML = '<strong>Provider writes:</strong> governed promotion, rollback, domain, and environment mutation are credential-bound.';
+    } else {
+      gaps.innerHTML = '<strong>Provider-write boundary:</strong> Git-triggered deployments and provider readback are operational. Direct Vercel promotion, rollback, domain, and environment mutation remain fail-closed until <code>VERCEL_AUTOMATION_TOKEN</code> is vaulted and bound.';
+    }
+
+    if (!response.ok || !fabricPass) {
+      document.querySelector('#rail-status').textContent = 'Vercel fabric degraded';
+    }
+  } catch {
+    badge.textContent = 'HOLD';
+    badge.className = 'badge hold';
+    document.querySelector('#fabric-observed').textContent = 'readback failed';
+    document.querySelector('#fabric-projects').innerHTML = '<article class="callout"><strong>HOLD:</strong> aggregate provider readback is unavailable.</article>';
+    setGate('Provider deployment readback', 'HOLD');
+    setGate('Platform API / MCP exposure', 'HOLD');
+    renderGates();
+  }
+}
+
+async function refreshAll() {
+  const button = document.querySelector('#refresh');
+  button.disabled = true;
+  try {
+    await Promise.allSettled([readHealth(), readFabric()]);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 render();
 activateRoute();
-readHealth();
+refreshAll();
 window.addEventListener('hashchange', activateRoute);
-document.querySelector('#refresh').addEventListener('click', readHealth);
+document.querySelector('#refresh').addEventListener('click', refreshAll);

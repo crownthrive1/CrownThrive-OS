@@ -53,8 +53,8 @@ def main() -> int:
     require("not found in local migrations directory" in migration.get("last_observed_error", ""), "Migration failure cause drifted")
 
     security = data.get("security_advisors", {})
-    require(security.get("total") == 173, "Security advisor count changed without snapshot reconciliation")
-    require(security.get("info") == 173, "Security INFO count changed without snapshot reconciliation")
+    require(security.get("total") == 14, "Security advisor count changed without snapshot reconciliation")
+    require(security.get("info") == 14, "Security INFO count changed without snapshot reconciliation")
     require(security.get("warn") == 0, "Security warning count changed without snapshot reconciliation")
     require(security.get("info_lint") == "rls_enabled_no_policy", "Expected RLS policy-intent INFO set drifted")
     require(security.get("gate") == "HOLD_PENDING_RLS_POLICY_INTENT_REVIEW", "RLS policy intent must remain held")

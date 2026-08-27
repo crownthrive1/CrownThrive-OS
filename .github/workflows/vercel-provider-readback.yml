@@ -1,0 +1,271 @@
+name: PentaVercel Production Readback
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/crownthrive-os-control-plane/**"
+      - "config/vercel/execution-fabric.v1.json"
+      - ".github/workflows/vercel-provider-readback.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentavercel-production-readback
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify all Vercel production planes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Collect provider-originated readback
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+          from datetime import datetime, timezone
+
+          endpoints = {
+              "crownthrive_os": "https://crown-thrive-os.vercel.app/health",
+              "private_penta_os": "https://private-penta-os.vercel.app/health",
+              "private_penta_execution": "https://private-penta-execution.vercel.app/health",
+              "chlom_protocol": "https://chlom-protocol.vercel.app/health",
+              "execution_fabric": "https://crown-thrive-os.vercel.app/fabric",
+              "mcp_gateway": "https://crown-thrive-os.vercel.app/api/mcp?selftest=1",
+              "pentafabric": "https://crown-thrive-os.vercel.app/api/penta?selftest=1",
+          }
+
+          def probe(url: str) -> dict:
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "Accept": "application/json",
+                      "User-Agent": "CrownThrive-PentaVercel-CI/1.0",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=10) as response:
+                      return {
+                          "url": url,
+                          "http_status": response.status,
+                          "body": json.loads(response.read().decode("utf-8")),
+                      }
+              except urllib.error.HTTPError as error:
+                  raw = error.read().decode("utf-8", errors="replace")
+                  try:
+                      body = json.loads(raw)
+                  except json.JSONDecodeError:
+                      body = {"raw": raw[:300]}
+                  return {
+                      "url": url,
+                      "http_status": error.code,
+                      "body": body,
+                      "error": f"HTTPError: {error}",
+                  }
+              except Exception as error:
+                  return {
+                      "url": url,
+                      "error": f"{type(error).__name__}: {error}",
+                  }
+
+          def validate(results: dict) -> list[str]:
+              failures: list[str] = []
+
+              for key in (
+                  "crownthrive_os",
+                  "private_penta_os",
+                  "private_penta_execution",
+                  "chlom_protocol",
+              ):
+                  result = results.get(key, {})
+                  body = result.get("body", {})
+                  provider_state = (
+                      body.get("provider_state")
+                      or body.get("vercel_provider_state")
+                  )
+                  if result.get("http_status") != 200:
+                      failures.append(f"{key}: HTTP status is not 200")
+                  if body.get("status") != "OPERATIONAL":
+                      failures.append(f"{key}: status is not OPERATIONAL")
+                  if body.get("release") != "production":
+                      failures.append(f"{key}: release is not production")
+                  if body.get("provider_readback") is not True:
+                      failures.append(
+                          f"{key}: provider_readback is not true"
+                      )
+                  if provider_state != "BOUND_PRODUCTION":
+                      failures.append(
+                          f"{key}: provider state is not BOUND_PRODUCTION"
+                      )
+                  if body.get("pass_manufactured") is not False:
+                      failures.append(
+                          f"{key}: pass_manufactured invariant failed"
+                      )
+
+              control = results.get("crownthrive_os", {}).get("body", {})
+              if control.get("build_sha") != os.getenv("GITHUB_SHA"):
+                  failures.append(
+                      "crownthrive_os: production build SHA does not match GITHUB_SHA"
+                  )
+
+              fabric = results.get("execution_fabric", {}).get("body", {})
+              if fabric.get("status") != "OPERATIONAL":
+                  failures.append(
+                      "execution_fabric: status is not OPERATIONAL"
+                  )
+              if fabric.get("required_project_count") != 4:
+                  failures.append(
+                      "execution_fabric: required project count is not 4"
+                  )
+              if fabric.get("operational_project_count") != 4:
+                  failures.append(
+                      "execution_fabric: operational project count is not 4"
+                  )
+              if fabric.get("evidence", {}).get("sink_bound") is not True:
+                  failures.append(
+                      "execution_fabric: evidence sink is not bound"
+                  )
+              if (
+                  fabric.get("governance", {}).get("pass_manufactured")
+                  is not False
+              ):
+                  failures.append(
+                      "execution_fabric: pass_manufactured invariant failed"
+                  )
+
+              mcp = results.get("mcp_gateway", {}).get("body", {})
+              if mcp.get("status") != "OPERATIONAL":
+                  failures.append(
+                      "mcp_gateway: status is not OPERATIONAL"
+                  )
+              if mcp.get("write_tools") != 0:
+                  failures.append(
+                      "mcp_gateway: write tool count is not zero"
+                  )
+              if mcp.get("self_test", {}).get("status") != "PASS":
+                  failures.append(
+                      "mcp_gateway: POST protocol self-test did not pass"
+                  )
+
+              penta = results.get("pentafabric", {}).get("body", {})
+              if penta.get("status") != "OPERATIONAL":
+                  failures.append(
+                      "pentafabric: status is not OPERATIONAL"
+                  )
+              if penta.get("self_test", {}).get("status") != "PASS":
+                  failures.append(
+                      "pentafabric: packet self-test did not pass"
+                  )
+              if penta.get("evidence_sink", {}).get("bound") is not True:
+                  failures.append(
+                      "pentafabric: evidence sink is not bound"
+                  )
+
+              return failures
+
+          results: dict = {}
+          failures: list[str] = []
+
+          for attempt in range(1, 13):
+              results = {
+                  key: probe(url)
+                  for key, url in endpoints.items()
+              }
+              failures = validate(results)
+              if not failures:
+                  break
+              if attempt < 12:
+                  print(
+                      f"Attempt {attempt}/12 remains HOLD; "
+                      "waiting for exact production provider convergence."
+                  )
+                  for failure in failures:
+                      print(f"- {failure}")
+                  time.sleep(10)
+
+          envelope = {
+              "schema": "ct.penta.vercel.provider-readback-ci.20260827.v2",
+              "status": "PASS" if not failures else "HOLD",
+              "attempts": attempt,
+              "results": results,
+              "failures": failures,
+              "observed_at": datetime.now(timezone.utc).isoformat(),
+              "github": {
+                  "repository": os.getenv("GITHUB_REPOSITORY"),
+                  "sha": os.getenv("GITHUB_SHA"),
+                  "event_name": os.getenv("GITHUB_EVENT_NAME"),
+                  "run_id": os.getenv("GITHUB_RUN_ID"),
+                  "run_attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
+              },
+              "pass_manufactured": False,
+          }
+          canonical = json.dumps(
+              envelope,
+              sort_keys=True,
+              separators=(",", ":"),
+          )
+          envelope["sha256"] = hashlib.sha256(
+              canonical.encode("utf-8")
+          ).hexdigest()
+
+          print(json.dumps(envelope, indent=2, sort_keys=True))
+
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              fabric = results.get(
+                  "execution_fabric", {}
+              ).get("body", {})
+              mcp = results.get("mcp_gateway", {}).get("body", {})
+              with open(
+                  summary_path, "a", encoding="utf-8"
+              ) as summary:
+                  summary.write(
+                      "# PentaVercel production readback\n\n"
+                  )
+                  summary.write(
+                      f"- Status: **{envelope['status']}**\n"
+                  )
+                  summary.write(
+                      f"- Attempts: `{envelope['attempts']}`\n"
+                  )
+                  summary.write(
+                      f"- SHA-256: `{envelope['sha256']}`\n"
+                  )
+                  summary.write(
+                      "- Required planes: "
+                      f"`{fabric.get('required_project_count', 'unknown')}`\n"
+                  )
+                  summary.write(
+                      "- Operational planes: "
+                      f"`{fabric.get('operational_project_count', 'unknown')}`\n"
+                  )
+                  summary.write(
+                      "- Evidence sink: "
+                      f"`{fabric.get('evidence', {}).get('sink_mode', 'unknown')}`\n"
+                  )
+                  summary.write(
+                      "- MCP self-test: "
+                      f"`{mcp.get('self_test', {}).get('status', 'unknown')}`\n"
+                  )
+                  if failures:
+                      summary.write("\n## Holds\n")
+                      for failure in failures:
+                          summary.write(f"- {failure}\n")
+
+          if failures:
+              raise SystemExit(1)
+          PY
