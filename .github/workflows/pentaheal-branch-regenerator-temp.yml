@@ -1,0 +1,71 @@
+name: PentaHeal Branch Regenerator TEMP
+
+on:
+  push:
+    branches:
+      - penta/patch-lifecycle-proof-v1
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    if: github.repository == 'crownthrive1/CrownThrive-Support' && github.ref == 'refs/heads/penta/patch-lifecycle-proof-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Regenerate exact allowlisted outputs
+        id: regen
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/build_penta_os_v1.py --write
+          mapfile -t changed < <(git diff --name-only)
+          allowed_a='data/penta/os-v1.registry.json'
+          allowed_b='automation/penta-os-v1.mdx'
+          for path in "${changed[@]}"; do
+            if [[ "$path" != "$allowed_a" && "$path" != "$allowed_b" ]]; then
+              echo "PentaHeal refused non-allowlisted mutation: $path" >&2
+              exit 1
+            fi
+          done
+          if [[ ${#changed[@]} -eq 0 ]]; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            printf 'PentaHeal generated:\n%s\n' "${changed[@]}"
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify regenerated state before branch write
+        if: steps.regen.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/build_penta_os_v1.py --check
+          python -m unittest tests.test_penta_os_v1 -v
+
+      - name: Commit deterministic generated state
+        if: steps.regen.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- data/penta/os-v1.registry.json automation/penta-os-v1.mdx
+          git diff --cached --name-only | while read -r path; do
+            [[ "$path" == 'data/penta/os-v1.registry.json' || "$path" == 'automation/penta-os-v1.mdx' ]] || exit 1
+          done
+          git commit -m 'chore(penta): regenerate Penta OS derived state [PentaHeal]'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
