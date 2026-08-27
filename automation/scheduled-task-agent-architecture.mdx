@@ -11,6 +11,7 @@ content_state: "current_with_holds"
 ---
 
 {/* pentadocs:audience-orientation:v2 */}
+
 <Note>
   **Audience:** operators and administrators (`operator`).
 
@@ -20,6 +21,7 @@ content_state: "current_with_holds"
 
   **Related guidance:** [Operating principles](/start-here/operating-principles) and [Permissions and approvals](/automation/permissions-and-approval-gates).
 </Note>
+
 {/* /pentadocs:audience-orientation:v2 */}
 
 ## Scheduled Task Agent Architecture
@@ -39,40 +41,44 @@ The scheduler is an execution trigger. It is **not** the institutional source of
 
 ## Current production topology
 
-As of August 24, 2026, the canonical scheduler topology is `ct.scheduler-topology.production.v1` and is **production-certified**. The former one-agent-one-external-ChatGPT-clock model is superseded where a compatible internal or folded route exists.
+As of August 27, 2026, the canonical scheduler topology is `ct.scheduler-topology.production.v1` and remains production-ready. ThriveBase, CrownThrive OS, Software Factory, Framework Factory, `pg_cron`, governed queues, Mintlify workflows, GitHub Actions, Edge Functions, and provider-native workflows own primary execution.
 
 ```text
-external failure-domain clocks
-├─ CrownThrive External Evidence Relay
-├─ CrownThrive Communications Watch
-├─ CrownThrive Daily Backup & Continuity
-└─ CrownThrive Maintenance Coordinator   # temporary while targeted maintenance is open
+production software fabric
+├─ ThriveBase / CrownThrive OS
+├─ Software Factory / Framework Factory
+├─ pg_cron and governed queues
+├─ Edge Functions and GitHub Actions
+├─ Mintlify workflows
+└─ provider-native workflows
 
-internal execution fabric
-├─ stable CHLOM / ThriveBase agent identities
-├─ owner/verifier work packets and internal subroutes
-├─ pg_cron for database-native recurrence
-└─ Mintlify workflows for documentation recurrence
+external connector failure domains
+├─ ct.schedule.external-evidence-relay.hourly.v1
+└─ governed communications attention route
 ```
 
-The normal post-maintenance external-clock target is **three**: evidence relay, communications, and backup/continuity. The maintenance coordinator is a temporary distinct recovery failure domain.
+The dedicated backup ChatGPT clock and the temporary maintenance-coordinator clock are retired scheduling scaffolding. Backup due-generation remains internal under `ct.schedule.backup-continuity.midnight.v2`; the canonical external relay performs only the connector-dependent Drive portion when a real due job exists. Maintenance is closed.
 
-The production stress suite passed with zero retired clocks enabled, zero pending scheduler dispositions, zero unreconciled schedules, zero enabled D3 external clocks, and deterministic repeatability. Targeted maintenance currently suspends the external evidence relay without changing the topology's production state.
+The former Agent A/B/C/D/S one-agent-one-clock model is permanently archived. Seven legacy schedule rows are historical-only with no provider task binding, three isolated executable scheduler functions were removed, two disabled provider bindings were tombstoned, and the canonical relay remains unchanged. See [Legacy A/B/C/D/S Scheduler Scaffolding Archive](/knowledge/legacy-abcds-scheduler-scaffolding-archive).
+
+Current production validation reports zero duplicate clocks, zero retired-but-enabled schedules, zero enabled D3 external clocks, zero pending external dispositions, and no recursive external schedulers.
 
 See [Agent Scheduler Topology Production Convergence](/developers/certification/agent-scheduler-topology-production-convergence-2026-08-24) and the machine contract `developers/contracts/agent-scheduler-topology-production.v1.json`.
 
 ```text
 Founder / governed objective
         ↓
-CHLOM Orchestrator
+CHLOM / CrownThrive OS orchestration
         ↓
-Stable agent identity + skill contract
+Stable agent or software capability + skill contract
         ↓
-Schedule / condition binding
+Internal schedule, queue, event, or provider-native trigger
         ↓
 Permission + risk + suppression + evidence gates
         ↓
-Provider task executes
+Certified executor runs
+        ↓
+Connector relay only when the internal fabric cannot perform the connector step
         ↓
 Readback / outcome / DAIL evidence
         ↓
@@ -91,21 +97,21 @@ Founder, legal, finance, security, rights and other qualified-human decisions re
 
 `ct.chlom.agent.orchestrator` is the operating parent for governed machine execution. It routes bounded packets to the institutional relay, specialist agents, operational watches, sales agents, content/governance agents, and reusable skill packages.
 
-### 3. Sovereign relay identities
+### 3. Historical relay roles and current authority
 
-The five sovereign relay identities remain the governed voter pool, but they no longer require five independent external ChatGPT scheduler slots. Their logical cadence, packet ownership, verifier identity and voting rules are preserved inside the institutional execution fabric.
+Agent A/B/C/D/S names may remain in prior ADRs, receipts, handoffs, migrations, review records, and separately governed capability registries. Their former staggered scheduler cadences are historical context only:
 
-| Agent | Role | Historical external cadence | Current scheduling treatment | Vote |
-| --- | --- | --- | --- | --- |
-| `ct.relay.agent-a` | Orchestrator & Integrator | hourly `:00` | folded/internal execution identity | yes |
-| `ct.relay.agent-b` | Evidence & Reconciliation Auditor | hourly `:15` | folded/internal execution identity | yes |
-| `ct.relay.agent-c` | Build & Documentation Executor | hourly `:30` | folded/internal execution identity | yes |
-| `ct.relay.agent-d` | Independent Gatekeeper & Handoff Steward | hourly `:45` | folded/internal execution identity | yes, mandatory |
-| `ct.relay.agent-s` | Security & Resilience Sentinel | hourly `:55` | folded/internal execution identity | yes |
+| Historical role | Former clock offset | Current scheduling treatment |
+| --- | --- | --- |
+| Agent A | hourly `:00` | no standalone clock; historical-only scheduling identity |
+| Agent B | hourly `:15` | no standalone clock; internal executors preferred |
+| Agent C | hourly `:30` | no standalone clock; governed queues/factories perform eligible work |
+| Agent D | hourly `:45` | no standalone clock; independent verification remains separate when current policy requires it |
+| Agent S | hourly `:55` | no standalone clock; security capabilities remain separately governed |
 
-Their former standalone external clocks are retained only as disabled historical scaffolding and are dispositioned as `RETIRED_SCHEDULING_SCAFFOLDING`. A shared external evidence-relay clock does not proxy, combine or manufacture their votes.
+All former external clocks, relay aliases, and scheduler entry points are dispositioned as `RETIRED_SCHEDULING_SCAFFOLDING`. They are not retained as runnable slots. The production database preserves their row identity, cadence, source references, hashes, and successor pointers as historical-only evidence.
 
-Automatic D0-D2 promotion still requires the applicable sovereign approvals, mandatory Agent D participation where required, no deny/block, applicable specialist evidence, rollback, and current-head validation. D3 remains human-reserved.
+A shared connector relay does not proxy a role, cast a vote, satisfy quorum, approve a merge, or create authority. Any current approval or independent-review requirement resolves from the current signed charter, registry, ADR, software policy, exact-head evidence, and human-reserved boundary. D3 remains human-reserved.
 
 ### 4. Non-voting specialist layer
 
