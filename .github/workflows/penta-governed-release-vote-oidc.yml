@@ -1,0 +1,286 @@
+name: Penta Governed Release Vote OIDC
+
+on:
+  repository_dispatch:
+    types: [penta_governed_release_vote]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: penta-governed-release-vote-5615a39d
+  cancel-in-progress: false
+
+env:
+  OIDC_AUDIENCE: crownthrive-repository-federation
+  VOTE_ENDPOINT: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-governed-release-vote-oidc
+  RELEASE_ID: 5615a39d-67e6-4558-9c08-0530e8e82768
+  EXACT_VERSION_REF: 1.0.0+edge.v5
+  CONTENT_SHA256: 5f31680b3aced8ee88d45814fa03dba5fc8e9d9150bf948742487c2e734269c0
+
+jobs:
+  exact-preflight:
+    name: Exact release preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate immutable request snapshot
+        env:
+          REQUEST_RELEASE_ID: ${{ github.event.client_payload.release_id }}
+          REQUEST_VERSION: ${{ github.event.client_payload.exact_version_ref }}
+          REQUEST_SHA256: ${{ github.event.client_payload.content_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$REQUEST_RELEASE_ID" = "$RELEASE_ID"
+          test "$REQUEST_VERSION" = "$EXACT_VERSION_REF"
+          test "$REQUEST_SHA256" = "$CONTENT_SHA256"
+          test "$GITHUB_REPOSITORY" = "crownthrive1/CrownThrive-OS"
+          test "$GITHUB_REPOSITORY_ID" = "1336348391"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_EVENT_NAME" = "repository_dispatch"
+          printf 'Exact request snapshot verified.\n' >> "$GITHUB_STEP_SUMMARY"
+
+  independent-vote:
+    name: Vote · ${{ matrix.agent_id }}
+    needs: exact-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - agent_id: ct.relay.agent-a
+            specialist_role: orchestrator_integrator
+          - agent_id: ct.relay.agent-b
+            specialist_role: evidence_reconciliation_auditor
+          - agent_id: ct.relay.agent-c
+            specialist_role: build_documentation_executor
+          - agent_id: ct.relay.agent-d
+            specialist_role: independent_gatekeeper
+          - agent_id: ct.relay.agent-s
+            specialist_role: security_resilience_sentinel
+    steps:
+      - name: Request signed GitHub OIDC token
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}"
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
+          oidc_url="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}"
+          response_file="$(mktemp)"
+          curl --silent --show-error --fail \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            -H "Accept: application/json" \
+            "$oidc_url" > "$response_file"
+          id_token="$(python3 - "$response_file" <<'PY'
+import json,sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    value=json.load(handle).get('value','')
+if not value or value.count('.') != 2:
+    raise SystemExit('GitHub OIDC token missing or malformed')
+print(value)
+PY
+)"
+          echo "::add-mask::$id_token"
+          printf '%s' "$id_token" > "$RUNNER_TEMP/github-oidc.jwt"
+          chmod 600 "$RUNNER_TEMP/github-oidc.jwt"
+          rm -f "$response_file"
+
+      - name: Submit independently bound vote
+        env:
+          VOTER_AGENT_ID: ${{ matrix.agent_id }}
+          SPECIALIST_ROLE: ${{ matrix.specialist_role }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload_file="$(mktemp)"
+          response_file="$(mktemp)"
+          status_file="$(mktemp)"
+          python3 - "$payload_file" <<'PY'
+import json,os,sys
+payload={
+  'mode':'vote',
+  'release_id':os.environ['RELEASE_ID'],
+  'exact_version_ref':os.environ['EXACT_VERSION_REF'],
+  'content_sha256':os.environ['CONTENT_SHA256'],
+  'voter_agent_id':os.environ['VOTER_AGENT_ID'],
+  'specialist_role':os.environ['SPECIALIST_ROLE'],
+  'self_approval_prohibited':True,
+  'synthetic':False,
+  'test_only':False,
+  'money_movement':False,
+  'checkout_activation':False,
+}
+with open(sys.argv[1],'w',encoding='utf-8') as handle:
+    json.dump(payload,handle,separators=(',',':'))
+PY
+          http_status="$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer $(cat "$RUNNER_TEMP/github-oidc.jwt")" \
+            -H "Content-Type: application/json" \
+            --data-binary "@$payload_file" \
+            "$VOTE_ENDPOINT")"
+          printf '%s' "$http_status" > "$status_file"
+          python3 - "$response_file" "$status_file" <<'PY'
+import json,sys
+with open(sys.argv[1],encoding='utf-8') as handle:
+    data=json.load(handle)
+status=int(open(sys.argv[2],encoding='utf-8').read())
+assert status == 200, (status,data)
+assert data.get('authenticated') is True, data
+assert data.get('receipt_state') == 'verified', data
+assert data.get('vote') == 'yes', data
+assert data.get('candidate_status',{}).get('genuine_pass') is True, data
+assert data.get('authority_manufactured') is False, data
+assert data.get('self_vote_created') is False, data
+assert data.get('money_movement') is False, data
+assert data.get('checkout_activation') is False, data
+print(json.dumps({
+  'voter_agent_id':data.get('voter_agent_id'),
+  'receipt_id':data.get('receipt_id'),
+  'vote_id':data.get('vote_id'),
+  'yes_votes':data.get('yes_votes'),
+  'agent_d_yes':data.get('agent_d_yes'),
+  'release_state':data.get('release',{}).get('release_state'),
+},separators=(',',':')))
+PY
+          python3 - "$response_file" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+import json,sys
+with open(sys.argv[1],encoding='utf-8') as handle:
+    data=json.load(handle)
+print(f"### {data['voter_agent_id']}")
+print(f"- OIDC authority receipt: `{data['receipt_id']}`")
+print(f"- Vote receipt: `{data['vote_id']}`")
+print(f"- Vote: **{data['vote']}**")
+print(f"- Exact candidate genuine PASS: `{data['candidate_status']['genuine_pass']}`")
+print(f"- Money movement: `{data['money_movement']}`")
+print(f"- Checkout activation: `{data['checkout_activation']}`")
+PY
+          rm -f "$payload_file" "$response_file" "$status_file" "$RUNNER_TEMP/github-oidc.jwt"
+
+  finalize-and-prove:
+    name: Finalize quorum, publish, and prove
+    needs: independent-vote
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Request finalizer OIDC token
+        shell: bash
+        run: |
+          set -euo pipefail
+          oidc_url="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${OIDC_AUDIENCE}"
+          response_file="$(mktemp)"
+          curl --silent --show-error --fail \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            -H "Accept: application/json" \
+            "$oidc_url" > "$response_file"
+          id_token="$(python3 - "$response_file" <<'PY'
+import json,sys
+value=json.load(open(sys.argv[1],encoding='utf-8')).get('value','')
+if not value or value.count('.') != 2:
+    raise SystemExit('GitHub OIDC token missing or malformed')
+print(value)
+PY
+)"
+          echo "::add-mask::$id_token"
+          printf '%s' "$id_token" > "$RUNNER_TEMP/github-oidc-finalize.jwt"
+          chmod 600 "$RUNNER_TEMP/github-oidc-finalize.jwt"
+          rm -f "$response_file"
+
+      - name: Recompute, dispatch, and verify publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload_file="$(mktemp)"
+          response_file="$(mktemp)"
+          proof_file="$(mktemp)"
+          python3 - "$payload_file" <<'PY'
+import json,os,sys
+json.dump({
+  'mode':'finalize',
+  'release_id':os.environ['RELEASE_ID'],
+  'exact_version_ref':os.environ['EXACT_VERSION_REF'],
+  'content_sha256':os.environ['CONTENT_SHA256'],
+  'money_movement':False,
+  'checkout_activation':False,
+},open(sys.argv[1],'w',encoding='utf-8'),separators=(',',':'))
+PY
+          status="$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer $(cat "$RUNNER_TEMP/github-oidc-finalize.jwt")" \
+            -H "Content-Type: application/json" \
+            --data-binary "@$payload_file" \
+            "$VOTE_ENDPOINT")"
+          test "$status" = "200"
+          curl --silent --show-error --fail \
+            -H "Accept: application/json" \
+            "$VOTE_ENDPOINT" > "$proof_file"
+          python3 - "$response_file" "$proof_file" <<'PY'
+import json,sys
+final=json.load(open(sys.argv[1],encoding='utf-8'))
+public=json.load(open(sys.argv[2],encoding='utf-8'))
+proof=final.get('proof',{})
+public_proof=public.get('proof',{})
+for data in (final,):
+    assert data.get('authenticated') is True, data
+    assert data.get('authority_manufactured') is False, data
+    assert data.get('self_vote_created') is False, data
+    assert data.get('money_movement') is False, data
+    assert data.get('checkout_activation') is False, data
+votes=proof.get('votes',{})
+release=proof.get('release',{})
+job=proof.get('publish_job') or {}
+projection=proof.get('projection') or {}
+assert votes.get('yes',0) >= 4, proof
+assert votes.get('agent_d_yes') is True, proof
+assert release.get('certification_state') == 'pass', proof
+assert release.get('vote_state') == 'accepted', proof
+assert release.get('release_state') == 'published', proof
+assert release.get('exact_version_ref') == '1.0.0+edge.v5', proof
+assert release.get('content_sha256') == '5f31680b3aced8ee88d45814fa03dba5fc8e9d9150bf948742487c2e734269c0', proof
+assert job.get('state') == 'published', proof
+assert job.get('rollback_ref'), proof
+assert job.get('exact_version_ref') == release.get('exact_version_ref'), proof
+assert job.get('content_sha256') == release.get('content_sha256'), proof
+assert projection.get('publication_state') == 'published', proof
+assert projection.get('exact_version_ref') == release.get('exact_version_ref'), proof
+assert projection.get('content_sha256') == release.get('content_sha256'), proof
+assert public_proof.get('release',{}).get('release_state') == 'published', public_proof
+assert public_proof.get('votes',{}).get('yes',0) >= 4, public_proof
+print(json.dumps({
+  'yes_votes':votes.get('yes'),
+  'agent_d_yes':votes.get('agent_d_yes'),
+  'release_state':release.get('release_state'),
+  'publish_job_state':job.get('state'),
+  'projection_state':projection.get('publication_state'),
+  'rollback_ref':job.get('rollback_ref'),
+  'public_url':job.get('public_url'),
+},separators=(',',':')))
+PY
+          python3 - "$proof_file" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+import json,sys
+proof=json.load(open(sys.argv[1],encoding='utf-8'))['proof']
+release=proof['release']; votes=proof['votes']; job=proof['publish_job']; projection=proof['projection']
+print('### Exact production proof')
+print(f"- OIDC YES votes: **{votes['yes']}**")
+print(f"- Required Agent D vote: `{votes['agent_d_yes']}`")
+print(f"- Certification: **{release['certification_state']}**")
+print(f"- Governance: **{release['vote_state']}**")
+print(f"- Release: **{release['release_state']}**")
+print(f"- Publish job: **{job['state']}**")
+print(f"- Projection: **{projection['publication_state']}**")
+print(f"- Exact version: `{release['exact_version_ref']}`")
+print(f"- Content SHA-256: `{release['content_sha256']}`")
+print(f"- Rollback reference: `{job['rollback_ref']}`")
+print(f"- Public URL: `{job['public_url']}`")
+print('- Money movement: `false`')
+print('- Checkout activation: `false`')
+PY
+          rm -f "$payload_file" "$response_file" "$proof_file" "$RUNNER_TEMP/github-oidc-finalize.jwt"
