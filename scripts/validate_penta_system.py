@@ -74,7 +74,6 @@ def main() -> int:
         ROOT / "penta" / "marketer" / "runtime.py",
         ROOT / "penta" / "marketer" / "adapters.registry.json",
         ROOT / "penta" / "maps" / "PENTAMAP-001.md",
-        ROOT / "supabase" / "migrations" / "20260826_penta_os_vergence_v1.sql",
         ROOT / "supabase" / "functions" / "penta-flex" / "index.ts",
         ROOT / "supabase" / "functions" / "penta-vergence-bridge" / "index.ts",
         ROOT / "scripts" / "penta_vergence_reconciler.py",
@@ -82,16 +81,17 @@ def main() -> int:
     absent = [str(p.relative_to(ROOT)) for p in required_files if not p.exists()]
     assert not absent, f"missing implementation files: {absent}"
 
-    migration = (ROOT / "supabase" / "migrations" / "20260826_penta_os_vergence_v1.sql").read_text(encoding="utf-8")
+    bridge = (ROOT / "supabase" / "functions" / "penta-vergence-bridge" / "index.ts").read_text(encoding="utf-8").lower()
     for invariant in [
-        "force row level security",
-        "penta-vergence-continuity-4h-v1",
-        "penta-vergence-deep-local-gate-v1",
-        "America/New_York",
+        "penta-vergence",
         "penta_vergence_claim_v1",
         "penta_vergence_complete_v1",
+        "crownthrive1/crownthrive-os",
+        "repository_id",
+        "oidc",
     ]:
-        assert invariant.lower() in migration.lower(), f"migration invariant missing: {invariant}"
+        assert invariant.lower() in bridge, f"PentaVergence bridge invariant missing: {invariant}"
+    assert "crownthrive-support" not in bridge, "active PentaVergence bridge must not target retired repository identity"
 
     reconciler = (ROOT / "scripts" / "penta_vergence_reconciler.py").read_text(encoding="utf-8").lower()
     assert "git push --force" not in reconciler
