@@ -35,9 +35,12 @@ on:
   schedule:
     - cron: '17 * * * *'
 
+# Default-deny privileged identity issuance. PR validation and ordinary provider
+# control-plane runs require repository read access only. If a future provider
+# requires GitHub OIDC, grant `id-token: write` on that specific non-PR job and
+# bind the provider trust policy to the exact repository/ref/environment.
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: penta-provider-control-plane-${{ github.ref }}
@@ -343,27 +346,4 @@ jobs:
           state = root / '.penta' / 'pentamail-provider-control'
           cert = mod.PentaCertify(registry, state).certify('resend', live_evidence=receipt['live_evidence'])
           nurture = mod.PentaNurture(registry, state).observe('resend')
-          gate = mod.ProductionGate(registry, state).decide('resend', 'email_send')
-          result = {
-              'certification': cert.state,
-              'certified_operations': cert.certified_operations,
-              'health': nurture.health,
-              'email_send_gate': gate,
-              'provider_message_id': receipt['provider_message_id'],
-              'lifecycle_state': receipt['lifecycle_state'],
-          }
-          print('PENTAMAIL_CERTIFICATION=' + json.dumps(result, sort_keys=True))
-          if cert.state != 'WRITE_VERIFIED' or not gate.get('eligible'):
-              raise SystemExit('email_send production operation did not reach exact-readback eligibility')
-          PY
-
-      - name: Publish PentaMail evidence summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo '## PentaMail Production Certification'
-            echo
-            echo 'Live send is governed by explicit D1 authority and exact provider readback.'
-            echo 'The provider receipt and certification disposition are printed in the job log.'
-          } >> "$GITHUB_STEP_SUMMARY"
+          gate = mod.ProductionGate(registry, state).decide('resend',
