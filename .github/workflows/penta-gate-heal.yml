@@ -1,0 +1,81 @@
+name: Penta Gate + Heal
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate-heal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: PentaGate scan
+        id: gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/penta_gate.py --root . --output "$RUNNER_TEMP/pentagate.json"
+
+      - name: PentaHeal bounded repair packet
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/penta_heal.py --root . --gate-report "$RUNNER_TEMP/pentagate.json" --output "$RUNNER_TEMP/pentaheal.json" || true
+
+      - name: Certify PentaGate and PentaHeal contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_penta_gate_heal tests.test_penta_lifecycle_proof -v
+
+      - name: Publish bounded evidence summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## PentaGate + PentaHeal'
+            echo
+            if [[ -f "$RUNNER_TEMP/pentagate.json" ]]; then
+              echo '### Gate receipt'
+              echo '```json'
+              cat "$RUNNER_TEMP/pentagate.json"
+              echo '```'
+            fi
+            if [[ -f "$RUNNER_TEMP/pentaheal.json" ]]; then
+              echo '### Heal packet'
+              echo '```json'
+              cat "$RUNNER_TEMP/pentaheal.json"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce PentaGate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, pathlib, sys
+          report = json.loads(pathlib.Path(os.environ['RUNNER_TEMP'], 'pentagate.json').read_text())
+          if report.get('status') != 'PASS':
+              print(json.dumps(report.get('findings', []), indent=2))
+              raise SystemExit(1)
+          print('PentaGate PASS')
+          PY
