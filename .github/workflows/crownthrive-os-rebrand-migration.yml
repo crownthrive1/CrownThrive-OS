@@ -1,0 +1,72 @@
+name: CrownThrive OS Repository Identity Migration
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crownthrive-os-rebrand-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate-live-references:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Rewrite legacy repository identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import re
+          import subprocess
+          from pathlib import Path
+
+          legacy = 'CrownThrive-' + 'Support'
+          pattern = re.compile(re.escape(legacy), re.IGNORECASE)
+          replacement = 'CrownThrive-OS'
+          tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0')
+          changed = []
+
+          for filename in tracked:
+              if not filename:
+                  continue
+              path = Path(filename)
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except (UnicodeDecodeError, OSError):
+                  continue
+              rewritten, count = pattern.subn(replacement, text)
+              if count:
+                  path.write_text(rewritten, encoding='utf-8')
+                  changed.append((filename, count))
+
+          if not changed:
+              print('No legacy repository identity remains in tracked UTF-8 text files.')
+              raise SystemExit(0)
+
+          print(f'Rewritten files: {len(changed)}')
+          print(f'Rewritten references: {sum(count for _, count in changed)}')
+          for filename, count in changed:
+              print(f'  {filename}: {count}')
+          PY
+
+          if git diff --quiet; then
+            echo "No migration commit required."
+            exit 0
+          fi
+
+          git config user.name "CrownThrive OS Automation"
+          git config user.email "contact@crownthrive.com"
+          git add -u
+          git commit -m "chore(os): migrate legacy repository identity to CrownThrive-OS"
+          git push origin HEAD:main
