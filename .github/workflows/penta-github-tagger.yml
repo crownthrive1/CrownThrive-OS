@@ -1,6 +1,8 @@
 name: PentaTagger GitHub Native
 
 on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft, closed]
   issues:
     types: [opened, reopened, edited, closed]
   schedule:
@@ -28,6 +30,10 @@ permissions:
   statuses: read
   actions: read
 
+concurrency:
+  group: penta-github-tagger-${{ github.repository }}-${{ github.event.pull_request.number || github.event.issue.number || 'sweep' }}
+  cancel-in-progress: true
+
 jobs:
   select:
     runs-on: ubuntu-latest
@@ -43,16 +49,26 @@ jobs:
           REQUESTED_NUMBER: ${{ github.event.inputs.number }}
           REQUESTED_KIND: ${{ github.event.inputs.kind }}
           EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == "issues" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
             mode=event
+            number="${EVENT_PR_NUMBER:-}"
+            kind=pr
+          elif [[ "$EVENT_NAME" == "issues" ]]; then
+            mode=event
+            number="${EVENT_ISSUE_NUMBER:-}"
+            kind=issue
           else
             mode="${REQUESTED_MODE:-sweep}"
+            number="${REQUESTED_NUMBER:-}"
+            kind="${REQUESTED_KIND:-all}"
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "number=${REQUESTED_NUMBER:-}" >> "$GITHUB_OUTPUT"
-          echo "kind=${REQUESTED_KIND:-all}" >> "$GITHUB_OUTPUT"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
 
   tagger:
     needs: select
