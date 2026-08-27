@@ -31,6 +31,35 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Bind convergence utility to governed security route
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/penta_wave3_gap_closure.py")
+          text = path.read_text(encoding="utf-8")
+          old_write = 'mesh = mesh.replace("../SECURITY.md", "/SECURITY").replace("/SECURITY.md", "/SECURITY")'
+          new_write = '''mesh = (
+              mesh.replace("../SECURITY.md", "/technology/security-privacy-continuity")
+              .replace("/SECURITY.md", "/technology/security-privacy-continuity")
+              .replace("/SECURITY", "/technology/security-privacy-continuity")
+          )'''
+          if old_write not in text:
+              raise SystemExit("expected security-route write transform was not found")
+          text = text.replace(old_write, new_write, 1)
+
+          old_check = '''if "../SECURITY.md" in mesh or "/SECURITY.md" in mesh:
+              raise GapClosureError("noncanonical security documentation link remains")'''
+          new_check = '''if any(value in mesh for value in ("../SECURITY.md", "/SECURITY.md", "/SECURITY")):
+              raise GapClosureError("noncanonical security documentation link remains")
+          if "/technology/security-privacy-continuity" not in mesh:
+              raise GapClosureError("governed security documentation route is missing")'''
+          if old_check not in text:
+              raise SystemExit("expected security-route check transform was not found")
+          text = text.replace(old_check, new_check, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
       - name: Produce bounded runtime and reconcile canonical state
         run: python scripts/penta_wave3_gap_closure.py --apply
 
@@ -39,6 +68,7 @@ jobs:
           python scripts/pentadocs_quality.py --apply
           python scripts/pentadocs_quality.py --check
           python scripts/penta_wave3_gap_closure.py --check
+          grep -F '/technology/security-privacy-continuity' virality-music/system-mesh.mdx >/dev/null
 
       - name: Compile repaired production software
         run: |
@@ -51,7 +81,7 @@ jobs:
             runtime/penta_immune.py \
             scripts/penta_wave3_gap_closure.py
 
-      - name: Validate repaired production contracts
+      - name: Validate repaired production contracts and governed links
         run: |
           python -m json.tool data/penta/family.registry.json >/dev/null
           python -m json.tool data/penta/institutional-services.registry.json >/dev/null
