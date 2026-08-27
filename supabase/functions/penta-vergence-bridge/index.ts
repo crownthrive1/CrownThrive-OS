@@ -5,7 +5,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 const ISSUER = "https://token.actions.githubusercontent.com";
 const AUDIENCE = "penta-vergence";
-const ALLOWED_REPOS = new Set(["crownthrive1/CrownThrive-Support", "crownthrive1/CrownThrive-CIE", "crownthrive1/chlom-protocol"]);
+const ALLOWED_REPOS = new Set(["crownthrive1/CrownThrive-OS", "crownthrive1/CrownThrive-CIE", "crownthrive1/chlom-protocol"]);
 const ALLOWED_EVENTS = new Set(["schedule", "workflow_dispatch", "push", "workflow_run"]);
 const JWKS = createRemoteJWKSet(new URL(`${ISSUER}/.well-known/jwks`));
 const SERVER = { name: "PentaVergence", version: "1.0.0", contract: "ct.penta.vergence.bridge.v1" };

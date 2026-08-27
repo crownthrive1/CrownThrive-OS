@@ -363,7 +363,7 @@ def main() -> int:
         return 0
 
     try:
-        branch = github_main(os.getenv("CT_REPOSITORY", "crownthrive1/CrownThrive-Support"), os.getenv("GITHUB_TOKEN"))
+        branch = github_main(os.getenv("CT_REPOSITORY", "crownthrive1/CrownThrive-OS"), os.getenv("GITHUB_TOKEN"))
     except Exception as exc:
         branch = {
             "protected": False,

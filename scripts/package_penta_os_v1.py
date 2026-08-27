@@ -91,7 +91,7 @@ EXPECTED_RELEASE_IDENTITY = {
     "lifecycle_intent": "publish_only_after_all_exact_head_and_provider_readback_gates_pass",
 }
 EXPECTED_RELEASE_SOURCE = {
-    "repository": "crownthrive1/CrownThrive-Support",
+    "repository": "crownthrive1/CrownThrive-OS",
     "exact_commit_sha_required": True,
     "registry_ref": "data/penta/os-v1.registry.json",
     "software_manifest_ref": "developers/manifests/penta-os-v1.v1.json",

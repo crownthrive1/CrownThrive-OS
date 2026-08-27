@@ -15,7 +15,7 @@ CrownThrive distinguishes five related states:
 4. **reserved human authority** — D3 actions require an authorized human/professional even when agent quorum passes;
 5. **post-promotion revalidation** — canonical state is independently rechecked for drift, bypass or regression.
 
-For `crownthrive1/CrownThrive-Support`, state 3 remains the sovereign decision authority. State 2 is now a **required defense-in-depth merge perimeter** for canonical `main`, not the authority root. State 5 remains required.
+For `crownthrive1/CrownThrive-OS`, state 3 remains the sovereign decision authority. State 2 is now a **required defense-in-depth merge perimeter** for canonical `main`, not the authority root. State 5 remains required.
 
 ## Automatic merge contract
 

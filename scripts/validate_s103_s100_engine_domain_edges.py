@@ -42,7 +42,7 @@ EXPECTED_IDS = [
     "ct.platform.thrivemaps",
     "ct.platform.collab-portal",
     "ct.platform.thrivesupport",
-    "ct.platform.crownthrive-support",
+    "ct.platform.CrownThrive-OS",
     "ct.platform.locticians",
     "ct.platform.thriveseat",
     "ct.platform.crownlytics",
@@ -70,7 +70,7 @@ EXPECTED = {
     "ct.platform.thrivemaps": ({"S103-PF-069"}, {"S100-PORT-015"}, {"S100-ENG-038"}, {"S100-DOM-009"}),
     "ct.platform.collab-portal": ({"S103-PF-007"}, {"S100-PORT-009"}, set(), {"S100-DOM-078"}),
     "ct.platform.thrivesupport": ({"S103-PF-065"}, {"S100-PORT-010"}, set(), set()),
-    "ct.platform.crownthrive-support": ({"S103-PF-065"}, {"S100-PORT-010"}, {"S100-ENG-043", "S100-ENG-044", "S100-ENG-045"}, {"S100-DOM-011"}),
+    "ct.platform.CrownThrive-OS": ({"S103-PF-065"}, {"S100-PORT-010"}, {"S100-ENG-043", "S100-ENG-044", "S100-ENG-045"}, {"S100-DOM-011"}),
     "ct.platform.locticians": ({"S103-PF-011"}, {"S100-PORT-037"}, set(), {"S100-DOM-063", "S100-DOM-064", "S100-DOM-073"}),
     "ct.platform.thriveseat": ({"S103-PF-021"}, {"S100-PORT-038"}, {"S100-ENG-031", "S100-ENG-032"}, {"S100-DOM-029"}),
     "ct.platform.crownlytics": ({"S103-PF-042"}, {"S100-PORT-012"}, {"S100-ENG-085"}, {"S100-DOM-058"}),
@@ -195,7 +195,7 @@ def main() -> int:
     support_family = record_by_id["ct.platform.thrivesupport"]
     if support_family.get("engine_rows") or support_family.get("domain_rows"):
         fail("ThriveSupport family must not inherit CrownThrive Support implementation edges")
-    support_projection = record_by_id["ct.platform.crownthrive-support"]
+    support_projection = record_by_id["ct.platform.CrownThrive-OS"]
     if set(support_projection.get("engine_rows", [])) != {"S100-ENG-043", "S100-ENG-044", "S100-ENG-045"}:
         fail("CrownThrive Support implementation engine set drifted")
     if set(support_projection.get("domain_rows", [])) != {"S100-DOM-011"}:

@@ -10,7 +10,7 @@ Human family titles exist to make the repository/dependency graph easier to unde
 
 | Human title | Machine role | Resource |
 | --- | --- | --- |
-| Father | `PARENT_AUTHORITY` | `ct.repo.crownthrive-support` |
+| Father | `PARENT_AUTHORITY` | `ct.repo.CrownThrive-OS` |
 | Mother | `NURTURE_GUARDIAN` | `ct.agent.repository-child-guardian-ad-litem` |
 
 The Father title reflects the existing canonical parent repository. The Mother title reflects the bounded nurture/continuity Guardian. Authority comes from the underlying repository and agent contracts, never the title.

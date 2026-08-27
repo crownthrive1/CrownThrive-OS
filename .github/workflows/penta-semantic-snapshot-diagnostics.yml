@@ -1,0 +1,66 @@
+name: Penta Semantic Snapshot Diagnostics
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "data/documentation/**"
+      - "scripts/substantive_rebuild_current_snapshot.py"
+      - "scripts/build_substantive_rebuild_wave*.py"
+      - ".github/workflows/penta-semantic-snapshot-diagnostics.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Build current semantic snapshot and drift summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python scripts/substantive_rebuild_current_snapshot.py --print > artifacts/substantive-rebuild-current-semantic-snapshot.v1.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          stored_path = Path("data/documentation/substantive-rebuild-current-semantic-snapshot.v1.json")
+          built_path = Path("artifacts/substantive-rebuild-current-semantic-snapshot.v1.json")
+          stored = json.loads(stored_path.read_text(encoding="utf-8"))
+          built = json.loads(built_path.read_text(encoding="utf-8"))
+          changed_top = sorted(key for key in set(stored) | set(built) if stored.get(key) != built.get(key))
+          wave_changes = {}
+          for wave in sorted(set(stored.get("current_waves", {})) | set(built.get("current_waves", {})), key=int):
+              before = stored.get("current_waves", {}).get(wave, {})
+              after = built.get("current_waves", {}).get(wave, {})
+              changed = sorted(key for key in set(before) | set(after) if before.get(key) != after.get(key))
+              if changed:
+                  wave_changes[wave] = {
+                      "changed_keys": changed,
+                      "before_wave_sha256": before.get("wave_sha256"),
+                      "after_wave_sha256": after.get("wave_sha256"),
+                  }
+          print(json.dumps({
+              "schema": "ct.docs.semantic-snapshot-diagnostics/v1",
+              "status": "PASS" if stored == built else "DRIFT",
+              "changed_top_level_keys": changed_top,
+              "wave_changes": wave_changes,
+              "stored_snapshot_sha256": stored.get("snapshot_sha256"),
+              "built_snapshot_sha256": built.get("snapshot_sha256"),
+          }, indent=2, sort_keys=True))
+          PY
+      - name: Upload generated snapshot evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-semantic-snapshot-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/substantive-rebuild-current-semantic-snapshot.v1.json
+          if-no-files-found: error
+          retention-days: 7

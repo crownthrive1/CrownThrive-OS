@@ -21,7 +21,7 @@ from penta_github_labels import LABEL_SPECS  # noqa: E402
 
 class FakeGH:
     def __init__(self, *, issue, pr=None, files=None):
-        self.repo = "crownthrive1/CrownThrive-Support"
+        self.repo = "crownthrive1/CrownThrive-OS"
         self.issue = issue
         self.pr = pr
         self.files = files or []

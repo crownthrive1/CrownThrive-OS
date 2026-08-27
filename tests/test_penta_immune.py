@@ -37,7 +37,7 @@ def candidate(
         blast_radius=blast_radius,
         rollback={"method": "git_revert", "scope": "candidate commit"},
         fallback={"method": "hold", "redundancy": "known-good-main"},
-        metadata={"repo": "crownthrive1/CrownThrive-Support"},
+        metadata={"repo": "crownthrive1/CrownThrive-OS"},
     )
 
 
