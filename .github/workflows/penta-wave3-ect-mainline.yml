@@ -86,12 +86,13 @@ jobs:
           git checkout -B penta-wave3-ect-integration origin/main
           git clean -fdx
 
-      - name: Additively integrate Wave 3 and reconcile promotion regressions
+      - name: Additively integrate Wave 3 and reconcile production contracts
         env:
           OLD_HEAD: "105460c828e8baf0d034d43689b278b47d2f9833"
         run: |
           python /tmp/penta_wave3_mainline_integrate.py
           python - <<'PY'
+          import json
           from pathlib import Path
 
           family_path = Path("tests/test_penta_family.py")
@@ -131,6 +132,40 @@ jobs:
               elif new not in exec_text:
                   raise SystemExit(f"context contract assertion was not found: {old}")
           exec_path.write_text(exec_text, encoding="utf-8")
+
+          context_path = Path("data/penta/systems.extensions.context.json")
+          context_catalog = json.loads(context_path.read_text(encoding="utf-8"))
+          context_systems = context_catalog.get("systems")
+          if not isinstance(context_systems, list) or len(context_systems) != 1:
+              raise SystemExit("PentaContext catalog must contain exactly one system")
+          context_system = context_systems[0]
+          context_system["axis"] = "truth"
+          context_system["purpose"] = "Provide scoped, provenance-aware, redacted operational-memory and bounded context retrieval across approved CrownThrive systems without manufacturing permissions or execution authority."
+          context_path.write_text(json.dumps(context_catalog, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+          os_test_path = Path("tests/test_penta_os_v1.py")
+          os_test = os_test_path.read_text(encoding="utf-8")
+          os_replacements = {
+              'self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 15)':
+                  'self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 16)',
+              '            "implemented": 40,': '            "implemented": 39,',
+              '            "production": 15,': '            "production": 16,',
+              'self.assertEqual(counts["dependency_assessed_members"], 70)':
+                  'self.assertEqual(counts["dependency_assessed_members"], 71)',
+              'self.assertEqual(counts["dependency_unassessed_members"], 144)':
+                  'self.assertEqual(counts["dependency_unassessed_members"], 143)',
+              '            "HOLD_DEPENDENCY_INVENTORY_UNASSESSED": 144,':
+                  '            "HOLD_DEPENDENCY_INVENTORY_UNASSESSED": 143,',
+              '            "HOLD_DEPENDENCY_MATURITY": 8,':
+                  '            "HOLD_DEPENDENCY_MATURITY": 9,',
+              '("truth", "implemented", "D2")': '("truth", "production", "D2")',
+          }
+          for old, new in os_replacements.items():
+              if old in os_test:
+                  os_test = os_test.replace(old, new, 1)
+              elif new not in os_test:
+                  raise SystemExit(f"PentaOS production-context expectation was not found: {old}")
+          os_test_path.write_text(os_test, encoding="utf-8")
           PY
 
       - name: Regenerate and validate canonical projections
