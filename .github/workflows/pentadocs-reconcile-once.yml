@@ -67,23 +67,26 @@ jobs:
       - name: Apply deterministic PentaDocs migration
         run: python scripts/pentadocs_quality.py --apply
 
-      - name: Verify family census and PentaDocs quality
-        run: |
-          python -m unittest -v tests.test_penta_convergence_certifier
-          python -m unittest -v tests.test_pentadocs_quality
-          python scripts/pentadocs_quality.py --check
-          python scripts/validate_docs.py
-
-      - name: Commit exact generated corpus
+      - name: Commit exact generated corpus before evaluation
+        id: commit
         run: |
           git config user.name "PentaDocs Reconciler"
           git config user.email "contact@crownthrive.com"
           git add -A
           git reset .github/workflows/pentadocs-reconcile-once.yml
           if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No generated changes required."
             exit 0
           fi
           git diff --cached --check
           git commit -m "fix: reconcile Penta Family census and PentaDocs profiles [pentadocs-generated]"
           git push origin HEAD:pentarelease/penta-family-production-suite-1.2.0
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Verify exact generated family census and PentaDocs corpus
+        run: |
+          python -m unittest -v tests.test_penta_convergence_certifier
+          python -m unittest -v tests.test_pentadocs_quality
+          python scripts/pentadocs_quality.py --check
+          python scripts/validate_docs.py
