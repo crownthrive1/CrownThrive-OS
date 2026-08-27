@@ -17,7 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Enforce CrownThrive OS identity
         shell: bash
@@ -40,11 +42,16 @@ jobs:
           if identity.get('canonical_url') != expected_url:
               raise SystemExit(f'Canonical URL mismatch: expected {expected_url}')
 
+          # Enforce live operational identity without falsifying historical records.
+          # Changelogs, archives, release evidence and migration records may retain
+          # former repository names as provenance. Live routing/control surfaces may not.
           legacy_slug = 'CrownThrive-' + 'Support'
           tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0')
           hits = []
           for filename in tracked:
               if not filename or filename == '.github/workflows/crownthrive-os-identity-guard.yml':
+                  continue
+              if not (filename.startswith('.github/') or filename.startswith('.crownthrive/')):
                   continue
               path = Path(filename)
               try:
@@ -56,11 +63,11 @@ jobs:
                   hits.append((filename, lines[:20]))
 
           if hits:
-              print('Legacy CrownThrive repository identity detected:')
+              print('Legacy repository identity detected in live control surfaces:')
               for filename, lines in hits:
                   print(f'  {filename}: lines {lines}')
-              print(f'Replace live references with {expected_url}')
+              print(f'Route live control references through {expected_url}; preserve history only in archival/evidence surfaces.')
               raise SystemExit(1)
 
-          print(f'Canonical CrownThrive OS identity verified: {expected_url}')
+          print(f'Canonical CrownThrive OS live-control identity verified: {expected_url}')
           PY
