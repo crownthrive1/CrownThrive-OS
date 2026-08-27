@@ -47,6 +47,8 @@ Because its stacked Phase-B/Phase-C ancestry was not accepted into current `main
 
 Historical Wallet test success remains test evidence, not production activation.
 
+The Phase-3 successor for this lineage is the private `chlom-wallet-continuity` control plane (PR #476). The safe Edge implementation is preserved under current Penta ownership; the eight continuity operations are service-role-only, the legacy `chlom_wallet` schema and hourly continuity job remain live shared infrastructure, and Phase-E suites and Gen6 bindings remain dated `CONTROLLED_TEST` lineage. Historical Phase-E SQL is not replayed.
+
 ## Offer/scheduler remediation lineage
 
 Old PR #220 correctly removed unsupported public economic/admin claims and precise private scheduler detail from an older offer packet. That principle is now generalized by Phase-3 contribution/claims rules and PentaGreen/PentaTime authority separation. Old offer economics or “for life” customer language must not be revived without current effective evidence.

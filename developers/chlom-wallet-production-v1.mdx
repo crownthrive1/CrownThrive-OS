@@ -29,6 +29,10 @@ content_state: "unresolved"
 
 ## CHLOM Wallet Production Contract v1
 
+<Warning>
+  **Current-state overlay:** CrownThrive is operating in **Phase 3 — Execute**. Wallet continuity stewardship now resolves through Penta owners (PentaNurture, PentaStatus, PentaCredentials, PentaCertify). Historical Wallet Phase-E suites and Gen6 agent bindings are dated `CONTROLLED_TEST` lineage, not current operating authority. See [Wallet continuity control plane](#wallet-continuity-control-plane-phase-3) below and the [continuity threat model](/security/chlom-wallet-continuity-penta-v2-threat-model).
+</Warning>
+
 **Effective:** August 23, 2026  
 **Wallet:** `ct.wallet.system.chlom-wallet-os`  
 **Runtime:** Production / active  
@@ -76,6 +80,69 @@ Canonical MCP operations include:
 - `chlom_wallet.status`
 - `chlom_wallet.stablecoin.status`
 - `chlom_wallet.provider_receipts.read`
+
+## Wallet continuity control plane (Phase 3)
+
+CHLOM Wallet continuity is a separate, production-available **private** control plane over the shared `chlom_wallet` continuity substrate. It observes continuity health, evaluates evidence freshness, records read-only oracle observations, and produces plan-only recovery output. It never moves money, writes providers, grants rights, broadcasts chain actions, or executes destructive recovery.
+
+Use it for server-to-server operational tooling that needs continuity status, evidence freshness checks, or reversible recovery planning. Do not use it from browsers, public clients, or any integration that cannot hold server-side credentials.
+
+### Access model
+
+The provider binding is the Supabase Edge Function `chlom-wallet-continuity` (`ACTIVE`, `verify_jwt=true`). The function additionally requires equality with the runtime service-role credential. Requests without the service-role credential receive `403` with `forbidden_service_role_required`.
+
+The function exposes three surfaces:
+
+- `GET /health` — bounded service and boundary state.
+- `POST /mcp` — JSON-RPC MCP endpoint (protocol version `2026-07-28`).
+- `/api/*` — HTTP routes mapped one-to-one onto the MCP tools.
+
+### Continuity MCP tools
+
+Eight service-role-only operations are bound for server-to-server use:
+
+| Tool | Purpose | Risk class |
+| --- | --- | --- |
+| `chlom_wallet_continuity_status_v1` | Read exact-head continuity status | D0 |
+| `chlom_wallet_continuity_assets_v1` | List sanitized continuity factory projections | D0 |
+| `chlom_wallet_continuity_dependencies_v1` | Read the continuity dependency graph | D0 |
+| `chlom_wallet_continuity_expiry_evaluate_v1` | Evaluate evidence freshness; stale evidence downgrades to HOLD | D1 |
+| `chlom_wallet_continuity_oracle_observe_v1` | Record a sanitized read-only oracle observation | D1 |
+| `chlom_wallet_continuity_recovery_plan_v1` | Create a reversible, non-destructive recovery plan | D2 |
+| `chlom_wallet_continuity_truth_snapshot_v1` | Run the fail-closed continuity tick and append a truth snapshot | D1 |
+| `chlom_wallet_continuity_factory_projection_v1` | Read the deterministic factory projection summary | D1 |
+
+Fresh evidence resolves to `ECAC`. Stale or invalid evidence resolves to `HOLD`. Explicit forbidden boundaries resolve to `DENY`. Recovery output is plan eligibility only; `execution_authorized` and `automatic_destructive_action` remain `false`.
+
+Example server-to-server call:
+
+```bash
+curl -X POST "https://<project-ref>.supabase.co/functions/v1/chlom-wallet-continuity/mcp" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -H "MCP-Protocol-Version: 2026-07-28" \
+  -H "Mcp-Method: tools/call" \
+  -H "Mcp-Name: chlom_wallet_continuity_status_v1" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"chlom_wallet_continuity_status_v1","arguments":{}}}'
+```
+
+The service-role credential is server-side infrastructure. Never embed it in browser code, return it in responses, or expose it through MCP content.
+
+### Shared substrate and historical lineage
+
+The legacy `chlom_wallet` continuity schema remains live shared infrastructure, and the hourly job `chlom-wallet-continuity-controlled-test-hourly-v1` (schedule `17 * * * *`) remains active. Service availability does not convert the continuity suite into production authority; the suite remains `CONTROLLED_TEST`.
+
+Historical Wallet Phase-E 600-asset/48-component suites and Gen6 agent bindings are preserved as dated `CONTROLLED_TEST` lineage. They are not current authority and their SQL is never replayed over the shared substrate without a new, explicit migration and independent certification.
+
+### Penta ownership
+
+- PentaNurture — continuity maintenance, drift, and recovery-plan stewardship.
+- PentaStatus — fresh runtime readback and status projection.
+- PentaCredentials — credential and server-binding health.
+- PentaCertify — exact-operation certification evidence.
+- PentaFactory / PentaBuild — software, adapters, and candidate projections.
+- PentaTriage — incident routing.
+- CHLOM — authority and governance boundary.
 
 ## Hard boundaries
 
