@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Reconcile family catalog and unlisted page disposition
+      - name: Reconcile family catalog, unlisted disposition, and root-relative links
         run: |
           python - <<'PY'
           import json
@@ -62,6 +62,11 @@ jobs:
               bucket.sort()
           disposition['effective_date'] = '2026-08-27'
           disposition_path.write_text(json.dumps(disposition, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          mesh_path = Path('virality-music/system-mesh.mdx')
+          mesh = mesh_path.read_text(encoding='utf-8')
+          mesh = mesh.replace('(../SECURITY.md)', '(/SECURITY.md)')
+          mesh_path.write_text(mesh, encoding='utf-8')
           PY
 
       - name: Apply deterministic PentaDocs migration and capture complete output
@@ -69,6 +74,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p evidence
+          rm -f evidence/pentadocs-apply-diagnostic.txt
           set +e
           python scripts/pentadocs_quality.py --apply > evidence/pentadocs-apply-diagnostic.txt 2>&1
           rc=$?
@@ -89,7 +95,7 @@ jobs:
             exit 0
           fi
           git diff --cached --check
-          git commit -m "fix: persist PentaDocs reconciliation output [pentadocs-generated]"
+          git commit -m "fix: complete PentaDocs reconciliation [pentadocs-generated]"
           git push origin HEAD:pentarelease/penta-family-production-suite-1.2.0
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
