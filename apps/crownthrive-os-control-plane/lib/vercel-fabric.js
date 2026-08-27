@@ -18,7 +18,9 @@ export const PROJECT_BINDINGS = Object.freeze([
     service: 'private-penta-os',
     project_id: 'prj_bokKbkKjxSq4jKYRtBjxhwEE4xbS',
     repository: 'crownthrive1/PRIVATE-PentaOS',
-    health_url: process.env.PRIVATE_PENTA_OS_HEALTH_URL || 'https://private-penta-os.vercel.app/health',
+    health_url:
+      process.env.PRIVATE_PENTA_OS_HEALTH_URL ||
+      'https://private-penta-os.vercel.app/health',
     visibility: 'private',
     required: true,
     lanes: ['control_plane'],
@@ -28,7 +30,9 @@ export const PROJECT_BINDINGS = Object.freeze([
     service: 'private-penta-execution',
     project_id: 'prj_d1uyuhNZHXfANgZv9zTEiaIlcZer',
     repository: 'crownthrive1/PRIVATE-PentaExecution',
-    health_url: process.env.PRIVATE_PENTA_EXECUTION_HEALTH_URL || 'https://private-penta-execution.vercel.app/health',
+    health_url:
+      process.env.PRIVATE_PENTA_EXECUTION_HEALTH_URL ||
+      'https://private-penta-execution.vercel.app/health',
     visibility: 'private',
     required: true,
     lanes: ['platform_api', 'control_plane'],
@@ -38,7 +42,9 @@ export const PROJECT_BINDINGS = Object.freeze([
     service: 'chlom-protocol',
     project_id: 'prj_HewLgMjUiVBNCl0FADFbSggSp2QN',
     repository: 'crownthrive1/chlom-protocol',
-    health_url: process.env.CHLOM_PROTOCOL_HEALTH_URL || 'https://chlom-protocol.vercel.app/health',
+    health_url:
+      process.env.CHLOM_PROTOCOL_HEALTH_URL ||
+      'https://chlom-protocol.vercel.app/health',
     visibility: 'public',
     required: true,
     lanes: ['platform_api', 'control_plane'],
@@ -49,13 +55,15 @@ export const FABRIC_LANES = Object.freeze([
   {
     id: 'public_experience',
     name: 'Public Experience',
-    function: 'Production UI, public-safe operating status, and future CrownThrive experience deployments.',
+    function:
+      'Production UI, public-safe operating status, and future CrownThrive experience deployments.',
     current_projects: ['prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN'],
   },
   {
     id: 'platform_api',
     name: 'Platform / API',
-    function: 'Health, Penta transport, provider readback, MCP, integration, and bounded execution endpoints.',
+    function:
+      'Health, Penta transport, provider readback, MCP, integration, and bounded execution endpoints.',
     current_projects: [
       'prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN',
       'prj_d1uyuhNZHXfANgZv9zTEiaIlcZer',
@@ -65,7 +73,8 @@ export const FABRIC_LANES = Object.freeze([
   {
     id: 'control_plane',
     name: 'Control Plane',
-    function: 'PentaRG, PentaVercel, PentaOS, PentaExecution, CHLOM authority, release evidence, and recovery.',
+    function:
+      'PentaRG, PentaVercel, PentaOS, PentaExecution, CHLOM authority, release evidence, and recovery.',
     current_projects: PROJECT_BINDINGS.map((project) => project.project_id),
   },
 ]);
@@ -89,16 +98,22 @@ function safeHealthProjection(payload = {}) {
     service: payload.service || null,
     role: payload.role || null,
     status: payload.status || 'UNKNOWN',
+    operating_mode: payload.operating_mode || null,
+    readiness_status: payload.readiness_status || null,
+    capability_states: payload.capability_states || null,
     release: payload.release || 'unknown',
     environment: payload.environment || null,
-    provider_state: payload.provider_state || payload.vercel_provider_state || 'UNKNOWN',
+    provider_state:
+      payload.provider_state || payload.vercel_provider_state || 'UNKNOWN',
     provider_readback: payload.provider_readback === true,
     write_state: payload.write_state || null,
     project_id: payload.project_id || null,
     repository: payload.repository || null,
     build_sha: payload.build_sha || null,
     deployment_id: payload.deployment_id || null,
-    capabilities: Array.isArray(payload.capabilities) ? payload.capabilities : [],
+    capabilities: Array.isArray(payload.capabilities)
+      ? payload.capabilities
+      : [],
     pass_manufactured: payload.pass_manufactured === true,
   };
 }
@@ -113,9 +128,13 @@ function localProjectState() {
     status: 'OPERATIONAL',
     release: environment === 'production' ? 'production' : 'candidate',
     environment,
-    provider_state: providerReadback ? `BOUND_${environment.toUpperCase()}` : 'BINDING_REQUIRED',
+    provider_state: providerReadback
+      ? `BOUND_${environment.toUpperCase()}`
+      : 'BINDING_REQUIRED',
     provider_readback: providerReadback,
-    write_state: process.env.VERCEL_AUTOMATION_TOKEN ? 'BOUND_GOVERNED' : 'GATED_CREDENTIAL_REQUIRED',
+    write_state: process.env.VERCEL_AUTOMATION_TOKEN
+      ? 'BOUND_GOVERNED'
+      : 'GATED_CREDENTIAL_REQUIRED',
     project_id: 'prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN',
     repository: 'crownthrive1/CrownThrive-OS',
     build_sha: process.env.VERCEL_GIT_COMMIT_SHA || 'local-candidate',
@@ -149,7 +168,10 @@ async function probeProject(binding, timeoutMs) {
     const contentType = response.headers.get('content-type') || '';
     const payload = contentType.includes('application/json')
       ? await response.json()
-      : { status: 'INVALID_RESPONSE', detail: (await response.text()).slice(0, 160) };
+      : {
+          status: 'INVALID_RESPONSE',
+          detail: (await response.text()).slice(0, 160),
+        };
     const health = safeHealthProjection(payload);
     const pass =
       response.ok &&
@@ -176,7 +198,10 @@ async function probeProject(binding, timeoutMs) {
       http_status: null,
       latency_ms: Date.now() - startedAt,
       health: null,
-      error: error?.name === 'AbortError' ? 'provider_readback_timeout' : 'provider_readback_failure',
+      error:
+        error?.name === 'AbortError'
+          ? 'provider_readback_timeout'
+          : 'provider_readback_failure',
     };
   } finally {
     clearTimeout(timer);
@@ -192,7 +217,10 @@ function projectPass(project) {
   );
 }
 
-export async function collectVercelFabric({ timeoutMs = 3500 } = {}) {
+export async function collectVercelFabric({
+  timeoutMs = 3500,
+  oidcTokenBound = false,
+} = {}) {
   const selfBinding = PROJECT_BINDINGS[0];
   const selfHealth = safeHealthProjection(localProjectState());
   const selfProject = {
@@ -212,18 +240,28 @@ export async function collectVercelFabric({ timeoutMs = 3500 } = {}) {
   };
 
   const external = await Promise.all(
-    PROJECT_BINDINGS.slice(1).map((binding) => probeProject(binding, timeoutMs)),
+    PROJECT_BINDINGS.slice(1).map((binding) =>
+      probeProject(binding, timeoutMs),
+    ),
   );
   const projects = [selfProject, ...external];
   const requiredProjects = projects.filter((project) => project.required);
   const operationalProjects = requiredProjects.filter(projectPass);
-  const operational = operationalProjects.length === requiredProjects.length;
+  const operational =
+    operationalProjects.length === requiredProjects.length;
   const environment = process.env.VERCEL_ENV || 'local';
   const writeBound = Boolean(process.env.VERCEL_AUTOMATION_TOKEN);
-  const evidenceSinkBound = Boolean(
-    (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+  const serviceRoleBound = Boolean(
+    (process.env.SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL) &&
       process.env.SUPABASE_SERVICE_ROLE_KEY,
   );
+  const evidenceSinkBound = serviceRoleBound || oidcTokenBound;
+  const evidenceSinkMode = serviceRoleBound
+    ? 'SERVICE_ROLE'
+    : oidcTokenBound
+      ? 'VERCEL_OIDC_RS256'
+      : 'UNBOUND';
 
   const receiptSubject = {
     schema: 'ct.penta.vercel.execution-fabric.receipt-subject.v1',
@@ -238,14 +276,19 @@ export async function collectVercelFabric({ timeoutMs = 3500 } = {}) {
       provider_state: project.health?.provider_state || null,
     })),
   };
-  const digest = createHash('sha256').update(stableStringify(receiptSubject)).digest('hex');
+  const digest = createHash('sha256')
+    .update(stableStringify(receiptSubject))
+    .digest('hex');
 
   return {
     schema: 'ct.penta.vercel.execution-fabric.20260827.v1',
-    version: '1.0.0',
+    version: '1.0.1',
     service: 'crownthrive-vercel-execution-fabric',
     status: operational ? 'OPERATIONAL' : 'DEGRADED',
-    release: environment === 'production' && operational ? 'production' : 'candidate',
+    release:
+      environment === 'production' && operational
+        ? 'production'
+        : 'candidate',
     environment,
     provider: 'vercel',
     team_id: VERCEL_TEAM_ID,
@@ -258,6 +301,7 @@ export async function collectVercelFabric({ timeoutMs = 3500 } = {}) {
       health: '/api/health',
       fabric: '/api/fabric',
       mcp: '/api/mcp',
+      mcp_self_test: '/api/mcp?selftest=1',
       pentafabric: '/api/penta',
       pentafabric_health: '/pentafabric/health',
     },
@@ -274,10 +318,18 @@ export async function collectVercelFabric({ timeoutMs = 3500 } = {}) {
       preview_deployments: 'BOUND',
       production_readback: operational ? 'BOUND' : 'DEGRADED',
       build_and_runtime_logs: 'BOUND_VIA_PROVIDER_CONNECTOR',
-      direct_project_mutation: writeBound ? 'BOUND_GOVERNED' : 'GATED_CREDENTIAL_REQUIRED',
-      environment_mutation: writeBound ? 'BOUND_GOVERNED' : 'GATED_CREDENTIAL_REQUIRED',
-      domain_mutation: writeBound ? 'BOUND_GOVERNED' : 'GATED_CREDENTIAL_REQUIRED',
-      promote_and_rollback: writeBound ? 'BOUND_GOVERNED' : 'GATED_CREDENTIAL_REQUIRED',
+      direct_project_mutation: writeBound
+        ? 'BOUND_GOVERNED'
+        : 'GATED_CREDENTIAL_REQUIRED',
+      environment_mutation: writeBound
+        ? 'BOUND_GOVERNED'
+        : 'GATED_CREDENTIAL_REQUIRED',
+      domain_mutation: writeBound
+        ? 'BOUND_GOVERNED'
+        : 'GATED_CREDENTIAL_REQUIRED',
+      promote_and_rollback: writeBound
+        ? 'BOUND_GOVERNED'
+        : 'GATED_CREDENTIAL_REQUIRED',
     },
     evidence: {
       event_contract: 'crownthrive.penta.event.v1',
@@ -287,7 +339,10 @@ export async function collectVercelFabric({ timeoutMs = 3500 } = {}) {
       provider_readback: operational,
       sink: 'supabase:pentafabric_events',
       sink_bound: evidenceSinkBound,
-      persistence_state: evidenceSinkBound ? 'AVAILABLE_THROUGH_PENTAFABRIC' : 'GATED_SINK_BINDING_REQUIRED',
+      sink_mode: evidenceSinkMode,
+      persistence_state: evidenceSinkBound
+        ? 'AVAILABLE_THROUGH_PENTAFABRIC'
+        : 'GATED_SINK_BINDING_REQUIRED',
     },
     governance: {
       authority: 'CHLOM + PentaRG + PentaRelease',
