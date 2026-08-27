@@ -63,36 +63,36 @@ class PentaOSV15Tests(unittest.TestCase):
         with self.assertRaisesRegex(builder.PentaOSBuildError, "invalid machine key"):
             builder.merge_rows([invalid], [])
 
-    def test_complete_212_member_census_preserves_maturity(self):
+    def test_complete_214_member_census_preserves_maturity(self):
         rows = self.registry["systems"]
-        self.assertEqual(len(rows), 212)
+        self.assertEqual(len(rows), 214)
         self.assertEqual(len(rows), len({row["machine_key"] for row in rows}))
         self.assertEqual(len(rows), len({row["canonical_name"] for row in rows}))
         self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 15)
         self.assertEqual(self.registry["counts"]["by_maturity"], {
-            "implemented": 38,
+            "implemented": 40,
             "production": 15,
             "specified": 159,
         })
-        self.assertEqual(self.registry["counts"]["systems"], 156)
+        self.assertEqual(self.registry["counts"]["systems"], 158)
         self.assertEqual(self.registry["counts"]["layers"], 4)
 
     def test_dependency_census_is_exact(self):
         counts = self.registry["counts"]
         graph = self.registry["dependency_graph"]
-        self.assertEqual(counts["dependency_assessed_members"], 68)
+        self.assertEqual(counts["dependency_assessed_members"], 70)
         self.assertEqual(counts["dependency_unassessed_members"], 144)
-        self.assertEqual(counts["members_with_declared_edges"], 67)
-        self.assertEqual(counts["penta_dependency_edges"], 249)
+        self.assertEqual(counts["members_with_declared_edges"], 69)
+        self.assertEqual(counts["penta_dependency_edges"], 258)
         self.assertEqual(counts["external_dependency_edges"], 6)
         self.assertEqual(counts["unresolved_penta_dependencies"], 0)
         self.assertEqual(graph["external_refs"], ["chlom", "cie", "crownlytics", "crownpulse"])
         self.assertEqual(graph["cyclic_scc_count"], 10)
         self.assertEqual(graph["cyclic_member_count"], 30)
         self.assertEqual(graph["cyclic_internal_edge_count"], 44)
-        self.assertEqual(graph["condensed_component_count"], 192)
-        self.assertEqual(graph["condensed_edge_count"], 173)
-        self.assertEqual(graph["transitive_membership_count"], 1006)
+        self.assertEqual(graph["condensed_component_count"], 194)
+        self.assertEqual(graph["condensed_edge_count"], 182)
+        self.assertEqual(graph["transitive_membership_count"], 1080)
         self.assertEqual(graph["maximum_transitive_closure"], 40)
 
     def test_strict_readiness_partition_is_exact_and_diagnostic(self):
@@ -100,13 +100,13 @@ class PentaOSV15Tests(unittest.TestCase):
             "HOLD_DEPENDENCY_INVENTORY_UNASSESSED": 144,
             "HOLD_EXTERNAL_DEPENDENCY_UNBOUND": 2,
             "HOLD_UNCLASSIFIED_DEPENDENCY_CYCLE": 30,
-            "HOLD_MEMBER_MATURITY": 28,
+            "HOLD_MEMBER_MATURITY": 30,
             "HOLD_DEPENDENCY_MATURITY": 8,
             "READY": 0,
         }
         self.assertEqual(self.registry["dependency_graph"]["readiness_partition"], expected)
         self.assertTrue(self.registry["dependency_graph"]["strict_readiness_is_diagnostic"])
-        self.assertEqual(sum(expected.values()), 212)
+        self.assertEqual(sum(expected.values()), 214)
 
     def test_transitive_closure_and_scc_are_deterministic(self):
         first = builder.build_registry(ROOT)
@@ -153,6 +153,8 @@ class PentaOSV15Tests(unittest.TestCase):
         self.assertEqual(self.runtime.resolve("PentaLoadBalancer")["machine_key"], "penta.balancer")
         self.assertEqual(self.runtime.resolve("Penta Evidence Builder")["machine_key"], "penta.evi-builder")
         self.assertEqual(self.runtime.resolve("Penta Immune System")["machine_key"], "penta.immune")
+        self.assertEqual(self.runtime.resolve("Penta Gate")["machine_key"], "penta.gate")
+        self.assertEqual(self.runtime.resolve("Penta Heal")["machine_key"], "penta.heal")
         description = self.runtime.describe("PentaMail")
         self.assertEqual(description["member"]["machine_key"], "penta.mail")
         self.assertFalse(description["side_effect_performed"])
@@ -171,6 +173,8 @@ class PentaOSV15Tests(unittest.TestCase):
         self.assertEqual(self.runtime.resolve("penta.results")["risk_ceiling"], "D2")
         self.assertEqual(self.runtime.resolve("penta.evi-builder")["axis"], "truth")
         self.assertEqual(self.runtime.resolve("penta.immune")["axis"], "continuity")
+        self.assertEqual((self.runtime.resolve("penta.gate")["axis"], self.runtime.resolve("penta.gate")["maturity"]), ("truth", "implemented"))
+        self.assertEqual((self.runtime.resolve("penta.heal")["axis"], self.runtime.resolve("penta.heal")["maturity"]), ("continuity", "implemented"))
         for key in ("penta.balancer", "penta.body", "penta.brain", "penta.costs", "penta.load", "penta.nerves", "penta.spine"):
             self.assertEqual(self.runtime.resolve(key)["maturity"], "implemented")
             self.assertIn("penta/organic/body.py", self.runtime.resolve(key)["evidence_paths"])
@@ -182,6 +186,10 @@ class PentaOSV15Tests(unittest.TestCase):
         specified = self.runtime.gate_dispatch(self.request("PentaRunners", "inspect", authority_trace="A0:test-authority"))
         self.assertFalse(specified["eligible"])
         self.assertIn("not execution eligible", " ".join(specified["reasons"]))
+        for member in ("penta.gate", "penta.heal"):
+            implemented = self.runtime.gate_dispatch(self.request(member, "inspect", authority_trace="A0:test-authority"))
+            self.assertFalse(implemented["eligible"])
+            self.assertIn("not execution eligible", " ".join(implemented["reasons"]))
 
     def test_unknown_operation_fails_closed_even_for_production_member(self):
         gate = self.runtime.gate_dispatch(self.request(operation="run"))

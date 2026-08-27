@@ -1,0 +1,139 @@
+name: Penta Gate + Heal
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate-heal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: PentaGate Actions runtime and supply-chain scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/validate_github_actions_runtime_policy.py
+
+      - name: PentaGate scan
+        id: gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/penta_gate.py --root . --output "$RUNNER_TEMP/pentagate.json"
+
+      - name: PentaHeal bounded repair packet
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/penta_heal.py --root . --gate-report "$RUNNER_TEMP/pentagate.json" --output "$RUNNER_TEMP/pentaheal.json" || true
+
+      - name: Certify PentaGate, PentaHeal, and PentaPR lifecycle contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest \
+            tests.test_penta_gate_heal \
+            tests.test_penta_lifecycle_proof \
+            tests.test_penta_pr_lifecycle \
+            tests.test_penta_pr_self_pending \
+            -v
+
+      - name: PentaHeal deterministic generated-state preview
+        id: generated
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/pentaheal-generated"
+          mkdir -p "$out/data/penta" "$out/automation"
+          python scripts/build_penta_os_v1.py --write
+          cp data/penta/os-v1.registry.json "$out/data/penta/os-v1.registry.json"
+          cp automation/penta-os-v1.mdx "$out/automation/penta-os-v1.mdx"
+          git diff --name-only -- data/penta/os-v1.registry.json automation/penta-os-v1.mdx > "$out/changed-files.txt"
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'pentaheal-generated'
+          registry = json.loads((root / 'data/penta/os-v1.registry.json').read_text())
+          report = {
+              'schema': 'ct.penta.heal-generated-preview.20260826.v1',
+              'source_head': os.environ.get('GITHUB_SHA'),
+              'mutation_scope': 'ephemeral_ci_workspace_only',
+              'repository_write_authority': False,
+              'generated_files': {
+                  'data/penta/os-v1.registry.json': hashlib.sha256((root / 'data/penta/os-v1.registry.json').read_bytes()).hexdigest(),
+                  'automation/penta-os-v1.mdx': hashlib.sha256((root / 'automation/penta-os-v1.mdx').read_bytes()).hexdigest(),
+              },
+              'counts': registry['counts'],
+              'readiness_partition': registry['dependency_graph']['readiness_partition'],
+              'registry_sha256': registry['registry_sha256'],
+          }
+          (root / 'preview-report.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload PentaHeal generated-state evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pentaheal-generated-${{ github.sha }}
+          path: ${{ runner.temp }}/pentaheal-generated
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish bounded evidence summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## PentaGate + PentaHeal'
+            echo
+            if [[ -f "$RUNNER_TEMP/pentagate.json" ]]; then
+              echo '### Gate receipt'
+              echo '```json'
+              cat "$RUNNER_TEMP/pentagate.json"
+              echo '```'
+            fi
+            if [[ -f "$RUNNER_TEMP/pentaheal.json" ]]; then
+              echo '### Heal packet'
+              echo '```json'
+              cat "$RUNNER_TEMP/pentaheal.json"
+              echo '```'
+            fi
+            if [[ -f "$RUNNER_TEMP/pentaheal-generated/preview-report.json" ]]; then
+              echo '### Generated-state preview'
+              echo '```json'
+              cat "$RUNNER_TEMP/pentaheal-generated/preview-report.json"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce PentaGate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, pathlib
+          report = json.loads(pathlib.Path(os.environ['RUNNER_TEMP'], 'pentagate.json').read_text())
+          if report.get('status') != 'PASS':
+              print(json.dumps(report.get('findings', []), indent=2))
+              raise SystemExit(1)
+          print('PentaGate PASS')
+          PY

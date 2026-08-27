@@ -1,0 +1,68 @@
+{
+  "schema_version": "1.0.0",
+  "registry_id": "crownthrive.penta.systems.extensions.penta-gate-heal",
+  "status_vocabulary": ["specified", "implemented", "certified", "production", "hold", "retired"],
+  "authority_invariant": "PentaGate and PentaHeal may inspect repository-local runner contracts and prepare bounded reversible repair packets only within existing CrownThrive authority. They cannot manufacture authority, execute arbitrary edits, self-certify, bypass PentaSerialized, force merge, promote HOLD, or claim production from candidate-branch evidence alone.",
+  "candidate_evidence": {
+    "pr": 561,
+    "scope": "exact candidate branch only until governed merge and post-merge readback",
+    "gate_workflow": ".github/workflows/penta-gate-heal.yml",
+    "gate_script": "scripts/penta_gate.py",
+    "heal_script": "scripts/penta_heal.py",
+    "tests": "tests/test_penta_gate_heal.py",
+    "lifecycle_tests": "tests/test_penta_lifecycle_proof.py",
+    "rollback": "git revert exact merge or candidate commits",
+    "fallback": "HOLD and known-good main",
+    "production_claim": false
+  },
+  "systems": [
+    {
+      "machine_key": "penta.gate",
+      "canonical_name": "PentaGate",
+      "aliases": ["Penta Gate", "Penta Gate Health"],
+      "category": "assurance_certification",
+      "axis": "truth",
+      "purpose": "Perform a read-only fail-closed preflight over repository-local Python syntax, test-discovery dependency availability and CI runner contract assumptions before expensive certification or terminal PR authority executes.",
+      "human_surface": "Gate receipt, blocking findings, dependency/runtime mismatch evidence and CI preflight summary",
+      "authority_boundary": "Read-only detection and HOLD authority only. It may block unsafe progression but cannot repair source, certify itself, merge, release, deploy, change provider state or expand authority.",
+      "risk_ceiling": "D1",
+      "maturity": "implemented",
+      "dependencies": ["penta.pr", "penta.certify", "penta.assure", "penta.immune"],
+      "five_stage": {
+        "discover": "Scan authorized repository-local Python and test modules plus workflow runner contracts without network probes or source mutation.",
+        "govern": "Classify deterministic syntax and unconditional test-dependency failures as BLOCK/HOLD while ignoring optional imports that are not discovery-time requirements.",
+        "execute": "Emit a canonical SHA-256 gate receipt; no source or provider mutation is authorized.",
+        "verify": "Require exact-head CI to rerun PentaGate tests and the wider governed repository gates.",
+        "preserve": "Publish bounded receipts into GitHub Actions summaries and route findings to PentaHeal/PentaImmune."
+      }
+    },
+    {
+      "machine_key": "penta.heal",
+      "canonical_name": "PentaHeal",
+      "aliases": ["Penta Heal", "Penta Repair Router"],
+      "category": "system_maintenance",
+      "axis": "continuity",
+      "purpose": "Convert deterministic PentaGate findings into bounded PentaImmune repair candidates with rollback, fallback, exact-head testing and independent certification requirements, then route execution to PentaBuild/PentaFactory and delivery to PentaPR.",
+      "human_surface": "Repair packets, routing chain, rollback/fallback evidence and hold reasons",
+      "authority_boundary": "Planning/routing only. It cannot perform arbitrary edits, execute external commands, self-certify, self-promote, force merge, bypass PentaSerialized or authorize D3/provider/legal/economic/security effects.",
+      "risk_ceiling": "D1",
+      "maturity": "implemented",
+      "dependencies": ["penta.immune", "penta.factory", "penta.pr", "penta.certify", "penta.assure"],
+      "five_stage": {
+        "discover": "Consume a deterministic PentaGate finding set or equivalent authorized repository-local gate receipt.",
+        "govern": "Map findings only to PentaImmune allowlisted repair handlers and require rollback, fallback, low blast radius, exact-head tests and independent certification.",
+        "execute": "Emit repair work packets for PentaBuild/PentaFactory; do not mutate source directly.",
+        "verify": "Require PentaCertify/PentaAssure exact-head PASS and all governing repository gates before PentaPR can route to terminal authority.",
+        "preserve": "Bind repair packets to gate receipt hashes and preserve successful recipes only through PentaImmune advisory memory."
+      }
+    }
+  ],
+  "routing_contract": {
+    "chain": ["PentaGate", "PentaHeal", "PentaImmune", "PentaBuild/PentaFactory", "PentaCertify/PentaAssure", "PentaPR", "PentaMerge|PentaCloser"],
+    "exact_head_required": true,
+    "pentaserialized_continuity_required_for_protected_changes": true,
+    "arbitrary_edit_authorized": false,
+    "self_certification_authorized": false,
+    "self_production_promotion_authorized": false
+  }
+}
