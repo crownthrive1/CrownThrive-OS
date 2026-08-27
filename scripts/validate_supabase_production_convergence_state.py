@@ -29,11 +29,15 @@ def main() -> int:
     migration = data.get("migration_custody", {})
     local_count = len(list((ROOT / "supabase/migrations").glob("*.sql")))
     recorded_count = migration.get("repository_migration_file_count")
+    provider_count = migration.get("provider_migration_count")
     require(
         local_count == recorded_count,
         f"Repository migration count changed; refresh local custody projection (actual={local_count}, recorded={recorded_count})",
     )
-    require(migration.get("provider_migration_count", 0) > local_count, "Migration custody hold must not be closed by count inference")
+    require(isinstance(provider_count, int) and provider_count > 0, "Provider migration count evidence is missing")
+    count_parity = provider_count == local_count
+    require(migration.get("count_parity_observed") is count_parity, "Migration count-parity projection drifted")
+    require(migration.get("count_parity_authoritative") is False, "Migration count parity may not become provider authority")
     require(migration.get("default_branch_status") == "MIGRATIONS_FAILED", "Default branch status changed without accepted readback")
     require(migration.get("gate") == "HOLD", "Migration custody must remain held")
     require("not found in local migrations directory" in migration.get("last_observed_error", ""), "Migration failure cause drifted")
@@ -71,7 +75,9 @@ def main() -> int:
         "project_health": "ACTIVE_HEALTHY",
         "sacred_history_reads": "PASS_OBSERVED",
         "repository_migration_file_count": local_count,
-        "provider_migration_file_count": migration.get("provider_migration_count"),
+        "provider_migration_file_count": provider_count,
+        "migration_count_parity": count_parity,
+        "migration_count_parity_authoritative": False,
         "migration_custody": "HOLD",
         "security_warnings": 0,
         "security_policy_intent": "HOLD",
