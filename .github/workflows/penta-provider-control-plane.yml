@@ -37,14 +37,53 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: penta-provider-control-plane-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  pr-safe-validation:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Enforce pull-request authority isolation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('.github/workflows/penta-provider-control-plane.yml').read_text()
+          pre_jobs = text.split('\njobs:\n', 1)[0]
+          if 'id-token: write' in pre_jobs:
+              raise SystemExit('workflow-level id-token: write is forbidden')
+          if "software-provider-control:\n    if: github.event_name != 'pull_request'" not in text:
+              raise SystemExit('provider credential job is not isolated from pull_request')
+          if "provider-live-readback:\n    if: github.event_name != 'pull_request'" not in text:
+              raise SystemExit('provider live-readback job is not isolated from pull_request')
+          PY
+
+      - name: Validate Penta provider contracts
+        run: python3 scripts/validate_penta_provider_control_plane.py
+
+      - name: Compile PR-safe Penta runtime
+        run: |
+          python3 -m py_compile \
+            runtime/penta_mail.py \
+            runtime/penta_runtime_suite.py \
+            runtime/penta-provider-control-plane/penta_control_plane.py
+
+      - name: Run PR-safe runtime regression suite
+        run: |
+          python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
+          python3 -m unittest discover -s tests -p 'test_penta_runtime_suite.py' -v
+          python3 tests/test_penta_family.py
+          python3 -m unittest discover -s tests -p 'test_penta_institutional_services.py' -v
+
   software-provider-control:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env: &provider-env
@@ -137,6 +176,7 @@ jobs:
           PY
 
   provider-live-readback:
+    if: github.event_name != 'pull_request'
     needs: software-provider-control
     runs-on: ubuntu-latest
     timeout-minutes: 10
