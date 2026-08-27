@@ -64,10 +64,19 @@ jobs:
           disposition_path.write_text(json.dumps(disposition, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           PY
 
-      - name: Apply deterministic PentaDocs migration
-        run: python scripts/pentadocs_quality.py --apply
+      - name: Apply deterministic PentaDocs migration and capture complete output
+        id: migrate
+        shell: bash
+        run: |
+          mkdir -p evidence
+          set +e
+          python scripts/pentadocs_quality.py --apply > evidence/pentadocs-apply-diagnostic.txt 2>&1
+          rc=$?
+          set -e
+          cat evidence/pentadocs-apply-diagnostic.txt
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
 
-      - name: Commit exact generated corpus before evaluation
+      - name: Commit exact generated corpus and diagnostic
         id: commit
         run: |
           git config user.name "PentaDocs Reconciler"
@@ -80,13 +89,20 @@ jobs:
             exit 0
           fi
           git diff --cached --check
-          git commit -m "fix: reconcile Penta Family census and PentaDocs profiles [pentadocs-generated]"
+          git commit -m "fix: persist PentaDocs reconciliation output [pentadocs-generated]"
           git push origin HEAD:pentarelease/penta-family-production-suite-1.2.0
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Verify exact generated family census and PentaDocs corpus
+        if: ${{ steps.migrate.outputs.rc == '0' }}
         run: |
           python -m unittest -v tests.test_penta_convergence_certifier
           python -m unittest -v tests.test_pentadocs_quality
           python scripts/pentadocs_quality.py --check
           python scripts/validate_docs.py
+
+      - name: Fail after persisting diagnostic evidence
+        if: ${{ steps.migrate.outputs.rc != '0' }}
+        run: |
+          echo "PentaDocs migration returned ${{ steps.migrate.outputs.rc }}; diagnostic and generated corpus were persisted on the branch."
+          exit 1
