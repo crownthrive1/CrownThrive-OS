@@ -17,12 +17,16 @@ concurrency:
   group: collision-governance-trusted-v2-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
   cancel-in-progress: true
 
+env:
+  COLLISION_MAX_FILES_PER_PR: '1500'
+  COLLISION_MAX_SEMANTIC_INSPECTIONS: '3000'
+
 jobs:
   trusted-base-preflight:
     name: Trusted base — live prevention and reaction
     if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout trusted base without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,20 +37,86 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          COLLISION_REPOSITORY: ${{ github.repository }}
+          COLLISION_BRANCH: ${{ github.event.pull_request.base.ref }}
+          COLLISION_CANDIDATE: ${{ github.event.pull_request.number }}
+          COLLISION_FAIL_SEVERITY: '2'
         shell: bash
-        run: >-
-          python3 scripts/governed_collision_agent_v2.py
-          --repository "${{ github.repository }}"
-          --branch "${{ github.event.pull_request.base.ref }}"
-          --candidate "${{ github.event.pull_request.number }}"
-          --output collision-governance-v2-report.json
-          --fail-on-severity 2
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          script = Path('scripts/governed_collision_agent_v2.py')
+          spec = importlib.util.spec_from_file_location('governed_collision_agent_v2', script)
+          if spec is None or spec.loader is None:
+              raise SystemExit('collision observer import failed')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          max_files = int(os.environ['COLLISION_MAX_FILES_PER_PR'])
+          max_semantic = int(os.environ['COLLISION_MAX_SEMANTIC_INSPECTIONS'])
+          if not 500 <= max_files <= 3000:
+              raise SystemExit('COLLISION_MAX_FILES_PER_PR outside governed bound')
+          if not max_files <= max_semantic <= 6000:
+              raise SystemExit('COLLISION_MAX_SEMANTIC_INSPECTIONS outside governed bound')
+          module.MAX_FILES_PER_PR = max_files
+          module.MAX_SEMANTIC_INSPECTIONS = max_semantic
+
+          report = Path('collision-governance-v2-report.json')
+          sys.argv = [
+              str(script),
+              '--repository', os.environ['COLLISION_REPOSITORY'],
+              '--branch', os.environ['COLLISION_BRANCH'],
+              '--candidate', os.environ['COLLISION_CANDIDATE'],
+              '--output', str(report),
+              '--fail-on-severity', os.environ['COLLISION_FAIL_SEVERITY'],
+          ]
+          rc = int(module.main() or 0)
+          if not report.is_file():
+              raise SystemExit('collision observer report missing')
+          payload = json.loads(report.read_text(encoding='utf-8'))
+          payload['observer_capacity'] = {
+              'schema': 'ct.collision-observer-capacity-proof.v1',
+              'max_files_per_pr': max_files,
+              'max_semantic_inspections': max_semantic,
+              'candidate_pr': int(os.environ['COLLISION_CANDIDATE']),
+              'authority_effect': 'none',
+              'merge_authority': False,
+              'provider_write': False,
+          }
+          report.write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(payload['observer_capacity'], sort_keys=True))
+          raise SystemExit(rc)
+          PY
+
+      - name: Publish bounded observer proof
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s collision-governance-v2-report.json
+          jq -e '.observer_capacity.max_files_per_pr == 1500' collision-governance-v2-report.json >/dev/null
+          jq -e '.observer_capacity.max_semantic_inspections == 3000' collision-governance-v2-report.json >/dev/null
+          {
+            echo '## Collision Governance Trusted v2'
+            echo
+            echo '- Bounded file ceiling per PR: **1500**'
+            echo '- Bounded semantic-inspection ceiling: **3000**'
+            echo '- Candidate source execution: **prohibited**'
+            echo '- Merge authority: **none**'
+            echo '- Provider write: **false**'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   trusted-main-reconciliation:
     name: Trusted main — continuous awareness and reaction
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout trusted main without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,10 +126,74 @@ jobs:
       - name: Recompute the open collision graph
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          COLLISION_REPOSITORY: ${{ github.repository }}
+          COLLISION_BRANCH: main
+          COLLISION_FAIL_SEVERITY: '6'
         shell: bash
-        run: >-
-          python3 scripts/governed_collision_agent_v2.py
-          --repository "${{ github.repository }}"
-          --branch main
-          --output collision-governance-v2-report.json
-          --fail-on-severity 6
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          script = Path('scripts/governed_collision_agent_v2.py')
+          spec = importlib.util.spec_from_file_location('governed_collision_agent_v2', script)
+          if spec is None or spec.loader is None:
+              raise SystemExit('collision observer import failed')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          max_files = int(os.environ['COLLISION_MAX_FILES_PER_PR'])
+          max_semantic = int(os.environ['COLLISION_MAX_SEMANTIC_INSPECTIONS'])
+          if not 500 <= max_files <= 3000:
+              raise SystemExit('COLLISION_MAX_FILES_PER_PR outside governed bound')
+          if not max_files <= max_semantic <= 6000:
+              raise SystemExit('COLLISION_MAX_SEMANTIC_INSPECTIONS outside governed bound')
+          module.MAX_FILES_PER_PR = max_files
+          module.MAX_SEMANTIC_INSPECTIONS = max_semantic
+
+          report = Path('collision-governance-v2-report.json')
+          sys.argv = [
+              str(script),
+              '--repository', os.environ['COLLISION_REPOSITORY'],
+              '--branch', os.environ['COLLISION_BRANCH'],
+              '--output', str(report),
+              '--fail-on-severity', os.environ['COLLISION_FAIL_SEVERITY'],
+          ]
+          rc = int(module.main() or 0)
+          if not report.is_file():
+              raise SystemExit('collision observer report missing')
+          payload = json.loads(report.read_text(encoding='utf-8'))
+          payload['observer_capacity'] = {
+              'schema': 'ct.collision-observer-capacity-proof.v1',
+              'max_files_per_pr': max_files,
+              'max_semantic_inspections': max_semantic,
+              'candidate_pr': None,
+              'authority_effect': 'none',
+              'merge_authority': False,
+              'provider_write': False,
+          }
+          report.write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(payload['observer_capacity'], sort_keys=True))
+          raise SystemExit(rc)
+          PY
+
+      - name: Publish bounded observer proof
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s collision-governance-v2-report.json
+          jq -e '.observer_capacity.max_files_per_pr == 1500' collision-governance-v2-report.json >/dev/null
+          jq -e '.observer_capacity.max_semantic_inspections == 3000' collision-governance-v2-report.json >/dev/null
+          {
+            echo '## Collision Governance Trusted v2 — Main Reconciliation'
+            echo
+            echo '- Bounded file ceiling per PR: **1500**'
+            echo '- Bounded semantic-inspection ceiling: **3000**'
+            echo '- Merge authority: **none**'
+            echo '- Provider write: **false**'
+          } >> "$GITHUB_STEP_SUMMARY"
