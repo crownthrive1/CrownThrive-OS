@@ -29,11 +29,24 @@ def main() -> int:
     migration = data.get("migration_custody", {})
     local_count = len(list((ROOT / "supabase/migrations").glob("*.sql")))
     expected_count = migration.get("repository_migration_file_count")
+    provider_count = migration.get("provider_migration_count", 0)
     require(
         local_count == expected_count,
-        f"Repository migration count changed; refresh provider custody evidence (expected={expected_count}, actual={local_count})",
+        f"Repository migration count changed; refresh repository inventory evidence (expected={expected_count}, actual={local_count})",
     )
-    require(migration.get("provider_migration_count", 0) > local_count, "Migration custody hold must not be closed by count inference")
+    require(
+        provider_count >= local_count,
+        f"Repository migration inventory exceeds the last provider snapshot (provider={provider_count}, repository={local_count})",
+    )
+    require(
+        migration.get("count_parity_is_not_custody_proof") is True,
+        "Migration-count parity must never be treated as replay, synchronization, or custody proof",
+    )
+    if provider_count == local_count:
+        require(
+            migration.get("count_parity_observed") is True,
+            "Observed provider/repository migration-count parity is not recorded",
+        )
     require(migration.get("default_branch_status") == "MIGRATIONS_FAILED", "Default branch status changed without accepted readback")
     require(migration.get("gate") == "HOLD", "Migration custody must remain held")
     require("not found in local migrations directory" in migration.get("last_observed_error", ""), "Migration failure cause drifted")
@@ -70,6 +83,10 @@ def main() -> int:
         "status": "PASS",
         "project_health": "ACTIVE_HEALTHY",
         "sacred_history_reads": "PASS_OBSERVED",
+        "repository_migrations": local_count,
+        "provider_snapshot_migrations": provider_count,
+        "count_parity": provider_count == local_count,
+        "count_parity_is_custody_proof": False,
         "migration_custody": "HOLD",
         "security_warnings": 0,
         "security_policy_intent": "HOLD",
