@@ -1,6 +1,8 @@
 import { emitPenta, fabricState, verifyPenta } from '../lib/pentafabric.js';
 
 const MAX_BODY_BYTES = 262144;
+const DEFAULT_PENTAFABRIC_INGEST_URL =
+  'https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/pentafabric-ingest';
 
 function send(response, status, payload) {
   response.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -27,13 +29,20 @@ function evidenceRow(penta) {
   };
 }
 
-async function persistPenta(penta) {
+function evidenceSinkState() {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return { status: 'SKIPPED_UNBOUND', sink: 'supabase', required_binding: 'SUPABASE_SERVICE_ROLE_KEY' };
-  }
+  const serviceRoleBound = Boolean(supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const oidcBound = Boolean(process.env.VERCEL_OIDC_TOKEN);
+  return {
+    provider: 'supabase',
+    bound: serviceRoleBound || oidcBound,
+    mode: serviceRoleBound ? 'SERVICE_ROLE' : oidcBound ? 'VERCEL_OIDC_RS256' : 'UNBOUND',
+    table: 'pentafabric_events',
+    edge_ingest: 'pentafabric-ingest',
+  };
+}
 
+async function persistWithServiceRole(penta, supabaseUrl, serviceRoleKey) {
   const result = await fetch(
     `${supabaseUrl.replace(/\/$/, '')}/rest/v1/pentafabric_events?on_conflict=penta_id`,
     {
@@ -51,7 +60,63 @@ async function persistPenta(penta) {
     const detail = await result.text();
     throw new Error(`Supabase Penta sink rejected delivery (${result.status}): ${detail.slice(0, 240)}`);
   }
-  return { status: 'PERSISTED', sink: 'supabase', idempotent_key: penta.id };
+  return {
+    status: 'PERSISTED',
+    sink: 'supabase',
+    authentication: 'SERVICE_ROLE',
+    idempotent_key: penta.id,
+  };
+}
+
+async function persistWithVercelOidc(penta, oidcToken) {
+  const ingestUrl = process.env.PENTAFABRIC_INGEST_URL || DEFAULT_PENTAFABRIC_INGEST_URL;
+  const result = await fetch(ingestUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${oidcToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ penta }),
+  });
+  const raw = await result.text();
+  let receipt = null;
+  if (raw) {
+    try {
+      receipt = JSON.parse(raw);
+    } catch {
+      receipt = { raw: raw.slice(0, 240) };
+    }
+  }
+  if (!result.ok) {
+    const detail = receipt?.detail || receipt?.error || raw || 'unknown edge rejection';
+    throw new Error(`Supabase OIDC Penta sink rejected delivery (${result.status}): ${String(detail).slice(0, 240)}`);
+  }
+  return {
+    status: 'PERSISTED',
+    sink: 'supabase-edge',
+    authentication: 'VERCEL_OIDC_RS256',
+    idempotent_key: penta.id,
+    receipt,
+  };
+}
+
+async function persistPenta(penta) {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (supabaseUrl && serviceRoleKey) {
+    return persistWithServiceRole(penta, supabaseUrl, serviceRoleKey);
+  }
+
+  const oidcToken = process.env.VERCEL_OIDC_TOKEN;
+  if (oidcToken) {
+    return persistWithVercelOidc(penta, oidcToken);
+  }
+
+  return {
+    status: 'SKIPPED_UNBOUND',
+    sink: 'supabase',
+    required_binding: 'SUPABASE_SERVICE_ROLE_KEY_OR_VERCEL_OIDC_TOKEN',
+  };
 }
 
 function runSelfTest(state) {
@@ -93,11 +158,7 @@ export default async function handler(request, response) {
         accepts: 'crownthrive.penta.event.v1',
         emits: 'crownthrive.penta.event.v1',
         chlom_governed: true,
-        evidence_sink: {
-          provider: 'supabase',
-          bound: Boolean((process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) && process.env.SUPABASE_SERVICE_ROLE_KEY),
-          table: 'pentafabric_events',
-        },
+        evidence_sink: evidenceSinkState(),
         self_test: selfTestRequested ? runSelfTest(state) : { status: 'NOT_REQUESTED' },
         observed_at: new Date().toISOString(),
       });
@@ -136,6 +197,7 @@ export default async function handler(request, response) {
       provider: 'vercel',
       chlom_binding: penta.mesh.chlom.binding,
       assurance: penta.integrity.algorithm,
+      transport_assurance: persistence.authentication || 'UNBOUND',
       persistence,
       build_sha: process.env.VERCEL_GIT_COMMIT_SHA || null,
       deployment_id: process.env.VERCEL_DEPLOYMENT_ID || null,
