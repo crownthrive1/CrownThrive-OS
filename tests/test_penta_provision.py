@@ -17,6 +17,23 @@ class PentaProvisionTests(unittest.TestCase):
         subprocess.run(["git", "config", "user.email", "test@crownthrive.local"], cwd=repo, check=True)
         subprocess.run(["git", "config", "user.name", "PentaTest"], cwd=repo, check=True)
         (repo / "seed.txt").write_text("seed\n")
+        manifest = repo / "developers/manifests/supabase-production-convergence-state.v1.json"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(json.dumps({
+            "migration_custody": {
+                "provider_readback_scope": "supabase_migrations.schema_migrations",
+                "provider_migration_count": 999,
+                "provider_last_migration_version": "20260827172622",
+                "provider_last_migration_name": "canonical_os_repository_function_rebind",
+                "repository_migration_file_count": 0,
+                "default_branch": "main",
+                "default_branch_status": "MIGRATIONS_FAILED",
+                "last_observed_error": "Remote migration versions not found in local migrations directory.",
+                "gate": "HOLD",
+                "owner": "test",
+                "required_resolution": "provider reconciliation required"
+            }
+        }, indent=2) + "\n")
         subprocess.run(["git", "add", "."], cwd=repo, check=True)
         subprocess.run(["git", "commit", "-qm", "seed"], cwd=repo, check=True)
         subprocess.run(["git", "checkout", "-qb", "preserved/source"], cwd=repo, check=True)
@@ -58,6 +75,24 @@ class PentaProvisionTests(unittest.TestCase):
         }]}
         with self.assertRaises(ProvisionError):
             provision(repo, req, apply=True)
+
+    def test_refreshes_only_local_custody_and_preserves_provider_hold(self):
+        td, repo, payload = self._repo()
+        self.addCleanup(td.cleanup)
+        req = {"request_id": "t3", "artifacts": [{
+            "destination_path": "supabase/migrations/artifact.sql",
+            "source_ref": "preserved/source",
+            "source_path": "archive/artifact.sql",
+            "expected_blob_sha": git_blob_sha(payload),
+        }]}
+        receipt = provision(repo, req, apply=True, refresh_local_custody=True)
+        custody = json.loads((repo / "developers/manifests/supabase-production-convergence-state.v1.json").read_text())["migration_custody"]
+        self.assertEqual(custody["repository_migration_file_count"], 1)
+        self.assertEqual(custody["provider_migration_count"], 999)
+        self.assertEqual(custody["gate"], "HOLD")
+        self.assertEqual(custody["default_branch_status"], "MIGRATIONS_FAILED")
+        self.assertFalse(receipt["provider_evidence_mutated"])
+        self.assertFalse(receipt["hold_promotion"])
 
 
 if __name__ == "__main__":
