@@ -36,29 +36,20 @@ def synchronize_os_golden()->dict[str,Any]:
     p.write_text(t,encoding="utf-8"); result["penta_context_production_assertion_count"]=t.count(prod); result["authority_anchor_scope"]="unchanged_by_wave3"; return result
 
 def reconcile_packager()->None:
+    """Keep Wave 3 compatible with the exact-main Penta OS packager contract."""
     p=ROOT/"scripts/package_penta_os_v1.py"
     text=p.read_text(encoding="utf-8")
-    old='        if not isinstance(manifest.get("files"), list):\n            raise PackageError("manifest files must be a list")\n'
-    new=('        files = manifest.get("files")\n'
-         '        if isinstance(files, dict):\n'
-         '            # Canonical package manifests may index entries by archive path.\n'
-         '            # Normalize to the historical list form consumed by this packager.\n'
-         '            normalized = []\n'
-         '            for archive_path, entry in files.items():\n'
-         '                if isinstance(entry, dict):\n'
-         '                    row = dict(entry)\n'
-         '                    row.setdefault("archive_path", archive_path)\n'
-         '                else:\n'
-         '                    row = {"archive_path": archive_path, "source_path": entry}\n'
-         '                normalized.append(row)\n'
-         '            manifest["files"] = normalized\n'
-         '        elif not isinstance(files, list):\n'
-         '            raise PackageError("manifest files must be a list or object")\n')
-    if old in text:
-        text=text.replace(old,new,1)
-    elif 'manifest files must be a list or object' not in text:
-        raise base.PipelineError("packager manifest validation contract not found")
-    p.write_text(text,encoding="utf-8")
+    # Current main already uses Mapping-based package inputs and deterministic
+    # file_records(). The old manifest-list validator no longer exists and must
+    # not be reintroduced. Validate the modern contract instead.
+    required=(
+        'from typing import Any, Mapping',
+        'def file_records(files: Mapping[str, bytes])',
+        'def collect(root: Path, metadata: Mapping[str, Any] | None = None)',
+    )
+    missing=[marker for marker in required if marker not in text]
+    if missing:
+        raise base.PipelineError(f"current-main packager contract incomplete: {missing}")
 
 base.reconcile_context_and_builder=reconcile_context_and_builder
 base.synchronize_os_golden=synchronize_os_golden
