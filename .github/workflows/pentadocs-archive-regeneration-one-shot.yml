@@ -33,6 +33,41 @@ jobs:
           out="$RUNNER_TEMP/pentadocs-archive-regeneration"
           mkdir -p "$out/files"
 
+          python - <<'PY'
+          from pathlib import Path
+
+          paths = (
+              'automation/agent-registry.mdx',
+              'automation/command-structure.mdx',
+              'automation/scheduled-task-agent-architecture.mdx',
+              'changelog/2026-08-26-phase3-entry-bootstrap-v2.mdx',
+              'changelog/locticians-claimmonth50-and-scheduled-agent-architecture-2026-08-21.mdx',
+              'changelog/phase-2-99-mcp-external-certification-security-hold.mdx',
+              'knowledge/legacy-abcds-scheduler-scaffolding-archive.mdx',
+              'support/help-center-795-article-disposition-seed.mdx',
+          )
+          start = '{/* pentadocs:audience-orientation:v2 */}'
+          end = '{/* /pentadocs:audience-orientation:v2 */}'
+          components = ('Info', 'Note', 'Warning')
+
+          for relative in paths:
+              path = Path(relative)
+              text = path.read_text(encoding='utf-8')
+              original = text
+              for component in components:
+                  text = text.replace(f'{start}\n\n<{component}>', f'{start}\n<{component}>', 1)
+                  text = text.replace(f'</{component}>\n\n{end}', f'</{component}>\n{end}', 1)
+              if start in text:
+                  marker_index = text.index(start)
+                  prefix = text[:marker_index]
+                  if prefix.endswith('\n\n'):
+                      text = prefix[:-1] + text[marker_index:]
+              if text == original:
+                  raise SystemExit(f'expected orientation boundary normalization absent: {relative}')
+              path.write_text(text, encoding='utf-8')
+          print('managed orientation boundary normalization PASS')
+          PY
+
           set +e
           python scripts/pentadocs_quality.py --apply > "$out/apply.log" 2>&1
           apply_rc=$?
