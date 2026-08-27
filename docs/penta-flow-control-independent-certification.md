@@ -31,3 +31,7 @@ The independent verifier receipt is not present in the live evidence set, and th
 ## Authority boundary
 
 This software verifies evidence. It does not create an independent receipt, enable provider execution, release provider jobs, or grant authority. An independent verifier must supply the receipt after performing the required external verification and rollback/readback exercise.
+
+## Persistent hand-raise successor
+
+`docs/phase3/PENTA_HOLD_HAND.md` defines the additive PentaHoldHand/PentaCrawler/PentaHelp contract. A HOLD remains visibly raised while those systems discover and route missing evidence. They may make a resolution receipt eligible only after every exact-head independent predicate passes; they do not self-certify or delete the historical HOLD.
