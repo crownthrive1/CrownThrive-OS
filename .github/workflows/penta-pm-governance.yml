@@ -1,6 +1,13 @@
 name: PentaPM Governance
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "config/penta_pm_policy.json"
+      - "scripts/penta_pm_reconcile.py"
+      - ".github/workflows/penta-pm-governance.yml"
+      - "tests/test_penta_pm_reconcile.py"
   pull_request:
     types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
   issues:
@@ -23,6 +30,7 @@ permissions:
   contents: read
   issues: write
   pull-requests: write
+  repository-projects: write
 
 concurrency:
   group: penta-pm-${{ github.repository }}
@@ -34,9 +42,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # Projects v2 mutations generally require a token whose project scope extends
-      # beyond the repository-scoped GITHUB_TOKEN. The dedicated token is preferred;
-      # GITHUB_TOKEN remains a fail-closed fallback for issue/milestone operations.
       PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
       GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN || github.token }}
     steps:
@@ -57,7 +62,7 @@ jobs:
         run: |
           APPLY=false
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.apply }}" == "true" ]]; then APPLY=true; fi
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "repository_dispatch" ]]; then APPLY=true; fi
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "repository_dispatch" || "${{ github.event_name }}" == "push" ]]; then APPLY=true; fi
           if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "issues" || "${{ github.event_name }}" == "release" ]]; then APPLY=true; fi
           echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
 
