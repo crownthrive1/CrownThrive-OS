@@ -53,7 +53,7 @@ class GH:
                 "Authorization": "Bearer " + self.token,
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "PentaPR/2.0.2",
+                "User-Agent": "PentaPR/2.0.3",
             },
         )
         try:
@@ -106,14 +106,51 @@ def _is_self_lifecycle_check(item: dict[str, Any]) -> bool:
     return name in SELF_LIFECYCLE_CHECK_NAMES
 
 
+def _check_context(item: dict[str, Any]) -> tuple[str, str]:
+    app = item.get("app") or {}
+    app_identity = str(app.get("slug") or app.get("name") or "unknown-app").strip().casefold()
+    name = str(item.get("name") or "").strip().casefold()
+    return app_identity, name
+
+
+def _check_recency(item: dict[str, Any]) -> tuple[int, str, str]:
+    try:
+        run_id = int(item.get("id") or 0)
+    except (TypeError, ValueError):
+        run_id = 0
+    return (
+        run_id,
+        str(item.get("completed_at") or ""),
+        str(item.get("started_at") or ""),
+    )
+
+
+def _latest_check_runs(observed: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return the latest GitHub check-run for each app+check status context."""
+    latest: dict[tuple[str, str], dict[str, Any]] = {}
+    for item in observed:
+        key = _check_context(item)
+        current = latest.get(key)
+        if current is None or _check_recency(item) > _check_recency(current):
+            latest[key] = item
+    return list(latest.values())
+
+
 def checks(gh: GH, sha: str) -> dict[str, Any]:
     observed = gh.get(f"/repos/{gh.repo}/commits/{sha}/check-runs?per_page=100").get("check_runs", [])
     statuses = gh.get(f"/repos/{gh.repo}/commits/{sha}/status")
-    ignored = [item for item in observed if _is_self_lifecycle_check(item)]
-    runs = [item for item in observed if not _is_self_lifecycle_check(item)]
+    current = _latest_check_runs(observed)
+    ignored = [item for item in current if _is_self_lifecycle_check(item)]
+    runs = [item for item in current if not _is_self_lifecycle_check(item)]
     bad = {"failure", "cancelled", "timed_out", "action_required", "stale", "startup_failure"}
-    pending = any(item.get("status") != "completed" for item in runs) or statuses.get("state") == "pending"
-    failed = any(item.get("conclusion") in bad for item in runs) or statuses.get("state") in {"failure", "error"}
+
+    legacy_count = int(statuses.get("total_count") or len(statuses.get("statuses") or []))
+    legacy_active = legacy_count > 0
+    legacy_pending = legacy_active and statuses.get("state") == "pending"
+    legacy_failed = legacy_active and statuses.get("state") in {"failure", "error"}
+
+    pending = any(item.get("status") != "completed" for item in runs) or legacy_pending
+    failed = any(item.get("conclusion") in bad for item in runs) or legacy_failed
     governed = [item for item in runs if "governed merge gate" in (item.get("name") or "").lower()]
     governed_ok = any(item.get("status") == "completed" and item.get("conclusion") == "success" for item in governed)
     return {
@@ -122,7 +159,10 @@ def checks(gh: GH, sha: str) -> dict[str, Any]:
         "governed_ok": governed_ok,
         "count": len(runs),
         "observed_count": len(observed),
+        "current_context_count": len(current),
+        "superseded_check_count": len(observed) - len(current),
         "ignored_self_count": len(ignored),
+        "legacy_status_count": legacy_count,
     }
 
 
