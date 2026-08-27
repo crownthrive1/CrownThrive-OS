@@ -34,6 +34,8 @@ jobs:
           mkdir -p "$out/files"
 
           python - <<'PY'
+          import json
+          import re
           from pathlib import Path
 
           paths = (
@@ -46,26 +48,36 @@ jobs:
               'knowledge/legacy-abcds-scheduler-scaffolding-archive.mdx',
               'support/help-center-795-article-disposition-seed.mdx',
           )
-          start = '{/* pentadocs:audience-orientation:v2 */}'
-          end = '{/* /pentadocs:audience-orientation:v2 */}'
-          components = ('Info', 'Note', 'Warning')
+          routes = {path.removesuffix('.mdx') for path in paths}
+          orientation = re.compile(
+              r'\{/\* pentadocs:audience-orientation:v2 \*/\}\s*'
+              r'<(?P<component>Info|Note|Warning)>.*?</(?P=component)>\s*'
+              r'\{/\* /pentadocs:audience-orientation:v2 \*/\}\s*',
+              flags=re.DOTALL,
+          )
 
           for relative in paths:
               path = Path(relative)
               text = path.read_text(encoding='utf-8')
-              original = text
-              for component in components:
-                  text = text.replace(f'{start}\n\n<{component}>', f'{start}\n<{component}>', 1)
-                  text = text.replace(f'</{component}>\n\n{end}', f'</{component}>\n{end}', 1)
-              if start in text:
-                  marker_index = text.index(start)
-                  prefix = text[:marker_index]
-                  if prefix.endswith('\n\n'):
-                      text = prefix[:-1] + text[marker_index:]
-              if text == original:
-                  raise SystemExit(f'expected orientation boundary normalization absent: {relative}')
-              path.write_text(text, encoding='utf-8')
-          print('managed orientation boundary normalization PASS')
+              rebuilt, count = orientation.subn('', text, count=1)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one managed orientation envelope: {relative}; found {count}')
+              path.write_text(rebuilt, encoding='utf-8')
+
+          profile_path = Path('data/documentation/pentadocs-page-profiles.v1.json')
+          profile_data = json.loads(profile_path.read_text(encoding='utf-8'))
+          prior_profiles = profile_data.get('profiles')
+          if not isinstance(prior_profiles, list):
+              raise SystemExit('PentaDocs profiles list is absent')
+          removed = {item.get('route') for item in prior_profiles if item.get('route') in routes}
+          missing = sorted(routes - removed)
+          # The newly created archive page may legitimately have no prior profile.
+          missing_allowed = {'knowledge/legacy-abcds-scheduler-scaffolding-archive'}
+          if set(missing) - missing_allowed:
+              raise SystemExit('expected prior profiles absent: ' + ', '.join(sorted(set(missing) - missing_allowed)))
+          profile_data['profiles'] = [item for item in prior_profiles if item.get('route') not in routes]
+          profile_path.write_text(json.dumps(profile_data, indent=2, sort_keys=False) + '\n', encoding='utf-8')
+          print(json.dumps({'managed_orientations_removed': len(paths), 'prior_profiles_removed': len(removed)}, sort_keys=True))
           PY
 
           set +e
@@ -116,10 +128,7 @@ jobs:
               destination.parent.mkdir(parents=True, exist_ok=True)
               shutil.copy2(source, destination)
               data = source.read_bytes()
-              files[relative] = {
-                  'bytes': len(data),
-                  'sha256': hashlib.sha256(data).hexdigest(),
-              }
+              files[relative] = {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
 
           receipt = {
               'schema': 'crownthrive.pentadocs.archive-regeneration-one-shot.v1',
