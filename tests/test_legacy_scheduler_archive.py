@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_guard_module():
+    path = ROOT / "scripts/verify_legacy_scheduler_archive.py"
+    spec = importlib.util.spec_from_file_location("legacy_scheduler_guard", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_article_is_historical_only() -> None:
@@ -66,3 +76,28 @@ def test_historical_page_is_removed_from_current_automation_navigation() -> None
     docs = json.loads((ROOT / "docs.json").read_text())
     serialized = json.dumps(docs)
     assert "knowledge/legacy-abcds-scheduler-scaffolding-archive" in serialized
+
+
+def test_guard_accepts_plural_agents_and_explicit_prohibitions(tmp_path: Path) -> None:
+    guard = _load_guard_module()
+    page = tmp_path / "safe.mdx"
+    page.write_text(
+        "These agents may be invoked by the canonical relay clock.\n"
+        "| Agent A | hourly :00 | no standalone clock |\n"
+        "The external relay is not a replacement one-agent-one-clock scheduler.\n"
+        "Do not create separate Agent A/B/C/D/S clocks.\n",
+        encoding="utf-8",
+    )
+    assert guard.scan(tmp_path, None) == []
+
+
+def test_guard_rejects_live_legacy_clock_reactivation(tmp_path: Path) -> None:
+    guard = _load_guard_module()
+    page = tmp_path / "unsafe.mdx"
+    page.write_text(
+        "Enable Agent A as an hourly external scheduler clock for production.\n",
+        encoding="utf-8",
+    )
+    violations = guard.scan(tmp_path, None)
+    assert len(violations) == 1
+    assert violations[0]["kind"] == "legacy_scheduler_semantics"
