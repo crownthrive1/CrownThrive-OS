@@ -1,0 +1,52 @@
+name: CHLOM Agent Wallet v2 Certification
+
+on:
+  pull_request:
+    paths:
+      - 'runners/chlom-agent-wallet/**'
+      - 'developers/reference/chlom-wallet/continuity/**'
+      - '.github/workflows/chlom-agent-wallet-v2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runners/chlom-agent-wallet/**'
+      - 'developers/reference/chlom-wallet/continuity/**'
+      - '.github/workflows/chlom-agent-wallet-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chlom-agent-wallet-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: runners/chlom-agent-wallet
+    steps:
+      - uses: actions/checkout@v4
+      - name: Protocol and shell certification
+        run: bash ./tests/run.sh
+      - name: Reconcile current CHLOM continuity boundary
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('../..')
+          policy=json.loads(pathlib.Path('config/policy.base-usdc.json').read_text())
+          interface=json.loads((root/'developers/reference/chlom-wallet/continuity/continuity-penta-interface-pack.v2.json').read_text())
+          assert policy['continuity_boundary']['profile_id'] == interface['schema']
+          assert policy['continuity_boundary']['semantic_version'] == interface['semantic_version']
+          assert policy['continuity_boundary']['state'] == interface['state']
+          for key,value in policy['continuity_boundary']['current_certified_boundary'].items():
+              assert interface['boundary'][key] is value, (key, interface['boundary'][key], value)
+          assert policy['capabilities']['money_movement'] is False
+          assert policy['capabilities']['chain_broadcast'] is False
+          assert interface['boundary']['money_movement'] is False
+          assert interface['boundary']['chain_broadcast'] is False
+          print('CHLOM_BOUNDARY_RECONCILIATION_PASS')
+          PY
