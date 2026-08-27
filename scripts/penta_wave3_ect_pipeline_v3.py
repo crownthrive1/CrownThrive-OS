@@ -142,6 +142,97 @@ def provider_ledger_evidence(repository_migration_count: int) -> dict[str, Any]:
 v2.provider_ledger_evidence = provider_ledger_evidence
 
 
+def reconcile_supabase_validator() -> None:
+    """Upgrade the convergence validator to a finite fail-closed state model."""
+
+    path = ROOT / "scripts/validate_supabase_production_convergence_state.py"
+    text = path.read_text(encoding="utf-8")
+    start_marker = "    # Count direction is evidence, not authority."
+    end_marker = '    security = data.get("security_advisors", {})'
+    start = text.find(start_marker)
+    end = text.find(end_marker, start)
+    if start < 0 or end < 0 or end <= start:
+        raise base.PipelineError(
+            "Supabase validator migration-custody block could not be located"
+        )
+
+    replacement = '''    # Migration inventory direction is evidence, never custody authority.
+    # The provider readback and repository inventory must agree on their signed
+    # delta and finite relationship classification, while every unresolved state
+    # remains explicitly held.
+    readback = migration.get("provider_ledger_readback")
+    require(isinstance(readback, dict), "Provider migration-ledger readback is missing")
+    require(readback.get("readback") is True, "Provider migration-ledger readback was not observed")
+
+    readback_provider_count = readback.get("provider_migration_count")
+    readback_repository_count = readback.get("repository_migration_file_count")
+    require(
+        type(readback_provider_count) is int and readback_provider_count > 0,
+        "Provider migration-ledger count must be a positive integer",
+    )
+    require(
+        type(readback_repository_count) is int and readback_repository_count > 0,
+        "Repository migration inventory count must be a positive integer",
+    )
+    require(
+        readback_provider_count == provider_count,
+        "Top-level and readback provider migration counts diverged",
+    )
+    require(
+        readback_repository_count == local_count,
+        "Readback and exact repository migration counts diverged",
+    )
+
+    delta = readback_provider_count - readback_repository_count
+    require(
+        readback.get("provider_repository_count_delta") == delta,
+        "Provider/repository migration count delta is inconsistent",
+    )
+    relationship = (
+        "COUNT_ALIGNED"
+        if delta == 0
+        else ("PROVIDER_AHEAD" if delta > 0 else "REPOSITORY_AHEAD")
+    )
+    expected_status = {
+        "PROVIDER_AHEAD": "PROVIDER_AHEAD_REPOSITORY_HISTORY_HOLD",
+        "REPOSITORY_AHEAD": "REPOSITORY_AHEAD_PROVIDER_APPLICATION_HOLD",
+        "COUNT_ALIGNED": "COUNT_ALIGNED_LEDGER_IDENTITY_REVIEW_HOLD",
+    }[relationship]
+    require(
+        readback.get("inventory_relationship") == relationship,
+        "Migration inventory relationship does not match the signed count delta",
+    )
+    require(
+        migration.get("default_branch_status") == expected_status,
+        "Default-branch migration status does not match verified custody evidence",
+    )
+    require(migration.get("gate") == "HOLD", "Migration custody must remain held")
+    require(
+        readback.get("count_alignment_proves_lineage") is False,
+        "Count alignment may not be promoted to migration-lineage proof",
+    )
+    require(
+        readback.get("repository_history_reconciled") is False,
+        "Repository migration history may not be marked reconciled by this audit",
+    )
+    require(
+        readback.get("provider_write_performed") is False,
+        "Provider migration state may not be mutated by this audit",
+    )
+    observed_error = migration.get("last_observed_error", "")
+    require(
+        "no migration was applied" in observed_error,
+        "Migration no-apply boundary is missing from the custody evidence",
+    )
+    require(
+        "no provider or repository history was rewritten" in observed_error,
+        "Migration history no-rewrite boundary is missing from the custody evidence",
+    )
+
+'''
+    path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+
+
 def reconcile_context_and_builder() -> None:
     v2_reconcile_context_and_builder()
 
@@ -160,14 +251,31 @@ def reconcile_context_and_builder() -> None:
         raise base.PipelineError("Supabase convergence migration_custody must be an object")
 
     relationship = evidence["inventory_relationship"]
-    custody["default_branch_status"] = evidence["status"]
-    custody["last_observed_error"] = (
-        f"Migration custody is not reconciled: relationship={relationship}; "
-        f"provider_count={evidence['provider_migration_count']}; "
-        f"repository_count={evidence['repository_migration_file_count']}; "
-        "no migration was applied and no provider or repository history was rewritten."
+    custody.update(
+        {
+            "provider_migration_count": evidence["provider_migration_count"],
+            "provider_last_migration_version": evidence[
+                "provider_last_migration_version"
+            ],
+            "provider_last_migration_name": evidence["provider_last_migration_name"],
+            "repository_migration_file_count": evidence[
+                "repository_migration_file_count"
+            ],
+            "count_parity_observed": (
+                evidence["provider_migration_count"]
+                == evidence["repository_migration_file_count"]
+            ),
+            "count_parity_is_not_custody_proof": True,
+            "default_branch_status": evidence["status"],
+            "last_observed_error": (
+                f"Migration custody is not reconciled: relationship={relationship}; "
+                f"provider_count={evidence['provider_migration_count']}; "
+                f"repository_count={evidence['repository_migration_file_count']}; "
+                "no migration was applied and no provider or repository history was rewritten."
+            ),
+            "gate": "HOLD",
+        }
     )
-    custody["gate"] = "HOLD"
     provider_readback = custody.get("provider_ledger_readback")
     if not isinstance(provider_readback, dict):
         provider_readback = {}
@@ -196,6 +304,7 @@ def reconcile_context_and_builder() -> None:
         }
     )
     base.write_json(convergence_path, convergence)
+    reconcile_supabase_validator()
 
     builder_path = ROOT / "scripts/build_penta_os_v1.py"
     builder = builder_path.read_text(encoding="utf-8")
