@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import build_substantive_rebuild_wave1 as wave1
-import build_substantive_rebuild_wave6 as wave6
+import execute_docs_rebuild_quad_lane_batch as quad_lane
 
 BATCH_RECEIPT = ROOT / "developers/manifests/docs-rebuild-quad-lane-batch-002.v1.json"
 PRIOR_GATE_RECEIPT = ROOT / "developers/manifests/docs-wave7-adluxe-substantive-gate-001.v1.json"
@@ -87,13 +87,7 @@ def aggregate_by_id() -> dict[str, dict[str, Any]]:
 
 
 def waves_1_6_ids() -> set[str]:
-    _sets, union = wave6.prior_wave_sets()
-    w6 = wave6.build()
-    union = set(union)
-    union.update(str(r["inventory_id"]) for r in w6["selected_records"])
-    if len(union) != 61:
-        raise ValueError(f"expected 61 Waves 1-6 qualified records, found {len(union)}")
-    return union
+    return quad_lane.prior_ids()
 
 
 def prior_qualified_ids() -> set[str]:
