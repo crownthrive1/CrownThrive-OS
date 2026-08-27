@@ -6,8 +6,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "penta" / "registry" / "penta-component-registry.v1.json"
+VERGENCE_MIGRATION = ROOT / "supabase" / "migrations" / "20260827183500_penta_os_vergence_lineage_reconcile_v1.sql"
 REQUIRED = {
-    "PentaOS", "PentaVergence", "PentaTechture", "PentaPology", "PentaFlex",
+    "PentaOS", "PentaVergence", "PentaCrawler", "PentaTechture", "PentaPology", "PentaFlex",
     "PentaPlanes", "PentaAgents", "PentaMCL", "PentaLLM", "PentaBoxes",
     "PentaStars", "PentaRithms", "PentaSets", "PentaBound", "PentaBind",
     "PentaWire", "PentaSecure", "PentaInterOps", "PentaMaps", "PentaFlows",
@@ -57,6 +58,8 @@ def main() -> int:
     assert by_name["PentaScribe"]["contract"] == "ct.penta.scribe.v1"
     assert by_name["PentaMarketer"]["axis"] == "execution"
     assert by_name["PentaMarketer"]["contract"] == "ct.penta.marketer.v1"
+    assert by_name["PentaCrawler"]["axis"] == "execution"
+    assert by_name["PentaCrawler"]["contract"] == "ct.penta.crawler.v1"
 
     route = by_name["PentaRoute"]
     assert route["contract"] == "ct.penta.route.v3"
@@ -74,15 +77,16 @@ def main() -> int:
         ROOT / "penta" / "marketer" / "runtime.py",
         ROOT / "penta" / "marketer" / "adapters.registry.json",
         ROOT / "penta" / "maps" / "PENTAMAP-001.md",
-        ROOT / "supabase" / "migrations" / "20260826_penta_os_vergence_v1.sql",
+        VERGENCE_MIGRATION,
         ROOT / "supabase" / "functions" / "penta-flex" / "index.ts",
         ROOT / "supabase" / "functions" / "penta-vergence-bridge" / "index.ts",
+        ROOT / "supabase" / "functions" / "penta-crawler" / "index.ts",
         ROOT / "scripts" / "penta_vergence_reconciler.py",
     ]
     absent = [str(p.relative_to(ROOT)) for p in required_files if not p.exists()]
     assert not absent, f"missing implementation files: {absent}"
 
-    migration = (ROOT / "supabase" / "migrations" / "20260826_penta_os_vergence_v1.sql").read_text(encoding="utf-8")
+    migration = VERGENCE_MIGRATION.read_text(encoding="utf-8")
     for invariant in [
         "force row level security",
         "penta-vergence-continuity-4h-v1",
@@ -90,8 +94,14 @@ def main() -> int:
         "America/New_York",
         "penta_vergence_claim_v1",
         "penta_vergence_complete_v1",
+        "crownthrive1/CrownThrive-OS",
+        "historical_read_only",
     ]:
-        assert invariant.lower() in migration.lower(), f"migration invariant missing: {invariant}"
+        assert invariant.lower() in migration.lower(), f"PentaVergence lineage invariant missing: {invariant}"
+
+    vergence_runtime = (ROOT / "penta" / "runtime" / "penta_vergence.ts").read_text(encoding="utf-8")
+    for invariant in ["PRESERVE_HOLD", "CLOSE_REPRESENTED", "MERGE_CANDIDATE", "RESTACK_REQUIRED", "mutationAllowed"]:
+        assert invariant in vergence_runtime, f"PentaVergence decision invariant missing: {invariant}"
 
     reconciler = (ROOT / "scripts" / "penta_vergence_reconciler.py").read_text(encoding="utf-8").lower()
     assert "git push --force" not in reconciler
