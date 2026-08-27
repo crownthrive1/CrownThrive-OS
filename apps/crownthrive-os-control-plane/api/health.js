@@ -1,5 +1,5 @@
 export default function handler(_request, response) {
-  const release = process.env.CROWNTHRIVE_OS_RELEASE || 'candidate';
+  const release = process.env.CROWNTHRIVE_OS_RELEASE || (process.env.VERCEL_ENV === 'production' ? 'production' : 'candidate');
   const providerState = process.env.VERCEL_ENV ? 'BOUND_' + process.env.VERCEL_ENV.toUpperCase() : 'BINDING_REQUIRED';
   const payload = {
     schema: 'ct.penta.vercel.health.20260827.v1',
