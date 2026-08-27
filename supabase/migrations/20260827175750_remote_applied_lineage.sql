@@ -1,0 +1,9 @@
+-- remote_applied_version: 20260827175750
+-- CrownThrive migration-lineage restoration marker v3
+-- Production migration name: pentafactory_final_production_proof_v1
+-- This timestamp is recorded as APPLIED in production ThriveBase.
+-- Exact historical SQL is intentionally not republished from production history.
+-- Canonical applied SQL remains under production migration-ledger custody.
+-- This file is a no-op and exists only to restore Git/Supabase timestamp lineage parity.
+-- It does not recreate, re-run, roll back, or mutate the production migration.
+-- Clean-room reconstruction from public lineage markers alone remains NOT CERTIFIED.
