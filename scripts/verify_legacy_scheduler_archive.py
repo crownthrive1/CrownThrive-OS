@@ -12,17 +12,28 @@ import json
 import pathlib
 import re
 import subprocess
-import sys
 from collections.abc import Iterable
 
+# Require an actual separator before the role letter. This prevents the ordinary
+# plural word "agents" from being interpreted as the historical "Agent S" role.
 ROLE = re.compile(
-    r"(?i)(?:^|[^a-z0-9])(?:agent[ ._/-]?[abcds]|a/b/c/d/s|original[ ._-]?five|one[ ._-]?agent[ ._-]?one[ ._-]?clock)(?:[^a-z0-9]|$)"
+    r"(?i)(?:^|[^a-z0-9])(?:agent(?:[ ._/-]+)[abcds]|a/b/c/d/s|original[ ._-]?five|one[ ._-]?agent[ ._-]?one[ ._-]?clock)(?:[^a-z0-9]|$)"
 )
 CLOCK = re.compile(
     r"(?i)(schedule|scheduler|clock|chatgpt|external[ ._-]?task|recurring[ ._-]?task|hourly[ ._-]?relay|provider[ ._-]?task)"
 )
-HISTORICAL = re.compile(
-    r"(?i)(historical|history|retired(?:_scheduling_scaffolding)?|superseded|archiv(?:e|ed|al)|former|prior|dated context|do not reactivate|reactivation prohibited|no current clock)"
+
+# Explicit historical and prohibition language is allowed. These phrases state
+# that the old topology cannot execute; they are not evidence of reactivation.
+HISTORICAL_OR_PROHIBITED = re.compile(
+    r"(?i)("
+    r"historical(?:-only)?|history|retired(?:_scheduling_scaffolding)?|superseded|"
+    r"archiv(?:e|ed|al)|former|prior|dated context|"
+    r"do not reactivate|must not be reactivated|reactivation prohibited|"
+    r"no current clock|has no current clock|no standalone clock|"
+    r"not a replacement|not retained as runnable|not part of the current|"
+    r"do not create|must not create|does not create|cannot create|cannot schedule"
+    r")"
 )
 OLD_PROVIDER_TASK_IDS = {
     "6a85065e56f08191aefd4180c2038452",
@@ -122,7 +133,11 @@ def scan(root: pathlib.Path, base: str | None) -> list[dict[str, object]]:
                 )
                 continue
 
-            if ROLE.search(line) and CLOCK.search(line) and not HISTORICAL.search(line):
+            if (
+                ROLE.search(line)
+                and CLOCK.search(line)
+                and not HISTORICAL_OR_PROHIBITED.search(line)
+            ):
                 violations.append(
                     {
                         "kind": "legacy_scheduler_semantics",
