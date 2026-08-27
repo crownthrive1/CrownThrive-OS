@@ -1,0 +1,6 @@
+-- CrownThrive PentaMigrationLineage™ historical migration marker.
+-- Provider-applied version: 20260827183832
+-- Provider migration name: retire_site_autopublish_quorum_for_autonomous_factory_v2
+-- Exact historical SQL is not reconstructed or claimed here.
+-- This marker exists only to restore immutable migration-version lineage parity.
+-- Production migration history was not mutated by this repair.
