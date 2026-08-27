@@ -1,5 +1,4 @@
 name: Penta Provider Control Plane
-
 on:
   workflow_dispatch:
     inputs:
@@ -34,18 +33,12 @@ on:
       - 'developers/manifests/penta-runtime-suite.v1.json'
   schedule:
     - cron: '17 * * * *'
-
-# Default-deny privileged identity issuance. PR validation and ordinary provider
-# control-plane runs require repository read access only. If a future provider
-# requires GitHub OIDC, grant `id-token: write` on that specific non-PR job and
-# bind the provider trust policy to the exact repository/ref/environment.
+# OIDC is default-denied here. Any future grant must be job-scoped to a non-PR path.
 permissions:
   contents: read
-
 concurrency:
   group: penta-provider-control-plane-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   software-provider-control:
     runs-on: ubuntu-latest
@@ -65,17 +58,14 @@ jobs:
       PENTAMAIL_FROM: ${{ secrets.PENTAMAIL_FROM }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Validate Penta provider contracts
         run: python3 scripts/validate_penta_provider_control_plane.py
-
       - name: Build, bind, certify, nurture
         run: |
           set -euo pipefail
           python3 runtime/penta-provider-control-plane/penta_control_plane.py \
             --state .penta/provider-control-plane all \
             | tee penta-provider-readiness.json
-
       - name: Publish readiness summary
         if: always()
         shell: bash
@@ -93,28 +83,24 @@ jobs:
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-
   penta-runtime-suite:
     needs: software-provider-control
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Compile shared Penta runtime
         run: |
           python3 -m py_compile \
             runtime/penta_mail.py \
             runtime/penta_runtime_suite.py \
             runtime/penta-provider-control-plane/penta_control_plane.py
-
       - name: Run Penta runtime regression suite
         run: |
           python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
           python3 -m unittest discover -s tests -p 'test_penta_runtime_suite.py' -v
           python3 tests/test_penta_family.py
           python3 -m unittest discover -s tests -p 'test_penta_institutional_services.py' -v
-
       - name: Generate evidence-backed runtime truth snapshot
         run: |
           python3 runtime/penta_runtime_suite.py --root . --output penta-runtime-suite-report.json
@@ -123,7 +109,6 @@ jobs:
           import json
           from pathlib import Path
           import sys
-
           path = Path('runtime/penta_runtime_suite.py')
           spec = importlib.util.spec_from_file_location('penta_runtime_suite_ci', path)
           mod = importlib.util.module_from_spec(spec)
@@ -138,7 +123,6 @@ jobs:
           if not snapshot['pentamail']['resend_registered']:
               raise SystemExit('Resend provider missing from Penta provider registry')
           PY
-
   provider-live-readback:
     needs: software-provider-control
     runs-on: ubuntu-latest
@@ -151,7 +135,6 @@ jobs:
     name: certify / ${{ matrix.provider }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Live certify ${{ matrix.provider }}
         id: certify
         continue-on-error: true
@@ -165,7 +148,6 @@ jobs:
           import os
           from pathlib import Path
           import sys
-
           root = Path.cwd()
           module_path = root / 'runtime' / 'penta-provider-control-plane' / 'penta_control_plane.py'
           registry_path = root / 'runtime' / 'penta-provider-control-plane' / 'providers.json'
@@ -173,7 +155,6 @@ jobs:
           mod = importlib.util.module_from_spec(spec)
           sys.modules[spec.name] = mod
           spec.loader.exec_module(mod)
-
           provider_id = os.environ['PROVIDER_ID']
           registry = mod.Registry(registry_path)
           state = root / '.penta' / ('provider-' + provider_id)
@@ -197,7 +178,6 @@ jobs:
           if cert.state not in {'CERTIFIED', 'WRITE_VERIFIED'}:
               raise SystemExit(78)
           PY
-
       - name: Record provider disposition
         if: always()
         shell: bash
@@ -209,7 +189,6 @@ jobs:
             echo '### ${{ matrix.provider }} — HOLD' >> "$GITHUB_STEP_SUMMARY"
             echo 'Credential binding or live provider readback is not yet proven. No authority was manufactured.' >> "$GITHUB_STEP_SUMMARY"
           fi
-
   pentamail-live-certification:
     needs: [penta-runtime-suite]
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[pentamail-live-certify]'))
@@ -218,7 +197,6 @@ jobs:
     env: *provider-env
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Resolve authorized recipient
         shell: bash
         run: |
@@ -227,7 +205,6 @@ jobs:
           else
             echo 'PENTAMAIL_RECIPIENT=jones.usmc.kj@gmail.com' >> "$GITHUB_ENV"
           fi
-
       - name: Establish Resend read-only certification
         run: |
           python3 - <<'PY'
@@ -235,7 +212,6 @@ jobs:
           import json
           from pathlib import Path
           import sys
-
           root = Path.cwd()
           module_path = root / 'runtime' / 'penta-provider-control-plane' / 'penta_control_plane.py'
           spec = importlib.util.spec_from_file_location('penta_control_plane_live_mail', module_path)
@@ -260,7 +236,6 @@ jobs:
           if cert.state not in {'CERTIFIED', 'WRITE_VERIFIED'} or 'domain_read' not in cert.certified_operations:
               raise SystemExit('Resend domain_read certification is not proven')
           PY
-
       - name: Send PentaStatus owner report through PentaMail
         run: |
           python3 - <<'PY'
@@ -269,7 +244,6 @@ jobs:
           import os
           from pathlib import Path
           import sys
-
           root = Path.cwd()
           def load(name, path):
               spec = importlib.util.spec_from_file_location(name, path)
@@ -277,7 +251,6 @@ jobs:
               sys.modules[spec.name] = mod
               spec.loader.exec_module(mod)
               return mod
-
           pm = load('penta_mail_live', root / 'runtime' / 'penta_mail.py')
           prs = load('penta_runtime_suite_live', root / 'runtime' / 'penta_runtime_suite.py')
           snapshot = prs.build_snapshot(root)
@@ -286,7 +259,6 @@ jobs:
           report += '\nGitHub commit: ' + os.environ['GITHUB_SHA']
           report += '\nExecution lane: registered Penta Provider Control Plane bridge.'
           report += '\nNo unrelated Penta maturity is promoted by this transport proof.'
-
           sender = (os.environ.get('PENTAMAIL_FROM') or '').strip() or 'CrownThrive PentaMail <contact@crownthrive.com>'
           recipient = os.environ['PENTAMAIL_RECIPIENT'].strip()
           correlation = 'pentamail-live-' + os.environ['GITHUB_RUN_ID']
@@ -326,7 +298,6 @@ jobs:
               'exact_readback': all(e.get('readback') is True for e in receipt['live_evidence']),
           }, sort_keys=True))
           PY
-
       - name: Promote exact email_send operation only after readback
         run: |
           python3 - <<'PY'
@@ -334,7 +305,6 @@ jobs:
           import json
           from pathlib import Path
           import sys
-
           root = Path.cwd()
           module_path = root / 'runtime' / 'penta-provider-control-plane' / 'penta_control_plane.py'
           spec = importlib.util.spec_from_file_location('penta_control_plane_post_mail', module_path)
@@ -344,6 +314,3 @@ jobs:
           receipt = json.loads(Path('pentamail-live-receipt.json').read_text())
           registry = mod.Registry(root / 'runtime' / 'penta-provider-control-plane' / 'providers.json')
           state = root / '.penta' / 'pentamail-provider-control'
-          cert = mod.PentaCertify(registry, state).certify('resend', live_evidence=receipt['live_evidence'])
-          nurture = mod.PentaNurture(registry, state).observe('resend')
-          gate = mod.ProductionGate(registry, state).decide('resend',
