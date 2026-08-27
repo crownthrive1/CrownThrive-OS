@@ -45,11 +45,16 @@ jobs:
           set -euo pipefail
           python scripts/penta_heal.py --root . --gate-report "$RUNNER_TEMP/pentagate.json" --output "$RUNNER_TEMP/pentaheal.json" || true
 
-      - name: Certify PentaGate and PentaHeal contracts
+      - name: Certify PentaGate, PentaHeal, and PentaPR lifecycle contracts
         shell: bash
         run: |
           set -euo pipefail
-          python -m unittest tests.test_penta_gate_heal tests.test_penta_lifecycle_proof -v
+          python -m unittest \
+            tests.test_penta_gate_heal \
+            tests.test_penta_lifecycle_proof \
+            tests.test_penta_pr_lifecycle \
+            tests.test_penta_pr_self_pending \
+            -v
 
       - name: PentaHeal deterministic generated-state preview
         id: generated
