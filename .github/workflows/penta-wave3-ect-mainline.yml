@@ -2,10 +2,8 @@ name: Penta Wave 3 ECT Mainline Production
 
 on:
   push:
-    branches:
-      - penta-production-promotion-wave3-restack-20260826-v2
-    paths:
-      - ".github/workflows/penta-wave3-ect-mainline.yml"
+    branches: [penta-production-promotion-wave3-restack-20260826-v2]
+    paths: [".github/workflows/penta-wave3-ect-mainline.yml"]
 
 permissions:
   contents: write
@@ -86,7 +84,7 @@ jobs:
           git checkout -B penta-wave3-ect-integration origin/main
           git clean -fdx
 
-      - name: Additively integrate Wave 3 and reconcile production contracts
+      - name: Integrate Wave 3 and reconcile production semantics
         env:
           OLD_HEAD: "105460c828e8baf0d034d43689b278b47d2f9833"
         run: |
@@ -96,60 +94,73 @@ jobs:
           from pathlib import Path
 
           family_path = Path("tests/test_penta_family.py")
-          family_text = family_path.read_text(encoding="utf-8")
+          family = family_path.read_text(encoding="utf-8")
           for key in ("penta.mail", "penta.status", "penta.credentials", "penta.build", "penta.certify"):
               needle = f'        "{key}",\n'
-              index = family_text.find(needle)
+              index = family.find(needle)
               if index < 0:
-                  raise SystemExit(f"stale held-member entry was not found: {key}")
-              family_text = family_text[:index] + family_text[index + len(needle):]
-          family_replacements = {
+                  raise SystemExit(f"stale held-member entry not found: {key}")
+              family = family[:index] + family[index + len(needle):]
+          for old, new in {
               '    assert mail["sections"]["status"]["member_maturity"] == "specified"':
                   '    assert mail["sections"]["status"]["member_maturity"] == "production"',
               '    assert mail["sections"]["status"]["execution_eligible"] is False':
                   '    assert mail["sections"]["status"]["execution_eligible"] is True',
-          }
-          for old, new in family_replacements.items():
-              if old in family_text:
-                  family_text = family_text.replace(old, new, 1)
-              elif new not in family_text:
-                  raise SystemExit(f"promotion assertion was not found: {old}")
-          family_path.write_text(family_text, encoding="utf-8")
+          }.items():
+              if old in family:
+                  family = family.replace(old, new, 1)
+              elif new not in family:
+                  raise SystemExit(f"promotion assertion not found: {old}")
+          family_path.write_text(family, encoding="utf-8")
 
           exec_path = Path("tests/test_penta_exec.py")
-          exec_text = exec_path.read_text(encoding="utf-8")
-          context_replacements = {
+          executable = exec_path.read_text(encoding="utf-8")
+          for old, new in {
               '    assert context["details"]["result"]["state"] == "PRODUCTION_CONTRACT_PRESENT"':
                   '    assert context["details"]["result"]["effective_maturity"] == "production"',
               '    assert context["details"]["result"]["missing_refs"] == []':
                   '    assert context["details"]["result"]["runtime_present"] is True and context["details"]["result"]["contract_tests_present"] is True and context["details"]["result"]["ci_present"] is True and context["details"]["result"]["edge_runtime_present"] is True and context["details"]["result"]["documentation_evidence_present"] is True',
               '    assert context["details"]["result"]["secret_values_returned"] is False':
                   '    assert context["details"]["result"]["provider_call_performed"] is False and context["details"]["result"]["credential_material_accessed"] is False and context["details"]["result"]["authority_expanded"] is False',
-          }
-          for old, new in context_replacements.items():
-              if old in exec_text:
-                  exec_text = exec_text.replace(old, new, 1)
-              elif new not in exec_text:
-                  raise SystemExit(f"context contract assertion was not found: {old}")
-          exec_path.write_text(exec_text, encoding="utf-8")
+          }.items():
+              if old in executable:
+                  executable = executable.replace(old, new, 1)
+              elif new not in executable:
+                  raise SystemExit(f"context assertion not found: {old}")
+          exec_path.write_text(executable, encoding="utf-8")
 
           context_path = Path("data/penta/systems.extensions.context.json")
           context_catalog = json.loads(context_path.read_text(encoding="utf-8"))
           context_systems = context_catalog.get("systems")
           if not isinstance(context_systems, list) or len(context_systems) != 1:
               raise SystemExit("PentaContext catalog must contain exactly one system")
-          context_system = context_systems[0]
-          context_system["axis"] = "truth"
-          context_system["purpose"] = "Provide scoped, provenance-aware, redacted operational-memory and bounded context retrieval across approved CrownThrive systems without manufacturing permissions or execution authority."
+          context_systems[0]["axis"] = "truth"
+          context_systems[0]["purpose"] = "Provide scoped, provenance-aware, redacted operational-memory and bounded context retrieval across approved CrownThrive systems without manufacturing permissions or execution authority."
           context_path.write_text(json.dumps(context_catalog, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-          os_test_path = Path("tests/test_penta_os_v1.py")
-          os_test = os_test_path.read_text(encoding="utf-8")
-          os_replacements = {
+          builder_path = Path("scripts/build_penta_os_v1.py")
+          builder = builder_path.read_text(encoding="utf-8")
+          old_axis = '        axis=infer_axis(machine_key, canonical_name, str(item.get("category", "")), purpose),'
+          new_axis = '        axis=str(item.get("axis") or infer_axis(machine_key, canonical_name, str(item.get("category", "")), purpose)),'
+          if old_axis in builder:
+              builder = builder.replace(old_axis, new_axis, 1)
+          elif new_axis not in builder:
+              raise SystemExit("PentaOS explicit-axis precedence insertion point missing")
+          builder_path.write_text(builder, encoding="utf-8")
+
+          os_path = Path("tests/test_penta_os_v1.py")
+          os_test = os_path.read_text(encoding="utf-8")
+          replacements = {
               'self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 15)':
                   'self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 16)',
               '            "implemented": 40,': '            "implemented": 39,',
               '            "production": 15,': '            "production": 16,',
+              'self.assertEqual(counts["members_with_declared_edges"], 69)':
+                  'self.assertEqual(counts["members_with_declared_edges"], 70)',
+              'self.assertEqual(counts["edge_count"], 157)':
+                  'self.assertEqual(counts["edge_count"], 161)',
+              'self.assertEqual(counts["internal_dependency_edges"], 142)':
+                  'self.assertEqual(counts["internal_dependency_edges"], 146)',
               'self.assertEqual(counts["dependency_assessed_members"], 70)':
                   'self.assertEqual(counts["dependency_assessed_members"], 71)',
               'self.assertEqual(counts["dependency_unassessed_members"], 144)':
@@ -160,15 +171,15 @@ jobs:
                   '            "HOLD_DEPENDENCY_MATURITY": 9,',
               '("truth", "implemented", "D2")': '("truth", "production", "D2")',
           }
-          for old, new in os_replacements.items():
+          for old, new in replacements.items():
               if old in os_test:
                   os_test = os_test.replace(old, new, 1)
               elif new not in os_test:
-                  raise SystemExit(f"PentaOS production-context expectation was not found: {old}")
-          os_test_path.write_text(os_test, encoding="utf-8")
+                  raise SystemExit(f"PentaOS expectation not found: {old}")
+          os_path.write_text(os_test, encoding="utf-8")
           PY
 
-      - name: Regenerate and validate canonical projections
+      - name: Regenerate compile and validate canonical projections
         run: |
           set -euo pipefail
           python scripts/build_penta_os_v1.py --write
@@ -181,13 +192,9 @@ jobs:
             runtime/penta_context.py runtime/penta_evi_builder.py runtime/penta_immune.py \
             runtime/penta_os_v1.py runtime/penta-provider-control-plane/penta_control_plane.py \
             scripts/build_penta_os_v1.py scripts/package_penta_os_v1.py
-          for file in \
-            data/penta/family.registry.json \
-            data/penta/execution-adapters.registry.json \
-            data/penta/member-runtime.contract.json \
-            data/penta/production-promotions.v1.json \
-            data/penta/systems.extensions.context.json \
-            penta/registry/penta-families.v1.json; do
+          for file in data/penta/family.registry.json data/penta/execution-adapters.registry.json \
+            data/penta/member-runtime.contract.json data/penta/production-promotions.v1.json \
+            data/penta/systems.extensions.context.json penta/registry/penta-families.v1.json; do
             python -m json.tool "$file" >/dev/null
           done
           python scripts/validate_penta_provider_control_plane.py
@@ -220,11 +227,8 @@ jobs:
           set -euo pipefail
           python scripts/package_penta_os_v1.py --output dist/penta-os-v1/build-a --source-revision "$MAIN_SHA"
           python scripts/package_penta_os_v1.py --output dist/penta-os-v1/build-b --source-revision "$MAIN_SHA"
-          python scripts/package_penta_os_v1.py \
-            --output dist/penta-os-v1/build-a \
-            --verify \
-            --compare-output dist/penta-os-v1/build-b \
-            > /tmp/penta-os-package-verification.json
+          python scripts/package_penta_os_v1.py --output dist/penta-os-v1/build-a --verify \
+            --compare-output dist/penta-os-v1/build-b > /tmp/penta-os-package-verification.json
           (cd dist/penta-os-v1/build-a && sha256sum -c penta-os-v1-1.5.0.sha256)
 
       - name: Seal exact ECT evidence and remove generated artifacts
@@ -282,18 +286,18 @@ jobs:
           path = root / 'evidence/penta/penta-wave3-ect-20260827.json'
           path.parent.mkdir(parents=True, exist_ok=True)
           path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
-          print(json.dumps(receipt, indent=2, sort_keys=True))
           assert receipt['promotion_count'] == 5
           assert receipt['bounded_executable_adapters'] == receipt['execution_eligible_members']
           assert receipt['provider_effect_adapters'] == 0
           assert receipt['interoperability_status'] == 'PASS'
           assert receipt['interoperability_blockers'] == 0
+          print(json.dumps(receipt, indent=2, sort_keys=True))
           PY
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
           rm -rf .pytest_cache .mypy_cache .ruff_cache dist
 
-      - name: Commit exact certified candidate and force-restack PR branch
+      - name: Commit certified candidate and force-restack PR branch
         shell: bash
         run: |
           set -euo pipefail
@@ -302,7 +306,7 @@ jobs:
           git add -A
           git diff --cached --check
           if git diff --cached --quiet; then
-            echo "No integrated production delta was generated."
+            echo "No integrated production delta generated."
             exit 1
           fi
           git commit -m "feat(ect): integrate Wave 3 into PentaOS V1.5 production"
@@ -313,13 +317,12 @@ jobs:
           path = Path('evidence/penta/penta-wave3-ect-20260827.json')
           data = json.loads(path.read_text())
           data['candidate_sha'] = '$CANDIDATE_SHA'
-          data['candidate_binding'] = 'This ECT receipt is committed in and binds the exact candidate SHA through the containing amended commit.'
+          data['candidate_binding'] = 'The containing amended commit binds this exact ECT candidate.'
           path.write_text(json.dumps(data, indent=2, sort_keys=True) + '\n')
           PY
           git add evidence/penta/penta-wave3-ect-20260827.json
           git commit --amend --no-edit
           FINAL_SHA=$(git rev-parse HEAD)
-          python -m json.tool evidence/penta/penta-wave3-ect-20260827.json >/dev/null
           git diff --check HEAD^
           git push --force-with-lease origin "HEAD:penta-production-promotion-wave3-restack-20260826-v2"
           echo "FINAL_SHA=$FINAL_SHA" >> "$GITHUB_ENV"
@@ -334,6 +337,4 @@ jobs:
             echo '- ECT: PASS'
             echo '- Promotion model: explicit evidence-bound; no automatic authority'
             echo '- Provider-effect adapters: 0'
-            echo '- PentaEVIBuilder: UNVERIFIED evidence preview only'
-            echo '- PentaImmune: bounded repair-plan preview only'
           } >> "$GITHUB_STEP_SUMMARY"
