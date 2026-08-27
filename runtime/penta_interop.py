@@ -113,6 +113,8 @@ def validate_interoperability_registry(registry: Mapping[str, Any]) -> None:
         "execution_preserves_member_maturity",
         "consequential_execution_requires_authority",
         "provider_execution_requires_certified_binding_and_readback",
+        "execution_requires_dail_event_plan",
+        "material_execution_requires_sealed_receipt_before_certification",
     ):
         if invariants.get(flag) is not True:
             raise PentaInteropError(f"invariants.{flag} must be true")
@@ -123,6 +125,18 @@ def validate_interoperability_registry(registry: Mapping[str, Any]) -> None:
     observability = set(registry.get("required_observability") or [])
     if observability != REQUIRED_OBSERVABILITY:
         raise PentaInteropError("required_observability does not match the canonical Penta observability spine")
+    handoff = registry.get("handoff_contract")
+    if not isinstance(handoff, Mapping):
+        raise PentaInteropError("handoff_contract must be an object")
+    if set(handoff.get("dail_write_modes") or []) != {"same_transaction", "transactional_outbox"}:
+        raise PentaInteropError("handoff_contract.dail_write_modes drift")
+    for flag in (
+        "execute_requires_chlom_and_dail_authority_refs",
+        "execute_requires_dail_event_plan",
+        "terminal_execution_requires_dail_receipt",
+    ):
+        if handoff.get(flag) is not True:
+            raise PentaInteropError(f"handoff_contract.{flag} must be true")
 
 
 def build_envelope(
@@ -259,8 +273,21 @@ def validate_envelope(envelope: Mapping[str, Any]) -> None:
 def _authority_present(envelope: Mapping[str, Any]) -> bool:
     authority = envelope["authority_trace"]
     return bool(
-        (authority.get("chlom_ref") or authority.get("dail_ref"))
+        authority.get("chlom_ref")
+        and authority.get("dail_ref")
         and authority.get("accountable_owner")
+    )
+
+
+def _dail_write_plan_present(envelope: Mapping[str, Any]) -> bool:
+    """Require every execution handoff to declare how its material event is sealed."""
+    metadata = envelope.get("metadata")
+    if not isinstance(metadata, Mapping):
+        return False
+    return bool(
+        metadata.get("dail_write_mode") in {"same_transaction", "transactional_outbox"}
+        and isinstance(metadata.get("dail_event_plan_ref"), str)
+        and metadata["dail_event_plan_ref"].strip()
     )
 
 
@@ -277,6 +304,8 @@ def _decision(disposition: str, reasons: list[str], *, envelope: Mapping[str, An
         "trace_id": envelope["trace_id"],
         "correlation_id": envelope["correlation_id"],
         "idempotency_key": envelope["idempotency_key"],
+        "dail_write_mode": envelope["metadata"].get("dail_write_mode"),
+        "dail_event_plan_ref": envelope["metadata"].get("dail_event_plan_ref"),
     }
     result["receipt_sha256"] = receipt_sha256(result)
     return result
@@ -322,7 +351,9 @@ def evaluate_handoff(family_snapshot: Mapping[str, Any], envelope: Mapping[str, 
     if target_maturity not in EXECUTION_ELIGIBLE:
         reasons.append(f"target maturity {target_maturity!r} is not execution-eligible")
     if not _authority_present(envelope):
-        reasons.append("execute requires CHLOM/DAIL authority trace and accountable owner")
+        reasons.append("execute requires both CHLOM and DAIL authority traces plus an accountable owner")
+    if not _dail_write_plan_present(envelope):
+        reasons.append("execute requires a canonical DAIL event plan using same_transaction or transactional_outbox")
 
     gate = envelope["human_gate"]
     human_required = envelope["risk_class"] in {"D2", "D3"} or gate.get("required") is True
@@ -350,7 +381,7 @@ def evaluate_handoff(family_snapshot: Mapping[str, Any], envelope: Mapping[str, 
         )
     return _decision(
         "execution_ready",
-        ["all repository-level interoperability gates represented; exact domain/provider execution remains separately bounded"],
+        ["all repository-level interoperability and DAIL sealing gates represented; exact domain/provider execution remains separately bounded"],
         envelope=envelope,
         source=source,
         target=target,
@@ -421,9 +452,14 @@ def build_interoperability_snapshot(root: Path) -> dict[str, Any]:
             "execution_preserves_member_maturity",
             "consequential_execution_requires_authority",
             "provider_execution_requires_certified_binding_and_readback",
+            "execution_requires_chlom_and_dail_authority_refs",
+            "execution_requires_dail_event_plan",
+            "terminal_execution_requires_dail_receipt",
         ):
             if family_interop.get(flag) is not True:
                 contract_errors.append(f"family interoperability_contract.{flag} must be true")
+        if set(family_interop.get("dail_write_modes") or []) != {"same_transaction", "transactional_outbox"}:
+            contract_errors.append("family interoperability_contract.dail_write_modes mismatch")
 
     coverage = []
     for machine_key in sorted(family_members):

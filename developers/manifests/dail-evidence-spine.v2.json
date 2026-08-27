@@ -1,0 +1,206 @@
+{
+  "schema_version": "2.0.0",
+  "manifest_id": "ct.manifest.dail-evidence-spine.v2",
+  "contract": "developers/contracts/dail-evidence-spine.contract.v2.json",
+  "lifecycle_state": "SOURCE_IMPLEMENTED_PENDING_INDEPENDENT_VERIFICATION_AND_RUNTIME_APPLY",
+  "framework_count_delta": 0,
+  "native_substrate_state": "DEFERRED_TARGET_ARCHITECTURE",
+  "canonical_chain_id": "ct.dail.global.v1",
+  "integration_rule": "Every material state transition must receive one canonical DAIL receipt in the same transaction or through a fail-closed transactional outbox. Raw bodies and high-volume telemetry remain in authorized stores and are represented by digests and references.",
+  "pentafabric_layer_bindings": [
+    {
+      "layer_id": "ct.pentafabric.identity-imprint",
+      "material_event_families": ["identity.created", "identity.changed", "custody.changed", "provenance.corrected"],
+      "write_mode": "same_transaction",
+      "minimum_evidence_class": "E2_SEPARATE_WORKLOAD_VERIFIED"
+    },
+    {
+      "layer_id": "ct.pentafabric.rights-conditions",
+      "material_event_families": ["rights.asserted", "rights.approved", "license.issued", "license.revoked", "policy.decision", "hold.changed"],
+      "write_mode": "same_transaction",
+      "minimum_evidence_class": "E2_SEPARATE_WORKLOAD_VERIFIED"
+    },
+    {
+      "layer_id": "ct.pentafabric.ledger-assurance",
+      "material_event_families": ["evidence.accepted", "verification.completed", "checkpoint.anchored", "correction.appended", "certification.decided"],
+      "write_mode": "canonical_append",
+      "minimum_evidence_class": "E1_INTERNAL_HASHED"
+    },
+    {
+      "layer_id": "ct.pentafabric.execution-interoperability",
+      "material_event_families": ["build.transitioned", "deployment.transitioned", "provider.operation", "mesh.failover", "rollback.completed"],
+      "write_mode": "same_transaction_or_transactional_outbox",
+      "minimum_evidence_class": "E2_SEPARATE_WORKLOAD_VERIFIED"
+    },
+    {
+      "layer_id": "ct.pentafabric.economy-distribution",
+      "material_event_families": ["commerce.activated", "payment.provider_event", "entitlement.changed", "settlement.reconciled", "payout.transitioned"],
+      "write_mode": "same_transaction_fail_closed",
+      "minimum_evidence_class": "E4_EXTERNAL_SYMMETRIC_VERIFIED"
+    }
+  ],
+  "capability_pallet_bindings": [
+    {"pallet_id": "P-01", "name": "Identity & Access", "event_families": ["identity", "access", "authentication"], "classification": "restricted", "dail_receipt_required": true},
+    {"pallet_id": "P-02", "name": "Governance & Compliance", "event_families": ["authority", "approval", "policy", "compliance", "hold"], "classification": "internal_or_restricted", "dail_receipt_required": true},
+    {"pallet_id": "P-03", "name": "Rights & Licensing", "event_families": ["rights", "license", "revocation", "remedy"], "classification": "restricted", "dail_receipt_required": true},
+    {"pallet_id": "P-04", "name": "Media & Intellectual Property", "event_families": ["asset", "provenance", "custody", "publication"], "classification": "mixed", "dail_receipt_required": true},
+    {"pallet_id": "P-05", "name": "Growth, Advertising & Measurement", "event_families": ["campaign", "attribution", "conversion", "measurement"], "classification": "mixed", "dail_receipt_required": true},
+    {"pallet_id": "P-06", "name": "Commerce, Booking & Loyalty", "event_families": ["product", "offer", "order", "booking", "entitlement", "loyalty"], "classification": "restricted", "dail_receipt_required": true},
+    {"pallet_id": "P-07", "name": "Community, Directory & Events", "event_families": ["membership", "directory", "community_event"], "classification": "mixed", "dail_receipt_required": true},
+    {"pallet_id": "P-08", "name": "Education, Incubator & Impact", "event_families": ["enrollment", "credential", "incubation", "impact"], "classification": "mixed", "dail_receipt_required": true},
+    {"pallet_id": "P-09", "name": "Physical Suites & Place-Based", "event_families": ["place", "suite", "occupancy", "facility"], "classification": "restricted", "dail_receipt_required": true},
+    {"pallet_id": "P-10", "name": "Operations & Institutional Memory", "event_families": ["operation", "incident", "backup", "restore", "documentation", "factory"], "classification": "internal", "dail_receipt_required": true},
+    {"pallet_id": "P-11", "name": "Capital, Revenue & Settlement", "event_families": ["price", "payment", "revenue", "royalty", "commission", "settlement"], "classification": "restricted", "dail_receipt_required": true},
+    {"pallet_id": "P-12", "name": "Sustainability & Impact Evidence", "event_families": ["sustainability", "impact_evidence", "attestation"], "classification": "mixed", "dail_receipt_required": true}
+  ],
+  "os_surface_bindings": [
+    {
+      "surface_id": "ct.os.canon-source",
+      "material_transitions": ["source.accepted", "canon.adjudicated", "correction.appended", "supersession.appended"],
+      "write_mode": "same_transaction_or_git_receipt_outbox",
+      "body_custody": "Git_or_Evidence_Vault",
+      "binding_state": "CONTRACT_REQUIRED_ADAPTER_CENSUS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.identity-authority",
+      "material_transitions": ["identity.changed", "delegation.changed", "approval.decided", "authority.revoked"],
+      "write_mode": "same_transaction_fail_closed",
+      "body_custody": "ThriveBase_restricted",
+      "binding_state": "CONTRACT_REQUIRED_ADAPTER_CENSUS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.rights-licensing",
+      "material_transitions": ["rights.asserted", "license.issued", "license.revoked", "remedy.changed"],
+      "write_mode": "same_transaction_fail_closed",
+      "body_custody": "Rights_Vault_and_ThriveBase_restricted",
+      "binding_state": "CONTRACT_REQUIRED_ADAPTER_CENSUS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.thrivebase-domain-state",
+      "material_transitions": ["domain_state.created", "domain_state.changed", "domain_state.corrected"],
+      "write_mode": "transactional_rpc_or_fail_closed_outbox",
+      "body_custody": "owning_database_schema",
+      "binding_state": "DAIL_V2_RPC_SOURCE_IMPLEMENTED_DOMAIN_ADAPTER_CENSUS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.factory-build",
+      "material_transitions": ["contour.completed", "build.checkpointed", "test.completed", "deployment.changed", "rollback.completed"],
+      "write_mode": "atomic_checkpoint_dail_and_outbox",
+      "body_custody": "Factory_artifact_store",
+      "binding_state": "SOURCE_CONTRACT_IMPLEMENTED_RUNTIME_ADAPTER_PENDING"
+    },
+    {
+      "surface_id": "ct.os.release-distribution",
+      "material_transitions": ["release.candidate", "release.published", "artifact.readback", "release.rolled_back"],
+      "write_mode": "provider_idempotency_then_readback_then_dail",
+      "body_custody": "GitHub_release_and_archive_store",
+      "binding_state": "CONTRACT_REQUIRED_ADAPTER_CENSUS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.provider-adapters",
+      "material_transitions": ["provider.ingress", "provider.operation", "provider.readback", "provider.reversal"],
+      "write_mode": "verified_ingress_or_prepare_send_readback_commit",
+      "body_custody": "provider_and_private_evidence_store",
+      "binding_state": "STRIPE_SOURCE_IMPLEMENTED_OTHER_ADAPTERS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.commerce-economics",
+      "material_transitions": ["commerce.activated", "price.changed", "entitlement.changed", "settlement.changed", "payout.changed"],
+      "write_mode": "same_transaction_fail_closed",
+      "body_custody": "ThriveEvergreen_restricted",
+      "binding_state": "CONTRACT_REQUIRED_ECAC_ADAPTER_CENSUS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.agents-schedulers",
+      "material_transitions": ["work.claimed", "work.completed", "work.failed", "schedule.changed", "escalation.created"],
+      "write_mode": "transactional_outbox",
+      "body_custody": "agent_work_queue",
+      "binding_state": "EXISTING_RELAY_REUSED_ADAPTER_PENDING"
+    },
+    {
+      "surface_id": "ct.os.mesh-continuity",
+      "material_transitions": ["route.changed", "failover.activated", "recovery.completed", "service.held"],
+      "write_mode": "same_transaction_or_fail_closed_outbox",
+      "body_custody": "mesh_control_plane",
+      "binding_state": "CONTRACT_REQUIRED_ADAPTER_CENSUS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.backup-preservation",
+      "material_transitions": ["backup.completed", "backup.readback", "restore.tested", "custody.changed"],
+      "write_mode": "receipt_then_independent_readback_then_dail",
+      "body_custody": "authorized_archive_and_object_store",
+      "binding_state": "CONTRACT_REQUIRED_ADAPTER_CENSUS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.docs-public-projections",
+      "material_transitions": ["documentation.published", "public_claim.corrected", "projection.changed"],
+      "write_mode": "exact_source_digest_and_provider_readback_outbox",
+      "body_custody": "PentaDocs_source_and_provider",
+      "binding_state": "CONTRACT_REQUIRED_ADAPTER_CENSUS_PENDING"
+    },
+    {
+      "surface_id": "ct.os.observability-telemetry",
+      "material_transitions": ["incident.opened", "incident.closed", "security.finding", "assurance.changed"],
+      "write_mode": "material_events_fail_closed_low_risk_samples_may_queue_unsealed",
+      "body_custody": "telemetry_store",
+      "binding_state": "REFERENCE_QUEUE_POLICY_IMPLEMENTED_RUNTIME_ADAPTER_PENDING"
+    }
+  ],
+  "runtime_bindings": [
+    {
+      "binding_id": "ct.dail.postgres.v2",
+      "surface": "chlom_runtime.dail_events",
+      "role": "canonical_append_only_chain",
+      "state": "SOURCE_IMPLEMENTED_RUNTIME_APPLY_PENDING"
+    },
+    {
+      "binding_id": "ct.dail.external-ingress.stripe.v1",
+      "surface": "supabase/functions/dail-external-ingress",
+      "role": "provider_authenticated_raw_body_ingress",
+      "state": "SOURCE_IMPLEMENTED_SECRET_AND_RUNTIME_BINDING_PENDING"
+    },
+    {
+      "binding_id": "ct.dail.external-evidence-relay.v1",
+      "surface": "ct.schedule.external-evidence-relay.hourly.v1",
+      "role": "separate_provider_readback_and_anchor_dispatch",
+      "state": "EXISTING_CLOCK_ADAPTER_PENDING"
+    },
+    {
+      "binding_id": "ct.dail.penta-serialized-wal.v1",
+      "surface": "penta/runtime/serialized",
+      "role": "local_failover_spool_not_canonical_authority",
+      "state": "ADAPTER_CONTRACT_IMPLEMENTED"
+    },
+    {
+      "binding_id": "ct.dail.factory-continuation.v2",
+      "surface": "developers/manifests/dail-factory-continuation.v2.json",
+      "role": "deterministic_factory_checkpoint_and_resume",
+      "state": "PARTIAL_SOURCE_IMPLEMENTATION_CLAIM_RECLAIM_PENDING"
+    },
+    {
+      "binding_id": "ct.dail.independent-anchor.v1",
+      "surface": "chlom_runtime.external_anchor_receipts_v2",
+      "role": "independent_checkpoint_write_and_readback",
+      "state": "SCHEMA_IMPLEMENTED_ADAPTER_NOT_BUILT_NO_PRODUCTION_CLAIM"
+    }
+  ],
+  "coverage_controls": {
+    "material_event_inventory_required": true,
+    "exactly_one_canonical_receipt_per_material_transition": true,
+    "domain_receipt_tables_are_projections_not_competing_authorities": true,
+    "certification_blocks_on_missing_or_unsealed_receipt": true,
+    "raw_payload_in_dail": false,
+    "secret_in_dail": false,
+    "corrections_append_only": true
+  },
+  "promotion_gates": [
+    "migration applies to a disposable database and preserves legacy chain verification",
+    "RLS, privileges, update, delete and truncate negative tests pass",
+    "valid, invalid, stale, rotated-secret and replay webhook tests pass",
+    "provider readback is executed by a distinct authenticated trust domain",
+    "factory crash, lease, fencing, deterministic digest and rollback tests pass",
+    "external checkpoint write and independent readback pass",
+    "cross-repository exact-SHA projection is independently verified",
+    "D3 human promotion decision is recorded"
+  ]
+}

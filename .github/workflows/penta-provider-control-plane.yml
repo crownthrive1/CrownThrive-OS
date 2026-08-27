@@ -1,4 +1,4 @@
-name: Penta Provider Control Plane
+name: Penta Provider Trusted Operations
 
 on:
   workflow_dispatch:
@@ -7,18 +7,6 @@ on:
         description: 'Authorized PentaMail certification recipient'
         required: false
         default: 'jones.usmc.kj@gmail.com'
-  pull_request:
-    paths:
-      - 'runtime/penta-provider-control-plane/**'
-      - 'runtime/penta_mail.py'
-      - 'runtime/penta_runtime_suite.py'
-      - 'tests/test_penta_mail.py'
-      - 'tests/test_penta_runtime_suite.py'
-      - 'scripts/validate_penta_provider_control_plane.py'
-      - 'data/penta/**'
-      - '.github/workflows/penta-provider-control-plane.yml'
-      - 'developers/manifests/penta-provider-control-plane.v1.json'
-      - 'developers/manifests/penta-runtime-suite.v1.json'
   push:
     branches: [main]
     paths:
@@ -37,7 +25,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: penta-provider-control-plane-${{ github.ref }}
@@ -45,8 +32,10 @@ concurrency:
 
 jobs:
   software-provider-control:
+    if: github.repository == 'crownthrive1/CrownThrive-Support' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: penta-provider-production
     env: &provider-env
       GITHUB_TOKEN: ${{ github.token }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -62,6 +51,9 @@ jobs:
       PENTAMAIL_FROM: ${{ secrets.PENTAMAIL_FROM }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
 
       - name: Validate Penta provider contracts
         run: python3 scripts/validate_penta_provider_control_plane.py
@@ -93,10 +85,14 @@ jobs:
 
   penta-runtime-suite:
     needs: software-provider-control
+    if: github.repository == 'crownthrive1/CrownThrive-Support' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
 
       - name: Compile shared Penta runtime
         run: |
@@ -138,8 +134,10 @@ jobs:
 
   provider-live-readback:
     needs: software-provider-control
+    if: github.repository == 'crownthrive1/CrownThrive-Support' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: penta-provider-production
     strategy:
       fail-fast: false
       matrix:
@@ -148,10 +146,12 @@ jobs:
     name: certify / ${{ matrix.provider }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
 
       - name: Live certify ${{ matrix.provider }}
         id: certify
-        continue-on-error: true
         shell: bash
         env:
           PROVIDER_ID: ${{ matrix.provider }}
@@ -193,6 +193,8 @@ jobs:
           print(json.dumps(result, sort_keys=True))
           if cert.state not in {'CERTIFIED', 'WRITE_VERIFIED'}:
               raise SystemExit(78)
+          if gate.get('state') == 'HOLD' or not gate.get('eligible'):
+              raise SystemExit(78)
           PY
 
       - name: Record provider disposition
@@ -209,12 +211,16 @@ jobs:
 
   pentamail-live-certification:
     needs: [penta-runtime-suite]
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[pentamail-live-certify]'))
+    if: github.repository == 'crownthrive1/CrownThrive-Support' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[pentamail-live-certify]')))
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: penta-provider-production
     env: *provider-env
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
 
       - name: Resolve authorized recipient
         shell: bash

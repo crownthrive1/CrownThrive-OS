@@ -1,173 +1,480 @@
-name: PentaRelease — CrownThrive OS Release Publisher
+name: PentaRelease — CrownThrive OS Human D3 Major Publisher
 
 on:
   push:
     branches: [main]
     paths:
-      - '.github/release-requests/crownthrive-os-*.json'
+      - '.github/release-requests/crownthrive-os-v4.0.0.0.json'
   workflow_dispatch:
     inputs:
       request_file:
-        description: Release request JSON path
+        description: Exact already-published request path for bounded partial retry
         required: true
-        default: .github/release-requests/crownthrive-os-v3.1.1.9.json
+        default: .github/release-requests/crownthrive-os-v4.0.0.0.json
 
 permissions:
   contents: write
+  pull-requests: read
+  checks: read
+
+env:
+  EXPECTED_REPOSITORY: crownthrive1/CrownThrive-Support
+  EXPECTED_REQUEST: .github/release-requests/crownthrive-os-v4.0.0.0.json
+  EXPECTED_TERMS: .github/release-terms/crownthrive-os-v4.0.0.0.json
+  EXPECTED_TAG: v4.0.0.0
+  EXPECTED_VERSION: 4.0.0.0
+  EXPECTED_TITLE: CrownThrive OS 4.0.0.0 — Human-Authorized Major Release
 
 concurrency:
-  group: pentarelease-crownthrive-os
+  group: pentarelease-provider-writes-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  publish-major:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout control branch
+      - name: Checkout immutable main-push merge
+        if: github.event_name == 'push'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Checkout main only to resolve an existing partial publication
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
-          fetch-depth: 2
-
-      - name: Resolve release request
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            REQUEST='${{ inputs.request_file }}'
-          else
-            REQUEST=$(git diff --name-only HEAD^ HEAD | grep '^.github/release-requests/crownthrive-os-.*\.json$' | tail -1)
-          fi
-          test -n "$REQUEST"
-          test -f "$REQUEST"
-          python -m json.tool "$REQUEST" >/dev/null
-
-          TAG=$(jq -r '.tag' "$REQUEST")
-          TARGET=$(jq -r '.target' "$REQUEST")
-          TITLE=$(jq -r '.title' "$REQUEST")
-          PACKAGE=$(jq -r '.package' "$REQUEST")
-          DRAFT=$(jq -r '.draft // false' "$REQUEST")
-          PRERELEASE=$(jq -r '.prerelease // false' "$REQUEST")
-
-          for V in TAG TARGET TITLE PACKAGE; do
-            test -n "${!V}" && test "${!V}" != "null"
-          done
-
-          echo "REQUEST=$REQUEST" >> "$GITHUB_ENV"
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-          echo "TARGET=$TARGET" >> "$GITHUB_ENV"
-          echo "TITLE=$TITLE" >> "$GITHUB_ENV"
-          echo "PACKAGE=$PACKAGE" >> "$GITHUB_ENV"
-          echo "DRAFT=$DRAFT" >> "$GITHUB_ENV"
-          echo "PRERELEASE=$PRERELEASE" >> "$GITHUB_ENV"
-
-      - name: Checkout requested release source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ env.TARGET }}
           fetch-depth: 0
+          fetch-tags: true
 
-      - name: Validate PentaRelease package contract
+      - name: Resolve immutable request and event-bound merge target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPATCH_REQUEST: ${{ inputs.request_file }}
         shell: bash
         run: |
           set -euo pipefail
-          test -f "$PACKAGE/RELEASE_NOTES.md"
-          test -f "$PACKAGE/MANIFEST.json"
-          python -m json.tool "$PACKAGE/MANIFEST.json" >/dev/null
-          test "$(jq -r '.tag' "$PACKAGE/MANIFEST.json")" = "$TAG"
-          test "$(jq -r '.target_ref' "$PACKAGE/MANIFEST.json")" = "$TARGET"
+          test "$GITHUB_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          REQUEST="$EXPECTED_REQUEST"
+          git fetch --no-tags origin main
 
-          # Fail closed on common secret-bearing files in the release package.
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            test "$GITHUB_REF" = refs/heads/main
+            TARGET="$GITHUB_SHA"
+            test "$(git rev-parse HEAD)" = "$TARGET"
+            test "$(git rev-parse origin/main)" = "$TARGET"
+          else
+            test "$DISPATCH_REQUEST" = "$EXPECTED_REQUEST"
+            gh release view "$EXPECTED_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+            git fetch --force origin "refs/tags/$EXPECTED_TAG:refs/tags/$EXPECTED_TAG"
+            TARGET=$(git rev-parse "$EXPECTED_TAG^{commit}")
+            git merge-base --is-ancestor "$TARGET" origin/main
+            git checkout --detach "$TARGET"
+            test "$(git rev-parse HEAD)" = "$TARGET"
+          fi
+
+          test "$(git rev-list --parents -n 1 "$TARGET" | awk '{print NF-1}')" -eq 2
+          test "$(git diff --diff-filter=A --name-only "$TARGET^1" "$TARGET" -- "$REQUEST")" = "$REQUEST"
+          test -f "$REQUEST"
+          python3 -m json.tool "$REQUEST" >/dev/null
+
+          TERMS=$(jq -er '.authority_terms.path' "$REQUEST")
+          PACKAGE=$(jq -er '.package' "$REQUEST")
+          test "$TERMS" = "$EXPECTED_TERMS"
+          test "$PACKAGE" = releases/4.0.0.0
+          test -f "$TERMS"
+          python3 -m json.tool "$TERMS" >/dev/null
+
+          REQUEST_SHA256=$(sha256sum "$REQUEST" | awk '{print $1}')
+          TERMS_SHA256=$(sha256sum "$TERMS" | awk '{print $1}')
+          test "$(jq -er '.authority_terms.sha256' "$REQUEST")" = "$TERMS_SHA256"
+
+          PREVIOUS_RELEASE_TAG=$(jq -er '.published_baseline.tag' "$REQUEST")
+          PREVIOUS_RELEASE_TAG_SHA=$(jq -er '.published_baseline.tag_sha | select(test("^[0-9a-f]{40}$"))' "$REQUEST")
+          SOURCE_BASELINE_SHA=$(jq -er '.published_baseline.source_baseline_sha | select(test("^[0-9a-f]{40}$"))' "$REQUEST")
+          LINEAGE_RESOLUTION=generated_release_parent_legacy
+          test "$(git rev-parse "${PREVIOUS_RELEASE_TAG}^{commit}")" = "$PREVIOUS_RELEASE_TAG_SHA"
+          git cat-file -e "${SOURCE_BASELINE_SHA}^{commit}"
+          read -r TAG_COMMIT TAG_PARENT TAG_EXTRA <<< "$(git rev-list --parents -n 1 "$PREVIOUS_RELEASE_TAG_SHA")"
+          test -n "$TAG_COMMIT"
+          test -n "$TAG_PARENT"
+          test -z "${TAG_EXTRA:-}"
+          case "$LINEAGE_RESOLUTION" in
+            generated_release_recorded_source|generated_release_parent_legacy)
+              test "$SOURCE_BASELINE_SHA" = "$TAG_PARENT"
+              jq -e \
+                --arg tag "$PREVIOUS_RELEASE_TAG" \
+                --arg tag_sha "$PREVIOUS_RELEASE_TAG_SHA" \
+                --arg source "$SOURCE_BASELINE_SHA" '
+                .lineage.legacy_generated_release_parent_allowlist[]
+                | select(.tag == $tag and .tag_sha == $tag_sha and .source_head_sha == $source)
+              ' .pentarelease/policy.json >/dev/null
+              ;;
+            *)
+              echo "HOLD: unsupported published-baseline lineage resolution." >&2
+              exit 42
+              ;;
+          esac
+          git merge-base --is-ancestor "$SOURCE_BASELINE_SHA" "$TARGET"
+
+          {
+            echo "REQUEST=$REQUEST"
+            echo "TERMS=$TERMS"
+            echo "PACKAGE=$PACKAGE"
+            echo "TARGET=$TARGET"
+            echo "TAG=$EXPECTED_TAG"
+            echo "VERSION=$EXPECTED_VERSION"
+            echo "TITLE=$EXPECTED_TITLE"
+            echo "REQUEST_SHA256=$REQUEST_SHA256"
+            echo "TERMS_SHA256=$TERMS_SHA256"
+            echo "PREVIOUS_RELEASE_TAG=$PREVIOUS_RELEASE_TAG"
+            echo "PREVIOUS_RELEASE_TAG_SHA=$PREVIOUS_RELEASE_TAG_SHA"
+            echo "SOURCE_BASELINE_SHA=$SOURCE_BASELINE_SHA"
+            echo "LINEAGE_RESOLUTION=$LINEAGE_RESOLUTION"
+          } >> "$GITHUB_ENV"
+
+      - name: Prove governed PR head H and accepted merge M
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/$GITHUB_REPOSITORY/commits/$TARGET/pulls?per_page=100" \
+            > /tmp/associated-pulls.json
+          jq -e --arg merge "$TARGET" '
+            [.[] | select(
+              .state == "closed" and
+              .merged_at != null and
+              .base.ref == "main" and
+              .merge_commit_sha == $merge
+            )]
+            | if length == 1 then .[0] else error("one exact merged PR required") end
+          ' /tmp/associated-pulls.json > /tmp/major-pr.json
+
+          PR_NUMBER=$(jq -er '.number' /tmp/major-pr.json)
+          HEAD_SHA=$(jq -er '.head.sha | select(test("^[0-9a-f]{40}$"))' /tmp/major-pr.json)
+          test "$(jq -er '.head.repo.full_name' /tmp/major-pr.json)" = "$EXPECTED_REPOSITORY"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+          git merge-base --is-ancestor "$HEAD_SHA" "$TARGET"
+          test "$(git rev-parse "$TARGET^2")" = "$HEAD_SHA"
+          test "$(git rev-parse "$HEAD_SHA^{tree}")" = "$(git rev-parse "$TARGET^{tree}")"
+          git diff --quiet "$HEAD_SHA" "$TARGET"
+          SOURCE_HEAD_SHA="$HEAD_SHA"
+          git merge-base --is-ancestor "$SOURCE_BASELINE_SHA" "$SOURCE_HEAD_SHA"
+          git merge-base --is-ancestor "$SOURCE_HEAD_SHA" HEAD
+
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            test "$TARGET" = "$GITHUB_SHA"
+            test "$(git rev-parse origin/main)" = "$TARGET"
+          else
+            git merge-base --is-ancestor "$TARGET" origin/main
+          fi
+
+          gh api "/repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs?per_page=100" > /tmp/check-runs.raw.json
+          jq -e --arg head "$HEAD_SHA" '
+            [.check_runs[] | select(
+              .name == "CrownThrive governed merge gate" and
+              .head_sha == $head and
+              .status == "completed" and
+              .conclusion == "success"
+            )] | length > 0
+          ' /tmp/check-runs.raw.json >/dev/null
+
+          gh pr checks "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --required --json name,state \
+            > /tmp/required-checks.json
+          jq -e 'length > 0 and all(.[]; .state == "SUCCESS")' /tmp/required-checks.json >/dev/null
+
+          echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+          echo "HEAD_SHA=$HEAD_SHA" >> "$GITHUB_ENV"
+          echo "SOURCE_HEAD_SHA=$SOURCE_HEAD_SHA" >> "$GITHUB_ENV"
+
+      - name: Validate exact package and build deterministic artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$PACKAGE/MANIFEST.json"
+          test -f "$PACKAGE/RELEASE_NOTES.md"
+          python3 -m json.tool "$PACKAGE/MANIFEST.json" >/dev/null
+          test "$(jq -er '.version' "$PACKAGE/MANIFEST.json")" = "$VERSION"
+          test "$(jq -er '.tag' "$PACKAGE/MANIFEST.json")" = "$TAG"
+          test "$(jq -er '.target_ref' "$PACKAGE/MANIFEST.json")" = github_event_merge_sha
+          test "$(jq -er '.institutional_phase' "$PACKAGE/MANIFEST.json")" = 3
+          test "$(jq -er '.os_4x_effective_only_after_v4_provider_readback' "$PACKAGE/MANIFEST.json")" = true
+
           if find "$PACKAGE" -type f \( \
               -name '.env' -o -name '.env.*' -o -name '*.pem' -o \
               -name '*.p12' -o -name '*.pfx' -o -iname '*private_key*' -o \
               -iname '*credential*' -o -iname '*secret*' \
             \) | grep -q .; then
-            echo 'Prohibited secret-like file detected in release package.' >&2
-            exit 1
+            echo 'HOLD: prohibited secret-like file in major release package.' >&2
+            exit 43
           fi
 
-      - name: Build governed downloadable artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
           mkdir -p dist/pentarelease
-          SAFE_TAG=$(printf '%s' "$TAG" | tr '/' '-')
-          ZIP="dist/pentarelease/CrownThrive-OS-${SAFE_TAG}-package.zip"
-          TGZ="dist/pentarelease/CrownThrive-OS-${SAFE_TAG}-package.tar.gz"
+          ZIP="dist/pentarelease/CrownThrive-OS-v4.0.0.0-package.zip"
+          TGZ="dist/pentarelease/CrownThrive-OS-v4.0.0.0-package.tar.gz"
+          git archive --format=zip --output="$ZIP" "$TARGET:$PACKAGE"
+          git archive --format=tar "$TARGET:$PACKAGE" | gzip -n > "$TGZ"
+          cp "$PACKAGE/MANIFEST.json" dist/pentarelease/MANIFEST.json
+          cp "$PACKAGE/RELEASE_NOTES.md" dist/pentarelease/RELEASE_NOTES.md
+          (
+            cd dist/pentarelease
+            sha256sum \
+              CrownThrive-OS-v4.0.0.0-package.zip \
+              CrownThrive-OS-v4.0.0.0-package.tar.gz \
+              MANIFEST.json RELEASE_NOTES.md > SHA256SUMS
+            sha256sum --strict --check SHA256SUMS
+          )
+          test "$(find dist/pentarelease -maxdepth 1 -type f | wc -l)" -eq 5
 
-          (cd "$PACKAGE" && zip -qr "$GITHUB_WORKSPACE/$ZIP" .)
-          tar -C "$PACKAGE" -czf "$TGZ" .
-          cp "$PACKAGE/MANIFEST.json" "dist/pentarelease/MANIFEST.json"
-          cp "$PACKAGE/RELEASE_NOTES.md" "dist/pentarelease/RELEASE_NOTES.md"
-          (cd dist/pentarelease && sha256sum * > SHA256SUMS)
-
-          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
-          echo "TGZ=$TGZ" >> "$GITHUB_ENV"
-
-      - name: Publish or update GitHub Release
+      - name: Establish fresh or exact-identity partial publication state
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          RELEASE_EXISTS=false
+          PARTIAL_RETRY=false
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --json tagName,name,targetCommitish,isDraft,isPrerelease,assets,body \
+              > /tmp/prepublication-release.json 2>/dev/null; then
+            RELEASE_EXISTS=true
+            PARTIAL_RETRY=true
+            jq -e \
+              --arg tag "$TAG" --arg title "$TITLE" --arg target "$TARGET" '
+              .tagName == $tag and
+              .name == $title and
+              .targetCommitish == $target and
+              .isDraft == false and
+              .isPrerelease == false
+            ' /tmp/prepublication-release.json >/dev/null
+            jq -e '
+              [.["assets"][]?.name] as $actual
+              | all($actual[];
+                  . == "CrownThrive-OS-v4.0.0.0-package.zip" or
+                  . == "CrownThrive-OS-v4.0.0.0-package.tar.gz" or
+                  . == "SHA256SUMS" or . == "MANIFEST.json" or . == "RELEASE_NOTES.md")
+            ' /tmp/prepublication-release.json >/dev/null
+          fi
 
-          FLAGS=()
-          [ "$DRAFT" = "true" ] && FLAGS+=(--draft)
-          [ "$PRERELEASE" = "true" ] && FLAGS+=(--prerelease)
+          REMOTE_TAG=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")
+          if [ "$RELEASE_EXISTS" = true ]; then
+            test -n "$REMOTE_TAG"
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            test "$(git rev-parse "$TAG^{commit}")" = "$TARGET"
+          else
+            test -z "$REMOTE_TAG"
+            test "$GITHUB_EVENT_NAME" = push
+          fi
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            test "$RELEASE_EXISTS" = true
+            test "$PARTIAL_RETRY" = true
+          fi
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" \
-              --title "$TITLE" \
-              --notes-file "$PACKAGE/RELEASE_NOTES.md" \
-              --target "$TARGET"
+          echo "RELEASE_EXISTS=$RELEASE_EXISTS" >> "$GITHUB_ENV"
+          echo "PARTIAL_RETRY=$PARTIAL_RETRY" >> "$GITHUB_ENV"
+
+      - name: Resolve live human D3 authority and validate all thirteen gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews?per_page=100" > /tmp/reviews.raw.json
+          gh api "/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" > /tmp/comments.raw.json
+
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg event_name "$GITHUB_EVENT_NAME" \
+            --arg event_ref "$GITHUB_REF" \
+            --arg event_sha "$TARGET" \
+            --argjson partial_retry "$PARTIAL_RETRY" \
+            --slurpfile pr /tmp/major-pr.json \
+            --slurpfile checks /tmp/check-runs.raw.json \
+            --slurpfile required /tmp/required-checks.json \
+            --slurpfile reviews /tmp/reviews.raw.json \
+            --slurpfile comments /tmp/comments.raw.json '
+            {
+              repository: $repository,
+              event_name: $event_name,
+              event_ref: $event_ref,
+              event_sha: $event_sha,
+              partial_retry: $partial_retry,
+              approval_consumption: "unconsumed_or_same_release_identity",
+              pull_request: {
+                number: $pr[0].number,
+                state: $pr[0].state,
+                merged: ($pr[0].merged_at != null),
+                merged_at: $pr[0].merged_at,
+                base_ref: $pr[0].base.ref,
+                head_sha: $pr[0].head.sha,
+                head_repository: $pr[0].head.repo.full_name,
+                merge_commit_sha: $pr[0].merge_commit_sha
+              },
+              check_runs: [
+                $checks[0].check_runs[] |
+                {name, head_sha, status, conclusion}
+              ],
+              required_checks: [
+                $required[0][] | {name, state}
+              ],
+              reviews: [
+                $reviews[0][] | {
+                  provider_id: (.id | tostring),
+                  actor_login: .user.login,
+                  author_association,
+                  state,
+                  commit_id,
+                  body: (.body // ""),
+                  approved_at: .submitted_at,
+                  dismissed: (.state == "DISMISSED"),
+                  revoked: false
+                }
+              ],
+              comments: [
+                $comments[0][] | {
+                  provider_id: (.id | tostring),
+                  actor_login: .user.login,
+                  author_association,
+                  body: (.body // ""),
+                  approved_at: (.updated_at // .created_at),
+                  revoked: false
+                }
+              ]
+            }
+          ' > /tmp/major-provider-evidence.json
+
+          python3 scripts/pentarelease/validate_major_release.py \
+            --repository-root . \
+            --mode ready \
+            --request "$REQUEST" \
+            --terms "$TERMS" \
+            --provider-evidence /tmp/major-provider-evidence.json \
+            --output /tmp/major-validation.json
+          jq -e '
+            .status == "PASS_EXACT_HUMAN_D3_MAJOR_RELEASE" and
+            .provider_write_authorized == true and
+            .candidate_head_sha == env.HEAD_SHA and
+            .merge_commit_sha == env.TARGET
+          ' /tmp/major-validation.json >/dev/null
+
+      - name: Publish append-only or repair only missing identity-matched assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t ASSETS < <(jq -r '.artifact_policy.required_assets[]' "$REQUEST")
+          test "${#ASSETS[@]}" -eq 5
+
+          if [ "$RELEASE_EXISTS" = true ]; then
+            EXISTING_DIR=$(mktemp -d)
+            if [ "$(jq '.assets | length' /tmp/prepublication-release.json)" -gt 0 ]; then
+              gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$EXISTING_DIR"
+              while IFS= read -r NAME; do
+                test -f "$EXISTING_DIR/$NAME"
+                cmp --silent "$EXISTING_DIR/$NAME" "dist/pentarelease/$NAME"
+              done < <(jq -r '.assets[].name' /tmp/prepublication-release.json)
+            fi
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+          actual = json.loads(Path('/tmp/prepublication-release.json').read_text())['body'] or ''
+          expected = Path('releases/4.0.0.0/RELEASE_NOTES.md').read_text()
+          if actual.rstrip('\r\n') != expected.rstrip('\r\n'):
+              raise SystemExit('HOLD: existing release notes do not match the exact package')
+          PY
           else
             gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
               --target "$TARGET" \
               --title "$TITLE" \
-              --notes-file "$PACKAGE/RELEASE_NOTES.md" \
-              "${FLAGS[@]}"
+              --notes-file "$PACKAGE/RELEASE_NOTES.md"
           fi
 
-          gh release upload "$TAG" \
-            "$ZIP" \
-            "$TGZ" \
-            dist/pentarelease/SHA256SUMS \
-            dist/pentarelease/MANIFEST.json \
-            dist/pentarelease/RELEASE_NOTES.md \
-            --clobber
+          UPLOAD=()
+          for NAME in "${ASSETS[@]}"; do
+            if [ "$RELEASE_EXISTS" = true ] && \
+                jq -e --arg name "$NAME" '.assets[]? | select(.name == $name)' \
+                  /tmp/prepublication-release.json >/dev/null; then
+              continue
+            fi
+            UPLOAD+=("dist/pentarelease/$NAME")
+          done
+          if [ "${#UPLOAD[@]}" -gt 0 ]; then
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "${UPLOAD[@]}"
+          fi
 
-      - name: Verify provider release and downloadable asset readback
+      - name: Verify exact provider identity and downloaded checksums
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          READBACK=$(gh release view "$TAG" --json tagName,name,url,isDraft,isPrerelease,targetCommitish,assets)
-          echo "$READBACK" | jq .
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,name,url,isDraft,isPrerelease,targetCommitish,assets,body \
+            > /tmp/final-release.json
+          jq -e \
+            --arg tag "$TAG" --arg title "$TITLE" --arg target "$TARGET" '
+            .tagName == $tag and
+            .name == $title and
+            .targetCommitish == $target and
+            .isDraft == false and
+            .isPrerelease == false and
+            (.assets | length) == 5
+          ' /tmp/final-release.json >/dev/null
 
-          test "$(echo "$READBACK" | jq -r '.tagName')" = "$TAG"
-          test "$(echo "$READBACK" | jq -r '.name')" = "$TITLE"
-          test "$(echo "$READBACK" | jq -r '.targetCommitish')" = "$TARGET"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          release = json.loads(Path('/tmp/final-release.json').read_text())
+          expected_names = [
+              'CrownThrive-OS-v4.0.0.0-package.zip',
+              'CrownThrive-OS-v4.0.0.0-package.tar.gz',
+              'SHA256SUMS', 'MANIFEST.json', 'RELEASE_NOTES.md',
+          ]
+          expected = {
+              name: Path('dist/pentarelease', name).stat().st_size
+              for name in expected_names
+          }
+          actual = {item['name']: item['size'] for item in release['assets']}
+          if actual != expected:
+              raise SystemExit(f'HOLD: provider asset identity mismatch: {actual!r}')
+          notes = Path('releases/4.0.0.0/RELEASE_NOTES.md').read_text()
+          if (release.get('body') or '').rstrip('\r\n') != notes.rstrip('\r\n'):
+              raise SystemExit('HOLD: provider release notes mismatch')
+          PY
 
-          for EXPECTED in \
-            "$(basename "$ZIP")" \
-            "$(basename "$TGZ")" \
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          test "$(git rev-parse "$TAG^{commit}")" = "$TARGET"
+
+          READBACK_DIR=$(mktemp -d)
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$READBACK_DIR"
+          test "$(find "$READBACK_DIR" -maxdepth 1 -type f | wc -l)" -eq 5
+          (
+            cd "$READBACK_DIR"
+            sha256sum --strict --check SHA256SUMS
+          )
+          for NAME in \
+            CrownThrive-OS-v4.0.0.0-package.zip \
+            CrownThrive-OS-v4.0.0.0-package.tar.gz \
             SHA256SUMS MANIFEST.json RELEASE_NOTES.md; do
-            echo "$READBACK" | jq -e --arg n "$EXPECTED" '.assets[] | select(.name == $n)' >/dev/null
+            cmp --silent "$READBACK_DIR/$NAME" "dist/pentarelease/$NAME"
           done
 
-      - name: Write PentaRelease evidence summary
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
-          ## PentaRelease provider proof
-          - Tag: $TAG
-          - Target: $TARGET
-          - Package: $PACKAGE
-          - ZIP: $(basename "$ZIP")
-          - TAR.GZ: $(basename "$TGZ")
-          - Checksums: SHA256SUMS
-          - Provider readback: verified
-          EOF
+          {
+            echo '## CrownThrive OS v4 human D3 publication proof'
+            echo
+            echo "- Frozen PR head H: $HEAD_SHA"
+            echo "- Accepted main merge M: $TARGET"
+            echo "- Human authority: live provider OWNER evidence, sanitized receipt only"
+            echo '- Institutional phase: 3 (unchanged)'
+            echo '- v3.14.0.0: abandoned invalid-lineage candidate; evidence preserved; reuse prohibited'
+            echo '- OS release family 4.x effect: effective only now, after exact provider readback'
+            echo '- Provider assets: exact five names, sizes, bytes, and SHA-256 checks verified'
+          } >> "$GITHUB_STEP_SUMMARY"

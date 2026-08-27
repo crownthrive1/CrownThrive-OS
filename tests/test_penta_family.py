@@ -97,7 +97,11 @@ def test_live_repository_contract() -> None:
     assert registry["status"] == "production"
     assert snapshot["family_status"] == "production"
     assert snapshot["fail_closed"] is True
-    assert snapshot["member_count"] >= 50
+    assert snapshot["member_count"] == 87
+    assert snapshot["promotion_count"] == 5
+    assert set(snapshot["promoted_members"]) == {
+        "penta.mail", "penta.status", "penta.credentials", "penta.build", "penta.certify"
+    }
 
     # Mature children may pass the family eligibility gate.
     scribe = member_dispatch_gate(snapshot, "penta.scribe")
@@ -114,15 +118,22 @@ def test_live_repository_contract() -> None:
     assert capital["eligible"] is False
     assert "implemented" in capital["reason"]
 
-    # Newly institutionalized family members are registered but stay held at
-    # specified maturity until independent implementation/certification proof.
+    # Explicit promotions recognize exact evidence-bound system maturity while
+    # leaving provider state and provider effects separately gated.
+    for key in snapshot["promoted_members"]:
+        gate = member_dispatch_gate(snapshot, key)
+        assert gate["eligible"] is True, (key, gate)
+        assert snapshot["members"][key]["catalog_maturity"] == "specified"
+        assert snapshot["members"][key]["maturity"] == "production"
+        promotion = snapshot["members"][key]["maturity_promotion"]
+        assert promotion["provider_state_disposition"] == "UNCHANGED_SEPARATELY_GATED"
+        assert promotion["provider_effect_authorized"] is False
+        assert promotion["self_certification_authorized"] is False
+
+    # Other newly institutionalized family members remain held at specified
+    # maturity until independent implementation/certification proof exists.
     for key in (
-        "penta.mail",
         "penta.concierge",
-        "penta.status",
-        "penta.credentials",
-        "penta.build",
-        "penta.certify",
         "penta.nurture",
         "penta.green",
         "penta.managers",
@@ -167,8 +178,10 @@ def test_every_member_has_portal_and_required_sections() -> None:
 
     mail = member_portal(snapshot, registry, "penta.mail")
     assert mail["portal_route"] == "/penta/mail"
-    assert mail["sections"]["status"]["member_maturity"] == "specified"
-    assert mail["sections"]["status"]["execution_eligible"] is False
+    assert mail["sections"]["status"]["catalog_maturity"] == "specified"
+    assert mail["sections"]["status"]["member_maturity"] == "production"
+    assert mail["sections"]["status"]["execution_eligible"] is True
+    assert mail["sections"]["status"]["maturity_promotion"]["authority_ref"]
     assert set(registry["portal_contract"]["required_sections"]) <= set(mail["sections"])
 
 

@@ -47,6 +47,16 @@ PentaStatus owns system-health and owner-report semantics. PentaMail transports 
 - Suppression/complaint rules override ordinary marketing or notification requests where legally or contractually required.
 - Administrative actions and template/provider changes are audited.
 
+## Mailgun delivery-resilience policy
+
+Policy `ct.pentamailer.policy.mailgun-delivery-resilience.v1` activates from authoritative Mailgun evidence or a founder-accepted Mailgun notice. The latter can open the protective hold but cannot clear it. An accepted provider-probation event holds the global Mailgun route for at least three hours without consuming queued-message attempts and places the offending trigger on 72-hour probation. The currently accepted origin is `db-trigger:public.ct_factory_adapter_certification_queue:trg_os_v2_notify_provider_cert_state_v1`. Its identity is propagated per notification; unrelated notifications retain `os-v2:notification`, while `mailgun-relay:notifications` remains a fail-closed legacy fallback.
+
+The route may leave HOLD only after the minimum interval and a fresh, ordered, authenticated Mailgun readback proves the provider is enabled. Release is controlled at no more than two messages per dispatcher invocation, two route-wide authorizations per rolling 60 seconds, and ten global authorizations per rolling hour. Capacity is reserved atomically before provider start and abandoned reservations are not refunded. A later accepted incident extends the hold and probation; local rate limits, heuristics, or unsupported operator assertions cannot automatically activate or clear the provider state.
+
+While the causal trigger remains on probation, its source events are preserved and coalesced into one delayed digest rather than expanded into individual provider sends. A stable outbox request key protects idempotency. Once a provider call starts, a timeout or otherwise ambiguous result enters `reconciliation_required` and is not retried blindly. Provider response bodies are reduced to bounded reason data and a SHA-256 digest; the governed private notification recipient is resolved from database preferences and is not embedded in public source.
+
+Queue, provider-incident, trigger-probation, release, and rollback evidence is append-only. Rollback returns the route to HOLD and preserves queued work and history; it never forces an unverified release. See `developers/PENTAMAILER-MAILGUN-DELIVERY-RESILIENCE.md`.
+
 ## Status contract
 
 PentaMail reports at minimum: version; lifecycle; heartbeat; queue depth/age; throughput; delivery/failure/defer/bounce/complaint rates; provider health; credential/certification readiness; dead-letter volume; suppression anomalies; recent incidents; material configuration drift; outstanding action items.

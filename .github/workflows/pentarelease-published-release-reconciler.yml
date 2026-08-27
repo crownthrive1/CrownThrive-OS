@@ -19,7 +19,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: pentarelease-published-release-reconciler
+  group: pentarelease-provider-writes-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -50,11 +50,17 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --tags --force
+          REPAIR=()
+          if gh release view v4.0.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Human D3 v4 is protected: published-release reconciliation is read-only.'
+          else
+            REPAIR+=(--repair)
+          fi
           python3 scripts/pentarelease/reconcile.py \
             --repository "$GITHUB_REPOSITORY" \
             --policy .pentarelease/policy.json \
             --output /tmp/pentarelease-reconciliation.json \
-            --repair
+            "${REPAIR[@]}"
 
       - name: Verify latest provider truth
         if: always()

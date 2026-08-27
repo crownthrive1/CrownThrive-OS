@@ -1,9 +1,10 @@
 """Production control-plane runtime for the CrownThrive Penta Family.
 
 The Penta Family is an umbrella registry, census, portal contract and dispatch
-guard. A production family never promotes a child system automatically: each
-member retains its own maturity and may execute only when its own state and
-authority gates permit it.
+guard. A production family never promotes a child system automatically. A child
+may advance only through a separate evidence-bound promotion registry whose
+prior maturity and exact evidence digests validate. Provider state and authority
+remain independent and fail closed.
 
 This module is dependency-free so it can run in CI, local operator checks, and
 minimal recovery environments. It performs no provider side effects.
@@ -16,7 +17,16 @@ import json
 import re
 from collections import Counter
 from pathlib import Path
+import sys
 from typing import Any, Dict, Iterable, List, Mapping, Tuple
+
+try:
+    from runtime.penta_promotions import PentaPromotionError, apply_promotions
+except ModuleNotFoundError:
+    runtime_dir = str(Path(__file__).resolve().parent)
+    if runtime_dir not in sys.path:
+        sys.path.insert(0, runtime_dir)
+    from penta_promotions import PentaPromotionError, apply_promotions
 
 ALLOWED_MATURITY = {"specified", "implemented", "certified", "production", "hold", "retired"}
 EXECUTION_ELIGIBLE = {"certified", "production"}
@@ -267,6 +277,11 @@ def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
     if not members:
         raise PentaFamilyError("family has no registered members")
 
+    try:
+        members, promotions = apply_promotions(root, members)
+    except PentaPromotionError as exc:
+        raise PentaFamilyError(f"invalid evidence-bound maturity promotion: {exc}") from exc
+
     control_plane_resolution = _resolve_control_planes(registry, members)
     base_route = registry["portal_contract"]["base_route"]
 
@@ -293,6 +308,8 @@ def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
             "authority_boundary": system.get("authority_boundary"),
             "risk_ceiling": system.get("risk_ceiling"),
             "maturity": system["maturity"],
+            "catalog_maturity": system.get("catalog_maturity", system["maturity"]),
+            "maturity_promotion": system.get("maturity_promotion"),
             "dependencies": system.get("dependencies", []),
             "source": member_sources[key],
             "portal_route": route,
@@ -315,6 +332,9 @@ def compose_family(root: Path, registry: Mapping[str, Any]) -> Dict[str, Any]:
         "maturity_counts": dict(sorted(maturity_counts.items())),
         "execution_eligible_members": execution_eligible,
         "held_members": held,
+        "promotion_count": len(promotions),
+        "promoted_members": sorted(promotions),
+        "promotion_registry": "data/penta/production-promotions.v1.json" if promotions else None,
         "control_plane_resolution": control_plane_resolution,
         "portal_index": portal_index,
         "self_build_coverage": {
@@ -369,6 +389,8 @@ def member_portal(snapshot: Mapping[str, Any], registry: Mapping[str, Any], mach
         "status": {
             "family_status": snapshot.get("family_status"),
             "member_maturity": maturity,
+            "catalog_maturity": member.get("catalog_maturity", maturity),
+            "maturity_promotion": member.get("maturity_promotion"),
             "execution_eligible": maturity in EXECUTION_ELIGIBLE,
             "portal_state": member.get("portal_state"),
         },
@@ -396,6 +418,7 @@ def member_portal(snapshot: Mapping[str, Any], registry: Mapping[str, Any], mach
         },
         "evidence": {
             "source_catalog": member.get("source"),
+            "maturity_promotion": member.get("maturity_promotion"),
             "rule": "Claims and maturity changes require evidence; portal presence is not deployment evidence.",
         },
         "api_mcp": {

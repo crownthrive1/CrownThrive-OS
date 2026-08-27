@@ -1,6 +1,6 @@
 {
   "schema": "ct.penta.provider-control-plane.v1",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "institutional_phase": "phase_3",
   "priority": "software",
   "policy": {
@@ -10,7 +10,9 @@
     "certification_requires_live_provider_readback": true,
     "write_requires_exact_operation_readback": true,
     "certification_ttl_hours": 24,
-    "cookie_role": "signed_non_sensitive_priority_health_pointer_only"
+    "cookie_role": "signed_non_sensitive_priority_health_pointer_only",
+    "material_provider_events_require_dail_receipt": true,
+    "external_hmac_is_not_public_nonrepudiation": true
   },
   "providers": [
     {
@@ -105,14 +107,33 @@
       },
       "adapter": {
         "adapter_id": "ct.adapter.stripe.v1",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "operations": [
           {"operation": "balance_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
+          {"operation": "webhook_ingress_verify", "side_effect": true, "authority_class": "D1", "requires_readback": true},
           {"operation": "product_write", "side_effect": true, "authority_class": "D2", "requires_readback": true},
           {"operation": "price_write", "side_effect": true, "authority_class": "D2", "requires_readback": true}
         ]
       },
-      "evidence_hints": ["developers/certification/stripe-crown-credits-chlom-thriveevergreen-production-2026-08-23.mdx", "https://docs.stripe.com/api/balance/balance_retrieve"]
+      "external_evidence": {
+        "ingress_surface": "supabase/functions/dail-external-ingress",
+        "credential_alias": "DAIL_STRIPE_WEBHOOK_SECRETS_JSON",
+        "credential_value_in_registry": false,
+        "exact_raw_body_verification": true,
+        "signature_tolerance_seconds": 300,
+        "multiple_active_secret_versions": true,
+        "dail_contract": "developers/contracts/dail-evidence-spine.contract.v2.json",
+        "provider_readback_clock": "ct.schedule.external-evidence-relay.hourly.v1",
+        "minimum_ingress_evidence_class": "E4_EXTERNAL_SYMMETRIC_VERIFIED",
+        "independent_readback_is_separate_receipt_dimension": true,
+        "production_state": "SOURCE_IMPLEMENTED_SECRET_AND_RUNTIME_BINDING_PENDING"
+      },
+      "evidence_hints": [
+        "developers/certification/stripe-crown-credits-chlom-thriveevergreen-production-2026-08-23.mdx",
+        "developers/contracts/dail-evidence-spine.contract.v2.json",
+        "https://docs.stripe.com/api/balance/balance_retrieve",
+        "https://docs.stripe.com/webhooks#verify-manually"
+      ]
     },
     {
       "provider_id": "resend",

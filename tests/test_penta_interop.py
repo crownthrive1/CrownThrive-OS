@@ -25,7 +25,18 @@ def fake_member(maturity: str) -> dict:
 
 
 def authority() -> dict:
-    return {"chlom_ref": "chlom:authority:test", "dail_ref": None, "accountable_owner": "role:owner"}
+    return {
+        "chlom_ref": "chlom:authority:test",
+        "dail_ref": "dail:authority:test",
+        "accountable_owner": "role:owner",
+    }
+
+
+def dail_plan() -> dict:
+    return {
+        "dail_write_mode": "transactional_outbox",
+        "dail_event_plan_ref": "ct.dail.plan:penta-handoff:v1",
+    }
 
 
 class PentaInteropTests(unittest.TestCase):
@@ -80,6 +91,7 @@ class PentaInteropTests(unittest.TestCase):
             evidence_refs=["evidence:controls:1"],
             authority_trace=authority(),
             readback_strategy="verify attestation receipt",
+            metadata=dail_plan(),
         )
         result = interop.evaluate_handoff(snapshot, envelope)
         self.assertEqual(result["disposition"], "governance_required")
@@ -100,6 +112,7 @@ class PentaInteropTests(unittest.TestCase):
             evidence_refs=["evidence:error:1"],
             authority_trace=authority(),
             readback_strategy="verify metric snapshot",
+            metadata=dail_plan(),
         )
         result = interop.evaluate_handoff(snapshot, envelope)
         self.assertEqual(result["disposition"], "execution_ready")
@@ -120,11 +133,32 @@ class PentaInteropTests(unittest.TestCase):
             evidence_refs=["evidence:metric:1"],
             authority_trace=authority(),
             provider_effect=True,
+            metadata=dail_plan(),
         )
         result = interop.evaluate_handoff(snapshot, envelope)
         self.assertEqual(result["disposition"], "governance_required")
         self.assertTrue(any("provider binding" in reason for reason in result["reasons"]))
         self.assertTrue(any("readback" in reason for reason in result["reasons"]))
+
+    def test_execution_without_dail_plan_fails_closed(self):
+        snapshot = {
+            "members": {
+                "penta.error": fake_member("production"),
+                "penta.metric": fake_member("production"),
+            }
+        }
+        envelope = interop.build_envelope(
+            source_member="penta.error",
+            target_member="penta.metric",
+            operation="record_failure_metric",
+            requested_effect="execute",
+            evidence_refs=["evidence:error:2"],
+            authority_trace=authority(),
+            readback_strategy="verify metric snapshot",
+        )
+        result = interop.evaluate_handoff(snapshot, envelope)
+        self.assertEqual(result["disposition"], "governance_required")
+        self.assertTrue(any("DAIL event plan" in reason for reason in result["reasons"]))
 
     def test_live_repository_interoperability_certifies(self):
         snapshot = interop.build_interoperability_snapshot(ROOT)

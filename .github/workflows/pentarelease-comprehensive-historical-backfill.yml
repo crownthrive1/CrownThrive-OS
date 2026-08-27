@@ -21,7 +21,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: pentarelease-comprehensive-historical-backfill
+  group: pentarelease-provider-writes-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -62,6 +62,11 @@ jobs:
           repaired=0
           verified=0
           for TAG in "${TAGS[@]}"; do
+            if [ "$TAG" = v4.0.0.0 ]; then
+              echo 'Skipping protected exact-five-asset human D3 v4 release.'
+              verified=$((verified+1))
+              continue
+            fi
             READBACK=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body,url)
             READY=$(echo "$READBACK" | jq '
               (.body | contains("pentarelease:comprehensive-release:start")) and

@@ -1,8 +1,8 @@
 # CrownThrive Institutional Versioning Policy
 
 Status: Active
-Policy version: 1.1.0
-Effective: 2026-08-26
+Policy version: 1.2.0
+Effective: 2026-08-27
 
 ## Purpose
 
@@ -71,6 +71,30 @@ The CrownThrive OS release line is the institutional umbrella version. Subsystem
 - v2.0.1 — Founder Visibility & Autonomous Briefing.
 - v2.1.0 — Institutional Version Registry & Release Governance.
 - v3.1.1.9 — Autonomous Institutional Runtime Consolidation.
+- v3.13.0.1 — Autonomous PentaRelease; provider publication verified at `2026-08-26T23:46:15Z` with five assets.
+
+This compact lineage is not a claim that no intermediate immutable provider releases exist. Provider history remains preserved and may be imported into the registry only from exact provider readback or an equivalent immutable evidence record.
+
+## Provider and candidate reconciliation
+
+A generated branch, package, request, manifest, version calculation, workflow success, or local tag does not by itself establish a published release. The current released baseline is the latest authorized provider release that has been independently read back. A one-ahead generated candidate remains `CANDIDATE` / `HOLD` when its tag or release is absent from provider readback, and it may not supersede the published baseline.
+
+Failed or incomplete candidates are never silently reused. Before their version or tag can be reused, an exact disposition must identify the candidate branch and commit, state whether it is abandoned, superseded, corrected, or intentionally resumed, and bind the decision to the new release head.
+
+The current evidence reconciliation is machine-readable at `docs/versioning/RELEASE_RECONCILIATION_MANIFEST.v1.json`.
+
+## Human-authorized major release gate
+
+A major release is a reserved compatibility decision, not a number selected merely because a release was requested. PentaRelease's current four-part bump rule would provisionally advance `3.13.0.1` to `4.0.0.0`, but no target tag is assigned until all of the following are true:
+
+- an exact D3 human-authority receipt names the release class, version, tag, target head, and compatibility effect;
+- the current phase and OS release-family records are reconciled without inferring a phase transition from the version number;
+- every earlier one-ahead candidate has an explicit immutable disposition;
+- the exact target head passes governed merge, documentation, test, security, secret, packaging, checksum, and rollback predicates;
+- inherited `HOLD`, `UNKNOWN`, `CONTROLLED_TEST`, legal, rights, financial, provider, and component states are resolved or explicitly carried forward without promotion; and
+- provider publication and required assets are read back after the write before the release is marked complete.
+
+A major OS version does not itself advance CrownThrive from Phase 3. A phase transition requires its own separately authorized canonical record.
 
 ## Automation requirement
 

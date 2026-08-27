@@ -16,9 +16,12 @@ PRODUCTION_CONTROLS = {"penta.compliance", "penta.license"}
 
 def test_controls_preserve_independent_maturity_and_scope() -> None:
     registry, snapshot = load_family(ROOT)
-    assert registry["schema_version"] == "1.4.0"
+    assert registry["schema_version"] == "1.5.0"
     assert registry["status"] == "production"
     assert registry["interoperability_contract"]["protocol_version"] == "1.0.0"
+    assert registry["interoperability_contract"]["execution_requires_chlom_and_dail_authority_refs"] is True
+    assert registry["interoperability_contract"]["execution_requires_dail_event_plan"] is True
+    assert registry["interoperability_contract"]["terminal_execution_requires_dail_receipt"] is True
     assert registry["interoperability_contract"]["execution_preserves_member_maturity"] is True
     for key in sorted(IMPLEMENTED):
         assert key in snapshot["members"], key

@@ -1,29 +1,36 @@
 {
-  "schema_version": "1.3.0",
+  "schema_version": "1.5.0",
   "contract_id": "crownthrive.penta.member-runtime",
   "status": "production",
   "runtime": "runtime/penta_exec.py",
   "adapter_registry": "data/penta/execution-adapters.registry.json",
+  "promotion_registry": "data/penta/production-promotions.v1.json",
   "request_schema": "schemas/penta/execution-request.schema.json",
   "receipt_schema": "schemas/penta/execution-receipt.schema.json",
-  "authority_invariant": "The member runtime makes registered Penta systems addressable and operable without promoting their maturity or manufacturing authority.",
+  "authority_invariant": "The member runtime makes registered Penta systems addressable and operable. It recognizes only exact-evidence-bound maturity promotions from the separate promotion registry and never manufactures authority, provider state, credentials, or provider effects.",
   "control_plane_actions": ["list", "status", "validate", "handoff", "invoke"],
   "invariants": {
     "all_registered_members_status_addressable": true,
     "unknown_members_fail_closed": true,
     "member_invocation_requires_static_adapter": true,
     "all_certified_and_production_members_require_adapter": true,
+    "provider_effect_adapters_disabled_in_v1_5": true,
+    "member_maturity_never_auto_promoted": true,
+    "evidence_bound_promotion_only": true,
+    "promotion_prior_maturity_must_match": true,
+    "promotion_evidence_digest_and_runtime_paths_must_validate": true,
     "execution_eligible_adapter_targets_require_certified_or_production_maturity": true,
     "execute_effect_requires_certified_or_production_maturity": true,
     "interop_envelope_required_before_adapter_handler": true,
     "trace_and_idempotency_preserved": true,
     "evidence_reference_required_for_invocation": true,
-    "provider_effect_adapters_disabled_in_v1_5": true,
+    "local_adapter_provider_effects_disabled": true,
     "arbitrary_shell_execution_disabled": true,
     "user_selected_dynamic_import_disabled": true,
     "credential_material_never_accepted": true,
     "d3_authority_never_automatic": true,
-    "member_maturity_never_auto_promoted": true
+    "provider_states_never_promoted_by_member_runtime": true,
+    "self_certification_never_authorized": true
   },
   "production_member_adapters": [
     "penta.fabric:family_snapshot",
@@ -40,8 +47,14 @@
     "penta.scribe:reconcile_preview",
     "penta.marketer:cycle_preview",
     "penta.evi-builder:bundle_preview",
-    "penta.immune:repair_plan_preview"
+    "penta.immune:repair_plan_preview",
+    "penta.context:runtime_contract_status",
+    "penta.mail:production_status",
+    "penta.status:owner_snapshot",
+    "penta.credentials:binding_census",
+    "penta.build:provider_adapter_probe",
+    "penta.certify:provider_static_probe"
   ],
-  "execution_boundary": "V1.5 member adapters are repository-local and provider-effect false. Readiness, observability, compliance, licensing, Scribe, Marketer, PentaEVIBuilder, and PentaImmune operations execute bounded internal logic only. License readiness never issues a grant; Scribe/Marketer previews never publish externally; evidence preview remains unverified; repair preview never executes a repair or promotes production.",
-  "promotion_rule": "A member cannot be represented as execution-operational merely by registry maturity. Certified/production maturity plus at least one tested bounded adapter is mandatory, and provider-effect operations remain separately gated by PentaCertify, CHLOM/DAIL, PentaHybrid, credentials, readback and evidence."
+  "execution_boundary": "All member adapters are repository-local and provider-effect false. PentaEVIBuilder emits an unverified preview; PentaImmune emits a bounded plan without executing repair; PentaContext reports fixed local contract hashes without contacting its provider or accepting credentials; PentaMail reports historical evidence without evaluating current provider state; PentaCredentials returns no secret values; PentaBuild writes only disposable local artifacts; PentaCertify disables network probes. No local adapter promotes provider state or production.",
+  "promotion_rule": "A member advances only through a PASS record with matching prior catalog maturity, external authority reference, exact evidence digests, existing runtime paths, and a tested bounded adapter. Provider-effect operations remain separately authorized, credential-bound, certified, readback-gated, and HOLD-aware."
 }

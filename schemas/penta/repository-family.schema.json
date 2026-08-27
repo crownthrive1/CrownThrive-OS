@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/penta/repository-family.v1.json",
+  "title": "CrownThrive Repository Federation Control Plane",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "control_plane_id", "canonical_hub_id", "owner", "institutional_phase", "state", "inventory", "information_flow", "failover", "release_governance", "build_dispatch", "invariants", "implementation"],
+  "properties": {
+    "schema": {"const": "ct.penta.repository-federation-control-plane.v1"},
+    "version": {"const": "1.0.0"},
+    "control_plane_id": {"const": "ct.penta.repository-convergence"},
+    "canonical_hub_id": {"const": "ct.repo.crownthrive-support"},
+    "owner": {"const": "CrownThrive LLC"},
+    "institutional_phase": {"const": "phase_3_execute"},
+    "state": {"const": "controlled_test_pending_provider_binding_and_child_readback"},
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected_physical_repository_count", "public_nodes", "restricted_nodes"],
+      "properties": {
+        "expected_physical_repository_count": {"const": 13},
+        "public_nodes": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {"$ref": "#/$defs/publicNode"}
+        },
+        "restricted_nodes": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {"$ref": "#/$defs/restrictedNode"}
+        }
+      }
+    },
+    "information_flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["afferent", "efferent", "lateral"],
+      "properties": {
+        "afferent": {"const": "repository telemetry -> PentaNerves -> PentaSpine -> PentaBrain"},
+        "efferent": {"const": "PentaBrain disposition -> exact authority -> PentaFactory/PentaPR"},
+        "lateral": {"const": "repository attestation -> PentaFederation -> peer receipt -> PentaSpine"}
+      }
+    },
+    "failover": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hot_primary", "cold_recovery", "silent_emergency"],
+      "properties": {
+        "hot_primary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "ttl_seconds", "required"],
+          "properties": {
+            "mode": {"const": "live_provider_readback"},
+            "ttl_seconds": {"type": "integer", "minimum": 60, "maximum": 86400},
+            "required": {"type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": {"enum": ["repository_identity", "exact_head", "node_attestation", "build_readback"]}}
+          }
+        },
+        "cold_recovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "max_age_seconds", "required", "provider_writes"],
+          "properties": {
+            "mode": {"const": "read_only_authority_reducing"},
+            "max_age_seconds": {"type": "integer", "minimum": 60, "maximum": 604800},
+            "required": {"type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": {"enum": ["content_digest", "external_signature_verification", "exact_head"]}},
+            "provider_writes": {"const": false}
+          }
+        },
+        "silent_emergency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "public_address", "external_broadcast", "authority_effect"],
+          "properties": {
+            "mode": {"const": "local_hash_chained_restricted_handoff"},
+            "public_address": {"const": "restricted_ref_only"},
+            "external_broadcast": {"const": false},
+            "authority_effect": {"const": "reduce_only"}
+          }
+        }
+      }
+    },
+    "release_governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "active_default_branch_ruleset_required", "required_check_contexts", "max_bypass_actor_count", "exact_head_success_required"],
+      "properties": {
+        "stable_id": {"const": "ct.repo.crownthrive-support"},
+        "active_default_branch_ruleset_required": {"const": true},
+        "required_check_contexts": {"const": ["CrownThrive governed merge gate"]},
+        "max_bypass_actor_count": {"const": 0},
+        "exact_head_success_required": {"const": true}
+      }
+    },
+    "build_dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_type", "default", "requires_exact_authority_lease", "allowed_effects", "prohibited_effects"],
+      "properties": {
+        "event_type": {"const": "crownthrive_penta_build_v1"},
+        "default": {"const": "candidate_only"},
+        "requires_exact_authority_lease": {"const": true},
+        "allowed_effects": {"type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": {"enum": ["validate", "test", "compile", "package", "preserve-evidence"]}},
+        "prohibited_effects": {"type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": {"enum": ["merge", "visibility-change", "delete", "release-publish", "provider-secret-return"]}}
+      }
+    },
+    "invariants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["private_coordinates_prohibited_in_public_source", "awareness_never_grants_authority", "direct_main_write_prohibited", "child_self_activation_prohibited", "unknown_or_stale_fails_closed", "build_dispatch_requires_exact_authority", "emergency_route_is_authority_reducing"],
+      "properties": {
+        "private_coordinates_prohibited_in_public_source": {"const": true},
+        "awareness_never_grants_authority": {"const": true},
+        "direct_main_write_prohibited": {"const": true},
+        "child_self_activation_prohibited": {"const": true},
+        "unknown_or_stale_fails_closed": {"const": true},
+        "build_dispatch_requires_exact_authority": {"const": true},
+        "emergency_route_is_authority_reducing": {"const": true}
+      }
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "validator", "workflow", "tests", "node_schema"],
+      "properties": {
+        "runtime": {"const": "penta/repository_fabric"},
+        "validator": {"const": "scripts/validate_repository_federation.py"},
+        "workflow": {"const": ".github/workflows/penta-repository-convergence.yml"},
+        "tests": {"const": "tests/test_penta_repository_fabric.py"},
+        "node_schema": {"const": "schemas/penta/repository-node-attestation.schema.json"}
+      }
+    }
+  },
+  "$defs": {
+    "stableId": {"type": "string", "pattern": "^ct\\.repo\\.[a-z0-9][a-z0-9.-]*$"},
+    "roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "publicNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "repository", "default_branch", "expected_provider_visibility", "node_manifest_path", "roles"],
+      "properties": {
+        "stable_id": {"$ref": "#/$defs/stableId"},
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "default_branch": {"const": "main"},
+        "expected_provider_visibility": {"const": "public"},
+        "node_manifest_path": {"const": ".crownthrive/penta-node.v1.json"},
+        "roles": {"$ref": "#/$defs/roles"}
+      }
+    },
+    "restrictedNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "locator", "default_branch", "expected_provider_visibility", "node_manifest_path", "roles"],
+      "properties": {
+        "stable_id": {"$ref": "#/$defs/stableId"},
+        "locator": {"const": "restricted_ref_only"},
+        "default_branch": {"const": "main"},
+        "expected_provider_visibility": {"const": "private"},
+        "node_manifest_path": {"const": ".crownthrive/penta-node.v1.json"},
+        "roles": {"$ref": "#/$defs/roles"}
+      }
+    }
+  }
+}

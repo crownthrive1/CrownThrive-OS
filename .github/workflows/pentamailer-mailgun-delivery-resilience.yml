@@ -1,0 +1,305 @@
+name: PentaMailer Mailgun Delivery Resilience
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'runtime/penta_mailgun_probation.py'
+      - 'tests/test_penta_mailgun_probation.py'
+      - 'runtime/penta-provider-control-plane/mailgun-delivery-resilience.v1.json'
+      - 'developers/manifests/pentamailer-mailgun-delivery-resilience.v1.json'
+      - 'developers/manifests/pentamailer-mailgun-deployment-receipt.v1.json'
+      - 'developers/PENTAMAILER-MAILGUN-DELIVERY-RESILIENCE.md'
+      - 'PENTAMAIL.md'
+      - 'docs/versioning/VERSION_REGISTRY.json'
+      - 'supabase/functions/mailgun-relay-control/index.ts'
+      - 'supabase/functions/penta-mail/index.ts'
+      - 'supabase/functions/crownthrive-os-v2-runtime/index.ts'
+      - 'supabase/functions/crownthrive-os-v2-runtime/deno.json'
+      - 'supabase/migrations/20260826234739_pentamail_mailgun_probation_queue_control.sql'
+      - 'supabase/migrations/20260827001419_pentamail_receipt_chain_epoch_correction.sql'
+      - 'supabase/migrations/20260827001902_pentamail_provider_control_fk_indexes.sql'
+      - 'supabase/migrations/20260827002646_os_v2_notification_trigger_identity.sql'
+      - 'supabase/migrations/20260827003843_pentamail_notification_recipient_privacy_boundary.sql'
+      - 'supabase/migrations/20260827005615_pentamail_probation_concurrency_hardening.sql'
+      - 'supabase/migrations/20260827010541_os_v2_governed_notification_claim.sql'
+      - 'supabase/migrations/20260827010838_pentamail_incident_projection_fix.sql'
+      - 'supabase/migrations/20260827011146_pentamail_receipt_epoch_anchor_hardening.sql'
+      - 'supabase/migrations/20260827011347_pentamail_service_role_assertion_hardening.sql'
+      - 'supabase/migrations/20260827011427_pentamail_readback_probe_ordering.sql'
+      - 'supabase/migrations/20260827013000_pentamail_receipt_epoch_anchor_fk_index.sql'
+      - '.github/workflows/pentamailer-mailgun-delivery-resilience.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/penta_mailgun_probation.py'
+      - 'tests/test_penta_mailgun_probation.py'
+      - 'runtime/penta-provider-control-plane/mailgun-delivery-resilience.v1.json'
+      - 'developers/manifests/pentamailer-mailgun-delivery-resilience.v1.json'
+      - 'developers/manifests/pentamailer-mailgun-deployment-receipt.v1.json'
+      - 'developers/PENTAMAILER-MAILGUN-DELIVERY-RESILIENCE.md'
+      - 'PENTAMAIL.md'
+      - 'docs/versioning/VERSION_REGISTRY.json'
+      - 'supabase/functions/mailgun-relay-control/index.ts'
+      - 'supabase/functions/penta-mail/index.ts'
+      - 'supabase/functions/crownthrive-os-v2-runtime/index.ts'
+      - 'supabase/functions/crownthrive-os-v2-runtime/deno.json'
+      - 'supabase/migrations/20260826234739_pentamail_mailgun_probation_queue_control.sql'
+      - 'supabase/migrations/20260827001419_pentamail_receipt_chain_epoch_correction.sql'
+      - 'supabase/migrations/20260827001902_pentamail_provider_control_fk_indexes.sql'
+      - 'supabase/migrations/20260827002646_os_v2_notification_trigger_identity.sql'
+      - 'supabase/migrations/20260827003843_pentamail_notification_recipient_privacy_boundary.sql'
+      - 'supabase/migrations/20260827005615_pentamail_probation_concurrency_hardening.sql'
+      - 'supabase/migrations/20260827010541_os_v2_governed_notification_claim.sql'
+      - 'supabase/migrations/20260827010838_pentamail_incident_projection_fix.sql'
+      - 'supabase/migrations/20260827011146_pentamail_receipt_epoch_anchor_hardening.sql'
+      - 'supabase/migrations/20260827011347_pentamail_service_role_assertion_hardening.sql'
+      - 'supabase/migrations/20260827011427_pentamail_readback_probe_ordering.sql'
+      - 'supabase/migrations/20260827013000_pentamail_receipt_epoch_anchor_fk_index.sql'
+      - '.github/workflows/pentamailer-mailgun-delivery-resilience.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentamailer-mailgun-delivery-resilience-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Compile deterministic policy reference
+        run: python3 -m py_compile runtime/penta_mailgun_probation.py
+
+      - name: Parse Edge function sources
+        run: |
+          node --check supabase/functions/mailgun-relay-control/index.ts
+          node --check supabase/functions/penta-mail/index.ts
+          node --check supabase/functions/crownthrive-os-v2-runtime/index.ts
+
+      - name: Run delivery-resilience regression suite
+        run: python3 -m unittest discover -s tests -p 'test_penta_mailgun_probation.py' -v
+
+      - name: Validate governed runtime contract
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          policy_id = 'ct.pentamailer.policy.mailgun-delivery-resilience.v1'
+          origin = 'db-trigger:public.ct_factory_adapter_certification_queue:trg_os_v2_notify_provider_cert_state_v1'
+          alias = 'mailgun-relay:notifications'
+          migration_paths = [
+              'supabase/migrations/20260826234739_pentamail_mailgun_probation_queue_control.sql',
+              'supabase/migrations/20260827001419_pentamail_receipt_chain_epoch_correction.sql',
+              'supabase/migrations/20260827001902_pentamail_provider_control_fk_indexes.sql',
+              'supabase/migrations/20260827002646_os_v2_notification_trigger_identity.sql',
+              'supabase/migrations/20260827003843_pentamail_notification_recipient_privacy_boundary.sql',
+              'supabase/migrations/20260827005615_pentamail_probation_concurrency_hardening.sql',
+              'supabase/migrations/20260827010541_os_v2_governed_notification_claim.sql',
+              'supabase/migrations/20260827010838_pentamail_incident_projection_fix.sql',
+              'supabase/migrations/20260827011146_pentamail_receipt_epoch_anchor_hardening.sql',
+              'supabase/migrations/20260827011347_pentamail_service_role_assertion_hardening.sql',
+              'supabase/migrations/20260827011427_pentamail_readback_probe_ordering.sql',
+          ]
+          migration_names = [
+              'pentamail_mailgun_probation_queue_control',
+              'pentamail_receipt_chain_epoch_correction',
+              'pentamail_provider_control_fk_indexes',
+              'os_v2_notification_trigger_identity',
+              'pentamail_notification_recipient_privacy_boundary',
+              'pentamail_probation_concurrency_hardening',
+              'os_v2_governed_notification_claim',
+              'pentamail_incident_projection_fix',
+              'pentamail_receipt_epoch_anchor_hardening',
+              'pentamail_service_role_assertion_hardening',
+              'pentamail_readback_probe_ordering',
+          ]
+          manifest = json.loads(Path('developers/manifests/pentamailer-mailgun-delivery-resilience.v1.json').read_text())
+          receipt = json.loads(Path('developers/manifests/pentamailer-mailgun-deployment-receipt.v1.json').read_text())
+          supplement = json.loads(Path('runtime/penta-provider-control-plane/mailgun-delivery-resilience.v1.json').read_text())
+          registry = json.loads(Path('docs/versioning/VERSION_REGISTRY.json').read_text())
+          migrations = {path: Path(path).read_text() for path in migration_paths}
+          migration = migrations[migration_paths[0]]
+          correction = migrations[migration_paths[1]]
+          trigger_identity = migrations[migration_paths[3]]
+          privacy = migrations[migration_paths[4]]
+          hardening = migrations[migration_paths[5]]
+          os_claim = migrations[migration_paths[6]]
+          incident_projection = migrations[migration_paths[7]]
+          receipt_anchor = migrations[migration_paths[8]]
+          service_role_assertion = migrations[migration_paths[9]]
+          ordered_readback = migrations[migration_paths[10]]
+          post_receipt_anchor_index = Path(
+              'supabase/migrations/20260827013000_pentamail_receipt_epoch_anchor_fk_index.sql'
+          ).read_text()
+          relay = Path('supabase/functions/mailgun-relay-control/index.ts').read_text()
+          dispatcher = Path('supabase/functions/penta-mail/index.ts').read_text()
+          notification_worker = Path('supabase/functions/crownthrive-os-v2-runtime/index.ts').read_text()
+
+          assert manifest['policy_id'] == policy_id
+          assert supplement['policy_id'] == policy_id
+          assert manifest['accepted_trigger']['trigger_ref'] == origin
+          assert manifest['accepted_trigger']['relay_enforcement_alias'] == alias
+          assert manifest['accepted_trigger']['notification_identity']['default_trigger_ref'] == 'os-v2:notification'
+          assert manifest['accepted_trigger']['notification_identity']['causal_trigger_ref_propagated_per_message'] is True
+          assert manifest['accepted_trigger']['notification_identity']['unrelated_notifications_share_probation'] is False
+          assert supplement['causal_trigger_ref'] == origin
+          assert supplement['legacy_enforcement_alias'] == alias
+          assert supplement['trigger_identity_contract']['default_notification_trigger_ref'] == 'os-v2:notification'
+          assert supplement['trigger_identity_contract']['causal_trigger_ref_propagated_per_message'] is True
+          assert supplement['trigger_identity_contract']['unrelated_notifications_share_causal_probation'] is False
+          assert manifest['route_hold']['minimum_seconds'] == 10800
+          assert manifest['accepted_trigger']['probation_seconds'] == 259200
+          assert manifest['controlled_release']['messages_per_dispatch'] == 2
+          assert manifest['controlled_release']['route_authorizations_per_rolling_minute'] == 2
+          assert manifest['controlled_release']['route_batch_window_seconds'] == 60
+          assert manifest['controlled_release']['global_authorizations_per_hour'] == 10
+          assert manifest['controlled_release']['global_window_seconds'] == 3600
+          assert 'developers/manifests/pentamailer-mailgun-deployment-receipt.v1.json' in manifest['assets']
+
+          assert receipt['policy_id'] == policy_id
+          assert [entry['name'] for entry in receipt['database_migrations']] == migration_names
+          assert receipt['live_readback']['provider_attempt_starts'] == 0
+          assert receipt['live_readback']['provider_attempt_outcomes'] == 0
+          assert receipt['security_readback']['service_role_direct_provider_control_update'] is False
+          assert receipt['security_readback']['service_role_direct_trigger_probation_update'] is False
+          assert receipt['security_readback']['service_role_direct_outbox_update'] is False
+          assert receipt['security_readback']['service_role_direct_receipt_epoch_insert'] is False
+          assert receipt['security_readback']['legacy_accept_rpc_execute'] is False
+          assert receipt['security_readback']['governed_accept_rpc_execute'] is True
+          assert receipt['security_readback']['legacy_readback_rpc_execute'] is False
+          assert receipt['security_readback']['ordered_readback_rpc_execute'] is True
+          assert receipt['receipt_chain_readback']['anchor_verified'] is True
+          assert receipt['receipt_chain_readback']['historical_receipts_mutated'] is False
+          assert not any(
+              entry['name'] == 'pentamail_receipt_epoch_anchor_fk_index'
+              for entry in receipt['database_migrations']
+          ), 'post-receipt source hardening must not be represented as deployed evidence'
+
+          component = next(
+              entry for entry in registry['components']
+              if entry['component_id'] == 'ct.pentamailer.mailgun-delivery-resilience'
+          )
+          assert component['version'] == manifest['version']
+          assert component['evidence_ref'] == 'developers/manifests/pentamailer-mailgun-deployment-receipt.v1.json'
+
+          required_sql = [
+              "interval '3 hours'",
+              "interval '72 hours'",
+              'pg_advisory_xact_lock',
+              "limit v_limit",
+              origin,
+              alias,
+          ]
+          for token in required_sql:
+              assert token in migration, token
+          assert 'historical_receipts_mutated' in correction
+          assert 'penta_mail_receipt_chain_epoch_status_v1' in correction
+          assert origin in trigger_identity
+          assert "default 'os-v2:notification'" in trigger_identity
+
+          for token in (
+              'penta_mail_notification_recipient_v1',
+              'penta_mail_recipient_allowed_v1',
+              'os_v2.system_notification_preferences',
+              'to service_role',
+          ):
+              assert token in privacy, token
+          for token in (
+              'penta_mail_reserve_mailgun_rate_v2',
+              "interval '1 minute'",
+              'v_batch_count >= 2',
+              'penta_mail_start_mailgun_attempt_v1',
+              'penta_mail_record_mailgun_attempt_outcome_v1',
+              "state = 'reconciliation_required'",
+              'revoke insert, update, delete, truncate on integration_control.penta_mail_provider_control_v1 from service_role',
+              'revoke insert, update, delete, truncate on integration_control.penta_mail_trigger_probation_v1 from service_role',
+              'revoke insert, update, delete, truncate on public.penta_mail_outbox_v1 from service_role',
+          ):
+              assert token in hardening, token
+          for token in (
+              'claim_mail_notifications_v1',
+              'least(coalesce(p_limit, 2), 2)',
+              'p.probation_until > v_now',
+              'for update skip locked',
+          ):
+              assert token in os_claim, token
+          for token in (
+              'penta_mail_accept_mailgun_probation_v3',
+              'revoke execute on function public.penta_mail_accept_mailgun_probation_v2',
+              'grant execute on function public.penta_mail_accept_mailgun_probation_v3',
+          ):
+              assert token in incident_projection, token
+          for token in (
+              'penta_mail_receipt_epoch_anchor_fk_v1',
+              'foreign key (starts_after_receipt_id, starts_after_chain_sha256)',
+              'penta_mail_validate_receipt_epoch_anchor_v1',
+              'from service_role',
+          ):
+              assert token in receipt_anchor, token
+          assert "session_user not in ('postgres','service_role')" in service_role_assertion
+          assert "current_setting('request.jwt.claim.role', true)" in service_role_assertion
+          for token in (
+              'penta_mail_record_mailgun_readback_v3',
+              'last_readback_probe_started_at',
+              'ignored_out_of_order',
+              'revoke execute on function public.penta_mail_record_mailgun_readback_v2',
+              'grant execute on function public.penta_mail_record_mailgun_readback_v3',
+          ):
+              assert token in ordered_readback, token
+          for token in (
+              'create index if not exists penta_mail_receipt_epoch_anchor_idx',
+              'starts_after_receipt_id',
+              'starts_after_chain_sha256',
+          ):
+              assert token in post_receipt_anchor_index, token
+
+          assert '/sending_queues' in relay
+          assert 'AbortSignal.timeout(15000)' in relay
+          assert 'AbortSignal.timeout(30000)' in relay
+          assert 'penta_mail_record_mailgun_readback_v3' in relay
+          assert 'penta_mail_accept_mailgun_probation_v3' in relay
+          assert 'penta_mail_start_mailgun_attempt_v1' in relay
+          assert 'penta_mail_record_mailgun_attempt_outcome_v1' in relay
+          assert 'reconciliation_required: true' in relay
+          assert 'provider_call_made: false' in relay
+          assert 'penta_mail_claim_outbox_v3' in dispatcher
+          assert '`penta-outbox:${m.message_id}`' in dispatcher
+          assert '${m.message_id}:${m.lease_id}' not in dispatcher
+          assert 'state=in.(pending,retry)' not in dispatcher
+          assert 'Math.min(2' in notification_worker
+          assert 'claim_mail_notifications_v1(${boundedLimit})' in notification_worker
+          assert "trigger_ref:n.trigger_ref||'os-v2:notification'" in notification_worker
+          assert 'attempt_count=greatest(attempt_count-1,0)' in notification_worker
+          assert "state='queued'" in notification_worker
+          assert 'provider_call_made===false' in notification_worker
+
+          digest_source = trigger_identity + hardening
+          for token in (
+              'coalesced_queued_during_trigger_probation',
+              'trigger_probation_digest',
+              'deferred_event_count',
+              'available_at = greatest(available_at, v_probation_until)',
+          ):
+              assert token in digest_source, token
+
+          public_source = '\n'.join([relay, dispatcher, notification_worker, *migrations.values()])
+          addresses = {
+              value.lower()
+              for value in re.findall(r'[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}', public_source, re.I)
+          }
+          assert addresses <= {'contact@crownthrive.com'}, addresses
+          print('PentaMailer Mailgun delivery-resilience contract: PASS')
+          PY

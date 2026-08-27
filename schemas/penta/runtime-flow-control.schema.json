@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/penta/runtime-flow-control.schema.json",
+  "title": "CrownThrive Penta Runtime Flow-Control Contracts",
+  "description": "Provider-neutral contracts for the nonvoting PentaQueue, PentaLoad, PentaBalancer and PentaCosts capability pack.",
+  "oneOf": [
+    {"$ref": "#/$defs/queueAdmission"},
+    {"$ref": "#/$defs/authorityReceipt"},
+    {"$ref": "#/$defs/loadSnapshot"},
+    {"$ref": "#/$defs/claim"},
+    {"$ref": "#/$defs/rateBook"},
+    {"$ref": "#/$defs/usageRecord"},
+    {"$ref": "#/$defs/budgetStatus"},
+    {"$ref": "#/$defs/costLedgerEntry"},
+    {"$ref": "#/$defs/forecastResult"},
+    {"$ref": "#/$defs/exceptionReport"},
+    {"$ref": "#/$defs/consolidatedReport"}
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^[^\\r\\n\\u0000]+$"
+    },
+    "exactScope": {
+      "allOf": [
+        {"$ref": "#/$defs/identifier"},
+        {"pattern": "^[^*]+$"}
+      ]
+    },
+    "queueAdmission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "idempotency_key", "payload", "priority", "route_candidates",
+        "required_scope", "estimated_cost_units", "max_attempts"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.admission.v1"},
+        "idempotency_key": {"$ref": "#/$defs/identifier"},
+        "payload": {"type": "object"},
+        "priority": {"type": "integer", "minimum": 0, "maximum": 100},
+        "route_candidates": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/identifier"}
+        },
+        "required_scope": {"$ref": "#/$defs/exactScope"},
+        "estimated_cost_units": {"$ref": "#/$defs/unit"},
+        "max_attempts": {"type": "integer", "minimum": 1, "maximum": 100}
+      }
+    },
+    "authorityReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "receipt_id", "subject_id", "scopes", "not_before",
+        "expires_at", "evidence_ref", "issuer_id", "environment_id",
+        "evidence_binding_digest", "revoked_at", "revocation_reason"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.authority-receipt.v1"},
+        "receipt_id": {"$ref": "#/$defs/identifier"},
+        "subject_id": {"$ref": "#/$defs/identifier"},
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/exactScope"}
+        },
+        "not_before": {"type": "integer"},
+        "expires_at": {"type": "integer"},
+        "evidence_ref": {"$ref": "#/$defs/identifier"},
+        "issuer_id": {"$ref": "#/$defs/identifier"},
+        "environment_id": {"$ref": "#/$defs/identifier"},
+        "evidence_binding_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "revoked_at": {"type": ["integer", "null"]},
+        "revocation_reason": {"type": ["string", "null"]}
+      }
+    },
+    "loadSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "route_id", "capacity", "reported_inflight",
+        "observed_at", "ttl_seconds", "enabled"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.load-snapshot.v1"},
+        "route_id": {"$ref": "#/$defs/identifier"},
+        "capacity": {"type": "integer", "minimum": 0},
+        "reported_inflight": {"type": "integer", "minimum": 0},
+        "observed_at": {"type": "integer"},
+        "ttl_seconds": {"type": "integer", "minimum": 1},
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "job_id", "worker_id", "route_id", "fencing_token",
+        "lease_expires_at", "attempt", "payload", "authority_receipt_id",
+        "cost_reservation_id"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.claim.v1"},
+        "job_id": {"$ref": "#/$defs/identifier"},
+        "worker_id": {"$ref": "#/$defs/identifier"},
+        "route_id": {"$ref": "#/$defs/identifier"},
+        "fencing_token": {"type": "integer", "minimum": 1},
+        "lease_expires_at": {"type": "integer"},
+        "attempt": {"type": "integer", "minimum": 1},
+        "payload": {"type": "object"},
+        "authority_receipt_id": {"$ref": "#/$defs/identifier"},
+        "cost_reservation_id": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "unit": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9223372036854775807
+    },
+    "rateBook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "rate_book_id", "version", "effective_at", "rates",
+        "evidence_ref", "digest", "immutable", "money_movement"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.rate-book.v1"},
+        "rate_book_id": {"$ref": "#/$defs/identifier"},
+        "version": {"$ref": "#/$defs/identifier"},
+        "effective_at": {"type": "integer"},
+        "rates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["operation", "units"],
+            "properties": {
+              "operation": {"$ref": "#/$defs/identifier"},
+              "units": {"$ref": "#/$defs/unit"}
+            }
+          }
+        },
+        "evidence_ref": {"$ref": "#/$defs/identifier"},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "immutable": {"const": true},
+        "money_movement": {"const": false}
+      }
+    },
+    "usageRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "record_id", "idempotency_key", "operation", "quantity",
+        "rate_book_id", "rate_version", "rate_digest", "estimated_cost_units",
+        "evidence_ref", "observed_at", "job_id", "route_id",
+        "fencing_token", "reservation_id", "result_digest", "append_only"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.usage.v1"},
+        "record_id": {"$ref": "#/$defs/identifier"},
+        "idempotency_key": {"$ref": "#/$defs/identifier"},
+        "operation": {"$ref": "#/$defs/identifier"},
+        "quantity": {"$ref": "#/$defs/unit"},
+        "rate_book_id": {"$ref": "#/$defs/identifier"},
+        "rate_version": {"$ref": "#/$defs/identifier"},
+        "rate_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "estimated_cost_units": {"$ref": "#/$defs/unit"},
+        "evidence_ref": {"$ref": "#/$defs/identifier"},
+        "observed_at": {"type": "integer"},
+        "job_id": {"$ref": "#/$defs/identifier"},
+        "route_id": {"$ref": "#/$defs/identifier"},
+        "fencing_token": {"type": "integer", "minimum": 1},
+        "reservation_id": {"$ref": "#/$defs/identifier"},
+        "result_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "append_only": {"const": true}
+      }
+    },
+    "budgetStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "route_id", "ceiling_units", "accounted_units",
+        "reserved_units", "available_units", "money_movement"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.budget-status.v1"},
+        "route_id": {"$ref": "#/$defs/identifier"},
+        "ceiling_units": {"$ref": "#/$defs/unit"},
+        "accounted_units": {"$ref": "#/$defs/unit"},
+        "reserved_units": {"$ref": "#/$defs/unit"},
+        "available_units": {"$ref": "#/$defs/unit"},
+        "money_movement": {"const": false}
+      }
+    },
+    "costLedgerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "entry_id", "idempotency_key", "sequence", "event_type",
+        "route_id", "job_id", "reservation_id", "units", "evidence_ref",
+        "append_only", "accounting_source_of_truth", "treasury_source_of_truth"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.cost-ledger-entry.v1"},
+        "entry_id": {"$ref": "#/$defs/identifier"},
+        "idempotency_key": {"$ref": "#/$defs/identifier"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "event_type": {"$ref": "#/$defs/identifier"},
+        "route_id": {"$ref": "#/$defs/identifier"},
+        "job_id": {"$ref": "#/$defs/identifier"},
+        "reservation_id": {"$ref": "#/$defs/identifier"},
+        "units": {"$ref": "#/$defs/unit"},
+        "evidence_ref": {"$ref": "#/$defs/identifier"},
+        "append_only": {"const": true},
+        "accounting_source_of_truth": {"const": false},
+        "treasury_source_of_truth": {"const": false}
+      }
+    },
+    "forecastResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "method", "sample_count", "periods", "projected_cost_units",
+        "advisory_only", "authorizes_spend"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.forecast.v1"},
+        "method": {"const": "ceiling_mean_v1"},
+        "sample_count": {"type": "integer", "minimum": 0},
+        "periods": {"$ref": "#/$defs/unit"},
+        "projected_cost_units": {"$ref": "#/$defs/unit"},
+        "advisory_only": {"const": true},
+        "authorizes_spend": {"const": false}
+      }
+    },
+    "exceptionGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fingerprint", "exception_class", "code", "normalized_message",
+        "exception_class_digest", "code_digest", "raw_evidence_count",
+        "first_observed_at", "last_observed_at", "evidence_refs",
+        "evidence_ref_digests"
+      ],
+      "properties": {
+        "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "exception_class": {"$ref": "#/$defs/identifier"},
+        "code": {"$ref": "#/$defs/identifier"},
+        "exception_class_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "code_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "normalized_message": {"type": "string"},
+        "raw_evidence_count": {"type": "integer", "minimum": 1},
+        "first_observed_at": {"type": "integer"},
+        "last_observed_at": {"type": "integer"},
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/identifier"}
+        },
+        "evidence_ref_digests": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "exceptionReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "raw_evidence_count", "max_raw_evidence_records",
+        "fingerprint_count", "groups", "raw_evidence"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.exceptions.v1"},
+        "raw_evidence_count": {"type": "integer", "minimum": 0},
+        "max_raw_evidence_records": {"type": "integer", "minimum": 1},
+        "fingerprint_count": {"type": "integer", "minimum": 0},
+        "groups": {"type": "array", "items": {"$ref": "#/$defs/exceptionGroup"}},
+        "raw_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "evidence_id", "exception_class", "exception_class_digest",
+              "code", "code_digest", "message", "message_digest",
+              "evidence_ref", "evidence_ref_digest", "redacted", "observed_at"
+            ],
+            "properties": {
+              "evidence_id": {"$ref": "#/$defs/identifier"},
+              "exception_class": {"const": "redacted-exception-class"},
+              "exception_class_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "code": {"const": "redacted-exception-code"},
+              "code_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "message": {"type": "string"},
+              "message_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "evidence_ref": {"type": "string"},
+              "evidence_ref_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "redacted": {"const": true},
+              "observed_at": {"type": "integer"}
+            }
+          }
+        }
+      }
+    },
+    "consolidatedReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "capability_pack", "lifecycle_state", "durable_store_bound",
+        "external_effect_adapter_bound", "external_effects_enabled",
+        "issuer_authentication", "quorum_eligible", "vote_eligible",
+        "certification_effect", "money_movement", "queue", "load",
+        "authority", "costs", "exceptions"
+      ],
+      "properties": {
+        "schema": {"const": "ct.penta.runtime-flow-control.report.v1"},
+        "capability_pack": {"const": "crownthrive.penta.runtime-flow-control.v1"},
+        "lifecycle_state": {"const": "CONTROLLED_TEST"},
+        "durable_store_bound": {"const": false},
+        "external_effect_adapter_bound": {"const": false},
+        "external_effects_enabled": {"const": false},
+        "issuer_authentication": {"const": false},
+        "quorum_eligible": {"const": false},
+        "vote_eligible": {"const": false},
+        "certification_effect": {"const": false},
+        "money_movement": {"const": false},
+        "queue": {"type": "object"},
+        "load": {"type": "object"},
+        "authority": {"type": "object"},
+        "costs": {"type": "object"},
+        "exceptions": {"$ref": "#/$defs/exceptionReport"}
+      }
+    }
+  }
+}

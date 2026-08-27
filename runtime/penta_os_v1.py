@@ -13,10 +13,23 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
+
+try:
+    from runtime.penta_promotions import (
+        PROMOTION_PATH,
+        PentaPromotionError,
+        load_promotion_manifest,
+    )
+except ModuleNotFoundError:
+    runtime_dir = str(Path(__file__).resolve().parent)
+    if runtime_dir not in sys.path:
+        sys.path.insert(0, runtime_dir)
+    from penta_promotions import PROMOTION_PATH, PentaPromotionError, load_promotion_manifest
 
 
 AXES = {"truth", "authority", "execution", "interoperation", "continuity"}
@@ -24,7 +37,7 @@ MATURITIES = {"specified", "implemented", "certified", "production", "hold", "re
 EXECUTION_ELIGIBLE = {"certified", "production"}
 RISK_ORDER = {"D0": 0, "D1": 1, "D2": 2, "D3": 3}
 RELEASE_VERSION = "1.5.0"
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.2.0"
 SAFE_OPERATIONS = {"describe", "status", "readiness", "validate", "verify", "plan"}
 UNIVERSAL_OPERATIONS = SAFE_OPERATIONS | {"dispatch"}
 CONTROL_PLANE_OPERATIONS = {"batch-plan", "verify-batch-plan", "verify-plan", "verify-receipt"}
@@ -329,6 +342,31 @@ class PentaOSV1:
             raise PentaOSV1Error("unexpected control-plane operation contract")
         if registry.get("production_certification") != "HOLD":
             raise PentaOSV1Error("Penta OS V1.5 production certification must remain HOLD")
+        if registry.get("promotion_registry") != "data/penta/production-promotions.v1.json":
+            raise PentaOSV1Error("unexpected or missing maturity promotion registry")
+        if registry.get("provider_state_promotion_authorized") is not False:
+            raise PentaOSV1Error("Penta OS may not authorize provider-state promotion")
+        try:
+            promotion_manifest = load_promotion_manifest(self.root, required=True)
+        except PentaPromotionError as exc:
+            raise PentaOSV1Error(f"invalid canonical maturity promotion registry: {exc}") from exc
+        canonical_promotions = {
+            item["machine_key"]: {
+                "promotion_id": item["promotion_id"],
+                "from_maturity": item["from_maturity"],
+                "to_maturity": item["to_maturity"],
+                "effective_at": item["effective_at"],
+                "authority_ref": item["authority_ref"],
+                "evidence_bindings": item["evidence_bindings"],
+                "runtime_refs": item["runtime_refs"],
+                "scope": item["scope"],
+                "provider_state_disposition": item["provider_state_disposition"],
+                "provider_effect_authorized": item["provider_effect_authorized"],
+                "self_certification_authorized": item["self_certification_authorized"],
+                "promotion_registry": str(PROMOTION_PATH),
+            }
+            for item in promotion_manifest["promotions"]
+        }
 
         systems = registry.get("systems")
         if not isinstance(systems, list) or not systems:
@@ -352,6 +390,54 @@ class PentaOSV1:
             canonical_names[normalized_name] = key
             if value.get("axis") not in AXES or value.get("maturity") not in MATURITIES:
                 raise PentaOSV1Error(f"invalid axis or maturity for {key}")
+            promotion = value.get("maturity_promotion")
+            catalog_maturity = value.get("catalog_maturity")
+            if (promotion is None) is not (catalog_maturity is None):
+                raise PentaOSV1Error(f"promotion lineage/catalog maturity mismatch for {key}")
+            if promotion is not None:
+                required_promotion_fields = {
+                    "promotion_id", "from_maturity", "to_maturity", "effective_at",
+                    "authority_ref", "evidence_bindings", "runtime_refs", "scope",
+                    "provider_state_disposition", "provider_effect_authorized",
+                    "self_certification_authorized", "promotion_registry",
+                }
+                if not isinstance(promotion, dict) or set(promotion) != required_promotion_fields:
+                    raise PentaOSV1Error(f"invalid maturity promotion shape for {key}")
+                if catalog_maturity not in MATURITIES:
+                    raise PentaOSV1Error(f"invalid catalog maturity for {key}")
+                if promotion["from_maturity"] != catalog_maturity or promotion["to_maturity"] != value["maturity"]:
+                    raise PentaOSV1Error(f"promotion maturity lineage mismatch for {key}")
+                if value["maturity"] not in EXECUTION_ELIGIBLE or value["maturity"] == catalog_maturity:
+                    raise PentaOSV1Error(f"invalid effective promotion maturity for {key}")
+                if promotion["provider_state_disposition"] != "UNCHANGED_SEPARATELY_GATED":
+                    raise PentaOSV1Error(f"provider state is not separately gated for {key}")
+                if promotion["provider_effect_authorized"] is not False:
+                    raise PentaOSV1Error(f"provider effect may not be authorized by promotion for {key}")
+                if promotion["self_certification_authorized"] is not False:
+                    raise PentaOSV1Error(f"self-certification may not be authorized for {key}")
+                if promotion["promotion_registry"] != registry["promotion_registry"]:
+                    raise PentaOSV1Error(f"promotion registry lineage mismatch for {key}")
+                bindings = promotion["evidence_bindings"]
+                runtime_refs = promotion["runtime_refs"]
+                if not isinstance(bindings, list) or not bindings:
+                    raise PentaOSV1Error(f"promotion evidence bindings missing for {key}")
+                if (
+                    not isinstance(runtime_refs, list)
+                    or not runtime_refs
+                    or any(not isinstance(ref, str) or not ref for ref in runtime_refs)
+                    or len(runtime_refs) != len(set(runtime_refs))
+                ):
+                    raise PentaOSV1Error(f"invalid promotion runtime references for {key}")
+                for binding in bindings:
+                    if (
+                        not isinstance(binding, dict)
+                        or set(binding) != {"path", "sha256", "claim"}
+                        or not isinstance(binding["path"], str)
+                        or not SHA256_PATTERN.fullmatch(binding["sha256"])
+                        or not isinstance(binding["claim"], str)
+                        or not binding["claim"]
+                    ):
+                        raise PentaOSV1Error(f"invalid promotion evidence binding for {key}")
             if value.get("kind") not in {"system", "primitive", "layer", "subcomponent"}:
                 raise PentaOSV1Error(f"invalid kind for {key}")
             if value.get("risk_ceiling") not in {"D0", "D1", "D2", "D3"}:
@@ -403,6 +489,16 @@ class PentaOSV1:
             if value.get("strict_readiness_state") not in READINESS_STATES:
                 raise PentaOSV1Error(f"invalid strict readiness for {key}")
             members[key] = value
+
+        embedded_promotions = {
+            key: value["maturity_promotion"]
+            for key, value in members.items()
+            if "maturity_promotion" in value
+        }
+        if embedded_promotions != canonical_promotions:
+            raise PentaOSV1Error(
+                "embedded maturity promotion lineage does not exactly match canonical registry"
+            )
 
         for key, value in members.items():
             parent = value.get("parent_machine_key")
@@ -458,6 +554,10 @@ class PentaOSV1:
         for field, expected in expected_counts.items():
             if counts.get(field) != expected:
                 raise PentaOSV1Error(f"registry count mismatch: {field}")
+        if counts.get("evidence_bound_maturity_promotions") != sum(
+            "maturity_promotion" in row for row in systems
+        ):
+            raise PentaOSV1Error("registry count mismatch: evidence_bound_maturity_promotions")
         if counts.get("by_strict_readiness") != analysis["summary"]["readiness_partition"]:
             raise PentaOSV1Error("strict readiness partition mismatch")
 
@@ -493,21 +593,43 @@ class PentaOSV1:
             or len(release_gate_codes) != len(set(release_gate_codes))
         ):
             raise PentaOSV1Error("release_gate_codes must be a sorted non-empty unique array")
-        if verify_sources:
-            sources = registry.get("source_digests_sha256")
-            if not isinstance(sources, dict) or not sources:
-                raise PentaOSV1Error("source_digests_sha256 must be a non-empty object")
-            for rel, expected in sources.items():
-                if not isinstance(rel, str) or not isinstance(expected, str) or not SHA256_PATTERN.fullmatch(expected):
-                    raise PentaOSV1Error("invalid source digest entry")
-                pure = PurePosixPath(rel)
-                if pure.is_absolute() or ".." in pure.parts or "\\" in rel:
-                    raise PentaOSV1Error(f"unsafe registry source path: {rel}")
+        sources = registry.get("source_digests_sha256")
+        if not isinstance(sources, dict) or not sources:
+            raise PentaOSV1Error("source_digests_sha256 must be a non-empty object")
+        for rel, expected in sources.items():
+            if not isinstance(rel, str) or not isinstance(expected, str) or not SHA256_PATTERN.fullmatch(expected):
+                raise PentaOSV1Error("invalid source digest entry")
+            pure = PurePosixPath(rel)
+            if pure.is_absolute() or ".." in pure.parts or "\\" in rel:
+                raise PentaOSV1Error(f"unsafe registry source path: {rel}")
+            if verify_sources:
                 path = (self.root / Path(*pure.parts)).resolve()
                 if not path.is_relative_to(self.root) or not path.is_file():
                     raise PentaOSV1Error(f"registry source missing or outside root: {rel}")
                 if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
                     raise PentaOSV1Error(f"registry source drift: {rel}")
+        if registry["promotion_registry"] not in sources:
+            raise PentaOSV1Error("promotion registry is not source-digest bound")
+        for key, value in members.items():
+            promotion = value.get("maturity_promotion")
+            if promotion is None:
+                continue
+            evidence_paths = value.get("evidence_paths")
+            registry_sources = value.get("registry_sources")
+            if not isinstance(evidence_paths, list) or not isinstance(registry_sources, list):
+                raise PentaOSV1Error(f"promotion evidence/source arrays missing for {key}")
+            required_sources = {
+                registry["promotion_registry"],
+                *promotion["runtime_refs"],
+                *(binding["path"] for binding in promotion["evidence_bindings"]),
+            }
+            if not required_sources.issubset(set(registry_sources)):
+                raise PentaOSV1Error(f"promotion source closure incomplete for {key}")
+            for binding in promotion["evidence_bindings"]:
+                if binding["path"] not in evidence_paths:
+                    raise PentaOSV1Error(f"promotion evidence path missing from member for {key}")
+                if sources.get(binding["path"]) != binding["sha256"]:
+                    raise PentaOSV1Error(f"promotion evidence digest lineage mismatch for {key}")
 
         expected_registry_digest = registry.get("registry_sha256")
         if not isinstance(expected_registry_digest, str) or not SHA256_PATTERN.fullmatch(expected_registry_digest):
@@ -532,6 +654,8 @@ class PentaOSV1:
             "registry_sha256": registry["registry_sha256"],
             "readiness_partition": analysis["summary"]["readiness_partition"],
             "production_certification": "HOLD",
+            "evidence_bound_maturity_promotions": counts["evidence_bound_maturity_promotions"],
+            "provider_state_promotion_authorized": False,
             "source_integrity_checked": verify_sources,
         }
 

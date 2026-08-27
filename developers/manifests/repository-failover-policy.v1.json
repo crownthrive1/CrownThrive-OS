@@ -1,0 +1,36 @@
+{
+  "schema": "ct.penta.repository-failover-policy.v1",
+  "version": "1.0.0",
+  "state": "runtime_tested_provider_and_infrastructure_certification_hold",
+  "routes": [
+    {
+      "route_id": "ct.route.repository.hot-primary",
+      "class": "HOT_PRIMARY",
+      "trigger": "fresh exact provider readback and valid node attestation",
+      "write_state": "separately_authorized_only",
+      "rpo_target_seconds": 3900,
+      "rpo_proven": false,
+      "rto_target_seconds": 600,
+      "rto_proven": false
+    },
+    {
+      "route_id": "ct.route.repository.cold-recovery",
+      "class": "COLD_RECOVERY",
+      "trigger": "hot unavailable and exact externally verified cold snapshot available",
+      "write_state": "read_only",
+      "cutover_certified": false,
+      "failback_certified": false
+    },
+    {
+      "route_id": "ct.route.repository.silent-emergency",
+      "class": "SILENT_EMERGENCY",
+      "trigger": "neither hot nor cold evidence is valid",
+      "address": "restricted_ref_only",
+      "write_state": "local_sealed_handoff_only",
+      "external_broadcast": false,
+      "authority_effect": "reduce_only",
+      "live_delivery_certified": false
+    }
+  ],
+  "certification_boundary": "Unit-tested route selection and durable local evidence do not prove GitHub credential binding, infrastructure replication, provider cutover, Command Center deployment, RPO/RTO, or failback. Those remain HOLD until live drills and readback exist."
+}

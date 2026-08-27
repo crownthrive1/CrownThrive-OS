@@ -26,7 +26,7 @@ permissions:
   checks: read
 
 concurrency:
-  group: pentarelease-comprehensive-release-surface
+  group: pentarelease-provider-writes-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -65,6 +65,10 @@ jobs:
             TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
           fi
           test -n "$TAG"
+          if [ "$TAG" = v4.0.0.0 ]; then
+            echo 'HOLD: comprehensive release surface cannot mutate the exact-five-asset human D3 v4 release.' >&2
+            exit 78
+          fi
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName,name,url,targetCommitish,isDraft,isPrerelease | jq .
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 

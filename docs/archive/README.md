@@ -22,7 +22,7 @@ Their documents, releases, branches, filenames, migration identifiers, articles,
 
 No new decimal institutional phases should be created. Precision belongs in component versions, maturity states, certification states, release numbers, waves, milestones, or temporary delivery cohorts.
 
-See [`../phase-model/PENTA_PHASE_MODEL.md`](../phase-model/PENTA_PHASE_MODEL.md) and [`PENTA_PHASE_RETIREMENT_MANIFEST.json`](PENTA_PHASE_RETIREMENT_MANIFEST.json).
+See [`../phase-model/PENTA_PHASE_MODEL.md`](../phase-model/PENTA_PHASE_MODEL.md), [`PENTA_PHASE_RETIREMENT_MANIFEST.json`](PENTA_PHASE_RETIREMENT_MANIFEST.json), and the additive [`RELEASE_SUPERSESSION_LEDGER.v1.json`](RELEASE_SUPERSESSION_LEDGER.v1.json).
 
 ## Archive rule
 

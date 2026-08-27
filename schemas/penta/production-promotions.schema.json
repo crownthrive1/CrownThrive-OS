@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/penta/production-promotions.schema.json",
+  "title": "CrownThrive Penta evidence-bound production promotions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "fail_closed",
+    "self_promotion_prohibited",
+    "provider_state_policy",
+    "authority_invariant",
+    "promotions"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema": {"const": "ct.penta.production-promotions.v1"},
+    "version": {"const": "1.1.0"},
+    "fail_closed": {"const": true},
+    "self_promotion_prohibited": {"const": true},
+    "provider_state_policy": {"const": "never_promoted_by_this_registry"},
+    "authority_invariant": {"type": "string", "minLength": 1},
+    "promotions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/promotion"}
+    }
+  },
+  "$defs": {
+    "evidenceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "claim"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "claim": {"type": "string", "minLength": 1}
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "promotion_id",
+        "machine_key",
+        "from_maturity",
+        "to_maturity",
+        "effective_at",
+        "authority_ref",
+        "evidence_status",
+        "evidence_bindings",
+        "runtime_refs",
+        "proof",
+        "scope",
+        "provider_state_disposition",
+        "provider_effect_authorized",
+        "self_certification_authorized"
+      ],
+      "properties": {
+        "promotion_id": {"type": "string", "pattern": "^promo-[a-z0-9.-]+$"},
+        "machine_key": {"type": "string", "pattern": "^penta\\.[a-z0-9.-]+$"},
+        "from_maturity": {
+          "enum": ["specified", "implemented", "certified", "production", "hold", "retired"]
+        },
+        "to_maturity": {"enum": ["certified", "production"]},
+        "effective_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "authority_ref": {"type": "string", "minLength": 1},
+        "evidence_status": {"const": "PASS"},
+        "evidence_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/evidenceBinding"}
+        },
+        "runtime_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "proof": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "scope": {"type": "string", "minLength": 1},
+        "provider_state_disposition": {"const": "UNCHANGED_SEPARATELY_GATED"},
+        "provider_effect_authorized": {"const": false},
+        "self_certification_authorized": {"const": false}
+      }
+    }
+  }
+}

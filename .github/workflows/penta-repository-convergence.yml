@@ -1,0 +1,89 @@
+name: Penta Repository Convergence Trusted Readback
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.crownthrive/**'
+      - 'penta/repository_fabric/**'
+      - 'penta/organic/**'
+      - 'developers/manifests/repository-*.json'
+      - 'scripts/run_repository_convergence.py'
+      - 'scripts/validate_repository_federation.py'
+      - '.github/workflows/penta-repository-convergence.yml'
+  schedule:
+    - cron: '37 * * * *'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: penta-repository-convergence-main
+  cancel-in-progress: false
+
+jobs:
+  authenticated-readback:
+    if: github.repository == 'crownthrive1/CrownThrive-Support' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: penta-repository-readonly
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Validate immutable repository contracts
+        run: python3 scripts/validate_repository_federation.py
+      - name: Read all authorized nodes and reconcile
+        id: observe
+        env:
+          PENTA_REPOSITORY_READ_TOKEN: ${{ secrets.PENTA_REPOSITORY_READ_TOKEN }}
+          PENTA_REPOSITORY_BINDINGS_JSON: ${{ secrets.PENTA_REPOSITORY_BINDINGS_JSON }}
+          PENTA_REPOSITORY_COLD_SNAPSHOTS_JSON: ${{ secrets.PENTA_REPOSITORY_COLD_SNAPSHOTS_JSON }}
+          PENTA_REPOSITORY_COLD_HMAC_KEY_B64: ${{ secrets.PENTA_REPOSITORY_COLD_HMAC_KEY_B64 }}
+          PENTA_REPOSITORY_PUBLIC_KEY_FINGERPRINT: ${{ secrets.PENTA_REPOSITORY_PUBLIC_KEY_FINGERPRINT }}
+          PENTA_REPOSITORY_EVIDENCE_ROOT: ${{ runner.temp }}/repository-convergence
+        run: |
+          umask 077
+          mkdir -p "${PENTA_REPOSITORY_EVIDENCE_ROOT}"
+          python3 scripts/run_repository_convergence.py \
+            --output "${PENTA_REPOSITORY_EVIDENCE_ROOT}/repository-convergence-result.json" \
+            --emergency-journal "${PENTA_REPOSITORY_EVIDENCE_ROOT}/repository-emergency-journal.jsonl" \
+            --organic-journal "${PENTA_REPOSITORY_EVIDENCE_ROOT}/repository-organic-spine.jsonl"
+      - name: Preserve sanitized convergence and emergency evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repository-convergence-${{ github.run_id }}
+          path: ${{ runner.temp }}/repository-convergence/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish bounded disposition
+        if: always()
+        env:
+          OBSERVATION_OUTCOME: ${{ steps.observe.outcome }}
+          PENTA_REPOSITORY_RESULT: ${{ runner.temp }}/repository-convergence/repository-convergence-result.json
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          path = Path(os.environ['PENTA_REPOSITORY_RESULT'])
+          state = 'HOLD_FAIL_CLOSED'
+          counts = {}
+          if path.is_file():
+              value = json.loads(path.read_text())
+              state = value.get('state', state)
+              counts = value.get('convergence', {}).get('route_counts', {})
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as out:
+              out.write('## Penta Repository Convergence\n\n')
+              out.write(f'**State:** `{state}`\n\n')
+              out.write(f'**Route counts:** `{json.dumps(counts, sort_keys=True)}`\n\n')
+              out.write(f'**Trusted step:** `{os.environ["OBSERVATION_OUTCOME"]}`\n\n')
+              out.write('Unknown, stale, unsigned, unbound, or contradictory evidence remains HOLD. No build, merge, visibility, release, or D3 authority is created by this workflow.\n')
+          PY

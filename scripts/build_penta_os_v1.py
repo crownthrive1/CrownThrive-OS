@@ -12,9 +12,22 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+try:
+    from runtime.penta_promotions import (
+        PROMOTION_PATH,
+        PentaPromotionError,
+        apply_promotions,
+    )
+except ModuleNotFoundError:
+    runtime_dir = str(Path(__file__).resolve().parents[1] / "runtime")
+    if runtime_dir not in sys.path:
+        sys.path.insert(0, runtime_dir)
+    from penta_promotions import PROMOTION_PATH, PentaPromotionError, apply_promotions
 
 
 AXES = ("truth", "authority", "execution", "interoperation", "continuity")
@@ -22,7 +35,7 @@ EXECUTION_ELIGIBLE = {"certified", "production"}
 MATURITY_ORDER = {"specified": 0, "implemented": 1, "certified": 2, "production": 3, "hold": -1, "retired": -2}
 GENERATED_DATE = "2026-08-26"
 RELEASE_VERSION = "1.5.0"
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.2.0"
 ADDRESSABLE_OPERATIONS = ["describe", "status", "readiness", "validate", "verify", "plan", "dispatch"]
 MACHINE_KEY_PATTERN = re.compile(r"^penta\.[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 OPERATION_POLICY_PATH = Path("data/penta/os-v1.operation-policies.json")
@@ -281,15 +294,36 @@ def family_members(root: Path) -> list[dict[str, Any]]:
             catalog_members[machine_key] = dict(item)
             catalog_sources[machine_key] = str(rel)
 
+    try:
+        effective_members, promotions = apply_promotions(
+            root,
+            catalog_members,
+            required=True,
+        )
+    except PentaPromotionError as exc:
+        raise PentaOSBuildError(f"invalid evidence-bound family promotion: {exc}") from exc
+
     rows: list[dict[str, Any]] = []
-    for machine_key in sorted(catalog_members):
-        row = dict(catalog_members[machine_key])
+    for machine_key in sorted(effective_members):
+        row = dict(effective_members[machine_key])
+        axis_is_explicit = row.get("axis") in AXES
+        promotion = promotions.get(machine_key)
+        evidence_paths = [
+            binding["path"] for binding in promotion.get("evidence_bindings", [])
+        ] if promotion else []
+        additional_sources = (
+            [str(PROMOTION_PATH), *evidence_paths, *promotion.get("runtime_refs", [])]
+            if promotion else []
+        )
         row.update({
             "source": catalog_sources[machine_key],
             "source_kind": "production_family_catalog",
+            "additional_registry_sources": additional_sources,
+            "evidence_paths": sorted(set(row.get("evidence_paths", [])) | set(evidence_paths)),
             "dependency_assessed": "dependencies" in row,
             "operator_route": f"/io/pentas/{machine_key.split('.', 1)[1]}",
             "axis": row.get("axis") or infer_axis(row.get("canonical_name", ""), row.get("purpose", "")),
+            "axis_is_explicit": axis_is_explicit,
             "role": row.get("purpose", ""),
         })
         rows.append(row)
@@ -393,12 +427,17 @@ def merge_rows(rows: list[dict[str, Any]], aliases: list[dict[str, str]]) -> lis
                 "contracts": sorted({incoming["contract"]} if incoming.get("contract") else set()),
                 "dependencies": sorted(set(incoming.get("dependencies", []))),
                 "dependency_assessed": incoming.get("dependency_assessed") is True,
-                "registry_sources": [incoming["source"]],
+                "registry_sources": sorted({
+                    incoming["source"],
+                    *incoming.get("additional_registry_sources", []),
+                }),
                 "source_kinds": [incoming["source_kind"]],
                 "evidence_paths": sorted(set(incoming.get("evidence_paths", []))),
                 "operator_route": incoming.get("operator_route") or f"/io/pentas/{slug_for(incoming['canonical_name'])}",
                 "intake_state": incoming.get("intake_state"),
                 "explicit_registration_state": incoming.get("registration_state"),
+                "catalog_maturity": incoming.get("catalog_maturity"),
+                "maturity_promotion": incoming.get("maturity_promotion"),
             }
             by_token[name_token] = current
             continue
@@ -413,6 +452,8 @@ def merge_rows(rows: list[dict[str, Any]], aliases: list[dict[str, str]]) -> lis
             current["canonical_name"] = CANONICAL_NAME_OVERRIDES.get(token(incoming["canonical_name"]), strip_mark(incoming["canonical_name"]))
             current["role"] = incoming.get("role") or current["role"]
             current["risk_ceiling"] = incoming.get("risk_ceiling", current["risk_ceiling"])
+            if incoming.get("axis_is_explicit"):
+                current["axis"] = incoming["axis"]
         elif incoming.get("source_kind") == "institutional_registry":
             current["operator_route"] = incoming["operator_route"]
             current["axis"] = incoming.get("axis", current["axis"])
@@ -441,12 +482,24 @@ def merge_rows(rows: list[dict[str, Any]], aliases: list[dict[str, str]]) -> lis
         current["aliases"] = sorted(set(current["aliases"]) | {strip_mark(alias) for alias in incoming_aliases})
         current["dependencies"] = sorted(set(current["dependencies"]) | set(incoming.get("dependencies", [])))
         current["dependency_assessed"] = current["dependency_assessed"] or incoming.get("dependency_assessed") is True
-        current["registry_sources"] = sorted(set(current["registry_sources"]) | {incoming["source"]})
+        current["registry_sources"] = sorted(
+            set(current["registry_sources"])
+            | {incoming["source"]}
+            | set(incoming.get("additional_registry_sources", []))
+        )
         current["source_kinds"] = sorted(set(current["source_kinds"]) | {incoming["source_kind"]})
         current["evidence_paths"] = sorted(set(current["evidence_paths"]) | set(incoming.get("evidence_paths", [])))
         current["intake_state"] = current.get("intake_state") or incoming.get("intake_state")
         current["parent_machine_key"] = current.get("parent_machine_key") or incoming.get("parent_machine_key")
         current["explicit_registration_state"] = current.get("explicit_registration_state") or incoming.get("registration_state")
+        if incoming.get("maturity_promotion") is not None:
+            existing_promotion = current.get("maturity_promotion")
+            if existing_promotion is not None and existing_promotion != incoming["maturity_promotion"]:
+                raise PentaOSBuildError(
+                    f"conflicting maturity promotion for {incoming['machine_key']}"
+                )
+            current["catalog_maturity"] = incoming.get("catalog_maturity")
+            current["maturity_promotion"] = incoming["maturity_promotion"]
 
     canonical_key_owner: dict[str, str] = {}
     systems: list[dict[str, Any]] = []
@@ -487,6 +540,9 @@ def merge_rows(rows: list[dict[str, Any]], aliases: list[dict[str, str]]) -> lis
             row.pop("machine_key_aliases", None)
         else:
             row["machine_key_aliases"] = sorted(set(row["machine_key_aliases"]))
+        if row.get("maturity_promotion") is None:
+            row.pop("catalog_maturity", None)
+            row.pop("maturity_promotion", None)
         systems.append(row)
 
     systems = sorted(systems, key=lambda item: item["machine_key"])
@@ -761,12 +817,14 @@ def build_registry(root: Path) -> dict[str, Any]:
         "release_state": "built_unreleased",
         "scope": "complete_identity_addressability_dependency_closure_verification_receipts_batch_planning_and_fail_closed_dispatch_kernel",
         "doctrine": "Discover -> Govern -> Execute -> Verify -> Preserve",
-        "authority_invariant": "Penta OS V1.5 supplies identity, status, validation, deterministic verification receipts, dependency closure, batch planning, and governed dispatch gates for every registered entry. It never infers maturity, manufactures authority or credentials, accesses providers, changes provider state, or creates a production claim.",
+        "authority_invariant": "Penta OS V1.5 supplies identity, status, validation, deterministic verification receipts, dependency closure, batch planning, and governed dispatch gates for every registered entry. It may project a separately governed exact-digest maturity promotion, but never infers maturity, manufactures authority or credentials, accesses providers, changes provider state, or creates a provider-production claim.",
         "phase_truth": "bounded_phase_3_production_core_with_ecosystem_transition_and_open_recovery_cie_commerce_holds",
         "operations": list(ADDRESSABLE_OPERATIONS),
         "control_plane_operations": ["batch-plan", "verify-batch-plan", "verify-plan", "verify-receipt"],
         "axes": list(AXES),
         "production_certification": "HOLD",
+        "promotion_registry": str(PROMOTION_PATH),
+        "provider_state_promotion_authorized": False,
         "release_gate_codes": sorted(RELEASE_GATE_CODES),
         "counts": {
             "total": len(systems),
@@ -775,6 +833,9 @@ def build_registry(root: Path) -> dict[str, Any]:
             "subcomponents": sum(row["kind"] == "subcomponent" for row in systems),
             "primitives": sum(row["kind"] == "primitive" for row in systems),
             "execution_eligible_by_registry": sum(row["execution_eligible_by_registry"] for row in systems),
+            "evidence_bound_maturity_promotions": sum(
+                "maturity_promotion" in row for row in systems
+            ),
             "dependency_assessed_members": dependency_graph["dependency_assessed_member_count"],
             "dependency_unassessed_members": dependency_graph["dependency_unassessed_member_count"],
             "members_with_declared_edges": dependency_graph["members_with_declared_dependencies"],
@@ -835,7 +896,7 @@ def render_docs(registry: dict[str, Any]) -> str:
         f"Penta OS V1.5 reconciles the institutional Penta list, the executable {counts['by_registration_state'].get('family_registered', 0)}-member Penta Family census, the technical component registry, public compatibility services, registered primitives, and governed incoming discoveries into one deterministic control-plane inventory.",
         "",
         "<Warning>",
-        "  Registry inclusion is not production promotion. Only entries whose own governed maturity is `certified` or `production` may pass the first dispatch gate, and all downstream authority, credential, security, provider, readback, and human-reserved D3 gates still apply.",
+        f"  Registry inclusion is not production promotion. {counts['evidence_bound_maturity_promotions']} entries carry separately governed, exact-digest maturity lineage; that lineage has no provider-state effect. Only entries whose effective governed maturity is `certified` or `production` may pass the first dispatch gate, and all downstream authority, credential, security, provider, readback, and human-reserved D3 gates still apply.",
         "</Warning>",
         "",
         "## Current institutional truth",
@@ -855,6 +916,7 @@ def render_docs(registry: dict[str, Any]) -> str:
         f"| Registered primitives | {counts['primitives']} |",
         f"| Family-registered | {counts['by_registration_state'].get('family_registered', 0)} |",
         f"| Independently execution-eligible by registry | {counts['execution_eligible_by_registry']} |",
+        f"| Exact-evidence maturity projections | {counts['evidence_bound_maturity_promotions']} |",
         f"| Dependency-assessed members | {counts['dependency_assessed_members']} |",
         f"| Dependency-unassessed members | {counts['dependency_unassessed_members']} |",
         f"| Members with declared edges | {counts['members_with_declared_edges']} |",
@@ -872,6 +934,21 @@ def render_docs(registry: dict[str, Any]) -> str:
     for row in registry["systems"]:
         lines.append(
             f"| {row['canonical_name']} | `{row['machine_key']}` | {row['kind']} | {row['axis']} | `{row['maturity']}` | `{row['registration_state']}` | {row['risk_ceiling']} | `{row['operator_route']}` |"
+        )
+    promoted = [row for row in registry["systems"] if "maturity_promotion" in row]
+    lines.extend([
+        "",
+        "## Evidence-bound maturity projections",
+        "",
+        "These projections recognize bounded system maturity only. Provider state remains `UNCHANGED_SEPARATELY_GATED`; provider effects and self-certification remain prohibited.",
+        "",
+        "| Penta | Catalog maturity | Effective maturity | Authority | Provider disposition |",
+        "| --- | --- | --- | --- | --- |",
+    ])
+    for row in promoted:
+        promotion = row["maturity_promotion"]
+        lines.append(
+            f"| {row['canonical_name']} | `{row['catalog_maturity']}` | `{row['maturity']}` | `{promotion['authority_ref']}` | `{promotion['provider_state_disposition']}` |"
         )
     lines.extend([
         "",

@@ -24,16 +24,16 @@ def test_every_registered_member_is_control_plane_addressable() -> None:
 
 
 def test_specified_member_has_real_status_without_fake_execution_promotion() -> None:
-    _, snapshot = load_family(ROOT); result = member_status(snapshot, "penta.mail")
+    _, snapshot = load_family(ROOT); result = member_status(snapshot, "penta.snapshot")
     assert result["details"]["maturity"] == "specified"
     assert result["details"]["execution_gate"]["eligible"] is False
-    assert result["details"]["portal_route"] == "/penta/mail"
+    assert result["details"]["portal_route"] == "/penta/snapshot"
 
 
 def test_execution_adapter_registry_is_static_and_fail_closed() -> None:
     registry = load_adapter_registry(ROOT)
-    assert registry["fail_closed"] is True and registry["version"] == "1.3.0"
-    assert len(registry["adapters"]) == 15
+    assert registry["fail_closed"] is True and registry["version"] == "1.5.0"
+    assert len(registry["adapters"]) == 21
     assert all(adapter["provider_effect"] is False for adapter in registry["adapters"])
 
 
@@ -51,11 +51,11 @@ def test_family_execution_contract_validates_and_covers_all_production_members()
     registry, snapshot = load_family(ROOT); result = family_validate(ROOT, registry, snapshot)
     assert result["disposition"] == "pass", result
     assert result["details"]["blockers"] == []
-    assert result["details"]["adapter_count"] == 15
+    assert result["details"]["adapter_count"] == 21
     coverage = result["details"]["execution_adapter_coverage"]
     assert coverage["complete"] is True
-    assert coverage["eligible_member_count"] == 15
-    assert coverage["eligible_members_with_adapter"] == 15
+    assert coverage["eligible_member_count"] == 21
+    assert coverage["eligible_members_with_adapter"] == 21
     assert coverage["missing_adapter_members"] == []
 
 
@@ -70,7 +70,10 @@ def test_mesh_route_check_can_inspect_specified_target_without_invoking_it() -> 
     result = invoke_member(ROOT, source_member="penta.status", target_member="penta.mesh", operation="route_check", evidence_refs=["test:penta-exec:mesh"], payload={"candidate_target": "penta.mail"}, risk_class="D0")
     assert result["disposition"] == "completed", result
     route = result["details"]["result"]
-    assert route["registered"] is True and route["maturity"] == "specified" and route["execution_eligible"] is False
+    assert route["registered"] is True
+    assert route["catalog_maturity"] == "specified" and route["maturity"] == "production"
+    assert route["maturity_promotion"]["provider_effect_authorized"] is False
+    assert route["execution_eligible"] is True
 
 
 def test_penta_error_normalize_redacts_context() -> None:
@@ -106,7 +109,7 @@ def test_penta_heartbeat_probes_all_production_members() -> None:
     assert result["disposition"] == "completed", result
     probe = result["details"]["result"]
     assert probe["schema"] == "ct.penta.heartbeat.control-plane-probe.v1"
-    assert probe["production_member_count"] == 15
+    assert probe["production_member_count"] == 21
     assert all(row["adapter_bound"] for row in probe["members"])
 
 
@@ -207,6 +210,40 @@ def test_penta_immune_builds_bounded_plan_without_executing_repair() -> None:
     assert preview["provider_write"] is False and preview["production_promotion_authorized"] is False
 
 
+def test_penta_context_reports_fixed_local_contract_without_provider_access() -> None:
+    result = invoke_member(
+        ROOT,
+        source_member="penta.status",
+        target_member="penta.context",
+        operation="runtime_contract_status",
+        evidence_refs=["test:penta-exec:context-contract"],
+        payload={},
+        risk_class="D1",
+    )
+    assert result["disposition"] == "completed", result
+    status = result["details"]["result"]
+    assert status["machine_key"] == "penta.context" and status["runtime_version"] == "1.1.0"
+    assert all(len(value) == 64 for value in status["source_sha256"].values())
+    assert status["provider_binding_state"] == "SEPARATELY_GATED_NOT_EVALUATED"
+    assert status["context_is_authority"] is False
+    assert status["credential_material_accepted"] is False
+    assert status["network_probe_performed"] is False
+    assert status["provider_write_performed"] is False
+    assert status["provider_state_changed"] is False
+    expect_error(
+        lambda: invoke_member(
+            ROOT,
+            source_member="penta.status",
+            target_member="penta.context",
+            operation="runtime_contract_status",
+            evidence_refs=["test:penta-exec:context-secret-reject"],
+            payload={"access_token": "never-accepted-secret"},
+            risk_class="D1",
+        ),
+        "credential material is not accepted",
+    )
+
+
 def test_new_preview_adapters_reject_authority_mismatch_and_secret_fields() -> None:
     payload = {
         "id": "weakness-secret",
@@ -270,6 +307,60 @@ def test_evi_preview_rejects_production_and_incomplete_evidence_contracts() -> N
     expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.evi-builder", operation="bundle_preview", evidence_refs=["test:penta-exec:evi-production"], payload=payload, risk_class="D1"), "target_state is outside")
     payload["target_state"] = "BUILD_CANDIDATE"
     expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.evi-builder", operation="bundle_preview", evidence_refs=["test:penta-exec:evi-receipt"], payload=payload, risk_class="D1"), "status is outside")
+
+
+def test_promoted_mail_adapter_reports_evidence_without_promoting_provider_state() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.mail", operation="production_status", evidence_refs=["test:penta-exec:mail-status"], payload={}, risk_class="D1")
+    assert result["disposition"] == "completed", result
+    status = result["details"]["result"]
+    assert status["system_maturity_evidence_state"] == "PASS"
+    assert status["current_provider_state"] == "NOT_EVALUATED_BY_LOCAL_ADAPTER"
+    assert status["provider_state_disposition"] == "UNCHANGED_SEPARATELY_GATED"
+    assert status["provider_write_performed"] is False
+    assert status["provider_state_changed"] is False
+    assert status["production_promotion_authorized"] is False
+
+
+def test_promoted_status_adapter_preserves_provider_hold_queue() -> None:
+    result = invoke_member(ROOT, source_member="penta.mail", target_member="penta.status", operation="owner_snapshot", evidence_refs=["test:penta-exec:owner-status"], payload={}, risk_class="D1")
+    assert result["disposition"] == "completed", result
+    snapshot = result["details"]["result"]
+    assert snapshot["promotion_count"] == 5
+    assert snapshot["production_member_count"] == 21
+    assert snapshot["production_adapter_coverage_complete"] is True
+    assert snapshot["provider_evidence_queue"]["needs_readback"] == 10
+    assert snapshot["provider_evidence_queue"]["production_promotion_remains_fail_closed"] is True
+    assert snapshot["provider_states_changed"] is False
+
+
+def test_promoted_credentials_build_and_certify_operations_are_disposable_and_local() -> None:
+    census = invoke_member(ROOT, source_member="penta.status", target_member="penta.credentials", operation="binding_census", evidence_refs=["test:penta-exec:credential-census"], payload={}, risk_class="D1")
+    assert census["disposition"] == "completed", census
+    census_result = census["details"]["result"]
+    assert census_result["provider_count"] > 0
+    assert census_result["secret_values_returned"] is False
+    assert census_result["state_persisted"] is False
+
+    build = invoke_member(ROOT, source_member="penta.status", target_member="penta.build", operation="provider_adapter_probe", evidence_refs=["test:penta-exec:build-probe"], payload={"provider_id": "resend"}, risk_class="D1")
+    assert build["disposition"] == "completed", build
+    build_result = build["details"]["result"]
+    assert build_result["build"]["artifact_exists_in_disposable_state"] is True
+    assert build_result["state_persisted"] is False
+    assert build_result["provider_write_performed"] is False
+
+    certification = invoke_member(ROOT, source_member="penta.status", target_member="penta.certify", operation="provider_static_probe", evidence_refs=["test:penta-exec:certify-static"], payload={"provider_id": "resend"}, risk_class="D1")
+    assert certification["disposition"] == "completed", certification
+    certification_result = certification["details"]["result"]
+    assert certification_result["network_probe_performed"] is False
+    assert certification_result["provider_write_performed"] is False
+    assert certification_result["provider_states_changed"] is False
+    assert certification_result["self_certification_performed"] is False
+    assert certification_result["production_promotion_authorized"] is False
+
+
+def test_promoted_operations_reject_unregistered_payload_and_provider() -> None:
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.mail", operation="production_status", evidence_refs=["test:penta-exec:mail-status-reject"], payload={"provider_id": "resend"}, risk_class="D1"), "permits only these fields")
+    expect_error(lambda: invoke_member(ROOT, source_member="penta.status", target_member="penta.build", operation="provider_adapter_probe", evidence_refs=["test:penta-exec:build-reject"], payload={"provider_id": "not/registered"}, risk_class="D1"), "bounded registry identifier")
 
 
 def test_unimplemented_mail_send_fails_closed() -> None:

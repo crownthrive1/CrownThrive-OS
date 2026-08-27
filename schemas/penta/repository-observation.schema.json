@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/penta/repository-observation.v1.json",
+  "title": "Authenticated Penta Repository Observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "source_adapter", "stable_id", "observed_at", "default_branch", "provider_visibility", "head_sha", "node_attestation", "node_attestation_sha256", "build", "observation_sha256"],
+  "properties": {
+    "schema": {"const": "ct.penta.repository-observation.v1"},
+    "source_adapter": {"const": "ct.adapter.github-repository-read.v1"},
+    "stable_id": {"type": "string", "pattern": "^ct\\.repo\\.[a-z0-9][a-z0-9.-]*$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "default_branch": {"const": "main"},
+    "provider_visibility": {"enum": ["public", "private"]},
+    "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "node_attestation": {"$ref": "https://crownthrive.com/schemas/penta/repository-node-attestation.v1.json"},
+    "node_attestation_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "head_sha", "evidence"],
+      "properties": {
+        "state": {"enum": ["passed", "failed", "unknown"]},
+        "head_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+        "evidence": {"type": "string", "minLength": 1}
+      }
+    },
+    "release_governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "head_sha", "active_default_branch_ruleset", "applicable_ruleset_count", "bypass_actor_count", "required_contexts", "successful_contexts", "all_ruleset_contexts_successful"],
+      "properties": {
+        "state": {"enum": ["passed", "hold"]},
+        "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "active_default_branch_ruleset": {"type": "boolean"},
+        "applicable_ruleset_count": {"type": "integer", "minimum": 0},
+        "bypass_actor_count": {"type": "integer", "minimum": 0},
+        "required_contexts": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "successful_contexts": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "all_ruleset_contexts_successful": {"type": "boolean"}
+      }
+    },
+    "observation_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "allOf": [{
+    "if": {"properties": {"stable_id": {"const": "ct.repo.crownthrive-support"}}, "required": ["stable_id"]},
+    "then": {"required": ["release_governance"]}
+  }]
+}

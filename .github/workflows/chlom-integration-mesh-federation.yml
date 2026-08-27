@@ -37,17 +37,20 @@ jobs:
           mesh = json.loads(Path("federation/penta-mesh.v1.json").read_text())
           node = json.loads(Path("federation/penta-mesh-node.v1.json").read_text())
           assert mesh.get("schema") == "ct.penta.repository-mesh.v1"
+          assert mesh.get("version") == "1.1.0"
           assert node.get("schema") == "ct.penta.repository-mesh-node.v1"
           assert mesh.get("canonical_hub") == "crownthrive1/CrownThrive-Support"
           assert mesh.get("protocol_registry") == "crownthrive1/chlom-protocol"
-          repos = {r["repository"]: r for r in mesh.get("repositories", [])}
-          assert set(repos) == {
-              "crownthrive1/CrownThrive-Support",
-              "crownthrive1/CrownThrive-CIE",
-              "crownthrive1/chlom-protocol",
-          }
+          inventory = mesh.get("inventory", {})
+          assert inventory.get("expected_physical_repository_count") == 13
+          assert inventory.get("public_contract_detail_count") == 3
+          assert inventory.get("restricted_repository_count") == 10
+          assert inventory.get("restricted_coordinates") == "restricted_ref_only"
+          assert mesh.get("interoperability", {}).get("information_flow") == [
+              "afferent", "efferent", "lateral"
+          ]
           assert node.get("repository") == "crownthrive1/CrownThrive-Support"
-          assert repos[node["repository"]]["node_manifest"] == "federation/penta-mesh-node.v1.json"
+          assert mesh.get("interoperability", {}).get("node_contract") == ".crownthrive/penta-node.v1.json"
           assert node.get("capabilities", {}).get("pentamail_transport") is True
           assert node.get("capabilities", {}).get("exact_provider_readback") is True
           print("Support Penta mesh node contract verified")
@@ -64,10 +67,10 @@ jobs:
           integrations = {x["integration_id"]: x for x in data.get("integrations", [])}
           io = integrations["ct.integration.crownthrive.io.mcp"]
           ad = integrations["ct.integration.adserver.online"]
-          assert io.get("provider_limit", {}).get("value") == "UNLIMITED"
-          assert io.get("provider_limit", {}).get("hardcoded") is True
-          assert ad.get("provider_limit", {}).get("value") == 3000000
-          assert ad.get("provider_limit", {}).get("hardcoded") is True
+          assert io.get("declared_limits", {}).get("usage_limit") == "UNLIMITED"
+          assert io.get("declared_limits", {}).get("hardcoded") is True
+          assert ad.get("declared_limits", {}).get("usage_limit") == 3000000
+          assert ad.get("declared_limits", {}).get("hardcoded") is True
           assert data.get("integration_policy", {}).get("vault_only_credentials") is True
           assert data.get("integration_policy", {}).get("bypass_provider_controls") is False
           print("Canonical CHLOM integration mesh federation verified")

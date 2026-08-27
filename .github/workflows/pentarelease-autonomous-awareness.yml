@@ -8,7 +8,6 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: write
   contents: write
   pull-requests: write
   checks: read
@@ -18,12 +17,13 @@ env:
   DECISION_FILE: /tmp/pentarelease-decision.json
 
 concurrency:
-  group: pentarelease-autonomous-awareness
+  group: pentarelease-provider-writes-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
   decide-and-materialize:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout institutional source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,8 +41,45 @@ jobs:
           test "$(jq -r '.enabled' "$POLICY_FILE")" = "true"
           test "$(jq -r '.mode' "$POLICY_FILE")" = "production"
 
+      - name: Yield to the human D3 major-release lane
+        id: major
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAJOR_REQUEST=.github/release-requests/crownthrive-os-v4.0.0.0.json
+          MAJOR_TEMPLATE=.pentarelease/templates/major-release-request.v4.0.0.0.template.json
+          if [ -e "$MAJOR_REQUEST" ]; then
+            CONTRACT_PATH="$MAJOR_REQUEST"
+            REASON=human_d3_major_request_pending
+            if ! jq -e '
+                .release_class == "major" and
+                .authority_class == "D3_HUMAN_RESERVED" and
+                .version == "4.0.0.0" and
+                .tag == "v4.0.0.0" and
+                .target_binding == "github_event_merge_sha"
+              ' "$MAJOR_REQUEST" >/dev/null 2>&1; then
+              REASON=major_release_request_present_but_invalid
+            fi
+          elif [ -e "$MAJOR_TEMPLATE" ]; then
+            CONTRACT_PATH="$MAJOR_TEMPLATE"
+            REASON=human_d3_major_release_lane_staged
+          else
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          jq -n --arg reason "$REASON" --arg contract "$CONTRACT_PATH" '{
+            decision: "hold",
+            release: false,
+            reason: $reason,
+            authority_class: "D3_HUMAN_RESERVED",
+            major_contract_path: $contract
+          }' > "$DECISION_FILE"
+          echo "pending=true" >> "$GITHUB_OUTPUT"
+          echo "PentaRelease HOLD: $REASON; autonomous publication yields to the human-major lane."
+
       - name: Observe repository and decide
         id: decide
+        if: steps.major.outputs.pending != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -86,9 +123,16 @@ jobs:
           WHY=$(jq -r '.why' "$DECISION_FILE")
           BUMP=$(jq -r '.bump' "$DECISION_FILE")
           LATEST=$(jq -r '.latest_tag' "$DECISION_FILE")
+          LATEST_TAG_SHA=$(jq -er '.latest_tag_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' "$DECISION_FILE")
+          SOURCE_BASELINE_SHA=$(jq -er '.source_baseline_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' "$DECISION_FILE")
+          SOURCE_HEAD_SHA=$(jq -er '.source_head_sha | select(type == "string" and test("^[0-9a-f]{40}$"))' "$DECISION_FILE")
+          LINEAGE_RESOLUTION=$(jq -er '.lineage_resolution | select(type == "string" and length > 0)' "$DECISION_FILE")
           PKG="releases/$VERSION"
           REQ=".github/release-requests/crownthrive-os-$VERSION.json"
           BRANCH="pentarelease/auto-${VERSION}-${GITHUB_RUN_ID}"
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD_SHA"
+          test "$(git rev-parse "${LATEST}^{commit}")" = "$LATEST_TAG_SHA"
+          git merge-base --is-ancestor "$SOURCE_BASELINE_SHA" "$SOURCE_HEAD_SHA"
           mkdir -p "$PKG" .github/release-requests
 
           {
@@ -111,13 +155,16 @@ jobs:
             echo "- Provider readback is mandatory."
           } > "$PKG/RELEASE_NOTES.md"
 
-          python3 - "$DECISION_FILE" "$PKG/MANIFEST.json" "$BRANCH" <<'PY'
+          python3 - "$DECISION_FILE" "$PKG/MANIFEST.json" <<'PY'
           import json,sys,datetime
-          d=json.load(open(sys.argv[1])); branch=sys.argv[3]
+          d=json.load(open(sys.argv[1]))
           m={
             'release_id':f"ct.os.v{d['version']}", 'version':d['version'], 'tag':d['tag'],
             'version_scheme':d['version_scheme'], 'title':f"CrownThrive OS {d['version']} — Autonomous PentaRelease",
-            'target_ref':branch, 'publisher':'PentaRelease', 'publisher_contract':'ct.pentarelease.autonomous.v2.0.2',
+            'target_ref':'main', 'publisher':'PentaRelease', 'publisher_contract':'ct.pentarelease.autonomous.v2.1.0',
+            'previous_release_tag':d['latest_tag'], 'previous_release_tag_sha':d['latest_tag_sha'],
+            'source_baseline_sha':d['source_baseline_sha'], 'source_head_sha':d['source_head_sha'],
+            'lineage_resolution':d['lineage_resolution'],
             'decision':d, 'artifact_policy':'governed_package_and_checksums',
             'generated_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'governance':{'d3_human_reserved':True,'hold_never_promoted_by_version_only':True,'provider_readback_required':True}
@@ -129,12 +176,17 @@ jobs:
           {
             "release_id": "ct.os.v$VERSION",
             "tag": "$TAG",
-            "target": "$BRANCH",
+            "target": "main",
             "title": "CrownThrive OS $VERSION — Autonomous PentaRelease",
             "package": "$PKG",
             "version_scheme": "$SCHEME",
             "publisher": "PentaRelease",
-            "publisher_contract": "ct.pentarelease.autonomous.v2.0.2",
+            "publisher_contract": "ct.pentarelease.autonomous.v2.1.0",
+            "previous_release_tag": "$LATEST",
+            "previous_release_tag_sha": "$LATEST_TAG_SHA",
+            "source_baseline_sha": "$SOURCE_BASELINE_SHA",
+            "source_head_sha": "$SOURCE_HEAD_SHA",
+            "lineage_resolution": "$LINEAGE_RESOLUTION",
             "requested_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "release_state": "requested",
             "draft": false,
@@ -148,8 +200,10 @@ jobs:
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "PKG=$PKG" >> "$GITHUB_ENV"
           echo "REQ=$REQ" >> "$GITHUB_ENV"
+          echo "SOURCE_BASELINE_SHA=$SOURCE_BASELINE_SHA" >> "$GITHUB_ENV"
+          echo "SOURCE_HEAD_SHA=$SOURCE_HEAD_SHA" >> "$GITHUB_ENV"
 
-      - name: Route through governance and publish resiliently
+      - name: Route through governance and publish exact merge
         if: steps.decide.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -162,10 +216,17 @@ jobs:
           git add "$PKG" "$REQ"
           git commit -m "pentarelease(auto): materialize CrownThrive OS $VERSION"
           HEAD_SHA=$(git rev-parse HEAD)
+          test "$(git rev-parse HEAD^)" = "$SOURCE_HEAD_SHA"
           git push origin "$BRANCH"
 
-          # Always execute the CrownThrive governed merge gate against the exact release branch.
-          gh workflow run governed-merge-gate.yml --ref "$BRANCH"
+          PR_URL=$(gh pr create --base main --head "$BRANCH" \
+            --title "PentaRelease autonomous release $VERSION" \
+            --body "Autonomous release candidate $VERSION. Publication remains blocked until this exact commit passes the CrownThrive governed merge gate and the pull request is merged into main.")
+          test -n "$PR_URL"
+          echo "Created governed release candidate PR: $PR_URL"
+
+          # The candidate-branch push runs the complete governed diff gate. A manually
+          # dispatched gate is deliberately ineligible to produce a successful check.
           success=false
           for i in $(seq 1 60); do
             sleep 10
@@ -180,25 +241,22 @@ jobs:
           done
           test "$success" = true
 
-          # Preferred path: governed PR + merge. If GitHub Actions PR creation is disabled,
-          # do not stall release autonomy. Publish from the fully governed exact branch instead.
-          PR_URL=""
-          if PR_URL=$(gh pr create --base main --head "$BRANCH" \
-              --title "PentaRelease autonomous release $VERSION" \
-              --body "Autonomous governed release $VERSION. Exact branch passed the CrownThrive governed merge gate. D3/new-authority actions remain excluded." 2>/tmp/pr-create.err); then
-            echo "Created governed release PR: $PR_URL"
-            if gh pr merge "$PR_URL" --merge --delete-branch; then
-              TARGET=main
-              echo "Governed PR merged; release target is main."
-            else
-              echo "PR merge unavailable; falling back to governed exact branch."
-              TARGET="$BRANCH"
-            fi
-          else
-            cat /tmp/pr-create.err || true
-            echo "GitHub Actions PR creation unavailable; using governed exact-branch release fallback."
-            TARGET="$BRANCH"
+          git fetch --no-tags origin main
+          CURRENT_MAIN_SHA=$(git rev-parse origin/main)
+          if [ "$CURRENT_MAIN_SHA" != "$SOURCE_HEAD_SHA" ]; then
+            echo "PentaRelease HOLD: main advanced after the exact source decision ($SOURCE_HEAD_SHA -> $CURRENT_MAIN_SHA)." >&2
+            exit 46
           fi
+          gh pr merge "$PR_URL" --merge --delete-branch
+          git fetch --no-tags origin main
+          MERGE_SHA=$(gh pr view "$PR_URL" --json state,mergeCommit \
+            --jq 'select(.state == "MERGED") | .mergeCommit.oid')
+          test -n "$MERGE_SHA"
+          git cat-file -e "${MERGE_SHA}^{commit}"
+          git merge-base --is-ancestor "$HEAD_SHA" "$MERGE_SHA"
+          git merge-base --is-ancestor "$MERGE_SHA" origin/main
+          TARGET="$MERGE_SHA"
+          echo "Governed PR merged; release target is exact accepted commit $TARGET."
 
           mkdir -p dist/pentarelease
           SAFE_TAG=$(printf '%s' "$TAG" | tr '/' '-')
@@ -212,18 +270,25 @@ jobs:
 
           TITLE="CrownThrive OS $VERSION — Autonomous PentaRelease"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TITLE" --notes-file "$PKG/RELEASE_NOTES.md" --target "$TARGET"
-          else
-            gh release create "$TAG" --target "$TARGET" --title "$TITLE" --notes-file "$PKG/RELEASE_NOTES.md"
+            echo "PentaRelease HOLD: release $TAG already exists; autonomous publication is append-only." >&2
+            exit 45
           fi
-          gh release upload "$TAG" "$ZIP" "$TGZ" dist/pentarelease/SHA256SUMS dist/pentarelease/MANIFEST.json dist/pentarelease/RELEASE_NOTES.md --clobber
+          gh release create "$TAG" --target "$TARGET" --title "$TITLE" --notes-file "$PKG/RELEASE_NOTES.md"
+          gh release upload "$TAG" "$ZIP" "$TGZ" dist/pentarelease/SHA256SUMS dist/pentarelease/MANIFEST.json dist/pentarelease/RELEASE_NOTES.md
 
           READBACK=$(gh release view "$TAG" --json tagName,name,url,isDraft,isPrerelease,targetCommitish,assets)
           echo "$READBACK" | jq .
           test "$(echo "$READBACK" | jq -r '.tagName')" = "$TAG"
+          test "$(echo "$READBACK" | jq -r '.targetCommitish')" = "$TARGET"
+          test "$(echo "$READBACK" | jq -r '.isDraft')" = "false"
+          test "$(echo "$READBACK" | jq -r '.isPrerelease')" = "false"
           for EXPECTED in "$(basename "$ZIP")" "$(basename "$TGZ")" SHA256SUMS MANIFEST.json RELEASE_NOTES.md; do
             echo "$READBACK" | jq -e --arg n "$EXPECTED" '.assets[] | select(.name == $n)' >/dev/null
           done
+          test "$(echo "$READBACK" | jq '[.assets[]] | length')" -eq 5
+          READBACK_DIR=$(mktemp -d)
+          gh release download "$TAG" --dir "$READBACK_DIR"
+          (cd "$READBACK_DIR" && sha256sum --strict --check SHA256SUMS)
 
           {
             echo '## PentaRelease production proof'
@@ -231,8 +296,10 @@ jobs:
             echo "- Version: $VERSION"
             echo "- Tag: $TAG"
             echo "- Governed exact commit: $HEAD_SHA"
-            echo "- Publication target: $TARGET"
-            echo "- Provider readback: verified"
+            echo "- Prior release source baseline: $SOURCE_BASELINE_SHA"
+            echo "- Evaluated source head: $SOURCE_HEAD_SHA"
+            echo "- Accepted main merge commit: $TARGET"
+            echo "- Provider asset names and SHA-256 readback: verified"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record autonomous decision

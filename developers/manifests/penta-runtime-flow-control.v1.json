@@ -1,0 +1,203 @@
+{
+  "schema": "ct.penta.capability-pack.manifest.v1",
+  "version": "1.0.0",
+  "pack_id": "crownthrive.penta.runtime-flow-control.v1",
+  "canonical_name": "Penta Runtime Flow-Control Capability Pack",
+  "lineage": {
+    "version": "1.0.0",
+    "supersedes": []
+  },
+  "canonical_registry": {
+    "path": "penta/registry/penta-component-registry.v1.json",
+    "registry_id": "ct.registry.penta-components.v1",
+    "version": "1.5.1",
+    "sha256": "14a64c500cbc3aff96ed62af430ea47deaa4e02c24925fbe9a30f1731a5b9fc4"
+  },
+  "institutional_framework": false,
+  "nonvoting_capability_pack": true,
+  "vote_eligible": false,
+  "quorum_eligible": false,
+  "independent_certifier": false,
+  "self_certification": false,
+  "lifecycle_state": "CONTROLLED_TEST",
+  "provider_neutral": true,
+  "purpose": "Bounded deterministic queueing, capacity backpressure, route balancing, internal resource-cost ceilings and redundant-exception consolidation for governed factory candidates.",
+  "members": [
+    {
+      "name": "PentaQueue",
+      "canonical_key": "penta.route",
+      "canonical_contract": "ct.penta.route.v3",
+      "canonical_axis": "interoperation",
+      "canonical_role": "routing and delivery umbrella governing distinct route primitives",
+      "registry_relationship": "primitive_under_component",
+      "primitive_name": "PentaQueue",
+      "implementation_binding": "penta.runtime.flow_control.PentaQueue",
+      "role": "Bounded priority admission, idempotency, leases, fencing, bounded retry and dead-letter state.",
+      "authority_effect": false
+    },
+    {
+      "name": "PentaLoad",
+      "canonical_key": "penta.load",
+      "canonical_contract": "ct.penta.load.v1",
+      "canonical_axis": "execution",
+      "canonical_role": "demand capacity and utilization measurement",
+      "registry_relationship": "component",
+      "implementation_binding": "penta.runtime.flow_control.PentaLoad",
+      "role": "Freshness-gated capacity evidence, local in-flight reservations and fail-closed backpressure.",
+      "authority_effect": false
+    },
+    {
+      "name": "PentaBalancer",
+      "canonical_key": "penta.balancer",
+      "canonical_contract": "ct.penta.balancer.v1",
+      "canonical_axis": "execution",
+      "canonical_role": "redundancy restoration load shedding and bounded capacity growth",
+      "registry_relationship": "component",
+      "implementation_binding": "penta.runtime.flow_control.PentaBalancer",
+      "role": "Deterministic least-utilized routing with stable hash tie-breaking across eligible routes.",
+      "authority_effect": false
+    },
+    {
+      "name": "PentaCosts",
+      "canonical_key": "penta.costs",
+      "canonical_contract": "ct.penta.costs.v1",
+      "canonical_axis": "authority",
+      "canonical_role": "cost-pressure detection and controlled recession recommendations without money movement",
+      "registry_relationship": "component",
+      "implementation_binding": "penta.runtime.flow_control.PentaCosts",
+      "role": "Pre-lease internal estimate-unit ceilings, reservations and accounted-use status.",
+      "money_movement": false,
+      "treasury_or_accounting_source_of_truth": false
+    }
+  ],
+  "hard_invariants": [
+    "The entire pack is CONTROLLED_TEST, has no external-effect adapter binding and enables no external effects.",
+    "Admission is bounded and an idempotency key cannot silently change its request.",
+    "Admission payloads and public claim payloads are detached, deeply immutable runtime custody values.",
+    "Priority, attempts, timestamps and all internal-unit fields reject booleans; max_attempts is at most 100 and unit values are at most 9223372036854775807.",
+    "Claim custody requires an active fenced lease and a current exact-scope authority receipt, but never authorizes an external effect.",
+    "Authority receipts bind an allowlisted issuer, the exact runtime environment and the receipt evidence fields; the binding digest is not an issuer signature or authentication proof.",
+    "Authority receipt, lease and load-TTL validity use exclusive upper bounds; authority expiry caps lease expiry and revocation fails subsequent validation closed.",
+    "Every active claim must exactly reproduce its job, worker, route, fencing token, lease expiry, attempt, immutable payload, receipt and reservation bindings.",
+    "Every active reservation must exactly reproduce its reservation id, job, fencing token, route and admitted estimate units.",
+    "A route cost ceiling is checked and reserved before a job lease is created.",
+    "Missing, disabled, future-dated or expired load evidence cannot increase throughput.",
+    "At-capacity routes produce backpressure rather than unbounded admission or dispatch.",
+    "Retries are bounded; exhaustion and repeated lease expiry end in dead-letter state.",
+    "Completion requires an explicit operation, non-negative bounded quantity, exact immutable PentaRate object, usage evidence reference and result; metered usage binds the job, route, fence, reservation and result digest.",
+    "Completion is local implementation verification only and has no certification, provider-write, vote, quorum or production-promotion effect.",
+    "Queue history, idempotency history, reservations, usage, operational ledger entries and exception evidence have explicit retention ceilings and fail closed before evidence would be dropped.",
+    "Every completion rate must exactly match a preconfigured immutable rate-book id/version/digest, be effective at completion time and meter no more units than the active admitted reservation.",
+    "A runtime stop irreversibly disables new admission for that instance while preserving bounded failure and lease-reap recovery paths.",
+    "Every schema-bound runtime object and readback has a detached plain-JSON serializer and validates against the supplied Draft 2020-12 schema.",
+    "Exception consolidation preserves exact counts and one output record per retained input while redacting sensitive report values and publishing digests of their unredacted source values.",
+    "PentaCosts uses internal integer estimate units and exposes no payment, transfer, settlement, pricing, treasury or accounting action.",
+    "PentaRate versions are immutable; rate lookup never mutates a prior version.",
+    "PentaMeter and PentaCostLedger append idempotent operational evidence rather than rewriting history.",
+    "All PentaCosts family arithmetic is bounded to non-negative signed 64-bit integer units and fails on overflow.",
+    "PentaForecast is advisory only and can never reserve a budget or authorize spend."
+  ],
+  "authority_model": {
+    "receipt_source": "externally governed authority evidence",
+    "configured_issuer_allowlist_required": true,
+    "exact_environment_binding_required": true,
+    "evidence_binding_digest_required": true,
+    "binding_digest_is_signature": false,
+    "issuer_authentication_provided": false,
+    "exact_scope_required": true,
+    "subject_binding_required": true,
+    "expiry_required": true,
+    "revocable": true,
+    "wildcard_scope_supported": false,
+    "d3_human_reserved": true,
+    "ability_is_not_permission": true
+  },
+  "runtime_model": {
+    "lifecycle_state": "CONTROLLED_TEST",
+    "durable_store_bound": false,
+    "external_effect_adapter_bound": false,
+    "external_effects_enabled": false,
+    "delivery_semantics": "at-least-once with idempotency and fencing",
+    "clock": "caller-supplied integer epoch seconds",
+    "validity_interval_rule": "not_before <= now < exclusive_upper_bound",
+    "priority_range": [0, 100],
+    "max_attempts": 100,
+    "max_unit": 9223372036854775807,
+    "boolean_as_integer_accepted": false,
+    "higher_priority_first": true,
+    "stable_tie_order": ["admitted_at", "sequence", "job_id"],
+    "terminal_states": ["implementation_verified", "dead_letter"],
+    "claim_custody_preflight": "PentaFlowControl.validate_claim",
+    "claim_custody_preflight_authorizes_external_effects": false,
+    "claim_payload_custody": "detached and deeply immutable",
+    "retention_policy": "explicit bounded capacities fail closed before history or evidence is dropped",
+    "rate_configuration": "preconfigured immutable id/version/digest with effective-time and reservation-ceiling checks",
+    "stop_control": "irreversible per-runtime admission stop; failure and reap remain enabled",
+    "wire_contract": "plain JSON serializers validated against Draft 2020-12",
+    "durable_multiworker_binding": "requires an independently governed transactional state adapter"
+  },
+  "completion_contract": {
+    "required_inputs": [
+      "exact active ClaimResult",
+      "result",
+      "operation",
+      "quantity",
+      "exact immutable PentaRate",
+      "usage_evidence_ref",
+      "now"
+    ],
+    "usage_binding": [
+      "job_id",
+      "route_id",
+      "fencing_token",
+      "reservation_id",
+      "result_digest",
+      "operation",
+      "quantity",
+      "rate_digest",
+      "evidence_ref"
+    ],
+    "success_state": "implementation_verified",
+    "certification_effect": false,
+    "provider_effect": false,
+    "money_movement": false
+  },
+  "cost_family_boundary": {
+    "PentaCosts": "compatibility facade composing the operational family while preserving the v1 budget API",
+    "PentaRate": "immutable versioned operation-to-integer-unit rate book",
+    "PentaMeter": "append-only idempotent usage records bound to an exact rate-book digest",
+    "PentaBudget": "atomic explicit per-route ceiling, reservation, release and accounted-use status",
+    "PentaCostLedger": "append-only operational reservation entries; not accounting or treasury source of truth",
+    "PentaForecast": "advisory ceiling-mean integer projection; never spend authority",
+    "PentaCost_identity_boundary": "The institutional penta.cost / PentaCost system is separate from this pack's penta.costs / PentaCosts component; neither aliases, supersedes nor replaces the other.",
+    "unit_ceiling": 9223372036854775807,
+    "currency_semantics": false,
+    "money_movement": false
+  },
+  "operational_readback": {
+    "lifecycle_state": "CONTROLLED_TEST",
+    "declares_external_effect_bindings": true,
+    "queue_capacity_and_retention": true,
+    "load_snapshot_and_local_inflight_counts": true,
+    "authority_environment_and_receipt_counts": true,
+    "budget_reservation_usage_and_ledger_counts": true,
+    "redacted_exception_counts_and_source_digests": true,
+    "certification_effect": false
+  },
+  "assets": {
+    "runtime": [
+      "penta/runtime/flow_control/__init__.py",
+      "penta/runtime/flow_control/core.py"
+    ],
+    "tests": [
+      "tests/test_penta_runtime_flow_control.py",
+      "tests/test_penta_runtime_flow_control_sql.py"
+    ],
+    "test_dependencies": ["requirements/penta-runtime-test.txt"],
+    "schema": "schemas/penta/runtime-flow-control.schema.json",
+    "documentation": "developers/penta-runtime-flow-control.md",
+    "controlled_test_migration": "supabase/migrations/20260827001730_penta_runtime_flow_control_v1.sql"
+  },
+  "promotion_rule": "This pack remains CONTROLLED_TEST until an independent verifier, exact-head CI, durable adapter tests, provider readback where applicable, rollback evidence and the governing release mechanism support a narrower state. The pack cannot promote itself.",
+  "rollback": "Disable new admission, stop effect preflight, allow safe failure/reap paths, preserve raw exceptions and claims, release only unaccounted reservations, and restore the previous exact runtime version through reviewed source history."
+}

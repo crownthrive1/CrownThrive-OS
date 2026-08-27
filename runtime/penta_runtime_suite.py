@@ -3,7 +3,8 @@
 
 This is deliberately NOT PentaSuite (the agent laboratory). It is a shared
 runtime/audit facade that composes Penta Family state, provider readiness and
-repository implementation signals without promoting member maturity.
+repository implementation signals. It projects only separately governed,
+exact-evidence-bound maturity promotions; provider state remains independent.
 """
 from __future__ import annotations
 
@@ -14,6 +15,14 @@ from pathlib import Path
 import re
 import sys
 from typing import Any
+
+try:
+    from runtime.penta_promotions import PentaPromotionError, apply_promotions
+except ModuleNotFoundError:
+    runtime_dir = str(Path(__file__).resolve().parent)
+    if runtime_dir not in sys.path:
+        sys.path.insert(0, runtime_dir)
+    from penta_promotions import PentaPromotionError, apply_promotions
 
 
 class PentaRuntimeSuiteError(ValueError):
@@ -48,10 +57,8 @@ def collect_members(root: Path) -> dict[str, dict[str, Any]]:
     data = root / "data" / "penta"
     members: dict[str, dict[str, Any]] = {}
     for path in sorted(data.glob("*.json")):
-        # Penta OS V1 is a reconciled census generated from these source
-        # registries.  Feeding either its discovery overlay or generated output
-        # back into the legacy runtime inventory would double-count identities
-        # and turn a derived artifact into a second authority source.
+        # These files are derived whole-system censuses; ingesting them again
+        # would duplicate the original registry members and blur provenance.
         if path.name in {"os-v1.discoveries.json", "os-v1.registry.json"}:
             continue
         raw = _load_json(path)
@@ -138,7 +145,10 @@ def provider_control_snapshot(root: Path) -> dict[str, Any]:
 
 def build_snapshot(root: Path) -> dict[str, Any]:
     root = Path(root).resolve()
-    members = collect_members(root)
+    try:
+        members, promotions = apply_promotions(root, collect_members(root))
+    except PentaPromotionError as exc:
+        raise PentaRuntimeSuiteError(f"invalid evidence-bound maturity promotion: {exc}") from exc
     rows: list[dict[str, Any]] = []
     maturity_counts: dict[str, int] = {}
     with_signals = 0
@@ -152,7 +162,9 @@ def build_snapshot(root: Path) -> dict[str, Any]:
         rows.append({
             "machine_key": key,
             "canonical_name": member.get("canonical_name"),
+            "catalog_maturity": member.get("catalog_maturity", maturity),
             "maturity": maturity,
+            "maturity_promotion": member.get("maturity_promotion"),
             "risk_ceiling": member.get("risk_ceiling"),
             "source": member["source"],
             "implementation_signals": signals,
@@ -163,15 +175,20 @@ def build_snapshot(root: Path) -> dict[str, Any]:
     mail = next((row for row in rows if row["machine_key"] == "penta.mail"), None)
     return {
         "schema": "ct.penta.runtime-suite.snapshot.v1",
-        "truth_rule": "implementation signals are evidence locations, not maturity promotion",
+        "truth_rule": "implementation signals are evidence locations, not maturity promotion; only exact-evidence-bound promotion records may change effective system maturity, and they never change provider state",
         "member_count": len(rows),
         "maturity_counts": dict(sorted(maturity_counts.items())),
         "members_with_implementation_signals": with_signals,
+        "promotion_count": len(promotions),
+        "promoted_members": sorted(promotions),
+        "provider_states_promoted": False,
         "members": rows,
         "provider_control_plane": provider,
         "pentamail": {
             "registered": mail is not None,
-            "registry_maturity": mail.get("maturity") if mail else None,
+            "catalog_maturity": mail.get("catalog_maturity") if mail else None,
+            "effective_maturity": mail.get("maturity") if mail else None,
+            "provider_state": "SEPARATELY_GATED_NOT_PROMOTED_BY_RUNTIME_SUITE",
             "implementation_signals": mail.get("implementation_signals") if mail else [],
             "resend_registered": any(p["provider_id"] == "resend" for p in provider.get("providers", [])),
             "mailgun_registered": any(p["provider_id"] == "mailgun" for p in provider.get("providers", [])),
@@ -213,10 +230,12 @@ def owner_summary(snapshot: dict[str, Any]) -> str:
         f"Registered Penta members: {snapshot['member_count']}",
         f"Members with repository implementation signals: {snapshot['members_with_implementation_signals']}",
         f"Maturity counts: {json.dumps(snapshot['maturity_counts'], sort_keys=True)}",
+        f"Evidence-bound maturity promotions: {snapshot['promotion_count']}",
         f"Provider control plane present: {provider.get('available')}",
         f"Provider count: {provider.get('provider_count', 0)}",
         f"PentaMail registered: {mail['registered']}",
-        f"PentaMail registry maturity: {mail['registry_maturity']}",
+        f"PentaMail catalog/effective maturity: {mail['catalog_maturity']}/{mail['effective_maturity']}",
+        f"PentaMail provider state: {mail['provider_state']}",
         f"PentaMail implementation signals: {len(mail['implementation_signals'])}",
         f"Resend registered: {mail['resend_registered']}",
         f"Mailgun registered: {mail['mailgun_registered']}",

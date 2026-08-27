@@ -1,0 +1,144 @@
+{
+  "schema_version": "2.0.0",
+  "manifest_id": "ct.manifest.dail-factory-continuation.v2",
+  "contract": "developers/contracts/dail-evidence-spine.contract.v2.json",
+  "supersedes_for_current_work": [
+    "developers/manifests/chlom-pentafabric-factory-intake.v1.json",
+    "developers/contracts/chlom-continuous-build.contract.v1.json"
+  ],
+  "historical_records_preserved": true,
+  "lifecycle_state": "PARTIAL_SOURCE_IMPLEMENTATION_CLAIM_RECLAIM_AND_RUNTIME_APPLY_PENDING",
+  "maintenance_reconciliation": {
+    "scheduler_topology_record": "CLOSED",
+    "legacy_chlom_projection_gate": "PAUSED_FOR_TARGETED_MAINTENANCE",
+    "effective_policy": "MOST_RESTRICTIVE_GATE_WINS",
+    "branch_scoped_founder_directed_build_allowed": true,
+    "automatic_child_projection_allowed": false,
+    "runtime_apply_allowed_by_this_manifest": false,
+    "production_promotion_allowed_by_this_manifest": false
+  },
+  "contour_capability": {
+    "canonical_term": "PentaContour",
+    "definition": "A deterministic boundary-shaping stage that converts governed intent into an exact build surface, dependency contour, test contour, rollback contour and evidence contour before compilation.",
+    "state": "SPECIFIED_SOURCE_CONTRACT_ONLY",
+    "authority_delta": false,
+    "required_outputs": [
+      "bounded_file_set",
+      "dependency_graph_digest",
+      "interface_contract_digest",
+      "data_classification",
+      "negative_authorization_cases",
+      "test_plan_digest",
+      "rollback_plan_digest",
+      "dail_event_plan_digest"
+    ]
+  },
+  "pipeline": [
+    "INTAKE",
+    "CONTOUR",
+    "PLAN",
+    "COMPILE",
+    "GENERATE",
+    "EXECUTE_TESTS",
+    "SECURITY_TEST",
+    "ROLLBACK_PROBE",
+    "INDEPENDENT_VERIFY",
+    "APPLY_IF_AUTHORIZED",
+    "PROVIDER_READBACK",
+    "DAIL_SEAL",
+    "DELIVER"
+  ],
+  "checkpoint_required_fields": [
+    "contract",
+    "schema_version",
+    "canonicalization_version",
+    "run_id",
+    "request_id",
+    "stream_id",
+    "lane",
+    "ordinal",
+    "attempt",
+    "state",
+    "worker_id",
+    "claim_id",
+    "fencing_token",
+    "lease_acquired_at",
+    "lease_until",
+    "available_at",
+    "idempotency_key",
+    "input_digest",
+    "output_digest",
+    "artifact_digest",
+    "compiler_version",
+    "authority_ref",
+    "correlation_id",
+    "causation_id",
+    "previous_event_hash",
+    "event_hash",
+    "provider_operation_id",
+    "provider_idempotency_key",
+    "provider_request_digest",
+    "provider_response_digest",
+    "readback_digest",
+    "rollback_ref",
+    "rollback_digest",
+    "error_class",
+    "retry_count",
+    "next_retry_at",
+    "started_at",
+    "completed_at"
+  ],
+  "determinism": {
+    "canonicalization_version": "ct-json-sort-v1",
+    "content_digest_excludes": [
+      "lease_acquired_at",
+      "lease_until",
+      "available_at",
+      "next_retry_at",
+      "started_at",
+      "completed_at"
+    ],
+    "idempotency_seed": ["run_id", "lane", "attempt", "input_digest", "provider_operation_id"],
+    "random_uuid_in_content_digest": false
+  },
+  "operational_sql_field_mapping": {
+    "contract": "contract_version",
+    "input_digest": "input_digest_sha256",
+    "output_digest": "output_digest_sha256",
+    "artifact_digest": "artifact_digest_sha256",
+    "provider_operation_id": "provider_operation",
+    "provider_request_digest": "provider_request_digest",
+    "provider_response_digest": "provider_response_sha256",
+    "readback_digest": "readback_digest",
+    "rollback_digest": "rollback_digest_sha256"
+  },
+  "continuation_controls": {
+    "claim_algorithm_required": "FOR_UPDATE_SKIP_LOCKED_WITH_EXPIRY",
+    "claim_algorithm_source_state": "SPECIFIED_RUNTIME_PENDING",
+    "fencing_token_monotonic": true,
+    "expired_running_claim_reclaim_required": true,
+    "expired_running_claim_reclaim_source_state": "SPECIFIED_RUNTIME_PENDING",
+    "stale_worker_completion": "REJECT",
+    "terminal_checkpoint_dail_and_outbox": "ONE_DATABASE_TRANSACTION",
+    "provider_side_effect": "IDEMPOTENT_PREPARE_SEND_READBACK_COMMIT_OR_HOLD",
+    "missing_readback_or_rollback_may_be_implemented": false
+  },
+  "receipt_surfaces": {
+    "operational_checkpoint": {
+      "ref": "chlom_runtime.factory_continuation_receipts_v2",
+      "producer_ref": "chlom_runtime.append_factory_continuation_v2",
+      "state": "PARTIAL_SOURCE_IMPLEMENTATION_NO_TERMINAL_ADMISSION"
+    },
+    "portable_release_evidence": {
+      "ref": "chlom-protocol/schemas/factory-continuation-receipt-v2.schema.json",
+      "state": "SCHEMA_ONLY_PRODUCER_PENDING"
+    },
+    "reference_object": {
+      "ref": "runtime/dail_evidence_spine.py:build_factory_continuation_receipt",
+      "state": "REFERENCE_TEST_MODEL_ONLY"
+    },
+    "cross_shape_substitution_allowed": false,
+    "mapping_and_exact_sha_projection_required_before_integration": true
+  },
+  "production_state": "NOT_PROMOTED"
+}

@@ -6,6 +6,8 @@ on:
     branches:
       - main
       - "phase4/**"
+      - "pentarelease/**"
+      - "chlom/publication-**"
   workflow_dispatch:
 
 permissions:
@@ -23,6 +25,13 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Reject manual dispatch as merge acceptance
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          echo 'Manual validation cannot certify a pull request or release candidate.' >&2
+          exit 78
+
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,6 +66,7 @@ jobs:
           python -m py_compile scripts/validate_agent_sovereign_governance.py
           python -m py_compile scripts/validate_security_governance.py
           python -m py_compile scripts/validate_github_actions_runtime_policy.py
+          python -m py_compile scripts/validate_release_governance_invariants.py
           python -m py_compile scripts/penta_gap_closure.py
           python -m py_compile scripts/governed_merge_decision.py
           python -m py_compile scripts/governed_current_pr_preflight.py
@@ -67,6 +77,9 @@ jobs:
 
       - name: Validate GitHub Actions runtime and supply-chain policy
         run: python scripts/validate_github_actions_runtime_policy.py
+
+      - name: Validate release-governance invariants
+        run: python scripts/validate_release_governance_invariants.py
 
       - name: Validate Phase 4 V4 gate contract
         run: python scripts/validate_gate_registry_v4.py
@@ -88,7 +101,7 @@ jobs:
             tests/test_penta_self_build.py
 
       - name: Resolve exact governed diff range
-        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/phase4/') || startsWith(github.ref, 'refs/heads/pentarelease/') || startsWith(github.ref, 'refs/heads/chlom/publication-')))
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -126,7 +139,7 @@ jobs:
           echo "CT_GIT_MERGE_BASE_SHA=$merge_base" >> "$GITHUB_ENV"
 
       - name: Enforce PentaSerialized continuity in required merge perimeter
-        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/phase4/') || startsWith(github.ref, 'refs/heads/pentarelease/') || startsWith(github.ref, 'refs/heads/chlom/publication-')))
         run: |
           python -m penta.runtime.serialized git-gate \
             --repo . \
@@ -135,7 +148,7 @@ jobs:
             --policy penta/registry/serialized-suite.json
 
       - name: Bind governed changed files to trusted Git diff
-        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/phase4/') || startsWith(github.ref, 'refs/heads/pentarelease/') || startsWith(github.ref, 'refs/heads/chlom/publication-')))
         run: |
           python scripts/governed_merge_decision.py \
             --verify-git-diff \
@@ -206,7 +219,7 @@ jobs:
           echo "This check does not synthesize provider CodeQL findings."
 
       - name: Review dependency changes
-        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/phase4/') || startsWith(github.ref, 'refs/heads/pentarelease/') || startsWith(github.ref, 'refs/heads/chlom/publication-')))
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate

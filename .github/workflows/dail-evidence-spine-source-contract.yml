@@ -1,0 +1,52 @@
+name: DAIL Evidence Spine Source Contract
+
+on:
+  pull_request:
+    paths:
+      - "runtime/dail_evidence_spine.py"
+      - "developers/contracts/dail-evidence-spine.contract.v2.json"
+      - "developers/manifests/dail-*.json"
+      - "supabase/functions/dail-external-ingress/**"
+      - "supabase/migrations/20260826233102_dail_evidence_spine_v2.sql"
+      - "tests/test_dail_*.py"
+      - ".github/workflows/dail-evidence-spine-source-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "runtime/dail_evidence_spine.py"
+      - "developers/contracts/dail-evidence-spine.contract.v2.json"
+      - "developers/manifests/dail-*.json"
+      - "supabase/functions/dail-external-ingress/**"
+      - "supabase/migrations/20260826233102_dail_evidence_spine_v2.sql"
+      - "tests/test_dail_*.py"
+      - ".github/workflows/dail-evidence-spine-source-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24"
+      - name: Validate governed manifests and Python admission controls
+        run: |
+          python -B scripts/validate_dail_evidence_spine_v2.py
+          python -B -m unittest -v \
+            tests.test_dail_evidence_spine \
+            tests.test_dail_evidence_spine_contract \
+            tests.test_dail_supabase_contract
+      - name: Validate exact-body Edge ingress controls
+        run: >-
+          node --test
+          supabase/functions/dail-external-ingress/handler.test.ts
+          supabase/functions/dail-external-ingress/stripe_signature.test.ts

@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write
   id-token: write
+  pull-requests: write
 
 concurrency:
   group: chlom-continuous-publisher
@@ -72,6 +73,16 @@ jobs:
               chlom/*.mdx) ;;
               *) echo "Unsafe destination path: $path" >&2; exit 19 ;;
             esac
+            resolved="$(realpath -m -- "$path")"
+            case "$resolved" in
+              "$GITHUB_WORKSPACE"/chlom/*.mdx) ;;
+              *) echo "Destination escapes the CHLOM candidate root: $path" >&2; exit 19 ;;
+            esac
+            if [[ -L "$path" ]]; then
+              echo "Symlink destinations are prohibited: $path" >&2
+              exit 19
+            fi
+            path="$resolved"
             mkdir -p "$(dirname "$path")"
             jq -j '.mdx' <<<"$command" > "$path"
             expected="$(jq -r '.content_sha256' <<<"$command")"
@@ -82,9 +93,11 @@ jobs:
             fi
           done
 
-      - name: Commit direct production publication
+      - name: Commit publication candidate and open pull request
         id: commit
         if: steps.claim.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -94,24 +107,40 @@ jobs:
           if git diff --cached --quiet; then
             echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "pr_url=" >> "$GITHUB_OUTPUT"
           else
             git commit -m "docs(chlom): autonomous governed publication batch"
-            git push origin HEAD:main
+            BRANCH="chlom/publication-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            git push origin "HEAD:refs/heads/$BRANCH"
+            PR_URL=$(gh pr create --base main --head "$BRANCH" \
+              --title "CHLOM governed publication candidate" \
+              --body "Provider-materialized CHLOM candidate. Production publication requires the ordinary governed pull-request acceptance path; this workflow does not merge or write directly to main.")
+            test -n "$PR_URL"
             echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Acknowledge destination commit
+      - name: Acknowledge candidate or existing destination
         if: steps.claim.outputs.count != '0' && success()
         shell: bash
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
           COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          CHANGED: ${{ steps.commit.outputs.changed }}
+          PR_URL: ${{ steps.commit.outputs.pr_url }}
         run: |
           set -euo pipefail
           ids="$(cat /tmp/chlom-command-ids.json)"
+          if [[ "$CHANGED" == "true" ]]; then
+            publication_state="candidate_pr"
+          else
+            publication_state="already_present_on_main"
+          fi
           jq -n --argjson ids "$ids" --arg sha "$COMMIT_SHA" \
-            '{action:"ack",command_ids:$ids,commit_sha:$sha}' > /tmp/chlom-ack-body.json
+            --arg state "$publication_state" --arg pr_url "$PR_URL" \
+            '{action:"ack",command_ids:$ids,commit_sha:$sha,publication_state:$state,pull_request_url:$pr_url}' \
+            > /tmp/chlom-ack-body.json
           curl --fail --silent --show-error \
             -X POST "$CHLOM_BRIDGE_URL" \
             -H "Authorization: Bearer $OIDC_TOKEN" \

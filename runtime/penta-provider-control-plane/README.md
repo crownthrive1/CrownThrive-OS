@@ -1,4 +1,4 @@
-# Penta Provider Control Plane v1.1
+# Penta Provider Control Plane v1.2
 
 This runtime package closes the Phase 3 software-provider gap through four independently governed subsystems:
 
@@ -18,6 +18,8 @@ A provider operation is executable only when the runtime can prove the required 
 ## Lifecycle integration
 
 This control plane is complementary to the production provider-lifecycle surface documented at `software-factory-v4/PENTA-PROVIDER-LIFECYCLE.md`. The control plane evaluates exact provider/credential/build/certification readiness; the ThriveBase/Supabase lifecycle persists governed evidence, maintenance state, and PentaNurture continuity. Neither surface may infer or expand authority from the other.
+
+Material provider events also bind to the DAIL evidence spine. A consequential provider operation cannot be certified solely from an adapter receipt: it needs the canonical DAIL receipt and its operation-specific readback. The Stripe adapter declares a separate raw-body webhook verification operation. That operation remains held until its Supabase secret/runtime binding, DAIL migration, distinct provider readback, and independent verification pass.
 
 ## Cookies
 
@@ -43,6 +45,7 @@ The initial registry can bind these runtime aliases when present:
 - Supabase native REST: `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
 - Vercel: `VERCEL_TOKEN`
 - Stripe: `STRIPE_SECRET_KEY`
+- Stripe webhook ingress: `DAIL_STRIPE_WEBHOOK_SECRETS_JSON` (versioned secret references and values supplied only to the Edge Function runtime)
 - Resend: `RESEND_API_KEY`
 - Mailgun: `MAILGUN_API_KEY` + `MAILGUN_DOMAIN`
 - Slack: `SLACK_BOT_TOKEN`
@@ -51,6 +54,8 @@ The initial registry can bind these runtime aliases when present:
 The existing PentaFactory GitHub→Supabase OIDC bridge remains a separately evidenced provider path; generic GitHub Actions OIDC availability is not treated as proof that the native Supabase adapter authenticated.
 
 These aliases are contract names, not claims that the corresponding secret is currently configured. PentaCredentials resolves that truth at runtime and PentaCertify separately proves authentication with a live read-only provider probe.
+
+The Stripe webhook secret is not interchangeable with the Stripe API secret. The raw signature header, raw body, and secret value never enter DAIL. DAIL stores their safe digests, the provider event identity, and the verification receipt. Stripe HMAC verification establishes provider-origin evidence but not public non-repudiation because the endpoint secret is shared; the External Evidence Relay must perform separate provider readback and a separate witness must anchor the checkpoint before independent immutability is claimed.
 
 ## Initial certification probes
 

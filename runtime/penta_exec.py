@@ -33,7 +33,7 @@ except ModuleNotFoundError:
     from runtime.penta_family import load_family, member_dispatch_gate
     from runtime.penta_interop import build_envelope, evaluate_handoff
 
-RUNTIME_VERSION = "1.3.0"
+RUNTIME_VERSION = "1.5.0"
 ADAPTER_REGISTRY = Path("data/penta/execution-adapters.registry.json")
 EXECUTION_ELIGIBLE = {"certified", "production"}
 VALID_EFFECTS = {"analyze", "prepare", "route", "execute", "verify", "preserve"}
@@ -107,14 +107,14 @@ def member_status(snapshot: Mapping[str, Any], machine_key: str) -> dict[str, An
     member, all_members = _member(snapshot, machine_key), _members(snapshot)
     deps = [{"machine_key": dep, "registered": dep in all_members, "maturity": all_members.get(dep, {}).get("maturity") if dep in all_members else None} for dep in member.get("dependencies") or []]
     missing = sorted(item["machine_key"] for item in deps if not item["registered"])
-    return _receipt("member_status", "healthy_control_plane" if not missing else "degraded_control_plane", {"machine_key": machine_key, "canonical_name": member.get("canonical_name"), "category": member.get("category"), "purpose": member.get("purpose"), "authority_boundary": member.get("authority_boundary"), "risk_ceiling": member.get("risk_ceiling"), "maturity": member.get("maturity"), "portal_route": member.get("portal_route"), "execution_gate": member_dispatch_gate(snapshot, machine_key), "dependencies": deps, "missing_dependencies": missing, "source": member.get("source")})
+    return _receipt("member_status", "healthy_control_plane" if not missing else "degraded_control_plane", {"machine_key": machine_key, "canonical_name": member.get("canonical_name"), "category": member.get("category"), "purpose": member.get("purpose"), "authority_boundary": member.get("authority_boundary"), "risk_ceiling": member.get("risk_ceiling"), "catalog_maturity": member.get("catalog_maturity", member.get("maturity")), "maturity": member.get("maturity"), "maturity_promotion": member.get("maturity_promotion"), "portal_route": member.get("portal_route"), "execution_gate": member_dispatch_gate(snapshot, machine_key), "dependencies": deps, "missing_dependencies": missing, "source": member.get("source")})
 
 
 def validate_adapter_registry(registry: Mapping[str, Any]) -> None:
     if registry.get("registry_id") != "crownthrive.penta.execution-adapters":
         raise PentaExecutionError("unexpected adapter registry_id")
-    if registry.get("version") != "1.3.0" or registry.get("fail_closed") is not True:
-        raise PentaExecutionError("adapter registry must be v1.3.0 and fail closed")
+    if registry.get("version") != "1.5.0" or registry.get("fail_closed") is not True:
+        raise PentaExecutionError("adapter registry must be v1.5.0 and fail closed")
     adapters = registry.get("adapters")
     if not isinstance(adapters, list):
         raise PentaExecutionError("adapters must be a list")
@@ -179,7 +179,7 @@ def _mesh_route_check(ctx: AdapterContext) -> dict[str, Any]:
     candidate = ctx.payload.get("candidate_target")
     if not isinstance(candidate, str) or not candidate.startswith("penta."): raise PentaExecutionError("route_check payload.candidate_target must be exact penta.* machine key")
     member, gate = _member(ctx.snapshot, candidate), member_dispatch_gate(ctx.snapshot, candidate)
-    return {"candidate_target": candidate, "registered": True, "maturity": member.get("maturity"), "execution_eligible": bool(gate.get("eligible")), "portal_route": member.get("portal_route"), "dependency_count": len(member.get("dependencies") or [])}
+    return {"candidate_target": candidate, "registered": True, "catalog_maturity": member.get("catalog_maturity", member.get("maturity")), "maturity": member.get("maturity"), "maturity_promotion": member.get("maturity_promotion"), "execution_eligible": bool(gate.get("eligible")), "portal_route": member.get("portal_route"), "dependency_count": len(member.get("dependencies") or [])}
 
 
 def _error_normalize(ctx: AdapterContext) -> dict[str, Any]:
@@ -464,6 +464,89 @@ def _immune_repair_plan_preview(ctx: AdapterContext) -> dict[str, Any]:
     return {"plan": plan, "adapter_boundary": "bounded_plan_only_no_repair_execution", "state_persisted": False, "repair_executed": False, "provider_write": False, "production_promotion_authorized": False}
 
 
+def _context_runtime_contract_status(ctx: AdapterContext) -> dict[str, Any]:
+    if ctx.payload:
+        _reject_secret_fields(ctx.payload)
+        raise PentaExecutionError("context runtime contract status accepts no payload fields")
+    fixed_paths = {
+        "runtime": Path("runtime/penta_context.py"),
+        "contract": Path("PENTACONTEXT.md"),
+        "schema": Path("schemas/penta-context-record-v1.schema.json"),
+    }
+    resolved: dict[str, Path] = {}
+    for role, relative in fixed_paths.items():
+        path = (ctx.root / relative).resolve()
+        if not path.is_relative_to(ctx.root.resolve()) or not path.is_file():
+            raise PentaExecutionError(f"fixed PentaContext {role} is missing")
+        resolved[role] = path
+    module = _load_fixed_module("penta_context_exec_adapter", resolved["runtime"])
+    if getattr(module, "SYSTEM_KEY", None) != "penta.context" or getattr(module, "VERSION", None) != "1.1.0":
+        raise PentaExecutionError("unexpected PentaContext runtime identity/version")
+    return {
+        "schema": "ct.penta.context.runtime-contract-status.v1",
+        "machine_key": module.SYSTEM_KEY,
+        "runtime_version": module.VERSION,
+        "source_sha256": {
+            role: sha256(path.read_bytes()).hexdigest()
+            for role, path in sorted(resolved.items())
+        },
+        "declared_actions": ["enqueue", "health", "ingest", "query", "queue_status"],
+        "provider_binding_state": "SEPARATELY_GATED_NOT_EVALUATED",
+        "current_provider_state": "NOT_EVALUATED_BY_LOCAL_ADAPTER",
+        "context_is_authority": False,
+        "credential_material_accepted": False,
+        "network_probe_performed": False,
+        "provider_write_performed": False,
+        "provider_state_changed": False,
+        "production_promotion_authorized": False,
+    }
+
+
+def _promoted_local_operation(ctx: AdapterContext, handler_name: str) -> dict[str, Any]:
+    try:
+        from runtime import penta_promoted_operations as promoted
+    except ModuleNotFoundError:
+        import penta_promoted_operations as promoted  # type: ignore[no-redef]
+    handler = getattr(promoted, handler_name, None)
+    if not callable(handler):
+        raise PentaExecutionError(f"fixed promoted operation is unavailable: {handler_name}")
+    try:
+        result = handler(ctx)
+    except (OSError, TypeError, ValueError, KeyError) as exc:
+        raise PentaExecutionError(f"promoted local operation failed closed: {exc}") from exc
+    if not isinstance(result, dict):
+        raise PentaExecutionError("promoted local operation must return an object")
+    forbidden_truth = (
+        "provider_write_performed",
+        "provider_states_changed",
+        "production_promotion_authorized",
+        "self_certification_performed",
+    )
+    if any(result.get(field) is True for field in forbidden_truth):
+        raise PentaExecutionError("promoted local operation attempted a forbidden authority effect")
+    return result
+
+
+def _mail_production_status(ctx: AdapterContext) -> dict[str, Any]:
+    return _promoted_local_operation(ctx, "mail_production_status")
+
+
+def _status_owner_snapshot(ctx: AdapterContext) -> dict[str, Any]:
+    return _promoted_local_operation(ctx, "status_owner_snapshot")
+
+
+def _credentials_binding_census(ctx: AdapterContext) -> dict[str, Any]:
+    return _promoted_local_operation(ctx, "credentials_binding_census")
+
+
+def _build_provider_adapter(ctx: AdapterContext) -> dict[str, Any]:
+    return _promoted_local_operation(ctx, "build_provider_adapter")
+
+
+def _certify_provider_static(ctx: AdapterContext) -> dict[str, Any]:
+    return _promoted_local_operation(ctx, "certify_provider_static")
+
+
 BUILTIN_HANDLERS: dict[str, Callable[[AdapterContext], dict[str, Any]]] = {
     "family_snapshot": _family_snapshot, "beata_heartbeat": _beata_heartbeat, "mesh_route_check": _mesh_route_check,
     "error_normalize": _error_normalize, "logger_emit": _logger_emit, "trace_new_context": _trace_new_context, "metric_snapshot": _metric_snapshot,
@@ -471,6 +554,10 @@ BUILTIN_HANDLERS: dict[str, Callable[[AdapterContext], dict[str, Any]]] = {
     "compliance_evaluate": _compliance_evaluate, "license_readiness": _license_readiness,
     "scribe_reconcile_preview": _scribe_reconcile_preview, "marketer_cycle_preview": _marketer_cycle_preview,
     "evi_bundle_preview": _evi_bundle_preview, "immune_repair_plan_preview": _immune_repair_plan_preview,
+    "context_runtime_contract_status": _context_runtime_contract_status,
+    "mail_production_status": _mail_production_status, "status_owner_snapshot": _status_owner_snapshot,
+    "credentials_binding_census": _credentials_binding_census, "build_provider_adapter": _build_provider_adapter,
+    "certify_provider_static": _certify_provider_static,
 }
 
 

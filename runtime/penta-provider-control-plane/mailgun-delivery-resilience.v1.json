@@ -1,0 +1,117 @@
+{
+  "schema": "ct.penta.provider-supplement.v1",
+  "supplement_id": "ct.penta.provider.mailgun-delivery-resilience.v1",
+  "version": "1.0.0",
+  "policy_id": "ct.pentamailer.policy.mailgun-delivery-resilience.v1",
+  "policy_version": "1.0.0",
+  "provider_id": "mailgun",
+  "owner_system": "PentaMailer",
+  "transport_system": "PentaMail",
+  "priority": "software",
+  "runtime_state": "PRODUCTION_PROVIDER_HOLD",
+  "causal_trigger_ref": "db-trigger:public.ct_factory_adapter_certification_queue:trg_os_v2_notify_provider_cert_state_v1",
+  "legacy_enforcement_alias": "mailgun-relay:notifications",
+  "trigger_identity_contract": {
+    "default_notification_trigger_ref": "os-v2:notification",
+    "causal_trigger_ref_propagated_per_message": true,
+    "unrelated_notifications_share_causal_probation": false,
+    "relay_enforcement_alias_role": "fail_closed_legacy_fallback"
+  },
+  "authoritative_incident_evidence": {
+    "automatic_activation_requires_authenticated_provider_evidence": true,
+    "protective_manual_activation_authority": "founder_accepted_notice",
+    "protective_manual_is_provider_authenticated": false,
+    "clearance_requires_authenticated_provider_readback": true,
+    "qualifying_operations": [
+      "email_send",
+      "domain_read",
+      "account_read",
+      "webhook_verify"
+    ],
+    "requires_provider_identity": "mailgun",
+    "requires_provider_response_digest": true,
+    "local_rate_limit_is_provider_probation_evidence": false,
+    "operator_assertion_is_provider_probation_evidence": false,
+    "founder_accepted_notice_can_activate_fail_closed_hold": true,
+    "founder_accepted_notice_can_clear_hold": false
+  },
+  "provider_probation_control": {
+    "operation_scope": "email_send",
+    "global_route_hold_minimum_seconds": 10800,
+    "provider_enabled_readback_required": true,
+    "offending_trigger_probation_seconds": 259200,
+    "hold_attempt_accounting": "do_not_increment",
+    "repeat_incident_behavior": "extend_hold_and_probation_from_latest_accepted_incident"
+  },
+  "controlled_release": {
+    "maximum_messages_per_dispatch": 2,
+    "maximum_route_authorizations_per_batch_window": 2,
+    "route_batch_window_seconds": 60,
+    "global_maximum_authorizations_per_window": 10,
+    "global_window_seconds": 3600,
+    "reservation_mode": "atomic_global_before_provider_start",
+    "abandoned_reservations_refunded": false,
+    "provider_attempt_start_recorded_separately": true,
+    "applies_to_eligible_triggers_while_causal_probation_active": true,
+    "causal_trigger_messages_deferred_until_probation_end": true,
+    "burst_bypass": false
+  },
+  "state_contract": {
+    "normal": "ENABLED",
+    "provider_incident": "PROVIDER_HOLD",
+    "trigger_state": "TRIGGER_PROBATION",
+    "release_state": "CONTROLLED_RELEASE",
+    "unproven_provider_state": "HOLD"
+  },
+  "audit_contract": {
+    "append_only": true,
+    "queue_state_transitions_required": true,
+    "provider_incident_events_required": true,
+    "trigger_probation_events_required": true,
+    "provider_enabled_readback_ref_required": true,
+    "sensitive_provider_payload_storage": false,
+    "raw_provider_response_storage": false,
+    "private_notification_recipient_in_public_source": false
+  },
+  "acceptance": {
+    "authority_ref": "ct-founder-directive-pentamail-provider-probation-20260826-v1",
+    "decision": "ACCEPTED",
+    "accepted_on": "2026-08-26",
+    "authority_expansion": false,
+    "runtime_certification_inherited": false
+  },
+  "rollback": {
+    "fail_closed_state": "PROVIDER_HOLD",
+    "preserve_queue": true,
+    "preserve_audit_chain": true,
+    "preserve_probation_history": true,
+    "forced_release_allowed": false,
+    "exact_source_and_readback_required": true
+  },
+  "documentation": "developers/PENTAMAILER-MAILGUN-DELIVERY-RESILIENCE.md",
+  "governance_manifest": "developers/manifests/pentamailer-mailgun-delivery-resilience.v1.json",
+  "deployment_readback": {
+    "as_of": "2026-08-27T01:16:07.423670Z",
+    "route_state": "PROVIDER_HOLD",
+    "database_route_state": "open",
+    "hold_until": "2026-08-27T03:11:55.823575Z",
+    "trigger_probation_until": "2026-08-30T00:11:55.823575Z",
+    "mailgun_enabled_readback": "PENDING_AFTER_HOLD_BOUNDARY",
+    "mailgun_relay_control_version": 12,
+    "mailgun_relay_control_repository_source_sha256": "b642f74d6f3d713c41ed2645f6f8902e9a7a137f6c78374ada644f8fc3681ed1",
+    "penta_mail_version": 5,
+    "penta_mail_repository_source_sha256": "60eaeeae6ad3a101a97741d65286efe3c5c620289a7e558e3b45c5950ee911f3",
+    "notification_worker_version": 8,
+    "notification_worker_repository_source_sha256": "fe25b9f6d26bf7d4d2f69b84ce06af24ab9e8f57d179a38ebfafcea4df7957db",
+    "notification_trigger_identity": "VERIFIED_EXACT_CAUSAL_OR_UNRELATED_DEFAULT",
+    "held_outbox_messages": 5,
+    "held_outbox_attempts": 0,
+    "queued_probation_digests": 1,
+    "coalesced_digest_event_count": 2464,
+    "provider_attempt_starts": 0,
+    "global_rate_reservations": 0,
+    "current_incident_evidence_kind": "founder_accepted_notice",
+    "current_incident_provider_authenticated": false,
+    "deployment_receipt": "developers/manifests/pentamailer-mailgun-deployment-receipt.v1.json"
+  }
+}

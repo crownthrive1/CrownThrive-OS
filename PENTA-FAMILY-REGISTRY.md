@@ -25,6 +25,12 @@ A Penta is not a nickname, loose feature, or undocumented agent. A named Penta i
 
 A Penta is **institutionalized** only when the required registry, portal, documentation, access, status, audit, release, and escalation artifacts are present. Naming alone does not satisfy the gate.
 
+## DAIL execution rail
+
+Every Penta-to-Penta `execute` handoff requires both CHLOM and DAIL authority references, an accountable owner, and a material-event plan using either `same_transaction` or `transactional_outbox`. Repository-level `execution_ready` means those gates are represented; it does not mean the external or domain effect has completed. Terminal certification still requires the resulting canonical DAIL receipt and any operation-specific provider readback or rollback evidence.
+
+Analysis, preparation, routing, verification, and preservation messages may circulate without manufacturing a material-event receipt, but any material state transition they later cause enters the same execution rail. Low-risk telemetry may queue only under the explicit unsealed policy and cannot support certification until sealed.
+
 ## CrownThrive IO portal contract
 
 Canonical family index: `/io/pentas`  

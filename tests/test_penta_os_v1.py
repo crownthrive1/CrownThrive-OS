@@ -41,8 +41,9 @@ class PentaOSV15Tests(unittest.TestCase):
 
     def test_release_and_schema_version_are_separate(self):
         self.assertEqual(self.registry["version"], "1.5.0")
-        self.assertEqual(self.registry["schema_version"], "1.1.0")
+        self.assertEqual(self.registry["schema_version"], "1.2.0")
         self.assertEqual(self.registry["production_certification"], "HOLD")
+        self.assertFalse(self.registry["provider_state_promotion_authorized"])
         self.assertEqual(
             set(self.registry["operations"]),
             {"describe", "status", "readiness", "validate", "verify", "plan", "dispatch"},
@@ -68,11 +69,12 @@ class PentaOSV15Tests(unittest.TestCase):
         self.assertEqual(len(rows), 212)
         self.assertEqual(len(rows), len({row["machine_key"] for row in rows}))
         self.assertEqual(len(rows), len({row["canonical_name"] for row in rows}))
-        self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 15)
+        self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 21)
+        self.assertEqual(self.registry["counts"]["evidence_bound_maturity_promotions"], 5)
         self.assertEqual(self.registry["counts"]["by_maturity"], {
             "implemented": 38,
-            "production": 15,
-            "specified": 159,
+            "production": 21,
+            "specified": 153,
         })
         self.assertEqual(self.registry["counts"]["systems"], 156)
         self.assertEqual(self.registry["counts"]["layers"], 4)
@@ -80,10 +82,10 @@ class PentaOSV15Tests(unittest.TestCase):
     def test_dependency_census_is_exact(self):
         counts = self.registry["counts"]
         graph = self.registry["dependency_graph"]
-        self.assertEqual(counts["dependency_assessed_members"], 68)
-        self.assertEqual(counts["dependency_unassessed_members"], 144)
-        self.assertEqual(counts["members_with_declared_edges"], 67)
-        self.assertEqual(counts["penta_dependency_edges"], 249)
+        self.assertEqual(counts["dependency_assessed_members"], 78)
+        self.assertEqual(counts["dependency_unassessed_members"], 134)
+        self.assertEqual(counts["members_with_declared_edges"], 77)
+        self.assertEqual(counts["penta_dependency_edges"], 281)
         self.assertEqual(counts["external_dependency_edges"], 6)
         self.assertEqual(counts["unresolved_penta_dependencies"], 0)
         self.assertEqual(graph["external_refs"], ["chlom", "cie", "crownlytics", "crownpulse"])
@@ -91,17 +93,17 @@ class PentaOSV15Tests(unittest.TestCase):
         self.assertEqual(graph["cyclic_member_count"], 30)
         self.assertEqual(graph["cyclic_internal_edge_count"], 44)
         self.assertEqual(graph["condensed_component_count"], 192)
-        self.assertEqual(graph["condensed_edge_count"], 173)
-        self.assertEqual(graph["transitive_membership_count"], 1006)
+        self.assertEqual(graph["condensed_edge_count"], 203)
+        self.assertEqual(graph["transitive_membership_count"], 1210)
         self.assertEqual(graph["maximum_transitive_closure"], 40)
 
     def test_strict_readiness_partition_is_exact_and_diagnostic(self):
         expected = {
-            "HOLD_DEPENDENCY_INVENTORY_UNASSESSED": 144,
+            "HOLD_DEPENDENCY_INVENTORY_UNASSESSED": 134,
             "HOLD_EXTERNAL_DEPENDENCY_UNBOUND": 2,
             "HOLD_UNCLASSIFIED_DEPENDENCY_CYCLE": 30,
-            "HOLD_MEMBER_MATURITY": 28,
-            "HOLD_DEPENDENCY_MATURITY": 8,
+            "HOLD_MEMBER_MATURITY": 34,
+            "HOLD_DEPENDENCY_MATURITY": 12,
             "READY": 0,
         }
         self.assertEqual(self.registry["dependency_graph"]["readiness_partition"], expected)
@@ -134,6 +136,34 @@ class PentaOSV15Tests(unittest.TestCase):
         self.assertEqual(self.registry["registry_sha256"], runtime_module.sha256(body))
         self.assertIn("data/penta/family.registry.json", self.registry["source_digests_sha256"])
         self.assertIn("data/penta/os-v1.operation-policies.json", self.registry["source_digests_sha256"])
+        self.assertIn("data/penta/production-promotions.v1.json", self.registry["source_digests_sha256"])
+
+    def test_exact_promotion_lineage_is_bounded_and_tamper_evident(self):
+        promoted = {
+            row["machine_key"]: row
+            for row in self.registry["systems"]
+            if "maturity_promotion" in row
+        }
+        self.assertEqual(set(promoted), {
+            "penta.mail", "penta.status", "penta.credentials", "penta.build", "penta.certify",
+        })
+        for row in promoted.values():
+            promotion = row["maturity_promotion"]
+            self.assertEqual(row["catalog_maturity"], "specified")
+            self.assertEqual(row["maturity"], "production")
+            self.assertEqual(promotion["provider_state_disposition"], "UNCHANGED_SEPARATELY_GATED")
+            self.assertFalse(promotion["provider_effect_authorized"])
+            self.assertFalse(promotion["self_certification_authorized"])
+
+        fixture = copy.deepcopy(self.registry)
+        mail = next(row for row in fixture["systems"] if row["machine_key"] == "penta.mail")
+        mail["maturity_promotion"]["authority_ref"] += "/tampered"
+        fixture["systems_sha256"] = runtime_module.sha256(fixture["systems"])
+        fixture["registry_sha256"] = runtime_module.sha256({
+            key: value for key, value in fixture.items() if key != "registry_sha256"
+        })
+        with self.assertRaisesRegex(runtime_module.PentaOSV1Error, "exactly match canonical"):
+            runtime_module.PentaOSV1(ROOT, fixture)
 
     def test_full_registry_digest_detects_alias_tampering(self):
         fixture = copy.deepcopy(self.registry)
@@ -165,8 +195,11 @@ class PentaOSV15Tests(unittest.TestCase):
         self.assertEqual((authority["kind"], authority["axis"], authority["risk_ceiling"]), ("layer", "authority", "D3"))
         self.assertIn("policy", authority["role"].casefold())
         context = self.runtime.resolve("penta.context")
-        self.assertEqual((context["axis"], context["maturity"], context["risk_ceiling"]), ("truth", "implemented", "D2"))
-        self.assertIn("operational-memory", context["role"])
+        self.assertEqual((context["axis"], context["maturity"], context["risk_ceiling"]), ("truth", "production", "D2"))
+        self.assertIn("scope-isolated context", context["role"])
+        self.assertIn("data/penta/systems.extensions.penta-context.json", context["registry_sources"])
+        self.assertIn("runtime/penta_context.py", context["evidence_paths"])
+        self.assertEqual(context["strict_readiness_state"], "HOLD_DEPENDENCY_MATURITY")
         self.assertEqual(self.runtime.resolve("penta.health")["axis"], "truth")
         self.assertEqual(self.runtime.resolve("penta.results")["risk_ceiling"], "D2")
         self.assertEqual(self.runtime.resolve("penta.evi-builder")["axis"], "truth")

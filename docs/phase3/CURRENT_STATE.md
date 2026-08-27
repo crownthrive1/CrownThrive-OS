@@ -1,8 +1,8 @@
 # CrownThrive Phase 3 Current State
 
-**Effective date:** 2026-08-26  
-**Institutional generation:** Phase 3 / CrownThrive OS 3.x  
-**Document role:** Canonical OS current-state orientation  
+**Effective date:** 2026-08-27<br>
+**Institutional generation:** Phase 3 / CrownThrive OS 3.x<br>
+**Document role:** Canonical OS current-state orientation<br>
 **Authority:** CrownThrive OS source-of-truth record; component/provider authority remains independently gated.
 
 ## Executive state
@@ -130,6 +130,12 @@ IP addresses are transport observations, not institutional identities. Private k
 ## Release discipline
 
 OS 3.x is the institutional Phase 3 release line. Component versions remain independent. Historical releases and old documentation are retained as evidence, moved or indexed under the archive where appropriate, and marked historical/superseded rather than erased.
+
+**CURRENT — VERIFIED AS OF 2026-08-26T23:46:15Z:** the latest provider-published CrownThrive OS release is `v3.13.0.1`, with five provider assets. The source tag resolves to commit `3b5ab399cc4a3014554f95736fcea7032972989a`.
+
+**HOLD — unpublished candidate:** `v3.14.0.0` exists only as generated branch `pentarelease/auto-3.14.0.0-33024509722` at commit `ede88f08c3c93eac12adec306811573bfff27a19`. No tag or provider release was observed, so it remains `CANDIDATE_HOLD`, does not supersede `v3.13.0.1`, and may not be presented or consumed as released.
+
+**HOLD — intended major release:** the release class is requested, but the exact target version, tag, and head remain unassigned pending D3 human authority, disposition of the `v3.14.0.0` candidate, exact-head validation, and reconciliation between the provisional `4.0.0.0` engine result and the currently canonical Phase 3 / OS `3.x` family. This intent does not advance the institutional phase. See [`RELEASE_CONVERGENCE_GATE.md`](RELEASE_CONVERGENCE_GATE.md) and the [machine reconciliation manifest](../versioning/RELEASE_RECONCILIATION_MANIFEST.v1.json).
 
 ## Authority boundary
 

@@ -52,7 +52,19 @@ class PentaRuntimeSuiteTests(unittest.TestCase):
             (data / "os-v1.registry.json").write_text(json.dumps(payload), encoding="utf-8")
             members = prs.collect_members(root)
             self.assertEqual(set(members), {"penta.mail"})
-            self.assertEqual(members["penta.mail"]["source"], "data/penta/systems.registry.json")
+            self.assertEqual(
+                members["penta.mail"]["source"],
+                "data/penta/systems.registry.json",
+            )
+
+    def test_live_snapshot_preserves_catalog_and_provider_boundaries(self):
+        snapshot = prs.build_snapshot(ROOT)
+        self.assertEqual(snapshot["promotion_count"], 5)
+        self.assertFalse(snapshot["provider_states_promoted"])
+        mail = snapshot["pentamail"]
+        self.assertEqual(mail["catalog_maturity"], "specified")
+        self.assertEqual(mail["effective_maturity"], "production")
+        self.assertEqual(mail["provider_state"], "SEPARATELY_GATED_NOT_PROMOTED_BY_RUNTIME_SUITE")
 
     def test_registered_member_can_pass_registry_signal_gate(self):
         snapshot = {"members": [{

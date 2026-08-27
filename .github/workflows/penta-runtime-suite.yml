@@ -5,6 +5,7 @@ on:
     paths:
       - 'runtime/penta_*.py'
       - 'runtime/penta-provider-control-plane/**'
+      - 'penta/runtime/flow_control/**'
       - 'tests/test_penta*.py'
       - 'scripts/run_function_tests.py'
       - 'scripts/penta-family'
@@ -12,6 +13,9 @@ on:
       - 'schemas/penta/**'
       - 'developers/manifests/penta-runtime-suite.v1.json'
       - 'developers/manifests/penta-os-v1.v1.json'
+      - 'developers/manifests/penta-runtime-flow-control.v1.json'
+      - 'developers/penta-runtime-flow-control.md'
+      - 'requirements/penta-runtime-test.txt'
       - 'scripts/build_penta_os_v1.py'
       - 'scripts/package_penta_os_v1.py'
       - 'automation/penta-os-v1.mdx'
@@ -24,6 +28,7 @@ on:
     paths:
       - 'runtime/penta_*.py'
       - 'runtime/penta-provider-control-plane/**'
+      - 'penta/runtime/flow_control/**'
       - 'tests/test_penta*.py'
       - 'scripts/run_function_tests.py'
       - 'scripts/penta-family'
@@ -31,6 +36,9 @@ on:
       - 'schemas/penta/**'
       - 'developers/manifests/penta-runtime-suite.v1.json'
       - 'developers/manifests/penta-os-v1.v1.json'
+      - 'developers/manifests/penta-runtime-flow-control.v1.json'
+      - 'developers/penta-runtime-flow-control.md'
+      - 'requirements/penta-runtime-test.txt'
       - 'scripts/build_penta_os_v1.py'
       - 'scripts/package_penta_os_v1.py'
       - 'automation/penta-os-v1.mdx'
@@ -69,8 +77,11 @@ jobs:
             runtime/penta_interop.py \
             runtime/penta_family.py \
             runtime/penta_exec.py \
+            runtime/penta_context.py \
             runtime/penta_evi_builder.py \
             runtime/penta_immune.py \
+            runtime/penta_promotions.py \
+            runtime/penta_promoted_operations.py \
             runtime/penta_institutional_services.py \
             runtime/penta_institutional_controls.py \
             runtime/penta_compliance_license.py \
@@ -80,11 +91,16 @@ jobs:
             runtime/penta_logger.py \
             runtime/penta_trace.py \
             runtime/penta_metric.py \
+            penta/runtime/flow_control/__init__.py \
+            penta/runtime/flow_control/core.py \
             runtime/penta-provider-control-plane/penta_control_plane.py \
             scripts/penta-family \
             scripts/build_penta_os_v1.py \
             scripts/package_penta_os_v1.py \
             scripts/run_function_tests.py
+
+      - name: Install pinned Penta runtime test dependencies
+        run: python3 -m pip install --disable-pip-version-check -r requirements/penta-runtime-test.txt
 
       - name: Run focused Penta runtime tests
         run: |
@@ -93,12 +109,14 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_penta_interop.py' -v
           python3 scripts/run_function_tests.py tests/test_penta_compliance_license.py tests/test_penta_self_build.py
           python3 tests/test_penta_family.py
-          python3 tests/test_penta_exec.py
-          python3 -m unittest tests.test_penta_evi_builder tests.test_penta_immune -v
+          python3 scripts/run_function_tests.py tests/test_penta_exec.py
+          python3 -m unittest tests.test_penta_context tests.test_penta_evi_builder tests.test_penta_immune tests.test_penta_promotions -v
           python3 tests/test_penta_institutional_services.py
           python3 tests/test_penta_institutional_controls.py
           python3 tests/test_penta_institutional_controls_family.py
           python3 -m unittest discover -s tests -p 'test_penta_observability.py' -v
+          python3 -m unittest discover -s tests -p 'test_penta_runtime_flow_control.py' -v
+          python3 -m unittest discover -s tests -p 'test_penta_runtime_flow_control_sql.py' -v
           python3 -m unittest tests.test_penta_os_v1 -v
 
       - name: Validate and package Penta OS V1

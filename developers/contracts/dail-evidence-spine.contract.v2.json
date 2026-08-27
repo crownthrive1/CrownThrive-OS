@@ -1,0 +1,151 @@
+{
+  "schema_version": "2.0.0",
+  "contract_id": "ct.contract.dail-evidence-spine.v2",
+  "system": "CrownThrive OS",
+  "canonical_ledger": "Decentralized Autonomous Information Ledger",
+  "implementation_class": "pentafabric_capability_pack",
+  "framework_count_delta": 0,
+  "vote_effect": false,
+  "quorum_effect": false,
+  "native_substrate_state": "DEFERRED_TARGET_ARCHITECTURE",
+  "scope": "Bind material institutional state transitions across the five Pentafabric layers and twelve CHLOM capability pallets to one append-only DAIL lineage without copying restricted bodies, secrets, or high-volume telemetry into the ledger.",
+  "truth_boundary": {
+    "source_implemented_is_not_production": true,
+    "provider_success_is_not_institutional_truth": true,
+    "hmac_verification_is_not_public_nonrepudiation": true,
+    "external_anchor_is_not_claimed_until_independent_readback": true,
+    "raw_information_remains_in_its_authorized_system_of_record": true,
+    "dail_records_material_transition_envelopes_and_content_digests": true
+  },
+  "canonical_chain": {
+    "chain_id": "ct.dail.global.v1",
+    "append_only": true,
+    "corrections_append": true,
+    "supersession_preserves_lineage": true,
+    "direct_update_allowed": false,
+    "direct_delete_allowed": false,
+    "truncate_allowed": false,
+    "v2_hash_preimage_required_fields": [
+      "preimage_format",
+      "canonicalization_version",
+      "chain_id",
+      "sequence_id",
+      "event_id",
+      "event_type",
+      "schema_version",
+      "source_system",
+      "source_event_id",
+      "trust_domain",
+      "evidence_class",
+      "idempotency_key",
+      "actor_ref",
+      "actor_did",
+      "agent_id",
+      "entity_type",
+      "entity_id",
+      "entity_version",
+      "correlation_id",
+      "causation_id",
+      "authority_basis",
+      "approval_id",
+      "visibility_class",
+      "payload_sha256",
+      "payload_ref",
+      "verification_receipt_id",
+      "correction_of_event_id",
+      "supersedes_event_id",
+      "previous_event_hash",
+      "chain_anchor_state",
+      "signature_ref",
+      "created_at"
+    ],
+    "legacy_compatibility": "Existing 1.0.0 and 1.1.0 rows retain their original hash rules and documented correction; v2 extends the same sequence and never rewrites history."
+  },
+  "evidence_classes": {
+    "E0_INTERNAL_ASSERTION": "An internal statement with no cryptographic or independent verification.",
+    "E1_INTERNAL_HASHED": "An internal content digest linked into the DAIL chain.",
+    "E2_SEPARATE_WORKLOAD_VERIFIED": "A receipt produced by an authenticated verifier identity outside the producer workload.",
+    "E3_EXTERNAL_UNVERIFIED": "Bytes or a claim arrived from an external route but have not passed cryptographic provider-origin verification.",
+    "E4_EXTERNAL_SYMMETRIC_VERIFIED": "Exact provider bytes passed a fresh shared-secret signature check; operational origin evidence, not public non-repudiation.",
+    "E5_EXTERNAL_ASYMMETRIC_ATTESTED": "A separately identified external party signs a digest with verifiable asymmetric evidence.",
+    "E6_INDEPENDENTLY_ANCHORED": "A checkpoint is written to and read back from an independently controlled append-only, timestamp, transparency, or object-lock surface."
+  },
+  "independence_policy": {
+    "producer_and_verifier_labels_are_insufficient": true,
+    "distinct_authenticated_workload_identities_required": true,
+    "producer_trust_domain_must_differ_from_verifier_trust_domain": true,
+    "verifier_may_not_mutate_producer_evidence": true,
+    "anchor_operator_may_not_rewrite_canonical_dail": true,
+    "secret_value_or_raw_signature_storage_in_dail": false
+  },
+  "write_policy": {
+    "consequential_transition": "SAME_TRANSACTION_OR_FAIL_CLOSED_TRANSACTIONAL_OUTBOX",
+    "rights_authority_economic_or_deployment_transition_without_dail_receipt": "DENY",
+    "low_risk_telemetry_when_dail_unavailable": "QUEUE_UNSEALED_WITH_EXPLICIT_STATE",
+    "unsealed_telemetry_may_support_certification": false,
+    "duplicate_idempotency_key_same_digest": "RETURN_EXISTING_RECEIPT",
+    "duplicate_idempotency_key_different_digest": "QUARANTINE_CONFLICT"
+  },
+  "external_ingress": {
+    "first_adapter": "stripe_webhook_signature",
+    "raw_body_required_before_parsing": true,
+    "signature_tolerance_seconds": 300,
+    "multiple_v1_signatures_supported": true,
+    "overlapping_versioned_secrets_supported": true,
+    "provider_event_id_durable_idempotency": true,
+    "business_processing_is_asynchronous": true,
+    "raw_body_storage": "AUTHORIZED_PRIVATE_EVIDENCE_STORE_ONLY",
+    "dail_projection": "DIGESTS_PROVENANCE_VERIFICATION_AND_REFERENCES_ONLY",
+    "independent_readback_clock": "ct.schedule.external-evidence-relay.hourly.v1",
+    "provider_readback_is_separate_receipt_dimension": true
+  },
+  "factory_continuation": {
+    "deterministic_content_digests_exclude_occurrence_timestamps": true,
+    "claim_requires_lease_and_fencing_token": true,
+    "expired_claims_reclaimable": true,
+    "stale_fencing_completion_rejected": true,
+    "provider_effect_pattern": "PREPARE_SEND_IDEMPOTENTLY_READBACK_COMMIT_OR_HOLD",
+    "terminal_transition_atomicity": [
+      "compare_fencing_token_and_lane_state",
+      "append_terminal_checkpoint",
+      "append_dail_event",
+      "insert_delivery_outbox"
+    ],
+    "implemented_requires": [
+      "executable_test_receipt",
+      "security_receipt",
+      "provider_readback_when_external",
+      "rollback_receipt",
+      "independent_verification",
+      "dail_receipt"
+    ]
+  },
+  "anchor_policy": {
+    "source_state": "SCHEMA_IMPLEMENTED_ADAPTER_NOT_BUILT",
+    "acceptable_surfaces": [
+      "independent_transparency_log",
+      "trusted_timestamp_authority",
+      "independent_object_lock_or_worm_store",
+      "authorized_checkpoint_chain"
+    ],
+    "checkpoint_contents": [
+      "chain_id",
+      "first_sequence_id",
+      "last_sequence_id",
+      "event_count",
+      "head_event_hash",
+      "merkle_root",
+      "created_at",
+      "signing_key_fingerprint"
+    ],
+    "promotion_requires_write_and_independent_readback": true
+  },
+  "authority": {
+    "maximum_machine_authority": "D2",
+    "d3_human_reserved": true,
+    "scheduler_creates_authority": false,
+    "ledger_creates_authority": false,
+    "factory_self_certification": false,
+    "economic_activation_authority": "ThriveEvergreen / ECAC"
+  }
+}

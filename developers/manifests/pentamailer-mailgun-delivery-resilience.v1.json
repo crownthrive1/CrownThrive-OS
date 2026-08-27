@@ -1,0 +1,215 @@
+{
+  "schema": "ct.pentamailer.mailgun-delivery-resilience.v1",
+  "policy_id": "ct.pentamailer.policy.mailgun-delivery-resilience.v1",
+  "version": "1.0.0",
+  "status": "accepted_governance_policy",
+  "runtime_state": "PRODUCTION_PROVIDER_HOLD",
+  "owner_system": "PentaMailer",
+  "transport_system": "PentaMail",
+  "provider": "mailgun",
+  "authority": {
+    "authority_ref": "ct-founder-directive-pentamail-provider-probation-20260826-v1",
+    "accepted_by": "Founding Member",
+    "accepted_on": "2026-08-26",
+    "decision": "ACCEPTED",
+    "authority_class": "D1",
+    "authority_expansion": false,
+    "independent_evidence_substitution_allowed": false
+  },
+  "evidence_authority": {
+    "rule": "Authenticated Mailgun evidence may activate the automatic control. A founder-accepted provider claim may activate protective containment but is not provider-authenticated evidence. Only an ordered authenticated Mailgun readback may clear the hold.",
+    "automatic_activation_sources": [
+      "provider HTTP response from the certified Mailgun adapter",
+      "authenticated Mailgun account or domain readback",
+      "signed Mailgun webhook or provider notice with verified provenance"
+    ],
+    "protective_manual_activation_authority": "founder_accepted_notice",
+    "protective_manual_activation_is_provider_authenticated": false,
+    "current_incident_provenance": "founder_supplied_provider_claim",
+    "excluded_sources": [
+      "CrownThrive local rate-limit response",
+      "operator assertion without accepted authority or Mailgun evidence",
+      "heuristic or model inference",
+      "unattributed upstream failure"
+    ],
+    "provider_enabled_readback_required_for_release": true,
+    "ordered_readback_required_for_release": true,
+    "raw_secrets_in_evidence": false,
+    "provider_response_digest_required": true
+  },
+  "accepted_trigger": {
+    "trigger_ref": "db-trigger:public.ct_factory_adapter_certification_queue:trg_os_v2_notify_provider_cert_state_v1",
+    "origin_job_ref": "pg_cron:ct-penta-self-v1",
+    "relay_enforcement_alias": "mailgun-relay:notifications",
+    "notification_identity": {
+      "default_trigger_ref": "os-v2:notification",
+      "causal_trigger_ref_propagated_per_message": true,
+      "unrelated_notifications_share_probation": false,
+      "relay_enforcement_alias_role": "fail_closed_legacy_fallback"
+    },
+    "state_on_incident": "PROBATION",
+    "probation_seconds": 259200,
+    "repeat_incident_rule": "extend from the latest accepted authenticated incident or founder-authorized protective activation"
+  },
+  "route_hold": {
+    "scope": "mailgun_global_send_route",
+    "minimum_seconds": 10800,
+    "queue_preserved": true,
+    "provider_calls_during_hold": false,
+    "attempts_consumed_during_hold": false,
+    "release_requires_minimum_elapsed": true,
+    "release_requires_provider_enabled_readback": true,
+    "extension_rule": "hold_until is the later of the existing hold and accepted incident time plus 10800 seconds"
+  },
+  "controlled_release": {
+    "messages_per_dispatch": 2,
+    "route_authorizations_per_rolling_minute": 2,
+    "route_batch_window_seconds": 60,
+    "global_authorizations_per_hour": 10,
+    "global_window_seconds": 3600,
+    "quota_reservation": "atomic_before_provider_start",
+    "authorization_reservation_consumes_capacity": true,
+    "abandoned_reservations_refunded": false,
+    "provider_attempt_start_recorded_separately": true,
+    "scope": "all Mailgun triggers, workers, and sender lanes",
+    "bypass_allowed": false
+  },
+  "trigger_probation_queue": {
+    "source_events_preserved": true,
+    "delivery_shape": "single_coalesced_digest",
+    "digest_available_at": "trigger_probation_until",
+    "individual_provider_sends_during_probation": false
+  },
+  "required_events": [
+    "mailgun.probation.accepted",
+    "mail.queue.hold_started",
+    "mail.provider_readback",
+    "mail.controlled_release_started",
+    "mail.trigger_probation_expired",
+    "mail.outbox_receipt_chain_epoch_started"
+  ],
+  "evidence_fields": [
+    "policy_id",
+    "policy_version",
+    "provider",
+    "provider_http_status",
+    "provider_response_sha256",
+    "trigger_ref",
+    "incident_observed_at",
+    "hold_until",
+    "probation_until",
+    "queued_count",
+    "attempts_consumed_during_hold",
+    "provider_enabled_readback_ref",
+    "release_batch_size",
+    "global_hourly_reservation"
+  ],
+  "rollback": {
+    "mode": "authority_reducing_fail_closed",
+    "immediate_action": "return the Mailgun route to HOLD and preserve every queued message",
+    "restore_requires": [
+      "exact prior source or deployment version",
+      "rollback receipt",
+      "post-rollback provider and queue readback"
+    ],
+    "prohibited": [
+      "delete queue history",
+      "delete provider incident evidence",
+      "reset attempt counts to conceal activity",
+      "force an unverified release"
+    ]
+  },
+  "deployment_evidence": {
+    "as_of": "2026-08-27T01:16:07.423670Z",
+    "supabase_project_ref": "tzajnzshmtzjenqulehq",
+    "receipt_ref": "developers/manifests/pentamailer-mailgun-deployment-receipt.v1.json",
+    "database_migrations": [
+      "pentamail_mailgun_probation_queue_control",
+      "pentamail_receipt_chain_epoch_correction",
+      "pentamail_provider_control_fk_indexes",
+      "os_v2_notification_trigger_identity",
+      "pentamail_notification_recipient_privacy_boundary",
+      "pentamail_probation_concurrency_hardening",
+      "os_v2_governed_notification_claim",
+      "pentamail_incident_projection_fix",
+      "pentamail_receipt_epoch_anchor_hardening",
+      "pentamail_service_role_assertion_hardening",
+      "pentamail_readback_probe_ordering"
+    ],
+    "hash_domains": {
+      "provider_bundle_sha256": "Supabase-issued ezbr_sha256 for the deployed Edge bundle",
+      "repository_source_sha256": "SHA-256 of the exact repository file bytes"
+    },
+    "mailgun_relay_control": {
+      "deployed_version": 12,
+      "provider_bundle_sha256": "18c7e7898fe4d47f5fcba9f1ecac0337f40b72cc5f4e8644df7d2d01ec11ba40",
+      "repository_source_sha256": "b642f74d6f3d713c41ed2645f6f8902e9a7a137f6c78374ada644f8fc3681ed1",
+      "live_provider_call_readback": "INTENTIONALLY_ABSENT_DURING_HOLD"
+    },
+    "penta_mail": {
+      "deployed_version": 5,
+      "provider_bundle_sha256": "11ffda61c859418f70cf5e35407055cc831b7b62450d514f7e2b16e765449498",
+      "repository_source_sha256": "60eaeeae6ad3a101a97741d65286efe3c5c620289a7e558e3b45c5950ee911f3",
+      "active_version_log_readback_at": "2026-08-27T01:10:04.502000Z"
+    },
+    "crownthrive_os_v2_runtime": {
+      "deployed_version": 8,
+      "provider_bundle_sha256": "422c7ad710c138d83c9826f040938bc707241f56db3eb410c4dbd5fe0dec6d35",
+      "repository_source_sha256": "fe25b9f6d26bf7d4d2f69b84ce06af24ab9e8f57d179a38ebfafcea4df7957db",
+      "import_map_source_sha256": "6dbcd127fc39d04f01301423f6be4234a2f401e3035134db652d1241e975f340",
+      "active_version_log_readback_at": "2026-08-27T01:10:05.801000Z"
+    },
+    "incident_id": "fc44a9ef-d294-4d50-bdd5-f67dc25831be",
+    "incident_evidence_kind": "founder_accepted_notice",
+    "incident_provider_authenticated": false,
+    "hold_started_at": "2026-08-27T00:11:55.823575Z",
+    "hold_until": "2026-08-27T03:11:55.823575Z",
+    "trigger_probation_until": "2026-08-30T00:11:55.823575Z",
+    "held_outbox_messages": 5,
+    "held_message_attempt_count": 0,
+    "provider_requests_after_emergency_circuit": 0,
+    "queued_probation_digests": 1,
+    "coalesced_digest_event_count": 2464,
+    "new_coalesced_source_events": 484,
+    "provider_attempt_starts": 0,
+    "provider_attempt_outcomes": 0,
+    "global_rate_reservations": 0,
+    "receipt_chain_epoch_state": "verified",
+    "receipt_chain_anchor_verified": true,
+    "historical_receipt_order_breaks_preserved": 26,
+    "historical_receipts_mutated": false,
+    "mailgun_enabled_readback": "PENDING_AFTER_HOLD_BOUNDARY"
+  },
+  "assets": [
+    "runtime/penta-provider-control-plane/mailgun-delivery-resilience.v1.json",
+    "runtime/penta_mailgun_probation.py",
+    "tests/test_penta_mailgun_probation.py",
+    "developers/PENTAMAILER-MAILGUN-DELIVERY-RESILIENCE.md",
+    "developers/manifests/pentamailer-mailgun-delivery-resilience.v1.json",
+    "developers/manifests/pentamailer-mailgun-deployment-receipt.v1.json",
+    "docs/versioning/VERSION_REGISTRY.json",
+    "PENTAMAIL.md",
+    "supabase/migrations/20260826234739_pentamail_mailgun_probation_queue_control.sql",
+    "supabase/migrations/20260827001419_pentamail_receipt_chain_epoch_correction.sql",
+    "supabase/migrations/20260827001902_pentamail_provider_control_fk_indexes.sql",
+    "supabase/migrations/20260827002646_os_v2_notification_trigger_identity.sql",
+    "supabase/migrations/20260827003843_pentamail_notification_recipient_privacy_boundary.sql",
+    "supabase/migrations/20260827005615_pentamail_probation_concurrency_hardening.sql",
+    "supabase/migrations/20260827010541_os_v2_governed_notification_claim.sql",
+    "supabase/migrations/20260827010838_pentamail_incident_projection_fix.sql",
+    "supabase/migrations/20260827011146_pentamail_receipt_epoch_anchor_hardening.sql",
+    "supabase/migrations/20260827011347_pentamail_service_role_assertion_hardening.sql",
+    "supabase/migrations/20260827011427_pentamail_readback_probe_ordering.sql",
+    "supabase/functions/mailgun-relay-control/index.ts",
+    "supabase/functions/penta-mail/index.ts",
+    "supabase/functions/crownthrive-os-v2-runtime/index.ts",
+    "supabase/functions/crownthrive-os-v2-runtime/deno.json",
+    ".github/workflows/pentamailer-mailgun-delivery-resilience.yml"
+  ],
+  "claims_boundary": [
+    "The current incident is a founder-supplied provider claim accepted for protective containment; it is not authenticated Mailgun evidence.",
+    "The recorded receipts prove the exact deployed hold, queue-custody, trigger-identity, and transactional-verification state at their timestamps.",
+    "No causal provider-call path was exercised while the trigger remained on probation.",
+    "The receipts do not prove future Mailgun enablement, controlled release completion, recipient delivery, or provider-wide certification."
+  ]
+}

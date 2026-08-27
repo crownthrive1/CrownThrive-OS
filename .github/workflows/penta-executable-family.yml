@@ -2,10 +2,10 @@ name: Penta Executable Family
 
 on:
   pull_request:
-    paths: ["runtime/penta_exec.py", "runtime/penta_evi_builder.py", "runtime/penta_immune.py", "runtime/penta_family.py", "runtime/penta_interop.py", "data/penta/**", "schemas/penta/**", "scripts/penta-family", "tests/test_penta_exec.py", "tests/test_penta_evi_builder.py", "tests/test_penta_immune.py", "tests/test_penta_family.py", ".github/workflows/penta-executable-family.yml"]
+    paths: ["runtime/penta_exec.py", "runtime/penta_context.py", "runtime/penta_evi_builder.py", "runtime/penta_immune.py", "runtime/penta_promotions.py", "runtime/penta_promoted_operations.py", "runtime/penta_family.py", "runtime/penta_interop.py", "data/penta/**", "schemas/penta/**", "scripts/penta-family", "scripts/run_function_tests.py", "tests/test_penta_exec.py", "tests/test_penta_context.py", "tests/test_penta_evi_builder.py", "tests/test_penta_immune.py", "tests/test_penta_promotions.py", "tests/test_penta_family.py", ".github/workflows/penta-executable-family.yml"]
   push:
     branches: [main]
-    paths: ["runtime/penta_exec.py", "runtime/penta_evi_builder.py", "runtime/penta_immune.py", "runtime/penta_family.py", "runtime/penta_interop.py", "data/penta/**", "schemas/penta/**", "scripts/penta-family", "tests/test_penta_exec.py", "tests/test_penta_evi_builder.py", "tests/test_penta_immune.py", "tests/test_penta_family.py", ".github/workflows/penta-executable-family.yml"]
+    paths: ["runtime/penta_exec.py", "runtime/penta_context.py", "runtime/penta_evi_builder.py", "runtime/penta_immune.py", "runtime/penta_promotions.py", "runtime/penta_promoted_operations.py", "runtime/penta_family.py", "runtime/penta_interop.py", "data/penta/**", "schemas/penta/**", "scripts/penta-family", "scripts/run_function_tests.py", "tests/test_penta_exec.py", "tests/test_penta_context.py", "tests/test_penta_evi_builder.py", "tests/test_penta_immune.py", "tests/test_penta_promotions.py", "tests/test_penta_family.py", ".github/workflows/penta-executable-family.yml"]
   workflow_dispatch:
 
 permissions:
@@ -22,13 +22,13 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with: {python-version: "3.12"}
       - name: Compile runtime
-        run: python -m py_compile runtime/penta_exec.py runtime/penta_evi_builder.py runtime/penta_immune.py runtime/penta_family.py runtime/penta_interop.py scripts/penta-family
+        run: python -m py_compile runtime/penta_exec.py runtime/penta_context.py runtime/penta_evi_builder.py runtime/penta_immune.py runtime/penta_promotions.py runtime/penta_promoted_operations.py runtime/penta_family.py runtime/penta_interop.py scripts/penta-family scripts/run_function_tests.py
       - name: Validate executable family contract
         run: python runtime/penta_exec.py --root . validate
       - name: Run executable family tests
-        run: python tests/test_penta_exec.py
-      - name: Re-run bounded maintenance and evidence tests
-        run: python -m unittest tests.test_penta_evi_builder tests.test_penta_immune -v
+        run: python scripts/run_function_tests.py tests/test_penta_exec.py
+      - name: Re-run bounded maintenance, evidence, and promotion tests
+        run: python -m unittest tests.test_penta_context tests.test_penta_evi_builder tests.test_penta_immune tests.test_penta_promotions -v
       - name: Re-run existing family regression tests
         run: python tests/test_penta_family.py
       - name: Smoke-test CLI status and heartbeat

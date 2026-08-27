@@ -1,0 +1,71 @@
+name: Penta Provider Control Plane
+
+on:
+  pull_request:
+    paths:
+      - 'runtime/penta-provider-control-plane/**'
+      - 'runtime/penta_mail.py'
+      - 'runtime/penta_runtime_suite.py'
+      - 'tests/test_penta_mail.py'
+      - 'tests/test_penta_runtime_suite.py'
+      - 'tests/test_provider_workflow_secret_boundary.py'
+      - 'scripts/validate_penta_provider_control_plane.py'
+      - 'scripts/validate_security_governance.py'
+      - 'data/penta/**'
+      - '.github/workflows/penta-provider-contract.yml'
+      - '.github/workflows/penta-provider-control-plane.yml'
+      - 'developers/manifests/penta-provider-control-plane.v1.json'
+      - 'developers/manifests/penta-runtime-suite.v1.json'
+      - '.gitignore'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-provider-contract-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  software-provider-control:
+    name: software-provider-control
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate secret-free provider contract boundary
+        run: |
+          python3 scripts/validate_security_governance.py
+          python3 -m unittest -v tests.test_provider_workflow_secret_boundary
+
+      - name: Validate Penta provider contracts without network probes
+        env:
+          PENTA_DISABLE_NETWORK_PROBES: '1'
+        run: python3 scripts/validate_penta_provider_control_plane.py
+
+  penta-runtime-suite:
+    needs: software-provider-control
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compile shared Penta runtime
+        run: |
+          python3 -m py_compile \
+            runtime/penta_mail.py \
+            runtime/penta_runtime_suite.py \
+            runtime/penta-provider-control-plane/penta_control_plane.py
+
+      - name: Run secret-free Penta runtime regression suite
+        env:
+          PENTA_DISABLE_NETWORK_PROBES: '1'
+        run: |
+          python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
+          python3 -m unittest discover -s tests -p 'test_penta_runtime_suite.py' -v
+          python3 tests/test_penta_family.py
+          python3 -m unittest discover -s tests -p 'test_penta_institutional_services.py' -v
