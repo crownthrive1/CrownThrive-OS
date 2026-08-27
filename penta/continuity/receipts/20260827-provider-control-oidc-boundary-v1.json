@@ -1,30 +1,49 @@
 {
   "schema": "crownthrive.penta.serialized.git-receipt/v1",
   "receipt_id": "ct.penta.serialized.provider-control-oidc-boundary.20260827.v1",
-  "created_at": "2026-08-27T14:41:27Z",
+  "created_at": "2026-08-27T14:59:00Z",
   "actor": "CrownThrive Founding Member directive via governed GitHub connector",
-  "reason": "Remove workflow-wide GitHub OIDC token issuance from the Penta Provider Control Plane so pull-request validation remains read-only while preserving all existing jobs, triggers, provider logic, schedules, evidence paths, and rollback lineage.",
+  "reason": "Remove workflow-wide GitHub OIDC issuance, move pull-request validation onto a credential-free read-only job, and prevent provider credential binding or live-readback jobs from executing on pull_request events while preserving trusted push, schedule, and manual execution.",
   "changes": [
     {
       "path": ".github/workflows/penta-provider-control-plane.yml",
       "operation": "modify",
       "previous_blob_sha": "d161e24483572e6365cae12a5aae08503d37c01c",
-      "new_blob_sha": "8f33d5c74d0ec940cad9e36eb8b145a446abbc8c",
-      "reason": "Delete only the workflow-wide id-token: write permission; contents remain read-only and no current job requires OIDC.",
+      "new_blob_sha": "8d1785e13371f9f09f1a4bd04df6a3dc3239c1e9",
+      "reason": "Enforce least privilege across both OIDC issuance and provider-secret execution on pull requests.",
       "rollback_ref": "b7b00a0b28c5137d10815f4d1d5c851db6540ea7"
     }
   ],
+  "supersession": {
+    "minimal_candidate_blob_sha": "8f33d5c74d0ec940cad9e36eb8b145a446abbc8c",
+    "minimal_candidate_state": "SUPERSEDED_BEFORE_MERGE",
+    "source_lineage_pr": 555,
+    "canonical_successor_pr": 576,
+    "history_policy": "append_or_supersede_never_silent_delete"
+  },
   "continuity": {
     "silent_replacement": false,
     "silent_delete": false,
     "tombstones": [],
-    "successors": [],
+    "successors": [
+      "ct.penta.serialized.provider-control-oidc-boundary.20260827.v1"
+    ],
     "os_umbrella_release_changed": false,
     "rollback_preserved": true
+  },
+  "authority_boundary": {
+    "provider_write_expansion": false,
+    "credential_export": false,
+    "money_movement": false,
+    "rights_or_entitlements": false,
+    "vote_or_quorum_effect": false,
+    "d3": false,
+    "direct_main_write": false,
+    "self_merge": false
   },
   "exclusions": [
     "No provider credential, private key, raw secret, or Vault value was read or changed.",
     "No production deployment, provider write, money movement, entitlement, rights grant, or authority expansion was performed.",
-    "No job, trigger, schedule, provider adapter, certification path, or evidence path was removed."
+    "No trusted push, schedule, manual provider execution, certification, or evidence path was removed."
   ]
 }

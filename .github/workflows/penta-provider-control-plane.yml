@@ -43,7 +43,47 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  pr-safe-validation:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Enforce pull-request authority isolation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('.github/workflows/penta-provider-control-plane.yml').read_text()
+          pre_jobs = text.split('\njobs:\n', 1)[0]
+          if 'id-token: write' in pre_jobs:
+              raise SystemExit('workflow-level id-token: write is forbidden')
+          if "software-provider-control:\n    if: github.event_name != 'pull_request'" not in text:
+              raise SystemExit('provider credential job is not isolated from pull_request')
+          if "provider-live-readback:\n    if: github.event_name != 'pull_request'" not in text:
+              raise SystemExit('provider live-readback job is not isolated from pull_request')
+          PY
+
+      - name: Validate Penta provider contracts
+        run: python3 scripts/validate_penta_provider_control_plane.py
+
+      - name: Compile PR-safe Penta runtime
+        run: |
+          python3 -m py_compile \
+            runtime/penta_mail.py \
+            runtime/penta_runtime_suite.py \
+            runtime/penta-provider-control-plane/penta_control_plane.py
+
+      - name: Run PR-safe runtime regression suite
+        run: |
+          python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
+          python3 -m unittest discover -s tests -p 'test_penta_runtime_suite.py' -v
+          python3 tests/test_penta_family.py
+          python3 -m unittest discover -s tests -p 'test_penta_institutional_services.py' -v
+
   software-provider-control:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env: &provider-env
@@ -61,17 +101,14 @@ jobs:
       PENTAMAIL_FROM: ${{ secrets.PENTAMAIL_FROM }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Validate Penta provider contracts
         run: python3 scripts/validate_penta_provider_control_plane.py
-
       - name: Build, bind, certify, nurture
         run: |
           set -euo pipefail
           python3 runtime/penta-provider-control-plane/penta_control_plane.py \
             --state .penta/provider-control-plane all \
             | tee penta-provider-readiness.json
-
       - name: Publish readiness summary
         if: always()
         shell: bash
@@ -96,21 +133,18 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Compile shared Penta runtime
         run: |
           python3 -m py_compile \
             runtime/penta_mail.py \
             runtime/penta_runtime_suite.py \
             runtime/penta-provider-control-plane/penta_control_plane.py
-
       - name: Run Penta runtime regression suite
         run: |
           python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
           python3 -m unittest discover -s tests -p 'test_penta_runtime_suite.py' -v
           python3 tests/test_penta_family.py
           python3 -m unittest discover -s tests -p 'test_penta_institutional_services.py' -v
-
       - name: Generate evidence-backed runtime truth snapshot
         run: |
           python3 runtime/penta_runtime_suite.py --root . --output penta-runtime-suite-report.json
@@ -119,7 +153,6 @@ jobs:
           import json
           from pathlib import Path
           import sys
-
           path = Path('runtime/penta_runtime_suite.py')
           spec = importlib.util.spec_from_file_location('penta_runtime_suite_ci', path)
           mod = importlib.util.module_from_spec(spec)
@@ -136,6 +169,7 @@ jobs:
           PY
 
   provider-live-readback:
+    if: github.event_name != 'pull_request'
     needs: software-provider-control
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -147,7 +181,6 @@ jobs:
     name: certify / ${{ matrix.provider }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Live certify ${{ matrix.provider }}
         id: certify
         continue-on-error: true
@@ -161,7 +194,6 @@ jobs:
           import os
           from pathlib import Path
           import sys
-
           root = Path.cwd()
           module_path = root / 'runtime' / 'penta-provider-control-plane' / 'penta_control_plane.py'
           registry_path = root / 'runtime' / 'penta-provider-control-plane' / 'providers.json'
@@ -169,12 +201,11 @@ jobs:
           mod = importlib.util.module_from_spec(spec)
           sys.modules[spec.name] = mod
           spec.loader.exec_module(mod)
-
           provider_id = os.environ['PROVIDER_ID']
           registry = mod.Registry(registry_path)
           state = root / '.penta' / ('provider-' + provider_id)
           binding = mod.PentaCredentials(registry, state).bind(provider_id)
-          build = mod.PentaBuild(registry, state).build(provider_id)
+          mod.PentaBuild(registry, state).build(provider_id)
           cert = mod.PentaCertify(registry, state).certify(provider_id)
           nurture = mod.PentaNurture(registry, state).observe(provider_id)
           probe_operation = registry.provider(provider_id)['certification_probe']['operation']
@@ -193,7 +224,6 @@ jobs:
           if cert.state not in {'CERTIFIED', 'WRITE_VERIFIED'}:
               raise SystemExit(78)
           PY
-
       - name: Record provider disposition
         if: always()
         shell: bash
@@ -214,7 +244,6 @@ jobs:
     env: *provider-env
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Resolve authorized recipient
         shell: bash
         run: |
@@ -223,7 +252,6 @@ jobs:
           else
             echo 'PENTAMAIL_RECIPIENT=jones.usmc.kj@gmail.com' >> "$GITHUB_ENV"
           fi
-
       - name: Establish Resend read-only certification
         run: |
           python3 - <<'PY'
@@ -231,7 +259,6 @@ jobs:
           import json
           from pathlib import Path
           import sys
-
           root = Path.cwd()
           module_path = root / 'runtime' / 'penta-provider-control-plane' / 'penta_control_plane.py'
           spec = importlib.util.spec_from_file_location('penta_control_plane_live_mail', module_path)
@@ -256,7 +283,6 @@ jobs:
           if cert.state not in {'CERTIFIED', 'WRITE_VERIFIED'} or 'domain_read' not in cert.certified_operations:
               raise SystemExit('Resend domain_read certification is not proven')
           PY
-
       - name: Send PentaStatus owner report through PentaMail
         run: |
           python3 - <<'PY'
@@ -265,7 +291,6 @@ jobs:
           import os
           from pathlib import Path
           import sys
-
           root = Path.cwd()
           def load(name, path):
               spec = importlib.util.spec_from_file_location(name, path)
@@ -273,7 +298,6 @@ jobs:
               sys.modules[spec.name] = mod
               spec.loader.exec_module(mod)
               return mod
-
           pm = load('penta_mail_live', root / 'runtime' / 'penta_mail.py')
           prs = load('penta_runtime_suite_live', root / 'runtime' / 'penta_runtime_suite.py')
           snapshot = prs.build_snapshot(root)
@@ -282,47 +306,30 @@ jobs:
           report += '\nGitHub commit: ' + os.environ['GITHUB_SHA']
           report += '\nExecution lane: registered Penta Provider Control Plane bridge.'
           report += '\nNo unrelated Penta maturity is promoted by this transport proof.'
-
           sender = (os.environ.get('PENTAMAIL_FROM') or '').strip() or 'CrownThrive PentaMail <contact@crownthrive.com>'
           recipient = os.environ['PENTAMAIL_RECIPIENT'].strip()
           correlation = 'pentamail-live-' + os.environ['GITHUB_RUN_ID']
           authority_ref = 'founder-directive-2026-08-26-pentamail-live-certification'
           envelope = pm.build_envelope(
-              origin_penta='penta.status',
-              purpose='owner_execution_report',
-              classification='internal',
-              recipient=recipient,
-              sender_identity=sender,
+              origin_penta='penta.status', purpose='owner_execution_report', classification='internal',
+              recipient=recipient, sender_identity=sender,
               subject='[PentaMail Production Validation] Penta Mesh Report — 2026-08-26',
-              body_text=report,
-              correlation_id=correlation,
-              authority_ref=authority_ref,
-              authority_class='D1',
-              priority='high',
-              retention_classification='institutional_status',
+              body_text=report, correlation_id=correlation, authority_ref=authority_ref,
+              authority_class='D1', priority='high', retention_classification='institutional_status',
               idempotency_key='pentamail-live-' + os.environ['GITHUB_RUN_ID'],
           )
           authorization = pm.AuthorizationContext(
-              authorized=True,
-              authorized_by='Founding Member execution directive 2026-08-26',
-              authority_ref=authority_ref,
-              authority_class='D1',
+              authorized=True, authorized_by='Founding Member execution directive 2026-08-26',
+              authority_ref=authority_ref, authority_class='D1',
           )
-          receipt = pm.certification_send(
-              envelope=envelope,
-              authorization=authorization,
-              state_dir=root / '.penta' / 'pentamail',
-          )
+          receipt = pm.certification_send(envelope=envelope, authorization=authorization, state_dir=root / '.penta' / 'pentamail')
           Path('pentamail-live-receipt.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
           print('PENTAMAIL_RECEIPT=' + json.dumps({
-              'provider': receipt['provider'],
-              'provider_message_id': receipt['provider_message_id'],
-              'lifecycle_state': receipt['lifecycle_state'],
-              'correlation_id': receipt['correlation_id'],
+              'provider': receipt['provider'], 'provider_message_id': receipt['provider_message_id'],
+              'lifecycle_state': receipt['lifecycle_state'], 'correlation_id': receipt['correlation_id'],
               'exact_readback': all(e.get('readback') is True for e in receipt['live_evidence']),
           }, sort_keys=True))
           PY
-
       - name: Promote exact email_send operation only after readback
         run: |
           python3 - <<'PY'
@@ -330,7 +337,6 @@ jobs:
           import json
           from pathlib import Path
           import sys
-
           root = Path.cwd()
           module_path = root / 'runtime' / 'penta-provider-control-plane' / 'penta_control_plane.py'
           spec = importlib.util.spec_from_file_location('penta_control_plane_post_mail', module_path)
@@ -344,18 +350,14 @@ jobs:
           nurture = mod.PentaNurture(registry, state).observe('resend')
           gate = mod.ProductionGate(registry, state).decide('resend', 'email_send')
           result = {
-              'certification': cert.state,
-              'certified_operations': cert.certified_operations,
-              'health': nurture.health,
-              'email_send_gate': gate,
-              'provider_message_id': receipt['provider_message_id'],
-              'lifecycle_state': receipt['lifecycle_state'],
+              'certification': cert.state, 'certified_operations': cert.certified_operations,
+              'health': nurture.health, 'email_send_gate': gate,
+              'provider_message_id': receipt['provider_message_id'], 'lifecycle_state': receipt['lifecycle_state'],
           }
           print('PENTAMAIL_CERTIFICATION=' + json.dumps(result, sort_keys=True))
           if cert.state != 'WRITE_VERIFIED' or not gate.get('eligible'):
               raise SystemExit('email_send production operation did not reach exact-readback eligibility')
           PY
-
       - name: Publish PentaMail evidence summary
         if: always()
         shell: bash
