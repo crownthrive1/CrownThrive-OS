@@ -7,14 +7,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: crownthrive-os-rebrand-migration
   cancel-in-progress: false
 
 jobs:
-  migrate-live-references:
+  materialize-migration:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -22,11 +22,12 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Rewrite legacy repository identity
+      - name: Rewrite and package legacy repository identity
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
+          import json
           import re
           import subprocess
           from pathlib import Path
@@ -35,8 +36,15 @@ jobs:
           pattern = re.compile(re.escape(legacy), re.IGNORECASE)
           replacement = 'CrownThrive-OS'
           tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0')
-          changed = []
+          stage = subprocess.check_output(['git', 'ls-files', '-s']).decode('utf-8').splitlines()
+          modes = {}
+          for line in stage:
+              if not line.strip():
+                  continue
+              mode, _, _, filename = line.split(None, 3)
+              modes[filename] = mode
 
+          changed = []
           for filename in tracked:
               if not filename:
                   continue
@@ -48,25 +56,42 @@ jobs:
               rewritten, count = pattern.subn(replacement, text)
               if count:
                   path.write_text(rewritten, encoding='utf-8')
-                  changed.append((filename, count))
+                  changed.append({
+                      'path': filename,
+                      'replacements': count,
+                      'mode': modes.get(filename, '100644')
+                  })
 
-          if not changed:
-              print('No legacy repository identity remains in tracked UTF-8 text files.')
-              raise SystemExit(0)
+          artifact_root = Path('/tmp/crownthrive-os-rebrand')
+          artifact_root.mkdir(parents=True, exist_ok=True)
+          for entry in changed:
+              src = Path(entry['path'])
+              dst = artifact_root / entry['path']
+              dst.parent.mkdir(parents=True, exist_ok=True)
+              dst.write_bytes(src.read_bytes())
 
-          print(f'Rewritten files: {len(changed)}')
-          print(f'Rewritten references: {sum(count for _, count in changed)}')
-          for filename, count in changed:
-              print(f'  {filename}: {count}')
+          manifest = {
+              'schema_version': '1.0.0',
+              'canonical_repository': 'crownthrive1/CrownThrive-OS',
+              'canonical_url': 'https://github.com/crownthrive1/CrownThrive-OS',
+              'legacy_repository_slug': legacy,
+              'replacement_repository_slug': replacement,
+              'changed_files': len(changed),
+              'replacements': sum(item['replacements'] for item in changed),
+              'files': changed
+          }
+          (artifact_root / '_migration_manifest.json').write_text(
+              json.dumps(manifest, indent=2) + '\n', encoding='utf-8'
+          )
+
+          print(f"Materialized files: {manifest['changed_files']}")
+          print(f"Materialized replacements: {manifest['replacements']}")
           PY
 
-          if git diff --quiet; then
-            echo "No migration commit required."
-            exit 0
-          fi
-
-          git config user.name "CrownThrive OS Automation"
-          git config user.email "contact@crownthrive.com"
-          git add -u
-          git commit -m "chore(os): migrate legacy repository identity to CrownThrive-OS"
-          git push origin HEAD:main
+      - name: Upload protected migration artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crownthrive-os-rebrand-migration
+          path: /tmp/crownthrive-os-rebrand
+          if-no-files-found: error
+          retention-days: 7
