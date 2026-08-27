@@ -13,7 +13,6 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
-import py_compile
 import sys
 from typing import Any, Iterable
 
@@ -74,8 +73,9 @@ def scan_repository(root: Path) -> dict[str, Any]:
     for path in python_files:
         rel = path.relative_to(root).as_posix()
         try:
-            py_compile.compile(str(path), doraise=True)
-        except py_compile.PyCompileError as exc:
+            source = path.read_text(encoding="utf-8")
+            compile(source, str(path), "exec", dont_inherit=True)
+        except (SyntaxError, UnicodeDecodeError) as exc:
             findings.append({
                 "code": "python_compile_failure",
                 "path": rel,
