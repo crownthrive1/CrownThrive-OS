@@ -1,0 +1,39 @@
+name: Supabase Migration Lineage Inventory
+
+on:
+  push:
+    branches:
+      - repair/supabase-migration-lineage-20260827
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Emit canonical local migration versions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          root = Path('supabase/migrations')
+          rows = []
+          for path in sorted(root.glob('*.sql')):
+              m = re.match(r'^(\d{14})_(.+)\.sql$', path.name)
+              if not m:
+                  continue
+              rows.append({'version': m.group(1), 'name': m.group(2), 'file': path.name})
+
+          versions = [row['version'] for row in rows]
+          print('LOCAL_MIGRATION_COUNT=' + str(len(rows)))
+          print('LOCAL_MIGRATION_VERSIONS=' + ','.join(versions))
+          print('LOCAL_MIGRATION_FIRST=' + (versions[0] if versions else 'NONE'))
+          print('LOCAL_MIGRATION_LAST=' + (versions[-1] if versions else 'NONE'))
+          print('LOCAL_MIGRATION_ROWS=' + json.dumps(rows, separators=(',', ':'), sort_keys=True))
+          PY
