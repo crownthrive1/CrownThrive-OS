@@ -1,23 +1,36 @@
 [Unit]
-Description=CrownThrive CHLOM Agent Wallet - Trust Wallet Agent Kit
+Description=CrownThrive CHLOM Agent Wallet - Governed Trust Wallet Agent Kit
+Documentation=https://github.com/crownthrive1/CrownThrive-OS/tree/main/runners/chlom-agent-wallet
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=%i
-EnvironmentFile=%h/.local/share/crownthrive/chlom-agent-wallet/config/runtime.env
-ExecStart=/usr/bin/env twak serve --rest --host 127.0.0.1 --port 8787 --auto-lock 15 --watch --watch-interval 60s
+Environment=CT_AGENT_WALLET_HOME=%h/.local/share/crownthrive/chlom-agent-wallet
+ExecStartPre=%h/.local/share/crownthrive/chlom-agent-wallet/bin/chlom_wallet_protocol.py validate-policy --policy %h/.local/share/crownthrive/chlom-agent-wallet/config/policy.base-usdc.json
+ExecStart=%h/.local/share/crownthrive/chlom-agent-wallet/bin/serve.sh
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=%h/.twak %h/.local/share/crownthrive/chlom-agent-wallet
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=%h/.twak %h/.local/share/crownthrive/chlom-agent-wallet
 UMask=0077
 
 [Install]
