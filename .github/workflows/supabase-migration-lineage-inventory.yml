@@ -12,8 +12,16 @@ jobs:
   inventory:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Emit canonical local migration versions
         shell: bash
         run: |
@@ -36,4 +44,20 @@ jobs:
           print('LOCAL_MIGRATION_FIRST=' + (versions[0] if versions else 'NONE'))
           print('LOCAL_MIGRATION_LAST=' + (versions[-1] if versions else 'NONE'))
           print('LOCAL_MIGRATION_ROWS=' + json.dumps(rows, separators=(',', ':'), sort_keys=True))
+          PY
+
+      - name: Report migration-fetch credential presence only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          for key in (
+              'SUPABASE_ACCESS_TOKEN',
+              'SUPABASE_DB_PASSWORD',
+              'SUPABASE_DB_URL',
+              'DATABASE_URL',
+              'SUPABASE_URL',
+              'SUPABASE_SERVICE_ROLE_KEY',
+          ):
+              print(f'{key}_PRESENT=' + ('true' if bool(os.getenv(key)) else 'false'))
           PY
