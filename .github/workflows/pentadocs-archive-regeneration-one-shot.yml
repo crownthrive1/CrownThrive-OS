@@ -1,0 +1,132 @@
+name: PentaDocs archive regeneration one shot
+
+on:
+  push:
+    branches:
+      - archive/legacy-abcds-scheduler-scaffolding-20260827
+
+permissions:
+  contents: read
+
+jobs:
+  regenerate:
+    name: Generate bounded PentaDocs archive state
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Regenerate and validate in ephemeral workspace
+        id: generate
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/pentadocs-archive-regeneration"
+          mkdir -p "$out/files"
+
+          set +e
+          python scripts/pentadocs_quality.py --apply > "$out/apply.log" 2>&1
+          apply_rc=$?
+          python scripts/pentadocs_quality.py --check > "$out/check.log" 2>&1
+          check_rc=$?
+          set -e
+
+          printf '%s\n' "$apply_rc" > "$out/apply-status.txt"
+          printf '%s\n' "$check_rc" > "$out/check-status.txt"
+          git diff --name-only --diff-filter=ACMRTUXB > "$out/changed-files.txt"
+
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          root = Path.cwd()
+          out = Path(os.environ['RUNNER_TEMP']) / 'pentadocs-archive-regeneration'
+          changed = [line.strip() for line in (out / 'changed-files.txt').read_text().splitlines() if line.strip()]
+          allowed = {
+              'automation/agent-registry.mdx',
+              'automation/command-structure.mdx',
+              'automation/scheduled-task-agent-architecture.mdx',
+              'changelog/2026-08-26-phase3-entry-bootstrap-v2.mdx',
+              'changelog/locticians-claimmonth50-and-scheduled-agent-architecture-2026-08-21.mdx',
+              'changelog/phase-2-99-mcp-external-certification-security-hold.mdx',
+              'data/documentation/pentadocs-page-profiles.v1.json',
+              'knowledge/legacy-abcds-scheduler-scaffolding-archive.mdx',
+              'support/help-center-795-article-disposition-seed.mdx',
+          }
+          unexpected = sorted(set(changed) - allowed)
+          if unexpected:
+              raise SystemExit('unexpected generated paths: ' + ', '.join(unexpected))
+          required = 'data/documentation/pentadocs-page-profiles.v1.json'
+          if required not in changed:
+              raise SystemExit(f'required generated path absent: {required}')
+
+          files = {}
+          for relative in changed:
+              source = root / relative
+              if not source.is_file():
+                  raise SystemExit(f'generated path is not a file: {relative}')
+              destination = out / 'files' / relative
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source, destination)
+              data = source.read_bytes()
+              files[relative] = {
+                  'bytes': len(data),
+                  'sha256': hashlib.sha256(data).hexdigest(),
+              }
+
+          receipt = {
+              'schema': 'crownthrive.pentadocs.archive-regeneration-one-shot.v1',
+              'source_head': os.environ['GITHUB_SHA'],
+              'branch': os.environ['GITHUB_REF_NAME'],
+              'mutation_scope': 'ephemeral_ci_workspace_only',
+              'repository_write_authority': False,
+              'recurring_clock_created': False,
+              'changed_paths': changed,
+              'generated_files': files,
+              'apply_status': int((out / 'apply-status.txt').read_text().strip()),
+              'check_status': int((out / 'check-status.txt').read_text().strip()),
+          }
+          (out / 'receipt.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload bounded generation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pentadocs-archive-regeneration-${{ github.sha }}
+          path: ${{ runner.temp }}/pentadocs-archive-regeneration
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce deterministic validation
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/pentadocs-archive-regeneration"
+          test "$(cat "$out/apply-status.txt")" = "0"
+          test "$(cat "$out/check-status.txt")" = "0"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          out = Path(os.environ['RUNNER_TEMP']) / 'pentadocs-archive-regeneration'
+          receipt = json.loads((out / 'receipt.json').read_text())
+          assert receipt['repository_write_authority'] is False
+          assert receipt['recurring_clock_created'] is False
+          assert receipt['check_status'] == 0
+          print('PentaDocs bounded regeneration PASS')
+          PY
