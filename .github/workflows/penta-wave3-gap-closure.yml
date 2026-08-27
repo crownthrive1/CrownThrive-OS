@@ -17,7 +17,7 @@ concurrency:
 jobs:
   close-gaps:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout exact branch with history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -31,97 +31,35 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Restore canonical source and reconcile registries
-        shell: bash
-        run: |
-          set -euo pipefail
-          git show 12d52fc356e4f34b6298bf9d3c1c4af6fef53444:data/penta/institutional-services.registry.json \
-            > data/penta/institutional-services.registry.json
-
-          python - <<'PY'
-          from __future__ import annotations
-
-          import json
-          from pathlib import Path
-
-          root = Path(".")
-
-          def load(path: Path) -> dict:
-              value = json.loads(path.read_text(encoding="utf-8"))
-              if not isinstance(value, dict):
-                  raise SystemExit(f"JSON root must be an object: {path}")
-              return value
-
-          def write(path: Path, value: dict) -> None:
-              path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-
-          family_path = root / "data/penta/family.registry.json"
-          family = load(family_path)
-          catalog = {
-              "catalog_id": "penta.immune",
-              "path": "data/penta/systems.extensions.penta-immune.json",
-              "required": True,
-              "role": "production_security_resilience_and_evidence_extension",
-          }
-          catalogs = family.get("catalogs")
-          if not isinstance(catalogs, list):
-              raise SystemExit("family registry catalogs must be a list")
-          matches = [item for item in catalogs if isinstance(item, dict) and item.get("catalog_id") == catalog["catalog_id"]]
-          if len(matches) > 1:
-              raise SystemExit("duplicate penta.immune catalog registrations")
-          if matches:
-              matches[0].clear()
-              matches[0].update(catalog)
-          else:
-              catalogs.append(catalog)
-          family["updated"] = "2026-08-27"
-          write(family_path, family)
-
-          disposition_path = root / "developers/manifests/pentadocs-unlisted-page-dispositions.v1.json"
-          disposition = load(disposition_path)
-          dispositions = disposition.get("dispositions")
-          if not isinstance(dispositions, dict):
-              raise SystemExit("dispositions must be an object")
-          bucket = dispositions.get("operational_reference_direct_link")
-          if not isinstance(bucket, list):
-              raise SystemExit("dispositions.operational_reference_direct_link must be a list")
-          page = "automation/penta-families.mdx"
-          if page not in bucket:
-              bucket.append(page)
-          bucket[:] = sorted(set(str(item) for item in bucket))
-          write(disposition_path, disposition)
-
-          convergence_path = root / "developers/manifests/supabase-production-convergence-state.v1.json"
-          convergence = load(convergence_path)
-          migration_custody = convergence.get("migration_custody")
-          if not isinstance(migration_custody, dict):
-              raise SystemExit("migration_custody must be an object")
-          local_count = len(list((root / "supabase/migrations").glob("*.sql")))
-          if local_count <= 0:
-              raise SystemExit("repository migration inventory is empty")
-          migration_custody["repository_migration_file_count"] = local_count
-          write(convergence_path, convergence)
-
-          mesh_path = root / "virality-music/system-mesh.mdx"
-          mesh_text = mesh_path.read_text(encoding="utf-8")
-          mesh_text = mesh_text.replace("../SECURITY.md", "/SECURITY")
-          mesh_text = mesh_text.replace("/SECURITY.md", "/SECURITY")
-          mesh_path.write_text(mesh_text, encoding="utf-8")
-
-          print(json.dumps({"repository_migration_file_count": local_count}, sort_keys=True))
-          PY
+      - name: Produce bounded runtime and reconcile canonical state
+        run: python scripts/penta_wave3_gap_closure.py --apply
 
       - name: Apply deterministic PentaDocs migration
         run: |
           python scripts/pentadocs_quality.py --apply
           python scripts/pentadocs_quality.py --check
+          python scripts/penta_wave3_gap_closure.py --check
+
+      - name: Compile repaired production software
+        run: |
+          python -m py_compile \
+            runtime/penta_exec.py \
+            runtime/penta_family.py \
+            runtime/penta_interop.py \
+            runtime/penta_promoted_operations.py \
+            runtime/penta_evi_builder.py \
+            runtime/penta_immune.py \
+            scripts/penta_wave3_gap_closure.py
 
       - name: Validate repaired production contracts
         run: |
           python -m json.tool data/penta/family.registry.json >/dev/null
           python -m json.tool data/penta/institutional-services.registry.json >/dev/null
+          python -m json.tool data/penta/execution-adapters.registry.json >/dev/null
+          python -m json.tool data/penta/member-runtime.contract.json >/dev/null
           python -m json.tool developers/manifests/pentadocs-unlisted-page-dispositions.v1.json >/dev/null
           python -m json.tool developers/manifests/supabase-production-convergence-state.v1.json >/dev/null
+          python -m unittest -v tests.test_penta_evi_builder tests.test_penta_immune
           python tests/test_penta_family.py
           python tests/test_penta_exec.py
           python -m unittest -v tests/test_penta_runtime_suite.py
