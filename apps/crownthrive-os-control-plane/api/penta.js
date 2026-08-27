@@ -1,6 +1,9 @@
+import { getVercelOidcToken } from '@vercel/oidc';
 import { emitPenta, fabricState, verifyPenta } from '../lib/pentafabric.js';
 
 const MAX_BODY_BYTES = 262144;
+const VERCEL_TEAM_ID = 'team_v4xkGtBZSrZXnJtLEJhra5nd';
+const VERCEL_PROJECT_ID = 'prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN';
 const DEFAULT_PENTAFABRIC_INGEST_URL =
   'https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/pentafabric-ingest';
 
@@ -29,10 +32,22 @@ function evidenceRow(penta) {
   };
 }
 
-function evidenceSinkState() {
+async function resolveVercelOidcToken() {
+  try {
+    const token = await getVercelOidcToken({
+      project: VERCEL_PROJECT_ID,
+      team: VERCEL_TEAM_ID,
+    });
+    return typeof token === 'string' && token.length > 0 ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+function evidenceSinkState(oidcToken) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleBound = Boolean(supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY);
-  const oidcBound = Boolean(process.env.VERCEL_OIDC_TOKEN);
+  const oidcBound = Boolean(oidcToken);
   return {
     provider: 'supabase',
     bound: serviceRoleBound || oidcBound,
@@ -100,14 +115,13 @@ async function persistWithVercelOidc(penta, oidcToken) {
   };
 }
 
-async function persistPenta(penta) {
+async function persistPenta(penta, oidcToken) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (supabaseUrl && serviceRoleKey) {
     return persistWithServiceRole(penta, supabaseUrl, serviceRoleKey);
   }
 
-  const oidcToken = process.env.VERCEL_OIDC_TOKEN;
   if (oidcToken) {
     return persistWithVercelOidc(penta, oidcToken);
   }
@@ -115,7 +129,7 @@ async function persistPenta(penta) {
   return {
     status: 'SKIPPED_UNBOUND',
     sink: 'supabase',
-    required_binding: 'SUPABASE_SERVICE_ROLE_KEY_OR_VERCEL_OIDC_TOKEN',
+    required_binding: 'SUPABASE_SERVICE_ROLE_KEY_OR_VERCEL_OIDC_CONTEXT',
   };
 }
 
@@ -147,6 +161,7 @@ function runSelfTest(state) {
 
 export default async function handler(request, response) {
   const state = fabricState();
+  const oidcToken = await resolveVercelOidcToken();
   if (request.method === 'GET') {
     try {
       const selfTestRequested = String(request.query?.selftest || '') === '1';
@@ -158,7 +173,7 @@ export default async function handler(request, response) {
         accepts: 'crownthrive.penta.event.v1',
         emits: 'crownthrive.penta.event.v1',
         chlom_governed: true,
-        evidence_sink: evidenceSinkState(),
+        evidence_sink: evidenceSinkState(oidcToken),
         self_test: selfTestRequested ? runSelfTest(state) : { status: 'NOT_REQUESTED' },
         observed_at: new Date().toISOString(),
       });
@@ -185,7 +200,7 @@ export default async function handler(request, response) {
     const body = request.body && typeof request.body === 'object' ? request.body : {};
     const penta = body.penta ? verifyPenta(body.penta) : emitPenta(body);
     verifyPenta(penta);
-    const persistence = await persistPenta(penta);
+    const persistence = await persistPenta(penta, oidcToken);
     const receipt = {
       schema: 'ct.penta.receipt.20260827.v1',
       status: 'DELIVERED',
