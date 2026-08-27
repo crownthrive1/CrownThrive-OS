@@ -1,0 +1,89 @@
+name: PentaDocs Reconcile Once
+
+on:
+  push:
+    branches:
+      - pentarelease/penta-family-production-suite-1.2.0
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pentadocs-reconcile-once-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    if: ${{ !contains(github.event.head_commit.message, '[pentadocs-generated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Reconcile family catalog and unlisted page disposition
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          family_path = Path('data/penta/family.registry.json')
+          family = json.loads(family_path.read_text(encoding='utf-8'))
+          catalog = {
+              'catalog_id': 'penta.immune-evidence-builder',
+              'path': 'data/penta/systems.extensions.penta-immune.json',
+              'required': True,
+              'role': 'autonomic_maintenance_and_evidence_construction_extension',
+          }
+          catalogs = family['catalogs']
+          existing = [item for item in catalogs if item.get('path') == catalog['path']]
+          if existing:
+              existing[0].update(catalog)
+          else:
+              catalogs.append(catalog)
+          family['schema_version'] = '1.5.0'
+          family['updated'] = '2026-08-27'
+          family_path.write_text(json.dumps(family, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          disposition_path = Path('developers/manifests/pentadocs-unlisted-page-dispositions.v1.json')
+          disposition = json.loads(disposition_path.read_text(encoding='utf-8'))
+          target = 'automation/penta-families.mdx'
+          bucket = disposition['dispositions']['operational_reference_direct_link']
+          if target not in bucket:
+              bucket.append(target)
+              bucket.sort()
+          disposition['effective_date'] = '2026-08-27'
+          disposition_path.write_text(json.dumps(disposition, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+
+      - name: Apply deterministic PentaDocs migration
+        run: python scripts/pentadocs_quality.py --apply
+
+      - name: Verify family census and PentaDocs quality
+        run: |
+          python -m unittest -v tests.test_penta_convergence_certifier
+          python -m unittest -v tests.test_pentadocs_quality
+          python scripts/pentadocs_quality.py --check
+          python scripts/validate_docs.py
+
+      - name: Commit exact generated corpus
+        run: |
+          git config user.name "PentaDocs Reconciler"
+          git config user.email "contact@crownthrive.com"
+          git add -A
+          git reset .github/workflows/pentadocs-reconcile-once.yml
+          if git diff --cached --quiet; then
+            echo "No generated changes required."
+            exit 0
+          fi
+          git diff --cached --check
+          git commit -m "fix: reconcile Penta Family census and PentaDocs profiles [pentadocs-generated]"
+          git push origin HEAD:pentarelease/penta-family-production-suite-1.2.0
