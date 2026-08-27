@@ -1,0 +1,64 @@
+name: Production Remediation Certification
+
+on:
+  push:
+    branches:
+      - repair/supabase-migration-lineage-20260827
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+
+jobs:
+  certify-remediation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact remediation head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Compile remediation software
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/penta_migration_lineage_verify.py
+          python3 -m py_compile scripts/penta_github_read_resilience.py
+          python3 -m py_compile scripts/pentarelease/penta_gate_readback.py
+
+      - name: Certify PentaMigrationLineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/penta_migration_lineage_verify.py
+
+      - name: Certify PentaGitHubResilience exact reads
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/penta_github_read_resilience.py \
+            --repository "${{ github.repository }}" \
+            --branch main \
+            --output /tmp/collision-readback.json \
+            --fail-on-severity 999
+          python3 -m json.tool /tmp/collision-readback.json >/dev/null
+
+      - name: Certify PentaReleaseGateReadback on known successful exact gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/pentarelease/penta_gate_readback.py \
+            --repository "${{ github.repository }}" \
+            --sha "ba881e520142a9707b21bdcde4c5ae3128ea4314" \
+            --check-name "CrownThrive governed merge gate" \
+            --token "$GH_TOKEN" \
+            --attempts 3 \
+            --interval 2

@@ -38,6 +38,7 @@ jobs:
           set -euo pipefail
           python3 -m json.tool "$POLICY_FILE" >/dev/null
           python3 -m py_compile scripts/pentarelease/decide.py
+          python3 -m py_compile scripts/pentarelease/penta_gate_readback.py
           test "$(jq -r '.enabled' "$POLICY_FILE")" = "true"
           test "$(jq -r '.mode' "$POLICY_FILE")" = "production"
 
@@ -164,21 +165,18 @@ jobs:
           HEAD_SHA=$(git rev-parse HEAD)
           git push origin "$BRANCH"
 
-          # Always execute the CrownThrive governed merge gate against the exact release branch.
+          # Execute the CrownThrive governed merge gate against the exact release branch.
           gh workflow run governed-merge-gate.yml --ref "$BRANCH"
-          success=false
-          for i in $(seq 1 60); do
-            sleep 10
-            STATE=$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
-              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
-            echo "Governed merge gate: $STATE"
-            if [ "$STATE" = "completed:success" ]; then success=true; break; fi
-            if [[ "$STATE" == completed:* ]] && [ "$STATE" != "completed:success" ]; then
-              echo "PentaRelease HOLD: governed merge gate did not pass ($STATE)." >&2
-              exit 44
-            fi
-          done
-          test "$success" = true
+
+          # PentaReleaseGateReadback keeps exact-SHA verification fail-closed while
+          # surviving installation quota exhaustion via public read fallback.
+          python3 scripts/pentarelease/penta_gate_readback.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --sha "$HEAD_SHA" \
+            --check-name "CrownThrive governed merge gate" \
+            --token "$GH_TOKEN" \
+            --attempts 30 \
+            --interval 10
 
           # Preferred path: governed PR + merge. If GitHub Actions PR creation is disabled,
           # do not stall release autonomy. Publish from the fully governed exact branch instead.
