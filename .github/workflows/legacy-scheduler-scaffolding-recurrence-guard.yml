@@ -1,0 +1,29 @@
+name: Legacy scheduler scaffolding recurrence guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Historical-only scheduler boundary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject reintroduced A/B/C/D/S clocks
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          python scripts/verify_legacy_scheduler_archive.py \
+            --root . \
+            --base "${BASE_SHA}" \
+            --json
