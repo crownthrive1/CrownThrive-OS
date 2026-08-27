@@ -1,0 +1,84 @@
+name: Penta Policy Continuity
+
+on:
+  pull_request:
+    paths:
+      - 'runtime/penta_policy_continuity.py'
+      - 'tests/test_penta_policy_continuity.py'
+      - 'data/penta/penta-policy-continuity.v1.json'
+      - 'docs/phase3/PENTA_POLICY_SUPERSESSION_CONTINUITY_v1.md'
+      - '.github/workflows/penta-policy-continuity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/penta_policy_continuity.py'
+      - 'tests/test_penta_policy_continuity.py'
+      - 'data/penta/penta-policy-continuity.v1.json'
+      - 'docs/phase3/PENTA_POLICY_SUPERSESSION_CONTINUITY_v1.md'
+      - '.github/workflows/penta-policy-continuity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Validate machine contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool data/penta/penta-policy-continuity.v1.json >/dev/null
+          python3 - <<'PY'
+          import json
+          p=json.load(open('data/penta/penta-policy-continuity.v1.json',encoding='utf-8'))
+          assert p['state']=='production'
+          assert p['authority_model']['current_control_id']=='ct.factory.autonomous.exact-evidence-promotion.v1'
+          assert p['authority_model']['superseded_control_id']=='ct.site.autopublish.v1'
+          assert p['authority_model']['d0_d2']=='autonomous_exact_evidence'
+          assert p['authority_model']['d3']=='human_reserved'
+          assert p['authority_model']['oidc']=='execution_identity_attestation_only'
+          assert p['authority_model']['vote_quorum_required_for_autonomous_factory'] is False
+          assert p['continuity']['external_scheduler_slot_delta']==0
+          assert p['safety']['money_movement'] is False
+          assert p['safety']['checkout_activation'] is False
+          assert p['safety']['d3_auto'] is False
+          print('Penta policy continuity machine contract PASS')
+          PY
+
+      - name: Run deterministic regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile runtime/penta_policy_continuity.py tests/test_penta_policy_continuity.py
+          python3 -m unittest tests.test_penta_policy_continuity
+
+      - name: Publish proof summary
+        shell: bash
+        run: |
+          {
+            echo '## Penta Policy Continuity — PASS'
+            echo
+            echo '- PentaPolice newest-control enforcement: PASS'
+            echo '- D0–D2 autonomous exact-evidence acceptance: PASS'
+            echo '- D3 human reservation: PASS'
+            echo '- OIDC identity-only semantics: PASS'
+            echo '- PentaArchiver historical preservation: PASS'
+            echo '- PentaHistorian current/history separation: PASS'
+            echo '- PentaScribe no-authority narrative: PASS'
+            echo '- External scheduler slots added: 0'
+            echo '- Money movement: false'
+            echo '- Checkout activation: false'
+          } >> "$GITHUB_STEP_SUMMARY"
