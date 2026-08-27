@@ -1,0 +1,53 @@
+name: TEMP Recompute Current Semantic Snapshot
+
+on:
+  push:
+    branches:
+      - chore/crownthrive-os-rebrand
+
+permissions:
+  contents: write
+
+jobs:
+  recompute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out rebrand branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: chore/crownthrive-os-rebrand
+
+      - name: Recompute current semantic snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          import substantive_rebuild_current_snapshot as snapshot
+
+          payload = snapshot.build_current_snapshot()
+          snapshot.SNAPSHOT_PATH.write_text(
+              json.dumps(payload, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print('snapshot_sha256=' + payload['snapshot_sha256'])
+          print('wave1_sha256=' + payload['current_waves']['1']['wave_sha256'])
+          PY
+
+      - name: Commit deterministic snapshot delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='data/documentation/substantive-rebuild-current-semantic-snapshot.v1.json'
+          if git diff --quiet -- "$target"; then
+            echo 'Current semantic snapshot already matches rebranded corpus.'
+            exit 0
+          fi
+          git config user.name 'CrownThrive OS Automation'
+          git config user.email 'contact@crownthrive.com'
+          git add -- "$target"
+          git commit -m 'docs(os): reconcile current semantic snapshot after canonical rebrand'
+          git push origin HEAD:chore/crownthrive-os-rebrand
