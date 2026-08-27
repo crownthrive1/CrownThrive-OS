@@ -1,5 +1,6 @@
 name: TEMP PentaSerialized Rebrand Continuity Receipt
 
+# Second pass after permanent PentaSerialized checkout-label normalization.
 on:
   push:
     branches:
@@ -59,9 +60,6 @@ jobs:
                   continue
               if code == 'R':
                   old_path, path = fields[1], fields[2]
-                  if not (is_protected(old_path) or is_protected(path)):
-                      # All renames are continuity-controlled by policy even outside protected paths.
-                      pass
                   entry = {
                       'path': path,
                       'old_path': old_path,
@@ -85,8 +83,7 @@ jobs:
                   'operation': 'modify' if code == 'M' else 'delete',
                   'previous_blob_sha': blob(base, path),
                   'reason': (
-                      'Retire one-time CrownThrive OS migration machinery after canonical cutover; '
-                      'permanent identity enforcement remains active.'
+                      'Retire one-time CrownThrive OS migration machinery after canonical cutover; permanent identity enforcement remains active.'
                       if code == 'D'
                       else 'Migrate the retired CrownThrive repository identity to CrownThrive-OS while preserving authority, semantics, evidence, and rollback lineage.'
                   ),
@@ -146,5 +143,5 @@ jobs:
           git config user.name 'CrownThrive OS Automation'
           git config user.email 'contact@crownthrive.com'
           git add -- "$receipt"
-          git commit -m 'chore(os): serialize canonical rebrand continuity'
+          git commit -m 'chore(os): refresh canonical rebrand continuity receipt'
           git push origin HEAD:chore/crownthrive-os-rebrand
