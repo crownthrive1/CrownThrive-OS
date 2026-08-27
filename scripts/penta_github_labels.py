@@ -93,15 +93,43 @@ def ensure_labels(gh: Any, names: Iterable[str] | None = None) -> None:
             )
         except RuntimeError as exc:
             # A concurrent run may have created the same label after readback.
-            if "422" not in str(exc) or "already_exists" not in str(exc):
+            text = str(exc).lower()
+            if "422" not in text or (
+                "already_exists" not in text
+                and "already exists" not in text
+            ):
                 raise
 
 
+def _looks_like_missing_label(exc: RuntimeError) -> bool:
+    text = str(exc).lower()
+    return "422" in text and (
+        "validation failed" in text
+        or '"code":"missing"' in text
+        or "label does not exist" in text
+        or "could not resolve" in text
+    )
+
+
 def add_labels(gh: Any, issue_number: int, labels: Iterable[str]) -> None:
+    """Add labels in one provider write, bootstrapping only on a real 422.
+
+    PentaTagger v2 enumerated the entire repository label catalog for every
+    event. v3 optimistically uses the established taxonomy, then performs the
+    more expensive catalog reconciliation only when GitHub proves a label is
+    missing.
+    """
     desired = sorted(set(labels))
     if not desired:
         return
-    gh.post(f"/repos/{gh.repo}/issues/{issue_number}/labels", {"labels": desired})
+    path = f"/repos/{gh.repo}/issues/{issue_number}/labels"
+    try:
+        gh.post(path, {"labels": desired})
+    except RuntimeError as exc:
+        if not _looks_like_missing_label(exc):
+            raise
+        ensure_labels(gh, desired)
+        gh.post(path, {"labels": desired})
 
 
 def remove_label(gh: Any, issue_number: int, label: str) -> None:
