@@ -102,6 +102,178 @@ def context_contract_probe(ctx: Any) -> dict[str, Any]:
     }
 
 
+
+def _reject_credential_keys(value: Any, *, path: str = "payload") -> None:
+    forbidden = {"api_key", "apikey", "token", "password", "secret", "private_key", "credential", "credentials"}
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            normalized = str(key).strip().casefold().replace("-", "_").replace(" ", "_")
+            if normalized in forbidden:
+                raise PromotedOperationError(f"credential-like field is not accepted by bounded adapter: {path}.{key}")
+            _reject_credential_keys(child, path=f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            _reject_credential_keys(child, path=f"{path}[{index}]")
+
+
+def _bounded_mapping_rows(value: Any, *, field: str, default: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = default if value is None else value
+    if not isinstance(rows, list) or not rows or len(rows) > 50:
+        raise PromotedOperationError(f"{field} must contain 1..50 objects")
+    if not all(isinstance(row, Mapping) for row in rows):
+        raise PromotedOperationError(f"{field} must contain only objects")
+    normalized = [dict(row) for row in rows]
+    _reject_credential_keys(normalized, path=field)
+    return normalized
+
+
+def evi_builder_evidence_preview(ctx: Any) -> dict[str, Any]:
+    runtime_path = ctx.root / "runtime/penta_evi_builder.py"
+    test_path = ctx.root / "tests/test_penta_evi_builder.py"
+    if not runtime_path.is_file() or not test_path.is_file():
+        raise PromotedOperationError("PentaEVIBuilder runtime/test surface is incomplete")
+    member = (ctx.snapshot.get("members") or {}).get("penta.evi-builder") or {}
+    if member.get("maturity") != "production":
+        raise PromotedOperationError("PentaEVIBuilder effective maturity is not production")
+    runtime = _load_fixed_module("penta_evi_builder_adapter_preview", runtime_path)
+    payload = dict(ctx.payload or {})
+    head_sha = payload.get("head_sha")
+    if not isinstance(head_sha, str):
+        raise PromotedOperationError("evidence_bundle_preview requires payload.head_sha")
+    authority_level = payload.get("authority_level", "D2")
+    if authority_level not in {"D0", "D1", "D2"}:
+        raise PromotedOperationError("bounded evidence preview permits only D0, D1, or D2")
+    observations = _bounded_mapping_rows(
+        payload.get("observations"),
+        field="observations",
+        default=[{"kind": "evidence_gap", "result": "bounded_adapter_probe"}],
+    )
+    claims = _bounded_mapping_rows(
+        payload.get("claims"),
+        field="claims",
+        default=[{"claim": "bundle constructed", "scope": "unverified preview only"}],
+    )
+    raw_receipts = payload.get("test_receipts") or [
+        {
+            "name": "adapter-contract",
+            "status": "PASS",
+            "source": ctx.evidence_refs[0],
+            "details": "bounded local evidence-construction probe",
+        }
+    ]
+    if not isinstance(raw_receipts, list) or not raw_receipts or len(raw_receipts) > 50:
+        raise PromotedOperationError("test_receipts must contain 1..50 objects")
+    receipts = []
+    for row in raw_receipts:
+        if not isinstance(row, Mapping):
+            raise PromotedOperationError("test_receipts must contain only objects")
+        receipts.append(
+            runtime.TestReceipt(
+                str(row.get("name", "")),
+                str(row.get("status", "")),
+                str(row.get("source", "")),
+                str(row.get("details", "")),
+            )
+        )
+    rollback = payload.get("rollback") or {"method": "git_revert", "target": head_sha}
+    fallback = payload.get("fallback") or {"method": "hold", "redundancy": "known-good-main"}
+    if not isinstance(rollback, Mapping) or not isinstance(fallback, Mapping):
+        raise PromotedOperationError("rollback and fallback must be objects")
+    _reject_credential_keys([rollback, fallback], path="recovery")
+    created_at = payload.get("created_at")
+    if created_at is not None and not isinstance(created_at, str):
+        raise PromotedOperationError("created_at must be an ISO timestamp string when supplied")
+    bundle = runtime.build_bundle(
+        work_order_id=str(payload.get("work_order_id", "penta-exec-evi-preview")),
+        subject=str(payload.get("subject", "bounded PentaEVIBuilder evidence preview")),
+        source_ref=str(payload.get("source_ref", ctx.evidence_refs[0])),
+        repo=str(payload.get("repo", "crownthrive1/CrownThrive-Support")),
+        head_sha=head_sha,
+        target_state=str(payload.get("target_state", "CONTROLLED_TEST")),
+        authority_level=authority_level,
+        observations=observations,
+        claims=claims,
+        evidence_refs=list(ctx.evidence_refs),
+        test_receipts=receipts,
+        rollback=dict(rollback),
+        fallback=dict(fallback),
+        created_at=created_at,
+    )
+    return {
+        "schema": "ct.penta.evi-builder.adapter-preview.v1",
+        "effective_maturity": member.get("maturity"),
+        "bundle": bundle,
+        "independent_certification_performed": False,
+        "production_promotion_performed": False,
+        "state_persisted": False,
+        "provider_write_performed": False,
+        "authority_expanded": False,
+    }
+
+
+def immune_repair_plan_preview(ctx: Any) -> dict[str, Any]:
+    runtime_path = ctx.root / "runtime/penta_immune.py"
+    test_path = ctx.root / "tests/test_penta_immune.py"
+    if not runtime_path.is_file() or not test_path.is_file():
+        raise PromotedOperationError("PentaImmune runtime/test surface is incomplete")
+    member = (ctx.snapshot.get("members") or {}).get("penta.immune") or {}
+    if member.get("maturity") != "production":
+        raise PromotedOperationError("PentaImmune effective maturity is not production")
+    runtime = _load_fixed_module("penta_immune_adapter_preview", runtime_path)
+    raw = ctx.payload.get("candidate") or {}
+    if not isinstance(raw, Mapping):
+        raise PromotedOperationError("repair_plan_preview candidate must be an object")
+    metadata = raw.get("metadata") or {"repo": "crownthrive1/CrownThrive-Support"}
+    rollback = raw.get("rollback") or {"method": "git_revert", "scope": "candidate commit"}
+    fallback = raw.get("fallback") or {"method": "hold", "redundancy": "known-good-main"}
+    if not all(isinstance(value, Mapping) for value in (metadata, rollback, fallback)):
+        raise PromotedOperationError("candidate metadata, rollback, and fallback must be objects")
+    _reject_credential_keys([metadata, rollback, fallback], path="candidate")
+
+    def score(name: str, default: int) -> int:
+        value = raw.get(name, default)
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 5:
+            raise PromotedOperationError(f"candidate {name} must be an integer from 0 through 5")
+        return value
+
+    candidate = runtime.WeaknessCandidate(
+        id=str(raw.get("id", "penta-exec-immune-preview")),
+        kind=str(raw.get("kind", "known_governance_defect")),
+        source_ref=str(raw.get("source_ref", ctx.evidence_refs[0])),
+        authority_level=str(raw.get("authority_level", "D2")),
+        handler=str(raw.get("handler", "patch_known_code")),
+        severity=score("severity", 4),
+        recurrence=score("recurrence", 3),
+        confidence=score("confidence", 5),
+        reversibility=score("reversibility", 5),
+        testability=score("testability", 5),
+        blast_radius=score("blast_radius", 1),
+        rollback=dict(rollback),
+        fallback=dict(fallback),
+        metadata=dict(metadata),
+    )
+    policy_raw = ctx.payload.get("policy") or {}
+    if not isinstance(policy_raw, Mapping):
+        raise PromotedOperationError("repair_plan_preview policy must be an object")
+    policy = runtime.AutonomyPolicy(
+        max_repairs_per_cycle=int(policy_raw.get("max_repairs_per_cycle", 1)),
+        max_attempts_per_candidate=int(policy_raw.get("max_attempts_per_candidate", 2)),
+        cooldown_seconds=int(policy_raw.get("cooldown_seconds", 3600)),
+        kill_switch_state=str(policy_raw.get("kill_switch_state", "armed")),
+    )
+    plan = runtime.build_repair_plan(candidate, policy)
+    return {
+        "schema": "ct.penta.immune.adapter-preview.v1",
+        "effective_maturity": member.get("maturity"),
+        "plan": plan,
+        "repair_execution_performed": False,
+        "independent_certification_performed": False,
+        "production_promotion_performed": False,
+        "state_persisted": False,
+        "provider_write_performed": False,
+        "authority_expanded": False,
+    }
+
 def mail_production_status(ctx: Any) -> dict[str, Any]:
     repair = _repair(ctx.root)
     hourly = repair["verified_state"]["hourly_reporting"]

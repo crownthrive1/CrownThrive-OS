@@ -32,7 +32,7 @@ def test_evidence_promoted_mail_has_real_status_and_gate() -> None:
 
 def test_execution_adapter_registry_is_static_and_fail_closed() -> None:
     registry = load_adapter_registry(ROOT)
-    assert registry["fail_closed"] is True and registry["version"] == "1.3.0" and len(registry["adapters"]) == 19
+    assert registry["fail_closed"] is True and registry["version"] == "1.4.0" and len(registry["adapters"]) == 21
     assert all(adapter["provider_effect"] is False for adapter in registry["adapters"])
 
 
@@ -49,9 +49,9 @@ def test_unknown_handler_is_rejected() -> None:
 def test_family_execution_contract_covers_all_production_members() -> None:
     registry, snapshot = load_family(ROOT); result = family_validate(ROOT, registry, snapshot)
     assert result["disposition"] == "pass", result
-    assert result["details"]["blockers"] == [] and result["details"]["adapter_count"] == 19 and result["details"]["promotion_count"] == 5
+    assert result["details"]["blockers"] == [] and result["details"]["adapter_count"] == 21 and result["details"]["promotion_count"] == 5
     coverage = result["details"]["execution_adapter_coverage"]
-    assert coverage == {"eligible_member_count": 19, "eligible_members_with_adapter": 19, "missing_adapter_members": [], "complete": True}
+    assert coverage == {"eligible_member_count": 21, "eligible_members_with_adapter": 21, "missing_adapter_members": [], "complete": True}
 
 
 def test_beata_heartbeat_and_mesh_routing_execute() -> None:
@@ -75,7 +75,7 @@ def test_observability_adapters_execute_and_redact() -> None:
 def test_heartbeat_and_od_see_all_production_members() -> None:
     result = invoke_member(ROOT, source_member="penta.status", target_member="penta.heartbeat", operation="control_plane_probe", evidence_refs=["test:heartbeat"], risk_class="D0")
     probe = result["details"]["result"]
-    assert result["disposition"] == "completed" and probe["production_member_count"] == 19
+    assert result["disposition"] == "completed" and probe["production_member_count"] == 21
     assert all(row["adapter_bound"] for row in probe["members"])
     assert isinstance(probe["healthy"], bool)
     od = invoke_member(ROOT, source_member="penta.status", target_member="penta.od", operation="readiness_assess", evidence_refs=["test:od"], payload={"candidate_target": "penta.mail"}, risk_class="D0")
@@ -114,7 +114,7 @@ def test_promoted_pentamail_status_is_bound_to_live_evidence() -> None:
 def test_promoted_pentastatus_owner_snapshot_is_current() -> None:
     result = invoke_member(ROOT, source_member="penta.status", target_member="penta.status", operation="owner_snapshot", evidence_refs=["test:status-owner"], risk_class="D0")
     snapshot = result["details"]["result"]
-    assert snapshot["production_member_count"] == 19 and snapshot["production_adapter_coverage_complete"] is True
+    assert snapshot["production_member_count"] == 21 and snapshot["production_adapter_coverage_complete"] is True
     assert snapshot["promotion_count"] == 5 and snapshot["provider_write_performed"] is False
     assert snapshot["hourly_reporting"]["provider_send_http_200_verified"] is True
 
@@ -138,6 +138,43 @@ def test_promoted_credentials_build_and_certify_operations_are_bounded() -> None
     certify = invoke_member(ROOT, source_member="penta.status", target_member="penta.certify", operation="provider_static_probe", evidence_refs=["test:certify"], payload={"provider_id": "resend"}, risk_class="D0")["details"]["result"]
     assert certify["runtime_probe"]["network_probe_performed"] is False and certify["runtime_probe"]["provider_write_performed"] is False
     assert certify["production_evidence_projection"]["current_failed"] == 0 and certify["production_evidence_projection"]["current_completed"] == 15
+
+
+
+def test_evi_builder_and_immune_adapters_are_bounded() -> None:
+    evi = invoke_member(
+        ROOT,
+        source_member="penta.status",
+        target_member="penta.evi-builder",
+        operation="evidence_bundle_preview",
+        evidence_refs=["test:evi-builder-preview"],
+        payload={"head_sha": "a" * 40, "created_at": "2026-08-27T00:00:00Z"},
+        risk_class="D0",
+    )
+    preview = evi["details"]["result"]
+    assert evi["disposition"] == "completed"
+    assert preview["schema"] == "ct.penta.evi-builder.adapter-preview.v1"
+    assert preview["bundle"]["certification_state"] == "UNVERIFIED"
+    assert preview["bundle"]["production_promotion"] is False
+    assert preview["independent_certification_performed"] is False
+    assert preview["state_persisted"] is False and preview["provider_write_performed"] is False
+
+    immune = invoke_member(
+        ROOT,
+        source_member="penta.status",
+        target_member="penta.immune",
+        operation="repair_plan_preview",
+        evidence_refs=["test:immune-plan-preview"],
+        payload={"candidate": {"id": "candidate-test", "authority_level": "D2"}},
+        risk_class="D0",
+    )
+    plan = immune["details"]["result"]
+    assert immune["disposition"] == "completed"
+    assert plan["schema"] == "ct.penta.immune.adapter-preview.v1"
+    assert plan["plan"]["status"] == "READY"
+    assert plan["plan"]["production_promotion_authorized"] is False
+    assert plan["repair_execution_performed"] is False
+    assert plan["state_persisted"] is False and plan["provider_write_performed"] is False
 
 
 def test_mail_send_still_requires_separate_provider_lane() -> None:

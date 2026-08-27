@@ -30,7 +30,7 @@ except ModuleNotFoundError:
     from runtime.penta_family import load_family, member_dispatch_gate
     from runtime.penta_interop import build_envelope, evaluate_handoff
 
-RUNTIME_VERSION = "1.3.0"
+RUNTIME_VERSION = "1.4.0"
 ADAPTER_REGISTRY = Path("data/penta/execution-adapters.registry.json")
 EXECUTION_ELIGIBLE = {"certified", "production"}
 VALID_EFFECTS = {"analyze", "prepare", "route", "execute", "verify", "preserve"}
@@ -91,7 +91,7 @@ def member_status(snapshot: Mapping[str, Any], machine_key: str) -> dict[str, An
 
 def validate_adapter_registry(registry: Mapping[str, Any]) -> None:
     if registry.get("registry_id") != "crownthrive.penta.execution-adapters": raise PentaExecutionError("unexpected adapter registry_id")
-    if registry.get("version") != "1.3.0" or registry.get("fail_closed") is not True: raise PentaExecutionError("adapter registry must be v1.3.0 and fail closed")
+    if registry.get("version") != "1.4.0" or registry.get("fail_closed") is not True: raise PentaExecutionError("adapter registry must be v1.4.0 and fail closed")
     adapters = registry.get("adapters")
     if not isinstance(adapters, list): raise PentaExecutionError("adapters must be a list")
     seen_ids: set[str] = set(); seen_routes: set[tuple[str, str]] = set()
@@ -241,10 +241,13 @@ def _status_owner_snapshot(ctx: AdapterContext): return _promoted("status_owner_
 def _credentials_binding_census(ctx: AdapterContext): return _promoted("credentials_binding_census",ctx)
 def _build_provider_adapter(ctx: AdapterContext): return _promoted("build_provider_adapter",ctx)
 def _certify_provider_static(ctx: AdapterContext): return _promoted("certify_provider_static",ctx)
+def _evi_builder_evidence_preview(ctx: AdapterContext): return _promoted("evi_builder_evidence_preview",ctx)
+def _immune_repair_plan_preview(ctx: AdapterContext): return _promoted("immune_repair_plan_preview",ctx)
 
 BUILTIN_HANDLERS: dict[str, Callable[[AdapterContext],dict[str,Any]]] = {
     "family_snapshot":_family_snapshot,"beata_heartbeat":_beata_heartbeat,"mesh_route_check":_mesh_route_check,"error_normalize":_error_normalize,"logger_emit":_logger_emit,"trace_new_context":_trace_new_context,"metric_snapshot":_metric_snapshot,"heartbeat_control_plane_probe":_heartbeat_control_plane_probe,"od_readiness_assess":_od_readiness_assess,"compliance_evaluate":_compliance_evaluate,"license_readiness":_license_readiness,"scribe_reconcile_preview":_scribe_reconcile_preview,"marketer_cycle_preview":_marketer_cycle_preview,
     "mail_production_status":_mail_production_status,"status_owner_snapshot":_status_owner_snapshot,"credentials_binding_census":_credentials_binding_census,"build_provider_adapter":_build_provider_adapter,"certify_provider_static":_certify_provider_static,
+    "evi_builder_evidence_preview":_evi_builder_evidence_preview,"immune_repair_plan_preview":_immune_repair_plan_preview,
 }
 
 

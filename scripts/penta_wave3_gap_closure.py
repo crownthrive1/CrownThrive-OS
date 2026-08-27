@@ -115,7 +115,7 @@ def update_documentation_and_custody_state() -> int:
 
     mesh_path = ROOT / "virality-music/system-mesh.mdx"
     mesh = mesh_path.read_text(encoding="utf-8")
-    mesh = mesh.replace("../SECURITY.md", "/SECURITY").replace("/SECURITY.md", "/SECURITY")
+    mesh = mesh.replace("../SECURITY.md", "/technology/security-privacy-continuity").replace("/SECURITY.md", "/technology/security-privacy-continuity").replace("/SECURITY", "/technology/security-privacy-continuity")
     mesh_path.write_text(mesh, encoding="utf-8")
     return local_count
 
@@ -542,8 +542,10 @@ def check_state() -> dict[str, Any]:
             f"migration custody count drift: recorded={recorded_count} actual={expected_count}"
         )
     mesh = (ROOT / "virality-music/system-mesh.mdx").read_text(encoding="utf-8")
-    if "../SECURITY.md" in mesh or "/SECURITY.md" in mesh:
+    if any(value in mesh for value in ("../SECURITY.md", "/SECURITY.md", "/SECURITY")):
         raise GapClosureError("noncanonical security documentation link remains")
+    if "/technology/security-privacy-continuity" not in mesh:
+        raise GapClosureError("governed security documentation route is missing")
     return {
         "ok": True,
         "runtime_version": RUNTIME_VERSION,
