@@ -78,6 +78,13 @@ jobs:
           elif new_selector not in text:
               raise SystemExit("exact-machine production-family selector target missing")
 
+          old_post_marker = 'current["aliases"] = sorted({alias for alias in current.get("aliases", []) if alias})'
+          new_post_marker = 'if not current.get("aliases"):'
+          if old_post_marker in text:
+              text = text.replace(old_post_marker, new_post_marker, 1)
+          elif new_post_marker not in text:
+              raise SystemExit("current-main post-merge insertion marker missing")
+
           path.write_text(text, encoding="utf-8")
           PY
           cp scripts/penta_wave3_mainline_integrate.py /tmp/penta_wave3_mainline_integrate.py
