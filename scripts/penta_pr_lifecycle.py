@@ -25,6 +25,7 @@ from penta_github_labels import (
 
 API = "https://api.github.com"
 MARKER = "<!-- penta-pr-lifecycle:"
+SELF_LIFECYCLE_CHECK_NAMES = frozenset({"run / lifecycle"})
 PRECLOSE_REQUIRED_LABELS = frozenset(
     {
         "penta:tagged",
@@ -52,7 +53,7 @@ class GH:
                 "Authorization": "Bearer " + self.token,
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "PentaPR/2.0.1",
+                "User-Agent": "PentaPR/2.0.2",
             },
         )
         try:
@@ -100,15 +101,29 @@ def parse_iso(value: str) -> dt.datetime:
     return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+def _is_self_lifecycle_check(item: dict[str, Any]) -> bool:
+    name = str(item.get("name") or "").strip().casefold()
+    return name in SELF_LIFECYCLE_CHECK_NAMES
+
+
 def checks(gh: GH, sha: str) -> dict[str, Any]:
-    runs = gh.get(f"/repos/{gh.repo}/commits/{sha}/check-runs?per_page=100").get("check_runs", [])
+    observed = gh.get(f"/repos/{gh.repo}/commits/{sha}/check-runs?per_page=100").get("check_runs", [])
     statuses = gh.get(f"/repos/{gh.repo}/commits/{sha}/status")
+    ignored = [item for item in observed if _is_self_lifecycle_check(item)]
+    runs = [item for item in observed if not _is_self_lifecycle_check(item)]
     bad = {"failure", "cancelled", "timed_out", "action_required", "stale", "startup_failure"}
     pending = any(item.get("status") != "completed" for item in runs) or statuses.get("state") == "pending"
     failed = any(item.get("conclusion") in bad for item in runs) or statuses.get("state") in {"failure", "error"}
     governed = [item for item in runs if "governed merge gate" in (item.get("name") or "").lower()]
     governed_ok = any(item.get("status") == "completed" and item.get("conclusion") == "success" for item in governed)
-    return {"failed": failed, "pending": pending, "governed_ok": governed_ok, "count": len(runs)}
+    return {
+        "failed": failed,
+        "pending": pending,
+        "governed_ok": governed_ok,
+        "count": len(runs),
+        "observed_count": len(observed),
+        "ignored_self_count": len(ignored),
+    }
 
 
 def lifecycle_comment(gh: GH, number: int) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
