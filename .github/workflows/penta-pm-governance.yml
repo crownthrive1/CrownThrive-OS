@@ -7,6 +7,7 @@ on:
       - "config/penta_pm_policy.json"
       - "config/penta_credential_bindings.json"
       - "scripts/penta_pm_reconcile.py"
+      - "scripts/penta_pm_repo_backfill.py"
       - ".github/workflows/penta-pm-governance.yml"
       - "tests/test_penta_pm_reconcile.py"
   pull_request:
@@ -52,11 +53,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Require dedicated PentaPM credential
+      - name: Require dedicated PentaPM Projects credential
         shell: bash
         run: |
           if [[ -z "${PENTA_PM_GITHUB_TOKEN}" ]]; then
-            echo "::error::PENTA_PM_GITHUB_TOKEN is unavailable to GitHub Actions. A Codespaces user secret is not an Actions secret. Rotate the exposed PAT, store the replacement as an Actions secret, and rerun."
+            echo "::error::PENTA_PM_GITHUB_TOKEN is unavailable to GitHub Actions. Bind the owner-authorized Penta credential as an Actions secret."
             exit 78
           fi
 
@@ -76,7 +77,22 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "issues" || "${{ github.event_name }}" == "release" ]]; then APPLY=true; fi
           echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
 
-      - name: Reconcile GitHub Projects, milestones and Development state
+      - name: Attempt Projects v2 and milestone reconciliation
+        id: provider
+        continue-on-error: true
+        run: |
+          if [[ "${{ steps.mode.outputs.apply }}" == "true" ]]; then
+            python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --apply
+          else
+            python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}"
+          fi
+
+      - name: Retroactively repair repository-scoped Development linkage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/penta_pm_repo_backfill.py
+
+      - name: Reconcile after repository backfill and emit authoritative state
         run: |
           if [[ "${{ steps.mode.outputs.apply }}" == "true" ]]; then
             python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --apply
@@ -106,11 +122,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Require dedicated PentaPM credential
+      - name: Require dedicated PentaPM Projects credential
         shell: bash
         run: |
           if [[ -z "${PENTA_PM_GITHUB_TOKEN}" ]]; then
-            echo "::error::PENTA_PM_GITHUB_TOKEN is unavailable to GitHub Actions. Rotate and bind the replacement credential as an Actions secret."
+            echo "::error::PENTA_PM_GITHUB_TOKEN is unavailable to GitHub Actions. Bind the owner-authorized Penta credential as an Actions secret."
             exit 78
           fi
       - name: Fail closed on unexplained metadata drift
