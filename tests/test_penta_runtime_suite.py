@@ -58,6 +58,28 @@ class PentaRuntimeSuiteTests(unittest.TestCase):
             (cache / "penta_mail.cpython-312.pyc").write_bytes(b"generated")
             self.assertEqual(prs.implementation_signals(root, "penta.mail"), [])
 
+    def test_live_snapshot_preserves_raw_lineage_and_applies_exact_promotions(self):
+        snapshot = prs.build_snapshot(ROOT)
+        promoted = {"penta.mail", "penta.status", "penta.credentials", "penta.build", "penta.certify"}
+        self.assertEqual(5, snapshot["promotion_count"])
+        self.assertEqual(promoted, set(snapshot["promoted_members"]))
+        by_key = {row["machine_key"]: row for row in snapshot["members"]}
+        for key in promoted:
+            row = by_key[key]
+            self.assertEqual("specified", row["raw_catalog_maturity"])
+            self.assertEqual("production", row["maturity"])
+            self.assertTrue(row["execution_eligible_by_registry"])
+            self.assertTrue(row["implementation_signals"])
+            self.assertIsNotNone(row["maturity_promotion"])
+        self.assertEqual("specified", snapshot["pentamail"]["raw_catalog_maturity"])
+        self.assertEqual("production", snapshot["pentamail"]["registry_maturity"])
+
+    def test_unpromoted_member_remains_fail_closed_in_live_snapshot(self):
+        snapshot = prs.build_snapshot(ROOT)
+        gate = prs.gate_member(snapshot, "penta.nurture")
+        self.assertFalse(gate["eligible"])
+        self.assertEqual("hold_fail_closed", gate["disposition"])
+
 
 if __name__ == "__main__":
     unittest.main()
