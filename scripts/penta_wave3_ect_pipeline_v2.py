@@ -112,6 +112,20 @@ def reconcile_context_and_builder() -> None:
 
     builder_path.write_text(builder, encoding="utf-8")
 
+    # Provider custody evidence is a repository-exact statement. Reconcile the
+    # recorded migration count to the exact current-main inventory before the
+    # convergence validator runs; do not infer provider application state.
+    convergence_path = ROOT / "developers/manifests/supabase-production-convergence-state.v1.json"
+    convergence = base.load_json(convergence_path)
+    custody = convergence.get("migration_custody")
+    if not isinstance(custody, dict):
+        raise base.PipelineError("Supabase convergence migration_custody must be an object")
+    migration_count = len(list((ROOT / "supabase/migrations").glob("*.sql")))
+    if migration_count <= 0:
+        raise base.PipelineError("repository migration inventory is empty")
+    custody["repository_migration_file_count"] = migration_count
+    base.write_json(convergence_path, convergence)
+
 
 def verify_package() -> None:
     build_a = "dist/penta-os-v1/build-a"
