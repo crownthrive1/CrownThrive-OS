@@ -79,9 +79,12 @@ jobs:
 
           disposition_path = root / "developers/manifests/pentadocs-unlisted-page-dispositions.v1.json"
           disposition = load(disposition_path)
-          bucket = disposition.get("operational_reference_direct_link")
+          dispositions = disposition.get("dispositions")
+          if not isinstance(dispositions, dict):
+              raise SystemExit("dispositions must be an object")
+          bucket = dispositions.get("operational_reference_direct_link")
           if not isinstance(bucket, list):
-              raise SystemExit("operational_reference_direct_link must be a list")
+              raise SystemExit("dispositions.operational_reference_direct_link must be a list")
           page = "automation/penta-families.mdx"
           if page not in bucket:
               bucket.append(page)
