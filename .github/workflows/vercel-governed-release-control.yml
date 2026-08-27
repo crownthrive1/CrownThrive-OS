@@ -1,0 +1,170 @@
+name: PentaVercel Governed Release Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Governed Vercel action"
+        type: choice
+        required: true
+        options:
+          - promote
+          - rollback
+      project_id:
+        description: "Allowlisted CrownThrive Vercel project"
+        type: choice
+        required: true
+        options:
+          - prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN
+          - prj_bokKbkKjxSq4jKYRtBjxhwEE4xbS
+          - prj_d1uyuhNZHXfANgZv9zTEiaIlcZer
+          - prj_HewLgMjUiVBNCl0FADFbSggSp2QN
+      deployment:
+        description: "Eligible deployment ID or Vercel deployment URL"
+        type: string
+        required: true
+      approval_phrase:
+        description: "Enter PENTARELEASE_VERCEL_WRITE_APPROVED"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentavercel-${{ inputs.project_id }}-production-write
+  cancel-in-progress: false
+
+jobs:
+  controlled-write:
+    name: Governed ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TEAM_ID: team_v4xkGtBZSrZXnJtLEJhra5nd
+      PROJECT_ID: ${{ inputs.project_id }}
+      DEPLOYMENT: ${{ inputs.deployment }}
+      ACTION: ${{ inputs.action }}
+      APPROVAL_PHRASE: ${{ inputs.approval_phrase }}
+    steps:
+      - name: Enforce PentaRelease write boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${VERCEL_TOKEN:-}" ]]; then
+            echo "::error::VERCEL_TOKEN is not bound. Provider writes remain fail-closed."
+            exit 1
+          fi
+
+          if [[ "$APPROVAL_PHRASE" != "PENTARELEASE_VERCEL_WRITE_APPROVED" ]]; then
+            echo "::error::Approval phrase mismatch."
+            exit 1
+          fi
+
+          case "$PROJECT_ID" in
+            prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN|\
+            prj_bokKbkKjxSq4jKYRtBjxhwEE4xbS|\
+            prj_d1uyuhNZHXfANgZv9zTEiaIlcZer|\
+            prj_HewLgMjUiVBNCl0FADFbSggSp2QN)
+              ;;
+            *)
+              echo "::error::Project is outside the CrownThrive Vercel allowlist."
+              exit 1
+              ;;
+          esac
+
+          if [[ ! "$DEPLOYMENT" =~ ^dpl_[A-Za-z0-9]+$ && ! "$DEPLOYMENT" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app/?$ ]]; then
+            echo "::error::Deployment must be a Vercel deployment ID or deployment URL."
+            exit 1
+          fi
+
+      - name: Inspect exact deployment before mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes vercel@59.3.0 inspect "$DEPLOYMENT" \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_TEAM_ID"
+
+      - name: Execute governed provider write
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$ACTION" == "promote" ]]; then
+            npx --yes vercel@59.3.0 promote "$DEPLOYMENT" \
+              --token "$VERCEL_TOKEN" \
+              --scope "$VERCEL_TEAM_ID" \
+              --yes
+          elif [[ "$ACTION" == "rollback" ]]; then
+            npx --yes vercel@59.3.0 rollback "$DEPLOYMENT" \
+              --token "$VERCEL_TOKEN" \
+              --scope "$VERCEL_TEAM_ID" \
+              --yes
+          else
+            echo "::error::Unsupported action."
+            exit 1
+          fi
+
+      - name: Provider readback after mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "$PROJECT_ID" in
+            prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN)
+              HEALTH_URL="https://crown-thrive-os.vercel.app/health"
+              ;;
+            prj_bokKbkKjxSq4jKYRtBjxhwEE4xbS)
+              HEALTH_URL="https://private-penta-os.vercel.app/health"
+              ;;
+            prj_d1uyuhNZHXfANgZv9zTEiaIlcZer)
+              HEALTH_URL="https://private-penta-execution.vercel.app/health"
+              ;;
+            prj_HewLgMjUiVBNCl0FADFbSggSp2QN)
+              HEALTH_URL="https://chlom-protocol.vercel.app/health"
+              ;;
+          esac
+
+          sleep 5
+          BODY="$(curl --fail --silent --show-error \
+            --retry 6 --retry-delay 5 --retry-all-errors \
+            --header 'Accept: application/json' \
+            "$HEALTH_URL")"
+
+          python3 - "$BODY" <<'PY'
+          import json
+          import sys
+
+          payload = json.loads(sys.argv[1])
+          provider_state = payload.get("provider_state") or payload.get("vercel_provider_state")
+          required = {
+              "status": "OPERATIONAL",
+              "release": "production",
+              "provider_readback": True,
+              "pass_manufactured": False,
+          }
+          failures = [
+              f"{key}={payload.get(key)!r}, expected {expected!r}"
+              for key, expected in required.items()
+              if payload.get(key) != expected
+          ]
+          if provider_state != "BOUND_PRODUCTION":
+              failures.append(f"provider_state={provider_state!r}, expected 'BOUND_PRODUCTION'")
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          if failures:
+              raise SystemExit("; ".join(failures))
+          PY
+
+          {
+            echo "# PentaVercel governed release control"
+            echo
+            echo "- Action: \`$ACTION\`"
+            echo "- Project: \`$PROJECT_ID\`"
+            echo "- Deployment: \`$DEPLOYMENT\`"
+            echo "- Provider readback: **PASS**"
+            echo "- Health URL: \`$HEALTH_URL\`"
+          } >> "$GITHUB_STEP_SUMMARY"

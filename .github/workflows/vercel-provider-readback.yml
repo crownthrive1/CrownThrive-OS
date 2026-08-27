@@ -1,0 +1,143 @@
+name: PentaVercel Production Readback
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/crownthrive-os-control-plane/**"
+      - "config/vercel/execution-fabric.v1.json"
+      - ".github/workflows/vercel-provider-readback.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentavercel-production-readback
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify all Vercel production planes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Collect provider-originated readback
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          import sys
+          import urllib.request
+          from datetime import datetime, timezone
+
+          endpoints = {
+              "crownthrive_os": "https://crown-thrive-os.vercel.app/health",
+              "private_penta_os": "https://private-penta-os.vercel.app/health",
+              "private_penta_execution": "https://private-penta-execution.vercel.app/health",
+              "chlom_protocol": "https://chlom-protocol.vercel.app/health",
+              "execution_fabric": "https://crown-thrive-os.vercel.app/fabric",
+              "mcp_gateway": "https://crown-thrive-os.vercel.app/api/mcp",
+          }
+
+          results = {}
+          failures = []
+
+          for key, url in endpoints.items():
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "Accept": "application/json",
+                      "User-Agent": "CrownThrive-PentaVercel-CI/1.0",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=10) as response:
+                      body = json.loads(response.read().decode("utf-8"))
+                      results[key] = {
+                          "url": url,
+                          "http_status": response.status,
+                          "body": body,
+                      }
+              except Exception as error:
+                  failures.append(f"{key}: {type(error).__name__}: {error}")
+                  results[key] = {"url": url, "error": str(error)}
+
+          for key in (
+              "crownthrive_os",
+              "private_penta_os",
+              "private_penta_execution",
+              "chlom_protocol",
+          ):
+              body = results.get(key, {}).get("body", {})
+              provider_state = body.get("provider_state") or body.get("vercel_provider_state")
+              if body.get("status") != "OPERATIONAL":
+                  failures.append(f"{key}: status is not OPERATIONAL")
+              if body.get("release") != "production":
+                  failures.append(f"{key}: release is not production")
+              if body.get("provider_readback") is not True:
+                  failures.append(f"{key}: provider_readback is not true")
+              if provider_state != "BOUND_PRODUCTION":
+                  failures.append(f"{key}: provider state is not BOUND_PRODUCTION")
+              if body.get("pass_manufactured") is not False:
+                  failures.append(f"{key}: pass_manufactured invariant failed")
+
+          fabric = results.get("execution_fabric", {}).get("body", {})
+          if fabric.get("status") != "OPERATIONAL":
+              failures.append("execution_fabric: status is not OPERATIONAL")
+          if fabric.get("required_project_count") != 4:
+              failures.append("execution_fabric: required project count is not 4")
+          if fabric.get("operational_project_count") != 4:
+              failures.append("execution_fabric: operational project count is not 4")
+          if fabric.get("governance", {}).get("pass_manufactured") is not False:
+              failures.append("execution_fabric: pass_manufactured invariant failed")
+
+          mcp = results.get("mcp_gateway", {}).get("body", {})
+          if mcp.get("status") != "OPERATIONAL":
+              failures.append("mcp_gateway: status is not OPERATIONAL")
+          if mcp.get("write_tools") != 0:
+              failures.append("mcp_gateway: write tool count is not zero")
+
+          envelope = {
+              "schema": "ct.penta.vercel.provider-readback-ci.20260827.v1",
+              "status": "PASS" if not failures else "HOLD",
+              "results": results,
+              "failures": failures,
+              "observed_at": datetime.now(timezone.utc).isoformat(),
+              "github": {
+                  "repository": os.getenv("GITHUB_REPOSITORY"),
+                  "sha": os.getenv("GITHUB_SHA"),
+                  "run_id": os.getenv("GITHUB_RUN_ID"),
+                  "run_attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
+              },
+              "pass_manufactured": False,
+          }
+          canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":"))
+          envelope["sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+          print(json.dumps(envelope, indent=2, sort_keys=True))
+
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a", encoding="utf-8") as summary:
+                  summary.write("# PentaVercel production readback\n\n")
+                  summary.write(f"- Status: **{envelope['status']}**\n")
+                  summary.write(f"- SHA-256: `{envelope['sha256']}`\n")
+                  summary.write(f"- Required planes: `{fabric.get('required_project_count', 'unknown')}`\n")
+                  summary.write(f"- Operational planes: `{fabric.get('operational_project_count', 'unknown')}`\n")
+                  summary.write(f"- MCP: `{mcp.get('status', 'unknown')}`\n")
+                  if failures:
+                      summary.write("\n## Holds\n")
+                      for failure in failures:
+                          summary.write(f"- {failure}\n")
+
+          if failures:
+              raise SystemExit(1)
+          PY
