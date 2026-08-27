@@ -11,9 +11,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "runtime"))
+from penta_d3_approval import evaluate as evaluate_d3_approval  # noqa: E402
 
 
 REQUIRED_BINDING = {
@@ -29,6 +36,9 @@ REQUIRED_BINDING = {
     "nonrenewing": True,
 }
 
+_HEX40 = re.compile(r"^[0-9a-f]{40}$")
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
 
 def _fail(check: str, reason: str) -> dict[str, str]:
     return {"check": check, "status": "FAIL", "reason": reason}
@@ -38,7 +48,9 @@ def _pass(check: str) -> dict[str, str]:
     return {"check": check, "status": "PASS"}
 
 
-def verify(bundle: dict[str, Any]) -> tuple[str, list[dict[str, str]]]:
+def verify(
+    bundle: dict[str, Any], *, now: datetime | None = None
+) -> tuple[str, list[dict[str, str]]]:
     checks: list[dict[str, str]] = []
     campaign_id = bundle.get("campaign_id")
     release = bundle.get("release", {})
@@ -52,8 +64,15 @@ def verify(bundle: dict[str, Any]) -> tuple[str, list[dict[str, str]]]:
     else:
         checks.append(_pass("campaign_id"))
 
-    if not release.get("repository") or not release.get("commit_sha"):
-        checks.append(_fail("exact_release", "repository and exact commit_sha are required"))
+    if release.get("repository") != "crownthrive1/CrownThrive-OS" or not _HEX40.fullmatch(
+        str(release.get("commit_sha", ""))
+    ):
+        checks.append(
+            _fail(
+                "exact_release",
+                "canonical CrownThrive-OS repository and lowercase 40-character commit_sha are required",
+            )
+        )
     else:
         checks.append(_pass("exact_release"))
 
@@ -105,13 +124,13 @@ def verify(bundle: dict[str, Any]) -> tuple[str, list[dict[str, str]]]:
             checks.append(_fail("receipt.independence", "verifier must be distinct from producer identities"))
         else:
             checks.append(_pass("receipt.independence"))
-        if not receipt.get("receipt_id") or not receipt.get("evidence_sha256"):
+        if not receipt.get("receipt_id") or not _HEX64.fullmatch(str(receipt.get("evidence_sha256", ""))):
             checks.append(_fail("receipt.integrity", "receipt_id and evidence_sha256 are required"))
         else:
             checks.append(_pass("receipt.integrity"))
 
     rollback_required = [
-        ("baseline_sha", "rollback baseline SHA is required"),
+        ("baseline_sha", "rollback baseline SHA-256 is required"),
         ("rollback_tested", "rollback must be explicitly tested"),
         ("pre_rollback_readback_sha", "pre-rollback readback SHA is required"),
         ("post_rollback_readback_sha", "post-rollback readback SHA is required"),
@@ -122,6 +141,40 @@ def verify(bundle: dict[str, Any]) -> tuple[str, list[dict[str, str]]]:
             checks.append(_fail(f"rollback.{key}", reason))
         else:
             checks.append(_pass(f"rollback.{key}"))
+
+    baseline_sha = str(rollback.get("baseline_sha", ""))
+    pre_sha = str(rollback.get("pre_rollback_readback_sha", ""))
+    post_sha = str(rollback.get("post_rollback_readback_sha", ""))
+    rollback_digests_match = bool(
+        _HEX64.fullmatch(baseline_sha)
+        and _HEX64.fullmatch(pre_sha)
+        and _HEX64.fullmatch(post_sha)
+        and post_sha == baseline_sha
+    )
+    if rollback_digests_match:
+        checks.append(_pass("rollback.digest_readback"))
+    else:
+        checks.append(
+            _fail(
+                "rollback.digest_readback",
+                "rollback digests must be lowercase SHA-256 values and post-rollback readback must equal baseline",
+            )
+        )
+
+    d3_bundle = bundle.get("d3_approval")
+    if not isinstance(d3_bundle, dict):
+        checks.append(_fail("d3.approval", "exact D3 Founder approval/release evidence is missing"))
+    else:
+        d3_result = evaluate_d3_approval(d3_bundle, now=now)
+        if d3_result.get("decision") != "RELEASE_ELIGIBLE":
+            checks.append(_fail("d3.approval", "D3 release evidence remains HOLD"))
+        else:
+            checks.append(_pass("d3.approval"))
+        d3_candidate = d3_bundle.get("candidate", {})
+        if d3_candidate.get("exact_version_ref") != release.get("commit_sha"):
+            checks.append(_fail("d3.exact_release", "D3 approval candidate does not match release commit"))
+        else:
+            checks.append(_pass("d3.exact_release"))
 
     failed = [c for c in checks if c["status"] == "FAIL"]
     return ("CERTIFIED" if not failed else "NOT_CERTIFIED", checks)
