@@ -1,0 +1,9 @@
+-- remote_applied_version: 20260827165604
+-- CrownThrive migration-lineage restoration marker v2
+-- Production migration name: archive_legacy_abcds_scheduler_scaffolding_v1
+-- This timestamp is recorded as APPLIED in production ThriveBase.
+-- Exact historical SQL is intentionally not republished from production history.
+-- Canonical applied SQL remains in supabase_migrations.schema_migrations under ThriveBase custody.
+-- This file is a no-op and exists only to restore Git/Supabase timestamp lineage parity.
+-- Bounded secret-pattern scan for this exact migration: PASS (no flagged categories).
+-- Clean-room reconstruction from public lineage markers alone remains NOT CERTIFIED.
