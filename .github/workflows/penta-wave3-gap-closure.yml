@@ -1,0 +1,139 @@
+name: Penta Wave 3 Gap Closure
+
+on:
+  push:
+    branches:
+      - penta-production-promotion-wave3-restack-20260826-v2
+    paths:
+      - ".github/workflows/penta-wave3-gap-closure.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: penta-wave3-gap-closure-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  close-gaps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact branch with history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: penta-production-promotion-wave3-restack-20260826-v2
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Restore canonical source and reconcile registries
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show 12d52fc356e4f34b6298bf9d3c1c4af6fef53444:data/penta/institutional-services.registry.json \
+            > data/penta/institutional-services.registry.json
+
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          from pathlib import Path
+
+          root = Path(".")
+
+          def load(path: Path) -> dict:
+              value = json.loads(path.read_text(encoding="utf-8"))
+              if not isinstance(value, dict):
+                  raise SystemExit(f"JSON root must be an object: {path}")
+              return value
+
+          def write(path: Path, value: dict) -> None:
+              path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+          family_path = root / "data/penta/family.registry.json"
+          family = load(family_path)
+          catalog = {
+              "catalog_id": "penta.immune",
+              "path": "data/penta/systems.extensions.penta-immune.json",
+              "required": True,
+              "role": "production_security_resilience_and_evidence_extension",
+          }
+          catalogs = family.get("catalogs")
+          if not isinstance(catalogs, list):
+              raise SystemExit("family registry catalogs must be a list")
+          matches = [item for item in catalogs if isinstance(item, dict) and item.get("catalog_id") == catalog["catalog_id"]]
+          if len(matches) > 1:
+              raise SystemExit("duplicate penta.immune catalog registrations")
+          if matches:
+              matches[0].clear()
+              matches[0].update(catalog)
+          else:
+              catalogs.append(catalog)
+          family["updated"] = "2026-08-27"
+          write(family_path, family)
+
+          disposition_path = root / "developers/manifests/pentadocs-unlisted-page-dispositions.v1.json"
+          disposition = load(disposition_path)
+          bucket = disposition.get("operational_reference_direct_link")
+          if not isinstance(bucket, list):
+              raise SystemExit("operational_reference_direct_link must be a list")
+          page = "automation/penta-families.mdx"
+          if page not in bucket:
+              bucket.append(page)
+          bucket[:] = sorted(set(str(item) for item in bucket))
+          write(disposition_path, disposition)
+
+          convergence_path = root / "developers/manifests/supabase-production-convergence-state.v1.json"
+          convergence = load(convergence_path)
+          migration_custody = convergence.get("migration_custody")
+          if not isinstance(migration_custody, dict):
+              raise SystemExit("migration_custody must be an object")
+          local_count = len(list((root / "supabase/migrations").glob("*.sql")))
+          if local_count <= 0:
+              raise SystemExit("repository migration inventory is empty")
+          migration_custody["repository_migration_file_count"] = local_count
+          write(convergence_path, convergence)
+          print(json.dumps({"repository_migration_file_count": local_count}, sort_keys=True))
+          PY
+
+      - name: Apply deterministic PentaDocs migration
+        run: |
+          python scripts/pentadocs_quality.py --apply
+          python scripts/pentadocs_quality.py --check
+
+      - name: Validate repaired production contracts
+        run: |
+          python -m json.tool data/penta/family.registry.json >/dev/null
+          python -m json.tool data/penta/institutional-services.registry.json >/dev/null
+          python -m json.tool developers/manifests/pentadocs-unlisted-page-dispositions.v1.json >/dev/null
+          python -m json.tool developers/manifests/supabase-production-convergence-state.v1.json >/dev/null
+          python tests/test_penta_family.py
+          python tests/test_penta_exec.py
+          python -m unittest -v tests/test_penta_runtime_suite.py
+          python -m unittest -v tests/test_penta_interop.py
+          python -m unittest -v tests/test_penta_observability.py
+          python runtime/penta_families.py --root . --portal-index >/dev/null
+          python scripts/validate_docs.py
+          python scripts/validate_supabase_production_convergence_state.py
+
+      - name: Commit governed repair and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/penta-wave3-gap-closure.yml
+          git add -A
+          git diff --cached --check
+          git diff --cached --stat
+          if git diff --cached --quiet; then
+            echo "No governed repair changes were generated."
+            exit 1
+          fi
+          git commit -m "fix(penta): close Wave 3 production convergence gaps"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
