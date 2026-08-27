@@ -15,7 +15,7 @@ def record():
     return {
         "tag": "v9.9.9",
         "title": "Test Release",
-        "official_release_url": "https://github.com/crownthrive1/CrownThrive-Support/releases/tag/v9.9.9",
+        "official_release_url": "https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v9.9.9",
         "why": "test",
         "what_changed": ["src/a.py"],
         "targets": ["main"],

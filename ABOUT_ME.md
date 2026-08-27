@@ -48,7 +48,7 @@ CrownThrive therefore emphasizes:
 - Developer Platform: [`developers/overview.mdx`](developers/overview.mdx)
 - Public Licensing & IP overview: [`support/licensing-and-ip-overview.mdx`](support/licensing-and-ip-overview.mdx)
 - Repository license: [`LICENSE`](LICENSE)
-- Contribution standards: [`CONTRIBUTING.md`](https://github.com/crownthrive1/crownthrive-support/blob/main/CONTRIBUTING.md)
+- Contribution standards: [`CONTRIBUTING.md`](https://github.com/crownthrive1/CrownThrive-OS/blob/main/CONTRIBUTING.md)
 - Security reporting: [`SECURITY.md`](SECURITY.md)
 
 ## Build, partner, license, or collaborate
@@ -66,7 +66,7 @@ This is a public-safe professional and institutional profile. It does not disclo
 ## Latest PentaRelease — v3.12.0.0
 
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-Support/releases/tag/v3.12.0.0
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.12.0.0
 - **Release title:** CrownThrive OS 3.12.0.0 — Autonomous PentaRelease
 - **Why:** new executable capability or runtime delta
 - **Changed paths:** 5

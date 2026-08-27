@@ -15,7 +15,7 @@ BASE = {
     "campaign_id": "ct.penta.flow-control.20260826.v1",
     "producer_ids": ["penta-build", "penta-runtime"],
     "release": {
-        "repository": "crownthrive1/CrownThrive-Support",
+        "repository": "crownthrive1/CrownThrive-OS",
         "commit_sha": "618fc84a503152d5075019272789c9694974e11a",
     },
     "binding": {

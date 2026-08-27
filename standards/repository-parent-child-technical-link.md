@@ -10,7 +10,7 @@ A physical child repository may be technically connected to its registered paren
 
 For CIE the current exact evidence is:
 
-- parent: `crownthrive1/CrownThrive-Support@8cab98810e600bf4f8739c3f4ed166b151a207da`
+- parent: `crownthrive1/CrownThrive-OS@8cab98810e600bf4f8739c3f4ed166b151a207da`
 - child: `crownthrive1/CrownThrive-CIE@2a92b791cbd460e69db30a2e921a3e85ff6e1826`
 - immutable child repository ID: `1341314455`
 - ThriveBase link receipt: `1760f921-2189-445d-a50d-d7cd4efcab53`

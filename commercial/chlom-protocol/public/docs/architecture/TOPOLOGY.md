@@ -8,7 +8,7 @@ This page defines the public-safe topology for CHLOM as a CrownThrive OS metapro
 CrownThrive institutional sources / governed vaults
                   │
                   ▼
-crownthrive1/CrownThrive-Support
+crownthrive1/CrownThrive-OS
 canonical public-safe governance parent
                   │
                   ├─ documentation and standards
@@ -64,7 +64,7 @@ The intended public routing hierarchy is:
 2. **Institutional documentation / support:** https://crownthrivesupport.com
 3. **Developer ecosystem:** https://crownthrive.io
 4. **CHLOM public commercial source:** https://github.com/crownthrive/chlom-protocol
-5. **Canonical public-safe governance parent:** https://github.com/crownthrive1/CrownThrive-Support
+5. **Canonical public-safe governance parent:** https://github.com/crownthrive1/CrownThrive-OS
 
 A route being listed here does not assert that every planned CHLOM page, API, MCP endpoint, checkout, or portal is live on that domain.
 

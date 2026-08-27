@@ -4,7 +4,7 @@
 
 This addendum supplements the CrownThrive public repository `LICENSE` for the CHLOM-managed relationship between:
 
-- **Canonical public-safe governance parent:** `crownthrive1/CrownThrive-Support`
+- **Canonical public-safe governance parent:** `crownthrive1/CrownThrive-OS`
 - **Public commercial child:** `crownthrive/chlom-protocol`
 
 If this addendum and the general parent repository license appear inconsistent for CHLOM-specific managed projection material, the more specific CHLOM rule controls the repository-family interpretation, subject to any separately executed CrownThrive agreement and applicable law.

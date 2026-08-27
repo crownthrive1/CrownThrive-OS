@@ -43,7 +43,7 @@ begin
   from institutional_federation.repository_parent_child_link_receipts_v1
   where link_receipt_id=p_link_receipt_id;
   if not found
-     or v_link.parent_repo_id<>'ct.repo.crownthrive-support'
+     or v_link.parent_repo_id<>'ct.repo.CrownThrive-OS'
      or v_link.child_repo_id<>'ct.repo.cie'
      or v_link.parent_head_sha<>p_parent_head
      or v_link.child_head_sha<>p_child_head
@@ -240,7 +240,7 @@ begin
 
   select * into v_link
   from institutional_federation.repository_parent_child_link_receipts_v1
-  where child_repo_id='ct.repo.cie' and parent_repo_id='ct.repo.crownthrive-support'
+  where child_repo_id='ct.repo.cie' and parent_repo_id='ct.repo.CrownThrive-OS'
   order by created_at desc
   limit 1;
   select * into v_alg from institutional_federation.algorithm_registry where algorithm_id='ct.algorithm.cie.v1';
@@ -409,7 +409,7 @@ begin
   from institutional_federation.repository_parent_child_link_receipts_v1
   where link_receipt_id=p_link_receipt_id;
   if not found or v_link.parent_head_sha<>p_parent_head or v_link.child_head_sha<>p_child_head
-     or v_link.parent_repo_id<>'ct.repo.crownthrive-support' or v_link.child_repo_id<>'ct.repo.cie'
+     or v_link.parent_repo_id<>'ct.repo.CrownThrive-OS' or v_link.child_repo_id<>'ct.repo.cie'
      or not v_link.guardian_verified or not v_link.family_verified or not v_link.interoperability_verified
      or v_link.authority_effect or v_link.operational_activation or v_link.vote_effect or v_link.child_self_activation then
     raise exception 'exact_fail_closed_parent_link_required';

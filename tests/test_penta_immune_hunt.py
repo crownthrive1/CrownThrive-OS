@@ -6,7 +6,7 @@ from scripts.penta_immune_hunt import candidates_from_snapshot, report
 class PentaImmuneHuntTests(unittest.TestCase):
     def test_failed_workflow_becomes_repo_local_candidate(self):
         snapshot = {
-            "repo": "crownthrive1/CrownThrive-Support",
+            "repo": "crownthrive1/CrownThrive-OS",
             "failed_workflow_runs": [
                 {
                     "id": 12,
@@ -27,7 +27,7 @@ class PentaImmuneHuntTests(unittest.TestCase):
 
     def test_unlabeled_issue_is_not_autonomously_selected(self):
         snapshot = {
-            "repo": "crownthrive1/CrownThrive-Support",
+            "repo": "crownthrive1/CrownThrive-OS",
             "failed_workflow_runs": [],
             "open_issues": [{"number": 9, "title": "random", "labels": []}],
         }
@@ -35,7 +35,7 @@ class PentaImmuneHuntTests(unittest.TestCase):
 
     def test_explicit_ready_issue_can_enter_queue(self):
         snapshot = {
-            "repo": "crownthrive1/CrownThrive-Support",
+            "repo": "crownthrive1/CrownThrive-OS",
             "failed_workflow_runs": [],
             "open_issues": [
                 {

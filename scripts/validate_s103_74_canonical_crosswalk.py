@@ -70,7 +70,7 @@ CRITICAL = {
     "S103-PF-035": ("exact", "ct.asset.artful-mane-gallery"),
     "S103-PF-054": ("exact", "ct.platform.kjv-sermon-toolkit"),
     "S103-PF-057": ("predecessor", "ct.platform.ops-oasis"),
-    "S103-PF-065": ("composite_split", "ct.platform.thrivesupport", "ct.platform.crownthrive-support"),
+    "S103-PF-065": ("composite_split", "ct.platform.thrivesupport", "ct.platform.CrownThrive-OS"),
     "S103-PF-066": ("predecessor", "ct.platform.virality-music"),
     "S103-PF-067": ("predecessor", "ct.platform.crownthrive-studios"),
     "S103-PF-068": ("alias", "ct.platform.ops-oasis"),

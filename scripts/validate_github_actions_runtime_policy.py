@@ -218,7 +218,7 @@ def main() -> int:
         "path": ".github/workflows/penta-runner-fabric-certification.yml",
         "event": "workflow_dispatch_only",
         "ref": "refs/heads/main",
-        "repository": "crownthrive1/CrownThrive-Support",
+        "repository": "crownthrive1/CrownThrive-OS",
         "labels": [
             "self-hosted", "linux", "x64", "crownthrive", "pentafabric",
             "rtc", "trusted", "provider", "pentamail",
@@ -310,7 +310,7 @@ def main() -> int:
                     if re.search(r"(?m)^\s{2}(?:pull_request|pull_request_target|push|schedule):", text):
                         fail(f"{rel} contains a prohibited automatic or public-code event")
                     guard = (
-                        "if: github.repository == 'crownthrive1/CrownThrive-Support' "
+                        "if: github.repository == 'crownthrive1/CrownThrive-OS' "
                         "&& github.ref == 'refs/heads/main'"
                     )
                     if guard not in text:

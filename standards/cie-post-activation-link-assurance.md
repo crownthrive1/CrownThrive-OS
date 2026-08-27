@@ -2,7 +2,7 @@
 
 ## Scope
 
-This control exists for the **Cultural Imprint Engine (CIE)** after CIE has already entered bounded governed production. It solves one narrow problem: CrownThrive-Support `main` may continue to advance after the exact Founder-authorized production snapshot while CIE `main` remains unchanged. The current technical parent/child evidence must be refreshable without pretending that the original Founder authorization covered the newer parent Git SHA.
+This control exists for the **Cultural Imprint Engine (CIE)** after CIE has already entered bounded governed production. It solves one narrow problem: CrownThrive-OS `main` may continue to advance after the exact Founder-authorized production snapshot while CIE `main` remains unchanged. The current technical parent/child evidence must be refreshable without pretending that the original Founder authorization covered the newer parent Git SHA.
 
 ## What this control does
 

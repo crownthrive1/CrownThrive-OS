@@ -83,7 +83,7 @@ Cultural Imprint Engine production is a governed internal runtime:
 - API/MCP exposure is governed-internal only;
 - public activation and commerce remain false.
 
-The CIE algorithm may execute from child repository `ct.repo.cie` while its Framework Factory package is hosted by parent repository `ct.repo.crownthrive-support` only when the current exact parent/child technical-link receipt proves matching repository heads, Guardian verification, family verification, interoperability verification, and zero authority/activation/vote/self-activation effects.
+The CIE algorithm may execute from child repository `ct.repo.cie` while its Framework Factory package is hosted by parent repository `ct.repo.CrownThrive-OS` only when the current exact parent/child technical-link receipt proves matching repository heads, Guardian verification, family verification, interoperability verification, and zero authority/activation/vote/self-activation effects.
 
 ThriveEvergreen remains the separate authority for pricing, checkout, Crown Credits/economic activation and entitlement.
 

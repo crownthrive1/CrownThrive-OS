@@ -9,7 +9,7 @@ set -Eeuo pipefail
 # - This runner is intended for trusted main/workflow_dispatch/schedule jobs only.
 # - Do NOT route public fork pull_request code to this runner.
 
-REPOSITORY="${GITHUB_REPOSITORY:-crownthrive1/CrownThrive-Support}"
+REPOSITORY="${GITHUB_REPOSITORY:-crownthrive1/CrownThrive-OS}"
 RUNNER_NAME="${PENTA_RUNNER_NAME:-$(hostname)-pentafabric}"
 RUNNER_ROOT="${PENTA_RUNNER_ROOT:-/opt/crownthrive/actions-runner}"
 RUNNER_USER="${PENTA_RUNNER_USER:-github-runner}"
