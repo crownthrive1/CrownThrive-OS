@@ -142,9 +142,10 @@ jobs:
           builder = builder_path.read_text(encoding="utf-8")
           old_axis = '        axis=infer_axis(machine_key, canonical_name, str(item.get("category", "")), purpose),'
           new_axis = '        axis=str(item.get("axis") or infer_axis(machine_key, canonical_name, str(item.get("category", "")), purpose)),'
+          current_axis = '            "axis": row.get("axis") or infer_axis(row.get("canonical_name", ""), row.get("purpose", "")),'
           if old_axis in builder:
               builder = builder.replace(old_axis, new_axis, 1)
-          elif new_axis not in builder:
+          elif new_axis not in builder and current_axis not in builder:
               raise SystemExit("PentaOS explicit-axis precedence insertion point missing")
           builder_path.write_text(builder, encoding="utf-8")
 
