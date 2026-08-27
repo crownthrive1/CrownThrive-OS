@@ -1,0 +1,73 @@
+name: Penta Wave 3 ECT Diagnostic
+
+on:
+  push:
+    branches: [penta-production-promotion-wave3-restack-20260826-v2]
+    paths:
+      - ".github/workflows/penta-wave3-ect-diagnostic.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-wave3-ect-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-failure-tail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Wave 3 history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: penta-production-promotion-wave3-restack-20260826-v2
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+
+      - name: Install deterministic validators
+        run: python -m pip install --disable-pip-version-check jsonschema==4.23.0
+
+      - name: Preserve ECT software and restack onto exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp scripts/penta_wave3_mainline_integrate.py /tmp/penta_wave3_mainline_integrate.py
+          cp scripts/penta_wave3_ect_pipeline.py /tmp/penta_wave3_ect_pipeline.py
+          cp scripts/penta_wave3_ect_pipeline_v2.py /tmp/penta_wave3_ect_pipeline_v2.py
+          cp scripts/penta_wave3_ect_pipeline_v3.py /tmp/penta_wave3_ect_pipeline_v3.py
+          chmod +x \
+            /tmp/penta_wave3_mainline_integrate.py \
+            /tmp/penta_wave3_ect_pipeline.py \
+            /tmp/penta_wave3_ect_pipeline_v2.py \
+            /tmp/penta_wave3_ect_pipeline_v3.py
+          git fetch origin main
+          MAIN_SHA=$(git rev-parse origin/main)
+          echo "MAIN_SHA=$MAIN_SHA" >> "$GITHUB_ENV"
+          git checkout -B penta-wave3-ect-diagnostic-integration origin/main
+          git clean -fdx
+
+      - name: Execute ECT and print compact failure tail
+        shell: bash
+        env:
+          TRANSFORMER_PATH: /tmp/penta_wave3_mainline_integrate.py
+          BASE_PIPELINE_PATH: /tmp/penta_wave3_ect_pipeline.py
+          V2_PIPELINE_PATH: /tmp/penta_wave3_ect_pipeline_v2.py
+          OLD_HEAD: "105460c828e8baf0d034d43689b278b47d2f9833"
+          MAIN_SHA: ${{ env.MAIN_SHA }}
+          ECT_RUN_ID: ${{ github.run_id }}
+          ECT_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set +e
+          python /tmp/penta_wave3_ect_pipeline_v3.py > /tmp/penta-wave3-ect.log 2>&1
+          status=$?
+          echo "ECT_EXIT_CODE=$status"
+          echo "===== PENTA WAVE 3 ECT FINAL 600 LINES ====="
+          tail -n 600 /tmp/penta-wave3-ect.log
+          echo "===== END PENTA WAVE 3 ECT FINAL 600 LINES ====="
+          exit "$status"
