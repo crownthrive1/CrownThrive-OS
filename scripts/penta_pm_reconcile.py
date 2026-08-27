@@ -25,6 +25,9 @@ POLICY = ROOT / "config" / "penta_pm_policy.json"
 RECEIPT_DIR = ROOT / "artifacts" / "penta-pm"
 LINK_RE = re.compile(r"(?im)^\s*(closes|fixes|resolves|refs|references)\s+#(\d+)\b")
 
+OWNER_PROJECT_QUERY = """query($owner:String!,$repo:String!){repository(owner:$owner,name:$repo){id owner{__typename login ... on User{id projectsV2(first:100){nodes{id title number}}} ... on Organization{id projectsV2(first:100){nodes{id title number}}}}}}"""
+PROJECT_STATE_QUERY = """query($id:ID!){node(id:$id){... on ProjectV2{fields(first:100){nodes{... on ProjectV2FieldCommon{id name dataType}}} items(first:100){nodes{id content{... on Issue{id number} ... on PullRequest{id number}}}}}}}"""
+
 
 def request(method, url, token, payload=None):
     data = None if payload is None else json.dumps(payload).encode()
@@ -78,8 +81,7 @@ def ensure_milestones(api, token, policy, apply):
 
 
 def owner_project_context(token, owner, repo):
-    q = """query($owner:String!,$repo:String!){repository(owner:$owner,name:$repo){id owner{__typename login ... on User{id projectsV2(first:100){nodes{id title number}}} ... on Organization{id projectsV2(first:100){nodes{id title number}}}}}}}"""
-    return graphql(token, q, {"owner": owner, "repo": repo})["repository"]
+    return graphql(token, OWNER_PROJECT_QUERY, {"owner": owner, "repo": repo})["repository"]
 
 
 def ensure_project(token, owner, repo, title, apply):
@@ -97,8 +99,7 @@ def ensure_project(token, owner, repo, title, apply):
 
 
 def project_items_and_fields(token, project_id):
-    q = """query($id:ID!){node(id:$id){... on ProjectV2{fields(first:100){nodes{... on ProjectV2FieldCommon{id name dataType}}} items(first:100){nodes{id content{... on Issue{id number} ... on PullRequest{id number}}}}}}}}"""
-    return graphql(token, q, {"id": project_id})["node"]
+    return graphql(token, PROJECT_STATE_QUERY, {"id": project_id})["node"]
 
 
 def ensure_project_fields(token, project_id, required, apply):
@@ -170,6 +171,15 @@ def receipt(repo, mode, actions, holds):
     return payload
 
 
+def write_receipt(repo, mode, actions, holds):
+    out = receipt(repo, mode, actions, holds)
+    RECEIPT_DIR.mkdir(parents=True, exist_ok=True)
+    path = RECEIPT_DIR / "latest.json"
+    path.write_text(json.dumps(out, indent=2) + "\n")
+    print(json.dumps(out, indent=2))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY"))
@@ -185,37 +195,39 @@ def main():
     api = f"https://api.github.com/repos/{owner}/{repo}"
     policy = json.loads(POLICY.read_text())
     actions, holds = [], []
+    mode = "apply" if args.apply else "check"
 
-    milestones, a = ensure_milestones(api, token, policy, args.apply)
-    actions += a
-    project, a = ensure_project(token, owner, repo, policy["canonical_project"], args.apply)
-    actions += a
-    if project:
-        actions += ensure_project_fields(token, project["id"], policy["project_fields"], args.apply)
-        pstate = project_items_and_fields(token, project["id"])
-        existing = {n["content"]["number"] for n in pstate["items"]["nodes"] if n.get("content") and n["content"].get("number")}
-    else:
-        existing = set()
-
-    for artifact in get_open_artifacts(api, token):
-        labels = artifact.get("labels", [])
-        governed = any((x.get("name", "") if isinstance(x, dict) else str(x)).startswith("penta:") for x in labels)
-        if not governed:
-            continue
-        c = classify(labels, policy)
+    try:
+        milestones, a = ensure_milestones(api, token, policy, args.apply)
+        actions += a
+        project, a = ensure_project(token, owner, repo, policy["canonical_project"], args.apply)
+        actions += a
         if project:
-            actions += ensure_project_item(token, project["id"], artifact["node_id"], existing, artifact["number"], args.apply)
-        actions += ensure_milestone(api, token, artifact, c["milestone"], milestones, args.apply)
-        if "pull_request" in artifact and not LINK_RE.search(artifact.get("body") or ""):
-            holds.append({"type": "missing_development_link", "number": artifact["number"]})
-        if c["owner"] == "unassigned" or not c["lanes"] or c["risk"] == "unclassified" or c["stage"] == "unclassified":
-            holds.append({"type": "incomplete_classification", "number": artifact["number"], "classification": c})
+            actions += ensure_project_fields(token, project["id"], policy["project_fields"], args.apply)
+            pstate = project_items_and_fields(token, project["id"])
+            existing = {n["content"]["number"] for n in pstate["items"]["nodes"] if n.get("content") and n["content"].get("number")}
+        else:
+            existing = set()
 
-    out = receipt(args.repo, "apply" if args.apply else "check", actions, holds)
-    RECEIPT_DIR.mkdir(parents=True, exist_ok=True)
-    path = RECEIPT_DIR / "latest.json"
-    path.write_text(json.dumps(out, indent=2) + "\n")
-    print(json.dumps(out, indent=2))
+        for artifact in get_open_artifacts(api, token):
+            labels = artifact.get("labels", [])
+            governed = any((x.get("name", "") if isinstance(x, dict) else str(x)).startswith("penta:") for x in labels)
+            if not governed:
+                continue
+            c = classify(labels, policy)
+            if project:
+                actions += ensure_project_item(token, project["id"], artifact["node_id"], existing, artifact["number"], args.apply)
+            actions += ensure_milestone(api, token, artifact, c["milestone"], milestones, args.apply)
+            if "pull_request" in artifact and not LINK_RE.search(artifact.get("body") or ""):
+                holds.append({"type": "missing_development_link", "number": artifact["number"]})
+            if c["owner"] == "unassigned" or not c["lanes"] or c["risk"] == "unclassified" or c["stage"] == "unclassified":
+                holds.append({"type": "incomplete_classification", "number": artifact["number"], "classification": c})
+    except Exception as exc:
+        holds.append({"type": "provider_or_runtime_error", "error": str(exc)})
+        write_receipt(args.repo, mode, actions, holds)
+        return 1
+
+    write_receipt(args.repo, mode, actions, holds)
     if args.check and (actions or holds):
         return 2
     return 0
