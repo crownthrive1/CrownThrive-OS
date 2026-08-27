@@ -55,6 +55,19 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: PentaGate and PentaHeal preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          gate_status=0
+          python penta-control/scripts/penta_gate.py --root penta-control --output "$RUNNER_TEMP/pentagate-pr-lifecycle.json" || gate_status=$?
+          python penta-control/scripts/penta_heal.py --root penta-control --gate-report "$RUNNER_TEMP/pentagate-pr-lifecycle.json" --output "$RUNNER_TEMP/pentaheal-pr-lifecycle.json" || true
+          if [[ "$gate_status" -ne 0 ]]; then
+            echo 'PentaGate blocked terminal PR authority.'
+            cat "$RUNNER_TEMP/pentagate-pr-lifecycle.json"
+            exit "$gate_status"
+          fi
+
       - name: Preflight PentaTagger before terminal authority
         if: ${{ env.PENTA_MODE == 'merge' || env.PENTA_MODE == 'closer' }}
         env:
@@ -109,8 +122,21 @@ jobs:
             echo
             echo "- Authority invoked: **${PENTA_MODE:-unknown}**"
             echo "- Target PR: **${PENTA_NUMBER:-repository sweep}**"
-            echo '- Terminal chain: PentaTagger preflight → PentaMerge/PentaCloser → PentaTagger terminal readback'
+            echo '- Preflight chain: PentaGate → PentaHeal packet (if needed) → PentaTagger'
+            echo '- Terminal chain: PentaMerge/PentaCloser → PentaTagger terminal readback'
             echo
+            if [[ -f "$RUNNER_TEMP/pentagate-pr-lifecycle.json" ]]; then
+              echo '### PentaGate'
+              echo '```json'
+              cat "$RUNNER_TEMP/pentagate-pr-lifecycle.json"
+              echo '```'
+            fi
+            if [[ -f "$RUNNER_TEMP/pentaheal-pr-lifecycle.json" ]]; then
+              echo '### PentaHeal'
+              echo '```json'
+              cat "$RUNNER_TEMP/pentaheal-pr-lifecycle.json"
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ -f "$RUNNER_TEMP/penta-pr-lifecycle-tagger-preflight.md" ]]; then
