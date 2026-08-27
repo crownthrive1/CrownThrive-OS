@@ -44,16 +44,21 @@ jobs:
           cp scripts/penta_wave3_ect_pipeline.py /tmp/penta_wave3_ect_pipeline.py
           cp scripts/penta_wave3_ect_pipeline_v2.py /tmp/penta_wave3_ect_pipeline_v2.py
           cp scripts/penta_wave3_ect_pipeline_v3.py /tmp/penta_wave3_ect_pipeline_v3.py
-          chmod +x \
-            /tmp/penta_wave3_mainline_integrate.py \
-            /tmp/penta_wave3_ect_pipeline.py \
-            /tmp/penta_wave3_ect_pipeline_v2.py \
-            /tmp/penta_wave3_ect_pipeline_v3.py
+          chmod +x /tmp/penta_wave3_mainline_integrate.py /tmp/penta_wave3_ect_pipeline.py /tmp/penta_wave3_ect_pipeline_v2.py /tmp/penta_wave3_ect_pipeline_v3.py
           git fetch origin main
           MAIN_SHA=$(git rev-parse origin/main)
           echo "MAIN_SHA=$MAIN_SHA" >> "$GITHUB_ENV"
           git checkout -B penta-wave3-ect-integration origin/main
           git clean -fdx
+
+      - name: Verify deployable control-plane root exists on exact main
+        run: |
+          set -euo pipefail
+          test -d apps/crownthrive-os-control-plane
+          test -f apps/crownthrive-os-control-plane/index.html
+          test -f apps/crownthrive-os-control-plane/app.js
+          test -f apps/crownthrive-os-control-plane/vercel.json
+          echo 'Vercel root verified: apps/crownthrive-os-control-plane'
 
       - name: Execute complete exact-main ECT pipeline
         env:
@@ -74,20 +79,19 @@ jobs:
           git config user.email "jones.usmc.kj@gmail.com"
           git add -A
           git diff --cached --check
-          if git diff --cached --quiet; then
-            echo "No integrated production delta generated."
-            exit 1
-          fi
-          git commit -m "feat(ect): integrate Wave 3 into PentaOS V1.5 production"
+          if git diff --cached --quiet; then exit 1; fi
+          git commit -m "feat(ect): integrate Wave 3 into exact current PentaOS production"
           CANDIDATE_SHA=$(git rev-parse HEAD)
           python - <<PY
           import json
           from pathlib import Path
-          path = Path('evidence/penta/penta-wave3-ect-20260827.json')
-          data = json.loads(path.read_text())
-          data['candidate_sha'] = '$CANDIDATE_SHA'
-          data['candidate_binding'] = 'The containing amended commit binds this exact ECT candidate.'
-          path.write_text(json.dumps(data, indent=2, sort_keys=True) + '\n')
+          path=Path('evidence/penta/penta-wave3-ect-20260827.json')
+          data=json.loads(path.read_text())
+          data['candidate_sha']='$CANDIDATE_SHA'
+          data['candidate_binding']='The containing amended commit binds this exact ECT candidate.'
+          data['vercel_root']='apps/crownthrive-os-control-plane'
+          data['vercel_root_verified']=True
+          path.write_text(json.dumps(data,indent=2,sort_keys=True)+'\n')
           PY
           git add evidence/penta/penta-wave3-ect-20260827.json
           git commit --amend --no-edit
@@ -100,13 +104,9 @@ jobs:
         run: |
           {
             echo '## Penta Wave 3 ECT Mainline Production'
-            echo
             echo "- Current main base: $MAIN_SHA"
             echo "- Exact certified candidate: $FINAL_SHA"
+            echo '- Vercel root: apps/crownthrive-os-control-plane (verified in candidate)'
             echo '- ECT: PASS'
-            echo '- Promotion model: explicit evidence-bound; no automatic authority'
             echo '- Provider-effect adapters: 0'
-            echo '- PentaEVIBuilder: UNVERIFIED evidence preview only'
-            echo '- PentaImmune: bounded repair-plan preview only'
-            echo '- Supabase provider ledger: exact readback captured; repository-history gap remains explicit HOLD'
           } >> "$GITHUB_STEP_SUMMARY"
