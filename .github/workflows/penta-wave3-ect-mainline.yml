@@ -148,45 +148,116 @@ jobs:
           elif new_axis not in builder and current_axis not in builder:
               raise SystemExit("PentaOS explicit-axis precedence insertion point missing")
           builder_path.write_text(builder, encoding="utf-8")
-
-          os_path = Path("tests/test_penta_os_v1.py")
-          os_test = os_path.read_text(encoding="utf-8")
-          replacements = {
-              'self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 15)':
-                  'self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 16)',
-              '            "implemented": 40,': '            "implemented": 39,',
-              '            "production": 15,': '            "production": 16,',
-              'self.assertEqual(counts["members_with_declared_edges"], 69)':
-                  'self.assertEqual(counts["members_with_declared_edges"], 70)',
-              'self.assertEqual(counts["edge_count"], 157)':
-                  'self.assertEqual(counts["edge_count"], 161)',
-              'self.assertEqual(counts["internal_dependency_edges"], 142)':
-                  'self.assertEqual(counts["internal_dependency_edges"], 146)',
-              'self.assertEqual(counts["dependency_assessed_members"], 70)':
-                  'self.assertEqual(counts["dependency_assessed_members"], 71)',
-              'self.assertEqual(counts["dependency_unassessed_members"], 144)':
-                  'self.assertEqual(counts["dependency_unassessed_members"], 143)',
-              '            "HOLD_DEPENDENCY_INVENTORY_UNASSESSED": 144,':
-                  '            "HOLD_DEPENDENCY_INVENTORY_UNASSESSED": 143,',
-              '            "HOLD_DEPENDENCY_MATURITY": 8,':
-                  '            "HOLD_DEPENDENCY_MATURITY": 9,',
-              '("truth", "implemented", "D2")': '("truth", "production", "D2")',
-          }
-          for old, new in replacements.items():
-              if old in os_test:
-                  os_test = os_test.replace(old, new, 1)
-              elif new not in os_test:
-                  raise SystemExit(f"PentaOS expectation not found: {old}")
-          os_path.write_text(os_test, encoding="utf-8")
           PY
 
-      - name: Regenerate compile and validate canonical projections
+      - name: Regenerate PentaOS and synchronize exact golden census
         run: |
           set -euo pipefail
           python scripts/build_penta_os_v1.py --write
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import re
+
+          registry = json.loads(Path("data/penta/os-v1.registry.json").read_text(encoding="utf-8"))
+          counts = registry["counts"]
+          graph = registry["dependency_graph"]
+          context = next(row for row in registry["systems"] if row["machine_key"] == "penta.context")
+          if (context["axis"], context["maturity"], context["risk_ceiling"]) != ("truth", "production", "D2"):
+              raise SystemExit(f"PentaContext semantic projection is invalid: {context}")
+          expected_dependencies = {"penta.docs", "penta.route", "penta.credentials", "penta.status"}
+          if set(context.get("dependencies") or []) != expected_dependencies:
+              raise SystemExit(f"PentaContext dependency projection is invalid: {context.get('dependencies')}")
+          if "operational-memory" not in context.get("role", ""):
+              raise SystemExit("PentaContext role lost operational-memory semantics")
+
+          path = Path("tests/test_penta_os_v1.py")
+          text = path.read_text(encoding="utf-8")
+
+          def replace_once(pattern: str, replacement: str, label: str) -> None:
+              global text
+              updated, count = re.subn(pattern, replacement, text, count=1)
+              if count != 1:
+                  raise SystemExit(f"unable to synchronize PentaOS golden value: {label}")
+              text = updated
+
+          replace_once(
+              r'self\.assertEqual\(self\.registry\["counts"\]\["execution_eligible_by_registry"\], \d+\)',
+              f'self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], {counts["execution_eligible_by_registry"]})',
+              "execution_eligible_by_registry",
+          )
+          for maturity in ("implemented", "production", "specified"):
+              replace_once(
+                  rf'            "{maturity}": \d+,',
+                  f'            "{maturity}": {counts["by_maturity"][maturity]},',
+                  f"by_maturity.{maturity}",
+              )
+          for field in (
+              "dependency_assessed_members",
+              "dependency_unassessed_members",
+              "members_with_declared_edges",
+              "penta_dependency_edges",
+              "external_dependency_edges",
+              "unresolved_penta_dependencies",
+          ):
+              replace_once(
+                  rf'self\.assertEqual\(counts\["{field}"\], \d+\)',
+                  f'self.assertEqual(counts["{field}"], {counts[field]})',
+                  field,
+              )
+          for field in (
+              "cyclic_scc_count",
+              "cyclic_member_count",
+              "cyclic_internal_edge_count",
+              "condensed_component_count",
+              "condensed_edge_count",
+              "transitive_membership_count",
+              "maximum_transitive_closure",
+          ):
+              replace_once(
+                  rf'self\.assertEqual\(graph\["{field}"\], \d+\)',
+                  f'self.assertEqual(graph["{field}"], {graph[field]})',
+                  field,
+              )
+          partition = graph["readiness_partition"]
+          for state in (
+              "HOLD_DEPENDENCY_INVENTORY_UNASSESSED",
+              "HOLD_EXTERNAL_DEPENDENCY_UNBOUND",
+              "HOLD_UNCLASSIFIED_DEPENDENCY_CYCLE",
+              "HOLD_MEMBER_MATURITY",
+              "HOLD_DEPENDENCY_MATURITY",
+              "READY",
+          ):
+              replace_once(
+                  rf'            "{state}": \d+,',
+                  f'            "{state}": {partition[state]},',
+                  f"readiness_partition.{state}",
+              )
+          replace_once(
+              r'\("truth", "(?:implemented|production)", "D2"\)',
+              '("truth", "production", "D2")',
+              "penta.context identity semantics",
+          )
+          path.write_text(text, encoding="utf-8")
+          print(json.dumps({
+              "execution_eligible_by_registry": counts["execution_eligible_by_registry"],
+              "by_maturity": counts["by_maturity"],
+              "penta_dependency_edges": counts["penta_dependency_edges"],
+              "readiness_partition": partition,
+              "context": {
+                  "axis": context["axis"],
+                  "maturity": context["maturity"],
+                  "dependencies": context["dependencies"],
+              },
+          }, indent=2, sort_keys=True))
+          PY
           python scripts/pentadocs_quality.py --apply
           python scripts/build_penta_os_v1.py --check
           python scripts/pentadocs_quality.py --check
+
+      - name: Compile and validate canonical projections
+        run: |
+          set -euo pipefail
           python -m py_compile \
             runtime/penta_family.py runtime/penta_exec.py runtime/penta_interop.py \
             runtime/penta_runtime_suite.py runtime/penta_wave3_operations.py \
