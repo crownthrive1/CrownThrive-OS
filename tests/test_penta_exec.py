@@ -32,7 +32,7 @@ def test_evidence_promoted_mail_has_real_status_and_gate() -> None:
 
 def test_execution_adapter_registry_is_static_and_fail_closed() -> None:
     registry = load_adapter_registry(ROOT)
-    assert registry["fail_closed"] is True and registry["version"] == "1.3.0" and len(registry["adapters"]) == 18
+    assert registry["fail_closed"] is True and registry["version"] == "1.3.0" and len(registry["adapters"]) == 19
     assert all(adapter["provider_effect"] is False for adapter in registry["adapters"])
 
 
@@ -49,9 +49,9 @@ def test_unknown_handler_is_rejected() -> None:
 def test_family_execution_contract_covers_all_production_members() -> None:
     registry, snapshot = load_family(ROOT); result = family_validate(ROOT, registry, snapshot)
     assert result["disposition"] == "pass", result
-    assert result["details"]["blockers"] == [] and result["details"]["adapter_count"] == 18 and result["details"]["promotion_count"] == 5
+    assert result["details"]["blockers"] == [] and result["details"]["adapter_count"] == 19 and result["details"]["promotion_count"] == 5
     coverage = result["details"]["execution_adapter_coverage"]
-    assert coverage == {"eligible_member_count": 18, "eligible_members_with_adapter": 18, "missing_adapter_members": [], "complete": True}
+    assert coverage == {"eligible_member_count": 19, "eligible_members_with_adapter": 19, "missing_adapter_members": [], "complete": True}
 
 
 def test_beata_heartbeat_and_mesh_routing_execute() -> None:
@@ -72,10 +72,10 @@ def test_observability_adapters_execute_and_redact() -> None:
     assert metric["details"]["result"]["counters"]["penta.exec.calls"] == 2.0
 
 
-def test_heartbeat_and_od_see_all_promoted_production_members() -> None:
+def test_heartbeat_and_od_see_all_production_members() -> None:
     result = invoke_member(ROOT, source_member="penta.status", target_member="penta.heartbeat", operation="control_plane_probe", evidence_refs=["test:heartbeat"], risk_class="D0")
     probe = result["details"]["result"]
-    assert result["disposition"] == "completed" and probe["production_member_count"] == 18 and probe["healthy"] is True
+    assert result["disposition"] == "completed" and probe["production_member_count"] == 19 and probe["healthy"] is True
     assert all(row["adapter_bound"] for row in probe["members"])
     od = invoke_member(ROOT, source_member="penta.status", target_member="penta.od", operation="readiness_assess", evidence_refs=["test:od"], payload={"candidate_target": "penta.mail"}, risk_class="D0")
     readiness = od["details"]["result"]
@@ -113,9 +113,19 @@ def test_promoted_pentamail_status_is_bound_to_live_evidence() -> None:
 def test_promoted_pentastatus_owner_snapshot_is_current() -> None:
     result = invoke_member(ROOT, source_member="penta.status", target_member="penta.status", operation="owner_snapshot", evidence_refs=["test:status-owner"], risk_class="D0")
     snapshot = result["details"]["result"]
-    assert snapshot["production_member_count"] == 18 and snapshot["production_adapter_coverage_complete"] is True
+    assert snapshot["production_member_count"] == 19 and snapshot["production_adapter_coverage_complete"] is True
     assert snapshot["promotion_count"] == 5 and snapshot["provider_write_performed"] is False
     assert snapshot["hourly_reporting"]["provider_send_http_200_verified"] is True
+
+
+def test_pentacontext_contract_probe_is_local_and_evidence_bound() -> None:
+    result = invoke_member(ROOT, source_member="penta.status", target_member="penta.context", operation="contract_probe", evidence_refs=["test:context-contract"], risk_class="D0")
+    probe = result["details"]["result"]
+    assert result["disposition"] == "completed"
+    assert probe["schema"] == "ct.penta.context.contract-probe.v1" and probe["system_key"] == "penta.context" and probe["version"] == "1.1.0"
+    assert probe["effective_maturity"] == "production"
+    assert probe["provider_call_performed"] is False and probe["credential_material_accessed"] is False and probe["authority_expanded"] is False
+    assert len(probe["production_evidence"]["v1_1_automation_receipt_sha256"]) == 64
 
 
 def test_promoted_credentials_build_and_certify_operations_are_bounded() -> None:
