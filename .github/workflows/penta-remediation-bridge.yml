@@ -1,23 +1,29 @@
-name: Penta Remediation Bridge
+name: Penta Ranger + Remediation Bridge
 
 on:
   pull_request:
     paths:
       - 'runtime/penta_hold_remediation.py'
       - 'scripts/penta_remediation_bridge.py'
+      - 'scripts/penta_ranger.py'
       - 'tests/test_penta_hold_remediation.py'
       - 'tests/test_penta_remediation_bridge.py'
+      - 'tests/test_penta_ranger.py'
       - '.github/workflows/penta-remediation-bridge.yml'
   pull_request_target:
     types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft]
   schedule:
-    - cron: '12,32,52 * * * *'
+    - cron: '*/10 * * * *'
   workflow_dispatch:
     inputs:
       number:
-        description: Optional pull request number; blank performs an open-PR sweep
+        description: Optional pull request number; blank performs an open-PR Ranger sweep
         required: false
         default: ''
+      force:
+        description: Ignore next_check_at and execute this Ranger cycle now
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -28,12 +34,12 @@ permissions:
   actions: write
 
 concurrency:
-  group: penta-remediation-${{ github.repository }}-${{ github.event.pull_request.number || github.event.inputs.number || 'sweep' }}
+  group: penta-ranger-${{ github.repository }}-${{ github.event.pull_request.number || github.event.inputs.number || 'sweep' }}
   cancel-in-progress: false
 
 jobs:
   contract:
-    name: Validate remediation safety contract
+    name: Validate Ranger remediation safety contract
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -44,115 +50,84 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
-
-      - name: Compile bridge
-        run: |
-          python -m py_compile runtime/penta_hold_remediation.py scripts/penta_remediation_bridge.py
-
-      - name: Run focused remediation suite
+      - name: Compile Ranger and bridge
+        run: python -m py_compile runtime/penta_hold_remediation.py scripts/penta_remediation_bridge.py scripts/penta_ranger.py
+      - name: Run focused Ranger remediation suite
         run: |
           python -m unittest \
             tests.test_penta_hold_remediation \
             tests.test_penta_remediation_bridge \
+            tests.test_penta_ranger \
             -v
-
       - name: Assert authority boundary remains fail-closed
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          text = Path('scripts/penta_remediation_bridge.py').read_text()
-          forbidden = [
-              '/merge"',
-              'draft": False',
-              'conclusion": "success"',
-              'merge_authority_granted": True',
-          ]
-          hits = [token for token in forbidden if token in text]
+          files = [Path('scripts/penta_remediation_bridge.py'), Path('scripts/penta_ranger.py')]
+          forbidden = ['/merge"', 'draft": False', 'conclusion": "success"', 'merge_authority_granted": True', 'force": true']
+          hits = {str(p): [t for t in forbidden if t in p.read_text()] for p in files}
+          hits = {p: v for p, v in hits.items() if v}
           if hits:
-              raise SystemExit(f'forbidden terminal-authority mutation in remediation bridge: {hits}')
-          print('remediation authority boundary PASS')
+              raise SystemExit(f'forbidden terminal-authority mutation in Ranger/remediation plane: {hits}')
+          print('Ranger/remediation authority boundary PASS')
           PY
 
-  remediate:
-    name: Route and execute bounded remediation
+  ranger:
+    name: Ranger autonomous sweep, tag, remediate, repeat
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout trusted canonical control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
-
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
-
-      - name: Execute PentaCrawler → PentaFlows → PentaHelper bridge
+      - name: Execute PentaRanger watch-and-tag loop
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
           REQUESTED_NUMBER: ${{ github.event.inputs.number }}
+          FORCE_RANGER: ${{ github.event.inputs.force }}
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          import os
-          from scripts.penta_remediation_bridge import GH, remediate
-
-          gh = GH(os.environ['GITHUB_REPOSITORY'])
-          explicit = (os.environ.get('EVENT_PR_NUMBER') or os.environ.get('REQUESTED_NUMBER') or '').strip()
-          if explicit:
-              numbers = [int(explicit)]
-          else:
-              pulls = gh.paginate(f"/repos/{gh.repo}/pulls?state=open&per_page=100&sort=updated&direction=asc")
-              numbers = [int(pull['number']) for pull in pulls]
-
-          results = []
-          failures = []
-          for number in numbers:
-              try:
-                  results.append({'number': number, 'result': remediate(gh, number)})
-              except Exception as exc:
-                  failures.append({'number': number, 'error': str(exc)[:2000]})
-
-          report = {'schema': 'ct.penta.remediation-sweep.20260827.v1', 'results': results, 'failures': failures}
-          path = os.path.join(os.environ['RUNNER_TEMP'], 'penta-remediation-sweep.json')
-          with open(path, 'w', encoding='utf-8') as handle:
-              json.dump(report, handle, indent=2, sort_keys=True)
-              handle.write('\n')
-          print(json.dumps(report, indent=2, sort_keys=True))
-          if failures:
-              raise SystemExit(1)
-          PY
-
-      - name: Publish causal remediation summary
+          args=(sweep --repo "$GITHUB_REPOSITORY")
+          number="${EVENT_PR_NUMBER:-${REQUESTED_NUMBER:-}}"
+          if [[ -n "$number" ]]; then args+=(--number "$number"); fi
+          if [[ "${FORCE_RANGER:-false}" == "true" ]]; then args+=(--force); fi
+          python scripts/penta_ranger.py "${args[@]}" | tee "$RUNNER_TEMP/penta-ranger-sweep.json"
+      - name: Publish Ranger awareness summary
         if: always()
         shell: bash
         run: |
           {
-            echo '## Penta Remediation Bridge'
+            echo '## PentaRanger Autonomous Control Loop'
             echo
-            echo '- Detection: PentaCrawler exact-head check readback'
-            echo '- Routing: PentaFlows multi-domain fan-out'
-            echo '- Execution: PentaHelper bounded recipes only'
-            echo '- Durable state: hash-chained causal projection on each PR'
-            echo '- Terminal authority: retained by PentaPR/PentaMerge/PentaCloser'
+            echo '- Wake cadence: **every 10 minutes**'
+            echo '- Semantic tagging authority: **PentaTagger**'
+            echo '- Detection: **PentaCrawler exact-head readback**'
+            echo '- Routing: **PentaFlows multi-domain fan-out**'
+            echo '- Execution: **PentaHelper bounded recipes**'
+            echo '- Remediation SLA: **30 minutes**'
+            echo '- Escalation boundary: **60 minutes → PentaTriage**'
+            echo '- Durable awareness: **per-PR Ranger watchdog + remediation hash chain**'
+            echo '- Terminal authority: **PentaPR/PentaMerge/PentaCloser**'
             echo
-            if [[ -f "$RUNNER_TEMP/penta-remediation-sweep.json" ]]; then
+            if [[ -f "$RUNNER_TEMP/penta-ranger-sweep.json" ]]; then
               echo '```json'
-              cat "$RUNNER_TEMP/penta-remediation-sweep.json"
+              cat "$RUNNER_TEMP/penta-ranger-sweep.json"
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
