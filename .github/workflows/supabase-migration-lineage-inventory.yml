@@ -6,178 +6,42 @@ on:
       - repair/supabase-migration-lineage-20260827
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   materialize:
-    if: github.event.head_commit.message != 'chore(supabase): restore production migration lineage parity'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
-      - name: Materialize fail-closed lineage parity
+      - name: Materialize safe migration lineage parity
+        run: python3 scripts/repair_supabase_migration_lineage.py
+
+      - name: Verify generated parity receipt
         shell: bash
         run: |
-          set -euo pipefail
           python3 - <<'PY'
-          from pathlib import Path
-          import hashlib
           import json
-          import re
-          import shutil
-
-          branch = 'repair/supabase-migration-lineage-20260827'
-          migration_dir = Path('supabase/migrations')
-          lineage_dir = Path('supabase/migration_lineage')
-          versions_dir = lineage_dir / 'remote_versions'
-          legacy_dir = lineage_dir / 'legacy_local_timestamp_drift'
-          legacy_dir.mkdir(parents=True, exist_ok=True)
-
-          remote_versions = []
-          for path in sorted(versions_dir.glob('*.txt')):
-              for raw in path.read_text().splitlines():
-                  version = raw.strip()
-                  if version:
-                      if not re.fullmatch(r'\d{14}', version):
-                          raise SystemExit(f'invalid remote migration version: {version!r}')
-                      remote_versions.append(version)
-
-          if len(remote_versions) != 991:
-              raise SystemExit(f'expected 991 remote versions, found {len(remote_versions)}')
-          if len(set(remote_versions)) != 991:
-              raise SystemExit('duplicate remote migration version detected')
-          remote_versions = sorted(remote_versions)
-          remote_set = set(remote_versions)
-
-          before_files = sorted(migration_dir.glob('*.sql'))
-          archived = []
-          preserved = []
-          for path in before_files:
-              m = re.match(r'^(\d{14})_(.+)\.sql$', path.name)
-              if not m:
-                  raise SystemExit(f'noncanonical migration filename: {path.name}')
-              version = m.group(1)
-              if version not in remote_set:
-                  dst = legacy_dir / path.name
-                  if dst.exists():
-                      raise SystemExit(f'legacy archive collision: {dst}')
-                  shutil.move(str(path), str(dst))
-                  archived.append(path.name)
-              else:
-                  preserved.append(path.name)
-
-          active_by_version = {}
-          for path in sorted(migration_dir.glob('*.sql')):
-              version = path.name[:14]
-              if version in active_by_version:
-                  raise SystemExit(f'duplicate active migration version: {version}')
-              active_by_version[version] = path
-
-          created = []
-          marker = (
-              '-- CrownThrive migration-lineage restoration marker v1\n'
-              '-- This timestamp is recorded as APPLIED in production ThriveBase.\n'
-              '-- Exact historical SQL is intentionally not republished from production history.\n'
-              '-- Production history contains secret-like, Vault, and protected implementation patterns.\n'
-              '-- Canonical applied SQL remains in supabase_migrations.schema_migrations under ThriveBase custody.\n'
-              '-- This marker is a no-op and exists to restore Git/Supabase timestamp lineage parity.\n'
-              '-- Clean-room reconstruction from these public markers alone is NOT certified.\n'
-          )
-          for version in remote_versions:
-              if version in active_by_version:
-                  continue
-              path = migration_dir / f'{version}_remote_applied_lineage.sql'
-              path.write_text(f'-- remote_applied_version: {version}\n' + marker)
-              active_by_version[version] = path
-              created.append(path.name)
-
-          active_versions = sorted(p.name[:14] for p in migration_dir.glob('*.sql'))
-          if active_versions != remote_versions:
-              missing = sorted(remote_set - set(active_versions))
-              extra = sorted(set(active_versions) - remote_set)
-              raise SystemExit(f'lineage parity failed: missing={missing[:10]} extra={extra[:10]}')
-
-          risk_rows = [
-              ['20260822055806','chlom_wallet_stripe_controlled_webhook_v1',['known_token_prefix','vault_literal_create']],
-              ['20260822075132','chlom_wallet_phase_c_proof_settlement_portability_v1',['known_token_prefix']],
-              ['20260822173027','project_issue_routing_score_vault_custody_v2',['vault_literal_create']],
-              ['20260822173829','chlom_wallet_institutionalization_engine_v1',['known_token_prefix']],
-              ['20260822185903','chlom_wallet_institutionalization_package_runtime_v2',['known_token_prefix']],
-              ['20260822192348','chlom_wallet_institutionalization_oidc_immutable_subject_v2',['quoted_secret_assignment']],
-              ['20260822193646','crownthrive_interoperability_algorithms_v1',['vault_literal_create']],
-              ['20260822202236','create_sermon_commerce_control_plane',['known_token_prefix']],
-              ['20260822202703','add_sermon_membership_benefit_grants',['known_token_prefix']],
-              ['20260822203925','add_partner_circle_profiles_and_catalog',['known_token_prefix']],
-              ['20260823045850','crownthrive_services_stack_algorithms_v1',['vault_literal_create']],
-              ['20260823194846','thriveledger_v1_schema_core',['known_token_prefix']],
-              ['20260823235410','framework_production_promotion_and_cie_activation_v1',['known_token_prefix']],
-              ['20260824014850','thriveevergreen_autonomous_publisher_v2_production_guarded_observer',['known_token_prefix']],
-              ['20260826045309','reconcile_kjv_partner_terms_v1',['known_token_prefix']],
-              ['20260826202223','crown_connect_github_oauth_v1',['quoted_secret_assignment','sensitive_named_literal']],
-              ['20260826230616','penta_context_production_v1',['known_token_prefix']],
-              ['20260827015046','paypal_live_app_credentials_v1',['vault_literal_create']],
-          ]
-          risk_payload = {
-              'schema': 'crownthrive.supabase.migration-lineage-risk-scan/v1',
-              'scanned_remote_migrations': 991,
-              'total_recorded_sql_bytes': 10433449,
-              'max_single_migration_bytes': 183801,
-              'private_key_hits': 0,
-              'flagged_migrations': [
-                  {'version': v, 'name': n, 'risk_categories': cats}
-                  for v, n, cats in risk_rows
-              ],
-              'publication_policy': 'exact_historical_sql_withheld_from_public_git; version lineage only',
-          }
-          (lineage_dir / 'risk_scan_20260827.json').write_text(json.dumps(risk_payload, indent=2, sort_keys=True) + '\n')
-
-          readme = f'''# Supabase Migration Lineage Recovery\n\nThis directory records the 2026-08-27 repair of Git/Supabase migration-history drift after the canonical repository transition to `crownthrive1/CrownThrive-OS`.\n\n## Certified facts\n\n- Production ThriveBase recorded migration versions: **991**.\n- Active local migration versions before repair: **{len(before_files)}**.\n- Existing local migrations preserved at exact production timestamps: **{len(preserved)}**.\n- Local-only timestamp-drift migrations archived append-only: **{len(archived)}**.\n- Missing production timestamps materialized as public no-op lineage markers: **{len(created)}**.\n- Final active timestamp parity: **991 / 991**.\n- Production migration-history rows changed: **0**.\n\n## Security boundary\n\nExact historical SQL was not bulk-published from ThriveBase because a bounded scan identified 18 migrations containing secret-like literals, Vault literal creation patterns, or similarly protected implementation material. The production `supabase_migrations.schema_migrations` table remains the authoritative custody location for exact applied statements.\n\nThe marker files in `supabase/migrations` are intentionally non-executable no-ops. They repair timestamp lineage for Supabase deployment/branching reconciliation without pretending that protected historical SQL is safe for a public repository. Existing source migrations whose timestamps already match production remain intact.\n\n## Rebuild boundary\n\nA clean-room database rebuild using the public lineage markers alone is **HOLD** and is not certified. Clean-room recovery must use the protected ThriveBase recovery package / exact migration history or a separately certified sanitized schema baseline.\n\n## Rollback\n\nPre-repair repository base: `97f9d9b993e8d80f29b0ec73f290aef44960f3ab`. No production database rollback is required because this repair does not mutate production migration history.\n'''
-          (lineage_dir / 'README.md').write_text(readme)
-
-          manifest_text = '\n'.join(active_versions) + '\n'
-          (lineage_dir / 'active_versions_20260827.txt').write_text(manifest_text)
-          (lineage_dir / 'active_versions_20260827.sha256').write_text(hashlib.sha256(manifest_text.encode()).hexdigest() + '  active_versions_20260827.txt\n')
-
-          receipt = {
-              'schema': 'crownthrive.supabase.migration-lineage-receipt/v1',
-              'receipt_id': 'ct.supabase.migration-lineage.20260827.v1',
-              'remote_migration_count': 991,
-              'pre_repair_local_count': len(before_files),
-              'preserved_exact_timestamp_count': len(preserved),
-              'archived_local_only_count': len(archived),
-              'created_lineage_marker_count': len(created),
-              'post_repair_active_count': len(active_versions),
-              'remote_history_mutated': False,
-              'exact_sql_published': False,
-              'risk_flagged_migration_count': len(risk_rows),
-              'rollback_ref': '97f9d9b993e8d80f29b0ec73f290aef44960f3ab',
-              'branch': branch,
-              'history_policy': 'append_or_supersede_never_silent_delete',
-          }
-          (lineage_dir / 'receipt_20260827.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
-
-          print('REMOTE_COUNT=991')
-          print('PRE_REPAIR_LOCAL_COUNT=' + str(len(before_files)))
-          print('PRESERVED_EXACT_TIMESTAMP_COUNT=' + str(len(preserved)))
-          print('ARCHIVED_LOCAL_ONLY_COUNT=' + str(len(archived)))
-          print('CREATED_LINEAGE_MARKER_COUNT=' + str(len(created)))
-          print('POST_REPAIR_ACTIVE_COUNT=' + str(len(active_versions)))
-          print('PARITY=PASS')
+          from pathlib import Path
+          receipt = json.loads(Path('supabase/migration_lineage/receipt_20260827.json').read_text())
+          assert receipt['remote_migration_count'] == 991
+          assert receipt['post_repair_active_count'] == 991
+          assert receipt['remote_history_mutated'] is False
+          assert receipt['exact_sql_published'] is False
+          print('LINEAGE_RECEIPT=PASS')
           PY
 
-      - name: Remove one-time repair workflow from final branch content
-        shell: bash
-        run: git rm .github/workflows/supabase-migration-lineage-inventory.yml
-
-      - name: Commit repair branch
+      - name: Remove one-time repair workflow and commit branch result
         shell: bash
         run: |
           set -euo pipefail
+          git rm .github/workflows/supabase-migration-lineage-inventory.yml
           git config user.name 'CrownThrive Migration Lineage Repair'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add supabase/migrations supabase/migration_lineage
+          git add -A
+          git diff --cached --check
           git commit -m 'chore(supabase): restore production migration lineage parity'
           git push origin HEAD:repair/supabase-migration-lineage-20260827
