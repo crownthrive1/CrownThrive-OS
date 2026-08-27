@@ -240,6 +240,26 @@ Homepage body.
         self.assertIn("body H1 remains outside fenced code", joined)
         self.assertIn("deprecated CardGroup remains outside a fenced example", joined)
 
+    def test_live_html_comment_fails_repository_gate(self) -> None:
+        root = self.make_root()
+        quality.apply_repository(root)
+        path = root / "developers/example.mdx"
+        path.write_text(
+            path.read_text(encoding="utf-8") + "\n<!-- live comment -->\n",
+            encoding="utf-8",
+        )
+        parsed = quality.split_frontmatter(path.read_text(encoding="utf-8"))
+        assert parsed is not None
+        line = quality.raw_html_comment_lines(parsed[1])[0]
+
+        errors, stats = quality.validate_repository(root)
+        self.assertIn(
+            f"developers/example.mdx: line {line}: raw HTML comments are not valid MDX; "
+            "use {/* ... */}",
+            errors,
+        )
+        self.assertEqual(stats["raw_html_comment_pages"], 1)
+
     def test_historical_page_requires_warning_and_boundary(self) -> None:
         root = self.make_root()
         quality.apply_repository(root)
@@ -974,6 +994,31 @@ unterminated example
         self.assertEqual(facts["unclosed_fences"], 1)
         self.assertEqual(facts["heading_level_skips"], 1)
         self.assertGreater(facts["component_balance_errors"], 0)
+
+    def test_structural_gate_rejects_live_html_comments_only(self) -> None:
+        body = """## Overview
+
+`<!-- inline example -->`
+
+{/* valid MDX comment containing <!-- example text */}
+
+```mdx
+<!-- fenced example -->
+```
+
+<!-- live comment -->
+
+<!-- unterminated live comment
+"""
+        errors, facts = quality.validate_mdx_structure(body)
+        self.assertEqual(
+            errors,
+            [
+                "line 11: raw HTML comments are not valid MDX; use {/* ... */}",
+                "line 13: raw HTML comments are not valid MDX; use {/* ... */}",
+            ],
+        )
+        self.assertEqual(facts["raw_html_comments"], 2)
 
     def test_image_accessibility_gate_and_media_human_review_diagnostic(self) -> None:
         valid = f"""## Media

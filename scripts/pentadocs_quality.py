@@ -291,6 +291,7 @@ MINTLIFY_TAG_RE = re.compile(
 )
 INLINE_CODE_RE = re.compile(r"(?P<ticks>`+)(?P<content>.*?)(?P=ticks)", flags=re.DOTALL)
 MDX_COMMENT_RE = re.compile(r"\{/\*.*?\*/\}", flags=re.DOTALL)
+RAW_HTML_COMMENT_RE = re.compile(r"<!--")
 
 
 @dataclass(frozen=True)
@@ -604,6 +605,21 @@ def heading_level_skips(body: str) -> list[tuple[int, int, int]]:
     return skips
 
 
+def raw_html_comment_lines(body: str) -> list[int]:
+    """Return raw HTML comment openings that Mintlify's MDX parser rejects.
+
+    Fenced examples, inline code, and valid MDX comments are masked so the
+    gate only reports live page syntax.
+    """
+
+    visible = mask_inline_code(outside_fence_text(body))
+    visible = MDX_COMMENT_RE.sub(_mask_match_preserve_newlines, visible)
+    return [
+        visible.count("\n", 0, match.start()) + 1
+        for match in RAW_HTML_COMMENT_RE.finditer(visible)
+    ]
+
+
 def validate_known_component_balance(body: str) -> tuple[list[str], int]:
     """Balance only known paired Mintlify blocks outside code examples."""
 
@@ -719,11 +735,17 @@ def validate_image_accessibility(body: str) -> tuple[list[str], dict[str, int]]:
 
 
 def validate_mdx_structure(body: str) -> tuple[list[str], dict[str, int]]:
-    """Run conservative fence, heading, component, and accessibility checks."""
+    """Run conservative fence, MDX, heading, component, and accessibility checks."""
 
     errors: list[str] = []
     fence_lines = unclosed_fence_opening_lines(body)
     errors.extend(f"line {line}: Markdown code fence is not closed" for line in fence_lines)
+
+    html_comment_lines = raw_html_comment_lines(body)
+    errors.extend(
+        f"line {line}: raw HTML comments are not valid MDX; use {{/* ... */}}"
+        for line in html_comment_lines
+    )
 
     skips = heading_level_skips(body)
     errors.extend(
@@ -737,6 +759,7 @@ def validate_mdx_structure(body: str) -> tuple[list[str], dict[str, int]]:
     errors.extend(image_errors)
     return errors, {
         "unclosed_fences": len(fence_lines),
+        "raw_html_comments": len(html_comment_lines),
         "heading_level_skips": len(skips),
         "component_balance_errors": len(component_errors),
         "known_component_tags_checked": component_tags,
@@ -2079,6 +2102,7 @@ def validate_repository(root: Path) -> tuple[list[str], dict[str, Any]]:
         "orientation_render_collision_excess": 0,
         "page_specific_orientation_rate": 0.0,
         "unclosed_fence_pages": 0,
+        "raw_html_comment_pages": 0,
         "heading_level_skip_pages": 0,
         "component_balance_error_pages": 0,
         "known_component_tags_checked": 0,
@@ -2168,6 +2192,7 @@ def validate_repository(root: Path) -> tuple[list[str], dict[str, Any]]:
             f"{path.relative_to(root)}: {error}" for error in structural_errors
         )
         stats["unclosed_fence_pages"] += structural_facts["unclosed_fences"] > 0
+        stats["raw_html_comment_pages"] += structural_facts["raw_html_comments"] > 0
         stats["heading_level_skip_pages"] += structural_facts["heading_level_skips"] > 0
         stats["component_balance_error_pages"] += (
             structural_facts["component_balance_errors"] > 0
