@@ -7,27 +7,31 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: crownthrive-os-rebrand-migration
   cancel-in-progress: false
 
 jobs:
-  materialize-migration:
+  stage-migration:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Rewrite and package legacy repository identity
+      - name: Stage non-workflow repository identity migration
         shell: bash
         run: |
           set -euo pipefail
+          target_branch='chore/crownthrive-os-rebrand'
+          git fetch origin "$target_branch" main
+          git checkout -B "$target_branch" "origin/$target_branch"
+          git merge --ff-only origin/main
+
           python - <<'PY'
-          import json
           import re
           import subprocess
           from pathlib import Path
@@ -36,17 +40,10 @@ jobs:
           pattern = re.compile(re.escape(legacy), re.IGNORECASE)
           replacement = 'CrownThrive-OS'
           tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0')
-          stage = subprocess.check_output(['git', 'ls-files', '-s']).decode('utf-8').splitlines()
-          modes = {}
-          for line in stage:
-              if not line.strip():
-                  continue
-              mode, _, _, filename = line.split(None, 3)
-              modes[filename] = mode
-
           changed = []
+
           for filename in tracked:
-              if not filename:
+              if not filename or filename.startswith('.github/workflows/'):
                   continue
               path = Path(filename)
               try:
@@ -56,42 +53,21 @@ jobs:
               rewritten, count = pattern.subn(replacement, text)
               if count:
                   path.write_text(rewritten, encoding='utf-8')
-                  changed.append({
-                      'path': filename,
-                      'replacements': count,
-                      'mode': modes.get(filename, '100644')
-                  })
+                  changed.append((filename, count))
 
-          artifact_root = Path('/tmp/crownthrive-os-rebrand')
-          artifact_root.mkdir(parents=True, exist_ok=True)
-          for entry in changed:
-              src = Path(entry['path'])
-              dst = artifact_root / entry['path']
-              dst.parent.mkdir(parents=True, exist_ok=True)
-              dst.write_bytes(src.read_bytes())
-
-          manifest = {
-              'schema_version': '1.0.0',
-              'canonical_repository': 'crownthrive1/CrownThrive-OS',
-              'canonical_url': 'https://github.com/crownthrive1/CrownThrive-OS',
-              'legacy_repository_slug': legacy,
-              'replacement_repository_slug': replacement,
-              'changed_files': len(changed),
-              'replacements': sum(item['replacements'] for item in changed),
-              'files': changed
-          }
-          (artifact_root / '_migration_manifest.json').write_text(
-              json.dumps(manifest, indent=2) + '\n', encoding='utf-8'
-          )
-
-          print(f"Materialized files: {manifest['changed_files']}")
-          print(f"Materialized replacements: {manifest['replacements']}")
+          print(f'Staged non-workflow files: {len(changed)}')
+          print(f'Staged non-workflow replacements: {sum(count for _, count in changed)}')
+          for filename, count in changed:
+              print(f'  {filename}: {count}')
           PY
 
-      - name: Upload protected migration artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: crownthrive-os-rebrand-migration
-          path: /tmp/crownthrive-os-rebrand
-          if-no-files-found: error
-          retention-days: 7
+          if git diff --quiet; then
+            echo 'No non-workflow migration delta remains.'
+            exit 0
+          fi
+
+          git config user.name 'CrownThrive OS Automation'
+          git config user.email 'contact@crownthrive.com'
+          git add -u
+          git commit -m 'chore(os): migrate canonical repository identity'
+          git push origin HEAD:"$target_branch"
