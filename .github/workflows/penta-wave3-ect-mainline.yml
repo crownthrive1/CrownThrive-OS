@@ -94,6 +94,22 @@ jobs:
           OLD_HEAD: "105460c828e8baf0d034d43689b278b47d2f9833"
         run: python /tmp/penta_wave3_mainline_integrate.py
 
+      - name: Reconcile evidence-promoted portal regression
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/test_penta_family.py")
+          text = path.read_text(encoding="utf-8")
+          old = '    assert mail["sections"]["status"]["member_maturity"] == "specified"'
+          new = '    assert mail["sections"]["status"]["member_maturity"] == "production"'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("PentaMail portal maturity assertion was not found")
+          path.write_text(text, encoding="utf-8")
+          PY
+
       - name: Regenerate canonical PentaOS and PentaDocs projections
         run: |
           python scripts/build_penta_os_v1.py --write
