@@ -6,8 +6,8 @@ and ECT behavior. It adds two order-independent production invariants:
 
 1. maturity backed by an explicit production-evidence object survives every
    registry merge order; and
-2. the authority-anchor golden assertion is synchronized from the exact
-   generated candidate graph rather than a stale historical constant.
+2. generated golden assertions are synchronized from the exact candidate graph
+   and evidence-backed PentaContext state rather than stale historical constants.
 
 No provider write, migration apply, automatic promotion, D3 authority, secret
 access, autonomous repair, or self-certification is introduced here.
@@ -163,6 +163,23 @@ def synchronize_os_golden() -> dict[str, Any]:
 
     test_path = ROOT / "tests/test_penta_os_v1.py"
     test_text = test_path.read_text(encoding="utf-8")
+
+    # The base synchronizer historically updated one PentaContext tuple. The
+    # current test suite has two independent semantic assertions. Reconcile all
+    # remaining stale tuples and then prove no implemented-state expectation
+    # survives for an evidence-backed production member.
+    stale_context = '("truth", "implemented", "D2")'
+    production_context = '("truth", "production", "D2")'
+    test_text = test_text.replace(stale_context, production_context)
+    if stale_context in test_text:
+        raise base.PipelineError(
+            "stale PentaContext implemented-state assertion remains after reconciliation"
+        )
+    if test_text.count(production_context) < 2:
+        raise base.PipelineError(
+            "PentaContext production semantics are not asserted by both identity and runtime tests"
+        )
+
     pattern = (
         r'\{"chlom":\s*\d+,\s*"chlom/dail":\s*\d+,\s*"neither":\s*\d+\}'
     )
@@ -183,6 +200,9 @@ def synchronize_os_golden() -> dict[str, Any]:
     test_path.write_text(updated, encoding="utf-8")
 
     result["authority_anchor_depth"] = anchor
+    result["penta_context_production_assertion_count"] = updated.count(
+        production_context
+    )
     return result
 
 
