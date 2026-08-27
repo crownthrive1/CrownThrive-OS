@@ -269,7 +269,7 @@ const scanJob = async (job: Record<string, unknown>) => {
   }
 
   const deduped = [...new Map(observations.map((o) => [`${o.source_url}|${o.email ?? "NO_EMAIL"}|${o.evidence_sha256}`, o])).values()];
-  const { data, error } = await db.schema("crm").rpc("contact_discovery_complete_v1", {
+  const { data, error } = await db.rpc("penta_crawler_complete_v1", {
     p_queue_id: queueId,
     p_observations: deduped,
     p_error: null,
@@ -280,7 +280,7 @@ const scanJob = async (job: Record<string, unknown>) => {
 
 const recordFailure = async (job: Record<string, unknown>, error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  const { data, error: completionError } = await db.schema("crm").rpc("contact_discovery_complete_v1", {
+  const { data, error: completionError } = await db.rpc("penta_crawler_complete_v1", {
     p_queue_id: String(job.queue_id),
     p_observations: [],
     p_error: message.slice(0, 1800),
@@ -303,18 +303,18 @@ Deno.serve(async (req) => {
 
     if (action === "status") {
       const [{ data: authority, error: aError }, { data: offer, error: oError }] = await Promise.all([
-        db.schema("crm").rpc("commercial_send_authority_v1", { p_principal_id: "ct.ops.agent.email-attention" }),
-        db.schema("crm").rpc("outreach_offer_ready_v1", { p_offer_ref: "locticians.claimmonth50.v1" }),
+        db.rpc("penta_crawler_commercial_authority_v1", { p_principal_id: "ct.ops.agent.email-attention" }),
+        db.rpc("penta_crawler_offer_ready_v1", { p_offer_ref: "locticians.claimmonth50.v1" }),
       ]);
       if (aError) throw aError;
       if (oError) throw oError;
       return json({ ok: true, service: SOFTWARE, version: VERSION, state: "PRODUCTION_FAIL_CLOSED", authority, offer });
     }
 
-    const { data: control, error: controlError } = await db.schema("crm").rpc("outreach_control_plane_v1");
+    const { data: control, error: controlError } = await db.rpc("penta_crawler_control_plane_v1");
     if (controlError) throw controlError;
 
-    const { data: jobs, error: claimError } = await db.schema("crm").rpc("contact_discovery_claim_v1", { p_limit: batch });
+    const { data: jobs, error: claimError } = await db.rpc("penta_crawler_claim_v1", { p_limit: batch });
     if (claimError) throw claimError;
     const claimed = Array.isArray(jobs) ? jobs : [];
     const results: unknown[] = [];
@@ -323,12 +323,12 @@ Deno.serve(async (req) => {
       catch (error) { results.push(await recordFailure(job, error)); }
     }
 
-    const { data: promotion, error: promotionError } = await db.schema("crm").rpc("promote_verified_prospects_v1", { p_limit: 100 });
+    const { data: promotion, error: promotionError } = await db.rpc("penta_crawler_promote_v1", { p_limit: 100 });
     if (promotionError) throw promotionError;
 
     let scheduler: unknown = null;
     if (action === "tick") {
-      const { data, error } = await db.schema("crm").rpc("outreach_scheduler_tick_v1");
+      const { data, error } = await db.rpc("penta_crawler_scheduler_tick_v1");
       if (error) throw error;
       scheduler = data;
     }
