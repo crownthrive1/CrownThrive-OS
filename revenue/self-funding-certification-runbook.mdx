@@ -5,3 +5,154 @@ description: "PentaBuild, PentaCredentials and PentaCertify production-readiness
 icon: "shield-check"
 keywords: ["PentaCertify", "PentaBuild", "PentaCredentials", "self-funding certification", "money movement controls", "production gate"]
 ---
+
+# Self-Funding Certification Runbook
+
+## Objective
+
+Move the Self-Funding Business Engine from implemented/gated to production-capable only when evidence proves that the software, provider, contracts, rights, settlement and reversal paths all work together.
+
+## Gate 1 — PentaBuild
+
+Build and package:
+
+- allocation engine;
+- transaction state machine;
+- provider adapter;
+- contract registry bindings;
+- event/audit ledger;
+- reconciliation worker;
+- refund/dispute handlers;
+- dashboard/reporting surfaces;
+- automated test suite.
+
+Required evidence: build artifact, version, checksum, test report and deployment manifest.
+
+## Gate 2 — PentaCredentials
+
+Bind provider credentials through reference-only secret handling.
+
+Required evidence:
+
+- credential exists;
+- correct environment is selected;
+- minimum required scope;
+- secret not present in source/database payloads;
+- rotation path documented;
+- provider account ownership confirmed.
+
+## Gate 3 — Provider readiness
+
+For each connected provider:
+
+- onboarding complete;
+- transfer capability enabled;
+- required business information verified;
+- account status monitored;
+- payout destination verified;
+- provider-specific requirements current.
+
+## Gate 4 — Contract readiness
+
+No provider allocation may activate without an executed applicable agreement.
+
+Required:
+
+- counterparty;
+- covered products;
+- economic schedule;
+- effective date;
+- refund/dispute terms;
+- tax treatment;
+- rights/compliance representations;
+- termination;
+- signature evidence;
+- contract checksum.
+
+## Gate 5 — CHLOM / PentaGreen authorization
+
+CHLOM validates rights, eligibility and evidence. PentaGreen activates authorized commerce economics.
+
+Constitutional rule:
+
+> **PentaGreen may optimize within authority. It may never manufacture authority.**
+
+## Gate 6 — PentaCertify
+
+Certification must cover:
+
+1. read verification;
+2. write canary in a controlled environment;
+3. readback verification;
+4. idempotency/retry test;
+5. refund test;
+6. dispute/chargeback test;
+7. partial reversal test;
+8. failed-transfer test;
+9. reconciliation test;
+10. rollback/compensation test;
+11. audit evidence test;
+12. security/RLS test.
+
+## Gate 7 — Production authorization
+
+Only after all prior gates pass can the provider adapter move from `fail_closed_unbound` toward production-enabled state.
+
+Production authorization must identify:
+
+- exact adapter version;
+- exact provider account;
+- exact policy version;
+- exact contract versions;
+- approved transaction types;
+- approved currencies/geographies;
+- risk ceiling;
+- rollback owner;
+- monitoring owner;
+- authorization timestamp.
+
+## Gate 8 — Canary
+
+Production should begin with a constrained canary rather than unrestricted money movement.
+
+Monitor:
+
+- allocation accuracy;
+- processor settlement variance;
+- transfer success rate;
+- reversal success rate;
+- dispute rate;
+- duplicate-event rate;
+- provider capability failures;
+- reconciliation latency;
+- unexplained balance variance.
+
+Any critical mismatch places the engine in `HOLD`.
+
+## Gate 9 — Institutional release
+
+After canary success:
+
+```text
+PentaBuild
+   ↓
+PentaCredentials
+   ↓
+CHLOM
+   ↓
+PentaGreen
+   ↓
+PentaCertify
+   ↓
+Canary
+   ↓
+PentaRelease
+   ↓
+Production
+```
+
+The release record must preserve the exact evidence set. A later policy or contract change creates a new version and does not silently mutate historical transaction economics.
+
+## Current state
+
+The Self-Funding Business Engine is **implemented and bound at the control-plane level, with live money movement intentionally held**. The Stripe provider adapter is fail-closed/unverified for live transfer operations. This is the correct institutional state until the production gates above are independently satisfied.
