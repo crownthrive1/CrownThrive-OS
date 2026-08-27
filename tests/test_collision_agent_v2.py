@@ -25,7 +25,7 @@ def pull(number: int, head: str, base: str, body: str | None = None) -> dict[str
 
 
 class FakeGitHubClient:
-    repository = "crownthrive1/CrownThrive-Support"
+    repository = "crownthrive1/CrownThrive-OS"
 
     def __init__(
         self,

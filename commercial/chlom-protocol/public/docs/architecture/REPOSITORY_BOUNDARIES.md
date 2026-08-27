@@ -2,7 +2,7 @@
 
 ## Canonical public-safe governance parent
 
-`crownthrive1/CrownThrive-Support` is the CrownThrive-controlled **public** canonical governance parent for the factory-managed CHLOM commercial overlay. It carries public-safe institutional policy, documentation, standards, manifests, contracts, factory controls, validators, and release/projection rules.
+`crownthrive1/CrownThrive-OS` is the CrownThrive-controlled **public** canonical governance parent for the factory-managed CHLOM commercial overlay. It carries public-safe institutional policy, documentation, standards, manifests, contracts, factory controls, validators, and release/projection rules.
 
 The parent repository is authoritative for the **managed public projection layer**. It is not an authorized location for raw secrets, private keys, protected evidence bodies, private contracts, confidential implementation logic, protected-person data, private customer data, restricted economic logic, or other vault-bounded material.
 
@@ -31,7 +31,7 @@ The child does not become authoritative over parent-managed policy merely becaus
 restricted institutional sources / vault-bounded evidence
                  │ references only
                  ▼
-CrownThrive-Support
+CrownThrive-OS
 public-safe canonical governance parent
                  │ deterministic allowlisted projection
                  ▼

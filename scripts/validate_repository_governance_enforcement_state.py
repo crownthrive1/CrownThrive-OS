@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate CrownThrive-Support repository governance state."""
+"""Validate CrownThrive-OS repository governance state."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def main() -> int:
         "source_id": "S106",
         "phase": "3",
         "historical_origin_phase": "2.99",
-        "repository": "crownthrive1/CrownThrive-Support",
+        "repository": "crownthrive1/CrownThrive-OS",
         "branch": "main",
         "canonical_main_sha": "1a07a8755e3b18d01ec6720ec2522b1727780c01",
         "bootstrap_pr": 64,

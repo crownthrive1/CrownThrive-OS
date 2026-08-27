@@ -1,6 +1,6 @@
 # Legacy Draft/HOLD PR Reconciliation — 2026-08-26
 
-**Repository:** `crownthrive1/CrownThrive-Support`  
+**Repository:** `crownthrive1/CrownThrive-OS`  
 **Current generation:** Phase 3 / Penta Family
 
 This record resolves older open Draft/HOLD transports against current `main`. Supersession closes a transport; it does not erase its Git history, evidence or archival branch.

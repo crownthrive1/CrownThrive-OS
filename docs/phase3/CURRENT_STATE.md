@@ -109,7 +109,7 @@ Phase 3 does **not** mean:
 
 The connected canonical repository family for this Phase 3 convergence consists of:
 
-1. `crownthrive1/CrownThrive-Support` — CrownThrive OS public-safe source, institutional documentation, governance, release, support, version, archive, and downstream documentation projection source.
+1. `crownthrive1/CrownThrive-OS` — CrownThrive OS public-safe source, institutional documentation, governance, release, support, version, archive, and downstream documentation projection source.
 2. `crownthrive1/chlom-protocol` — CHLOM public-safe protocol, registry, schemas, services, evidence-oriented contracts, and integration governance.
 3. `crownthrive1/CrownThrive-CIE` — CIE framework package, doctrine, contracts, profiles, engine, runtime/federation material, and controlled public/internal boundaries.
 

@@ -50,7 +50,7 @@ begin
   end if;
 
   select * into v_parent from institutional_federation.repository_registry
-  where repo_id='ct.repo.crownthrive-support';
+  where repo_id='ct.repo.CrownThrive-OS';
   select * into v_child from institutional_federation.repository_registry
   where repo_id='ct.repo.cie';
   select * into v_pkg from institutional_federation.framework_package_registry
@@ -121,7 +121,7 @@ begin
   end if;
 
   select * into v_po from institutional_federation.repository_external_observations_v1
-  where repo_id='ct.repo.crownthrive-support' order by observed_at desc limit 1;
+  where repo_id='ct.repo.CrownThrive-OS' order by observed_at desc limit 1;
   select * into v_co from institutional_federation.repository_external_observations_v1
   where repo_id='ct.repo.cie' order by observed_at desc limit 1;
   if v_po.observation_id is null or not v_po.repository_exists or coalesce(v_po.archived,false)
@@ -134,7 +134,7 @@ begin
   end if;
 
   select * into v_guard from institutional_federation.repository_child_guardian_bindings_v1
-  where repo_id='ct.repo.cie' and parent_repo_id='ct.repo.crownthrive-support' and binding_state='active'
+  where repo_id='ct.repo.cie' and parent_repo_id='ct.repo.CrownThrive-OS' and binding_state='active'
   order by updated_at desc limit 1;
   if v_guard.repo_id is null or not v_guard.can_observe or not v_guard.can_nurture or not v_guard.can_open_handoff
      or v_guard.can_merge or v_guard.can_delete or v_guard.can_archive or v_guard.can_change_visibility
@@ -145,7 +145,7 @@ begin
   select exists(
     select 1 from institutional_federation.repository_family_relationships_v1
     where family_id='ct.family.repository-child-guardian.v1'
-      and source_resource_id='ct.repo.crownthrive-support'
+      and source_resource_id='ct.repo.CrownThrive-OS'
       and target_resource_id='ct.repo.cie'
       and machine_relation='PARENT_OF'
       and relationship_state='active'
@@ -181,7 +181,7 @@ begin
     interoperability_verified,architecture_root_sha256,evidence,source_ref,
     authority_effect,operational_activation,vote_effect,child_self_activation
   ) values (
-    'ct.contract.repository-parent-child-technical-link.v1','ct.repo.crownthrive-support','ct.repo.cie',
+    'ct.contract.repository-parent-child-technical-link.v1','ct.repo.CrownThrive-OS','ct.repo.cie',
     p_parent_head,p_child_head,1341314455,p_link_contract_sha256,'linked_governed',v_guard.guardian_agent_id,
     true,true,true,v_arch,
     coalesce(p_evidence,'{}'::jsonb)||jsonb_build_object(
@@ -202,7 +202,7 @@ begin
   if v_receipt is null then
     select link_receipt_id into v_receipt
     from institutional_federation.repository_parent_child_link_receipts_v1
-    where parent_repo_id='ct.repo.crownthrive-support' and child_repo_id='ct.repo.cie'
+    where parent_repo_id='ct.repo.CrownThrive-OS' and child_repo_id='ct.repo.cie'
       and parent_head_sha=p_parent_head and child_head_sha=p_child_head
     order by created_at desc limit 1;
   end if;
@@ -218,7 +218,7 @@ begin
         'post_activation_link_authority_effect',false,
         'production_authority_snapshot_rewritten',false
       ),updated_at=now()
-  where repo_id='ct.repo.crownthrive-support';
+  where repo_id='ct.repo.CrownThrive-OS';
 
   update institutional_federation.repository_registry
   set last_parent_sha=p_parent_head,last_child_sha=p_child_head,
@@ -236,7 +236,7 @@ begin
   v_dail:=chlom_runtime.append_dail_event(
     'repository.parent_child.production_assurance_refreshed','repository','ct.repo.cie',
     jsonb_build_object(
-      'parent_repo_id','ct.repo.crownthrive-support','parent_head_sha',p_parent_head,
+      'parent_repo_id','ct.repo.CrownThrive-OS','parent_head_sha',p_parent_head,
       'child_head_sha',p_child_head,'link_receipt_id',v_receipt,
       'activation_receipt_id',v_prod.receipt_id,'activation_parent_head',v_activation_parent,
       'production_authority_mode',v_prod.authority_mode,'production_authority_rewritten',false,

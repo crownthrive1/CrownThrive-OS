@@ -4,7 +4,7 @@
 
 CHLOM is built to coordinate heterogeneous systems without pretending they are one system. It can sit above databases, websites, APIs, MCPs, agents, providers, optional chains, contracts, and human governance while preserving identity, rights, evidence, correction, and economic boundaries.
 
-> **Repository role:** `crownthrive/chlom-protocol` is the public commercial child of the CHLOM repository family. The canonical public-safe governance parent is `crownthrive1/CrownThrive-Support`. Both repositories are public. Restricted institutional state, secrets, private contracts, protected evidence, private economic logic, and confidential implementation details belong outside public Git.
+> **Repository role:** `crownthrive/chlom-protocol` is the public commercial child of the CHLOM repository family. The canonical public-safe governance parent is `crownthrive1/CrownThrive-OS`. Both repositories are public. Restricted institutional state, secrets, private contracts, protected evidence, private economic logic, and confidential implementation details belong outside public Git.
 
 ## Why CHLOM exists
 

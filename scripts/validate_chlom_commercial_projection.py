@@ -76,7 +76,7 @@ def validate_pentafabric(pentafabric: dict) -> None:
     assert [layer["layer"] for layer in pentafabric["layers"]] == [1, 2, 3, 4, 5]
     assert pentafabric["canonical_terms"]["DAIL"] == "Decentralized Autonomous Information Ledger"
     assert pentafabric["canonical_terms"]["DLA"] == "Dynamic Licensing Asset"
-    assert pentafabric["repository_family"]["canonical_public_safe_parent"] == "crownthrive1/CrownThrive-Support"
+    assert pentafabric["repository_family"]["canonical_public_safe_parent"] == "crownthrive1/CrownThrive-OS"
     assert pentafabric["repository_family"]["public_commercial_child"] == "crownthrive/chlom-protocol"
     assert pentafabric["repository_family"]["both_public"] is True
     assert pentafabric["repository_family"]["restricted_state_in_public_git"] is False
@@ -171,7 +171,7 @@ def validate_manifest(
     continuous: dict,
     maintenance: dict,
 ) -> None:
-    assert manifest["canonical_parent_repository"] == "crownthrive1/CrownThrive-Support"
+    assert manifest["canonical_parent_repository"] == "crownthrive1/CrownThrive-OS"
     assert manifest["public_commercial_repository"] == "crownthrive/chlom-protocol"
     assert manifest["public_repository_role"] == "commercial_public_projection"
     assert manifest["architecture_id"] == "ct.architecture.pentafabric.v1"

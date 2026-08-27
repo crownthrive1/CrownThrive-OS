@@ -15,7 +15,7 @@ APP = {"slug": "github-actions"}
 
 class SelfCheckGH:
     def __init__(self, *, unrelated_pending: bool = False, empty_legacy: bool = False):
-        self.repo = "crownthrive1/CrownThrive-Support"
+        self.repo = "crownthrive1/CrownThrive-OS"
         self.unrelated_pending = unrelated_pending
         self.empty_legacy = empty_legacy
         self.pr = {

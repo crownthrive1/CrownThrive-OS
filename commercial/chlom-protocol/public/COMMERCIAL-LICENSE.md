@@ -2,7 +2,7 @@
 
 Copyright © 2026 CrownThrive, LLC. All rights reserved.
 
-This notice explains the commercial licensing posture of CHLOM™ and the relationship between the canonical public-safe governance parent, `crownthrive1/CrownThrive-Support`, and the public commercial child, `crownthrive/chlom-protocol`.
+This notice explains the commercial licensing posture of CHLOM™ and the relationship between the canonical public-safe governance parent, `crownthrive1/CrownThrive-OS`, and the public commercial child, `crownthrive/chlom-protocol`.
 
 ## Public visibility is not a commercial grant
 

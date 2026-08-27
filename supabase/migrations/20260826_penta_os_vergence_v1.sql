@@ -112,7 +112,7 @@ revoke all on penta_runtime.vergence_receipts_v1 from public, anon, authenticate
 grant select,insert on penta_runtime.vergence_receipts_v1 to service_role;
 
 insert into penta_runtime.component_registry_v1(component_key,canonical_name,role,primary_axis,stable_contract_id,aliases,backing_refs) values
-('penta.os','PentaOS','Operating-system umbrella and canonical technical namespace','execution','ct.penta.os.v1',array['CrownThrive OS'],jsonb_build_object('source','CrownThrive-Support')),
+('penta.os','PentaOS','Operating-system umbrella and canonical technical namespace','execution','ct.penta.os.v1',array['CrownThrive OS'],jsonb_build_object('source','CrownThrive-OS')),
 ('penta.vergence','PentaVergence','Convergence, reconciliation, stale-state repair and supersession','continuity','ct.penta.vergence.v1','{}',jsonb_build_object('runtime','penta_runtime.vergence_jobs_v1')),
 ('penta.techture','PentaTechture','Architecture definitions, ADRs and system decomposition','truth','ct.penta.techture.v1',array['architecture'],'{}'),
 ('penta.pology','PentaPology','Topology graph, dependencies, routes and reachability','interoperation','ct.penta.pology.v1',array['topology'],jsonb_build_object('runtime','penta_runtime.topology_edges_v1')),
@@ -164,7 +164,7 @@ insert into penta_runtime.agent_registry_v1(agent_id,canonical_name,owner_compon
 on conflict(agent_id) do update set canonical_name=excluded.canonical_name,owner_component_key=excluded.owner_component_key,role=excluded.role,capabilities=excluded.capabilities,status='active',updated_at=now();
 
 insert into penta_runtime.repository_registry_v1(repository_full_name,canonical_role,mutation_policy) values
-('crownthrive1/CrownThrive-Support','PentaOS institutional source and PentaDocs','governed'),
+('crownthrive1/CrownThrive-OS','PentaOS institutional source and PentaDocs','governed'),
 ('crownthrive1/CrownThrive-CIE','CIE child framework repository','governed'),
 ('crownthrive1/chlom-protocol','CHLOM protocol child repository','governed')
 on conflict(repository_full_name) do update set canonical_role=excluded.canonical_role,mutation_policy=excluded.mutation_policy,enabled=true,updated_at=now();

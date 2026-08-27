@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The **Cultural Imprint Engine (CIE)** is already in bounded governed production. Its immutable Founder-direct production authority remains tied to the exact activation snapshot. This watch keeps the *current repository-link assurance* healthy as CrownThrive-Support evolves, without converting routine parent-repository evolution into new production authority.
+The **Cultural Imprint Engine (CIE)** is already in bounded governed production. Its immutable Founder-direct production authority remains tied to the exact activation snapshot. This watch keeps the *current repository-link assurance* healthy as CrownThrive-OS evolves, without converting routine parent-repository evolution into new production authority.
 
 The watch is hosted by the existing Repository Child Guardian 30-minute cycle. It adds **no new cron job, no new external scheduler task, and no new agent authority**.
 
@@ -26,9 +26,9 @@ If external observations are absent or older than 90 minutes, the watcher return
 
 ## Parent-only automatic assurance
 
-A newer CrownThrive-Support `main` SHA may be automatically reconciled only when the newest trusted Support observation proves:
+A newer CrownThrive-OS `main` SHA may be automatically reconciled only when the newest trusted Support observation proves:
 
-- repository identity is exactly `crownthrive1/CrownThrive-Support` / repository ID `1336348391`;
+- repository identity is exactly `crownthrive1/CrownThrive-OS` / repository ID `1336348391`;
 - `compare_status=ahead`;
 - `compare_base_sha` equals the immutable Founder-authorized activation parent SHA;
 - `compare_head_sha` equals the newly observed Support `main` SHA;

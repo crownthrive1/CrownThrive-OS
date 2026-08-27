@@ -22,7 +22,7 @@ from penta_pr_lifecycle import (  # noqa: E402
 
 class FakeGH:
     def __init__(self):
-        self.repo = "crownthrive1/CrownThrive-Support"
+        self.repo = "crownthrive1/CrownThrive-OS"
         self.issue = {
             "number": 12,
             "labels": [

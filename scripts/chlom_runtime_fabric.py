@@ -51,7 +51,7 @@ def run_controller(out: Path):
         "schema": "dail.chlom.runtime-event.v1",
         "event_type": "RUNTIME_FABRIC_CYCLE",
         "run_id": run_id,
-        "repository": os.getenv("GITHUB_REPOSITORY", "crownthrive1/CrownThrive-Support"),
+        "repository": os.getenv("GITHUB_REPOSITORY", "crownthrive1/CrownThrive-OS"),
         "commit": os.getenv("GITHUB_SHA", "unknown"),
         "trigger": os.getenv("GITHUB_EVENT_NAME", "local"),
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

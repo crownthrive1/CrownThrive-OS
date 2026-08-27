@@ -4,7 +4,7 @@
 
 Campaign: `ct.penta.flow-control.20260826.v1`
 
-Release candidate: `crownthrive1/CrownThrive-Support@618fc84a503152d5075019272789c9694974e11a`
+Release candidate: `crownthrive1/CrownThrive-OS@618fc84a503152d5075019272789c9694974e11a`
 
 ## Required certification evidence
 

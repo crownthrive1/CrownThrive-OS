@@ -161,7 +161,7 @@ def test_penta_evi_builder_constructs_unverified_exact_head_bundle_only() -> Non
         "work_order_id": "wo-penta-v15",
         "subject": "Penta OS V1.5",
         "source_ref": "git:exact-head",
-        "repo": "crownthrive1/CrownThrive-Support",
+        "repo": "crownthrive1/CrownThrive-OS",
         "head_sha": "a" * 40,
         "target_state": "BUILD_CANDIDATE",
         "authority_level": "D1",
@@ -257,7 +257,7 @@ def test_execution_evidence_refs_match_the_bounded_schema_contract() -> None:
 def test_evi_preview_rejects_production_and_incomplete_evidence_contracts() -> None:
     payload = {
         "work_order_id": "wo-invalid", "subject": "Invalid preview", "source_ref": "git:exact-head",
-        "repo": "crownthrive1/CrownThrive-Support", "head_sha": "b" * 40,
+        "repo": "crownthrive1/CrownThrive-OS", "head_sha": "b" * 40,
         "target_state": "PRODUCTION", "authority_level": "D1", "observations": [], "claims": [],
         "test_receipts": [{"name": "focused", "status": "NOPE", "source": "test:invalid"}],
         "rollback": {"method": "git_revert", "target_head_sha": "c" * 40},

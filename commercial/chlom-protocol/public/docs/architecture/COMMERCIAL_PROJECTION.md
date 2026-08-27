@@ -8,7 +8,7 @@ The design separates **commercial discoverability** from **restricted implementa
 
 ## Repository truth
 
-- `crownthrive1/CrownThrive-Support` is the **public canonical governance parent** for the managed CHLOM commercial overlay.
+- `crownthrive1/CrownThrive-OS` is the **public canonical governance parent** for the managed CHLOM commercial overlay.
 - `crownthrive/chlom-protocol` is the **public commercial child**.
 - Restricted institutional state and confidential implementation bodies are not authorized for publication in either public repository.
 
@@ -34,7 +34,7 @@ The public child controls its own local validation, contribution workflow, publi
 governed CrownThrive sources
         |
         v
-CrownThrive-Support/main
+CrownThrive-OS/main
         |
         v
 commercial/chlom-protocol/public/

@@ -52,7 +52,7 @@ begin
   where package_id='ct.framework-package.cie' and event_type='activation'
   order by created_at desc limit 1;
   select * into v_parent_obs from institutional_federation.repository_external_observations_v1
-  where repo_id='ct.repo.crownthrive-support' order by observed_at desc limit 1;
+  where repo_id='ct.repo.CrownThrive-OS' order by observed_at desc limit 1;
   select * into v_child_obs from institutional_federation.repository_external_observations_v1
   where repo_id='ct.repo.cie' order by observed_at desc limit 1;
   select * into v_link from institutional_federation.repository_parent_child_link_receipts_v1
@@ -136,7 +136,7 @@ begin
     v_reason := 'CIE main moved beyond the Founder-authorized production child SHA; a child-code change cannot be auto-assured as parent continuity.';
     v_unlock := 'Run a new governed CIE production-source review and exact human/authorized production decision for the new child SHA before changing production authority.';
 
-  elsif v_parent_obs.evidence->>'repository' <> 'crownthrive1/CrownThrive-Support'
+  elsif v_parent_obs.evidence->>'repository' <> 'crownthrive1/CrownThrive-OS'
      or coalesce((v_parent_obs.evidence->>'repository_id')::bigint,0) <> 1336348391
      or coalesce((v_parent_obs.evidence->>'production_authority_rewritten')::boolean,false) then
     v_state := 'HOLD_SUPPORT_PARENT_OBSERVATION_TRUST_MISMATCH';

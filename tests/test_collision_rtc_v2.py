@@ -48,7 +48,7 @@ def make_intent(
         {
             "schema_version": "2.0.0",
             "intent_id": intent_id or str(uuid.uuid4()),
-            "repository": "crownthrive1/CrownThrive-Support",
+            "repository": "crownthrive1/CrownThrive-OS",
             "target": {"kind": "pull_request", "id": target_id},
             "agent": {
                 "agent_id": "ct.subagent.collision.preflight-sentinel",
