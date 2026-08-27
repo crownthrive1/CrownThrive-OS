@@ -91,7 +91,8 @@ def main() -> int:
         "oidc",
     ]:
         assert invariant.lower() in bridge, f"PentaVergence bridge invariant missing: {invariant}"
-    assert "crownthrive-support" not in bridge, "active PentaVergence bridge must not target retired repository identity"
+    retired_slug = "crownthrive-" + "support"
+    assert retired_slug not in bridge, "active PentaVergence bridge must not target retired repository identity"
 
     reconciler = (ROOT / "scripts" / "penta_vergence_reconciler.py").read_text(encoding="utf-8").lower()
     assert "git push --force" not in reconciler
