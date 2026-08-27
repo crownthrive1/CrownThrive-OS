@@ -1,0 +1,125 @@
+name: PentaRG Autonomous Governance and Recovery
+
+on:
+  pull_request:
+    paths:
+      - "scripts/penta_rg.py"
+      - "scripts/validate_vercel_control_plane.py"
+      - "tests/test_penta_rg.py"
+      - "tests/test_vercel_control_plane.py"
+      - "config/penta_rg_policy.json"
+      - "config/penta_rg_topology.json"
+      - "config/vercel_control_plane.json"
+      - ".github/workflows/**"
+      - "apps/crownthrive-os-control-plane/**"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/penta_rg.py"
+      - "scripts/validate_vercel_control_plane.py"
+      - "tests/test_penta_rg.py"
+      - "tests/test_vercel_control_plane.py"
+      - "config/penta_rg_policy.json"
+      - "config/penta_rg_topology.json"
+      - "config/vercel_control_plane.json"
+      - ".github/workflows/**"
+      - "apps/crownthrive-os-control-plane/**"
+  schedule:
+    - cron: "7,27,47 * * * *"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply policy-enumerated reversible recovery actions"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-rg-${{ github.repository }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: PentaRG governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile PentaRG and provider contract
+        run: |
+          python -m py_compile scripts/penta_rg.py scripts/validate_vercel_control_plane.py
+
+      - name: Execute focused PentaRG certification
+        run: |
+          python -m unittest tests.test_penta_rg tests.test_vercel_control_plane -v
+
+      - name: Audit topology, workflows, archives, restore contract and Vercel readiness
+        run: |
+          mkdir -p artifacts/penta-rg
+          python scripts/penta_rg.py audit --root . --output artifacts/penta-rg/local-audit.json
+          python scripts/validate_vercel_control_plane.py --root . --output artifacts/penta-rg/vercel-source.json
+
+      - name: Upload PentaRG contract receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-rg-contract-${{ github.sha }}
+          path: artifacts/penta-rg
+          if-no-files-found: error
+          retention-days: 90
+
+  autonomous-control:
+    name: PentaRG bounded autonomous administration
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Execute bounded provider audit, recovery and archival sweep
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          APPLY_REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.apply || true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/penta-rg
+          args=(remote --repo "$GITHUB_REPOSITORY" --output artifacts/penta-rg/provider-receipt.json)
+          if [[ "$APPLY_REQUESTED" == "true" ]]; then args+=(--apply); fi
+          python scripts/penta_rg.py "${args[@]}"
+
+      - name: Upload DAIL-ready provider receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-rg-provider-${{ github.run_id }}
+          path: artifacts/penta-rg
+          if-no-files-found: error
+          retention-days: 90
