@@ -183,7 +183,7 @@ See [`docs/archive/README.md`](docs/archive/README.md) and [`docs/archive/PENTA_
 
 ## Repository family
 
-The current canonical public-safe repository family includes `crownthrive1/CrownThrive-Support`, `crownthrive1/chlom-protocol`, and `crownthrive1/CrownThrive-CIE`, with other repositories and providers federated through the OS and PENTA control fabric according to their exact scope.
+The current canonical public-safe repository family includes `crownthrive1/CrownThrive-OS`, `crownthrive1/chlom-protocol`, and `crownthrive1/CrownThrive-CIE`, with other repositories and providers federated through the OS and PENTA control fabric according to their exact scope.
 
 ## Licensing, intellectual property, and machine use
 
@@ -211,7 +211,7 @@ That is PENTA. That is the institutional lifecycle through Phase 5. Every future
 ## Latest PentaRelease — v3.12.0.0
 
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-Support/releases/tag/v3.12.0.0
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.12.0.0
 - **Release title:** CrownThrive OS 3.12.0.0 — Autonomous PentaRelease
 - **Why:** new executable capability or runtime delta
 - **Changed paths:** 5
