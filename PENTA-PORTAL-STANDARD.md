@@ -50,6 +50,23 @@ Each PentaDocs guide SHALL include, proportionate to the subsystem:
 - FAQ and glossary
 - Trademark/provider attribution
 
+## Registry-driven PentaDocs namespace
+
+PentaDocs SHALL expose a dedicated top-level **Pentas** portal. The generated documentation surface is governed by `scripts/penta_portal_docs.py` and `data/penta/namespace-census.v1.json` and SHALL include:
+
+- `/pentas` — portal home and census summary;
+- `/pentas/all` — complete A–Z Penta namespace directory;
+- `/pentas/canonical` — every canonical Penta OS registry identity;
+- `/pentas/candidates` — aliases, governed extensions, founder-declared candidates, and unresolved references awaiting canonical disposition;
+- `/pentas/families` — the 15-family institutional directory;
+- `/pentas/families/{slug}` — one internally linked documentation page for each institutional family;
+- `/pentas/canonical/{slug}` — one dedicated guide for every canonical Penta; and
+- `/pentas/candidates/{slug}` — one fail-closed guide for every noncanonical Penta reference.
+
+The generator MUST fail on canonical-registry count drift, missing dedicated pages, duplicate documentation paths, or navigation drift. Candidate pages MUST explicitly state that documentation is not a production claim. Registry-backed and docs-inferred family assignments MUST remain distinguishable until the canonical family registry resolves them.
+
+The candidate/reference namespace is a preservation and canonicalization queue. A candidate may resolve to a distinct Penta, alias, primitive, subcomponent, engine, compatibility name, superseded name, or retired reference. Documentation alone SHALL NOT select that disposition.
+
 ## Portal readiness gate
 
 A route is not `PRODUCTION` merely because a page renders. Production readiness requires: canonical registry match; authenticated/authorized surface; current PentaStatus adapter; live or explicitly non-live operational state; valid docs link; dependency inventory; audit instrumentation; release/version identity; escalation path; no exposed secret material; and provider readback for any capability that claims external execution.
@@ -61,3 +78,5 @@ PentaStatus SHALL flag a Penta when the production version, portal behavior, pro
 ## New-Penta creation contract
 
 No future `Penta*` name is complete until PentaScribe registers its terminology/mark, the master Penta registry receives its identity and role, PentaDocs receives its guide, CrownThrive IO receives the dedicated route, PentaStatus receives a producer/status contract, and the applicable build/certify/release/security/governance controls are bound.
+
+Any newly registered canonical Penta or governed `data/penta/systems*.json` extension SHALL be picked up by the portal generator on the next governed docs reconciliation. Other named Penta references MUST first enter the candidate namespace so they are preserved without silent authority or maturity promotion.
