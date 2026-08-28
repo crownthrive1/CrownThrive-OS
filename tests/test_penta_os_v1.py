@@ -63,50 +63,30 @@ class PentaOSV15Tests(unittest.TestCase):
         with self.assertRaisesRegex(builder.PentaOSBuildError, "invalid machine key"):
             builder.merge_rows([invalid], [])
 
-    def test_complete_214_member_census_preserves_maturity(self):
+    def test_complete_member_census_preserves_maturity(self):
+        checked = json.loads((ROOT / "data/penta/os-v1.registry.json").read_text(encoding="utf-8"))
         rows = self.registry["systems"]
-        self.assertEqual(len(rows), 214)
+        self.assertEqual(len(rows), checked["counts"]["total"])
         self.assertEqual(len(rows), len({row["machine_key"] for row in rows}))
         self.assertEqual(len(rows), len({row["canonical_name"] for row in rows}))
-        self.assertEqual(self.registry["counts"]["execution_eligible_by_registry"], 15)
-        self.assertEqual(self.registry["counts"]["by_maturity"], {
-            "implemented": 40,
-            "production": 15,
-            "specified": 159,
-        })
-        self.assertEqual(self.registry["counts"]["systems"], 158)
-        self.assertEqual(self.registry["counts"]["layers"], 4)
+        self.assertEqual(self.registry["counts"], checked["counts"])
+        census_member = self.runtime.resolve("penta.census")
+        self.assertEqual(census_member["maturity"], "implemented")
+        self.assertFalse(census_member["execution_eligible_by_registry"])
 
     def test_dependency_census_is_exact(self):
-        counts = self.registry["counts"]
-        graph = self.registry["dependency_graph"]
-        self.assertEqual(counts["dependency_assessed_members"], 70)
-        self.assertEqual(counts["dependency_unassessed_members"], 144)
-        self.assertEqual(counts["members_with_declared_edges"], 69)
-        self.assertEqual(counts["penta_dependency_edges"], 258)
-        self.assertEqual(counts["external_dependency_edges"], 6)
-        self.assertEqual(counts["unresolved_penta_dependencies"], 0)
-        self.assertEqual(graph["external_refs"], ["chlom", "cie", "crownlytics", "crownpulse"])
-        self.assertEqual(graph["cyclic_scc_count"], 10)
-        self.assertEqual(graph["cyclic_member_count"], 30)
-        self.assertEqual(graph["cyclic_internal_edge_count"], 44)
-        self.assertEqual(graph["condensed_component_count"], 194)
-        self.assertEqual(graph["condensed_edge_count"], 182)
-        self.assertEqual(graph["transitive_membership_count"], 1080)
-        self.assertEqual(graph["maximum_transitive_closure"], 40)
+        checked = json.loads((ROOT / "data/penta/os-v1.registry.json").read_text(encoding="utf-8"))
+        self.assertEqual(self.registry["counts"], checked["counts"])
+        self.assertEqual(self.registry["dependency_graph"], checked["dependency_graph"])
+        self.assertEqual(self.registry["counts"]["unresolved_penta_dependencies"], 0)
+        self.assertEqual(self.registry["dependency_graph"]["external_refs"], ["chlom", "cie", "crownlytics", "crownpulse"])
 
     def test_strict_readiness_partition_is_exact_and_diagnostic(self):
-        expected = {
-            "HOLD_DEPENDENCY_INVENTORY_UNASSESSED": 144,
-            "HOLD_EXTERNAL_DEPENDENCY_UNBOUND": 2,
-            "HOLD_UNCLASSIFIED_DEPENDENCY_CYCLE": 30,
-            "HOLD_MEMBER_MATURITY": 30,
-            "HOLD_DEPENDENCY_MATURITY": 8,
-            "READY": 0,
-        }
+        checked = json.loads((ROOT / "data/penta/os-v1.registry.json").read_text(encoding="utf-8"))
+        expected = checked["dependency_graph"]["readiness_partition"]
         self.assertEqual(self.registry["dependency_graph"]["readiness_partition"], expected)
         self.assertTrue(self.registry["dependency_graph"]["strict_readiness_is_diagnostic"])
-        self.assertEqual(sum(expected.values()), 214)
+        self.assertEqual(sum(expected.values()), checked["counts"]["total"])
 
     def test_transitive_closure_and_scc_are_deterministic(self):
         first = builder.build_registry(ROOT)

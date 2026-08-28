@@ -114,6 +114,18 @@ def test_live_repository_contract() -> None:
     assert capital["eligible"] is False
     assert "implemented" in capital["reason"]
 
+    # PentaCensus is addressable through the production family, but family
+    # membership must not promote its independently governed implemented maturity.
+    assert "penta.census" in snapshot["members"]
+    census_member = snapshot["members"]["penta.census"]
+    assert census_member["maturity"] == "implemented"
+    assert census_member["source"] == "data/penta/systems.extensions.penta-census.json"
+    assert census_member["portal_route"] == "/penta/census"
+    census_gate = member_dispatch_gate(snapshot, "penta.census")
+    assert census_gate["eligible"] is False
+    assert census_gate["disposition"] == "hold_fail_closed"
+    assert "implemented" in census_gate["reason"]
+
     # Newly institutionalized family members are registered but stay held at
     # specified maturity until independent implementation/certification proof.
     for key in (
@@ -170,6 +182,11 @@ def test_every_member_has_portal_and_required_sections() -> None:
     assert mail["sections"]["status"]["member_maturity"] == "specified"
     assert mail["sections"]["status"]["execution_eligible"] is False
     assert set(registry["portal_contract"]["required_sections"]) <= set(mail["sections"])
+
+    census = member_portal(snapshot, registry, "penta.census")
+    assert census["portal_route"] == "/penta/census"
+    assert census["sections"]["status"]["member_maturity"] == "implemented"
+    assert census["sections"]["status"]["execution_eligible"] is False
 
 
 def test_contract_cannot_disable_fail_closed() -> None:
