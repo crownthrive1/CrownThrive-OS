@@ -49,6 +49,21 @@ def test_terminal_readback_is_passive_and_stage_coherent() -> None:
     assert "Final provider readback is GET-only" in workflow
 
 
+def test_workflow_run_is_exact_head_and_settlement_bound() -> None:
+    workflow = read(".github/workflows/penta-pr-autopilot.yml")
+    assert "RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}" in workflow
+    assert "/commits/{urllib.parse.quote(run_head)}/pulls" in workflow
+    assert "workflow_run:unresolved_head" in workflow
+    assert "workflow_run:head_moved" in workflow or "':head_moved'" in workflow
+    assert "Wait for exact-head CI settlement" in workflow
+    assert "time.monotonic() + 240" in workflow
+    assert "check.get('status') != 'completed'" in workflow
+    assert "context.get('state') == 'pending'" in workflow
+    assert "quiescent_exact_head" in workflow
+    assert "settlement_timeout" in workflow
+    assert "Failed completed checks remain fail-closed" in workflow
+
+
 def test_supabase_inventory_snapshot_is_not_a_mutable_expected_count() -> None:
     validator = read("scripts/validate_supabase_production_convergence_state.py")
     assert "local_count == expected_count" not in validator

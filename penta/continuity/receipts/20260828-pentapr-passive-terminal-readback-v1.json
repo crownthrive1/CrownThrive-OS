@@ -2,15 +2,16 @@
   "schema": "crownthrive.penta.serialized.git-receipt/v1",
   "receipt_id": "ct.penta.serialized.pentapr-passive-terminal-readback.20260828.v1",
   "created_at": "2026-08-28T19:30:00Z",
+  "updated_at": "2026-08-28T19:36:00Z",
   "actor": "PentaSerialized/PentaPR/PentaCertify",
-  "reason": "Repair the Penta PR Autopilot production canary failure by replacing a post-lifecycle mutating PentaTagger verification pass with authenticated GET-only provider readback. Preserve PentaTagger preflight, PentaPR lifecycle authority, exact-head merge gates, and all fail-closed boundaries.",
+  "reason": "Repair the Penta PR Autopilot production canary failures by making post-lifecycle provider verification GET-only and by adding exact-head workflow-run resolution plus a bounded CI settlement barrier before terminal evaluation. Preserve PentaTagger preflight, PentaPR lifecycle authority, exact-head merge gates, and all fail-closed boundaries.",
   "changes": [
     {
       "path": ".github/workflows/penta-pr-autopilot.yml",
       "operation": "modify",
       "previous_blob_sha": "34974dd3253ea45a80f814451d73bd01512e296d",
-      "new_blob_sha": "75274f0244452ad71ed4f63a4503896e31f7f222",
-      "reason": "Make terminal provider verification passive and read-only after PentaPR writes lifecycle state, eliminating the observed same-pass stage-label reclassification collision while explicitly verifying disposition/stage coherence and merge/close terminal labels.",
+      "new_blob_sha": "0e94ba780f40f991f65bc1162a77638802ac463a",
+      "reason": "Replace the post-lifecycle mutating tagger readback with authenticated GET-only verification; resolve workflow_run targets from payload PR or exact head SHA without silently degrading to a sweep; wait boundedly for queued/in-progress exact-head checks to settle before PentaPR terminal evaluation; never rewrite failed conclusions or bypass HOLD/draft/governance boundaries.",
       "rollback_ref": "c0a4c339e96e6d7de6d3045eeb32a761285c3eff"
     }
   ],
@@ -25,6 +26,8 @@
   "exclusions": [
     "No merge eligibility requirement is weakened.",
     "No PentaTagger preflight authority is removed.",
+    "The settlement barrier waits only for queued/in-progress exact-head checks; completed failures remain failures.",
+    "A workflow_run with unresolved or moved head is skipped rather than converted into a broad repository sweep.",
     "No D3 authority, credential, provider permission, payout authority, or money-movement permission is created.",
     "The passive readback performs authenticated GET requests only."
   ]
