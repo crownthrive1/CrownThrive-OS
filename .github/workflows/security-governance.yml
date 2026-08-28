@@ -81,7 +81,38 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Resolve dependency-review scope
+        id: dependency_scope
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --no-recurse-submodules --depth=256 origin "$BASE_SHA"
+          git fetch --no-tags --no-recurse-submodules --depth=256 origin "$HEAD_SHA"
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+          dependency_pattern='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|deno\.lock|requirements([^/]*)\.txt|Pipfile|Pipfile\.lock|poetry\.lock|pyproject\.toml|uv\.lock|Gemfile|Gemfile\.lock|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|composer\.json|composer\.lock|pom\.xml|build\.gradle|build\.gradle\.kts|gradle\.lockfile|packages\.lock\.json|paket\.dependencies|paket\.lock|mix\.exs|mix\.lock|Package\.swift|Package\.resolved)$'
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -Eq "$dependency_pattern"; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            echo "Dependency manifest changes detected; provider dependency review is required."
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency manifest changes detected; provider dependency review is not applicable."
+          fi
+
       - name: Review dependency changes
+        if: steps.dependency_scope.outputs.required == 'true'
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
+          base-ref: ${{ github.event.pull_request.base.sha }}
+          head-ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Record dependency-review no-op
+        if: steps.dependency_scope.outputs.required != 'true'
+        run: echo "Dependency review not applicable because the pull-request diff contains no dependency manifests."
