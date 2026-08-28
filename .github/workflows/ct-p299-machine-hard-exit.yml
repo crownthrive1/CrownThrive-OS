@@ -1,0 +1,147 @@
+name: CT-P299 Machine Hard Exit
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ct-p299-machine-hard-exit.yml"
+      - ".github/workflows/machine-trigger-asset-fabric.yml"
+      - "developers/manifests/ct-p299-machine-hard-exit.v1.json"
+      - "developers/manifests/machine-trigger-*.v1.json"
+      - "governance/phase3-entry-authority-receipt.v1.json"
+      - "governance/phase3-entry-recovery-receipt.v1.json"
+      - "scripts/evaluate_ct_p299_machine_exit.py"
+      - "scripts/machine_trigger_asset_fabric.py"
+      - "scripts/validate_machine_trigger_bindings.py"
+      - "technology/phase-3-readiness-gate.mdx"
+      - "technology/phase-3-institutional-core.mdx"
+      - "automation/perpetual-commercial-release-factory.mdx"
+      - "automation/machine-trigger-asset-fabric.mdx"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ct-p299-machine-hard-exit.yml"
+      - ".github/workflows/machine-trigger-asset-fabric.yml"
+      - "developers/manifests/ct-p299-machine-hard-exit.v1.json"
+      - "developers/manifests/machine-trigger-*.v1.json"
+      - "governance/phase3-entry-authority-receipt.v1.json"
+      - "governance/phase3-entry-recovery-receipt.v1.json"
+      - "scripts/evaluate_ct_p299_machine_exit.py"
+      - "scripts/machine_trigger_asset_fabric.py"
+      - "scripts/validate_machine_trigger_bindings.py"
+      - "technology/phase-3-readiness-gate.mdx"
+      - "technology/phase-3-institutional-core.mdx"
+      - "automation/perpetual-commercial-release-factory.mdx"
+      - "automation/machine-trigger-asset-fabric.mdx"
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+    inputs:
+      attempt_phase3_bootstrap:
+        description: "Require GO and emit the CT-PHASE3-BOOTSTRAP-v1 packet"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ct-p299-machine-hard-exit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: Evaluate CT-P299 hard exit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile and self-test phase gate
+        run: |
+          python -m py_compile scripts/evaluate_ct_p299_machine_exit.py
+          python scripts/evaluate_ct_p299_machine_exit.py --self-test
+
+      - name: Validate bound machine-trigger asset fabric
+        run: |
+          python -m py_compile scripts/machine_trigger_asset_fabric.py
+          python -m py_compile scripts/validate_machine_trigger_bindings.py
+          python scripts/machine_trigger_asset_fabric.py --validate-only
+          python scripts/validate_machine_trigger_bindings.py
+
+      - name: Acquire exact THIVEBASE snapshot through GitHub OIDC
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase3-inputs artifacts
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?}"
+          OIDC_RESPONSE="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ct-phase3-hard-exit")"
+          OIDC_TOKEN="$(jq -er '.value' <<<"${OIDC_RESPONSE}")"
+          BODY="$(jq -cn \
+            --arg head_sha "$(git rev-parse HEAD)" \
+            --arg event_name "${GITHUB_EVENT_NAME}" \
+            '{protocol:"ct_p299_phase3_snapshot_v1",head_sha:$head_sha,event_name:$event_name}')"
+          HTTP_CODE="$(curl --silent --show-error \
+            --output phase3-inputs/thivebase-snapshot.json \
+            --write-out "%{http_code}" \
+            -X POST "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/ct-phase3-hard-exit-snapshot" \
+            -H "Authorization: Bearer ${OIDC_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "${BODY}")"
+          if [[ "${HTTP_CODE}" != "200" ]]; then
+            echo "THIVEBASE snapshot unavailable; gate must HOLD/NO-GO (HTTP ${HTTP_CODE})."
+            cat phase3-inputs/thivebase-snapshot.json || true
+          fi
+
+      - name: Evaluate current gate state
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CT_REPOSITORY: ${{ github.repository }}
+          CT_EXPECTED_MAIN: main
+        run: |
+          python scripts/evaluate_ct_p299_machine_exit.py \
+            --thivebase-snapshot phase3-inputs/thivebase-snapshot.json \
+            --output artifacts/ct-p299-hard-exit-evaluation.json
+          cat artifacts/ct-p299-hard-exit-evaluation.json
+
+      - name: Require GO and emit bootstrap packet when explicitly requested
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.attempt_phase3_bootstrap }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CT_REPOSITORY: ${{ github.repository }}
+          CT_EXPECTED_MAIN: main
+        run: |
+          python scripts/evaluate_ct_p299_machine_exit.py \
+            --thivebase-snapshot phase3-inputs/thivebase-snapshot.json \
+            --output artifacts/ct-p299-hard-exit-evaluation.json \
+            --emit-bootstrap artifacts/ct-phase3-bootstrap-v1.json \
+            --require-go
+          cat artifacts/ct-phase3-bootstrap-v1.json
+
+      - name: Re-run documentation governance
+        run: python scripts/validate_docs.py
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
