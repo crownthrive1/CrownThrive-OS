@@ -1,0 +1,93 @@
+{
+  "component_id": "ct.pentamarketer.persona-execution-bridge",
+  "system_key": "penta.persona-execution",
+  "canonical_name": "PentaMarketer Persona Execution Bridge",
+  "version": "1.0.0",
+  "institutional_phase": "phase_3",
+  "source_state": "candidate_until_source_acceptance_and_post_deploy_readback",
+  "purpose": "Convert PentaMarketer persona routing into bounded, idempotent, evidence-backed execution through existing governed Penta systems.",
+  "risk_ceiling": "D2",
+  "autonomy": {
+    "D0": "eligible_for_bounded_automation",
+    "D1": "eligible_for_bounded_automation",
+    "D2": "eligible_only_with_exact_capability_binding_and_existing_governed_downstream_control",
+    "D3": "human_reserved_fail_closed"
+  },
+  "architecture": {
+    "broker": "crm.penta_persona_enqueue_execution_v1",
+    "executor": "crm.penta_persona_execute_one_v1",
+    "worker": "crm.penta_persona_execution_tick_v1",
+    "scheduler": "crm.penta_persona_execution_scheduler_tick_v1",
+    "status": "crm.penta_persona_execution_status_v1",
+    "canary": "crm.penta_persona_execution_canary_v1",
+    "capability_sync": "crm.penta_persona_capability_sync_v1",
+    "event_ledger": "crm.penta_persona_execution_events_v1"
+  },
+  "integrated_penta_systems": [
+    "PentaMation",
+    "PentaMaker",
+    "PentaMeshes",
+    "PentaWorkforce",
+    "PentaReports",
+    "PentaAssure",
+    "PentaService",
+    "PentaGreen",
+    "CHLOM"
+  ],
+  "domain_adapters": [
+    "Virality Music knowledge",
+    "Virality service qualification",
+    "Go Flipbooks capacity-aware quote",
+    "PentaService qualification",
+    "explicit persona handoff"
+  ],
+  "safety_contract": {
+    "least_privilege": true,
+    "fixed_handler_allowlist": true,
+    "dynamic_sql": false,
+    "raw_secret_payloads": false,
+    "credential_body_access": false,
+    "direct_provider_writes": false,
+    "direct_money_movement": false,
+    "direct_rights_grant": false,
+    "direct_merge_authority": false,
+    "d3_auto": false,
+    "idempotency_required": true,
+    "append_only_execution_events": true,
+    "rls_service_role_boundary": true,
+    "retry_backoff": true,
+    "max_retry_seconds": 900,
+    "kill_switch": true,
+    "synthetic_work_auto_execution": false,
+    "payment_and_entitlement_gate_supported": true,
+    "chlom_invocation_gate_supported": true
+  },
+  "business_boundaries": {
+    "backroad_editorial_firewall_preserved": true,
+    "virality_rights_grants_require_chlom": true,
+    "high_ticket_quotes_remain_qualification_or_proposal_paths": true,
+    "pentaservice_fulfillment_requires_valid_entitlement": true,
+    "provider_failure_is_not_billable": true,
+    "go_flipbooks_capacity_policy_is_authoritative": true
+  },
+  "source_files": [
+    "supabase/migrations/20260828193000_pentamarketer_persona_execution_bridge_schema_v1.sql",
+    "supabase/migrations/20260828193100_pentamarketer_persona_execution_bridge_runtime_v1.sql",
+    "supabase/migrations/20260828193150_pentamarketer_persona_execution_scheduler_hardening_v1.sql",
+    "supabase/migrations/20260828193200_pentamarketer_persona_execution_bridge_certification_v1.sql",
+    "supabase/rollback/20260828193200_pentamarketer_persona_execution_bridge_v1.sql"
+  ],
+  "promotion_contract": {
+    "source_pr_required": true,
+    "runtime_canary_required": true,
+    "all_canary_checks_must_pass": true,
+    "penta_assure_certification_required": true,
+    "cron_readback_required": true,
+    "post_deploy_registry_readback_required": true,
+    "production_claim_before_readback": false
+  },
+  "rollback": {
+    "source": "supabase/rollback/20260828193200_pentamarketer_persona_execution_bridge_v1.sql",
+    "behavior": "Unschedule automation, set kill switch, hold capabilities, cancel only not-yet-running queued/retry work, preserve all evidence and history."
+  }
+}
