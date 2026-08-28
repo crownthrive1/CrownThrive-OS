@@ -92,29 +92,46 @@ function stableStringify(value) {
   return JSON.stringify(value);
 }
 
-function safeHealthProjection(payload = {}) {
+function firstDefined(...values) {
+  return values.find((value) => value !== undefined && value !== null);
+}
+
+export function safeHealthProjection(payload = {}) {
   return {
     schema: payload.schema || null,
     service: payload.service || null,
     role: payload.role || null,
     status: payload.status || 'UNKNOWN',
-    operating_mode: payload.operating_mode || null,
-    readiness_status: payload.readiness_status || null,
-    capability_states: payload.capability_states || null,
+    operating_mode:
+      firstDefined(payload.operating_mode, payload.operatingMode) || null,
+    readiness_status:
+      firstDefined(payload.readiness_status, payload.readinessStatus) || null,
+    capability_states:
+      firstDefined(payload.capability_states, payload.capabilityStates) || null,
     release: payload.release || 'unknown',
     environment: payload.environment || null,
     provider_state:
-      payload.provider_state || payload.vercel_provider_state || 'UNKNOWN',
-    provider_readback: payload.provider_readback === true,
-    write_state: payload.write_state || null,
-    project_id: payload.project_id || null,
+      firstDefined(
+        payload.provider_state,
+        payload.providerState,
+        payload.vercel_provider_state,
+      ) || 'UNKNOWN',
+    provider_readback:
+      payload.provider_readback === true || payload.providerReadback === true,
+    write_state:
+      firstDefined(payload.write_state, payload.writeState) || null,
+    project_id:
+      firstDefined(payload.project_id, payload.projectId) || null,
     repository: payload.repository || null,
-    build_sha: payload.build_sha || null,
-    deployment_id: payload.deployment_id || null,
+    build_sha:
+      firstDefined(payload.build_sha, payload.buildSha) || null,
+    deployment_id:
+      firstDefined(payload.deployment_id, payload.deploymentId) || null,
     capabilities: Array.isArray(payload.capabilities)
       ? payload.capabilities
       : [],
-    pass_manufactured: payload.pass_manufactured === true,
+    pass_manufactured:
+      payload.pass_manufactured === true || payload.passManufactured === true,
   };
 }
 

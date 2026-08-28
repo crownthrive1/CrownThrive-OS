@@ -1,0 +1,62 @@
+name: Penta Cookie Runtime Certification
+on:
+  pull_request:
+    paths:
+      - 'contracts/chlom/penta-economic-cookie-fabric.v1.json'
+      - 'contracts/penta/pentaproof.v1.json'
+      - '.pentarelease/penta-economic-cookie-fabric-v1.json'
+      - 'data/penta/systems.pentaproof.v1.json'
+      - 'scripts/penta-cookie-canary.mjs'
+      - 'scripts/penta-proof.mjs'
+      - 'scripts/penta-proof-selftest.mjs'
+      - '.github/workflows/penta-cookie-certification.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/chlom/penta-economic-cookie-fabric.v1.json'
+      - 'contracts/penta/pentaproof.v1.json'
+      - '.pentarelease/penta-economic-cookie-fabric-v1.json'
+      - 'data/penta/systems.pentaproof.v1.json'
+      - 'scripts/penta-cookie-canary.mjs'
+      - 'scripts/penta-proof.mjs'
+      - 'scripts/penta-proof-selftest.mjs'
+      - '.github/workflows/penta-cookie-certification.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: penta-cookie-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+      - name: Run PentaProof fail-closed self-tests
+        run: node scripts/penta-proof-selftest.mjs | tee penta-proof-selftest-evidence.json
+      - name: Validate PentaProof self-test verdict
+        run: node -e "const e=require('./penta-proof-selftest-evidence.json'); if(e.verdict!=='PASS'||e.failed!==0||e.passed!==7||e.tests.length!==7) process.exit(1)"
+      - name: Run fail-closed cookie canaries
+        run: node scripts/penta-cookie-canary.mjs | tee penta-cookie-evidence.json
+      - name: Validate cookie evidence verdict
+        run: node -e "const e=require('./penta-cookie-evidence.json'); if(e.verdict!=='PASS'||e.failed!==0||e.passed!==14||e.tests.length!==14) process.exit(1)"
+      - name: PentaProof bind certification evidence
+        run: node scripts/penta-proof.mjs penta-cookie-evidence.json penta-proof-envelope.json
+      - name: Validate PentaProof envelope
+        run: node -e "const e=require('./penta-proof-envelope.json'); if(e.penta!=='PentaProof'||e.verdict!=='PASS'||e.state!=='CERTIFIED_EVIDENCE'||!e.envelope_sha256) process.exit(1)"
+      - name: Upload certification and proof evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-cookie-certification-${{ github.sha }}
+          path: |
+            penta-cookie-evidence.json
+            penta-proof-selftest-evidence.json
+            penta-proof-envelope.json
+          if-no-files-found: error
+          retention-days: 90
