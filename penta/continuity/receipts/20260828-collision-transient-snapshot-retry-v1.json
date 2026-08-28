@@ -2,16 +2,16 @@
   "schema": "crownthrive.penta.serialized.git-receipt/v1",
   "receipt_id": "ct.penta.serialized.collision-transient-snapshot-retry.20260828.v1",
   "created_at": "2026-08-28T20:02:00Z",
-  "updated_at": "2026-08-28T20:02:00Z",
+  "updated_at": "2026-08-28T20:04:00Z",
   "actor": "PentaSerialized/PentaRG/PentaPR/PentaCertify",
-  "reason": "Prevent a transient open-PR snapshot fence change from becoming a persistent trusted-collision blocker while preserving the first fail-closed evaluation and all substantive HOLD conditions.",
+  "reason": "Prevent a transient open-PR snapshot fence change from becoming a persistent trusted-collision blocker while preserving the first fail-closed evaluation, the configured material-collision threshold, and all substantive HOLD conditions.",
   "changes": [
     {
       "path": ".github/workflows/collision-governance-trusted-v2.yml",
       "operation": "modify",
       "previous_blob_sha": "1326d31732f34e21ff280df0f36e46869ed6a69c",
-      "new_blob_sha": "fb9b48e7abf28871205a4ec4010f4c3f9608bece",
-      "reason": "Boundedly recompute trusted collision preflight only when the sole reason code is snapshot_changed_during_evaluation, there are no collisions or inspection errors, and main/candidate SHAs remained stable. Preserve per-attempt reports and fail after three attempts or immediately on any substantive condition.",
+      "new_blob_sha": "260269f4b62ae1e5055452c898c77c2db9ef2fef",
+      "reason": "Boundedly recompute trusted collision preflight when snapshot_changed_during_evaluation is present, no collision reaches the configured fail threshold, there are no inspection errors, and main/candidate SHAs remained stable. Severity-1 awareness overlaps remain observable but do not become a false material blocker solely because the open-PR inventory changed mid-scan. Preserve per-attempt reports and fail after three attempts or immediately on material conditions.",
       "rollback_ref": "5053ca5e0b20ce7e918c1b47ed2612e5ea3d48a4"
     }
   ],
@@ -24,10 +24,11 @@
     "rollback_preserved": true
   },
   "exclusions": [
-    "No collision severity threshold is weakened.",
-    "No failed evaluation is converted to PASS.",
-    "Any real collision, inspection error, provider read failure, changed main SHA, changed candidate SHA, or additional HOLD reason remains immediately fail-closed.",
+    "No collision severity threshold is weakened; trusted preflight remains fail-on-severity 2.",
+    "No failed evaluation is converted to PASS; each retry runs the collision agent again against fresh provider state.",
+    "Any collision at or above the configured fail threshold, inspection error, provider read failure, changed main SHA, or changed candidate SHA remains fail-closed.",
     "Retry count is bounded to three evaluations; exhaustion remains failure.",
+    "Severity-1 awareness remains recorded in collision reports and repair proposals.",
     "No D3, credential, provider-write, payout, release, or money-movement authority is added."
   ]
 }
