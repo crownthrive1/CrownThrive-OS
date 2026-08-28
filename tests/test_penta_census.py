@@ -37,15 +37,16 @@ class PentaCensusTests(unittest.TestCase):
         )
         return root
 
-    def test_known_namespace_and_machine_key_do_not_drift(self) -> None:
+    def test_known_namespace_reference_does_not_drift(self) -> None:
         root = self.make_root()
         path = root / "runtime/example.py"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("TARGET = 'PentaKnown'\nKEY = 'penta.known'\n", encoding="utf-8")
+        path.write_text("TARGET = 'PentaKnown'\n", encoding="utf-8")
 
         report = build_report(root)
 
-        self.assertEqual(report["counts"]["total_unknown_observations"], 0)
+        self.assertEqual(report["counts"]["strict_unknown_declarations"], 0)
+        self.assertEqual(report["counts"]["advisory_unstructured_symbol_references"], 0)
 
     def test_governed_extension_is_known_without_canonical_promotion(self) -> None:
         root = self.make_root()
@@ -63,27 +64,66 @@ class PentaCensusTests(unittest.TestCase):
         )
         path = root / "runtime/example.py"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("TARGET = 'PentaExtension'\nKEY = 'penta.extension'\n", encoding="utf-8")
+        path.write_text("TARGET = 'PentaExtension'\n", encoding="utf-8")
 
         report = build_report(root)
 
-        self.assertEqual(report["counts"]["total_unknown_observations"], 0)
+        self.assertEqual(report["counts"]["strict_unknown_declarations"], 0)
+        self.assertEqual(report["counts"]["advisory_unstructured_symbol_references"], 0)
         self.assertEqual(report["counts"]["known_namespace_identities"], 3)
 
-    def test_unknown_symbol_and_machine_key_are_routed_as_candidates(self) -> None:
+    def test_unknown_structured_identity_declaration_is_hard_gated(self) -> None:
+        root = self.make_root()
+        write_json(
+            root / "penta/registry/example.json",
+            {
+                "systems": [
+                    {
+                        "canonical_name": "PentaNewThing",
+                        "machine_key": "penta.new-thing",
+                    }
+                ]
+            },
+        )
+
+        report = build_report(root)
+
+        self.assertEqual(report["counts"]["unknown_declared_display_identities"], 1)
+        self.assertEqual(report["counts"]["unknown_declared_machine_identities"], 1)
+        self.assertEqual(report["counts"]["strict_unknown_declarations"], 2)
+        self.assertEqual(report["unknown_declared_display_identities"][0]["value"], "PentaNewThing")
+        self.assertEqual(report["unknown_declared_machine_identities"][0]["value"], "penta.new-thing")
+        self.assertEqual(report["routing"]["unknown_identity_state"], "CANDIDATE_DISCOVERY")
+        self.assertFalse(report["routing"]["automatic_canonical_registration"])
+
+    def test_unstructured_code_symbol_is_advisory_not_identity_promotion(self) -> None:
         root = self.make_root()
         path = root / "runtime/example.py"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("TARGET = 'PentaNewThing'\nKEY = 'penta.new-thing'\n", encoding="utf-8")
+        path.write_text("class PentaNewThingError(Exception):\n    pass\n", encoding="utf-8")
 
         report = build_report(root)
 
-        self.assertEqual(report["counts"]["unknown_display_symbols"], 1)
-        self.assertEqual(report["counts"]["unknown_machine_keys"], 1)
-        self.assertEqual(report["unknown_display_symbols"][0]["value"], "PentaNewThing")
-        self.assertEqual(report["unknown_machine_keys"][0]["value"], "penta.new-thing")
-        self.assertEqual(report["routing"]["unknown_identity_state"], "CANDIDATE_DISCOVERY")
-        self.assertFalse(report["routing"]["automatic_canonical_registration"])
+        self.assertEqual(report["counts"]["strict_unknown_declarations"], 0)
+        self.assertEqual(report["counts"]["advisory_unstructured_symbol_references"], 1)
+        self.assertEqual(report["advisory_unstructured_symbol_references"][0]["value"], "PentaNewThingError")
+        self.assertEqual(report["advisory_unstructured_symbol_references"][0]["state"], "SEMANTIC_REVIEW_PENDING")
+
+    def test_non_identity_penta_machine_events_are_not_declarations(self) -> None:
+        root = self.make_root()
+        write_json(
+            root / "data/penta/events.json",
+            {
+                "events": [
+                    "penta.marketer.queue.enqueued",
+                    "penta.operations.duration_seconds",
+                ]
+            },
+        )
+
+        report = build_report(root)
+
+        self.assertEqual(report["counts"]["strict_unknown_declarations"], 0)
 
     def test_report_is_deterministic(self) -> None:
         root = self.make_root()
