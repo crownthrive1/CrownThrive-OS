@@ -22,27 +22,19 @@ jobs:
     timeout-minutes: 7
     env:
       DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url }}
-      VERCEL_TRUSTED_AUDIENCE: https://vercel.com/crownthrive-os
     steps:
-      - name: Resolve GitHub OIDC identity
+      - name: Resolve provider-compatible GitHub OIDC identity
         id: oidc
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
-            echo "::error::GitHub OIDC identity is unavailable; preview certification remains fail-closed."
-            exit 1
-          fi
-          RESPONSE="$(curl --fail --silent --show-error \
-            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${VERCEL_TRUSTED_AUDIENCE}")"
-          TOKEN="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<<"$RESPONSE")"
-          if [[ -z "$TOKEN" ]]; then
-            echo "::error::GitHub OIDC token resolution returned an empty token."
-            exit 1
-          fi
-          echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const token = await core.getIDToken();
+            if (!token) {
+              core.setFailed('GitHub OIDC token resolution returned an empty token.');
+              return;
+            }
+            core.setSecret(token);
+            core.setOutput('token', token);
 
       - name: Provider-originated preview certification
         shell: bash
