@@ -7,18 +7,27 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "scripts/penta_operational_knowledge.py"
+CORE_SCRIPT = ROOT / "scripts/penta_operational_knowledge.py"
+ENTRYPOINT_SCRIPT = ROOT / "scripts/penta_operational_knowledge_entrypoint.py"
 
-spec = importlib.util.spec_from_file_location("penta_operational_knowledge", SCRIPT)
-assert spec and spec.loader
-knowledge = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = knowledge
-spec.loader.exec_module(knowledge)
+core_spec = importlib.util.spec_from_file_location("penta_operational_knowledge", CORE_SCRIPT)
+assert core_spec and core_spec.loader
+core = importlib.util.module_from_spec(core_spec)
+sys.modules[core_spec.name] = core
+core_spec.loader.exec_module(core)
+
+entry_spec = importlib.util.spec_from_file_location("penta_operational_knowledge_entrypoint", ENTRYPOINT_SCRIPT)
+assert entry_spec and entry_spec.loader
+entrypoint = importlib.util.module_from_spec(entry_spec)
+sys.modules[entry_spec.name] = entrypoint
+entry_spec.loader.exec_module(entrypoint)
+knowledge = entrypoint.core
 
 
 class PentaOperationalKnowledgeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        entrypoint.validate_taxonomy_contract()
         cls.census = json.loads((ROOT / "data/penta/namespace-census.v1.json").read_text(encoding="utf-8"))
         cls.taxonomy = json.loads((ROOT / "data/penta/operational-taxonomy.v1.json").read_text(encoding="utf-8"))
         cls.operational = json.loads((ROOT / "data/penta/operational-knowledge.v1.json").read_text(encoding="utf-8"))
@@ -38,6 +47,28 @@ class PentaOperationalKnowledgeTest(unittest.TestCase):
             self.assertTrue(record["layers"], record["identity"])
             self.assertTrue(record["jobs"], record["identity"])
             self.assertIn("operator", record["audiences"])
+
+    def test_every_noncanonical_identity_routes_through_canonicalization_lane(self):
+        candidates = [r for r in self.records if r["namespace_state"] != "canonical"]
+        self.assertEqual(192, len(candidates))
+        for record in candidates:
+            self.assertIn("control-governance", record["layers"], record["identity"])
+            self.assertIn("data-knowledge", record["layers"], record["identity"])
+            self.assertIn("govern", record["jobs"], record["identity"])
+            self.assertIn("document", record["jobs"], record["identity"])
+            provenance = record["classification_provenance"]["jobs"]
+            self.assertTrue(provenance.startswith("candidate_canonicalization"), record["identity"])
+
+    def test_docs_inferred_family_does_not_seed_candidate_operational_jobs(self):
+        census_by_name = {r["name"]: r for r in self.census["records"]}
+        for record in self.records:
+            if record["namespace_state"] == "canonical":
+                continue
+            census = census_by_name[record["identity"]]
+            if census.get("assignment_state") != "docs_inferred":
+                continue
+            provenance = record["classification_provenance"]["jobs"]
+            self.assertNotIn("registry_family", provenance, record["identity"])
 
     def test_taxonomy_references_resolve(self):
         valid_layers = {x["id"] for x in self.taxonomy["layers"]}
