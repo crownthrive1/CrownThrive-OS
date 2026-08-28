@@ -1,11 +1,15 @@
 name: PentaRelease — PR Backlog Reconciler
 
 on:
+  release:
+    types: [published]
   workflow_run:
-    workflows: ["PentaRelease — Comprehensive Release Surface"]
+    workflows:
+      - "PentaRelease — Autonomous Release Awareness"
+      - "PentaRelease — Comprehensive Release Surface"
     types: [completed]
   schedule:
-    - cron: '17,47 * * * *'
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -18,7 +22,6 @@ concurrency:
 
 jobs:
   reconcile:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Retire provider-proven PentaRelease PR shells
@@ -91,8 +94,10 @@ jobs:
           {
             echo '## PentaRelease PR backlog reconciliation'
             echo
+            echo "- Trigger: $GITHUB_EVENT_NAME"
             echo "- Latest published release: $LATEST"
             echo "- Generated PR shells retired: $retired"
             echo '- Safety invariant: no release PR is retired without provider release + required-asset readback.'
+            echo '- Upstream workflow conclusion is advisory only; provider evidence is authoritative for cleanup.'
             echo '- Main-branch rules are not bypassed or weakened.'
           } >> "$GITHUB_STEP_SUMMARY"
