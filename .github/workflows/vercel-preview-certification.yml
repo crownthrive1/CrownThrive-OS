@@ -23,25 +23,22 @@ jobs:
     env:
       DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url }}
     steps:
-      - name: Resolve provider-compatible GitHub OIDC identity
-        id: oidc
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
-        with:
-          script: |
-            const token = await core.getIDToken();
-            if (!token) {
-              core.setFailed('GitHub OIDC token resolution returned an empty token.');
-              return;
-            }
-            core.setSecret(token);
-            core.setOutput('token', token);
-
       - name: Provider-originated preview certification
         shell: bash
-        env:
-          TRUSTED_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
         run: |
           set -euo pipefail
+
+          # Match GitHub toolkit core.getIDToken() with no audience override.
+          # Vercel Trusted Sources validates GitHub's default OIDC identity.
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?GitHub OIDC request URL unavailable}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?GitHub OIDC request token unavailable}"
+          OIDC_RESPONSE="$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}")"
+          TRUSTED_OIDC_TOKEN="$(jq -er '.value' <<<"${OIDC_RESPONSE}")"
+          echo "::add-mask::${TRUSTED_OIDC_TOKEN}"
+          export TRUSTED_OIDC_TOKEN
+
           python3 - <<'PY'
           from __future__ import annotations
 
