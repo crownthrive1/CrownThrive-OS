@@ -65,10 +65,7 @@ jobs:
           git diff --check
       - name: Commit deterministic documentation projection
         run: |
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "Penta portal already converged."
-            exit 0
-          fi
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
           git config user.name "CrownThrive PentaDocs"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A -- \
@@ -78,6 +75,10 @@ jobs:
             pentas.mdx \
             pentas \
             changelog/penta-portal-full-census-2026-08-28.mdx
+          if git diff --cached --quiet; then
+            echo "Penta portal already converged."
+            exit 0
+          fi
           git commit -m "docs(penta): finalize governed full Penta portal"
           git push origin HEAD:${GITHUB_REF_NAME}
 
