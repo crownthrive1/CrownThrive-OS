@@ -64,6 +64,17 @@ def test_workflow_run_is_exact_head_and_settlement_bound() -> None:
     assert "Failed completed checks remain fail-closed" in workflow
 
 
+def test_pull_request_target_uses_exact_head_settlement_without_self_deadlock() -> None:
+    workflow = read(".github/workflows/penta-pr-autopilot.yml")
+    assert "elif event == 'pull_request_target':\n              wait_for_settle = True" in workflow
+    assert "self_checks = {" in workflow
+    assert "'pentaprautopilot'," in workflow
+    assert "'pentaprlifecycle'," in workflow
+    assert "'pentaprlifecycleenforcement'," in workflow
+    assert "current_head != expected_head" in workflow
+    assert "settlement_timeout" in workflow
+
+
 def test_supabase_inventory_snapshot_is_not_a_mutable_expected_count() -> None:
     validator = read("scripts/validate_supabase_production_convergence_state.py")
     assert "local_count == expected_count" not in validator
