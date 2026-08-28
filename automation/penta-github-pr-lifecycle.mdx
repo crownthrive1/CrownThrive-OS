@@ -1,0 +1,145 @@
+---
+title: "Penta GitHub PR Lifecycle and Label Taxonomy"
+sidebarTitle: "GitHub PR Lifecycle"
+description: "The contributor-facing contract for PentaPR classification, PentaTagger labels, PentaMerge exact-head squash merges, PentaCloser readback-gated closes, and the penta:hold operator override."
+icon: "code-pull-request"
+keywords: ["PentaPR", "PentaTagger", "PentaMerge", "PentaCloser", "pull request", "labels", "penta:hold", "lifecycle", "merge", "close"]
+standard_version: "1.0.0"
+primary_audience: "operator"
+page_type: "workflow"
+content_state: "current_with_holds"
+---
+
+{/* pentadocs:audience-orientation:v2 */}
+<Note>
+  **Audience:** operators, administrators, and repository contributors (`operator`).
+
+  **This page:** Penta GitHub PR Lifecycle and Label Taxonomy — The contributor-facing contract for PentaPR classification, PentaTagger labels, PentaMerge exact-head squash merges, PentaCloser readback-gated closes, and the `penta:hold` operator override.
+
+  **Documentation state:** `current_with_holds` for page type `workflow`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Related guidance:** [Permissions and approvals](/automation/permissions-and-approval-gates) and [Governance observability capability](/automation/governance-observability-penta-capability).
+</Note>
+{/* /pentadocs:audience-orientation:v2 */}
+
+## Penta GitHub PR Lifecycle and Label Taxonomy
+
+Every pull request opened against a governed CrownThrive repository enters an automated lifecycle control plane. Four distinct authorities act on the PR. Each authority has one job and cannot perform another authority's job:
+
+1. **PentaPR** classifies each open PR as `MERGE`, `RESTACK`, `NURTURE`, or `CLOSE` and starts a 12-hour hard terminal deadline.
+2. **PentaTagger** applies and verifies the semantic GitHub label taxonomy. It never merges or closes anything.
+3. **PentaMerge** is the only actor that merges. It performs an exact-head squash merge only when the governed merge gate is green.
+4. **PentaCloser** is the only actor that closes. It performs a terminal close only after the deadline passes and only after a fresh fail-closed readback succeeds.
+
+If you contribute a PR, you will see these labels, a lifecycle receipt comment, and a visible deadline. This page explains what each signal means and how to respond.
+
+## What you see as a contributor
+
+When you open a PR:
+
+- PentaPR posts one lifecycle control comment containing the current disposition, the reason, the head commit it evaluated, and the hard terminal deadline (12 hours from first classification).
+- PentaTagger applies labels for entity, authority, risk, lane, stage, and disposition. Direct PentaTagger runs also maintain one idempotent receipt comment with the classified lanes, risk level, lifecycle projection, label readback verdict, deterministic receipt digest, and authority boundary. Lifecycle-triggered runs publish the same readback evidence into the GitHub Actions job summary instead of duplicating the comment.
+- If the PR is not merged by the deadline, PentaCloser closes it (it does not force-merge it). History and branch provenance are preserved, so a closed PR can be reopened or restacked.
+
+## Lifecycle dispositions
+
+PentaPR evaluates each open PR and assigns one disposition:
+
+| Disposition | Meaning | Typical reasons |
+|---|---|---|
+| `MERGE` | Mergeable with the governed merge gate green | `mergeable_governed_green` |
+| `RESTACK` | Branch needs repair before it can merge | `dirty`, `behind`, `not_mergeable` |
+| `NURTURE` | Needs more work, evidence, or checks | `draft`, `checks_failed`, `checks_pending`, `operator_hold`, `awaiting_governed_merge_gate` |
+| `CLOSE` | Superseded or represented at zero delta | `superseded_or_represented` |
+
+A PR whose title or body contains `superseded by` or `represented-zero-delta` is classified `CLOSE`. A PR carrying `penta:hold` is always classified `NURTURE / operator_hold`.
+
+## Label taxonomy
+
+PentaTagger manages only the label families below. It reconciles labels within each managed family and preserves any unrelated repository labels you add.
+
+### Identity and authority
+
+| Label | Meaning |
+|---|---|
+| `penta:tagged` | PentaTagger classification was applied and read back |
+| `penta:entity:pr` / `penta:entity:issue` | Entity type |
+| `penta:authority:tagger` | PentaTagger owns semantic classification only |
+| `penta:authority:pr` | PentaPR owns lifecycle classification |
+| `penta:authority:merge` | PentaMerge owns governed merge execution |
+| `penta:authority:closer` | PentaCloser owns terminal close execution |
+
+### Risk
+
+| Label | Meaning |
+|---|---|
+| `penta:risk:d0` | Informational or documentation-only change |
+| `penta:risk:d1` | Bounded operational change |
+| `penta:risk:d2` | Production, security, rights, provider, database, money, or destructive change |
+
+### Operational lanes
+
+A PR or issue can carry multiple lane labels: `penta:lane:docs`, `penta:lane:workflow`, `penta:lane:database`, `penta:lane:provider`, `penta:lane:security`, `penta:lane:commerce`, `penta:lane:media`, `penta:lane:observability`, and `penta:lane:general`.
+
+### Stage and disposition
+
+PentaPR writes the compatible disposition labels: `penta:merge`, `penta:restack`, `penta:nurture`, `penta:close`, and `penta:deadline-12h`. PentaTagger projects each disposition into a visible stage label:
+
+| Disposition | Stage label |
+|---|---|
+| `MERGE` | `penta:stage:merge-ready` |
+| `RESTACK` | `penta:stage:restack` |
+| `NURTURE` | `penta:stage:nurture` |
+| `CLOSE` | `penta:stage:close-candidate` |
+
+Issues use `penta:stage:open`, and PRs awaiting first classification use `penta:stage:review`.
+
+### Terminal state
+
+Terminal writes produce `penta:terminal:merged` or `penta:terminal:closed`. Active stage labels are removed when an item becomes terminal. The disposition label remains as audit history.
+
+## Operator hold override
+
+`penta:hold` is the explicit founder/operator override. Apply it to any PR to block both automated merge and automated close:
+
+- PentaMerge refuses to merge a held PR (`operator_hold`).
+- PentaCloser skips a held PR entirely (`terminal=HELD`) and re-checks for the label immediately before any close.
+- PentaPR classifies the PR as `NURTURE / operator_hold` until you remove the label.
+
+Use `penta:hold` when a PR needs human review time beyond the 12-hour deadline.
+
+## Merge contract
+
+PentaMerge only acts on PRs labeled `penta:merge`. Before merging, it re-verifies the PR is not a draft, is currently mergeable, carries no `penta:hold`, and has the governed merge gate green with no failed or pending checks. The merge itself is an exact-head squash merge: PentaMerge passes the evaluated head commit SHA to GitHub, so if anyone pushes a new commit between evaluation and merge, GitHub rejects the merge instead of merging unreviewed content.
+
+```text
+PentaMerge #512 merged=True
+commit title: "PentaMerge: fix: require PentaTagger readback before PentaCloser closure"
+```
+
+## Fail-closed terminal close readback chain
+
+PentaCloser is the last actor in the chain and runs the strictest gate. At the 12-hour deadline it first re-attempts an exact-head merge. Only if the PR still cannot merge does it proceed toward closure, and the close is gated by a fresh GitHub provider readback that must all pass on the exact head commit:
+
+1. The lifecycle state's recorded head SHA must equal the PR head SHA observed at close time. A stale or missing SHA fails the run (`preclose_lifecycle_head_stale`).
+2. A fresh read of the PR must show it is still open (`preclose_pr_not_open`) and still on the same head (`preclose_head_changed`).
+3. A fresh label read must show no `penta:hold` (`preclose_hold_detected`).
+4. The same label read must contain all required labels: `penta:tagged`, `penta:authority:tagger`, `penta:entity:pr`, `penta:authority:pr`, `penta:close`, and `penta:stage:close-candidate`. Any missing label fails the run (`preclose_label_readback_failed`).
+
+Any failure aborts the close. PentaCloser never falls back to closing without readback evidence. On success, PentaCloser posts a closure comment citing the verified labels and exact head SHA, closes the PR, and marks it `penta:terminal:closed`.
+
+## Schedule and triggers
+
+The lifecycle reacts immediately to pull-request events and also runs on fixed scheduled lanes:
+
+| Minute of each hour | Actor | Action |
+|---|---|---|
+| :07 | PentaPR | Classification |
+| :27 | PentaMerge | Governed merge execution |
+| :47 | PentaCloser | Terminal execution |
+
+Each lifecycle run invokes PentaTagger afterward, so independent workflows cannot race or overwrite the projected lifecycle stage. Issue events and a six-hour reconciliation sweep across all open issues and PRs keep labels current outside the PR lanes. A contract verification workflow compiles the control software, runs its tests, and statically rejects any merge or close execution path inside PentaTagger.
+
+## Readback contract
+
+No label write in this system is treated as successful until GitHub returns the expected labels on a fresh read. A missing expected label fails the run. This applies to PentaTagger classification, PentaPR disposition writes, and the PentaCloser pre-close gate.
