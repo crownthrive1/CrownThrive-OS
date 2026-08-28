@@ -1,0 +1,20 @@
+-- Explicit service-role-only RLS policies. anon/authenticated remain denied.
+drop policy if exists pentafactory_daily_fleet_policy_service_select_v1 on public.pentafactory_daily_fleet_policy_v1;
+create policy pentafactory_daily_fleet_policy_service_select_v1
+on public.pentafactory_daily_fleet_policy_v1 for select to service_role using (true);
+
+drop policy if exists pentafactory_daily_fleet_policy_service_update_v1 on public.pentafactory_daily_fleet_policy_v1;
+create policy pentafactory_daily_fleet_policy_service_update_v1
+on public.pentafactory_daily_fleet_policy_v1 for update to service_role using (true) with check (true);
+
+drop policy if exists pentafactory_daily_fleet_runs_service_select_v1 on public.pentafactory_daily_fleet_runs_v1;
+create policy pentafactory_daily_fleet_runs_service_select_v1
+on public.pentafactory_daily_fleet_runs_v1 for select to service_role using (true);
+
+drop policy if exists pentafactory_daily_fleet_entities_service_select_v1 on public.pentafactory_daily_fleet_entities_v1;
+create policy pentafactory_daily_fleet_entities_service_select_v1
+on public.pentafactory_daily_fleet_entities_v1 for select to service_role using (true);
+
+drop policy if exists pentafactory_daily_fleet_receipts_service_select_v1 on public.pentafactory_daily_fleet_receipts_v1;
+create policy pentafactory_daily_fleet_receipts_service_select_v1
+on public.pentafactory_daily_fleet_receipts_v1 for select to service_role using (true);
