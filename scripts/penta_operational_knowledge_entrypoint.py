@@ -6,9 +6,10 @@ existing PentaDocs presentation schema. This adapter preserves those machine
 identities while mapping MDX metadata into the narrower PentaDocs enums.
 
 It also prevents a noncanonical identity from inheriting operational jobs merely
-because a provisional/docs-inferred family classifier guessed a family. Such
-identities are routed through the canonicalization/governance lane first, with
-only explicit keyword overlays used as provisional intended-function metadata.
+because a provisional/docs-inferred family classifier guessed a family. Every
+noncanonical identity is first placed in the canonicalization/governance lane.
+A registry-backed family may add intended-function metadata; a provisional family
+may not. Explicit keyword overlays may add provisional intended-function metadata.
 """
 from __future__ import annotations
 
@@ -111,13 +112,19 @@ def governed_classification(record: dict, taxonomy: dict) -> dict:
         return base
 
     assignment_state = str(record.get("assignment_state") or "pending_canonicalization")
-    # A registry-backed noncanonical extension may use its governed family as a
-    # classification input. Provisional/docs-inferred family guesses may not.
-    if assignment_state == "registry_backed":
-        return base
-
     layers = ["control-governance", "data-knowledge"]
     jobs = ["govern", "document"]
+    family_metadata_used = False
+
+    # A registry-backed family is governed evidence and may supplement the
+    # candidate's current canonicalization lane. A docs-inferred/provisional
+    # family is discovery metadata only and cannot seed operational jobs.
+    if assignment_state == "registry_backed" and record.get("family_id"):
+        defaults = (taxonomy.get("family_defaults") or {}).get(record.get("family_id"), {})
+        layers.extend(str(value) for value in defaults.get("layers", []))
+        jobs.extend(str(value) for value in defaults.get("jobs", []))
+        family_metadata_used = bool(defaults)
+
     overlays: list[dict] = []
     haystack = _normalize(" ".join([
         str(record.get("name") or ""),
@@ -145,6 +152,13 @@ def governed_classification(record: dict, taxonomy: dict) -> dict:
 
     layers = _dedupe(layers)[:5]
     jobs = _dedupe(jobs)[:6]
+    provenance = "candidate_canonicalization_default"
+    if family_metadata_used and overlays:
+        provenance = "candidate_canonicalization_plus_registry_family_plus_keyword"
+    elif family_metadata_used:
+        provenance = "candidate_canonicalization_plus_registry_family"
+    elif overlays:
+        provenance = "candidate_canonicalization_plus_keyword"
     return {
         "layers": layers,
         "jobs": jobs,
@@ -152,8 +166,8 @@ def governed_classification(record: dict, taxonomy: dict) -> dict:
         "audiences": ["agent", "developer", "owner-admin", "auditor"],
         "provenance": {
             "family": assignment_state,
-            "layers": "candidate_canonicalization_plus_keyword" if overlays else "candidate_canonicalization_default",
-            "jobs": "candidate_canonicalization_plus_keyword" if overlays else "candidate_canonicalization_default",
+            "layers": provenance,
+            "jobs": provenance,
             "overlays": overlays,
         },
     }
