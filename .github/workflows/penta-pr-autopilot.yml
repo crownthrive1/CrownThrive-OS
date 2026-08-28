@@ -108,6 +108,7 @@ jobs:
           exit "$status"
 
       - name: Execute PentaPR autonomous convergence
+        id: converge
         if: ${{ steps.tagger.outputs.deferred != 'true' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -126,8 +127,8 @@ jobs:
           fi
           python penta-control/scripts/penta_pr_autopilot.py "${args[@]}"
 
-      - name: PentaTagger terminal provider readback
-        if: always()
+      - name: Passive terminal provider readback
+        if: ${{ always() && steps.tagger.outputs.deferred != 'true' && steps.converge.outcome == 'success' && steps.target.outputs.number != '' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -135,21 +136,81 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 24 --request-budget 180 --no-comment)
-          if [[ -n "${PENTA_NUMBER:-}" ]]; then
-            args+=(--number "$PENTA_NUMBER")
-          fi
-          args+=(--receipt-path "$RUNNER_TEMP/penta-pr-autopilot-tagger-final.json")
-          args+=(--summary-path "$RUNNER_TEMP/penta-pr-autopilot-tagger-final.md")
-          set +e
-          python penta-control/scripts/penta_github_tagger.py "${args[@]}"
-          status=$?
-          set -e
-          if [[ "$status" -eq 75 ]]; then
-            echo 'Final provider readback deferred by bounded request budget.'
-            exit 0
-          fi
-          exit "$status"
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          number = int(os.environ['PENTA_NUMBER'])
+          token = os.environ['GITHUB_TOKEN']
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'CrownThrive-PentaPR-Autopilot',
+          }
+
+          def get(path):
+              req = urllib.request.Request(f'https://api.github.com/repos/{repo}{path}', headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          pull = get(f'/pulls/{number}')
+          issue = get(f'/issues/{number}')
+          labels = {item['name'] for item in issue.get('labels', []) if item.get('name')}
+          stage_labels = sorted(name for name in labels if name.startswith('penta:stage:'))
+          dispositions = {
+              'penta:nurture': 'penta:stage:nurture',
+              'penta:restack': 'penta:stage:restack',
+              'penta:merge': 'penta:stage:merge-candidate',
+              'penta:close': 'penta:stage:close-candidate',
+          }
+          active = [(label, stage) for label, stage in dispositions.items() if label in labels]
+          state = pull.get('state')
+          merged = bool(pull.get('merged'))
+
+          if state == 'open':
+              if 'penta:authority:pr' not in labels:
+                  raise SystemExit(f'PentaPR readback missing authority label on #{number}')
+              if len(active) != 1:
+                  raise SystemExit(f'PentaPR readback requires exactly one disposition on #{number}: {active}')
+              expected_stage = active[0][1]
+              if stage_labels != [expected_stage]:
+                  raise SystemExit(
+                      f'PentaPR stage/disposition collision on #{number}: '
+                      f'disposition={active[0][0]} expected={expected_stage} observed={stage_labels}'
+                  )
+          elif merged:
+              required = {'penta:terminal:merged', 'penta:authority:merge'}
+              missing = required.difference(labels)
+              if missing or stage_labels:
+                  raise SystemExit(
+                      f'PentaMerge terminal readback mismatch on #{number}: '
+                      f'missing={sorted(missing)} stages={stage_labels}'
+                  )
+          else:
+              required = {'penta:terminal:closed', 'penta:authority:closer'}
+              missing = required.difference(labels)
+              if missing or stage_labels:
+                  raise SystemExit(
+                      f'PentaCloser terminal readback mismatch on #{number}: '
+                      f'missing={sorted(missing)} stages={stage_labels}'
+                  )
+
+          receipt = {
+              'schema': 'crownthrive.pentapr.autopilot-provider-readback/v1',
+              'number': number,
+              'state': state,
+              'merged': merged,
+              'head_sha': (pull.get('head') or {}).get('sha'),
+              'labels': sorted(labels),
+              'stage_labels': stage_labels,
+              'status': 'PASS',
+              'mutation_performed_by_readback': False,
+          }
+          print(json.dumps(receipt, sort_keys=True))
+          PY
 
       - name: Publish autonomous execution receipt
         if: always()
@@ -162,10 +223,11 @@ jobs:
             echo "- Target PR: **${{ steps.target.outputs.number || 'repository sweep' }}**"
             echo "- Deadline close authority: **${{ steps.target.outputs.allow_close }}**"
             echo "- PentaTagger deferred: **${{ steps.tagger.outputs.deferred == 'true' && 'YES' || 'NO' }}**"
-            echo '- Chain: PentaGate → PentaHeal → PentaTagger → PentaPR → PentaRestack/PentaMerge → provider readback'
+            echo '- Chain: PentaGate → PentaHeal → PentaTagger preflight → PentaPR → PentaRestack/PentaMerge → passive provider readback'
+            echo '- Final provider readback is GET-only and cannot overwrite PentaPR lifecycle state.'
             echo '- HOLD, draft, failed-check, D3, credential, provider-permission, and money-movement boundaries remain fail-closed.'
-            if [[ -f "$RUNNER_TEMP/penta-pr-autopilot-tagger-final.md" ]]; then
+            if [[ -f "$RUNNER_TEMP/penta-pr-autopilot-tagger-preflight.md" ]]; then
               echo
-              cat "$RUNNER_TEMP/penta-pr-autopilot-tagger-final.md"
+              cat "$RUNNER_TEMP/penta-pr-autopilot-tagger-preflight.md"
             fi
           } >> "$GITHUB_STEP_SUMMARY"

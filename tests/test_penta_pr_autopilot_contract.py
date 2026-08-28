@@ -16,7 +16,7 @@ def test_penta_pr_autopilot_is_event_driven() -> None:
     assert "cron: '*/10 * * * *'" in workflow
     assert "penta_pr_autopilot.py" in workflow
     assert "PentaGate and PentaHeal preflight" in workflow
-    assert "PentaTagger terminal provider readback" in workflow
+    assert "Passive terminal provider readback" in workflow
 
 
 def test_split_lifecycle_clocks_are_retired() -> None:
@@ -37,6 +37,16 @@ def test_autopilot_preserves_fail_closed_and_restack_contract() -> None:
     assert 'f"/repos/{gh.repo}/pulls/{number}/update-branch"' in script
     assert "lifecycle.attempt_merge" in script
     assert "--allow-deadline-close" in script
+
+
+def test_terminal_readback_is_passive_and_stage_coherent() -> None:
+    workflow = read(".github/workflows/penta-pr-autopilot.yml")
+    assert workflow.count("penta_github_tagger.py") == 1
+    assert "mutation_performed_by_readback': False" in workflow
+    assert "PentaPR stage/disposition collision" in workflow
+    assert "penta:terminal:merged" in workflow
+    assert "penta:terminal:closed" in workflow
+    assert "Final provider readback is GET-only" in workflow
 
 
 def test_supabase_inventory_snapshot_is_not_a_mutable_expected_count() -> None:
