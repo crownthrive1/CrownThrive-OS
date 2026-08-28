@@ -1,0 +1,121 @@
+---
+standard_version: "1.0.0"
+primary_audience: "developer"
+page_type: "reference"
+content_state: "implemented_gated"
+title: "Self-Funding Software Control Plane"
+sidebarTitle: "Control Plane"
+description: "Runtime architecture, transaction state machine, allocation engine, provider binding and reconciliation controls for the Self-Funding Business Engine."
+icon: "server-cog"
+keywords: ["self-funding control plane", "allocation engine", "Stripe Connect", "reconciliation", "idempotency", "provider binding", "PentaCertify"]
+---
+
+<Info>
+  The runtime control plane is implemented in the CrownThrive Supabase project. **Live money movement remains gated.** The current provider adapter is fail-closed until PentaCertify evidence, active contracts, provider readiness and production authority are satisfied.
+</Info>
+
+# Self-Funding Software Control Plane
+
+## Runtime components
+
+| Component | Responsibility |
+| --- | --- |
+| `ct_self_funding_policies` | Versioned allocation policies |
+| `ct_self_funding_contracts` | Contract/economic entitlement registry |
+| `ct_self_funding_provider_bindings` | Provider onboarding, capability and production-write state |
+| `ct_self_funding_transactions` | Transaction state, eligibility and idempotency |
+| `ct_self_funding_allocations` | Deterministic allocation records |
+| `ct_self_funding_events` | Durable evidence/event ledger |
+| `ct_calculate_self_funding_allocations()` | Deterministic 80/10/5/3/2 calculation |
+| `ct-self-funding-settlement` | Authenticated Edge Function; simulation only until production gates pass |
+
+## State machine
+
+```text
+RECEIVED
+   ↓
+ELIGIBILITY_PENDING
+   ↓
+APPROVED
+   ↓
+ALLOCATION_READY
+   ↓
+SETTLEMENT_PENDING
+   ↓
+SETTLED
+   ↓
+RECONCILED
+```
+
+Failure paths include `HELD`, `BLOCKED`, `FAILED`, `DISPUTED`, `PARTIALLY_REVERSED` and `REFUNDED`.
+
+## Deterministic allocation
+
+The active target policy is `CT-SFE-80-10-5-3-2@1.0.0`:
+
+- Provider: 8,000 bps = 80%
+- HQ Growth & Technology: 1,000 bps = 10%
+- Regional Leadership: 500 bps = 5%
+- National Advertising: 300 bps = 3%
+- ThriveFund: 200 bps = 2%
+
+The allocation function uses integer minor currency units and assigns the residual rounding amount to ThriveFund so the allocation always reconciles exactly to gross transaction value.
+
+## Provider rail
+
+The current architecture is **Stripe Connect / Separate Charges and Transfers** because the engine needs multiple downstream allocation records from one transaction. Stripe's marketplace documentation supports separate charges and transfers for cases where one payment must be split across multiple sellers or when independent settlement is required. citeturn0search9turn0search8
+
+The provider binding is currently:
+
+```text
+Stripe Connect
+  ↓
+Separate Charges and Transfers
+  ↓
+CrownThrive platform control
+  ↓
+Provider + institutional allocation destinations
+```
+
+## Security controls
+
+- Secrets are represented by vault references only.
+- Provider writes are fail-closed.
+- Transactions require idempotency keys.
+- Allocation requires compliance and rights pass states.
+- Production money movement is explicitly disabled in the active policy.
+- Refunds/disputes must be represented as reversal events rather than editing historical allocations.
+- Every material allocation has a durable event record.
+- Database tables use RLS.
+
+## Production gates
+
+Production settlement requires all of the following:
+
+1. PentaCredentials provider credential readiness.
+2. Connected-account onboarding and transfer capability verification.
+3. Executed applicable commercial contract.
+4. Active economic schedule.
+5. CHLOM rights/compliance eligibility.
+6. PentaCertify read/write/readback/rollback evidence.
+7. Reconciliation against processor settlement.
+8. Refund/dispute/reversal certification.
+9. Observability and incident routing.
+10. Explicit production authorization.
+
+**No gate may be bypassed because a transaction is profitable or because an integration appears technically functional.**
+
+## Test certification
+
+A \$100 simulation was executed against the database allocation function and produced:
+
+```text
+Provider             $80.00
+HQ Growth & Tech     $10.00
+Regional Leadership   $5.00
+National Advertising  $3.00
+ThriveFund            $2.00
+TOTAL               $100.00
+```
+
+The certification transaction was removed after verification. No live payment was created or transferred by this test.
