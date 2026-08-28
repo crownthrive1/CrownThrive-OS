@@ -29,20 +29,25 @@ class PentaOperationalKnowledgeTest(unittest.TestCase):
     def setUpClass(cls):
         entrypoint.validate_taxonomy_contract()
         cls.census = json.loads((ROOT / "data/penta/namespace-census.v1.json").read_text(encoding="utf-8"))
+        cls.os_registry = json.loads((ROOT / "data/penta/os-v1.registry.json").read_text(encoding="utf-8"))
+        cls.candidate_seed = json.loads((ROOT / "data/penta/namespace-candidates.v1.json").read_text(encoding="utf-8"))
         cls.taxonomy = json.loads((ROOT / "data/penta/operational-taxonomy.v1.json").read_text(encoding="utf-8"))
         cls.operational = json.loads((ROOT / "data/penta/operational-knowledge.v1.json").read_text(encoding="utf-8"))
         cls.agent = json.loads((ROOT / "data/penta/agent-knowledge.v1.json").read_text(encoding="utf-8"))
         cls.records = cls.operational["records"]
+        cls.expected_canonical = cls.os_registry["counts"]["total"]
+        cls.expected_noncanonical = cls.candidate_seed["candidate_count"]
+        cls.expected_total = cls.expected_canonical + cls.expected_noncanonical
 
     def test_complete_namespace_has_one_operational_record(self):
         self.assertEqual(self.census["counts"]["total"], len(self.records))
-        self.assertEqual(406, len(self.records))
+        self.assertEqual(self.expected_total, len(self.records))
         self.assertEqual(len(self.records), len({r["identity"] for r in self.records}))
         self.assertEqual(len(self.records), len({r["docs_path"] for r in self.records}))
 
     def test_every_canonical_identity_has_layer_and_job(self):
         canonical = [r for r in self.records if r["namespace_state"] == "canonical"]
-        self.assertEqual(214, len(canonical))
+        self.assertEqual(self.expected_canonical, len(canonical))
         for record in canonical:
             self.assertTrue(record["layers"], record["identity"])
             self.assertTrue(record["jobs"], record["identity"])
@@ -50,7 +55,7 @@ class PentaOperationalKnowledgeTest(unittest.TestCase):
 
     def test_every_noncanonical_identity_routes_through_canonicalization_lane(self):
         candidates = [r for r in self.records if r["namespace_state"] != "canonical"]
-        self.assertEqual(192, len(candidates))
+        self.assertEqual(self.expected_noncanonical, len(candidates))
         for record in candidates:
             self.assertIn("control-governance", record["layers"], record["identity"])
             self.assertIn("data-knowledge", record["layers"], record["identity"])
@@ -83,7 +88,7 @@ class PentaOperationalKnowledgeTest(unittest.TestCase):
 
     def test_candidate_docs_never_manufacture_execution_authority(self):
         candidates = [r for r in self.records if r["namespace_state"] != "canonical"]
-        self.assertEqual(192, len(candidates))
+        self.assertEqual(self.expected_noncanonical, len(candidates))
         for record in candidates:
             self.assertFalse(record["execution_eligible_by_registry"], record["identity"])
             self.assertIn("perform independent runtime/provider writes", " ".join(record["forbidden_actions"]))
@@ -92,7 +97,8 @@ class PentaOperationalKnowledgeTest(unittest.TestCase):
             self.assertNotIn("operate", record["lifecycle_stages"])
 
     def test_machine_manifests_are_one_to_one(self):
-        self.assertEqual(406, self.agent["record_count"])
+        self.assertEqual(len(self.records), self.agent["record_count"])
+        self.assertEqual(self.expected_total, self.agent["record_count"])
         self.assertEqual(self.records, self.agent["records"])
         lines = [json.loads(x) for x in (ROOT / "data/penta/agent-knowledge.v1.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
         self.assertEqual(self.records, lines)
@@ -142,9 +148,9 @@ class PentaOperationalKnowledgeTest(unittest.TestCase):
     def test_deterministic_operational_check_passes(self):
         result = knowledge.check()
         self.assertEqual("PASS", result["status"])
-        self.assertEqual(406, result["identities"])
-        self.assertEqual(13, result["layers"])
-        self.assertEqual(18, result["jobs"])
+        self.assertEqual(self.expected_total, result["identities"])
+        self.assertEqual(len(self.taxonomy["layers"]), result["layers"])
+        self.assertEqual(len(self.taxonomy["jobs"]), result["jobs"])
 
 
 if __name__ == "__main__":
