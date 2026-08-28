@@ -45,3 +45,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/upsert_pr_governance_state.py
+      - name: Publish governance observability receipt
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Governance Observability'
+            echo
+            if [[ -f github-observability.json ]]; then
+              echo '```json'
+              cat github-observability.json
+              echo '```'
+            else
+              echo '- Receipt: **FAIL — github-observability.json missing**'
+              exit 1
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
