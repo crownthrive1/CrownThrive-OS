@@ -63,7 +63,7 @@ jobs:
                   raise SystemExit(f'Expected retired identity not found in {path}')
               path.write_text(text.replace(legacy, canonical), encoding='utf-8')
 
-          # First discover and govern every MDX page this PR introduced outside docs.json.
+          # Discover and govern every MDX page introduced outside docs.json.
           probe = subprocess.run(
               ['python', 'scripts/validate_docs.py'],
               stdout=subprocess.PIPE,
@@ -86,9 +86,10 @@ jobs:
           manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
           print(f'Added {len(additions)} explicit operational-reference dispositions.')
 
-          # Preserve declared custom orientation pages. Every other v2 block is managed
-          # generated state and is safe to strip and deterministically regenerate via
-          # pentadocs_quality.py --apply. Newly governed pages default to managed-v2.
+          # Preserve declared custom orientation pages. Every other v2 block is
+          # generated managed state. Accept both canonical blocks with an end marker
+          # and legacy managed blocks that omitted the end marker; PentaDocs --apply
+          # recreates the canonical managed-v2 block deterministically.
           profile_path = Path('data/documentation/pentadocs-page-profiles.v1.json')
           profile_manifest = json.loads(profile_path.read_text(encoding='utf-8'))
           custom_paths = {
@@ -98,8 +99,8 @@ jobs:
           }
           orientation_re = re.compile(
               r'\{/\* pentadocs:audience-orientation:v2 \*/\}\s*'
-              r'<(?:Info|Note|Warning)>.*?</(?:Info|Note|Warning)>\s*'
-              r'\{/\* /pentadocs:audience-orientation:v2 \*/\}\s*',
+              r'<(?P<tag>Info|Note|Warning)>.*?</(?P=tag)>\s*'
+              r'(?:\{/\* /pentadocs:audience-orientation:v2 \*/\}\s*)?',
               flags=re.DOTALL,
           )
           marker = '{/* pentadocs:audience-orientation:v2 */}'
