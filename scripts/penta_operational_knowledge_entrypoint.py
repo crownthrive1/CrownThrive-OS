@@ -3,8 +3,8 @@
 
 The machine taxonomy intentionally carries richer audience identities than the
 existing PentaDocs presentation schema. This adapter preserves those machine
-identities while mapping MDX `primary_audience` metadata into the narrower,
-repository-governed PentaDocs enum.
+identities while mapping MDX `primary_audience` and generic guide semantics into
+the narrower, repository-governed PentaDocs frontmatter enums.
 """
 from __future__ import annotations
 
@@ -29,17 +29,60 @@ ALLOWED_PENTADOCS_AUDIENCES = {
     "rights_support",
     "historical",
 }
+ALLOWED_PENTADOCS_PAGE_TYPES = {
+    "orientation",
+    "doctrine",
+    "registry",
+    "reference",
+    "status",
+    "workflow",
+    "runbook",
+    "standard",
+    "support",
+    "how_to",
+    "policy",
+    "legal",
+    "developer",
+    "changelog",
+    "historical_record",
+    "redirect",
+}
 
 _original_fm = core.fm
 
 
+def presentation_page_type(title: str, page_type: str) -> str:
+    if page_type != "guide":
+        return page_type
+    value = title.casefold()
+    if "runbook" in value or "incident" in value:
+        return "runbook"
+    if "development" in value or "integration" in value:
+        return "developer"
+    if "quickstart" in value:
+        return "how_to"
+    if any(token in value for token in ("layer", "job", "lifecycle", "audience")):
+        return "registry"
+    return "reference"
+
+
 def governed_fm(title: str, description: str, *, page_type: str = "guide", audience: str = "operator") -> str:
     rendered_audience = FRONTMATTER_AUDIENCE_MAP.get(audience, audience)
+    rendered_page_type = presentation_page_type(title, page_type)
     if rendered_audience not in ALLOWED_PENTADOCS_AUDIENCES:
         raise ValueError(
             f"unsupported PentaDocs presentation audience: machine={audience!r} rendered={rendered_audience!r}"
         )
-    return _original_fm(title, description, page_type=page_type, audience=rendered_audience)
+    if rendered_page_type not in ALLOWED_PENTADOCS_PAGE_TYPES:
+        raise ValueError(
+            f"unsupported PentaDocs page type: source={page_type!r} rendered={rendered_page_type!r} title={title!r}"
+        )
+    return _original_fm(
+        title,
+        description,
+        page_type=rendered_page_type,
+        audience=rendered_audience,
+    )
 
 
 core.fm = governed_fm
@@ -54,6 +97,21 @@ def validate_taxonomy_contract() -> None:
     invalid = set(FRONTMATTER_AUDIENCE_MAP.values()) - ALLOWED_PENTADOCS_AUDIENCES
     if invalid:
         raise ValueError(f"invalid mapped PentaDocs audiences: {sorted(invalid)}")
+    for sample in (
+        "Penta Operational Knowledge",
+        "Penta Architectural Layers",
+        "Penta Jobs & Functions",
+        "Penta Lifecycle",
+        "Penta Audience Guides",
+        "Penta Development Guide",
+        "Penta Quickstarts",
+        "Penta Agent Ingestion",
+        "Penta Integration Guide",
+        "Penta Runbooks & Incidents",
+    ):
+        resolved = presentation_page_type(sample, "guide")
+        if resolved not in ALLOWED_PENTADOCS_PAGE_TYPES:
+            raise ValueError(f"invalid page-type mapping for {sample!r}: {resolved!r}")
 
 
 def main() -> int:
