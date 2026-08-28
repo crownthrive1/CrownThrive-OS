@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "config" / "penta_pm_policy.json"
 RECEIPT_DIR = ROOT / "artifacts" / "penta-pm"
 LINK_RE = re.compile(r"(?im)^\s*(closes|fixes|resolves|refs|references)\s+#(\d+)\b")
+PROJECT_STATE_QUERY = """query($id:ID!){node(id:$id){... on ProjectV2{fields(first:100){nodes{... on ProjectV2FieldCommon{id name dataType}}} items(first:100){nodes{id content{... on Issue{id number} ... on PullRequest{id number}}}}}}}"""
 
 
 def request(method, url, token, payload=None):
@@ -153,8 +154,7 @@ def ensure_project(token, owner, repo, title, apply):
 
 
 def project_items_and_fields(token, project_id):
-    q = """query($id:ID!){node(id:$id){... on ProjectV2{fields(first:100){nodes{... on ProjectV2FieldCommon{id name dataType}}} items(first:100){nodes{id content{... on Issue{id number} ... on PullRequest{id number}}}}}}}}"""
-    return graphql(token, q, {"id": project_id})["node"]
+    return graphql(token, PROJECT_STATE_QUERY, {"id": project_id})["node"]
 
 
 def ensure_project_fields(token, project_id, required, apply):
