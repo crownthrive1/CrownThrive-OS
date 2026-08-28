@@ -1,7 +1,7 @@
 # PentaRelease™
 
-Status: active-design
-Version: 1.0.0
+Status: active-design baseline; the production autonomous engine is documented in [PENTARELEASE.md](../PENTARELEASE.md)
+Version: 1.0.0 (baseline contract); current engine `2.2.2`
 Owner: CrownThrive OS
 
 PentaRelease is CrownThrive's governed release-engine subsystem. Its job is to turn an approved, version-addressable change set into a reproducible package, validate that package, publish the provider release, attach downloadable artifacts, verify provider readback, record evidence, and preserve prior versions without silently mutating unrelated systems.
@@ -62,7 +62,9 @@ hold_packaging_failed
 hold_publish_failed
 hold_readback_failed
 
-No failure state may be silently rewritten to published.
+The v2.2.2 release-surface promotion path adds two provider-identity HOLD states: `HOLD_PR_PROVIDER_IDENTITY` (GitHub Actions cannot create the protected-main PR) and `HOLD_PR_MERGE_IDENTITY` (the PR is gated but the workflow token cannot merge it). PentaRelease never pushes directly to protected `main`; a missing provider identity is held, not bypassed.
+
+No failure or HOLD state may be silently rewritten to published.
 
 ## Version handling
 
