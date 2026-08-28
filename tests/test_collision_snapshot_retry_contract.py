@@ -17,15 +17,22 @@ def test_transient_snapshot_retry_is_bounded() -> None:
     assert "sleep $((attempt * 2))" in workflow
 
 
-def test_retry_predicate_is_narrow_and_fail_closed() -> None:
+def test_retry_predicate_only_tolerates_subthreshold_awareness() -> None:
     workflow = workflow_text()
-    assert 'codes == {"snapshot_changed_during_evaluation"}' in workflow
-    assert "and not collisions" in workflow
+    assert 'fail_threshold=2' in workflow
+    assert '"snapshot_changed_during_evaluation" in codes' in workflow
+    assert 'int(item.get("severity") or 0) >= fail_threshold' in workflow
+    assert "and not material_collisions" in workflow
     assert "and not inspection_errors" in workflow
     assert "and main_stable" in workflow
     assert "and candidate_stable" in workflow
+
+
+def test_retry_exhaustion_and_material_failures_remain_fail_closed() -> None:
+    workflow = workflow_text()
     assert 'if [[ "$retryable" != "true" || "$attempt" -ge "$max_attempts" ]]' in workflow
     assert 'exit "$status"' in workflow
+    assert '--fail-on-severity "$fail_threshold"' in workflow
 
 
 def test_each_attempt_recomputes_and_preserves_evidence() -> None:
@@ -36,8 +43,7 @@ def test_each_attempt_recomputes_and_preserves_evidence() -> None:
     assert "recomputing from fresh provider state" in workflow
 
 
-def test_real_collision_threshold_is_unchanged() -> None:
+def test_main_reconciliation_threshold_is_unchanged() -> None:
     workflow = workflow_text()
-    assert '--fail-on-severity 2' in workflow
     assert '--fail-on-severity 6' in workflow
     assert "D3" not in workflow
