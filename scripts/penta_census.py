@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Deterministic, fail-closed Penta namespace discovery.
 
-PentaCensus discovers explicit Penta symbols and machine keys in governed source
-classes and compares them with the existing namespace census plus governed
-extensions. It does not register, authorize, certify, or promote anything.
+PentaCensus distinguishes authoritative-ish structured identity declarations from
+unstructured code/workflow references. Unknown declarations are hard-gated;
+unknown references are an advisory semantic/topology queue. Neither class creates
+canonical identity, authority, maturity, certification, or production status.
 """
 from __future__ import annotations
 
@@ -17,16 +18,14 @@ from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 CENSUS_PATH = Path("data/penta/namespace-census.v1.json")
-SCAN_ROOTS = (
-    Path("data/penta"),
-    Path("penta/registry"),
-    Path("runtime"),
-    Path("scripts"),
-    Path(".github/workflows"),
-)
+STRUCTURED_ROOTS = (Path("data/penta"), Path("penta/registry"))
+REFERENCE_ROOTS = (Path("runtime"), Path("scripts"), Path(".github/workflows"))
+ALL_SCAN_ROOTS = STRUCTURED_ROOTS + REFERENCE_ROOTS
 TEXT_SUFFIXES = {".json", ".py", ".md", ".mdx", ".yml", ".yaml"}
 MAX_SCAN_BYTES = 1_500_000
 MAX_EVIDENCE_PATHS = 20
+IDENTITY_NAME_KEYS = {"canonical_name"}
+IDENTITY_MACHINE_KEYS = {"machine_key", "canonical_machine_key"}
 
 # Generated machine corpora contain repeated projections of the same namespace and
 # are intentionally excluded from discovery evidence to avoid self-amplification.
@@ -40,7 +39,7 @@ EXCLUDED_FILES = {
 }
 
 PENTA_SYMBOL_RE = re.compile(r"(?<![A-Za-z0-9])Penta[A-Z][A-Za-z0-9]*(?![A-Za-z0-9])")
-PENTA_MACHINE_RE = re.compile(r"(?<![a-z0-9_.-])penta\.[a-z][a-z0-9_.-]*(?![a-z0-9_.-])")
+SYSTEM_MACHINE_RE = re.compile(r"^penta\.[a-z0-9]+(?:[-_][a-z0-9]+)*$")
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -54,8 +53,8 @@ def normalize_name(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", value.casefold())
 
 
-def iter_scan_files(root: Path) -> Iterable[Path]:
-    for rel_root in SCAN_ROOTS:
+def iter_scan_files(root: Path, roots: Iterable[Path]) -> Iterable[Path]:
+    for rel_root in roots:
         base = root / rel_root
         if not base.exists():
             continue
@@ -91,9 +90,8 @@ def known_namespace(root: Path) -> tuple[set[str], set[str], dict[str, str]]:
         if isinstance(machine, str) and machine.startswith("penta."):
             machine_keys.add(machine)
 
-    # Governed extensions are allowed to exist outside the frozen canonical OS
-    # registry. Their names/keys are known discovery identities, but they do not
-    # become canonical merely because PentaCensus recognizes them.
+    # Governed extensions are known namespace identities even when they remain
+    # outside the frozen canonical OS registry. Recognition is not promotion.
     for path in sorted((root / "data/penta").glob("systems*.json")):
         try:
             data = load_json(path)
@@ -117,71 +115,128 @@ def known_namespace(root: Path) -> tuple[set[str], set[str], dict[str, str]]:
     return known_names, machine_keys, display_by_norm
 
 
+def walk_identity_declarations(value: Any) -> Iterable[tuple[str, str]]:
+    """Yield (kind, value) only from explicit identity-bearing JSON fields."""
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in IDENTITY_NAME_KEYS and isinstance(child, str):
+                if normalize_name(child).startswith("penta"):
+                    yield "display_name", child.strip()
+            elif key in IDENTITY_MACHINE_KEYS and isinstance(child, str):
+                if SYSTEM_MACHINE_RE.fullmatch(child.strip()):
+                    yield "machine_key", child.strip()
+            yield from walk_identity_declarations(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from walk_identity_declarations(child)
+
+
 def build_report(root: Path = ROOT) -> dict[str, Any]:
     known_names, known_machine_keys, _ = known_namespace(root)
-    symbol_paths: dict[str, set[str]] = defaultdict(set)
-    machine_paths: dict[str, set[str]] = defaultdict(set)
-    scanned: list[tuple[str, str]] = []
+    declaration_name_paths: dict[str, set[str]] = defaultdict(set)
+    declaration_machine_paths: dict[str, set[str]] = defaultdict(set)
+    advisory_symbol_paths: dict[str, set[str]] = defaultdict(set)
+    scanned: dict[str, str] = {}
 
-    for path in iter_scan_files(root):
+    # Structured registry/data declarations are the hard-gated discovery plane.
+    for path in iter_scan_files(root, STRUCTURED_ROOTS):
+        rel = path.relative_to(root).as_posix()
+        try:
+            raw = path.read_bytes()
+        except OSError:
+            continue
+        scanned[rel] = hashlib.sha256(raw).hexdigest()
+        if path.suffix.lower() != ".json":
+            continue
+        try:
+            value = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        for kind, declared in walk_identity_declarations(value):
+            if kind == "display_name":
+                if normalize_name(declared) not in known_names:
+                    declaration_name_paths[declared].add(rel)
+            elif declared not in known_machine_keys:
+                declaration_machine_paths[declared].add(rel)
+
+    # Runtime/script/workflow symbols are useful discovery evidence but may be
+    # classes, clients, errors, helpers, fixtures, or compatibility names. They
+    # therefore enter an advisory queue instead of becoming identity declarations.
+    for path in iter_scan_files(root, REFERENCE_ROOTS):
         rel = path.relative_to(root).as_posix()
         try:
             raw = path.read_bytes()
             text = raw.decode("utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        scanned.append((rel, hashlib.sha256(raw).hexdigest()))
+        scanned[rel] = hashlib.sha256(raw).hexdigest()
         for symbol in PENTA_SYMBOL_RE.findall(text):
             if normalize_name(symbol) not in known_names:
-                symbol_paths[symbol].add(rel)
-        for machine_key in PENTA_MACHINE_RE.findall(text):
-            if machine_key not in known_machine_keys:
-                machine_paths[machine_key].add(rel)
+                advisory_symbol_paths[symbol].add(rel)
 
-    source_digest_input = "\n".join(f"{path}\0{digest}" for path, digest in scanned).encode("utf-8")
+    source_digest_input = "\n".join(
+        f"{path}\0{digest}" for path, digest in sorted(scanned.items())
+    ).encode("utf-8")
     source_digest = hashlib.sha256(source_digest_input).hexdigest()
 
-    unknown_symbols = [
+    unknown_declared_names = [
         {
-            "candidate_type": "display_symbol",
+            "candidate_type": "declared_display_identity",
             "value": value,
             "normalized": normalize_name(value),
             "state": "CANDIDATE_DISCOVERY",
             "evidence_paths": sorted(paths)[:MAX_EVIDENCE_PATHS],
         }
-        for value, paths in sorted(symbol_paths.items(), key=lambda item: item[0].casefold())
+        for value, paths in sorted(declaration_name_paths.items(), key=lambda item: item[0].casefold())
     ]
-    unknown_machine_keys = [
+    unknown_declared_machine_keys = [
         {
-            "candidate_type": "machine_key",
+            "candidate_type": "declared_machine_identity",
             "value": value,
             "state": "CANDIDATE_DISCOVERY",
             "evidence_paths": sorted(paths)[:MAX_EVIDENCE_PATHS],
         }
-        for value, paths in sorted(machine_paths.items())
+        for value, paths in sorted(declaration_machine_paths.items())
     ]
+    advisory_references = [
+        {
+            "candidate_type": "unstructured_symbol_reference",
+            "value": value,
+            "normalized": normalize_name(value),
+            "state": "SEMANTIC_REVIEW_PENDING",
+            "evidence_paths": sorted(paths)[:MAX_EVIDENCE_PATHS],
+        }
+        for value, paths in sorted(advisory_symbol_paths.items(), key=lambda item: item[0].casefold())
+    ]
+    strict_unknown = len(unknown_declared_names) + len(unknown_declared_machine_keys)
 
     return {
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "report_id": "crownthrive.penta.census.discovery.v1",
         "authority_invariant": (
             "Discovery and repeated observation never create canonical identity, maturity, execution eligibility, "
             "credentials, provider permission, certification, production status, financial/rights authority, or D3 authority."
         ),
-        "source_classes": [path.as_posix() for path in SCAN_ROOTS],
+        "source_classes": {
+            "hard_gated_identity_declarations": [path.as_posix() for path in STRUCTURED_ROOTS],
+            "advisory_unstructured_references": [path.as_posix() for path in REFERENCE_ROOTS],
+        },
         "source_digest_sha256": source_digest,
         "counts": {
             "known_namespace_identities": len(known_names),
             "known_machine_keys": len(known_machine_keys),
             "scanned_files": len(scanned),
-            "unknown_display_symbols": len(unknown_symbols),
-            "unknown_machine_keys": len(unknown_machine_keys),
-            "total_unknown_observations": len(unknown_symbols) + len(unknown_machine_keys),
+            "unknown_declared_display_identities": len(unknown_declared_names),
+            "unknown_declared_machine_identities": len(unknown_declared_machine_keys),
+            "strict_unknown_declarations": strict_unknown,
+            "advisory_unstructured_symbol_references": len(advisory_references),
         },
-        "unknown_display_symbols": unknown_symbols,
-        "unknown_machine_keys": unknown_machine_keys,
+        "unknown_declared_display_identities": unknown_declared_names,
+        "unknown_declared_machine_identities": unknown_declared_machine_keys,
+        "advisory_unstructured_symbol_references": advisory_references,
         "routing": {
             "unknown_identity_state": "CANDIDATE_DISCOVERY",
+            "advisory_reference_state": "SEMANTIC_REVIEW_PENDING",
             "handoff": ["PentaScribe", "PentaPology", "PentaDocs", "PentaAssure"],
             "automatic_canonical_registration": False,
             "automatic_execution_enablement": False,
@@ -197,29 +252,32 @@ def main() -> int:
     parser.add_argument(
         "--allow-unknown",
         action="store_true",
-        help="Return success even when new candidate discoveries exist; useful for advisory inspection only.",
+        help="Return success even when strict unknown identity declarations exist; advisory inspection only.",
     )
     args = parser.parse_args()
 
     report = build_report(args.root.resolve())
+    counts = report["counts"]
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
-        counts = report["counts"]
         print(
             "PentaCensus: "
             f"known={counts['known_namespace_identities']} "
             f"machine_keys={counts['known_machine_keys']} "
             f"files={counts['scanned_files']} "
-            f"unknown={counts['total_unknown_observations']} "
+            f"strict_unknown={counts['strict_unknown_declarations']} "
+            f"advisory_refs={counts['advisory_unstructured_symbol_references']} "
             f"source_sha256={report['source_digest_sha256']}"
         )
-        for row in report["unknown_display_symbols"]:
-            print(f"UNKNOWN_SYMBOL {row['value']} :: {', '.join(row['evidence_paths'])}")
-        for row in report["unknown_machine_keys"]:
-            print(f"UNKNOWN_MACHINE_KEY {row['value']} :: {', '.join(row['evidence_paths'])}")
+        for row in report["unknown_declared_display_identities"]:
+            print(f"UNKNOWN_DECLARED_NAME {row['value']} :: {', '.join(row['evidence_paths'])}")
+        for row in report["unknown_declared_machine_identities"]:
+            print(f"UNKNOWN_DECLARED_MACHINE {row['value']} :: {', '.join(row['evidence_paths'])}")
+        for row in report["advisory_unstructured_symbol_references"]:
+            print(f"ADVISORY_REFERENCE {row['value']} :: {', '.join(row['evidence_paths'])}")
 
-    if report["counts"]["total_unknown_observations"] and not args.allow_unknown:
+    if counts["strict_unknown_declarations"] and not args.allow_unknown:
         return 2
     return 0
 
