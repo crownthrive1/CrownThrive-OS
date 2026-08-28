@@ -1,0 +1,106 @@
+---
+title: "Governed Merge Gate and V4 Gate Registry"
+sidebarTitle: "Merge Gate & Gate Registry"
+description: "The canonical V4 governance gate registry, the stable CrownThrive governed merge gate status context, PentaSerialized continuity as a transitive merge requirement, and V1–V3 backward compatibility."
+icon: "shield-check"
+keywords: ["gate registry", "governed merge gate", "V4 gate contract", "PentaSerialized", "required status check", "fail closed", "Phase 4 preparation"]
+standard_version: "1.0.0"
+primary_audience: "developer"
+page_type: "reference"
+content_state: "current_with_holds"
+---
+
+{/* pentadocs:audience-orientation:v2 */}
+<Info>
+  **Audience:** developers and governance operators (`developer`).
+
+  **This page:** Governed Merge Gate and V4 Gate Registry — The canonical V4 governance gate registry, the stable CrownThrive governed merge gate status context, PentaSerialized continuity as a transitive merge requirement, and V1–V3 backward compatibility.
+
+  **Documentation state:** `current_with_holds` for page type `reference`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Related guidance:** [Current operational state](/start-here/current-operational-state) and [Documentation source governance](/standards/documentation-source-of-truth-and-autonomous-governance).
+</Info>
+{/* /pentadocs:audience-orientation:v2 */}
+
+## Governed merge gate and V4 gate registry
+
+**Effective snapshot:** August 26, 2026
+**Canonical registry schema:** `ct.governance.gate-registry.v4`
+**Registered gates:** 59
+**Required merge status context:** `CrownThrive governed merge gate`
+**Institutional phase:** Phase 3 — Execute; Phase 4 state is `PREPARATION`, not activation
+
+CrownThrive registers every governance, security, documentation, certification, assurance, and continuity workflow in one canonical gate registry. The registry advanced to its fourth contract generation (V4). Earlier V1–V3 gate contract statements on other pages are historical evidence of prior generations, not the current contract.
+
+## What the V4 gate registry is
+
+The V4 registry is a single machine-readable manifest that enumerates every registered gate. Each entry records a V4-canonical gate ID, the exact workflow it binds to, its governance role, its contract version, and whether it is required for merge. Exactly one gate carries the `required_merge_perimeter` role: the governed merge gate that publishes the stable `CrownThrive governed merge gate` status context.
+
+```json
+{
+  "schema": "ct.governance.gate-registry.v4",
+  "registry_version": "4.0.0",
+  "current_institutional_phase": 3,
+  "target_phase": 4,
+  "phase4_state": "PREPARATION",
+  "canonical_required_status_context": "CrownThrive governed merge gate",
+  "gates": [
+    {
+      "gate_id": "ct.gate.governed-merge-gate.v4",
+      "role": "required_merge_perimeter",
+      "contract_version": "4.0.0",
+      "required_for_merge": true
+    }
+  ]
+}
+```
+
+The canonical registry lives at `developers/manifests/phase4-gate-contract.v4.json` in the institutional source repository.
+
+## When the registry applies
+
+Use the V4 registry whenever you need to answer one of these questions:
+
+- Which workflow is the required merge perimeter for `main`?
+- Is a given governance workflow registered, and under which V4 gate ID?
+- Which contract generation does a gate descend from (`unversioned_legacy_name`, `legacy_v2_name`, `legacy_v3_name`, `legacy_phase_2_99_name`, or `phase_3_name`)?
+- Is a Phase 4 claim preparation or activation?
+
+Pull requests to `main` must satisfy the `CrownThrive governed merge gate` status context. All other registered gates supply evidence but are not individually required for merge under the V4 contract.
+
+## PentaSerialized continuity is a transitive merge requirement
+
+The governed merge gate enforces PentaSerialized git continuity inside the required status context. Because the status context is required for merge, PentaSerialized continuity is an explicit transitive requirement of every merge to `main`:
+
+- The gate hydrates exact immutable base and head ancestry before evaluation, so merge-base resolution is proven rather than assumed.
+- Continuity is evaluated over a fail-closed three-dot diff between the merge base and the head.
+- Silent replacement and silent deletion of serialized records fail the gate.
+- The same continuity, trusted diff binding, and dependency-review checks also run on `phase4/**` branch pushes, so connector-created branch heads receive evidence even when no pull-request event is emitted.
+
+If the merge gate reports a continuity failure, the pull request cannot merge until the serialized record carries a proper receipt, tombstone, or successor.
+
+## V1–V3 backward compatibility
+
+The V4 contract accepts contract generations `[1, 2, 3, 4]` and adapts legacy gates instead of silently rewriting them:
+
+- Legacy workflow file names and paths are preserved. A `v2`-named or `phase-2-99`-named workflow keeps its path and gains a V4-canonical gate ID.
+- The required status context was not renamed at any generation. `CrownThrive governed merge gate` remains the stable required check.
+- Backward compatibility is fail-closed. The V4 envelope may not promote a `HOLD` to a pass, and it may not manufacture provider or D3 authority.
+- The Phase 3 validator remains binding during Phase 4 preparation.
+
+## Validation and drift control
+
+Two scripts keep the registry honest:
+
+- `scripts/validate_gate_registry_v4.py` fails closed when the registry drifts: wrong schema or version fields, a gate ID that is not V4-canonical, a duplicate gate ID or workflow path, a registered workflow file that does not exist, more or fewer than one required merge perimeter, or a compatibility invariant flipped away from `true`.
+- `scripts/run_phase4_preparation_audit.py` runs the Phase 4 preparation audit over the existing Phase 3 execution baseline without asserting activation.
+
+When a concurrent merge lands a new governance workflow, the registry must be drift-synced in a follow-up change so `all_registered_workflows_must_exist` and the registered gate count stay true. The registry records its last drift-sync reference for audit.
+
+## Mesh replication
+
+The V4 gate contract (`ct.governance.gate-contract.v4`) replicates from the authority repository to the governed repository mesh. Each replica records its binding state and merge or head reference in `developers/manifests/phase4-gate-replication.v4.json`. Replication invariants match the registry: replication is not Phase 4 activation, local gate logic remains binding, and no hold is promoted by version alone.
+
+## Phase boundary
+
+Phase 4 preparation is not Phase 4 activation. The institution remains in **Phase 3 — Execute** under the PENTA lifecycle (Discover → Govern → Execute → Verify → Preserve). Registry fields `current_institutional_phase: 3`, `target_phase: 4`, and `phase4_state: "PREPARATION"` encode that boundary, and the validator fails any change that asserts activation early. See [Current Operational State](/start-here/current-operational-state) for the controlling institutional phase.
