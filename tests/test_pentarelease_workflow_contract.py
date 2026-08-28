@@ -1,13 +1,16 @@
 import unittest
 from pathlib import Path
 
-WORKFLOW = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pentarelease-comprehensive-release-surface.yml"
+ROOT = Path(__file__).resolve().parents[1]
+COMPREHENSIVE_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-comprehensive-release-surface.yml"
+AWARENESS_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-autonomous-awareness.yml"
 
 
 class PentaReleaseWorkflowContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.text = WORKFLOW.read_text(encoding="utf-8")
+        cls.text = COMPREHENSIVE_WORKFLOW.read_text(encoding="utf-8")
+        cls.awareness_text = AWARENESS_WORKFLOW.read_text(encoding="utf-8")
 
     def test_never_direct_pushes_protected_main(self):
         self.assertNotIn('git push origin "$HEAD_SHA":refs/heads/main', self.text)
@@ -49,6 +52,16 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
             "PENTARELEASE_CHANGELOG.md",
         ):
             self.assertIn(name, self.text)
+
+    def test_generated_pentadocs_are_normalized_before_governance(self):
+        self.assertIn("python3 scripts/pentadocs_quality.py --apply", self.text)
+        self.assertIn("python3 scripts/validate_docs.py", self.text)
+        self.assertIn("data/documentation/pentadocs-page-profiles.v1.json", self.text)
+
+    def test_secret_gate_allows_public_templates_but_still_blocks_real_env_files(self):
+        self.assertIn(r"\.env\.(example|sample|template)$", self.awareness_text)
+        self.assertIn(r"\.env($|\.)", self.awareness_text)
+        self.assertIn("prohibited secret-bearing path", self.awareness_text)
 
 
 if __name__ == "__main__":
