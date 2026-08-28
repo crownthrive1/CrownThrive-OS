@@ -71,7 +71,20 @@ def main() -> None:
     require("raw workflow logs were not emitted" in classifier, "sensitive-log firewall acknowledgement missing")
 
     require("ct-governance-observability-v2" in readback, "machine comment marker missing")
-    require("Institutional disposition: `NOT_DERIVED_FROM_CI`" in readback, "interpretation firewall missing")
+    legacy_firewall = "Institutional disposition: `NOT_DERIVED_FROM_CI`" in readback
+    phase35_firewall = all(
+        marker in readback
+        for marker in (
+            "Evidence disposition:",
+            "CHLOM/D3 disposition created by this readback: `NONE`",
+            '"institutional_state": "HOLD_EVIDENCE"',
+            '"authority_created": "NONE"',
+        )
+    )
+    require(
+        legacy_firewall or phase35_firewall,
+        "interpretation firewall missing: CI/provider state must not manufacture institutional authority",
+    )
     require("PentaNurture / PentaStatus" in readback, "current Penta ownership missing")
     require("pull_request_target:" in obs and "workflow_run:" in obs, "observability triggers incomplete")
     require("ref: ${{ github.event.repository.default_branch }}" in obs, "privileged event must execute canonical code")
