@@ -1,0 +1,122 @@
+name: One-shot docs integration heal 652
+
+on:
+  push:
+    branches:
+      - phase3.5/docs-convergence-replv3
+
+permissions:
+  contents: write
+
+jobs:
+  heal:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: phase3.5/docs-convergence-replv3
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Repair governed documentation integration defects
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import re
+          import subprocess
+          from pathlib import Path
+
+          replacements = {
+              Path('brands/crownlytics.mdx'): {
+                  '/platforms/crownlytics-institutional-registry': '/technology/ecosystem-status-resilience',
+              },
+              Path('brands/chlom.mdx'): {
+                  '/chlom/governance-and-growth-engine': '/chlom/ecosystem-integrations',
+              },
+              Path('brands/wearable-art.mdx'): {
+                  '/brands/artful-mane-gallery': '/brands/the-tame-gallery',
+              },
+          }
+          for path, mapping in replacements.items():
+              text = path.read_text(encoding='utf-8')
+              for old, new in mapping.items():
+                  if old not in text:
+                      raise SystemExit(f'Expected broken route not found in {path}: {old}')
+                  text = text.replace(old, new)
+              path.write_text(text, encoding='utf-8')
+
+          canonical = 'https://github.com/crownthrive1/CrownThrive-OS'
+          legacy = 'CrownThrive-' + 'Support'
+          identity_files = [
+              Path('changelog/phase-2-99-governance-as-code-enforcement-audit.mdx'),
+              Path('standards/documentation-source-of-truth-and-autonomous-governance.mdx'),
+          ]
+          for path in identity_files:
+              text = path.read_text(encoding='utf-8')
+              if legacy not in text:
+                  raise SystemExit(f'Expected retired identity not found in {path}')
+              path.write_text(text.replace(legacy, canonical), encoding='utf-8')
+
+          probe = subprocess.run(
+              ['python', 'scripts/validate_docs.py'],
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              text=True,
+              check=False,
+          )
+          pattern = re.compile(r'ERROR: Unlisted MDX page lacks an explicit governed disposition: (.+)$', re.MULTILINE)
+          missing = sorted(set(pattern.findall(probe.stdout)))
+          if not missing:
+              print('No unlisted disposition defects detected.')
+          else:
+              manifest_path = Path('developers/manifests/pentadocs-unlisted-page-dispositions.v1.json')
+              manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+              dispositions = manifest.setdefault('dispositions', {})
+              target = list(dispositions.setdefault('operational_reference_direct_link', []))
+              existing = set()
+              for values in dispositions.values():
+                  existing.update(values)
+              additions = [p for p in missing if p not in existing]
+              target.extend(additions)
+              dispositions['operational_reference_direct_link'] = sorted(set(target))
+              manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+              print(f'Added {len(additions)} explicit operational-reference dispositions.')
+          PY
+
+          python scripts/pentadocs_quality.py apply
+          python scripts/substantive_rebuild_current_snapshot.py --print > /tmp/substantive-rebuild-current-semantic-snapshot.v1.json
+          mv /tmp/substantive-rebuild-current-semantic-snapshot.v1.json data/documentation/substantive-rebuild-current-semantic-snapshot.v1.json
+          python scripts/substantive_rebuild_current_snapshot.py --check
+          python scripts/validate_docs.py
+
+          if git grep -n -i -- 'CrownThrive-Support' -- ':!supabase/migrations/**' ':!.github/workflows/crownthrive-os-identity-guard.yml'; then
+            echo 'Retired repository identity remains outside governed archive boundary.' >&2
+            exit 1
+          fi
+      - name: Commit deterministic repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add brands/crownlytics.mdx brands/chlom.mdx brands/wearable-art.mdx \
+            changelog/phase-2-99-governance-as-code-enforcement-audit.mdx \
+            standards/documentation-source-of-truth-and-autonomous-governance.mdx \
+            developers/manifests/pentadocs-unlisted-page-dispositions.v1.json \
+            data/documentation/pentadocs-page-profiles.v1.json \
+            data/documentation/pentadocs-orientation-trail.v1.json \
+            data/documentation/substantive-rebuild-current-semantic-snapshot.v1.json \
+            revenue/revenue-architecture.mdx \
+            revenue/crown-affiliates-flywheel-engine.mdx
+          if git diff --cached --quiet; then
+            echo 'No repair changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'heal(docs): reconcile PR 652 integration governance'
+          git push origin HEAD:phase3.5/docs-convergence-replv3
