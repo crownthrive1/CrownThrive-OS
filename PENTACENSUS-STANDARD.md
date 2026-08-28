@@ -1,7 +1,7 @@
 # PentaCensus Continuous Namespace Standard
 
 **Standard ID:** `ct.standard.penta.census.v1`  
-**Version:** `1.2.0`  
+**Version:** `1.2.1`  
 **System identity:** `PentaCensus` / `penta.census`  
 **Primary family:** Intelligence, Research & Impact  
 **Pentagonal axis:** Truth  
@@ -236,3 +236,18 @@ Planned bounded evolution includes:
 - approved PentaCrawler integration for broader discovery without unbounded external scanning.
 
 Every expansion preserves the central invariant: **discovery increases awareness, not authority.**
+
+## 17. Canonical reconciliation lane
+
+PentaCensus owns a deterministic branch-only reconciliation lane for accepted namespace changes. On a governed PentaCensus development branch it may regenerate the Penta OS union registry, derived PentaDocs pages, operational/agent knowledge, Pentagonal reference manifests and registry-derived tests, then commit those projections back to the same branch for independent PR gates.
+
+This reconciliation authority is deliberately narrower than release authority:
+
+- it may derive artifacts only from checked-in governed source;
+- it may not write directly to `main`;
+- it may not convert `implemented` to `certified` or `production`;
+- it may not make a noncanonical reference executable;
+- it may not bypass exact-head tests, PentaSerialized, Security, PentaAssure, Governed Merge or provider readback; and
+- any bot-generated reconciliation commit becomes the new exact head and must re-earn the complete required gate set before merge.
+
+The canonical census therefore evolves without brittle hand-maintained totals while preserving the separation between **identity inclusion** and **runtime authority**.
