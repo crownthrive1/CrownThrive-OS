@@ -21,6 +21,7 @@ on:
       - "PENTA-FAMILY-REGISTRY.md"
       - "PENTA-PORTAL-STANDARD.md"
       - "PENTAGONAL-KNOWLEDGE-STANDARD.md"
+      - "PENTAGONAL-FULL-SUITE-SPECIFICATION.md"
       - "pentas.mdx"
       - "pentas/**"
       - "docs.json"
@@ -42,6 +43,7 @@ on:
       - "PENTA-FAMILY-REGISTRY.md"
       - "PENTA-PORTAL-STANDARD.md"
       - "PENTAGONAL-KNOWLEDGE-STANDARD.md"
+      - "PENTAGONAL-FULL-SUITE-SPECIFICATION.md"
       - "pentas.mdx"
       - "pentas/**"
       - "docs.json"
@@ -73,6 +75,21 @@ jobs:
         run: python scripts/penta_operational_knowledge_entrypoint.py --apply
       - name: Generate Pentagonal reference and paper suite
         run: python scripts/pentagonal_reference_suite.py --apply
+      - name: Validate Pentagonal full-suite ingestion contract
+        run: |
+          test -s PENTAGONAL-FULL-SUITE-SPECIFICATION.md
+          python -m json.tool data/penta/pentagonal-ingestion-contract.v1.json >/dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('data/penta/pentagonal-ingestion-contract.v1.json').read_text())
+          required = {'boot_order','routing_pipeline','execution_gate','forbidden_inferences','evidence_minimum','penta_record_minimum'}
+          missing = sorted(required - set(p))
+          if missing:
+              raise SystemExit(f'missing ingestion contract keys: {missing}')
+          if len(p['boot_order']) < 8 or len(p['routing_pipeline']) < 12 or len(p['penta_record_minimum']) < 30:
+              raise SystemExit('Pentagonal ingestion contract is shallow')
+          PY
       - name: Validate complete Penta knowledge system
         run: |
           python scripts/penta_portal_finalize.py --check
@@ -95,7 +112,9 @@ jobs:
             data/penta/agent-knowledge.v1.jsonl \
             data/penta/pentagonal-reference.v1.json \
             data/penta/pentagonal-reference.v1.jsonl \
+            data/penta/pentagonal-ingestion-contract.v1.json \
             data/documentation/pentadocs-page-profiles.v1.json \
+            PENTAGONAL-FULL-SUITE-SPECIFICATION.md \
             pentas.mdx \
             pentas \
             changelog/penta-portal-full-census-2026-08-28.mdx
@@ -121,6 +140,21 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
+      - name: Validate Pentagonal full-suite ingestion contract
+        run: |
+          test -s PENTAGONAL-FULL-SUITE-SPECIFICATION.md
+          python -m json.tool data/penta/pentagonal-ingestion-contract.v1.json >/dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('data/penta/pentagonal-ingestion-contract.v1.json').read_text())
+          required = {'boot_order','routing_pipeline','execution_gate','forbidden_inferences','evidence_minimum','penta_record_minimum'}
+          missing = sorted(required - set(p))
+          if missing:
+              raise SystemExit(f'missing ingestion contract keys: {missing}')
+          if len(p['boot_order']) < 8 or len(p['routing_pipeline']) < 12 or len(p['penta_record_minimum']) < 30:
+              raise SystemExit('Pentagonal ingestion contract is shallow')
+          PY
       - name: Verify deterministic governed knowledge corpus
         run: |
           python scripts/penta_portal_finalize.py --check
