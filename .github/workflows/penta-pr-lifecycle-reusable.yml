@@ -33,6 +33,10 @@ permissions:
 env:
   PENTA_MODE: ${{ inputs.mode || github.event.inputs.mode }}
   PENTA_NUMBER: ${{ inputs.number || github.event.inputs.number }}
+  # PentaTagger averages about five provider calls per entity when labels drift.
+  # Keep each five-minute sweep comfortably below its 180-request safety budget;
+  # untagged entities sort first, so repeated bounded sweeps converge the backlog.
+  PENTA_TAGGER_SWEEP_MAX_ITEMS: '24'
 
 jobs:
   lifecycle:
@@ -61,7 +65,7 @@ jobs:
           set -euo pipefail
           gate_status=0
           python penta-control/scripts/penta_gate.py --root penta-control --output "$RUNNER_TEMP/pentagate-pr-lifecycle.json" || gate_status=$?
-          python penta-control/scripts/penta_heal.py --root penta-control --gate-report "$RUNNER_TEMP/pentagate-pr-lifecycle.json" --output "$RUNNER_TEMP/pentaheal-pr-lifecycle.json" || true
+          python penta-control/scripts/penta_heal.py --root penta-control --gate-report "$RUNNER_TEMP/pentaheal-pr-lifecycle.json" --output "$RUNNER_TEMP/pentaheal-pr-lifecycle.json" || true
           if [[ "$gate_status" -ne 0 ]]; then
             echo 'PentaGate blocked terminal PR authority.'
             cat "$RUNNER_TEMP/pentagate-pr-lifecycle.json"
@@ -76,7 +80,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 500 --no-comment)
+          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items "$PENTA_TAGGER_SWEEP_MAX_ITEMS" --no-comment)
           if [[ -n "${PENTA_NUMBER:-}" ]]; then
             args+=(--number "$PENTA_NUMBER")
           fi
@@ -105,7 +109,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 500 --no-comment)
+          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items "$PENTA_TAGGER_SWEEP_MAX_ITEMS" --no-comment)
           if [[ -n "${PENTA_NUMBER:-}" ]]; then
             args+=(--number "$PENTA_NUMBER")
           fi
@@ -122,6 +126,7 @@ jobs:
             echo
             echo "- Authority invoked: **${PENTA_MODE:-unknown}**"
             echo "- Target PR: **${PENTA_NUMBER:-repository sweep}**"
+            echo "- PentaTagger bounded sweep size: **${PENTA_TAGGER_SWEEP_MAX_ITEMS}**"
             echo '- Preflight chain: PentaGate → PentaHeal packet (if needed) → PentaTagger'
             echo '- Terminal chain: PentaMerge/PentaCloser → PentaTagger terminal readback'
             echo
