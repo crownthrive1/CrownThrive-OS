@@ -9,14 +9,14 @@
 - Kept the existing flow-control campaign on HOLD until its missing independent-verifier and exact rollback/readback evidence exists.
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.27.0.0
+## Latest PentaRelease — v3.27.1.0
 
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.27.0.0
-- **Release title:** CrownThrive OS 3.27.0.0 — Autonomous PentaRelease
-- **Why:** new executable capability or runtime delta
-- **Changed paths:** 18
-- **Penta components:** PentaRelease
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.27.1.0
+- **Release title:** CrownThrive OS 3.27.1.0 — Autonomous PentaRelease
+- **Why:** production fix/hardening delta
+- **Changed paths:** 3
+- **Penta components:** PentaRelease, PentaReleaseComprehensiveReleaseSurface
 - **Direct USD payload cost:** not available
 - **CIE score:** not available
 - **Data/evidence:** comprehensive record, FAQ, changelog, costs, CIE status, data catalog, and evidence are attached to the official release.
