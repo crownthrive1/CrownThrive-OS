@@ -32,6 +32,21 @@ jobs:
           import subprocess
           from pathlib import Path
 
+          marker = '{/* pentadocs:audience-orientation:v2 */}'
+          for path in (
+              Path('revenue/revenue-architecture.mdx'),
+              Path('revenue/crown-affiliates-flywheel-engine.mdx'),
+          ):
+              text = path.read_text(encoding='utf-8')
+              normalized = text
+              for component in ('Info', 'Note', 'Warning'):
+                  normalized = normalized.replace(
+                      f'{marker}\n\n<{component}>',
+                      f'{marker}\n<{component}>',
+                  )
+              if normalized != text:
+                  path.write_text(normalized, encoding='utf-8')
+
           replacements = {
               Path('brands/crownlytics.mdx'): {
                   '/platforms/crownlytics-institutional-registry': '/technology/ecosystem-status-resilience',
@@ -103,15 +118,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git add brands/crownlytics.mdx brands/chlom.mdx brands/wearable-art.mdx \
-            changelog/phase-2-99-governance-as-code-enforcement-audit.mdx \
-            standards/documentation-source-of-truth-and-autonomous-governance.mdx \
-            developers/manifests/pentadocs-unlisted-page-dispositions.v1.json \
-            data/documentation/pentadocs-page-profiles.v1.json \
-            data/documentation/pentadocs-orientation-trail.v1.json \
-            data/documentation/substantive-rebuild-current-semantic-snapshot.v1.json \
-            revenue/revenue-architecture.mdx \
-            revenue/crown-affiliates-flywheel-engine.mdx
+          git add -A
           if git diff --cached --quiet; then
             echo 'No repair changes required.'
             exit 0
