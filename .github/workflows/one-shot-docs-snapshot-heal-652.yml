@@ -1,0 +1,44 @@
+name: One-shot docs snapshot heal 652
+
+on:
+  push:
+    branches:
+      - phase3.5/docs-convergence-replv3
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: phase3.5/docs-convergence-replv3
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Regenerate current semantic snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/substantive_rebuild_current_snapshot.py --print > /tmp/substantive-rebuild-current-semantic-snapshot.v1.json
+          mv /tmp/substantive-rebuild-current-semantic-snapshot.v1.json data/documentation/substantive-rebuild-current-semantic-snapshot.v1.json
+          python scripts/substantive_rebuild_current_snapshot.py --check
+      - name: Commit deterministic repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add data/documentation/substantive-rebuild-current-semantic-snapshot.v1.json
+          if git diff --cached --quiet; then
+            echo 'Snapshot already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'heal(docs): refresh current semantic snapshot for PR 652'
+          git push origin HEAD:phase3.5/docs-convergence-replv3
