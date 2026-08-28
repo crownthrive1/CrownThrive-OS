@@ -49,6 +49,12 @@ jobs:
               "pentafabric": "https://crown-thrive-os.vercel.app/api/penta?selftest=1",
           }
 
+          def parse_body(raw: str) -> dict:
+              try:
+                  return json.loads(raw)
+              except json.JSONDecodeError:
+                  return {"raw": raw[:300]}
+
           def probe(url: str) -> dict:
               request = urllib.request.Request(
                   url,
@@ -66,14 +72,42 @@ jobs:
                       }
               except urllib.error.HTTPError as error:
                   raw = error.read().decode("utf-8", errors="replace")
-                  try:
-                      body = json.loads(raw)
-                  except json.JSONDecodeError:
-                      body = {"raw": raw[:300]}
                   return {
                       "url": url,
                       "http_status": error.code,
-                      "body": body,
+                      "body": parse_body(raw),
+                      "error": f"HTTPError: {error}",
+                  }
+              except Exception as error:
+                  return {
+                      "url": url,
+                      "error": f"{type(error).__name__}: {error}",
+                  }
+
+          def probe_unauthorized_write(url: str) -> dict:
+              request = urllib.request.Request(
+                  url,
+                  data=b"{}",
+                  method="POST",
+                  headers={
+                      "Accept": "application/json",
+                      "Content-Type": "application/json",
+                      "User-Agent": "CrownThrive-PentaVercel-CI/1.0",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=10) as response:
+                      return {
+                          "url": url,
+                          "http_status": response.status,
+                          "body": json.loads(response.read().decode("utf-8")),
+                      }
+              except urllib.error.HTTPError as error:
+                  raw = error.read().decode("utf-8", errors="replace")
+                  return {
+                      "url": url,
+                      "http_status": error.code,
+                      "body": parse_body(raw),
                       "error": f"HTTPError: {error}",
                   }
               except Exception as error:
@@ -174,6 +208,28 @@ jobs:
                   failures.append(
                       "pentafabric: evidence sink is not bound"
                   )
+              if penta.get("write_authorization", {}).get("required") is not True:
+                  failures.append(
+                      "pentafabric: write authorization is not required"
+                  )
+
+              negative = results.get(
+                  "unauthorized_pentafabric_write", {}
+              )
+              negative_status = negative.get("http_status")
+              negative_body = negative.get("body", {})
+              if negative_status not in (401, 403, 503):
+                  failures.append(
+                      "pentafabric: unauthenticated POST was not denied"
+                  )
+              if negative_body.get("status") != "WRITE_GATED":
+                  failures.append(
+                      "pentafabric: unauthenticated POST did not report WRITE_GATED"
+                  )
+              if negative_body.get("pass_manufactured") is not False:
+                  failures.append(
+                      "pentafabric: unauthenticated POST invariant failed"
+                  )
 
               return failures
 
@@ -185,6 +241,11 @@ jobs:
                   key: probe(url)
                   for key, url in endpoints.items()
               }
+              results["unauthorized_pentafabric_write"] = (
+                  probe_unauthorized_write(
+                      "https://crown-thrive-os.vercel.app/api/penta"
+                  )
+              )
               failures = validate(results)
               if not failures:
                   break
@@ -198,7 +259,7 @@ jobs:
                   time.sleep(10)
 
           envelope = {
-              "schema": "ct.penta.vercel.provider-readback-ci.20260827.v2",
+              "schema": "ct.penta.vercel.provider-readback-ci.20260827.v3",
               "status": "PASS" if not failures else "HOLD",
               "attempts": attempt,
               "results": results,
@@ -230,6 +291,9 @@ jobs:
                   "execution_fabric", {}
               ).get("body", {})
               mcp = results.get("mcp_gateway", {}).get("body", {})
+              negative = results.get(
+                  "unauthorized_pentafabric_write", {}
+              )
               with open(
                   summary_path, "a", encoding="utf-8"
               ) as summary:
@@ -260,6 +324,10 @@ jobs:
                   summary.write(
                       "- MCP self-test: "
                       f"`{mcp.get('self_test', {}).get('status', 'unknown')}`\n"
+                  )
+                  summary.write(
+                      "- Unauthorized Penta write: "
+                      f"`{negative.get('http_status', 'unknown')}`\n"
                   )
                   if failures:
                       summary.write("\n## Holds\n")
