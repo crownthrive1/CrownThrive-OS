@@ -25,10 +25,21 @@ function send(response, status, payload) {
   return response.status(status).json(payload);
 }
 
+function projectHealth(payload) {
+  const upstream = payload?.upstream || {};
+  return {
+    ...payload,
+    operating_mode:
+      payload?.operating_mode || upstream.operating_mode || upstream.operatingMode || null,
+    capability_states:
+      payload?.capability_states || upstream.capability_states || upstream.capabilityStates || null,
+  };
+}
+
 export default async function handler(request, response) {
   if (request.method === 'GET' || request.method === 'HEAD') {
     try {
-      const payload = await fetchChlomHealth();
+      const payload = projectHealth(await fetchChlomHealth());
       if (request.method === 'HEAD') {
         setHeaders(response, payload);
         return response.status(payload.status === 'OPERATIONAL' ? 200 : 503).end();
