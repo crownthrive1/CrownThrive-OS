@@ -204,6 +204,25 @@ def classify_run_conclusion(value):
     return ("PENDING", "await_provider_completion") if not value else ("HOLD", "unclassified_provider_conclusion")
 
 
+def provider_rerun_not_retriable(exc):
+    """Return true only for an explicit provider rejection of a rerun attempt.
+
+    Permission failures and generic 403 responses remain fatal. This classification
+    only converts GitHub's immutable/non-rerunnable historical-run response into a
+    receipt-producing HOLD disposition.
+    """
+    value = str(exc or "").casefold()
+    return "rerun-failed-jobs_" in value and any(
+        marker in value
+        for marker in (
+            "this workflow run cannot be retried",
+            "workflow run cannot be retried",
+            "workflow run is not rerunnable",
+            "workflow run cannot be re-run",
+        )
+    )
+
+
 class GitHubClient:
     def __init__(self, repo, token, budget):
         self.repo, self.token, self.budget = repo, token, budget
@@ -300,7 +319,30 @@ def remote_audit(repo, token, policy, apply=False):
                     run, pr = int(action.target), int((action.metadata or {}).get("pr") or 0); key = f"rerun-{run}-v1"
                     if pr and _marked(gh, pr, key):
                         executed.append({"action": action.action, "run_id": run, "status": "NOOP_ALREADY_REQUESTED"}); continue
-                    gh.post(f"/repos/{repo}/actions/runs/{run}/rerun-failed-jobs", {})
+                    try:
+                        gh.post(f"/repos/{repo}/actions/runs/{run}/rerun-failed-jobs", {})
+                    except ProviderDeferred:
+                        raise
+                    except PentaRGError as exc:
+                        if not provider_rerun_not_retriable(exc):
+                            raise
+                        hold_key = f"rerun-{run}-provider-nonretriable-v1"
+                        if pr:
+                            _comment(
+                                gh,
+                                pr,
+                                hold_key,
+                                f"### PentaRG non-retriable provider HOLD\n\nGitHub refused a failed-job rerun for historical run `{run}` on exact head `{(action.metadata or {}).get('head_sha')}` because the workflow run is no longer retriable. No PASS was manufactured and no history was rewritten. The failed provider evidence remains immutable and requires current-head remediation or supersession rather than another retry.",
+                            )
+                        executed.append({
+                            "action": action.action,
+                            "run_id": run,
+                            "status": "SKIPPED_PROVIDER_NOT_RETRIABLE",
+                            "provider_reason": "workflow_run_cannot_be_retried",
+                            "head_sha": (action.metadata or {}).get("head_sha"),
+                            "pr": pr or None,
+                        })
+                        continue
                     if pr: _comment(gh, pr, key, f"### PentaRG bounded retry\n\nRequested one failed-job rerun for `{run}` on exact head `{(action.metadata or {}).get('head_sha')}`. A rerun is not PASS; readback remains required.")
                     executed.append({"action": action.action, "run_id": run, "status": "DISPATCHED"})
     except ProviderDeferred as exc:
