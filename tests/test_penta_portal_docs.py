@@ -2,18 +2,28 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "scripts/penta_portal_docs.py"
+GENERATOR = ROOT / "scripts/penta_portal_docs.py"
+FINALIZER = ROOT / "scripts/penta_portal_finalize.py"
 
-spec = importlib.util.spec_from_file_location("penta_portal_docs", SCRIPT)
-assert spec and spec.loader
-portal = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = portal
-spec.loader.exec_module(portal)
+
+def load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+portal = load_module("penta_portal_docs", GENERATOR)
+finalizer = load_module("penta_portal_finalize", FINALIZER)
+
 
 class PentaPortalDocsTest(unittest.TestCase):
     @classmethod
@@ -21,6 +31,7 @@ class PentaPortalDocsTest(unittest.TestCase):
         cls.census = json.loads((ROOT / "data/penta/namespace-census.v1.json").read_text(encoding="utf-8"))
         cls.os_registry = json.loads((ROOT / "data/penta/os-v1.registry.json").read_text(encoding="utf-8"))
         cls.seed = json.loads((ROOT / "data/penta/namespace-candidates.v1.json").read_text(encoding="utf-8"))
+        cls.family_registry = json.loads((ROOT / "penta/registry/penta-families.v1.json").read_text(encoding="utf-8"))
         cls.records = cls.census["records"]
 
     def test_canonical_registry_coverage_is_exact(self):
@@ -31,10 +42,16 @@ class PentaPortalDocsTest(unittest.TestCase):
             {portal.normalize(r["canonical_name"]) for r in self.os_registry["systems"]},
         )
 
+    def test_final_census_is_exact_single_identity_universe(self):
+        expected = self.os_registry["counts"]["total"] + self.seed["candidate_count"]
+        self.assertEqual(len(self.records), expected)
+        self.assertEqual(self.census["counts"]["total"], expected)
+        for record in self.records:
+            self.assertEqual(len(re.findall(r"\bPenta", record["name"])), 1, record["name"])
+
     def test_every_seed_candidate_is_preserved(self):
         actual = {portal.normalize(r["name"]) for r in self.records}
         self.assertTrue({portal.normalize(x) for x in self.seed["candidates"]}.issubset(actual))
-        self.assertGreaterEqual(len(self.records), self.os_registry["counts"]["total"] + self.seed["candidate_count"])
 
     def test_every_identity_has_one_dedicated_page(self):
         paths = [r["docs_path"] + ".mdx" for r in self.records]
@@ -52,26 +69,43 @@ class PentaPortalDocsTest(unittest.TestCase):
 
     def test_family_and_directory_surfaces_exist(self):
         for rel in [
-            "pentas/index.mdx",
+            "pentas.mdx",
             "pentas/all.mdx",
-            "pentas/canonical/index.mdx",
-            "pentas/candidates/index.mdx",
+            "pentas/canonical.mdx",
+            "pentas/candidates.mdx",
             "pentas/families.mdx",
         ]:
             self.assertTrue((ROOT / rel).exists(), rel)
-        family_registry = json.loads((ROOT / "penta/registry/penta-families.v1.json").read_text(encoding="utf-8"))
-        self.assertEqual(len(family_registry["families"]), 15)
-        for family in family_registry["families"]:
+        self.assertEqual(len(self.family_registry["families"]), 15)
+        for family in self.family_registry["families"]:
             self.assertTrue((ROOT / f"pentas/families/{family['slug']}.mdx").exists())
 
-    def test_mintlify_has_dedicated_pentas_tab(self):
+    def test_mintlify_has_one_dedicated_pentas_tab(self):
         docs = json.loads((ROOT / "docs.json").read_text(encoding="utf-8"))
         tabs = docs["navigation"]["tabs"]
         matches = [tab for tab in tabs if isinstance(tab, dict) and tab.get("tab") == "Pentas"]
         self.assertEqual(len(matches), 1)
 
-    def test_generator_is_clean(self):
-        portal.check_artifacts()
+    def test_every_identity_is_in_pentas_navigation_exactly_once(self):
+        docs = json.loads((ROOT / "docs.json").read_text(encoding="utf-8"))
+        pages = finalizer.iter_navigation_pages(docs)
+        self.assertEqual(len(pages), len(set(pages)))
+        for record in self.records:
+            self.assertEqual(pages.count(record["docs_path"]), 1, record["docs_path"])
+        self.assertNotIn("automation/penta-family", pages)
+        self.assertNotIn("automation/penta-os-v1", pages)
+
+    def test_aggregate_parser_capture_is_removed(self):
+        names = {r["name"] for r in self.records}
+        self.assertNotIn(
+            "PentaQuery, PentaSearch, PentaRead, PentaList, PentaParse, PentaResolve, PentaTransform, PentaValidate, PentaCache, PentaSync, and PentaIngest",
+            names,
+        )
+
+    def test_finalizer_and_pentadocs_quality_are_clean(self):
+        receipt = finalizer.check()
+        self.assertEqual(receipt["status"], "PASS")
+
 
 if __name__ == "__main__":
     unittest.main()
