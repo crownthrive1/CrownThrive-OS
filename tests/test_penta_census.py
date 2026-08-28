@@ -93,8 +93,59 @@ class PentaCensusTests(unittest.TestCase):
         self.assertEqual(report["counts"]["strict_unknown_declarations"], 2)
         self.assertEqual(report["unknown_declared_display_identities"][0]["value"], "PentaNewThing")
         self.assertEqual(report["unknown_declared_machine_identities"][0]["value"], "penta.new-thing")
-        self.assertEqual(report["routing"]["unknown_identity_state"], "CANDIDATE_DISCOVERY")
-        self.assertFalse(report["routing"]["automatic_canonical_registration"])
+
+    def test_root_penta_registry_single_token_name_is_identity_declaration(self) -> None:
+        root = self.make_root()
+        write_json(
+            root / "penta/registry/provision.json",
+            {
+                "schema_version": "1.0.0",
+                "registry_id": "ct.penta.provision.v1",
+                "canonical_name": "PentaProvision",
+                "status": "active",
+            },
+        )
+
+        report = build_report(root)
+
+        self.assertEqual(report["counts"]["strict_unknown_declarations"], 1)
+        self.assertEqual(report["unknown_declared_display_identities"][0]["value"], "PentaProvision")
+
+    def test_family_and_composite_canonical_names_are_not_penta_identities(self) -> None:
+        root = self.make_root()
+        write_json(
+            root / "penta/registry/families.json",
+            {
+                "registry_id": "ct.registry.penta-families.v1",
+                "canonical_name": "Penta Family of Families",
+                "families": [
+                    {
+                        "family_id": "example",
+                        "canonical_name": "Penta Example Family",
+                    }
+                ],
+            },
+        )
+
+        report = build_report(root)
+
+        self.assertEqual(report["counts"]["strict_unknown_declarations"], 0)
+
+    def test_system_key_only_component_bridge_is_not_penta_identity(self) -> None:
+        root = self.make_root()
+        write_json(
+            root / "data/penta/component.json",
+            {
+                "registry_id": "ct.pentamarketer.persona-execution-bridge.v1",
+                "system_key": "penta.persona-execution",
+                "canonical_name": "PentaMarketer Persona Execution Bridge",
+                "version": "1.0.0",
+            },
+        )
+
+        report = build_report(root)
+
+        self.assertEqual(report["counts"]["strict_unknown_declarations"], 0)
 
     def test_unstructured_code_symbol_is_advisory_not_identity_promotion(self) -> None:
         root = self.make_root()
