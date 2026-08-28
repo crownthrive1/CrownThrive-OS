@@ -43,10 +43,10 @@ jobs:
           test "$(jq -r '.isPrerelease' /tmp/pentarelease-latest.json)" = "false"
 
           gh pr list --repo "$REPO" --state open --limit 100 \
-            --json number,title,headRefName,author > /tmp/pentarelease-open-prs.json
+            --json number,title,headRefName > /tmp/pentarelease-open-prs.json
 
           retired=0
-          while IFS=$'\t' read -r number title head author; do
+          while IFS=$'\t' read -r number title head; do
             [ -n "$number" ] || continue
 
             case "$head" in
@@ -80,16 +80,17 @@ jobs:
                 ;;
             esac
 
+            author=$(gh api "repos/$REPO/pulls/$number" --jq '.user.login // empty')
             if [ "$author" != "github-actions[bot]" ]; then
-              echo "KEEP #$number: matching branch is not GitHub Actions authored."
+              echo "KEEP #$number: provider REST author is '$author', not github-actions[bot]."
               continue
             fi
 
-            NOTE="PentaRelease reconciler: provider readback proves $tag is published and its required evidence assets exist. This generated PR shell is therefore retired to prevent release backlog; branch protection and release evidence remain unchanged."
+            NOTE="PentaRelease reconciler: provider readback proves $tag is published and its required evidence assets exist. Provider REST identity also proves this generated PR was authored by github-actions[bot]. This release shell is therefore retired to prevent backlog; branch protection and release evidence remain unchanged."
             gh pr close "$number" --repo "$REPO" --comment "$NOTE" --delete-branch
             echo "RETIRED #$number ($tag)"
             retired=$((retired + 1))
-          done < <(jq -r '.[] | [.number,.title,.headRefName,(.author.login // "")] | @tsv' /tmp/pentarelease-open-prs.json)
+          done < <(jq -r '.[] | [.number,.title,.headRefName] | @tsv' /tmp/pentarelease-open-prs.json)
 
           {
             echo '## PentaRelease PR backlog reconciliation'
@@ -98,6 +99,7 @@ jobs:
             echo "- Latest published release: $LATEST"
             echo "- Generated PR shells retired: $retired"
             echo '- Safety invariant: no release PR is retired without provider release + required-asset readback.'
+            echo '- Generated-PR identity is verified from the provider REST pull-request record.'
             echo '- Upstream workflow conclusion is advisory only; provider evidence is authoritative for cleanup.'
             echo '- Main-branch rules are not bypassed or weakened.'
           } >> "$GITHUB_STEP_SUMMARY"
