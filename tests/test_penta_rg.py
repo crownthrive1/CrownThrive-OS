@@ -35,6 +35,11 @@ class PentaRGTests(unittest.TestCase):
                 "generic_title_prefixes": ["create "],
                 "generic_workflow_paths": [".github/workflows/static.yml"],
             },
+            "provider": {
+                "request_budget": 100,
+                "max_open_pulls_per_sweep": 10,
+                "deferred_retry_seconds": 1800,
+            },
             "required_paths": [],
             "required_topology_nodes": [],
             "required_topology_edges": [],
@@ -94,6 +99,83 @@ steps:
         budget.consume()
         with self.assertRaises(penta_rg.ProviderDeferred):
             budget.consume()
+
+    def test_provider_nonretriable_classifier_is_narrow(self):
+        nonretriable = penta_rg.PentaRGError(
+            'github_POST_/repos/acme/repo/actions/runs/123/rerun-failed-jobs_403:{"message":"This workflow run cannot be retried"}'
+        )
+        permission = penta_rg.PentaRGError(
+            'github_POST_/repos/acme/repo/actions/runs/123/rerun-failed-jobs_403:{"message":"Resource not accessible by integration"}'
+        )
+        self.assertTrue(penta_rg.provider_rerun_not_retriable(nonretriable))
+        self.assertFalse(penta_rg.provider_rerun_not_retriable(permission))
+        self.assertFalse(penta_rg.provider_rerun_not_retriable(penta_rg.ProviderDeferred("github_quota_exhausted")))
+
+    def test_remote_audit_preserves_hold_and_receipt_when_old_run_cannot_rerun(self):
+        original_client = penta_rg.GitHubClient
+
+        class FakeGitHubClient:
+            comments = []
+
+            def __init__(self, repo, token, budget):
+                self.repo, self.token, self.budget = repo, token, budget
+
+            def paginate(self, path, pages=3):
+                if "/pulls?state=open" in path:
+                    return [{
+                        "number": 42,
+                        "title": "Fix current governed workflow",
+                        "draft": False,
+                        "head": {"sha": "a" * 40},
+                    }]
+                if "/pulls/42/files" in path:
+                    return [{"filename": "README.md"}]
+                if "/issues/42/comments" in path:
+                    return list(self.comments)
+                raise AssertionError(path)
+
+            def get(self, path):
+                if "/actions/runs?head_sha=" in path:
+                    return {
+                        "workflow_runs": [{
+                            "id": 123,
+                            "name": "Historical Gate",
+                            "status": "completed",
+                            "conclusion": "failure",
+                        }]
+                    }
+                raise AssertionError(path)
+
+            def post(self, path, body):
+                if path.endswith("/actions/runs/123/rerun-failed-jobs"):
+                    raise penta_rg.PentaRGError(
+                        'github_POST_/repos/acme/repo/actions/runs/123/rerun-failed-jobs_403:{"message":"This workflow run cannot be retried"}'
+                    )
+                if "/issues/42/comments" in path:
+                    self.comments.append({"body": body["body"]})
+                    return {}
+                raise AssertionError(path)
+
+            def patch(self, path, body):
+                raise AssertionError((path, body))
+
+        penta_rg.GitHubClient = FakeGitHubClient
+        try:
+            result = penta_rg.remote_audit("acme/repo", "token", self.policy(), apply=True)
+        finally:
+            penta_rg.GitHubClient = original_client
+
+        self.assertEqual("HOLD", result["status"])
+        self.assertFalse(result["pass_manufactured"])
+        self.assertIsNone(result["deferred"])
+        self.assertRegex(result["receipt_sha256"], r"^[0-9a-f]{64}$")
+        skipped = [
+            action for action in result["executed_actions"]
+            if action.get("status") == "SKIPPED_PROVIDER_NOT_RETRIABLE"
+        ]
+        self.assertEqual(1, len(skipped))
+        self.assertEqual(123, skipped[0]["run_id"])
+        self.assertEqual("workflow_run_cannot_be_retried", skipped[0]["provider_reason"])
 
     def test_local_audit_detects_missing_required_path(self):
         policy = self.policy()
