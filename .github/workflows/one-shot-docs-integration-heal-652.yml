@@ -51,6 +51,21 @@ jobs:
                   text = text.replace(old, new)
               path.write_text(text, encoding='utf-8')
 
+          # Map non-schema editorial labels into the governed PentaDocs enum without
+          # changing their substantive authority posture. These three pages are current
+          # architecture with explicit execution/contract/provider holds.
+          content_state_fixes = {
+              Path('revenue/self-funding-business-engine.mdx'): 'founder_directed',
+              Path('revenue/self-funding-contract-suite.mdx'): 'founder_directed',
+              Path('revenue/self-funding-software-control-plane.mdx'): 'implemented_gated',
+          }
+          for path, prior_state in content_state_fixes.items():
+              text = path.read_text(encoding='utf-8')
+              old = f'content_state: "{prior_state}"'
+              if old not in text:
+                  raise SystemExit(f'Expected non-schema content_state not found in {path}: {prior_state}')
+              path.write_text(text.replace(old, 'content_state: "current_with_holds"', 1), encoding='utf-8')
+
           canonical = 'https://github.com/crownthrive1/CrownThrive-OS'
           legacy = 'CrownThrive-' + 'Support'
           identity_files = [
