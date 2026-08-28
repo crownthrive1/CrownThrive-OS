@@ -1,20 +1,5 @@
 # Changelog
 
-<!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.12.0.0
-
-
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.12.0.0
-- **Release title:** CrownThrive OS 3.12.0.0 — Autonomous PentaRelease
-- **Why:** new executable capability or runtime delta
-- **Changed paths:** 5
-- **Penta components:** PentaRelease, PentaSerialized.Institutionalization, PentaSerializedInstitutionalOperations, PentaSerializedV1.0.0
-- **Direct USD payload cost:** not available
-- **CIE score:** not available
-- **Data/evidence:** comprehensive record, FAQ, changelog, costs, CIE status, data catalog, and evidence are attached to the official release.
-
-This section is maintained by PentaRelease. Content outside the managed markers remains under its existing ownership and editorial authority.
-<!-- pentarelease:managed-release-surface:end -->
 
 ## 2026-08-27 — D3 Founder Production Approval Window v1
 
@@ -22,3 +7,19 @@ This section is maintained by PentaRelease. Content outside the managed markers 
 - Added exact-candidate approval receipts, automatic governed-release binding, D3 release-dimension enforcement, cumulative effect-specific gates, revocation, and authority-reducing rollback.
 - Added a deterministic evaluator and expanded the flow-control certifier so Founder approval cannot substitute for independent verification or rollback/readback evidence.
 - Kept the existing flow-control campaign on HOLD until its missing independent-verifier and exact rollback/readback evidence exists.
+
+<!-- pentarelease:managed-release-surface:start -->
+## Latest PentaRelease — v3.26.0.0
+
+
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.26.0.0
+- **Release title:** CrownThrive OS 3.26.0.0 — Autonomous PentaRelease
+- **Why:** new executable capability or runtime delta
+- **Changed paths:** 76
+- **Penta components:** PentaCookieCanary, PentaCookieCertification, PentaHealBranchRegeneratorTemp, PentaMailLiveCertification, PentaPmReconcile, PentaPrLifecycleReusable, PentaProof, PentaProof.V1, PentaProofSelftest, PentaRelease, PentaReleaseAutonomousAwareness, PentaReleaseComprehensiveReleaseSurface, PentaReleasePublishedReleaseReconciler, PentaWire.V2
+- **Direct USD payload cost:** not available
+- **CIE score:** not available
+- **Data/evidence:** comprehensive record, FAQ, changelog, costs, CIE status, data catalog, and evidence are attached to the official release.
+
+This section is maintained by PentaRelease. Content outside the managed markers remains under its existing ownership and editorial authority.
+<!-- pentarelease:managed-release-surface:end -->
