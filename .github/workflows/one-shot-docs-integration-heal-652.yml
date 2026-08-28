@@ -32,25 +32,6 @@ jobs:
           import subprocess
           from pathlib import Path
 
-          # Two aggregate revenue pages carry stale generated managed-v2 blocks.
-          # Remove only the generated block so PentaDocs --apply can recreate it
-          # deterministically from current frontmatter/profile inputs.
-          orientation_re = re.compile(
-              r'\{/\* pentadocs:audience-orientation:v2 \*/\}\s*'
-              r'<(?:Info|Note|Warning)>.*?</(?:Info|Note|Warning)>\s*'
-              r'\{/\* /pentadocs:audience-orientation:v2 \*/\}\s*',
-              flags=re.DOTALL,
-          )
-          for path in (
-              Path('revenue/revenue-architecture.mdx'),
-              Path('revenue/crown-affiliates-flywheel-engine.mdx'),
-          ):
-              text = path.read_text(encoding='utf-8')
-              updated, count = orientation_re.subn('', text, count=1)
-              if count != 1:
-                  raise SystemExit(f'Expected exactly one stale managed-v2 orientation in {path}; found {count}')
-              path.write_text(updated, encoding='utf-8')
-
           replacements = {
               Path('brands/crownlytics.mdx'): {
                   '/platforms/crownlytics-institutional-registry': '/technology/ecosystem-status-resilience',
@@ -82,6 +63,7 @@ jobs:
                   raise SystemExit(f'Expected retired identity not found in {path}')
               path.write_text(text.replace(legacy, canonical), encoding='utf-8')
 
+          # First discover and govern every MDX page this PR introduced outside docs.json.
           probe = subprocess.run(
               ['python', 'scripts/validate_docs.py'],
               stdout=subprocess.PIPE,
@@ -91,21 +73,54 @@ jobs:
           )
           pattern = re.compile(r'ERROR: Unlisted MDX page lacks an explicit governed disposition: (.+)$', re.MULTILINE)
           missing = sorted(set(pattern.findall(probe.stdout)))
-          if not missing:
-              print('No unlisted disposition defects detected.')
-          else:
-              manifest_path = Path('developers/manifests/pentadocs-unlisted-page-dispositions.v1.json')
-              manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-              dispositions = manifest.setdefault('dispositions', {})
-              target = list(dispositions.setdefault('operational_reference_direct_link', []))
-              existing = set()
-              for values in dispositions.values():
-                  existing.update(values)
-              additions = [p for p in missing if p not in existing]
-              target.extend(additions)
-              dispositions['operational_reference_direct_link'] = sorted(set(target))
-              manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
-              print(f'Added {len(additions)} explicit operational-reference dispositions.')
+          manifest_path = Path('developers/manifests/pentadocs-unlisted-page-dispositions.v1.json')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          dispositions = manifest.setdefault('dispositions', {})
+          target = list(dispositions.setdefault('operational_reference_direct_link', []))
+          existing = set()
+          for values in dispositions.values():
+              existing.update(values)
+          additions = [p for p in missing if p not in existing]
+          target.extend(additions)
+          dispositions['operational_reference_direct_link'] = sorted(set(target))
+          manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          print(f'Added {len(additions)} explicit operational-reference dispositions.')
+
+          # Preserve declared custom orientation pages. Every other v2 block is managed
+          # generated state and is safe to strip and deterministically regenerate via
+          # pentadocs_quality.py --apply. Newly governed pages default to managed-v2.
+          profile_path = Path('data/documentation/pentadocs-page-profiles.v1.json')
+          profile_manifest = json.loads(profile_path.read_text(encoding='utf-8'))
+          custom_paths = {
+              record['path']
+              for record in profile_manifest.get('profiles', [])
+              if record.get('orientation_mode') == 'custom'
+          }
+          orientation_re = re.compile(
+              r'\{/\* pentadocs:audience-orientation:v2 \*/\}\s*'
+              r'<(?:Info|Note|Warning)>.*?</(?:Info|Note|Warning)>\s*'
+              r'\{/\* /pentadocs:audience-orientation:v2 \*/\}\s*',
+              flags=re.DOTALL,
+          )
+          marker = '{/* pentadocs:audience-orientation:v2 */}'
+          stripped = 0
+          malformed = []
+          for path in sorted(Path('.').rglob('*.mdx')):
+              rel = path.as_posix()
+              if rel in custom_paths:
+                  continue
+              text = path.read_text(encoding='utf-8')
+              if marker not in text:
+                  continue
+              updated, count = orientation_re.subn('', text, count=1)
+              if count == 1:
+                  path.write_text(updated, encoding='utf-8')
+                  stripped += 1
+              else:
+                  malformed.append(rel)
+          if malformed:
+              raise SystemExit('Managed-v2 marker could not be safely isolated in: ' + ', '.join(malformed))
+          print(f'Stripped {stripped} managed-v2 blocks for deterministic regeneration; preserved {len(custom_paths)} custom pages.')
           PY
 
           python scripts/pentadocs_quality.py --apply
