@@ -63,13 +63,13 @@ For business, licensing, development, media, partnership, ecosystem, research, o
 This is a public-safe professional and institutional profile. It does not disclose private contracts, restricted evidence, protected algorithms, confidential economic schedules, credentials, private customer data, unpublished source assets, or other restricted CrownThrive material.
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.27.0.0
+## Latest PentaRelease — v3.28.0.0
 
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.27.0.0
-- **Release title:** CrownThrive OS 3.27.0.0 — Autonomous PentaRelease
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.28.0.0
+- **Release title:** CrownThrive OS 3.28.0.0 — Autonomous PentaRelease
 - **Why:** new executable capability or runtime delta
-- **Changed paths:** 18
+- **Changed paths:** 3
 - **Penta components:** PentaRelease
 - **Direct USD payload cost:** not available
 - **CIE score:** not available
