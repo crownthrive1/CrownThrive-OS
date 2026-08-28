@@ -1,5 +1,7 @@
+import { timingSafeEqual } from 'node:crypto';
 import { emitPenta, fabricState, verifyPenta } from '../lib/pentafabric.js';
 import {
+  requestHeader,
   requestQueryParam,
   resolveVercelOidcToken,
 } from '../lib/vercel-oidc.js';
@@ -12,6 +14,9 @@ function send(response, status, payload) {
   response.setHeader('Cache-Control', 'no-store, max-age=0');
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.setHeader('X-PentaFabric-Version', '1.0.0');
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('X-Frame-Options', 'DENY');
+  response.setHeader('Referrer-Policy', 'no-referrer');
   return response.status(status).json(payload);
 }
 
@@ -51,6 +56,80 @@ function evidenceSinkState(oidcToken) {
         : 'UNBOUND',
     table: 'pentafabric_events',
     edge_ingest: 'pentafabric-ingest',
+  };
+}
+
+function writeAuthorizationState() {
+  if (process.env.PENTAFABRIC_WRITE_TOKEN) {
+    return {
+      required: true,
+      bound: true,
+      mode: 'PENTAFABRIC_WRITE_TOKEN',
+    };
+  }
+  if (process.env.VERCEL_OIDC_TOKEN) {
+    return {
+      required: true,
+      bound: true,
+      mode: 'VERCEL_OIDC_TOKEN_EXACT',
+    };
+  }
+  return {
+    required: true,
+    bound: false,
+    mode: 'UNBOUND',
+  };
+}
+
+function bearerToken(request) {
+  const authorization = requestHeader(request, 'authorization');
+  if (!authorization) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
+  return match?.[1] || null;
+}
+
+function constantTimeEqual(left, right) {
+  if (typeof left !== 'string' || typeof right !== 'string') return false;
+  const leftBytes = Buffer.from(left, 'utf8');
+  const rightBytes = Buffer.from(right, 'utf8');
+  if (leftBytes.length !== rightBytes.length) return false;
+  return timingSafeEqual(leftBytes, rightBytes);
+}
+
+function authorizeWrite(request) {
+  const presented = bearerToken(request);
+  const configuredToken = process.env.PENTAFABRIC_WRITE_TOKEN || null;
+  const workloadToken = process.env.VERCEL_OIDC_TOKEN || null;
+
+  if (!presented) {
+    return {
+      authorized: false,
+      status: configuredToken || workloadToken ? 401 : 503,
+      error:
+        configuredToken || workloadToken
+          ? 'write_authorization_required'
+          : 'write_authorization_binding_required',
+    };
+  }
+
+  if (configuredToken && constantTimeEqual(presented, configuredToken)) {
+    return {
+      authorized: true,
+      method: 'PENTAFABRIC_WRITE_TOKEN',
+    };
+  }
+
+  if (workloadToken && constantTimeEqual(presented, workloadToken)) {
+    return {
+      authorized: true,
+      method: 'VERCEL_OIDC_TOKEN_EXACT',
+    };
+  }
+
+  return {
+    authorized: false,
+    status: 403,
+    error: 'write_authorization_rejected',
   };
 }
 
@@ -195,6 +274,7 @@ export default async function handler(request, response) {
         emits: 'crownthrive.penta.event.v1',
         chlom_governed: true,
         evidence_sink: evidenceSinkState(oidcToken),
+        write_authorization: writeAuthorizationState(),
         self_test: selfTestRequested
           ? runSelfTest(state)
           : { status: 'NOT_REQUESTED' },
@@ -216,6 +296,21 @@ export default async function handler(request, response) {
     return send(response, 405, {
       status: 'REJECTED',
       error: 'method_not_allowed',
+    });
+  }
+
+  const authorization = authorizeWrite(request);
+  if (!authorization.authorized) {
+    response.setHeader(
+      'WWW-Authenticate',
+      'Bearer realm="CrownThrive PentaFabric"',
+    );
+    return send(response, authorization.status, {
+      schema: 'ct.penta.error.v1',
+      status: 'WRITE_GATED',
+      error: authorization.error,
+      service: 'crownthrive-os-control-plane',
+      pass_manufactured: false,
     });
   }
 
@@ -249,6 +344,7 @@ export default async function handler(request, response) {
       provider: 'vercel',
       chlom_binding: penta.mesh.chlom.binding,
       assurance: penta.integrity.algorithm,
+      write_authorization: authorization.method,
       transport_assurance:
         persistence.authentication || 'UNBOUND',
       persistence,

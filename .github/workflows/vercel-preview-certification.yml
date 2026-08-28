@@ -1,0 +1,205 @@
+name: PentaVercel Preview Certification
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+  deployments: read
+  id-token: write
+
+concurrency:
+  group: pentavercel-preview-${{ github.event.deployment.id }}
+  cancel-in-progress: true
+
+jobs:
+  certify-preview:
+    name: Certify Vercel preview
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Preview'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url }}
+      VERCEL_TRUSTED_AUDIENCE: https://vercel.com/crownthrive-os
+    steps:
+      - name: Resolve GitHub OIDC identity
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
+            echo "::error::GitHub OIDC identity is unavailable; preview certification remains fail-closed."
+            exit 1
+          fi
+          RESPONSE="$(curl --fail --silent --show-error \
+            --header "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${VERCEL_TRUSTED_AUDIENCE}")"
+          TOKEN="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])' <<<"$RESPONSE")"
+          if [[ -z "$TOKEN" ]]; then
+            echo "::error::GitHub OIDC token resolution returned an empty token."
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Provider-originated preview certification
+        shell: bash
+        env:
+          TRUSTED_OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime, timezone
+
+          raw_base = os.environ.get("DEPLOYMENT_URL", "").strip().rstrip("/")
+          parsed = urllib.parse.urlparse(raw_base)
+          if (
+              parsed.scheme != "https"
+              or not parsed.hostname
+              or not parsed.hostname.endswith(".vercel.app")
+              or parsed.username
+              or parsed.password
+              or parsed.port not in (None, 443)
+          ):
+              raise SystemExit("Preview URL is missing or outside the allowlisted Vercel HTTPS boundary.")
+
+          bypass_token = os.environ["TRUSTED_OIDC_TOKEN"]
+          common_headers = {
+              "Accept": "application/json",
+              "User-Agent": "CrownThrive-PentaVercel-Preview-Certifier/1.0",
+              "x-vercel-trusted-oidc-idp-token": bypass_token,
+          }
+
+          def request_json(path: str) -> tuple[int, dict]:
+              request = urllib.request.Request(
+                  f"{raw_base}{path}",
+                  headers=common_headers,
+              )
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  return response.status, json.loads(response.read().decode("utf-8"))
+
+          results: dict[str, dict] = {}
+          failures: list[str] = []
+
+          for key, path in {
+              "health": "/api/health",
+              "mcp": "/api/mcp?selftest=1",
+              "pentafabric": "/api/penta?selftest=1",
+          }.items():
+              try:
+                  status, body = request_json(path)
+                  results[key] = {"http_status": status, "body": body}
+              except Exception as error:
+                  results[key] = {"error": f"{type(error).__name__}: {error}"}
+                  failures.append(f"{key}: provider request failed")
+
+          health = results.get("health", {}).get("body", {})
+          if results.get("health", {}).get("http_status") != 200:
+              failures.append("health: HTTP status is not 200")
+          if health.get("status") != "OPERATIONAL":
+              failures.append("health: status is not OPERATIONAL")
+          if health.get("release") != "candidate":
+              failures.append("health: preview release is not candidate")
+          if health.get("vercel_provider_state") != "BOUND_PREVIEW":
+              failures.append("health: provider state is not BOUND_PREVIEW")
+          if health.get("provider_readback") is not True:
+              failures.append("health: provider_readback is not true")
+          if health.get("pass_manufactured") is not False:
+              failures.append("health: pass_manufactured invariant failed")
+
+          mcp = results.get("mcp", {}).get("body", {})
+          if mcp.get("status") != "OPERATIONAL":
+              failures.append("mcp: status is not OPERATIONAL")
+          if mcp.get("self_test", {}).get("status") != "PASS":
+              failures.append("mcp: protocol self-test did not pass")
+          if mcp.get("write_tools") != 0:
+              failures.append("mcp: write tool count is not zero")
+
+          penta = results.get("pentafabric", {}).get("body", {})
+          if penta.get("status") != "OPERATIONAL":
+              failures.append("pentafabric: status is not OPERATIONAL")
+          if penta.get("self_test", {}).get("status") != "PASS":
+              failures.append("pentafabric: packet self-test did not pass")
+          if penta.get("write_authorization", {}).get("required") is not True:
+              failures.append("pentafabric: write authorization is not required")
+
+          negative_request = urllib.request.Request(
+              f"{raw_base}/api/penta",
+              data=b"{}",
+              method="POST",
+              headers={
+                  **common_headers,
+                  "Content-Type": "application/json",
+              },
+          )
+          try:
+              with urllib.request.urlopen(negative_request, timeout=15) as response:
+                  negative_status = response.status
+                  negative_body = json.loads(response.read().decode("utf-8"))
+          except urllib.error.HTTPError as error:
+              negative_status = error.code
+              raw = error.read().decode("utf-8", errors="replace")
+              try:
+                  negative_body = json.loads(raw)
+              except json.JSONDecodeError:
+                  negative_body = {"raw": raw[:240]}
+          except Exception as error:
+              negative_status = None
+              negative_body = {"error": f"{type(error).__name__}: {error}"}
+
+          results["unauthorized_write"] = {
+              "http_status": negative_status,
+              "body": negative_body,
+          }
+          if negative_status not in (401, 403, 503):
+              failures.append(
+                  f"pentafabric: unauthenticated write returned {negative_status}, expected 401/403/503"
+              )
+          if negative_body.get("status") != "WRITE_GATED":
+              failures.append("pentafabric: unauthenticated write did not report WRITE_GATED")
+
+          envelope = {
+              "schema": "ct.penta.vercel.preview-certification.20260827.v1",
+              "status": "PASS" if not failures else "HOLD",
+              "deployment_url": raw_base,
+              "deployment_id": os.getenv("GITHUB_EVENT_DEPLOYMENT_ID"),
+              "results": results,
+              "failures": failures,
+              "github": {
+                  "repository": os.getenv("GITHUB_REPOSITORY"),
+                  "sha": os.getenv("GITHUB_SHA"),
+                  "run_id": os.getenv("GITHUB_RUN_ID"),
+                  "run_attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
+              },
+              "observed_at": datetime.now(timezone.utc).isoformat(),
+              "pass_manufactured": False,
+          }
+          canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":"))
+          envelope["sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+          print(json.dumps(envelope, indent=2, sort_keys=True))
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("# PentaVercel preview certification\n\n")
+              summary.write(f"- Status: **{envelope['status']}**\n")
+              summary.write(f"- Deployment: `{raw_base}`\n")
+              summary.write(f"- Receipt: `{envelope['sha256']}`\n")
+              summary.write("- MCP write tools: `0`\n")
+              summary.write(f"- Unauthorized Penta write: `{negative_status}`\n")
+              if failures:
+                  summary.write("\n## Holds\n")
+                  for failure in failures:
+                      summary.write(f"- {failure}\n")
+
+          if failures:
+              raise SystemExit(1)
+          PY

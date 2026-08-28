@@ -1,0 +1,82 @@
+{
+  "schema": "ct.penta.wire.v2",
+  "canonical_name": "PentaWire",
+  "agent_id": "ct.agent.penta-wire",
+  "parent_agent_id": "ct.agent.factory.api-mcp-packaging",
+  "service_id": "penta_wire_mesh",
+  "version": "2.0.0",
+  "runtime": {
+    "provider": "Supabase Edge Functions",
+    "function_slug": "penta-wire-mesh",
+    "edge_function_version": 2,
+    "edge_function_sha256": "49c92d4e2a3eb311f1171761d047d09771880e7094922b9461ee7db122206bf3",
+    "base_url": "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-wire-mesh",
+    "openapi_url": "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-wire-mesh/openapi.json",
+    "well_known_url": "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-wire-mesh/.well-known/penta-wire"
+  },
+  "fabrics": [
+    "PentaMesh",
+    "PentaFabric",
+    "PentaFactory",
+    "PentaCertify",
+    "PentaStatus",
+    "PentaPolice"
+  ],
+  "scheduler": {
+    "existing_job": "ct-software-factory-tick-v2",
+    "cron": "*/5 * * * *",
+    "external_scheduler_slot_delta": 0,
+    "new_external_clock": false
+  },
+  "authority": {
+    "autonomy_class": "A3",
+    "authority_ceiling": "D2",
+    "d3_human_reserved": true,
+    "no_self_approval": true,
+    "provider_write": false,
+    "credential_forwarding": false,
+    "money_movement": false,
+    "checkout_activation": false,
+    "authority_effect": "none"
+  },
+  "exact_read_adapters": [
+    {"service_id":"chlom_public_resolver","kind":"PUBLIC_HTTP","contract":"ct.chlom.public-identity-resolver.v1","operations":["identity.resolve"]},
+    {"service_id":"crownthrive_io_product_sandbox","kind":"PUBLIC_HTTP","contract":"ct.contract.crownthrive-io.api-sandbox.v1","operations":["health.read","manifest.read","openapi.read","links.list","links.read","statistics.read"]},
+    {"service_id":"pentabeata","kind":"PUBLIC_HTTP","contract":"ct.pentabeata.v4","operations":["status.read"]},
+    {"service_id":"framework_factory_v2","kind":"PUBLIC_HTTP","contract":"ct.pentaframework-factory.v1","operations":["status.read"]},
+    {"service_id":"penta_heartbeat","kind":"INTERNAL_SQL","contract":"ct.penta.heartbeat.v1","operations":["status.read"]},
+    {"service_id":"penta_od","kind":"INTERNAL_SQL","contract":"ct.penta.od.v1","operations":["status.read"]},
+    {"service_id":"thivebase","kind":"INTERNAL_SQL","contract":"ct.thrivebase.health-snapshot.v1","operations":["health.read"]}
+  ],
+  "gap_handling": {
+    "discover_all_registered_services": true,
+    "safe_exact_reads_auto_wire": true,
+    "credentialed_or_unknown_provider_semantics": "HOLD_EXACT_PROVIDER_CONTRACT_REQUIRED",
+    "tool_contract_drift": "FACTORY_REPAIR_WORK_REQUIRED",
+    "deduplicated_factory_requests": true,
+    "construction_work_items": true,
+    "release_only_after_exact_evidence": true
+  },
+  "certification": {
+    "certification_id": "ct.cert.penta-wire.mesh-v2.20260827.v1",
+    "decision": "PASS",
+    "evidence_sha256": "e064a898f943335830cce1cb8594457a8cbad866bd67ac7417930c9686aea707",
+    "public_routes": "14/14",
+    "exact_read_adapters": "7/7",
+    "public_probes": "5/5",
+    "direct_mcp_contracts": "22/22 enabled and closed-schema",
+    "negative_tests": {
+      "post_blocked_http": 405,
+      "unknown_adapter_http": 409,
+      "invalid_public_id_http": 400,
+      "invalid_operation_http": 400
+    }
+  },
+  "invariants": [
+    "A missing provider contract is active factory work, not permission to invent an endpoint.",
+    "Public probes never send credentials and never persist response bodies.",
+    "Internal status adapters project only allowlisted read-only fields.",
+    "PentaWire may create repair candidates but may not create provider-write, payment, checkout, deletion, D3, or self-approval authority.",
+    "The existing PentaFactory five-minute clock is reused; PentaWire creates no external scheduler."
+  ]
+}
