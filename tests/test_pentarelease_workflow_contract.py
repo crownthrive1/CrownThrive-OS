@@ -20,6 +20,13 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("HOLD_PR_PROVIDER_IDENTITY", self.text)
         self.assertIn("HOLD_PR_MERGE_IDENTITY", self.text)
 
+    def test_recursive_actions_identity_is_hold_not_false_code_failure(self):
+        self.assertIn('RUN_CONCLUSION" = "action_required', self.text)
+        self.assertIn("GitHub Actions recursive identity prevented PR workflow execution", self.text)
+        self.assertIn('promotion_state=HOLD_PR_PROVIDER_IDENTITY', self.text)
+        self.assertIn('RUN_CONCLUSION" != "success', self.text)
+        self.assertIn("exit 46", self.text)
+
     def test_reconciliation_has_local_and_provider_preflight(self):
         self.assertIn("Determine reconciliation need", self.text)
         self.assertIn("local_ready=", self.text)
