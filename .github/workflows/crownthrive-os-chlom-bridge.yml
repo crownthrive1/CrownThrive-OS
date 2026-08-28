@@ -12,7 +12,6 @@ on:
       - "apps/crownthrive-os-control-plane/contracts/chlom-chain-evidence-bridge.v1.json"
       - "apps/crownthrive-os-control-plane/tests/chlom-bridge.test.mjs"
       - "apps/crownthrive-os-control-plane/tests/vercel-fabric.test.mjs"
-      - "apps/crownthrive-os-control-plane/package.json"
       - "apps/crownthrive-os-control-plane/vercel.json"
       - ".github/workflows/crownthrive-os-chlom-bridge.yml"
   push:
@@ -27,7 +26,6 @@ on:
       - "apps/crownthrive-os-control-plane/contracts/chlom-chain-evidence-bridge.v1.json"
       - "apps/crownthrive-os-control-plane/tests/chlom-bridge.test.mjs"
       - "apps/crownthrive-os-control-plane/tests/vercel-fabric.test.mjs"
-      - "apps/crownthrive-os-control-plane/package.json"
       - "apps/crownthrive-os-control-plane/vercel.json"
       - ".github/workflows/crownthrive-os-chlom-bridge.yml"
   workflow_dispatch:
@@ -57,7 +55,13 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - name: Syntax, protocol, and governance certification
-        run: npm run certify
+        run: |
+          node --check api/chlom.js
+          node --check api/health.js
+          node --check api/mcp.js
+          node --check lib/chlom-fabric.js
+          node --check lib/vercel-fabric.js
+          node --test tests/*.test.mjs
       - name: Verify fail-closed authority boundaries
         run: |
           grep -q "CHLOM_PRODUCTION_BASE_URL = 'https://chlom-protocol.vercel.app'" lib/chlom-fabric.js
