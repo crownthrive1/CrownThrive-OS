@@ -205,13 +205,32 @@ jobs:
           echo "Provider-managed CodeQL default setup remains the registered mode."
           echo "This check does not synthesize provider CodeQL findings."
 
-      - name: Review dependency changes
+      - name: Detect dependency-manifest changes
+        id: dependency_scope
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        shell: bash
+        run: |
+          set -euo pipefail
+          dependency_pattern='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|deno\.lock|requirements([^/]*)\.txt|Pipfile|Pipfile\.lock|poetry\.lock|pyproject\.toml|uv\.lock|Gemfile|Gemfile\.lock|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|composer\.json|composer\.lock|pom\.xml|build\.gradle|build\.gradle\.kts|gradle\.lockfile|packages\.lock\.json|paket\.dependencies|paket\.lock|mix\.exs|mix\.lock|Package\.swift|Package\.resolved)$'
+          if git diff --name-only "$CT_GIT_BASE_SHA" "$CT_GIT_HEAD_SHA" | grep -Eq "$dependency_pattern"; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            echo "Dependency manifest changes detected; provider dependency review is required."
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency manifest changes detected; provider dependency review is not applicable."
+          fi
+
+      - name: Review dependency changes
+        if: (github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))) && steps.dependency_scope.outputs.required == 'true'
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
           base-ref: ${{ env.CT_GIT_BASE_SHA }}
           head-ref: ${{ env.CT_GIT_HEAD_SHA }}
+
+      - name: Record dependency-review no-op
+        if: (github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))) && steps.dependency_scope.outputs.required != 'true'
+        run: echo "Dependency review not applicable because the governed diff contains no dependency manifests."
 
       - name: Check whitespace and conflict markers
         run: |
