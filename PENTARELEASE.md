@@ -2,7 +2,7 @@
 
 Status: Implemented software; registry maturity `specified`; production certification `HOLD`
 Component ID: `ct.pentarelease`
-Version: `2.1.0`
+Version: `2.2.2`
 Canonical role: CrownThrive autonomous release intelligence, packaging, publication, repair, reconciliation, and release-evidence subsystem.
 
 ## Mission
@@ -20,8 +20,9 @@ PentaRelease determines **when a release is warranted, what should be released, 
 7. For bounded D0-D2 releaseable deltas, generate release notes and a machine-readable manifest explaining the exact `why`, files changed, prior version, selected bump, target, governance constraints, and package policy.
 8. Create the governed release request automatically.
 9. Hand the request to the PentaRelease publisher, which validates, packages, hashes, publishes, attaches downloadable artifacts, and performs provider readback.
-10. Reconcile already-published releases against the current artifact contract and repair missing downloadable evidence from the immutable release tag when a valid governed package is present.
-11. Treat a release as complete only after GitHub/provider readback confirms the expected tag and required assets.
+10. Synchronize the comprehensive release surface for the latest published release, promoting repository surface updates only through a gated pull request or recording an explicit HOLD.
+11. Reconcile already-published releases against the current artifact contract and repair missing downloadable evidence from the immutable release tag when a valid governed package is present.
+12. Treat a release as complete only after GitHub/provider readback confirms the expected tag and required assets.
 
 ## Version intelligence
 
@@ -41,6 +42,29 @@ The version number never grants rights, settles money, certifies a provider, cha
 PentaRelease runs on every merge/push to `main`, every 15 minutes as a reconciliation watch, and on explicit workflow dispatch. A scheduled run that finds no release-relevant delta records HOLD and exits without creating noise.
 
 Release-worthy signals include executable runtime changes, new integrations/adapters/providers, security fixes, governed production fixes, release-contract changes, and machine-governed version/Phase 3 control-plane changes. Ordinary prose-only or historical documentation updates do not automatically create an OS release.
+
+## Resilient autonomous publication
+
+PentaRelease 2.0.2 hardened the autonomous publisher so a provider identity gap does not stall a governed release.
+
+- Every autonomous release is materialized on a governed exact branch named `pentarelease/auto-<version>-<run-id>` and must pass the CrownThrive governed merge gate on that exact branch before publication.
+- The preferred promotion path is a protected-main pull request that PentaRelease creates and merges itself.
+- If GitHub Actions cannot create or merge the protected-main pull request, PentaRelease publishes the release from the fully gated exact branch instead. The release request and manifest record that exact branch as the target.
+- The publisher builds the governed ZIP and TAR.GZ bundles, `SHA256SUMS`, `MANIFEST.json`, and `RELEASE_NOTES.md`, uploads them to the provider release, and performs provider readback before treating publication as complete.
+- The publisher contract for this path is `ct.pentarelease.autonomous.v2.0.2`.
+
+## Release-surface synchronization and idempotent promotion
+
+PentaRelease 2.2.2 governs how the comprehensive release surface (managed repository surfaces, PentaDocs release pages, and provider release assets) is kept synchronized with the latest published release.
+
+- A release-readiness preflight runs before any work. It verifies local readiness (release-surface state matches the latest tag, managed blocks are present, the PentaDocs release tab and pages are intact) and provider readiness (the comprehensive release body block and all eight required release assets exist, including `PENTARELEASE_RELEASE_RECORD.json`, `PENTARELEASE_DATA_CATALOG.json`, and `PENTARELEASE_EVIDENCE.json`).
+- If both local and provider state are already current, the run records `ALREADY_SYNCHRONIZED` and exits. Reruns are idempotent and create no duplicate branches, pull requests, or assets.
+- If local surfaces are current but provider assets are incomplete, PentaRelease repairs only the provider release assets. No repository promotion occurs.
+- Pending repository updates live on one stable PentaRelease-owned branch per release and base commit, named `pentarelease/surface-<tag>-<base-sha>`. Retries reuse that branch instead of creating new ones.
+- Before merge, the governed merge gate must pass as a `pull_request` run against the exact head commit of that pull request. A stale or non-passing gate is a HOLD.
+- The direct protected-main push fallback is removed. PentaRelease never pushes directly to protected `main`.
+- A missing provider identity is recorded as an explicit HOLD instead of a bypass. `HOLD_PR_PROVIDER_IDENTITY` means GitHub Actions cannot create the protected-main pull request; the gated branch is preserved for an authorized PR provider identity. `HOLD_PR_MERGE_IDENTITY` means the pull request is gated and ready but the workflow token cannot perform the protected-main merge.
+- `MERGED` is the only promotion success state. HOLD states are never silently rewritten.
 
 ## Published-release reconciliation
 
@@ -72,8 +96,11 @@ The files below are executable implementation signals. They do not by themselves
 - Activation state: `.pentarelease/state/activation.json`
 - Decision engine: `scripts/pentarelease/decide.py`
 - Published-release reconciler: `scripts/pentarelease/reconcile.py`
+- Release-surface engine: `scripts/pentarelease/release_surface.py`
 - Autonomous observer: `.github/workflows/pentarelease-autonomous-awareness.yml`
+- Comprehensive release surface: `.github/workflows/pentarelease-comprehensive-release-surface.yml`
 - Published-release repair workflow: `.github/workflows/pentarelease-published-release-reconciler.yml`
+- Workflow contract tests: `tests/test_pentarelease_workflow_contract.py`, `tests/test_pentarelease_release_surface.py`
 - Publisher: `.github/workflows/crownthrive-os-v2-release.yml`
 - Release requests: `.github/release-requests/`
 - Release packages: `releases/`
