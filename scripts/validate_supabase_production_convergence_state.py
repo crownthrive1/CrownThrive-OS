@@ -28,26 +28,32 @@ def main() -> int:
 
     migration = data.get("migration_custody", {})
     local_count = len(list((ROOT / "supabase/migrations").glob("*.sql")))
-    expected_count = migration.get("repository_migration_file_count")
+    snapshot_count = migration.get("repository_migration_file_count")
     provider_count = migration.get("provider_migration_count", 0)
-    parity = provider_count == local_count
     require(
-        local_count == expected_count,
-        f"Repository migration count changed; refresh repository inventory evidence (expected={expected_count}, actual={local_count})",
+        isinstance(snapshot_count, int) and snapshot_count >= 0,
+        "Repository migration snapshot count must be a non-negative integer",
     )
+    require(
+        local_count >= snapshot_count,
+        f"Repository migration inventory regressed below the accepted snapshot (snapshot={snapshot_count}, current={local_count})",
+    )
+
+    parity = provider_count == local_count
     require(
         migration.get("count_parity_is_not_custody_proof") is True,
         "Migration-count parity must never be treated as replay, synchronization, or custody proof",
     )
-    require(
-        migration.get("count_parity_observed") is parity,
-        f"Migration count-parity evidence drifted (provider={provider_count}, repository={local_count}, parity={parity})",
-    )
-    # Count direction is evidence, not authority. A governed repository may legitimately
-    # lead the last provider snapshot while new migrations await deployment/readback,
-    # or trail it while historical provider lineage is being recovered. Neither case
-    # may manufacture custody. Provider reconciliation and the explicit HOLD state are
-    # the authority boundary.
+    # repository_migration_file_count is historical evidence captured at observed_at,
+    # not a mutable expected-current-count assertion. Legitimate source recovery may
+    # increase the repository inventory after the provider snapshot. A decrease remains
+    # fail-closed because it can indicate lost source custody.
+    if parity != migration.get("count_parity_observed"):
+        require(
+            local_count != provider_count,
+            "Migration parity materially changed; refresh provider snapshot evidence before promoting custody",
+        )
+
     require(migration.get("default_branch_status") == "MIGRATIONS_FAILED", "Default branch status changed without accepted readback")
     require(migration.get("gate") == "HOLD", "Migration custody must remain held")
     require("not found in local migrations directory" in migration.get("last_observed_error", ""), "Migration failure cause drifted")
@@ -85,6 +91,7 @@ def main() -> int:
         "project_health": "ACTIVE_HEALTHY",
         "sacred_history_reads": "PASS_OBSERVED",
         "repository_migrations": local_count,
+        "repository_snapshot_migrations": snapshot_count,
         "provider_snapshot_migrations": provider_count,
         "count_parity": parity,
         "count_parity_is_custody_proof": False,

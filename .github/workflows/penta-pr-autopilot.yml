@@ -1,0 +1,171 @@
+name: Penta PR Autopilot
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft]
+  workflow_run:
+    workflows: ["Governed Merge Gate"]
+    types: [completed]
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      number:
+        description: Optional pull request number; blank performs a bounded repository sweep
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  statuses: read
+  actions: read
+
+concurrency:
+  group: penta-pr-autopilot-${{ github.repository }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.inputs.number || 'sweep' }}
+  cancel-in-progress: false
+
+jobs:
+  autopilot:
+    name: PentaPR autopilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout canonical Penta control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: crownthrive1/CrownThrive-OS
+          ref: main
+          persist-credentials: false
+          path: penta-control
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Resolve autonomous target and terminal policy
+        id: target
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          DISPATCH_NUMBER: ${{ github.event.inputs.number }}
+        run: |
+          set -euo pipefail
+          number=''
+          allow_close='false'
+          case "$EVENT_NAME" in
+            pull_request_target) number="${EVENT_PR_NUMBER:-}" ;;
+            workflow_run) number="${RUN_PR_NUMBER:-}" ;;
+            workflow_dispatch) number="${DISPATCH_NUMBER:-}" ;;
+            schedule) allow_close='true' ;;
+          esac
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "allow_close=$allow_close" >> "$GITHUB_OUTPUT"
+
+      - name: PentaGate and PentaHeal preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          gate_status=0
+          python penta-control/scripts/penta_gate.py --root penta-control --output "$RUNNER_TEMP/pentagate-pr-autopilot.json" || gate_status=$?
+          python penta-control/scripts/penta_heal.py --root penta-control --gate-report "$RUNNER_TEMP/pentagate-pr-autopilot.json" --output "$RUNNER_TEMP/pentaheal-pr-autopilot.json" || true
+          if [[ "$gate_status" -ne 0 ]]; then
+            echo 'PentaGate blocked autonomous PR terminal authority.'
+            cat "$RUNNER_TEMP/pentagate-pr-autopilot.json"
+            exit "$gate_status"
+          fi
+
+      - name: PentaTagger exact-target preflight
+        id: tagger
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PENTA_NUMBER: ${{ steps.target.outputs.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 24 --request-budget 180 --no-comment)
+          if [[ -n "${PENTA_NUMBER:-}" ]]; then
+            args+=(--number "$PENTA_NUMBER")
+          fi
+          args+=(--receipt-path "$RUNNER_TEMP/penta-pr-autopilot-tagger-preflight.json")
+          args+=(--summary-path "$RUNNER_TEMP/penta-pr-autopilot-tagger-preflight.md")
+          set +e
+          python penta-control/scripts/penta_github_tagger.py "${args[@]}"
+          status=$?
+          set -e
+          if [[ "$status" -eq 75 ]]; then
+            echo 'deferred=true' >> "$GITHUB_OUTPUT"
+            echo 'PentaTagger provider budget deferred terminal authority; next event/sweep will retry.'
+            exit 0
+          fi
+          echo 'deferred=false' >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Execute PentaPR autonomous convergence
+        if: ${{ steps.tagger.outputs.deferred != 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PENTA_NUMBER: ${{ steps.target.outputs.number }}
+          ALLOW_DEADLINE_CLOSE: ${{ steps.target.outputs.allow_close }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--repo "$GITHUB_REPOSITORY")
+          if [[ -n "${PENTA_NUMBER:-}" ]]; then
+            args+=(--number "$PENTA_NUMBER")
+          fi
+          if [[ "$ALLOW_DEADLINE_CLOSE" == 'true' ]]; then
+            args+=(--allow-deadline-close)
+          fi
+          python penta-control/scripts/penta_pr_autopilot.py "${args[@]}"
+
+      - name: PentaTagger terminal provider readback
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PENTA_NUMBER: ${{ steps.target.outputs.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 24 --request-budget 180 --no-comment)
+          if [[ -n "${PENTA_NUMBER:-}" ]]; then
+            args+=(--number "$PENTA_NUMBER")
+          fi
+          args+=(--receipt-path "$RUNNER_TEMP/penta-pr-autopilot-tagger-final.json")
+          args+=(--summary-path "$RUNNER_TEMP/penta-pr-autopilot-tagger-final.md")
+          set +e
+          python penta-control/scripts/penta_github_tagger.py "${args[@]}"
+          status=$?
+          set -e
+          if [[ "$status" -eq 75 ]]; then
+            echo 'Final provider readback deferred by bounded request budget.'
+            exit 0
+          fi
+          exit "$status"
+
+      - name: Publish autonomous execution receipt
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Penta PR Autopilot'
+            echo
+            echo "- Event: **${{ github.event_name }}**"
+            echo "- Target PR: **${{ steps.target.outputs.number || 'repository sweep' }}**"
+            echo "- Deadline close authority: **${{ steps.target.outputs.allow_close }}**"
+            echo "- PentaTagger deferred: **${{ steps.tagger.outputs.deferred == 'true' && 'YES' || 'NO' }}**"
+            echo '- Chain: PentaGate → PentaHeal → PentaTagger → PentaPR → PentaRestack/PentaMerge → provider readback'
+            echo '- HOLD, draft, failed-check, D3, credential, provider-permission, and money-movement boundaries remain fail-closed.'
+            if [[ -f "$RUNNER_TEMP/penta-pr-autopilot-tagger-final.md" ]]; then
+              echo
+              cat "$RUNNER_TEMP/penta-pr-autopilot-tagger-final.md"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
