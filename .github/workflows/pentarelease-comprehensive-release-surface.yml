@@ -346,6 +346,13 @@ jobs:
               pr_success=true
               break
             fi
+            if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" = "action_required" ]; then
+              echo "::warning title=PentaRelease provider identity HOLD::GitHub Actions recursive identity prevented PR workflow execution. The exact governed branch and PR remain preserved for an authorized repository event identity."
+              echo "promotion_state=HOLD_PR_PROVIDER_IDENTITY" >> "$GITHUB_OUTPUT"
+              echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+              echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" != "success" ]; then
               echo "PentaRelease surface HOLD: PR-specific governed gate did not pass ($RUN_CONCLUSION)." >&2
               exit 46
