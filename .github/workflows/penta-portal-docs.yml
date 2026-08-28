@@ -1,0 +1,83 @@
+name: Penta Portal Docs
+
+on:
+  push:
+    branches:
+      - "admin-mcp/penta-portal-*"
+    paths:
+      - "scripts/penta_portal_docs.py"
+      - "data/penta/**"
+      - "penta/registry/**"
+      - "runtime/penta_families.py"
+      - "PENTA-FAMILY-REGISTRY.md"
+      - "docs.json"
+      - ".github/workflows/penta-portal-docs.yml"
+  pull_request:
+    paths:
+      - "scripts/penta_portal_docs.py"
+      - "tests/test_penta_portal_docs.py"
+      - "data/penta/**"
+      - "penta/registry/**"
+      - "runtime/penta_families.py"
+      - "pentas/**"
+      - "docs.json"
+      - ".github/workflows/penta-portal-docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Generate full Penta portal
+        run: python scripts/penta_portal_docs.py --write
+      - name: Validate Penta portal
+        run: |
+          python -m unittest tests.test_penta_portal_docs
+          python runtime/penta_families.py --portal-index > /tmp/penta-families.json
+          git diff --check
+      - name: Commit deterministic documentation projection
+        run: |
+          if git diff --quiet; then
+            echo "Penta portal already converged."
+            exit 0
+          fi
+          git config user.name "CrownThrive PentaDocs"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs.json data/penta/namespace-census.v1.json pentas changelog/penta-portal-full-census-2026-08-28.mdx
+          git commit -m "docs(penta): generate complete Penta portal census [skip ci]"
+          git push origin HEAD:${GITHUB_REF_NAME}
+
+  verify:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Verify deterministic corpus
+        run: |
+          python scripts/penta_portal_docs.py --check
+          python -m unittest tests.test_penta_portal_docs
+          python runtime/penta_families.py --portal-index > /tmp/penta-families.json
+          git diff --check
