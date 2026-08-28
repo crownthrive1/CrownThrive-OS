@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - "admin-mcp/penta-portal-*"
+      - "admin-mcp/pentadocs-*"
     paths:
       - "scripts/penta_portal_docs.py"
       - "scripts/penta_portal_finalize.py"
+      - "scripts/penta_operational_knowledge.py"
       - "tests/test_penta_portal_docs.py"
+      - "tests/test_penta_operational_knowledge.py"
       - "data/penta/**"
       - "data/documentation/pentadocs-page-profiles.v1.json"
       - "penta/registry/**"
@@ -22,7 +25,9 @@ on:
     paths:
       - "scripts/penta_portal_docs.py"
       - "scripts/penta_portal_finalize.py"
+      - "scripts/penta_operational_knowledge.py"
       - "tests/test_penta_portal_docs.py"
+      - "tests/test_penta_operational_knowledge.py"
       - "data/penta/**"
       - "data/documentation/pentadocs-page-profiles.v1.json"
       - "penta/registry/**"
@@ -42,7 +47,7 @@ jobs:
   generate:
     if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out exact branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,10 +61,13 @@ jobs:
         run: python scripts/penta_portal_docs.py --write
       - name: Finalize governed PentaDocs corpus
         run: python scripts/penta_portal_finalize.py --apply
-      - name: Validate complete Penta portal
+      - name: Generate operational and agent knowledge
+        run: python scripts/penta_operational_knowledge.py --apply
+      - name: Validate complete Penta knowledge system
         run: |
           python scripts/penta_portal_finalize.py --check
-          python -m unittest tests.test_penta_portal_docs
+          python scripts/penta_operational_knowledge.py --check
+          python -m unittest tests.test_penta_portal_docs tests.test_penta_operational_knowledge
           python scripts/validate_docs.py
           python runtime/penta_families.py --portal-index > /tmp/penta-families.json
           git diff --check
@@ -71,21 +79,24 @@ jobs:
           git add -A -- \
             docs.json \
             data/penta/namespace-census.v1.json \
+            data/penta/operational-knowledge.v1.json \
+            data/penta/agent-knowledge.v1.json \
+            data/penta/agent-knowledge.v1.jsonl \
             data/documentation/pentadocs-page-profiles.v1.json \
             pentas.mdx \
             pentas \
             changelog/penta-portal-full-census-2026-08-28.mdx
           if git diff --cached --quiet; then
-            echo "Penta portal already converged."
+            echo "Penta knowledge system already converged."
             exit 0
           fi
-          git commit -m "docs(penta): finalize governed full Penta portal"
+          git commit -m "docs(penta): generate operational and agent knowledge"
           git push origin HEAD:${GITHUB_REF_NAME}
 
   verify:
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -97,10 +108,11 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-      - name: Verify deterministic governed corpus
+      - name: Verify deterministic governed knowledge corpus
         run: |
           python scripts/penta_portal_finalize.py --check
-          python -m unittest tests.test_penta_portal_docs
+          python scripts/penta_operational_knowledge.py --check
+          python -m unittest tests.test_penta_portal_docs tests.test_penta_operational_knowledge
           python scripts/validate_docs.py
           python runtime/penta_families.py --portal-index > /tmp/penta-families.json
           git diff --check
