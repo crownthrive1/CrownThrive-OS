@@ -32,7 +32,7 @@ def test_retry_exhaustion_and_material_failures_remain_fail_closed() -> None:
     workflow = workflow_text()
     assert 'if [[ "$retryable" != "true" || "$attempt" -ge "$max_attempts" ]]' in workflow
     assert 'exit "$status"' in workflow
-    assert '--fail-on-severity "$fail_threshold"' in workflow
+    assert '--fail-on-severity 2' in workflow
 
 
 def test_each_attempt_recomputes_and_preserves_evidence() -> None:
