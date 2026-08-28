@@ -20,9 +20,26 @@ begin
     jsonb_build_array(
       'urn:crownthrive:thrivebase:migration:20260828193000_pentamarketer_persona_execution_bridge_schema_v1',
       'urn:crownthrive:thrivebase:migration:20260828193100_pentamarketer_persona_execution_bridge_runtime_v1',
+      'urn:crownthrive:thrivebase:migration:20260828193150_pentamarketer_persona_execution_scheduler_hardening_v1',
+      'urn:crownthrive:rollback:20260828193200_pentamarketer_persona_execution_bridge_v1',
       jsonb_build_object('type','runtime_canary','result',v_canary)
     ),
     coalesce(v_canary->'checks','[]'::jsonb)||jsonb_build_array(
+      jsonb_build_object('check','secret_bearing_payload_rejected','passed',
+        not crm.penta_persona_payload_safe_v1('{"api_key":"synthetic-not-a-secret"}'::jsonb)),
+      jsonb_build_object('check','opaque_credential_reference_allowed','passed',
+        crm.penta_persona_payload_safe_v1('{"credential_ref":"opaque-handle"}'::jsonb)),
+      jsonb_build_object('check','idempotency_unique_constraint_present','passed',exists(
+        select 1 from pg_constraint
+        where conrelid='crm.penta_persona_execution_requests_v1'::regclass
+          and contype='u' and pg_get_constraintdef(oid) ilike '%idempotency_key%')),
+      jsonb_build_object('check','append_only_event_trigger_enabled','passed',exists(
+        select 1 from pg_trigger
+        where tgrelid='crm.penta_persona_execution_events_v1'::regclass
+          and tgname='penta_persona_execution_events_immutable_v1' and tgenabled<>'D')),
+      jsonb_build_object('check','synthetic_work_auto_execution_excluded','passed',
+        position('persona_transport_test' in pg_get_functiondef('crm.penta_persona_execution_scheduler_tick_v1(integer)'::regprocedure))>0
+        and position('penta_self_report' in pg_get_functiondef('crm.penta_persona_execution_scheduler_tick_v1(integer)'::regprocedure))>0),
       jsonb_build_object('check','direct_provider_write_not_granted','passed',true),
       jsonb_build_object('check','money_movement_not_granted','passed',true),
       jsonb_build_object('check','rights_grant_not_granted','passed',true),
