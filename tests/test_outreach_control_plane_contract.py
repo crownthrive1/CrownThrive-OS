@@ -23,9 +23,12 @@ def main() -> None:
     assert cold['single_cold_attempt_per_contact'] is True
     assert cold['offer_ref'] == 'locticians.claimmonth50.v1'
     assert cold['safe_offer_copy'] == [
-        '50% off eligible recurring membership payments',
-        'verify your eligible plan at checkout',
+        '50% off Community+ Member or Basic for claimable listings only',
+        'use code CLAIMMONTH50 and verify exact eligibility and terms at checkout',
     ]
+    prohibited = set(cold['prohibited_unverified_claims'])
+    assert {'all plans', 'higher-tier plans', 'lifetime discount'}.issubset(prohibited)
+    assert all('recurring membership payments' not in line.lower() for line in cold['safe_offer_copy'])
     nurture = c['nurture']
     assert nurture['unlimited'] is True
     assert nurture['global_monthly_cap'] is None
