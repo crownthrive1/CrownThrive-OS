@@ -6,24 +6,30 @@ on:
       - "admin-mcp/penta-portal-*"
     paths:
       - "scripts/penta_portal_docs.py"
+      - "scripts/penta_portal_finalize.py"
       - "tests/test_penta_portal_docs.py"
       - "data/penta/**"
+      - "data/documentation/pentadocs-page-profiles.v1.json"
       - "penta/registry/**"
       - "runtime/penta_families.py"
       - "PENTA-FAMILY-REGISTRY.md"
       - "PENTA-PORTAL-STANDARD.md"
+      - "pentas.mdx"
       - "pentas/**"
       - "docs.json"
       - ".github/workflows/penta-portal-docs.yml"
   pull_request:
     paths:
       - "scripts/penta_portal_docs.py"
+      - "scripts/penta_portal_finalize.py"
       - "tests/test_penta_portal_docs.py"
       - "data/penta/**"
+      - "data/documentation/pentadocs-page-profiles.v1.json"
       - "penta/registry/**"
       - "runtime/penta_families.py"
       - "PENTA-FAMILY-REGISTRY.md"
       - "PENTA-PORTAL-STANDARD.md"
+      - "pentas.mdx"
       - "pentas/**"
       - "docs.json"
       - ".github/workflows/penta-portal-docs.yml"
@@ -36,7 +42,7 @@ jobs:
   generate:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out exact branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,29 +52,39 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-      - name: Generate full Penta portal
+      - name: Generate raw Penta namespace projection
         run: python scripts/penta_portal_docs.py --write
-      - name: Validate Penta portal
+      - name: Finalize governed PentaDocs corpus
+        run: python scripts/penta_portal_finalize.py --apply
+      - name: Validate complete Penta portal
         run: |
+          python scripts/penta_portal_finalize.py --check
           python -m unittest tests.test_penta_portal_docs
+          python scripts/validate_docs.py
           python runtime/penta_families.py --portal-index > /tmp/penta-families.json
           git diff --check
       - name: Commit deterministic documentation projection
         run: |
-          if git diff --quiet; then
+          if [ -z "$(git status --porcelain)" ]; then
             echo "Penta portal already converged."
             exit 0
           fi
           git config user.name "CrownThrive PentaDocs"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs.json data/penta/namespace-census.v1.json pentas changelog/penta-portal-full-census-2026-08-28.mdx
-          git commit -m "docs(penta): generate complete Penta portal census [skip ci]"
+          git add -A -- \
+            docs.json \
+            data/penta/namespace-census.v1.json \
+            data/documentation/pentadocs-page-profiles.v1.json \
+            pentas.mdx \
+            pentas \
+            changelog/penta-portal-full-census-2026-08-28.mdx
+          git commit -m "docs(penta): finalize governed full Penta portal [skip ci]"
           git push origin HEAD:${GITHUB_REF_NAME}
 
   verify:
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -80,9 +96,10 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
-      - name: Verify deterministic corpus
+      - name: Verify deterministic governed corpus
         run: |
-          python scripts/penta_portal_docs.py --check
+          python scripts/penta_portal_finalize.py --check
           python -m unittest tests.test_penta_portal_docs
+          python scripts/validate_docs.py
           python runtime/penta_families.py --portal-index > /tmp/penta-families.json
           git diff --check
