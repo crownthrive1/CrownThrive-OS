@@ -19,6 +19,7 @@ from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 CENSUS_PATH = Path("data/penta/namespace-census.v1.json")
+CANDIDATE_SEED_PATH = Path("data/penta/namespace-candidates.v1.json")
 STRUCTURED_ROOTS = (Path("data/penta"), Path("penta/registry"))
 REFERENCE_ROOTS = (Path("runtime"), Path("scripts"), Path(".github/workflows"))
 TEXT_SUFFIXES = {".json", ".py", ".md", ".mdx", ".yml", ".yaml"}
@@ -90,6 +91,19 @@ def known_namespace(root: Path) -> tuple[set[str], set[str], dict[str, str]]:
         machine = row.get("canonical_machine_key")
         if isinstance(machine, str) and machine.startswith("penta."):
             machine_keys.add(machine)
+
+    # Candidate seed is itself a governed preservation source and can advance one
+    # commit before the generated namespace census. Treat those names as known so
+    # PentaCensus does not fail merely because deterministic PentaDocs regeneration
+    # has not yet projected the same candidate into namespace-census.v1.json.
+    candidate_seed_path = root / CANDIDATE_SEED_PATH
+    if candidate_seed_path.exists():
+        candidate_seed = load_json(candidate_seed_path)
+        for name in candidate_seed.get("candidates", []):
+            if isinstance(name, str) and name.strip():
+                norm = normalize_name(name)
+                known_names.add(norm)
+                display_by_norm.setdefault(norm, name.strip())
 
     # Governed extensions are known namespace identities even when they remain
     # outside the frozen canonical OS registry. Recognition is not promotion.
