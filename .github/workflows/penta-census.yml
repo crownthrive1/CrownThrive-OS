@@ -1,0 +1,63 @@
+name: PentaCensus Namespace Discovery
+
+on:
+  push:
+    branches:
+      - main
+      - "admin-mcp/pentadocs-pentacensus-*"
+    paths:
+      - "scripts/penta_census.py"
+      - "tests/test_penta_census.py"
+      - "data/penta/**"
+      - "penta/registry/**"
+      - "runtime/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - "PENTACENSUS-STANDARD.md"
+  pull_request:
+    paths:
+      - "scripts/penta_census.py"
+      - "tests/test_penta_census.py"
+      - "data/penta/**"
+      - "penta/registry/**"
+      - "runtime/**"
+      - "scripts/**"
+      - ".github/workflows/**"
+      - "PENTACENSUS-STANDARD.md"
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  census:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Focused PentaCensus tests
+        run: python -m unittest tests.test_penta_census
+      - name: Compile PentaCensus runtime
+        run: python -m py_compile scripts/penta_census.py
+      - name: Census governed Penta namespace
+        shell: bash
+        run: |
+          set +e
+          python scripts/penta_census.py --json > /tmp/pentacensus.json
+          status=$?
+          set -e
+          python -m json.tool /tmp/pentacensus.json >/dev/null
+          cat /tmp/pentacensus.json
+          if [ "$status" -ne 0 ]; then
+            echo "PentaCensus detected unresolved namespace drift. Preserve/classify the identity; do not weaken the gate."
+          fi
+          exit "$status"
