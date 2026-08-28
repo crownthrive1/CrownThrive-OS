@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Deterministic, fail-closed Penta namespace discovery.
 
-PentaCensus distinguishes authoritative-ish structured identity declarations from
-unstructured code/workflow references. Unknown declarations are hard-gated;
-unknown references are an advisory semantic/topology queue. Neither class creates
-canonical identity, authority, maturity, certification, or production status.
+PentaCensus separates explicit institutional identity declarations from ordinary
+Penta-named components, families, exceptions, clients, metrics, events and helper
+symbols. Unknown institutional declarations are hard-gated; unstructured symbols
+are an advisory semantic/topology queue. Neither class creates authority, maturity,
+certification, or production status.
 """
 from __future__ import annotations
 
@@ -20,12 +21,10 @@ ROOT = Path(__file__).resolve().parents[1]
 CENSUS_PATH = Path("data/penta/namespace-census.v1.json")
 STRUCTURED_ROOTS = (Path("data/penta"), Path("penta/registry"))
 REFERENCE_ROOTS = (Path("runtime"), Path("scripts"), Path(".github/workflows"))
-ALL_SCAN_ROOTS = STRUCTURED_ROOTS + REFERENCE_ROOTS
 TEXT_SUFFIXES = {".json", ".py", ".md", ".mdx", ".yml", ".yaml"}
 MAX_SCAN_BYTES = 1_500_000
 MAX_EVIDENCE_PATHS = 20
-IDENTITY_NAME_KEYS = {"canonical_name"}
-IDENTITY_MACHINE_KEYS = {"machine_key", "canonical_machine_key"}
+IDENTITY_MACHINE_KEYS = ("machine_key", "canonical_machine_key")
 
 # Generated machine corpora contain repeated projections of the same namespace and
 # are intentionally excluded from discovery evidence to avoid self-amplification.
@@ -39,7 +38,9 @@ EXCLUDED_FILES = {
 }
 
 PENTA_SYMBOL_RE = re.compile(r"(?<![A-Za-z0-9])Penta[A-Z][A-Za-z0-9]*(?![A-Za-z0-9])")
+PENTA_IDENTITY_NAME_RE = re.compile(r"^Penta[A-Z][A-Za-z0-9]*$")
 SYSTEM_MACHINE_RE = re.compile(r"^penta\.[a-z0-9]+(?:[-_][a-z0-9]+)*$")
+PENTA_REGISTRY_ID_RE = re.compile(r"^ct\.penta\.[a-z0-9][a-z0-9.-]*\.v[0-9]+$")
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -104,31 +105,57 @@ def known_namespace(root: Path) -> tuple[set[str], set[str], dict[str, str]]:
             if not isinstance(row, dict):
                 continue
             name = row.get("canonical_name")
-            if isinstance(name, str) and normalize_name(name).startswith("penta"):
+            if isinstance(name, str) and PENTA_IDENTITY_NAME_RE.fullmatch(name.strip()):
                 norm = normalize_name(name)
                 known_names.add(norm)
-                display_by_norm.setdefault(norm, name)
+                display_by_norm.setdefault(norm, name.strip())
             machine = row.get("machine_key")
-            if isinstance(machine, str) and machine.startswith("penta."):
-                machine_keys.add(machine)
+            if isinstance(machine, str) and SYSTEM_MACHINE_RE.fullmatch(machine.strip()):
+                machine_keys.add(machine.strip())
 
     return known_names, machine_keys, display_by_norm
 
 
-def walk_identity_declarations(value: Any) -> Iterable[tuple[str, str]]:
-    """Yield (kind, value) only from explicit identity-bearing JSON fields."""
+def _declared_machine_key(value: dict[str, Any]) -> str | None:
+    for key in IDENTITY_MACHINE_KEYS:
+        child = value.get(key)
+        if isinstance(child, str) and SYSTEM_MACHINE_RE.fullmatch(child.strip()):
+            return child.strip()
+    return None
+
+
+def walk_identity_declarations(value: Any, *, root_object: bool = False) -> Iterable[tuple[str, str]]:
+    """Yield only object-scoped institutional identity declarations.
+
+    A JSON object is an identity declaration when it has a simple Penta machine key
+    in the same object. A root-level registry object may also declare a single-token
+    Penta identity through ``ct.penta.*.vN`` + ``canonical_name``. This deliberately
+    excludes family display names, component bridges using ``system_key``, and other
+    nested records whose ``canonical_name`` is not an institutional Penta identity.
+    """
     if isinstance(value, dict):
-        for key, child in value.items():
-            if key in IDENTITY_NAME_KEYS and isinstance(child, str):
-                if normalize_name(child).startswith("penta"):
-                    yield "display_name", child.strip()
-            elif key in IDENTITY_MACHINE_KEYS and isinstance(child, str):
-                if SYSTEM_MACHINE_RE.fullmatch(child.strip()):
-                    yield "machine_key", child.strip()
-            yield from walk_identity_declarations(child)
+        machine = _declared_machine_key(value)
+        name = value.get("canonical_name")
+
+        if machine is not None:
+            yield "machine_key", machine
+            if isinstance(name, str) and PENTA_IDENTITY_NAME_RE.fullmatch(name.strip()):
+                yield "display_name", name.strip()
+        elif root_object:
+            registry_id = value.get("registry_id")
+            if (
+                isinstance(registry_id, str)
+                and PENTA_REGISTRY_ID_RE.fullmatch(registry_id.strip())
+                and isinstance(name, str)
+                and PENTA_IDENTITY_NAME_RE.fullmatch(name.strip())
+            ):
+                yield "display_name", name.strip()
+
+        for child in value.values():
+            yield from walk_identity_declarations(child, root_object=False)
     elif isinstance(value, list):
         for child in value:
-            yield from walk_identity_declarations(child)
+            yield from walk_identity_declarations(child, root_object=False)
 
 
 def build_report(root: Path = ROOT) -> dict[str, Any]:
@@ -152,7 +179,7 @@ def build_report(root: Path = ROOT) -> dict[str, Any]:
             value = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             continue
-        for kind, declared in walk_identity_declarations(value):
+        for kind, declared in walk_identity_declarations(value, root_object=True):
             if kind == "display_name":
                 if normalize_name(declared) not in known_names:
                     declaration_name_paths[declared].add(rel)
@@ -211,7 +238,7 @@ def build_report(root: Path = ROOT) -> dict[str, Any]:
     strict_unknown = len(unknown_declared_names) + len(unknown_declared_machine_keys)
 
     return {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "report_id": "crownthrive.penta.census.discovery.v1",
         "authority_invariant": (
             "Discovery and repeated observation never create canonical identity, maturity, execution eligibility, "
@@ -220,6 +247,16 @@ def build_report(root: Path = ROOT) -> dict[str, Any]:
         "source_classes": {
             "hard_gated_identity_declarations": [path.as_posix() for path in STRUCTURED_ROOTS],
             "advisory_unstructured_references": [path.as_posix() for path in REFERENCE_ROOTS],
+        },
+        "identity_grammar": {
+            "same_object_machine_identity": "canonical_name plus machine_key/canonical_machine_key",
+            "root_registry_identity": "single-token Penta canonical_name plus ct.penta.*.vN registry_id",
+            "excluded_from_automatic_identity": [
+                "family/composite display names",
+                "system_key-only components",
+                "event/metric keys",
+                "runtime helper/client/error symbols",
+            ],
         },
         "source_digest_sha256": source_digest,
         "counts": {
