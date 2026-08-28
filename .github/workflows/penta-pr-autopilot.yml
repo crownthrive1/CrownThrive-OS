@@ -1,0 +1,432 @@
+name: Penta PR Autopilot
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft]
+  workflow_run:
+    workflows: ["Governed Merge Gate"]
+    types: [completed]
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      number:
+        description: Optional pull request number; blank performs a bounded repository sweep
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  statuses: read
+  actions: read
+
+concurrency:
+  group: penta-pr-autopilot-${{ github.repository }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.inputs.number || 'sweep' }}
+  cancel-in-progress: false
+
+jobs:
+  autopilot:
+    name: PentaPR autopilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout canonical Penta control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: crownthrive1/CrownThrive-OS
+          ref: main
+          persist-credentials: false
+          path: penta-control
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Resolve autonomous target and exact head
+        id: target
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          DISPATCH_NUMBER: ${{ github.event.inputs.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          event = os.environ.get('EVENT_NAME', '')
+          number = (os.environ.get('EVENT_PR_NUMBER') or '').strip()
+          run_number = (os.environ.get('RUN_PR_NUMBER') or '').strip()
+          run_head = (os.environ.get('RUN_HEAD_SHA') or '').strip()
+          run_conclusion = (os.environ.get('RUN_CONCLUSION') or '').strip()
+          dispatch_number = (os.environ.get('DISPATCH_NUMBER') or '').strip()
+          allow_close = event == 'schedule'
+          wait_for_settle = False
+          skip = False
+          source = event
+
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'CrownThrive-PentaPR-Autopilot',
+          }
+
+          def get(path):
+              req = urllib.request.Request(f'https://api.github.com/repos/{repo}{path}', headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          if event == 'workflow_run':
+              if run_conclusion != 'success':
+                  skip = True
+                  source = f'workflow_run:{run_conclusion or "unknown"}'
+              else:
+                  number = run_number
+                  wait_for_settle = True
+                  if not number and run_head:
+                      pulls = get(f'/commits/{urllib.parse.quote(run_head)}/pulls')
+                      candidates = [
+                          p for p in pulls
+                          if p.get('state') == 'open'
+                          and (p.get('base') or {}).get('ref') == 'main'
+                          and (p.get('head') or {}).get('sha') == run_head
+                      ]
+                      if len(candidates) == 1:
+                          number = str(candidates[0]['number'])
+                          source = 'workflow_run:head_sha_fallback'
+                      else:
+                          skip = True
+                          source = f'workflow_run:unresolved_head:{len(candidates)}'
+                  elif number:
+                      source = 'workflow_run:payload_pr'
+          elif event == 'workflow_dispatch':
+              number = dispatch_number
+          elif event == 'schedule':
+              number = ''
+          elif event == 'pull_request_target':
+              wait_for_settle = True
+              source = 'pull_request_target:payload_pr'
+
+          head_sha = ''
+          if number and not skip:
+              pull = get(f'/pulls/{int(number)}')
+              if pull.get('state') != 'open':
+                  skip = True
+                  source += ':not_open'
+              else:
+                  head_sha = (pull.get('head') or {}).get('sha') or ''
+                  if event == 'workflow_run' and run_head and head_sha != run_head:
+                      skip = True
+                      source += ':head_moved'
+
+          output_path = os.environ['GITHUB_OUTPUT']
+          with open(output_path, 'a', encoding='utf-8') as fh:
+              fh.write(f'number={number}\n')
+              fh.write(f'head_sha={head_sha}\n')
+              fh.write(f'allow_close={str(allow_close).lower()}\n')
+              fh.write(f'wait_for_settle={str(wait_for_settle).lower()}\n')
+              fh.write(f'skip={str(skip).lower()}\n')
+              fh.write(f'source={source}\n')
+
+          print(json.dumps({
+              'event': event,
+              'number': number or None,
+              'head_sha': head_sha or None,
+              'run_head_sha': run_head or None,
+              'run_conclusion': run_conclusion or None,
+              'wait_for_settle': wait_for_settle,
+              'allow_close': allow_close,
+              'skip': skip,
+              'source': source,
+          }, sort_keys=True))
+          PY
+
+      - name: Wait for exact-head CI settlement
+        id: settle
+        if: ${{ steps.target.outputs.skip != 'true' && steps.target.outputs.wait_for_settle == 'true' && steps.target.outputs.number != '' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PENTA_NUMBER: ${{ steps.target.outputs.number }}
+          PENTA_HEAD_SHA: ${{ steps.target.outputs.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.parse
+          import urllib.request
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          number = int(os.environ['PENTA_NUMBER'])
+          expected_head = os.environ['PENTA_HEAD_SHA']
+          deadline = time.monotonic() + 240
+          settled = False
+          reason = 'settlement_timeout'
+          pending_names = []
+
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'CrownThrive-PentaPR-Autopilot',
+          }
+
+          def get(path):
+              req = urllib.request.Request(f'https://api.github.com/repos/{repo}{path}', headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          def norm(value):
+              return ''.join(ch for ch in str(value or '').lower() if ch.isalnum())
+
+          self_checks = {
+              'pentaprautopilot',
+              'pentaprlifecycle',
+              'pentaprlifecycleenforcement',
+          }
+
+          while time.monotonic() < deadline:
+              pull = get(f'/pulls/{number}')
+              if pull.get('state') != 'open':
+                  reason = 'pr_not_open'
+                  break
+              current_head = (pull.get('head') or {}).get('sha') or ''
+              if current_head != expected_head:
+                  reason = 'head_moved'
+                  break
+
+              check_payload = get(
+                  f'/commits/{urllib.parse.quote(expected_head)}/check-runs?per_page=100'
+              )
+              pending_names = sorted({
+                  check.get('name') or 'unnamed-check'
+                  for check in check_payload.get('check_runs', [])
+                  if check.get('status') != 'completed'
+                  and norm(check.get('name')) not in self_checks
+              })
+
+              status_payload = get(f'/commits/{urllib.parse.quote(expected_head)}/status')
+              pending_statuses = sorted({
+                  context.get('context') or 'unnamed-status'
+                  for context in status_payload.get('statuses', [])
+                  if context.get('state') == 'pending'
+                  and norm(context.get('context')) not in self_checks
+              })
+              pending_names = sorted(set(pending_names + pending_statuses))
+
+              if not pending_names:
+                  settled = True
+                  reason = 'quiescent_exact_head'
+                  break
+
+              print(json.dumps({
+                  'state': 'WAITING',
+                  'number': number,
+                  'head_sha': expected_head,
+                  'pending': pending_names,
+              }, sort_keys=True))
+              time.sleep(10)
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f'settled={str(settled).lower()}\n')
+              fh.write(f'reason={reason}\n')
+
+          print(json.dumps({
+              'state': 'SETTLED' if settled else 'DEFERRED',
+              'number': number,
+              'head_sha': expected_head,
+              'reason': reason,
+              'remaining_pending': pending_names,
+          }, sort_keys=True))
+          PY
+
+      - name: PentaGate and PentaHeal preflight
+        if: ${{ steps.target.outputs.skip != 'true' && (steps.target.outputs.wait_for_settle != 'true' || steps.settle.outputs.settled == 'true') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gate_status=0
+          python penta-control/scripts/penta_gate.py --root penta-control --output "$RUNNER_TEMP/pentagate-pr-autopilot.json" || gate_status=$?
+          python penta-control/scripts/penta_heal.py --root penta-control --gate-report "$RUNNER_TEMP/pentagate-pr-autopilot.json" --output "$RUNNER_TEMP/pentaheal-pr-autopilot.json" || true
+          if [[ "$gate_status" -ne 0 ]]; then
+            echo 'PentaGate blocked autonomous PR terminal authority.'
+            cat "$RUNNER_TEMP/pentagate-pr-autopilot.json"
+            exit "$gate_status"
+          fi
+
+      - name: PentaTagger exact-target preflight
+        id: tagger
+        if: ${{ steps.target.outputs.skip != 'true' && (steps.target.outputs.wait_for_settle != 'true' || steps.settle.outputs.settled == 'true') }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PENTA_NUMBER: ${{ steps.target.outputs.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 24 --request-budget 180 --no-comment)
+          if [[ -n "${PENTA_NUMBER:-}" ]]; then
+            args+=(--number "$PENTA_NUMBER")
+          fi
+          args+=(--receipt-path "$RUNNER_TEMP/penta-pr-autopilot-tagger-preflight.json")
+          args+=(--summary-path "$RUNNER_TEMP/penta-pr-autopilot-tagger-preflight.md")
+          set +e
+          python penta-control/scripts/penta_github_tagger.py "${args[@]}"
+          status=$?
+          set -e
+          if [[ "$status" -eq 75 ]]; then
+            echo 'deferred=true' >> "$GITHUB_OUTPUT"
+            echo 'PentaTagger provider budget deferred terminal authority; next event/sweep will retry.'
+            exit 0
+          fi
+          echo 'deferred=false' >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Execute PentaPR autonomous convergence
+        id: converge
+        if: ${{ steps.target.outputs.skip != 'true' && (steps.target.outputs.wait_for_settle != 'true' || steps.settle.outputs.settled == 'true') && steps.tagger.outputs.deferred != 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PENTA_NUMBER: ${{ steps.target.outputs.number }}
+          ALLOW_DEADLINE_CLOSE: ${{ steps.target.outputs.allow_close }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--repo "$GITHUB_REPOSITORY")
+          if [[ -n "${PENTA_NUMBER:-}" ]]; then
+            args+=(--number "$PENTA_NUMBER")
+          fi
+          if [[ "$ALLOW_DEADLINE_CLOSE" == 'true' ]]; then
+            args+=(--allow-deadline-close)
+          fi
+          python penta-control/scripts/penta_pr_autopilot.py "${args[@]}"
+
+      - name: Passive terminal provider readback
+        if: ${{ always() && steps.target.outputs.skip != 'true' && steps.tagger.outputs.deferred != 'true' && steps.converge.outcome == 'success' && steps.target.outputs.number != '' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PENTA_NUMBER: ${{ steps.target.outputs.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          number = int(os.environ['PENTA_NUMBER'])
+          token = os.environ['GITHUB_TOKEN']
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'CrownThrive-PentaPR-Autopilot',
+          }
+
+          def get(path):
+              req = urllib.request.Request(f'https://api.github.com/repos/{repo}{path}', headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          pull = get(f'/pulls/{number}')
+          issue = get(f'/issues/{number}')
+          labels = {item['name'] for item in issue.get('labels', []) if item.get('name')}
+          stage_labels = sorted(name for name in labels if name.startswith('penta:stage:'))
+          dispositions = {
+              'penta:nurture': 'penta:stage:nurture',
+              'penta:restack': 'penta:stage:restack',
+              'penta:merge': 'penta:stage:merge-candidate',
+              'penta:close': 'penta:stage:close-candidate',
+          }
+          active = [(label, stage) for label, stage in dispositions.items() if label in labels]
+          state = pull.get('state')
+          merged = bool(pull.get('merged'))
+
+          if state == 'open':
+              if 'penta:authority:pr' not in labels:
+                  raise SystemExit(f'PentaPR readback missing authority label on #{number}')
+              if len(active) != 1:
+                  raise SystemExit(f'PentaPR readback requires exactly one disposition on #{number}: {active}')
+              expected_stage = active[0][1]
+              if stage_labels != [expected_stage]:
+                  raise SystemExit(
+                      f'PentaPR stage/disposition collision on #{number}: '
+                      f'disposition={active[0][0]} expected={expected_stage} observed={stage_labels}'
+                  )
+          elif merged:
+              required = {'penta:terminal:merged', 'penta:authority:merge'}
+              missing = required.difference(labels)
+              if missing or stage_labels:
+                  raise SystemExit(
+                      f'PentaMerge terminal readback mismatch on #{number}: '
+                      f'missing={sorted(missing)} stages={stage_labels}'
+                  )
+          else:
+              required = {'penta:terminal:closed', 'penta:authority:closer'}
+              missing = required.difference(labels)
+              if missing or stage_labels:
+                  raise SystemExit(
+                      f'PentaCloser terminal readback mismatch on #{number}: '
+                      f'missing={sorted(missing)} stages={stage_labels}'
+                  )
+
+          receipt = {
+              'schema': 'crownthrive.pentapr.autopilot-provider-readback/v1',
+              'number': number,
+              'state': state,
+              'merged': merged,
+              'head_sha': (pull.get('head') or {}).get('sha'),
+              'labels': sorted(labels),
+              'stage_labels': stage_labels,
+              'status': 'PASS',
+              'mutation_performed_by_readback': False,
+          }
+          print(json.dumps(receipt, sort_keys=True))
+          PY
+
+      - name: Publish autonomous execution receipt
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Penta PR Autopilot'
+            echo
+            echo "- Event: **${{ github.event_name }}**"
+            echo "- Target source: **${{ steps.target.outputs.source || 'unknown' }}**"
+            echo "- Target PR: **${{ steps.target.outputs.number || 'repository sweep' }}**"
+            echo "- Exact head: **${{ steps.target.outputs.head_sha || 'sweep/not-resolved' }}**"
+            echo "- Target skipped: **${{ steps.target.outputs.skip == 'true' && 'YES' || 'NO' }}**"
+            echo "- Settlement: **${{ steps.target.outputs.wait_for_settle == 'true' && (steps.settle.outputs.reason || 'not-run') || 'not-required' }}**"
+            echo "- Deadline close authority: **${{ steps.target.outputs.allow_close }}**"
+            echo "- PentaTagger deferred: **${{ steps.tagger.outputs.deferred == 'true' && 'YES' || 'NO' }}**"
+            echo '- Chain: exact target/head → CI settlement barrier → PentaGate → PentaHeal → PentaTagger preflight → PentaPR → PentaRestack/PentaMerge → passive provider readback'
+            echo '- Final provider readback is GET-only and cannot overwrite PentaPR lifecycle state.'
+            echo '- Failed completed checks remain fail-closed; settlement only waits for queued/in-progress checks and never changes conclusions.'
+            echo '- HOLD, draft, D3, credential, provider-permission, and money-movement boundaries remain fail-closed.'
+            if [[ -f "$RUNNER_TEMP/penta-pr-autopilot-tagger-preflight.md" ]]; then
+              echo
+              cat "$RUNNER_TEMP/penta-pr-autopilot-tagger-preflight.md"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
