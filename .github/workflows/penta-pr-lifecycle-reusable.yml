@@ -33,6 +33,8 @@ permissions:
 env:
   PENTA_MODE: ${{ inputs.mode || github.event.inputs.mode }}
   PENTA_NUMBER: ${{ inputs.number || github.event.inputs.number }}
+  PENTA_TAGGER_SWEEP_MAX_ITEMS: '24'
+  PENTA_TAGGER_REQUEST_BUDGET: '180'
 
 jobs:
   lifecycle:
@@ -69,6 +71,7 @@ jobs:
           fi
 
       - name: Preflight PentaTagger before terminal authority
+        id: tagger-preflight
         if: ${{ env.PENTA_MODE == 'merge' || env.PENTA_MODE == 'closer' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -76,15 +79,46 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 500 --no-comment)
+          args=(
+            verify
+            --repo "$GITHUB_REPOSITORY"
+            --kind pr
+            --max-items "$PENTA_TAGGER_SWEEP_MAX_ITEMS"
+            --request-budget "$PENTA_TAGGER_REQUEST_BUDGET"
+            --no-comment
+          )
           if [[ -n "${PENTA_NUMBER:-}" ]]; then
             args+=(--number "$PENTA_NUMBER")
           fi
           args+=(--receipt-path "$RUNNER_TEMP/penta-pr-lifecycle-tagger-preflight.json")
           args+=(--summary-path "$RUNNER_TEMP/penta-pr-lifecycle-tagger-preflight.md")
+
+          set +e
           python penta-control/scripts/penta_github_tagger.py "${args[@]}"
+          status=$?
+          set -e
+
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [[ "$status" -eq 75 ]]; then
+            python - "$RUNNER_TEMP/penta-pr-lifecycle-tagger-preflight.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          if payload.get("status") != "DEFERRED":
+              raise SystemExit("exit 75 requires a DEFERRED PentaTagger receipt")
+          print("PASS: terminal authority remains deferred without workflow crash")
+          PY
+            echo "deferred=true" >> "$GITHUB_OUTPUT"
+            echo "::warning title=PentaTagger terminal preflight deferred::Provider request budget was preserved. PentaMerge/PentaCloser will not execute in this pass."
+            exit 0
+          fi
+          echo "deferred=false" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
       - name: Run PentaPR, PentaMerge, or PentaCloser
+        if: ${{ success() && steps.tagger-preflight.outputs.deferred != 'true' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -98,6 +132,7 @@ jobs:
           python penta-control/scripts/penta_pr_lifecycle.py "${args[@]}"
 
       - name: Project final lifecycle through PentaTagger and verify provider readback
+        id: tagger-final
         if: always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -105,13 +140,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(verify --repo "$GITHUB_REPOSITORY" --kind pr --max-items 500 --no-comment)
+          args=(
+            verify
+            --repo "$GITHUB_REPOSITORY"
+            --kind pr
+            --max-items "$PENTA_TAGGER_SWEEP_MAX_ITEMS"
+            --request-budget "$PENTA_TAGGER_REQUEST_BUDGET"
+            --no-comment
+          )
           if [[ -n "${PENTA_NUMBER:-}" ]]; then
             args+=(--number "$PENTA_NUMBER")
           fi
           args+=(--receipt-path "$RUNNER_TEMP/penta-pr-lifecycle-tagger-receipt.json")
           args+=(--summary-path "$RUNNER_TEMP/penta-pr-lifecycle-tagger-summary.md")
+
+          set +e
           python penta-control/scripts/penta_github_tagger.py "${args[@]}"
+          status=$?
+          set -e
+
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          if [[ "$status" -eq 75 ]]; then
+            python - "$RUNNER_TEMP/penta-pr-lifecycle-tagger-receipt.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          if payload.get("status") != "DEFERRED":
+              raise SystemExit("exit 75 requires a DEFERRED PentaTagger receipt")
+          print("PASS: bounded final projection deferred without workflow crash")
+          PY
+            echo "deferred=true" >> "$GITHUB_OUTPUT"
+            echo "::warning title=PentaTagger final projection deferred::Provider request budget was preserved and the deferred receipt remains available for the next sweep."
+            exit 0
+          fi
+          echo "deferred=false" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
       - name: Publish lifecycle and tagger receipts
         if: always()
@@ -122,6 +187,9 @@ jobs:
             echo
             echo "- Authority invoked: **${PENTA_MODE:-unknown}**"
             echo "- Target PR: **${PENTA_NUMBER:-repository sweep}**"
+            echo "- Bounded PentaTagger sweep: **${PENTA_TAGGER_SWEEP_MAX_ITEMS} entities / ${PENTA_TAGGER_REQUEST_BUDGET} requests**"
+            echo "- Terminal preflight state: **${{ steps.tagger-preflight.outputs.deferred == 'true' && 'DEFERRED' || 'COMPLETE_OR_NOT_REQUIRED' }}**"
+            echo "- Final projection state: **${{ steps.tagger-final.outputs.deferred == 'true' && 'DEFERRED' || 'COMPLETE' }}**"
             echo '- Preflight chain: PentaGate → PentaHeal packet (if needed) → PentaTagger'
             echo '- Terminal chain: PentaMerge/PentaCloser → PentaTagger terminal readback'
             echo
