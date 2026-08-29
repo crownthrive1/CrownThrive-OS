@@ -5,11 +5,15 @@ on:
     paths:
       - '.github/workflows/penta-self-remediation-handoff.yml'
       - '.github/workflows/penta-self-remediation-pr-check.yml'
+      - '.github/workflows/penta-remediation-worker-execution.yml'
       - 'config/penta_pm_policy.json'
       - 'scripts/penta_self_remediation_handoff.py'
       - 'scripts/penta_pm_remediation_assign.py'
+      - 'scripts/penta_remediation_worker_execute.py'
       - 'tests/test_penta_self_remediation_handoff.py'
+      - 'tests/test_penta_remediation_worker_execute.py'
       - 'supabase/migrations/*penta_self_pr_pm_remediation_handoff*.sql'
+      - 'supabase/migrations/*penta_pm_assignment_execution_bridge*.sql'
   workflow_dispatch:
 
 permissions:
@@ -31,8 +35,9 @@ jobs:
         run: |
           python -m py_compile \
             scripts/penta_self_remediation_handoff.py \
-            scripts/penta_pm_remediation_assign.py
+            scripts/penta_pm_remediation_assign.py \
+            scripts/penta_remediation_worker_execute.py
       - name: Validate PentaPM remediation policy
         run: python -m json.tool config/penta_pm_policy.json >/dev/null
-      - name: Run remediation routing regression suite
-        run: python -m unittest tests.test_penta_self_remediation_handoff -v
+      - name: Run remediation routing and execution regression suite
+        run: python -m unittest tests.test_penta_self_remediation_handoff tests.test_penta_remediation_worker_execute -v
