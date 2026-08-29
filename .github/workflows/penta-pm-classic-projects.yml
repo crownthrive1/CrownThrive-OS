@@ -1,0 +1,91 @@
+name: PentaPM Classic Projects Provider
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/penta-pm-classic-projects.yml"
+      - "scripts/penta_pm_reconcile.py"
+      - "config/penta_pm_policy.json"
+  workflow_run:
+    workflows: ["PentaPM PR Metadata Convergence"]
+    types: [completed]
+  workflow_dispatch:
+  schedule:
+    - cron: "29 * * * *"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  repository-projects: write
+
+concurrency:
+  group: penta-pm-classic-projects-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  projects:
+    name: PentaPM classic Projects v2 reconcile
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_CLASSIC_TOKEN }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_CLASSIC_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Require classic PentaPM Projects credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${PENTA_PM_GITHUB_TOKEN}" ]]; then
+            echo "::error::PENTA_PM_GITHUB_CLASSIC_TOKEN is unavailable; refusing Projects-v2 mutation."
+            exit 78
+          fi
+
+      - name: Validate PentaPM reconcile contracts
+        run: python -m unittest tests.test_penta_pm_reconcile -v
+
+      - name: Reconcile canonical Project and governed artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/penta-pm
+          python scripts/penta_pm_reconcile.py --repo "$GITHUB_REPOSITORY" --apply | tee artifacts/penta-pm/classic-projects.json
+
+      - name: Require Projects-v2 provider success
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifacts/penta-pm/latest.json')
+          if not p.exists():
+              raise SystemExit('missing PentaPM receipt')
+          data=json.loads(p.read_text())
+          provider=[h for h in data.get('holds',[]) if h.get('type') in {'projects_v2_provider_authority','project_item_provider_authority'}]
+          if provider:
+              raise SystemExit('Projects-v2 provider hold remains: '+json.dumps(provider,sort_keys=True))
+          print('PentaPM classic Projects-v2 provider reconciliation passed.')
+          PY
+
+      - name: Upload Projects-v2 evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-pm-classic-projects-${{ github.run_id }}
+          path: artifacts/penta-pm/
+          if-no-files-found: error
+          retention-days: 90
