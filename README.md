@@ -208,19 +208,19 @@ That is PENTA. That is the institutional lifecycle through Phase 5. Every future
 **Impact. Legacy. Cultural advancement. Governed convergence. PENTA. 👑**
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.49.2.0
+## Latest PentaRelease — v3.49.3.0
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.49.2.0
-- **Release title:** CrownThrive OS 3.49.2.0 — Autonomous PentaRelease
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.49.3.0
+- **Release title:** CrownThrive OS 3.49.3.0 — Autonomous PentaRelease
 - **Who:** PentaRelease / provider actor github-actions[bot]
 - **Why:** production fix/hardening delta
-- **Changed paths:** 2
+- **Changed paths:** 20
 - **Provider actual cost:** $0.00 USD
 - **Recognized release exposure:** $0.00 USD
 - **Direct usage calculation:** `not_available`
 - **CIE:** **PASS — 100/100**
 - **CIE dimensions:** brand_safety=20, identity_fit=20, legacy_impact=20, community_value=20, story_alignment=20
-- **Evidence:** `92b0c8b74571f5557461a646337081cdd6728518bea1c51acd57b6bb6eed2a16`
+- **Evidence:** `a9c55330f5ee74258c61f82d94ea1336dbf98a312279415e7265e059abfc9a02`
 
 PentaRelease maintains this bounded block. Content outside the markers remains under its existing ownership and editorial authority.
 <!-- pentarelease:managed-release-surface:end -->
