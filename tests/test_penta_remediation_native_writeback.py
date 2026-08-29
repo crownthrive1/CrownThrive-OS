@@ -11,6 +11,8 @@ class PentaRemediationNativeWritebackTests(unittest.TestCase):
         self.assertIn('GH_TOKEN: ${{ github.token }}', workflow)
         self.assertIn('penta_remediation_worker_execute_native.py', workflow)
         self.assertIn('os.environ["PENTA_PM_GITHUB_TOKEN"] = native', wrapper)
+        self.assertIn('"penta:remediation" in labels and "penta:hold" in labels', wrapper)
+        self.assertIn('if bool(receipt.get("no_code_delta")):', wrapper)
         self.assertIn('return worker.main()', wrapper)
 
 
