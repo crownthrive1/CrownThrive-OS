@@ -108,14 +108,14 @@ For a public-safe moderation issue, reference the relevant issue/PR and request 
 This conduct standard does not replace `LICENSE`, licensing addenda, `CONTRIBUTING.md`, `SECURITY.md`, `AGENTS.md`, applicable law, binding agreements, or governing CrownThrive records. Participation does not create ownership, a license, compensation, partnership, employment, certification, governance authority, or other institutional rights not separately granted.
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.27.0.1
+## Latest PentaRelease — v3.41.0.0
 
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.27.0.1
-- **Release title:** CrownThrive OS 3.27.0.1 — Autonomous PentaRelease
-- **Why:** release-relevant bounded delta
-- **Changed paths:** 15
-- **Penta components:** PentaDocsPageProfiles.V1, PentaRelease
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.41.0.0
+- **Release title:** CrownThrive OS 3.41.0.0 — Autonomous PentaRelease
+- **Why:** new executable capability or runtime delta
+- **Changed paths:** 14
+- **Penta components:** PentaCookieV1.Schema, PentaCrawlerMeshProtocolV3, PentaRelease, PentaSPacketV1.Schema, PentaSRouting
 - **Direct USD payload cost:** not available
 - **CIE score:** not available
 - **Data/evidence:** comprehensive record, FAQ, changelog, costs, CIE status, data catalog, and evidence are attached to the official release.
