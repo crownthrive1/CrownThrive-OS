@@ -5,15 +5,32 @@
 --   remain recoverable from Supabase's append-only migration ledger while the
 --   byte-exact bootstrap files are exported into repository custody.
 --
--- This file DOES NOT pretend to be the original bootstrap source. It fails
--- closed when the provider ledger is missing, changed, or incomplete.
+-- This file DOES NOT pretend to be the original bootstrap source.
+-- - Existing/partially-existing PentaDND state: fail closed on missing/drifted
+--   provider-ledger source.
+-- - Truly clean database with no PentaDND schema or ledger rows: defer to the
+--   exact bootstrap export rather than failing for the wrong reason.
 -- Historical migrations remain immutable and are never rewritten.
 
 do $$
 declare
   v_missing jsonb;
   v_changed jsonb;
+  v_existing_state boolean;
 begin
+  v_existing_state :=
+    to_regnamespace('penta_dnd') is not null
+    or exists (
+      select 1
+      from supabase_migrations.schema_migrations
+      where name ilike 'penta_dnd%'
+    );
+
+  if not v_existing_state then
+    raise notice 'PENTADND_PROVIDER_LEDGER_GUARD_DEFERRED_CLEAN_BOOTSTRAP';
+    return;
+  end if;
+
   with expected(version,name,statement_bytes,statement_sha256) as (
     values
       ('20260829221916','penta_dnd_core_v1',18401,'52a14f1beefe4d3e09f88bc5261826e0a995519baefcb584c405362b55c82078'),
