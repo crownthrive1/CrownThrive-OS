@@ -3,7 +3,12 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from scripts.penta_remediation_worker_execute import assigned_pentas_from_labels, finding_id_from_pr
+from scripts.penta_remediation_worker_execute import (
+    HTTPError,
+    Supabase,
+    assigned_pentas_from_labels,
+    finding_id_from_pr,
+)
 
 
 class PentaRemediationWorkerExecutionTests(unittest.TestCase):
@@ -43,6 +48,20 @@ class PentaRemediationWorkerExecutionTests(unittest.TestCase):
         self.assertIn("PENTA_REMEDIATION_OIDC_TOKEN", worker)
         self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", worker)
         self.assertNotIn("/rest/v1/rpc/", worker)
+
+    def test_long_sweep_refreshes_expired_oidc_once_per_rpc(self) -> None:
+        source = Path("scripts/penta_remediation_worker_execute.py").read_text(encoding="utf-8")
+        self.assertIn("def mint_github_oidc_token", source)
+        self.assertIn("ACTIONS_ID_TOKEN_REQUEST_URL", source)
+        self.assertIn("ACTIONS_ID_TOKEN_REQUEST_TOKEN", source)
+        self.assertIn("self._refresh_oidc()", source)
+        self.assertIn("oidc_refresh_count", source)
+        self.assertTrue(
+            Supabase._is_expired_oidc_error(
+                HTTPError('POST bridge -> 409: {"detail":"\\"exp\\" claim timestamp check failed"}')
+            )
+        )
+        self.assertFalse(Supabase._is_expired_oidc_error(HTTPError("POST bridge -> 409: handler_failed")))
 
     def test_assignment_dispatches_execution_after_metadata(self) -> None:
         source = Path("scripts/penta_pm_remediation_assign.py").read_text(encoding="utf-8")
