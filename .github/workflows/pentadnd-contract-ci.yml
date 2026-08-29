@@ -1,0 +1,30 @@
+name: PentaDND Contract CI
+
+on:
+  pull_request:
+    paths:
+      - "docs/cos-v1/pentadnd/**"
+      - "specs/cos-v1/pentadnd/**"
+      - "schemas/cos-v1/pentadnd/**"
+      - "tests/test_pentadnd_contract.py"
+      - ".github/workflows/pentadnd-contract-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentadnd-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate manifests and safety invariants
+        run: python -m pytest tests/test_pentadnd_contract.py -q
