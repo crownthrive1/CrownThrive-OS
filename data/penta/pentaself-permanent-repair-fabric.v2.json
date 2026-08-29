@@ -1,0 +1,60 @@
+{
+  "contract": "ct.penta.self.permanent-repairs.v2",
+  "version": "2.0.0",
+  "status": "production_applied",
+  "authority": "ct.pentaself.scheduler-permanence.v2",
+  "objective": "Make verified PentaSELF repairs durable without blocking genuinely new failures.",
+  "invariants": {
+    "scheduler_desired_state_generation_monotonic": true,
+    "stale_generation_rejected": true,
+    "critical_clock_drift_auto_restored": true,
+    "resolved_problem_stale_reopen_blocked": true,
+    "genuinely_new_evidence_may_reopen": true,
+    "repair_classes_allowlisted": true,
+    "repair_receipts_append_only": true,
+    "dail_receipt_required": true,
+    "d3_human_reserved": true,
+    "credential_material_exposed": false,
+    "provider_authority_manufactured": false,
+    "money_movement_authority": false
+  },
+  "permanent_repairs": [
+    "ct.repair.scheduler-permanence",
+    "ct.repair.current-truth",
+    "ct.repair.pentamarketer-event-projection",
+    "ct.repair.bd-warm-failover"
+  ],
+  "scheduled_jobs": {
+    "permanent_repair_tick": {
+      "jobname": "ct-pentaself-permanent-repairs-v2",
+      "schedule": "2-59/3 * * * *"
+    },
+    "current_truth": {
+      "jobname": "ct-pentaself-current-truth-v2",
+      "schedule": "4-59/5 * * * *"
+    },
+    "marketing_projection": {
+      "jobname": "ct-pentamarketer-event-projection-v2",
+      "schedule": "3-59/5 * * * *"
+    }
+  },
+  "rollback": {
+    "implicit_or_stale": "forbidden",
+    "required": "higher generation plus explicit rollback ticket and governed authority",
+    "emergency_kill_switches": "remain independently authoritative"
+  },
+  "production_evidence": {
+    "scheduler_canary": {
+      "drift_injected": true,
+      "restored_drift": true,
+      "schedule_matches": true,
+      "command_matches": true,
+      "stale_write_rejected": true
+    },
+    "runtime_migrations": [
+      "penta_marketer_event_derived_projection_v2",
+      "pentaself_current_truth_and_phase_reconciliation_v2_fix",
+      "pentaself_monotonic_permanent_repair_fabric_v2"
+    ]
+  }
+}
