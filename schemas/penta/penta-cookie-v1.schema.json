@@ -1,0 +1,136 @@
+{
+  "$id": "https://crownthrive.com/schemas/penta/penta-cookie-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Server-side per-Penta protocol identity/state capsule. This is not a browser or user-tracking cookie.",
+  "properties": {
+    "authority_ceiling": {
+      "enum": [
+        "D0",
+        "D1",
+        "D2",
+        "D3"
+      ]
+    },
+    "cookie_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "cookie_state": {
+      "enum": [
+        "active",
+        "hold",
+        "retired"
+      ]
+    },
+    "current_revision": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "identity_claims": {
+      "type": "object"
+    },
+    "identity_public_key_ref": {
+      "maxLength": 512,
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "installed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "installed_by": {
+      "type": "string"
+    },
+    "last_seen_at": {
+      "format": "date-time",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "mutation_seq": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "observed_state": {
+      "type": "object"
+    },
+    "oracle_policy": {
+      "additionalProperties": true,
+      "properties": {
+        "allowed_target": {
+          "const": "oracle_state"
+        },
+        "confidence_floor": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "d3_human_reserved": {
+          "const": true
+        },
+        "maximum_disagreement": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "minimum_distinct_oracles": {
+          "minimum": 2,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "minimum_distinct_oracles",
+        "confidence_floor",
+        "maximum_disagreement",
+        "d3_human_reserved",
+        "allowed_target"
+      ],
+      "type": "object"
+    },
+    "oracle_state": {
+      "propertyNames": {
+        "enum": [
+          "capabilities",
+          "routing",
+          "protocol_preferences",
+          "operational_constraints",
+          "advisory",
+          "feature_flags"
+        ]
+      },
+      "type": "object"
+    },
+    "protocol_version": {
+      "const": "1.0.0"
+    },
+    "system_key": {
+      "maxLength": 160,
+      "minLength": 1,
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "required": [
+    "cookie_id",
+    "system_key",
+    "protocol_version",
+    "cookie_state",
+    "authority_ceiling",
+    "identity_claims",
+    "observed_state",
+    "oracle_state",
+    "oracle_policy",
+    "current_revision",
+    "mutation_seq",
+    "installed_at"
+  ],
+  "title": "PentaCookie Protocol Capsule v1",
+  "type": "object"
+}
