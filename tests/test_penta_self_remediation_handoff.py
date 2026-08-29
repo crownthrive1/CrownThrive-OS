@@ -9,6 +9,9 @@ from scripts.penta_pm_remediation_assign import desired_owners, owner_slug
 from scripts.penta_self_remediation_handoff import normalize_finding, remediation_key
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 class PentaSelfRemediationHandoffTests(unittest.TestCase):
     def setUp(self) -> None:
         self.policy = {
@@ -96,6 +99,29 @@ class PentaSelfRemediationHandoffTests(unittest.TestCase):
 
     def test_owner_slug_is_deterministic(self) -> None:
         self.assertEqual(owner_slug("Penta Build / Recovery"), "penta-build-recovery")
+
+    def test_repository_dispatch_uses_bounded_envelope(self) -> None:
+        migration = (
+            ROOT
+            / "supabase/migrations/20260920013100_penta_self_pr_pm_remediation_handoff_dispatch_wrapper.sql"
+        ).read_text(encoding="utf-8")
+        self.assertIn("'client_payload',jsonb_build_object(", migration)
+        self.assertIn("'finding',v_row.payload", migration)
+        self.assertIn("'client_payload_top_level_properties',3", migration)
+        self.assertNotIn("'client_payload',v_row.payload", migration)
+
+    def test_workflow_unwraps_envelope_and_preserves_legacy_payload(self) -> None:
+        workflow = (
+            ROOT / ".github/workflows/penta-self-remediation-handoff.yml"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(
+            workflow.count('payload = client_payload.get("finding") or client_payload'),
+            2,
+        )
+        self.assertIn(
+            "github.event.client_payload.finding.finding_id || github.event.client_payload.finding_id",
+            workflow,
+        )
 
 
 if __name__ == "__main__":
