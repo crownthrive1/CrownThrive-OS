@@ -1,0 +1,51 @@
+name: PentaDocs Presentation Governance
+
+on:
+  pull_request:
+    paths:
+      - "docs.json"
+      - "style.css"
+      - "logo/**"
+      - "favicon.svg"
+      - "scripts/validate_pentadocs_presentation.py"
+      - ".github/workflows/pentadocs-presentation-governance.yml"
+  push:
+    branches:
+      - main
+      - "admin-mcp/**"
+    paths:
+      - "docs.json"
+      - "style.css"
+      - "logo/**"
+      - "favicon.svg"
+      - "scripts/validate_pentadocs_presentation.py"
+      - ".github/workflows/pentadocs-presentation-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentadocs-presentation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  presentation-contract:
+    name: PentaDocs presentation contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify presentation validator syntax
+        run: python -m py_compile scripts/validate_pentadocs_presentation.py
+
+      - name: Enforce branded responsive presentation contract
+        run: python scripts/validate_pentadocs_presentation.py
