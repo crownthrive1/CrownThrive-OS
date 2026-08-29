@@ -1,0 +1,46 @@
+{
+  "contract": "ct.penta.self.forward-repair.v2",
+  "version": "2.0.0",
+  "status": "production",
+  "authority_ceiling": "D2",
+  "d3_human_reserved": true,
+  "purpose": "Persist verified PentaSELF repairs and required scheduler topology without automatic rollback to stale observations.",
+  "state_rules": {
+    "repair_direction": "forward_only",
+    "automatic_rollback": false,
+    "verified_resolution_is_monotonic": true,
+    "reopen_requires": "newer_independent_failure_evidence",
+    "historical_failure_may_not_override_newer_success": true,
+    "conflicting_current_evidence": "hold_and_escalate"
+  },
+  "scheduler_rules": {
+    "desired_state_table": "penta_self.required_cron_contracts_v2",
+    "primary_watchdog": "ct-penta-self-persistence-guard-v2",
+    "redundant_watchdog": "ct-penta-self-persistence-watchdog-v2",
+    "missing_job_action": "recreate_from_exact_contract",
+    "drift_action": "repair_forward_to_exact_contract",
+    "duplicate_action": "quarantine_disable_preserve_history",
+    "delete_history": false,
+    "peer_repair": true
+  },
+  "evidence": {
+    "append_only_receipts": "penta_self.persistence_receipts_v2",
+    "resolution_watermarks": "penta_self.problem_resolution_watermarks_v2",
+    "external_truth_cache": "penta_self.external_truth_cache_v2",
+    "dail_projection": true,
+    "sha256_required": true
+  },
+  "non_authorities": [
+    "does_not_manufacture_provider_permission",
+    "does_not_manufacture_credentials",
+    "does_not_bypass_rate_limits",
+    "does_not_move_money",
+    "does_not_grant_rights",
+    "does_not_bypass_release_gates",
+    "does_not_execute_d3"
+  ],
+  "source": {
+    "migration": "supabase/migrations/20260829021500_penta_self_forward_repair_persistence_v2.sql",
+    "test": "tests/test_pentaself_forward_repair_persistence_v2.py"
+  }
+}
