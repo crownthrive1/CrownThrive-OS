@@ -1,0 +1,35 @@
+{
+  "schema": "crownthrive.penta.serialized.git-receipt/v1",
+  "receipt_id": "ct.penta.serialized.chlom-publication-stale-claim-recovery.20260829.v1",
+  "created_at": "2026-08-29T19:28:10Z",
+  "actor": "CrownThrive bounded execution repair",
+  "reason": "Prevent failed or timed-out CHLOM publisher jobs from leaving publication commands permanently CLAIMED. Recover only claims older than the publisher 20-minute hard timeout plus a two-minute cushion, while preserving the existing retry ceiling and BLOCKED fail-closed behavior.",
+  "changes": [
+    {
+      "path": "supabase/migrations/20260829192500_chlom_publication_stale_claim_recovery.sql",
+      "operation": "create",
+      "reason": "Governed stale-claim recovery inside the canonical claim RPC; no direct queue mutation path is introduced."
+    }
+  ],
+  "production_migration": {
+    "project_ref": "tzajnzshmtzjenqulehq",
+    "migration_name": "chlom_publication_stale_claim_recovery",
+    "first_attempt": "deadlock_40P01_rolled_back",
+    "retry": "applied_successfully",
+    "dail_failure_event": "054a681d-0084-4e27-90cd-563dbf0d429d",
+    "dail_applied_event": "6bb51ea3-badb-4bff-8d21-1550eb7697d7"
+  },
+  "continuity": {
+    "silent_replacement": false,
+    "silent_delete": false,
+    "rollback_preserved": true,
+    "retry_ceiling_preserved": true,
+    "blocked_fail_closed_preserved": true
+  },
+  "exclusions": [
+    "No direct publication-queue table mutation was used to recover an individual claim.",
+    "No provider identity or receipt was manufactured.",
+    "No credential creation, rotation, read, or exposure.",
+    "No D3 authority, rights grant, money movement, contract acceptance, or certification."
+  ]
+}
