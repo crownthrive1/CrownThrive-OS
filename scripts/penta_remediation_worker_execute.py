@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 GITHUB_API = "https://api.github.com"
+DEFAULT_OIDC_ENDPOINT = "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-remediation-worker-oidc"
 MARKER_RE = re.compile(r"penta-self-remediation:([0-9a-fA-F-]{36})")
 EXEC_MARKER = "<!-- penta-remediation-execution:{execution_id} -->"
 
@@ -50,7 +51,7 @@ class GH:
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
             "Content-Type": "application/json",
-            "User-Agent": "CrownThrive-PentaRemediationWorker/1.1",
+            "User-Agent": "CrownThrive-PentaRemediationWorker/1.2",
         }
 
     def req(self, method: str, path: str, body: Any | None = None, *, allow_404: bool = False) -> Any:
@@ -82,18 +83,28 @@ class GH:
 
 
 class Supabase:
-    def __init__(self, url: str, service_key: str) -> None:
-        self.base = url.rstrip("/") + "/rest/v1/rpc/"
+    """OIDC-authenticated RPC façade. No Supabase service-role secret enters Actions."""
+
+    def __init__(self, endpoint: str, oidc_token: str) -> None:
+        self.endpoint = endpoint.rstrip("/")
         self.headers = {
-            "apikey": service_key,
-            "Authorization": f"Bearer {service_key}",
+            "Authorization": f"Bearer {oidc_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "CrownThrive-PentaRemediationWorker/1.1",
+            "User-Agent": "CrownThrive-PentaRemediationWorker/1.2",
         }
 
     def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
-        return request_json("POST", self.base + name, self.headers, payload or {})
+        envelope = request_json(
+            "POST",
+            self.endpoint,
+            self.headers,
+            {"op": name, "args": payload or {}},
+        )
+        if not isinstance(envelope, dict) or not envelope.get("ok"):
+            raise RuntimeError(f"penta_remediation_oidc_rpc_rejected:{name}")
+        result = envelope.get("result")
+        return result if isinstance(result, dict) else result
 
 
 def now_iso() -> str:
@@ -261,7 +272,7 @@ def mark_verified_pr(gh: GH, pr: dict[str, Any], execution: dict[str, Any]) -> N
 
 def finalize_pr(gh: GH, sb: Supabase, number: int) -> None:
     readback = sb.rpc("penta_remediation_execution_read_v1", {"p_pr_number": number})
-    for execution in readback.get("items", []):
+    for execution in (readback or {}).get("items", []):
         pr = gh.get(f"/pulls/{number}")
         state = execution.get("state")
         if state == "verified":
@@ -289,12 +300,12 @@ def main() -> int:
     if not args.repo:
         raise SystemExit("repo_required")
     token = os.environ.get("PENTA_PM_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN")
-    sb_url = os.environ.get("SUPABASE_URL")
-    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    if not token or not sb_url or not sb_key:
-        raise SystemExit("trusted_remediation_credentials_required")
+    oidc_token = os.environ.get("PENTA_REMEDIATION_OIDC_TOKEN")
+    oidc_endpoint = os.environ.get("PENTA_REMEDIATION_OIDC_ENDPOINT") or DEFAULT_OIDC_ENDPOINT
+    if not token or not oidc_token:
+        raise SystemExit("trusted_remediation_github_and_oidc_credentials_required")
     gh = GH(args.repo, token)
-    sb = Supabase(sb_url, sb_key)
+    sb = Supabase(oidc_endpoint, oidc_token)
 
     requested = args.pr or event_pr_number()
     adopted: list[int] = []
@@ -312,11 +323,11 @@ def main() -> int:
             if len(adopted) >= 50:
                 break
 
-    reconcile = sb.rpc("penta_remediation_execution_reconcile_v1", {})
+    reconcile = sb.rpc("penta_remediation_execution_reconcile_v1", {}) or {}
     for number in adopted:
         finalize_pr(gh, sb, number)
 
-    claim = sb.rpc("penta_remediation_execution_claim_v1", {"p_limit": max(1, min(args.limit, 10))})
+    claim = sb.rpc("penta_remediation_execution_claim_v1", {"p_limit": max(1, min(args.limit, 10))}) or {}
     executed: list[dict[str, Any]] = []
     for item in claim.get("items", []):
         number = int(item["pr_number"])
@@ -325,11 +336,11 @@ def main() -> int:
         if current_head != item.get("head_sha"):
             adopt_pr(gh, sb, number)
             continue
-        result = sb.rpc("penta_remediation_execute_known_v3", {"p_execution_id": item["execution_id"]})
+        result = sb.rpc("penta_remediation_execute_known_v3", {"p_execution_id": item["execution_id"]}) or {}
         executed.append(result)
         finalize_pr(gh, sb, number)
 
-    status = sb.rpc("penta_remediation_execution_status_v1", {})
+    status = sb.rpc("penta_remediation_execution_status_v1", {}) or {}
     print(json.dumps({"state": "COMPLETE", "adopted_prs": adopted, "reconcile": reconcile, "claimed": claim.get("count", 0), "executed": executed, "status": status}, sort_keys=True))
     return 0
 
