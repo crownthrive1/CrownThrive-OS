@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/schemas/cos-v1/pentadnd/run-receipt.v1.schema.json",
+  "title": "PentaDND Hourly Convergence Run Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_id",
+    "run_id",
+    "job_id",
+    "context_id",
+    "scope_key",
+    "lease_id",
+    "started_at",
+    "finished_at",
+    "result_state",
+    "source_observations",
+    "actions",
+    "redundancy_state",
+    "next_phase",
+    "email_projection",
+    "evidence"
+  ],
+  "properties": {
+    "receipt_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "format": "uuid"},
+    "job_id": {"const": "ct.job.cos-convergence.hourly.v1"},
+    "context_id": {"const": "ct.context.sol-ultra.pro-hourly.v1"},
+    "scope_key": {"type": "string", "minLength": 1},
+    "lease_id": {"type": "string", "format": "uuid"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "result_state": {"enum": ["completed", "completed_with_holds", "hold", "failed_safe"]},
+    "source_observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_kind", "source_ref", "observed_at", "freshness_state", "digest"],
+        "properties": {
+          "source_kind": {"type": "string"},
+          "source_ref": {"type": "string"},
+          "observed_at": {"type": "string", "format": "date-time"},
+          "freshness_state": {"enum": ["current", "stale", "unknown", "historical"]},
+          "digest": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "subject_ref", "disposition", "evidence_ref"],
+        "properties": {
+          "action": {"type": "string"},
+          "subject_ref": {"type": "string"},
+          "disposition": {"enum": ["observed", "implemented", "verified", "archived", "superseded", "retired", "held", "queued", "failed_safe"]},
+          "evidence_ref": {"type": "string"},
+          "rollback_ref": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "redundancy_state": {
+      "type": "object",
+      "required": ["hot", "warm", "cold_a", "cold_b"],
+      "properties": {
+        "hot": {"$ref": "#/$defs/lineState"},
+        "warm": {"$ref": "#/$defs/lineState"},
+        "cold_a": {"$ref": "#/$defs/lineState"},
+        "cold_b": {"$ref": "#/$defs/lineState"}
+      }
+    },
+    "next_phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase_key", "objective", "priority", "not_before", "owner_capability", "source_cursor"],
+      "properties": {
+        "phase_key": {"type": "string", "minLength": 1},
+        "objective": {"type": "string", "minLength": 1},
+        "priority": {"type": "integer", "minimum": 0, "maximum": 100},
+        "not_before": {"type": "string", "format": "date-time"},
+        "owner_capability": {"type": "string", "minLength": 1},
+        "source_cursor": {"type": "object"},
+        "holds": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "email_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recipient", "subject", "state"],
+      "properties": {
+        "recipient": {"const": "contact@crownthrive.com"},
+        "subject": {"type": "string", "minLength": 1},
+        "state": {"enum": ["queued", "sent", "verified", "failed_safe", "hold"]},
+        "provider_message_id": {"type": ["string", "null"]},
+        "sent_at": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payload_sha256", "dail_event_ref", "chlom_identity_ref", "signature_state"],
+      "properties": {
+        "payload_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "dail_event_ref": {"type": ["string", "null"]},
+        "chlom_identity_ref": {"type": ["string", "null"]},
+        "signature_state": {"enum": ["signed", "unsigned_hold"]},
+        "signature_ref": {"type": ["string", "null"]}
+      }
+    }
+  },
+  "$defs": {
+    "lineState": {
+      "type": "object",
+      "required": ["line_id", "health_state", "evidence_state"],
+      "properties": {
+        "line_id": {"type": "string"},
+        "health_state": {"enum": ["healthy", "degraded", "unavailable", "unknown"]},
+        "evidence_state": {"enum": ["verified", "stale", "pending", "not_applicable"]},
+        "last_verified_at": {"type": ["string", "null"], "format": "date-time"},
+        "promotion_allowed": {"type": "boolean"},
+        "hold_reason": {"type": ["string", "null"]}
+      }
+    }
+  }
+}
