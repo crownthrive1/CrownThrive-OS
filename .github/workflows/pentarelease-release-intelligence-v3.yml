@@ -18,6 +18,7 @@ permissions:
   checks: read
   contents: write
   id-token: write
+  issues: write
   pull-requests: write
 
 concurrency:
@@ -247,6 +248,7 @@ jobs:
           echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Govern and merge synchronized surfaces
+        id: merge
         if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -256,21 +258,53 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh workflow run governed-merge-gate.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+
+          ISSUE_URL=$(gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "PentaRelease $TAG release-intelligence production convergence" \
+            --body "Autonomous tracking issue for the exact $TAG release-intelligence synchronization. The generated PR must receive the PR-bound CrownThrive governed merge gate and reach a merged terminal state before production readback. No authority is manufactured and HOLD remains fail-closed.")
+          ISSUE_NUM="${ISSUE_URL##*/}"
+
+          PR_URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+            --title "PentaRelease release intelligence $TAG" \
+            --body "Canonical convergence of GitHub Release, README, repository release surfaces, PentaDocs, calculated economic methodology, CIE scorecard and provider readback for $TAG. Generated from exact governed evidence; no authority is manufactured.\n\nRefs #${ISSUE_NUM}" )
+          PR_NUM="${PR_URL##*/}"
+
           PASS=false
-          for _ in $(seq 1 60); do
+          for _ in $(seq 1 90); do
             sleep 10
             STATE=$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
-              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
-            echo "Governed branch gate: $STATE"
+              --jq "[.check_runs[] | select(.name==\"CrownThrive governed merge gate\") | select(any(.pull_requests[]?; .number == ${PR_NUM}))] | sort_by(.started_at) | last | ((.status // \"missing\") + \":\" + (.conclusion // \"pending\"))")
+            echo "PR-bound governed gate: $STATE"
             if [ "$STATE" = "completed:success" ]; then PASS=true; break; fi
             if [[ "$STATE" == completed:* ]] && [ "$STATE" != "completed:success" ]; then exit 44; fi
           done
           test "$PASS" = true
-          PR_URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
-            --title "PentaRelease release intelligence $TAG" \
-            --body "Canonical convergence of GitHub Release, README, repository release surfaces, PentaDocs, calculated economic methodology, CIE scorecard and provider readback for $TAG. Generated from exact governed evidence; no authority is manufactured." )
-          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --auto --squash --subject "docs(pentarelease): converge release intelligence $TAG"
+
+          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --auto --squash \
+            --subject "PentaRelease release intelligence $TAG"
+
+          MERGED=false
+          for _ in $(seq 1 90); do
+            SNAPSHOT=$(gh pr view "$PR_URL" --repo "$GITHUB_REPOSITORY" --json state,mergedAt,mergeCommit)
+            STATE=$(jq -r '.state' <<<"$SNAPSHOT")
+            MERGED_AT=$(jq -r '.mergedAt // empty' <<<"$SNAPSHOT")
+            if [ -n "$MERGED_AT" ]; then
+              MERGE_SHA=$(jq -r '.mergeCommit.oid // empty' <<<"$SNAPSHOT")
+              test -n "$MERGE_SHA"
+              echo "merge_sha=$MERGE_SHA" >> "$GITHUB_OUTPUT"
+              echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+              MERGED=true
+              break
+            fi
+            if [ "$STATE" = "CLOSED" ]; then
+              echo "Synchronization PR closed without merge" >&2
+              exit 46
+            fi
+            sleep 10
+          done
+          test "$MERGED" = true
+          gh issue close "$ISSUE_NUM" --repo "$GITHUB_REPOSITORY" --reason completed \
+            --comment "Merged synchronization PR #${PR_NUM}; terminal merge confirmed before production readback."
 
       - name: Production readback
         env:
@@ -280,16 +314,17 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main
-          git show origin/main:README.md | grep -Fq "Latest PentaRelease — $TAG"
-          git show origin/main:.pentarelease/state/release-surface.json | jq -e --arg tag "$TAG" '.last_release == $tag' >/dev/null
-          git show origin/main:pentarelease/latest.mdx | grep -Fq 'Cost calculation and methodology'
-          git show origin/main:pentarelease/latest.mdx | grep -Fq 'What to expect'
-          git show origin/main:pentarelease/cie.mdx | grep -Eq 'Overall score:.*[0-9]+.*\/100'
-          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Identity Fit'
-          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Community Value'
-          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Story Alignment'
-          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Brand Safety'
-          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Legacy Impact'
+          git checkout --detach origin/main
+          git show HEAD:README.md | grep -Fq "Latest PentaRelease — $TAG"
+          git show HEAD:.pentarelease/state/release-surface.json | jq -e --arg tag "$TAG" '.last_release == $tag' >/dev/null
+          git show HEAD:pentarelease/latest.mdx | grep -Fq 'Cost calculation and methodology'
+          git show HEAD:pentarelease/latest.mdx | grep -Fq 'What to expect'
+          git show HEAD:pentarelease/cie.mdx | grep -Eq 'Overall score:.*[0-9]+.*\/100'
+          git show HEAD:pentarelease/cie.mdx | grep -Fq 'Identity Fit'
+          git show HEAD:pentarelease/cie.mdx | grep -Fq 'Community Value'
+          git show HEAD:pentarelease/cie.mdx | grep -Fq 'Story Alignment'
+          git show HEAD:pentarelease/cie.mdx | grep -Fq 'Brand Safety'
+          git show HEAD:pentarelease/cie.mdx | grep -Fq 'Legacy Impact'
           python3 scripts/pentarelease/pentadocs_group.py --root . --policy .pentarelease/policy.json --check
           READBACK=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body)
           jq -e '.body | contains("Release intelligence")' <<<"$READBACK" >/dev/null
