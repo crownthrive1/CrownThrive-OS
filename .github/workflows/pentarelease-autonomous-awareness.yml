@@ -95,7 +95,9 @@ jobs:
           LATEST=$(jq -r '.latest_tag' "$DECISION_FILE")
           PKG="releases/$VERSION"
           REQ=".github/release-requests/crownthrive-os-$VERSION.json"
-          BRANCH="pentarelease/auto-${VERSION}-${GITHUB_RUN_ID}"
+          # A workflow rerun must never collide with the branch from an earlier
+          # attempt of the same run. Attempt identity is part of the release lane.
+          BRANCH="pentarelease/auto-${VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           mkdir -p "$PKG" .github/release-requests
 
           {
@@ -163,6 +165,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Provider capacity is transient; governance is not. Retry bounded
+          # GitHub API operations instead of converting a temporary 403/5xx into
+          # a false release failure after the exact governed gate later passes.
+          gh_retry() {
+            local attempt=1
+            local max_attempts=12
+            local delay=10
+            local rc=0
+            while true; do
+              if "$@"; then
+                return 0
+              fi
+              rc=$?
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                echo "PentaRelease provider retry exhausted after $attempt attempts: $*" >&2
+                return "$rc"
+              fi
+              echo "PentaRelease provider capacity/readback unavailable (attempt $attempt/$max_attempts); retrying in ${delay}s." >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              if [ "$delay" -lt 60 ]; then delay=$((delay + 10)); fi
+            done
+          }
+
           git config user.name 'PentaRelease'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -b "$BRANCH"
@@ -172,12 +199,16 @@ jobs:
           git push origin "$BRANCH"
 
           # Always execute the CrownThrive governed merge gate against the exact release branch.
-          gh workflow run governed-merge-gate.yml --ref "$BRANCH"
+          gh_retry gh workflow run governed-merge-gate.yml --ref "$BRANCH"
           success=false
-          for i in $(seq 1 60); do
+          for i in $(seq 1 90); do
             sleep 10
-            STATE=$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
-              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
+            STATE=""
+            if ! STATE=$(gh_retry gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))'); then
+              echo "PentaRelease HOLD: provider readback remained unavailable after bounded retry." >&2
+              exit 45
+            fi
             echo "Governed merge gate: $STATE"
             if [ "$STATE" = "completed:success" ]; then success=true; break; fi
             if [[ "$STATE" == completed:* ]] && [ "$STATE" != "completed:success" ]; then
@@ -219,13 +250,13 @@ jobs:
 
           TITLE="CrownThrive OS $VERSION — Autonomous PentaRelease"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TITLE" --notes-file "$PKG/RELEASE_NOTES.md" --target "$TARGET"
+            gh_retry gh release edit "$TAG" --title "$TITLE" --notes-file "$PKG/RELEASE_NOTES.md" --target "$TARGET"
           else
-            gh release create "$TAG" --target "$TARGET" --title "$TITLE" --notes-file "$PKG/RELEASE_NOTES.md"
+            gh_retry gh release create "$TAG" --target "$TARGET" --title "$TITLE" --notes-file "$PKG/RELEASE_NOTES.md"
           fi
-          gh release upload "$TAG" "$ZIP" "$TGZ" dist/pentarelease/SHA256SUMS dist/pentarelease/MANIFEST.json dist/pentarelease/RELEASE_NOTES.md --clobber
+          gh_retry gh release upload "$TAG" "$ZIP" "$TGZ" dist/pentarelease/SHA256SUMS dist/pentarelease/MANIFEST.json dist/pentarelease/RELEASE_NOTES.md --clobber
 
-          READBACK=$(gh release view "$TAG" --json tagName,name,url,isDraft,isPrerelease,targetCommitish,assets)
+          READBACK=$(gh_retry gh release view "$TAG" --json tagName,name,url,isDraft,isPrerelease,targetCommitish,assets)
           echo "$READBACK" | jq .
           test "$(echo "$READBACK" | jq -r '.tagName')" = "$TAG"
           for EXPECTED in "$(basename "$ZIP")" "$(basename "$TGZ")" SHA256SUMS MANIFEST.json RELEASE_NOTES.md; do
@@ -240,6 +271,8 @@ jobs:
             echo "- Governed exact commit: $HEAD_SHA"
             echo "- Publication target: $TARGET"
             echo "- Provider readback: verified"
+            echo "- Provider retry contract: bounded exponential recovery"
+            echo "- Attempt-isolated branch: $BRANCH"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Record autonomous decision
