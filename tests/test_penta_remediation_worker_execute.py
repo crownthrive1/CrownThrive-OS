@@ -52,6 +52,21 @@ class PentaRemediationWorkerExecutionTests(unittest.TestCase):
         self.assertIn("D3_HUMAN_RESERVED", migration)
         self.assertIn("authority_manufactured", migration)
 
+    def test_recurrence_surgery_carries_failure_history_across_job_replacement(self) -> None:
+        migration = Path(
+            "supabase/migrations/20260829184100_penta_remediation_recurring_cron_surgery_v2.sql"
+        ).read_text(encoding="utf-8")
+        self.assertIn("penta_remediation_execute_known_v2", migration)
+        self.assertIn("v_failure_jobid:=nullif(p.evidence->>'jobid','')::bigint", migration)
+        self.assertIn("v_deadlocks>=3", migration)
+        self.assertIn("9,19,29,39,49,59 * * * *", migration)
+        self.assertIn("recurrence_surgery", migration)
+        self.assertIn("state='verification'", migration)
+
+        worker = Path("scripts/penta_remediation_worker_execute.py").read_text(encoding="utf-8")
+        self.assertIn('sb.rpc("penta_remediation_execute_known_v2"', worker)
+        self.assertNotIn('sb.rpc("penta_remediation_execute_known_v1"', worker)
+
     def test_verified_state_is_only_path_that_releases_hold(self) -> None:
         source = Path("scripts/penta_remediation_worker_execute.py").read_text(encoding="utf-8")
         verified_block = source.split('if state == "verified":', 1)[1].split('elif state in', 1)[0]
