@@ -1,4 +1,4 @@
-# CHLOM autonomous publication provider — bootstrap push is bounded to this workflow path.
+# CHLOM autonomous publication provider — provider claims remain bounded; repository writes converge through governed main.
 name: CHLOM Continuous Publisher
 
 on:
@@ -11,8 +11,11 @@ on:
       - '.github/workflows/chlom-continuous-publisher.yml'
 
 permissions:
+  actions: write
+  checks: read
   contents: write
   id-token: write
+  pull-requests: write
 
 concurrency:
   group: chlom-continuous-publisher
@@ -24,7 +27,7 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 20
     steps:
       - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,7 +85,7 @@ jobs:
             fi
           done
 
-      - name: Commit direct production publication
+      - name: Commit governed publication candidate
         id: commit
         if: steps.claim.outputs.count != '0'
         shell: bash
@@ -90,26 +93,100 @@ jobs:
           set -euo pipefail
           git config user.name "CrownThrive CHLOM Publisher"
           git config user.email "contact@crownthrive.com"
+          BASE_SHA="$(git rev-parse HEAD)"
+          BRANCH="chlom/publication-${BASE_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git checkout -b "$BRANCH"
           git add chlom/
           if git diff --cached --quiet; then
-            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+            echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "docs(chlom): autonomous governed publication batch"
-            git push origin HEAD:main
-            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            HEAD_SHA="$(git rev-parse HEAD)"
+            git push origin "$BRANCH"
+            echo "sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+            echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Govern and request protected-main merge
+        id: merge
+        if: steps.commit.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.commit.outputs.branch }}
+          HEAD_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          set -euo pipefail
+          gh workflow run governed-merge-gate.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+          PASS=false
+          for _ in $(seq 1 60); do
+            sleep 10
+            STATE="$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')"
+            echo "Governed publication gate: $STATE"
+            if [ "$STATE" = "completed:success" ]; then PASS=true; break; fi
+            if [[ "$STATE" == completed:* ]] && [ "$STATE" != "completed:success" ]; then exit 44; fi
+          done
+          test "$PASS" = true
+          PR_URL="$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+            --title "CHLOM governed publication batch" \
+            --body "Bounded CHLOM publication commands materialized with per-file SHA-256 verification. This PR uses the canonical governed merge gate; no direct protected-main push, force-push, admin bypass, credential mutation, or authority expansion is requested.")"
+          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --auto --squash --subject "docs(chlom): autonomous governed publication batch"
+          MERGED=false
+          for _ in $(seq 1 60); do
+            sleep 10
+            STATE="$(gh pr view "$PR_URL" --repo "$GITHUB_REPOSITORY" --json state --jq '.state')"
+            echo "Publication PR state: $STATE"
+            if [ "$STATE" = "MERGED" ]; then MERGED=true; break; fi
+            if [ "$STATE" = "CLOSED" ]; then exit 45; fi
+          done
+          test "$MERGED" = true
+          MERGE_SHA="$(gh pr view "$PR_URL" --repo "$GITHUB_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid // empty')"
+          test "$MERGE_SHA" != ""
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "sha=$MERGE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Verify exact destination commit
+        id: readback
+        if: steps.claim.outputs.count != '0' && success()
+        shell: bash
+        env:
+          CHANGED: ${{ steps.commit.outputs.changed }}
+          CANDIDATE_SHA: ${{ steps.commit.outputs.sha }}
+          MERGE_SHA: ${{ steps.merge.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$CHANGED" = "true" ]; then
+            DEST_SHA="$MERGE_SHA"
+          else
+            DEST_SHA="$CANDIDATE_SHA"
+          fi
+          test -n "$DEST_SHA"
+          git fetch origin main
+          git cat-file -e "${DEST_SHA}^{commit}"
+          jq -c '.result.commands[]' /tmp/chlom-claim.json | while IFS= read -r command; do
+            path="$(jq -r '.file_path' <<<"$command")"
+            expected="$(jq -r '.content_sha256' <<<"$command")"
+            git show "${DEST_SHA}:${path}" > /tmp/chlom-destination-readback.mdx
+            actual="$(sha256sum /tmp/chlom-destination-readback.mdx | awk '{print $1}')"
+            test "$expected" = "$actual"
+          done
+          echo "sha=$DEST_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Acknowledge destination commit
         if: steps.claim.outputs.count != '0' && success()
         shell: bash
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
-          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+          COMMIT_SHA: ${{ steps.readback.outputs.sha }}
         run: |
           set -euo pipefail
           ids="$(cat /tmp/chlom-command-ids.json)"
+          test -n "$COMMIT_SHA"
           jq -n --argjson ids "$ids" --arg sha "$COMMIT_SHA" \
             '{action:"ack",command_ids:$ids,commit_sha:$sha}' > /tmp/chlom-ack-body.json
           curl --fail --silent --show-error \
