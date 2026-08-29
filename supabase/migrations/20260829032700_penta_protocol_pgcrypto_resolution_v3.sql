@@ -19,3 +19,7 @@ $$;
 
 revoke all on function public.penta_protocol_sha256_v1(jsonb) from public, anon, authenticated;
 grant execute on function public.penta_protocol_sha256_v1(jsonb) to service_role;
+
+-- The compatibility shim is needed only across the ordered migration window above.
+-- Remove it once the stable hash function is explicitly bound to extensions.digest.
+drop function if exists public.digest(bytea,text);
