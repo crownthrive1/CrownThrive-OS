@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m json.tool .pentarelease/policy.json >/dev/null
-          python3 -m py_compile scripts/pentarelease/release_surface.py
+          python3 -m py_compile scripts/pentarelease/release_surface.py scripts/pentadocs_quality.py scripts/validate_docs.py
           python3 -m unittest tests.test_pentarelease_release_surface tests.test_pentarelease_workflow_contract
           test "$(jq -r '.release_surface.enabled' .pentarelease/policy.json)" = "true"
           test "$(jq -r '.release_surface.max_repository_surfaces' .pentarelease/policy.json)" -le 7
@@ -180,6 +180,13 @@ jobs:
             --outdir dist/pentarelease-surface \
             "${EXTRA[@]}"
 
+          # Release-surface pages must be normalized into the current PentaDocs
+          # contract before any governed branch can be created.
+          if [ "$LOCAL_READY" != "true" ]; then
+            python3 scripts/pentadocs_quality.py --apply
+            python3 scripts/validate_docs.py
+          fi
+
           for JSON in PENTARELEASE_RELEASE_RECORD.json PENTARELEASE_COSTS.json PENTARELEASE_CIE_SCORE.json PENTARELEASE_DATA_CATALOG.json PENTARELEASE_EVIDENCE.json; do
             python3 -m json.tool "dist/pentarelease-surface/$JSON" >/dev/null
           done
@@ -263,6 +270,7 @@ jobs:
           git checkout -b "$BRANCH"
           git add \
             .pentarelease/state/release-surface.json \
+            data/documentation/pentadocs-page-profiles.v1.json \
             docs.json \
             README.md ABOUT_ME.md LICENSE CODE_OF_CONDUCT.md PARTNERS.md FAQ.md CHANGELOG.md \
             pentarelease/latest.mdx pentarelease/faq.mdx pentarelease/changelog.mdx \
@@ -337,6 +345,13 @@ jobs:
             if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" = "success" ]; then
               pr_success=true
               break
+            fi
+            if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" = "action_required" ]; then
+              echo "::warning title=PentaRelease provider identity HOLD::GitHub Actions recursive identity prevented PR workflow execution. The exact governed branch and PR remain preserved for an authorized repository event identity."
+              echo "promotion_state=HOLD_PR_PROVIDER_IDENTITY" >> "$GITHUB_OUTPUT"
+              echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+              echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+              exit 0
             fi
             if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" != "success" ]; then
               echo "PentaRelease surface HOLD: PR-specific governed gate did not pass ($RUN_CONCLUSION)." >&2

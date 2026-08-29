@@ -1,0 +1,12 @@
+-- CrownThrive OS / PentaFactory™ Daily Agent Fleet 10x100 v1
+-- Governed source manifest for the production migration applied to ThriveBase on 2026-08-28.
+-- The executable contract is intentionally split into bounded sequential migration fragments:
+--   20260828150001 ... core
+--   20260828150002 ... entity materializer
+--   20260828150003 ... lifecycle and status
+--   20260828150004 ... daily tick
+--   20260828150005 ... schedule and permissions
+--   20260828150100 ... service-role-only RLS
+--   20260828150200 ... FK-supporting indexes
+-- Production authority: D0-D2 autonomous exact-evidence; D3 human-reserved.
+select 'ct.pentafactory.daily-agent-fleet.10x100.v1'::text as governed_source_manifest;

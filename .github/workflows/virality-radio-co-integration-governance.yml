@@ -1,0 +1,155 @@
+name: Virality Music Radio.co Integration Governance
+
+on:
+  pull_request:
+    paths:
+      - "integrations/radio-co/virality-music/**"
+      - ".github/workflows/virality-radio-co-integration-governance.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "integrations/radio-co/virality-music/**"
+      - ".github/workflows/virality-radio-co-integration-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Radio.co institutional contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Parse institutional JSON contracts
+        run: |
+          python -m json.tool integrations/radio-co/virality-music/provider.json >/dev/null
+          python -m json.tool integrations/radio-co/virality-music/station-identity.json >/dev/null
+          python -m json.tool integrations/radio-co/virality-music/public-projection.json >/dev/null
+          python -m json.tool integrations/radio-co/virality-music/verification-contract.json >/dev/null
+          python -m json.tool integrations/radio-co/virality-music/consumer-bindings.json >/dev/null
+          python -m json.tool integrations/radio-co/virality-music/readback-receipts/2026-08-29T001013Z.json >/dev/null
+      - name: Compile public readback verifier
+        run: python -m py_compile integrations/radio-co/virality-music/verify_public_readback.py
+      - name: Validate identity projection and security invariants
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("integrations/radio-co/virality-music")
+          provider = json.loads((root / "provider.json").read_text())
+          identity = json.loads((root / "station-identity.json").read_text())
+          projection = json.loads((root / "public-projection.json").read_text())
+          contract = json.loads((root / "verification-contract.json").read_text())
+          bindings = json.loads((root / "consumer-bindings.json").read_text())
+          receipt = json.loads((root / "readback-receipts/2026-08-29T001013Z.json").read_text())
+
+          integration_id = "virality-music.radio-co.s0831f6c44"
+          station_id = "s0831f6c44"
+          station_name = "Backroad FM"
+          integration_label = "Virality Music Website Demo"
+
+          assert provider["integration"]["id"] == integration_id
+          for document in (projection, contract, bindings, receipt):
+              assert document["integration_id"] == integration_id
+
+          assert provider["integration"]["station_id"] == station_id
+          assert identity["station_id"] == station_id
+          assert projection["station_id"] == station_id
+          assert contract["station_id"] == station_id
+          assert receipt["station_id"] == station_id
+
+          assert provider["integration"]["provider_station_name"] == station_name
+          assert identity["provider_reported_name"] == station_name
+          assert projection["station_name"] == station_name
+          assert receipt["required_checks"]["station_metadata"]["provider_reported_name"] == station_name
+          assert bindings["bindings"][0]["provider_station_identity"] == station_name
+
+          assert provider["integration"]["display_name"] == integration_label
+          assert provider["integration"]["display_name_semantics"] == "consumer_widget_label"
+          assert identity["relationship"]["consumer_integration_label"] == integration_label
+          assert projection["integration_label"] == integration_label
+          assert bindings["bindings"][0]["consumer_integration_label"] == integration_label
+
+          assert provider["live_broadcast"]["password_secret_ref"] == "RADIOCO_VIRALITY_LIVE_BROADCAST_PASSWORD"
+          assert provider["live_broadcast"]["secret_ref_semantics"] == "compatibility_key_do_not_rename_without_runtime_migration"
+
+          projection_text = json.dumps(projection)
+          identity_text = json.dumps(identity)
+          receipt_text = json.dumps(receipt)
+          secret_ref = "RADIOCO_VIRALITY_LIVE_BROADCAST_PASSWORD"
+          assert secret_ref not in projection_text
+          assert secret_ref not in identity_text
+          assert secret_ref not in receipt_text
+          assert "live_broadcast" not in projection
+          assert projection["consumer_policy"]["contains_credentials"] is False
+          assert projection["consumer_policy"]["contains_live_broadcast_secret_reference"] is False
+
+          assert receipt["overall_state"] == "verified"
+          assert receipt["security"]["secret_accessed"] is False
+          assert receipt["security"]["provider_mutated"] is False
+          assert receipt["interpretation"]["credential_rotation_verified"] is False
+          assert receipt["interpretation"]["website_consumer_deployment_verified"] is False
+
+          required = {item["id"] for item in contract["checks"] if item["class"] == "required"}
+          assert required == {"station_metadata", "station_status"}
+          assert contract["security"]["may_read_live_broadcast_secret"] is False
+          assert contract["security"]["may_mutate_provider_state"] is False
+
+          for item in contract["checks"]:
+              assert item["method"] == "GET"
+              assert item["url"].startswith("https://public.radio.co/")
+
+          binding = bindings["bindings"][0]
+          assert bindings["tracking_issue"] == 742
+          assert binding["projection_source"] == "public-projection.json"
+          assert binding["control_plane_state"] in {"unbound", "bound", "verified"}
+          PY
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
+
+  public-readback:
+    name: Read back Radio.co public provider state
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Execute secret-free provider readback
+        run: python integrations/radio-co/virality-music/verify_public_readback.py --output radio-co-readback.json
+      - name: Show evidence digest
+        if: always()
+        run: |
+          if [ -f radio-co-readback.json ]; then
+            cat radio-co-readback.json
+          fi
+      - name: Retain provider readback evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: virality-radio-co-readback-${{ github.run_id }}
+          path: radio-co-readback.json
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
+          overwrite: false
+          include-hidden-files: false

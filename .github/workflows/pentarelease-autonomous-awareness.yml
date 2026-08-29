@@ -70,8 +70,15 @@ jobs:
         run: |
           set -euo pipefail
           jq -r '.changed_files[]' "$DECISION_FILE" > /tmp/changed-files.txt
-          if grep -Eiq '(^|/)(\.env($|\.)|secrets?($|/)|credentials?($|/)|vault($|/)|private[-_]?keys?($|/)|.*\.(pem|p12|pfx|key)$)' /tmp/changed-files.txt; then
+
+          # Checked-in public templates are not secret-bearing files. Keep real
+          # environment files, credential stores, vaults, and key material fail-closed.
+          grep -Eiv '(^|/)\.env\.(example|sample|template)$' /tmp/changed-files.txt \
+            > /tmp/secret-scan-files.txt || true
+          SENSITIVE=$(grep -Ei '(^|/)(\.env($|\.)|secrets?($|/)|credentials?($|/)|vault($|/)|private[-_]?keys?($|/)|.*\.(pem|p12|pfx|key)$)' /tmp/secret-scan-files.txt || true)
+          if [ -n "$SENSITIVE" ]; then
             echo 'PentaRelease HOLD: prohibited secret-bearing path detected.' >&2
+            printf '%s\n' "$SENSITIVE" >&2
             exit 43
           fi
 

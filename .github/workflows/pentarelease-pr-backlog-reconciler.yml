@@ -1,0 +1,105 @@
+name: PentaRelease — PR Backlog Reconciler
+
+on:
+  release:
+    types: [published]
+  workflow_run:
+    workflows:
+      - "PentaRelease — Autonomous Release Awareness"
+      - "PentaRelease — Comprehensive Release Surface"
+    types: [completed]
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pentarelease-pr-backlog-reconciler
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retire provider-proven PentaRelease PR shells
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REPO="$GITHUB_REPOSITORY"
+          LATEST=$(gh release list --repo "$REPO" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
+          if [ -z "$LATEST" ]; then
+            echo 'No published release exists; nothing may be retired.'
+            exit 0
+          fi
+
+          gh release view "$LATEST" --repo "$REPO" --json tagName,isDraft,isPrerelease,url >/tmp/pentarelease-latest.json
+          test "$(jq -r '.isDraft' /tmp/pentarelease-latest.json)" = "false"
+          test "$(jq -r '.isPrerelease' /tmp/pentarelease-latest.json)" = "false"
+
+          gh pr list --repo "$REPO" --state open --limit 100 \
+            --json number,title,headRefName > /tmp/pentarelease-open-prs.json
+
+          retired=0
+          while IFS=$'\t' read -r number title head; do
+            [ -n "$number" ] || continue
+
+            case "$head" in
+              pentarelease/auto-*)
+                version=${title#PentaRelease autonomous release }
+                tag="v${version#v}"
+                if ! gh release view "$tag" --repo "$REPO" --json tagName,isDraft,isPrerelease,assets >/tmp/pentarelease-candidate.json 2>/dev/null; then
+                  echo "KEEP #$number: no provider release readback for $tag"
+                  continue
+                fi
+                test "$(jq -r '.isDraft' /tmp/pentarelease-candidate.json)" = "false"
+                test "$(jq -r '.isPrerelease' /tmp/pentarelease-candidate.json)" = "false"
+                jq -e '[.assets[].name] | index("MANIFEST.json") != null' /tmp/pentarelease-candidate.json >/dev/null
+                jq -e '[.assets[].name] | index("RELEASE_NOTES.md") != null' /tmp/pentarelease-candidate.json >/dev/null
+                ;;
+
+              pentarelease/surface-*)
+                tag=${title#PentaRelease comprehensive surface }
+                if ! gh release view "$tag" --repo "$REPO" --json tagName,isDraft,isPrerelease,assets >/tmp/pentarelease-candidate.json 2>/dev/null; then
+                  echo "KEEP #$number: no provider release readback for $tag"
+                  continue
+                fi
+                test "$(jq -r '.isDraft' /tmp/pentarelease-candidate.json)" = "false"
+                test "$(jq -r '.isPrerelease' /tmp/pentarelease-candidate.json)" = "false"
+                jq -e '[.assets[].name] | index("PENTARELEASE_COMPREHENSIVE_RELEASE.md") != null' /tmp/pentarelease-candidate.json >/dev/null
+                jq -e '[.assets[].name] | index("PENTARELEASE_EVIDENCE.json") != null' /tmp/pentarelease-candidate.json >/dev/null
+                ;;
+
+              *)
+                continue
+                ;;
+            esac
+
+            author=$(gh api "repos/$REPO/pulls/$number" --jq '.user.login // empty')
+            if [ "$author" != "github-actions[bot]" ]; then
+              echo "KEEP #$number: provider REST author is '$author', not github-actions[bot]."
+              continue
+            fi
+
+            NOTE="PentaRelease reconciler: provider readback proves $tag is published and its required evidence assets exist. Provider REST identity also proves this generated PR was authored by github-actions[bot]. This release shell is therefore retired to prevent backlog; branch protection and release evidence remain unchanged."
+            gh pr close "$number" --repo "$REPO" --comment "$NOTE" --delete-branch
+            echo "RETIRED #$number ($tag)"
+            retired=$((retired + 1))
+          done < <(jq -r '.[] | [.number,.title,.headRefName] | @tsv' /tmp/pentarelease-open-prs.json)
+
+          {
+            echo '## PentaRelease PR backlog reconciliation'
+            echo
+            echo "- Trigger: $GITHUB_EVENT_NAME"
+            echo "- Latest published release: $LATEST"
+            echo "- Generated PR shells retired: $retired"
+            echo '- Safety invariant: no release PR is retired without provider release + required-asset readback.'
+            echo '- Generated-PR identity is verified from the provider REST pull-request record.'
+            echo '- Upstream workflow conclusion is advisory only; provider evidence is authoritative for cleanup.'
+            echo '- Main-branch rules are not bypassed or weakened.'
+          } >> "$GITHUB_STEP_SUMMARY"

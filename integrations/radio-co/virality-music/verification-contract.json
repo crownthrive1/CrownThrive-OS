@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0.0",
+  "integration_id": "virality-music.radio-co.s0831f6c44",
+  "station_id": "s0831f6c44",
+  "purpose": "secret-free provider readback and drift detection",
+  "security": {
+    "public_network_only": true,
+    "may_read_live_broadcast_secret": false,
+    "may_emit_credentials": false,
+    "may_mutate_provider_state": false
+  },
+  "checks": [
+    {
+      "id": "station_metadata",
+      "class": "required",
+      "method": "GET",
+      "url": "https://public.radio.co/api/v2/s0831f6c44",
+      "expected_http": [200],
+      "expect_json": true,
+      "required_json_paths": ["data.name", "data.streaming_links"]
+    },
+    {
+      "id": "station_status",
+      "class": "required",
+      "method": "GET",
+      "url": "https://public.radio.co/api/v2/s0831f6c44/status",
+      "expected_http": [200],
+      "expect_json": true,
+      "required_json_paths": ["data.status"],
+      "allowed_values": {
+        "data.status": ["onair", "offair"]
+      }
+    },
+    {
+      "id": "current_track",
+      "class": "observational",
+      "method": "GET",
+      "url": "https://public.radio.co/api/v2/s0831f6c44/track/current",
+      "expected_http": [200, 404],
+      "expect_json": true
+    },
+    {
+      "id": "next_track",
+      "class": "observational",
+      "method": "GET",
+      "url": "https://public.radio.co/api/v2/s0831f6c44/track/next",
+      "expected_http": [200, 404],
+      "expect_json": true
+    },
+    {
+      "id": "track_history",
+      "class": "observational",
+      "method": "GET",
+      "url": "https://public.radio.co/api/v2/s0831f6c44/track/history?limit=20&hours=24",
+      "expected_http": [200, 404],
+      "expect_json": true
+    }
+  ],
+  "drift_rules": [
+    "required_check_transport_or_schema_failure_blocks provider_readback_verified",
+    "station_status_outside_onair_offair_is_contract_drift",
+    "station_metadata_streaming_links_should_be_reconciled_with_provider.json listen_links before changing canonical endpoints",
+    "observational_track_404_does_not_by_itself declare station failure",
+    "no readback result may be interpreted as proof that the live-broadcast credential is valid or rotated"
+  ],
+  "evidence": {
+    "minimum_fields": [
+      "checked_at",
+      "integration_id",
+      "station_id",
+      "overall_state",
+      "checks"
+    ],
+    "allowed_overall_states": [
+      "verified",
+      "degraded",
+      "unverified"
+    ]
+  }
+}

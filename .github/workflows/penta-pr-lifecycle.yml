@@ -1,20 +1,19 @@
-name: Penta PR Lifecycle
+name: Penta PR Lifecycle — Manual Compatibility
 
 on:
-  pull_request_target:
-    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft, closed]
-  schedule:
-    - cron: '7 * * * *'
-    - cron: '27 * * * *'
-    - cron: '47 * * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: pr, merge, closer, or auto
-        required: false
-        default: auto
+        description: Manual recovery authority: pr, merge, or closer
+        required: true
+        default: pr
+        type: choice
+        options:
+          - pr
+          - merge
+          - closer
       number:
-        description: Optional pull request number
+        description: Optional pull request number; blank performs a bounded repository sweep
         required: false
         default: ''
 
@@ -27,48 +26,9 @@ permissions:
   actions: read
 
 jobs:
-  select:
-    runs-on: ubuntu-latest
-    outputs:
-      mode: ${{ steps.pick.outputs.mode }}
-      number: ${{ steps.pick.outputs.number }}
-    steps:
-      - id: pick
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
-          REQUESTED_MODE: ${{ github.event.inputs.mode }}
-          REQUESTED_NUMBER: ${{ github.event.inputs.number }}
-          EVENT_SCHEDULE: ${{ github.event.schedule }}
-        run: |
-          set -euo pipefail
-          if [[ "$EVENT_NAME" == "pull_request_target" ]]; then
-            mode=pr
-            number="${EVENT_PR_NUMBER:-}"
-          elif [[ -n "${REQUESTED_MODE:-}" && "$REQUESTED_MODE" != auto ]]; then
-            mode="$REQUESTED_MODE"
-            number="${REQUESTED_NUMBER:-}"
-          elif [[ "$EVENT_SCHEDULE" == '7 * * * *' ]]; then
-            mode=pr
-            number=''
-          elif [[ "$EVENT_SCHEDULE" == '27 * * * *' ]]; then
-            mode=merge
-            number=''
-          elif [[ "$EVENT_SCHEDULE" == '47 * * * *' ]]; then
-            mode=closer
-            number=''
-          else
-            mode=pr
-            number="${REQUESTED_NUMBER:-}"
-          fi
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "number=$number" >> "$GITHUB_OUTPUT"
-
   run:
-    needs: select
     uses: ./.github/workflows/penta-pr-lifecycle-reusable.yml
     with:
-      mode: ${{ needs.select.outputs.mode }}
-      number: ${{ needs.select.outputs.number }}
+      mode: ${{ github.event.inputs.mode }}
+      number: ${{ github.event.inputs.number }}
     secrets: inherit

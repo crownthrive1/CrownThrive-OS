@@ -1,0 +1,98 @@
+{
+  "contract": "ct.pentamarketer.locticians.dynamic-outreach.v3",
+  "version": "3.1.0",
+  "status": "production",
+  "campaign": "ct.pentamarketer.locticians.claim.20260827.v1",
+  "provider_authority": "ct.locticians.brilliant-directories.api-fabric.v3",
+  "authority_rule": "bd_reference_never_creates_execution_authority",
+  "renderer": {
+    "public_interface": "crm.penta_marketer_locticians_v3_render_v1(uuid)",
+    "output": ["subject", "preheader", "text", "html", "profile_url", "cta_url", "coupon_code", "persona_id", "provider_contract", "personalization_basis"],
+    "html_max_bytes": 120000,
+    "plain_text_required": true,
+    "dynamic": true
+  },
+  "offer": {
+    "offer_ref": "locticians.claimmonth50.v1",
+    "coupon_code": "CLAIMMONTH50",
+    "cta_context_parameter": "ct_offer=CLAIMMONTH50",
+    "automatic_checkout_redemption_claimed": false,
+    "copy_source": "canonical_safe_offer_registry"
+  },
+  "persona": {
+    "default": "ct.persona.locticians.member-success.avery.v1",
+    "transport_identity_source": "PentaMail governed sender identity registry"
+  },
+  "transport": {
+    "owner": "PentaMail",
+    "dispatch_edge": "penta-mail-marketer-dispatch:v6",
+    "mailgun_edge": "mailgun-relay-control:v19",
+    "multipart_html": true,
+    "provider_adaptive": true,
+    "suppression_required": true,
+    "one_click_unsubscribe": true,
+    "provider_receipt_required": true
+  },
+  "reference_redundancy": {
+    "primary": "crownthrive1/brilliant-directories-mcp",
+    "fallback": "brilliantdirectories/brilliant-directories-mcp",
+    "execution_authority": false,
+    "live_probe": "integration_control.locticians_bd_reference_live_probe_v3()",
+    "daily_receipt": "integration_control.locticians_bd_reference_daily_receipt_v3()",
+    "cron": "ct-locticians-bd-reference-daily-v3",
+    "cron_schedule_utc": "31 6 * * *",
+    "upstream_follow": {
+      "workflow": ".github/workflows/crownthrive-upstream-follow.yml",
+      "cadence": "6h",
+      "mode": "overlay_aware_governed_pr",
+      "force_push": false,
+      "merge_directly_from_upstream": false,
+      "pre_overlay_common_sha": "04db35bd62597979abeed701d3d75a9a8408fe78",
+      "fork_overlay_merge_sha": "2d44d6d1650f43ea73b63cdd78c4259b2bd565f1"
+    }
+  },
+  "provider_failover": {
+    "state": "WARM_PRIMARY_CUSTODY_REDUNDANT",
+    "router": "locticians-bd-router-v2:v2/runtime-3.0.0",
+    "primary_lane": "ct.locticians.bd.hot.a.v3",
+    "selector": "integration_control.locticians_bd_select_warm_credential_v3(text)",
+    "reconcile": "integration_control.locticians_bd_warm_failover_reconcile_v3()",
+    "status": "integration_control.locticians_bd_warm_failover_status_v3()",
+    "daily_receipt": "integration_control.locticians_bd_warm_failover_daily_receipt_v3()",
+    "reconcile_cron": "ct-locticians-bd-failover-reconcile-v3",
+    "daily_receipt_cron": "ct-locticians-bd-failover-daily-v3",
+    "primary_provider_canary_http_status": 200,
+    "same_credential_custody_copies": 2,
+    "independent_candidates": [
+      {"provider_key_id": 13, "provider_key_name": "PentaMailer", "target_lane": "ct.locticians.bd.hot.b.v3", "state": "provider_issued_unbound"},
+      {"provider_key_id": 14, "provider_key_name": "PentaMailer 2", "target_lane": "ct.locticians.bd.cold.reserve.v3", "state": "provider_issued_unbound"}
+    ],
+    "independent_standbys_ready": 0,
+    "promotion_rule": "distinct_vault_material_plus_provider_read_canary",
+    "vault_alias_failure_may_use_same_credential_copy": true,
+    "provider_auth_failure_requires_distinct_verified_standby": true,
+    "shared_provider_quota": true,
+    "switch_on_429": false,
+    "switch_on_quota": false,
+    "switch_on_provider_global_cooldown": false
+  },
+  "skills": [
+    "penta.skill.locticians.dynamic-outreach.v3",
+    "penta.skill.brilliant-directories.reference-v3"
+  ],
+  "custody": {
+    "public_contract": "CrownThrive-OS",
+    "restricted_implementation": "PRIVATE-PentaOS",
+    "chlom_asset": "ct.asset.pentamarketer.locticians.dynamic-outreach-v3",
+    "vaulted_capability": "ct.capability.pentamarketer.locticians.render-v3",
+    "raw_credentials_in_repository": false
+  },
+  "safety": {
+    "fake_scarcity": false,
+    "invented_public_facts": false,
+    "d3_bypass": false,
+    "rate_limit_key_hopping": false,
+    "suppression_bypass": false,
+    "fail_closed": true
+  }
+}

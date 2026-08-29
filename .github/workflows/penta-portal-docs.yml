@@ -1,0 +1,166 @@
+name: Penta Portal Docs
+
+on:
+  push:
+    branches:
+      - "admin-mcp/penta-portal-*"
+      - "admin-mcp/pentadocs-*"
+    paths:
+      - "scripts/penta_portal_docs.py"
+      - "scripts/penta_portal_finalize.py"
+      - "scripts/penta_operational_knowledge.py"
+      - "scripts/penta_operational_knowledge_entrypoint.py"
+      - "scripts/pentagonal_reference_*.py"
+      - "tests/test_penta_portal_docs.py"
+      - "tests/test_penta_operational_knowledge.py"
+      - "tests/test_pentagonal_reference_suite.py"
+      - "data/penta/**"
+      - "data/documentation/pentadocs-page-profiles.v1.json"
+      - "penta/registry/**"
+      - "runtime/penta_families.py"
+      - "PENTA-FAMILY-REGISTRY.md"
+      - "PENTA-PORTAL-STANDARD.md"
+      - "PENTAGONAL-KNOWLEDGE-STANDARD.md"
+      - "PENTAGONAL-FULL-SUITE-SPECIFICATION.md"
+      - "pentas.mdx"
+      - "pentas/**"
+      - "docs.json"
+      - ".github/workflows/penta-portal-docs.yml"
+  pull_request:
+    paths:
+      - "scripts/penta_portal_docs.py"
+      - "scripts/penta_portal_finalize.py"
+      - "scripts/penta_operational_knowledge.py"
+      - "scripts/penta_operational_knowledge_entrypoint.py"
+      - "scripts/pentagonal_reference_*.py"
+      - "tests/test_penta_portal_docs.py"
+      - "tests/test_penta_operational_knowledge.py"
+      - "tests/test_pentagonal_reference_suite.py"
+      - "data/penta/**"
+      - "data/documentation/pentadocs-page-profiles.v1.json"
+      - "penta/registry/**"
+      - "runtime/penta_families.py"
+      - "PENTA-FAMILY-REGISTRY.md"
+      - "PENTA-PORTAL-STANDARD.md"
+      - "PENTAGONAL-KNOWLEDGE-STANDARD.md"
+      - "PENTAGONAL-FULL-SUITE-SPECIFICATION.md"
+      - "pentas.mdx"
+      - "pentas/**"
+      - "docs.json"
+      - ".github/workflows/penta-portal-docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Generate raw Penta namespace projection
+        run: python scripts/penta_portal_docs.py --write
+      - name: Finalize governed PentaDocs corpus
+        run: python scripts/penta_portal_finalize.py --apply
+      - name: Generate operational and agent knowledge
+        run: python scripts/penta_operational_knowledge_entrypoint.py --apply
+      - name: Generate Pentagonal reference and paper suite
+        run: python scripts/pentagonal_reference_suite.py --apply
+      - name: Validate Pentagonal full-suite ingestion contract
+        run: |
+          test -s PENTAGONAL-FULL-SUITE-SPECIFICATION.md
+          python -m json.tool data/penta/pentagonal-ingestion-contract.v1.json >/dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('data/penta/pentagonal-ingestion-contract.v1.json').read_text())
+          required = {'boot_order','routing_pipeline','execution_gate','forbidden_inferences','evidence_minimum','penta_record_minimum'}
+          missing = sorted(required - set(p))
+          if missing:
+              raise SystemExit(f'missing ingestion contract keys: {missing}')
+          if len(p['boot_order']) < 8 or len(p['routing_pipeline']) < 12 or len(p['penta_record_minimum']) < 30:
+              raise SystemExit('Pentagonal ingestion contract is shallow')
+          PY
+      - name: Validate complete Penta knowledge system
+        run: |
+          python scripts/penta_portal_finalize.py --check
+          python scripts/penta_operational_knowledge_entrypoint.py --check
+          python scripts/pentagonal_reference_suite.py --check
+          python -m unittest tests.test_penta_portal_docs tests.test_penta_operational_knowledge tests.test_pentagonal_reference_suite
+          python scripts/validate_docs.py
+          python runtime/penta_families.py --portal-index > /tmp/penta-families.json
+          git diff --check
+      - name: Commit deterministic documentation projection
+        run: |
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          git config user.name "CrownThrive PentaDocs"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- \
+            docs.json \
+            data/penta/namespace-census.v1.json \
+            data/penta/operational-knowledge.v1.json \
+            data/penta/agent-knowledge.v1.json \
+            data/penta/agent-knowledge.v1.jsonl \
+            data/penta/pentagonal-reference.v1.json \
+            data/penta/pentagonal-reference.v1.jsonl \
+            data/penta/pentagonal-ingestion-contract.v1.json \
+            data/documentation/pentadocs-page-profiles.v1.json \
+            PENTAGONAL-FULL-SUITE-SPECIFICATION.md \
+            pentas.mdx \
+            pentas \
+            changelog/penta-portal-full-census-2026-08-28.mdx
+          if git diff --cached --quiet; then
+            echo "Penta knowledge system already converged."
+            exit 0
+          fi
+          git commit -m "docs(penta): generate Pentagonal reference suite"
+          git push origin HEAD:${GITHUB_REF_NAME}
+
+  verify:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Validate Pentagonal full-suite ingestion contract
+        run: |
+          test -s PENTAGONAL-FULL-SUITE-SPECIFICATION.md
+          python -m json.tool data/penta/pentagonal-ingestion-contract.v1.json >/dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('data/penta/pentagonal-ingestion-contract.v1.json').read_text())
+          required = {'boot_order','routing_pipeline','execution_gate','forbidden_inferences','evidence_minimum','penta_record_minimum'}
+          missing = sorted(required - set(p))
+          if missing:
+              raise SystemExit(f'missing ingestion contract keys: {missing}')
+          if len(p['boot_order']) < 8 or len(p['routing_pipeline']) < 12 or len(p['penta_record_minimum']) < 30:
+              raise SystemExit('Pentagonal ingestion contract is shallow')
+          PY
+      - name: Verify deterministic governed knowledge corpus
+        run: |
+          python scripts/penta_portal_finalize.py --check
+          python scripts/penta_operational_knowledge_entrypoint.py --check
+          python scripts/pentagonal_reference_suite.py --check
+          python -m unittest tests.test_penta_portal_docs tests.test_penta_operational_knowledge tests.test_pentagonal_reference_suite
+          python scripts/validate_docs.py
+          python runtime/penta_families.py --portal-index > /tmp/penta-families.json
+          git diff --check

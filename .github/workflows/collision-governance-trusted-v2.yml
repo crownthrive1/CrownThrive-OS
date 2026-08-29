@@ -34,13 +34,67 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_EVENT_ACTION: ${{ github.event.action }}
         shell: bash
-        run: >-
-          python3 scripts/governed_collision_agent_v2.py
-          --repository "${{ github.repository }}"
-          --branch "${{ github.event.pull_request.base.ref }}"
-          --candidate "${{ github.event.pull_request.number }}"
-          --output collision-governance-v2-report.json
-          --fail-on-severity 2
+        run: |
+          set -euo pipefail
+          attempt=1
+          max_attempts=3
+          fail_threshold=2
+          while true; do
+            report="collision-governance-v2-report-attempt-${attempt}.json"
+            set +e
+            python3 scripts/governed_collision_agent_v2.py \
+              --repository "${{ github.repository }}" \
+              --branch "${{ github.event.pull_request.base.ref }}" \
+              --candidate "${{ github.event.pull_request.number }}" \
+              --output "$report" \
+              --fail-on-severity 2
+            status=$?
+            set -e
+
+            cp "$report" collision-governance-v2-report.json
+            if [[ "$status" -eq 0 ]]; then
+              echo "Collision preflight passed on attempt ${attempt}."
+              exit 0
+            fi
+
+            retryable=$(python3 - "$report" "$fail_threshold" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              report = json.load(fh)
+          fail_threshold = int(sys.argv[2])
+
+          decision = report.get("decision") or {}
+          codes = set(decision.get("reason_codes") or [])
+          collisions = report.get("collisions") or []
+          inspection_errors = report.get("inspection_errors") or {}
+          main_stable = report.get("main_sha_start") == report.get("main_sha_end")
+          candidate_stable = report.get("candidate_head_start") == report.get("candidate_head_end")
+          material_collisions = [
+              item for item in collisions
+              if int(item.get("severity") or 0) >= fail_threshold
+          ]
+          retryable = (
+              "snapshot_changed_during_evaluation" in codes
+              and not material_collisions
+              and not inspection_errors
+              and main_stable
+              and candidate_stable
+          )
+          print("true" if retryable else "false")
+          PY
+          )
+
+            if [[ "$retryable" != "true" || "$attempt" -ge "$max_attempts" ]]; then
+              echo "Collision preflight remains fail-closed: status=${status} retryable=${retryable} attempt=${attempt}/${max_attempts}."
+              exit "$status"
+            fi
+
+            echo "Transient collision snapshot fence changed during evaluation; preserving attempt ${attempt} and recomputing from fresh provider state."
+            sleep $((attempt * 2))
+            attempt=$((attempt + 1))
+          done
 
   trusted-main-reconciliation:
     name: Trusted main — continuous awareness and reaction

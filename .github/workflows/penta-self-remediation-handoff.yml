@@ -1,0 +1,101 @@
+name: PentaSELF Remediation Handoff
+
+on:
+  repository_dispatch:
+    types: [penta-self-remediation]
+  workflow_dispatch:
+    inputs:
+      finding_json:
+        description: "PentaSELF finding JSON payload"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: penta-self-remediation-${{ github.event.client_payload.finding.finding_id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  pentapr:
+    name: PentaPR remediation intake
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      issue_number: ${{ steps.handoff.outputs.issue_number }}
+      pr_number: ${{ steps.handoff.outputs.pr_number }}
+      finding_id: ${{ steps.handoff.outputs.finding_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Materialize bounded PentaSELF finding
+        env:
+          MANUAL_FINDING_JSON: ${{ inputs.finding_json }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          if os.environ.get("GITHUB_EVENT_NAME") == "repository_dispatch":
+              event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
+              payload = (event.get("client_payload") or {}).get("finding") or {}
+          else:
+              payload = json.loads(os.environ.get("MANUAL_FINDING_JSON") or "{}")
+          if not isinstance(payload, dict) or not payload.get("finding_id") or not payload.get("symptom"):
+              raise SystemExit("PentaSELF remediation payload requires finding_id and symptom")
+          Path("/tmp/penta-self-finding.json").write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+          PY
+      - id: handoff
+        name: PentaPR create or reconcile remediation PR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/penta_self_remediation_handoff.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --finding-file /tmp/penta-self-finding.json \
+            --base main
+
+  pentapm:
+    name: PentaPM assign remediation workers
+    needs: pentapr
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Materialize bounded PentaSELF finding
+        env:
+          MANUAL_FINDING_JSON: ${{ inputs.finding_json }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          if os.environ.get("GITHUB_EVENT_NAME") == "repository_dispatch":
+              event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
+              payload = (event.get("client_payload") or {}).get("finding") or {}
+          else:
+              payload = json.loads(os.environ.get("MANUAL_FINDING_JSON") or "{}")
+          if not isinstance(payload, dict) or not payload.get("finding_id") or not payload.get("symptom"):
+              raise SystemExit("PentaSELF remediation payload requires finding_id and symptom")
+          Path("/tmp/penta-self-finding.json").write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+          PY
+      - name: Reconcile complete PentaPM owner set
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/penta_pm_remediation_assign.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --finding-file /tmp/penta-self-finding.json \
+            --issue "${{ needs.pentapr.outputs.issue_number }}" \
+            --pr "${{ needs.pentapr.outputs.pr_number }}" \
+            --policy config/penta_pm_policy.json
