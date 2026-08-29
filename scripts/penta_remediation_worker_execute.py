@@ -325,7 +325,7 @@ def main() -> int:
         if current_head != item.get("head_sha"):
             adopt_pr(gh, sb, number)
             continue
-        result = sb.rpc("penta_remediation_execute_known_v2", {"p_execution_id": item["execution_id"]})
+        result = sb.rpc("penta_remediation_execute_known_v3", {"p_execution_id": item["execution_id"]})
         executed.append(result)
         finalize_pr(gh, sb, number)
 
