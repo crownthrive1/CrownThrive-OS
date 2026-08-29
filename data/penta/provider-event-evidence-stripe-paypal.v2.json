@@ -1,0 +1,63 @@
+{
+  "contract": "ct.provider-event-evidence.stripe-paypal.v2",
+  "version": "2.0.0",
+  "status": "production",
+  "stripe": {
+    "ingress_contract": "ct.stripe.institutional-event-ingress.v2",
+    "webhook_lanes": [
+      {
+        "lane": "thrivetickets",
+        "edge_function": "thrivetickets-stripe-webhook",
+        "former_failure": "HTTP 404",
+        "current_state": "resolved",
+        "signature_verification": "Stripe-Signature HMAC-SHA256",
+        "provider_endpoint_exact_readback": true
+      },
+      {
+        "lane": "sermon-toolkit",
+        "edge_function": "sermon-toolkit-stripe-webhook",
+        "compatibility_edge": "kjv-sermon-toolkit-stripe-webhook",
+        "former_failure": "HTTP 503",
+        "current_state": "resolved",
+        "signature_verification": "Stripe-Signature HMAC-SHA256",
+        "provider_endpoint_exact_readback": true
+      }
+    ],
+    "event_receipts": "integration_control.stripe_institutional_event_receipts_v2",
+    "dispatch_queue": "integration_control.stripe_event_dispatch_queue_v2",
+    "provider_reconciler": "integration_control.stripe_webhook_provider_reconcile_v2(boolean)",
+    "transport_probe": "integration_control.stripe_webhook_transport_probe_v2()",
+    "provider_event_backfill": "integration_control.stripe_provider_event_backfill_v2(integer)",
+    "health_reconciler": "integration_control.stripe_p0_health_state_reconcile_v2()",
+    "unsigned_payload_accepted": false,
+    "raw_payload_stored": false,
+    "provider_readback_receipts_are_real": true,
+    "synthetic_receipts": 0,
+    "resolution_rule": "transport reachable + exact provider endpoint + signed provider event"
+  },
+  "paypal": {
+    "contract": "ct.paypal.provider-event-evidence.v1",
+    "provider_event_backfill": "integration_control.paypal_provider_event_backfill_v1(integer)",
+    "event_receipts": "integration_control.paypal_institutional_event_receipts_v1",
+    "poll_receipts": "integration_control.paypal_event_poll_receipts_v1",
+    "provider_read_verified": true,
+    "webhook_signature_claimed": false,
+    "raw_payload_stored": false,
+    "synthetic_receipts": 0
+  },
+  "scheduled_reconciliation": [
+    "ct-stripe-webhook-transport-watch-v2",
+    "ct-stripe-provider-event-backfill-v2",
+    "ct-stripe-webhook-provider-reconcile-v2",
+    "ct-stripe-p0-health-reconcile-v2",
+    "ct-paypal-provider-event-backfill-v1"
+  ],
+  "governance": {
+    "event_ingress_is_not_money_movement": true,
+    "money_movement_authority": false,
+    "d3_bypass": false,
+    "provider_credentials_in_repository": false,
+    "idempotent_receipts": true,
+    "append_only_provider_evidence": true
+  }
+}
