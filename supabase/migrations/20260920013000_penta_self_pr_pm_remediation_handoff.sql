@@ -83,6 +83,7 @@ as $$
 declare
   v_problem penta_self.problem_ledger_v1%rowtype;
   v_payload jsonb;
+  v_material_state jsonb;
   v_sha text;
   v_queued integer := 0;
   v_changed integer := 0;
@@ -138,7 +139,26 @@ begin
       )
     );
 
-    v_sha := encode(extensions.digest(v_payload::text, 'sha256'), 'hex');
+    -- Volatile heartbeat/evidence timestamps remain in the payload for context but are
+    -- intentionally excluded from the handoff identity. Only material remediation
+    -- changes may requeue a problem and cause PentaPR/PentaPM to run again.
+    v_material_state := jsonb_build_object(
+      'problem_id', v_problem.problem_id::text,
+      'fingerprint', v_problem.fingerprint,
+      'category', v_problem.category,
+      'severity', v_problem.severity,
+      'priority', v_problem.priority,
+      'risk', coalesce(nullif(v_problem.authority_class,''), 'D1'),
+      'lane', penta_self.remediation_lane_v1(v_problem.category, v_problem.source_system),
+      'state', v_problem.state,
+      'target_ref', coalesce(v_problem.source_ref, v_problem.source_system, ''),
+      'symptom', coalesce(v_problem.title, v_problem.summary, 'PentaSELF persistent problem'),
+      'required_pentas', v_owner_array,
+      'handler_key', v_problem.handler_key,
+      'blocked_reason', v_problem.blocked_reason,
+      'auto_heal_allowed', v_problem.auto_heal_allowed
+    );
+    v_sha := encode(extensions.digest(v_material_state::text, 'sha256'), 'hex');
 
     insert into penta_self.remediation_handoffs_v1(
       problem_id, dedupe_key, state, payload, payload_sha256, next_attempt_at, queued_at, updated_at
