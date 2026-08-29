@@ -6,7 +6,7 @@ Owner brand: Virality Music
 Provider: Radio.co  
 Station ID: `s0831f6c44`
 
-This package institutionalizes the non-secret Radio.co configuration supplied for Virality Music. CrownThrive-OS carries the canonical integration contract, capability inventory, embed identifiers, public stream endpoints, and the logical secret reference. Provider credentials remain outside source control.
+This package institutionalizes the non-secret Radio.co configuration supplied for Virality Music. CrownThrive-OS carries the canonical integration contract, capability inventory, embed identifiers, public stream endpoints, public provider readback contract, and the logical secret reference. Provider credentials remain outside source control.
 
 ## Public embed inventory
 
@@ -54,6 +54,40 @@ Canonical link snippets:
 
 The M3U endpoint is preserved exactly as supplied by the provider. Do not silently rewrite its scheme without provider readback/verification.
 
+## Public provider readback
+
+Radio.co publishes secret-free station and playout readback endpoints. This package registers the station-specific endpoints in `provider.json` and codifies verification semantics in `verification-contract.json`.
+
+Registered readback includes:
+
+- station metadata and streaming-link readback
+- on-air/off-air status
+- current source
+- current track
+- next track
+- recent track history
+- legacy/full station status
+
+The required institutional checks are station metadata and station status. Track endpoints are observational: an accepted `404` from an optional track resource does not, by itself, declare the station unavailable.
+
+Run the secret-free verifier from this directory:
+
+```bash
+python3 verify_public_readback.py
+```
+
+Optional evidence file:
+
+```bash
+python3 verify_public_readback.py --output radio-co-readback.json
+```
+
+The verifier is deliberately restricted to HTTPS on `public.radio.co`, performs GET-only operations, does not read the broadcast credential, and does not mutate provider state. A failed required check produces `overall_state=unverified`; observational transport failures produce `overall_state=degraded`; required checks passing without observational failures produce `overall_state=verified`.
+
+## Public projection
+
+`public-projection.json` is the browser/downstream-safe projection of this provider binding. It contains the public widget sources, listening URLs, and selected public readback URLs, but excludes the live-broadcast credential and its secret reference. Downstream website, documentation, analytics, and agent consumers should prefer this projection when they do not need privileged broadcast configuration.
+
 ## Live broadcasting contract
 
 - Host: `s0831f6c44.dj.radio.co`
@@ -65,9 +99,9 @@ The live-broadcast password must be stored in the approved secret store and inje
 
 ## Provider documentation
 
-Radio.co custom branded player guidance:
-
-`https://help.radio.co/en/articles/899717-create-custom-branded-players`
+- Radio.co custom branded player guidance: `https://help.radio.co/en/articles/899717-create-custom-branded-players`
+- Radio.co playout API: `https://www.radio.co/api`
+- Radio.co Public API v2 contract: `https://developers-84608658bd058c817.radio.co/api-reference/openapi_specs/public-v2`
 
 ## Institutional awareness contract
 
@@ -80,25 +114,31 @@ The provider binding exposes these system capabilities to CrownThrive institutio
 - low-bandwidth mobile streaming
 - M3U/directory distribution
 - live broadcast ingest
+- public station readback
+- now-playing readback
+- track-history readback
 
-Only non-secret integration metadata may be projected to websites, documentation, registries, analytics, or downstream agents. Secrets remain represented by logical secret references only.
+Only non-secret integration metadata may be projected to websites, documentation, registries, analytics, or downstream agents. Secrets remain represented by logical secret references only in privileged configuration.
 
 ## Consumer rules
 
-1. Consumer surfaces may use the public stream URLs and embed script sources from `provider.json`.
-2. A page should select the appropriate player variant intentionally rather than assuming both player scripts belong in the same placement.
-3. Server-side/live-broadcast workloads resolve the logical secret reference at runtime.
-4. No consumer may substitute a cached plaintext password for the secret reference.
-5. Changes to station IDs, widget IDs, stream endpoints, or live host/port require provider readback and an update to this package.
-6. Public-site deployment and provider-side credential rotation are separate execution boundaries; this contract does not claim either occurred unless independently verified.
+1. Consumer surfaces may use the public stream URLs and embed script sources from `public-projection.json`.
+2. Privileged server-side consumers may resolve `provider.json`; public/browser consumers must not receive privileged credential configuration.
+3. A page should select the appropriate player variant intentionally rather than assuming both player scripts belong in the same placement.
+4. Server-side/live-broadcast workloads resolve the logical secret reference at runtime.
+5. No consumer may substitute a cached plaintext password for the secret reference.
+6. Changes to station IDs, widget IDs, stream endpoints, or live host/port require provider readback and an update to this package.
+7. Public-site deployment and provider-side credential rotation are separate execution boundaries; this contract does not claim either occurred unless independently verified.
 
 ## Verification checklist
 
-- Provider manifest parses as valid JSON.
+- `provider.json`, `public-projection.json`, and `verification-contract.json` parse as valid JSON.
+- `verify_public_readback.py` compiles and uses standard-library networking only.
 - Request, schedule, and player identifiers match the supplied Radio.co configuration.
 - Standard and mobile endpoints use HTTPS as supplied.
 - Playlist endpoint is retained exactly as supplied.
-- Secret value is absent from source control.
+- Public API endpoints align with Radio.co's published station/playout contract.
+- Secret value is absent from source control and public projection.
 - Secret logical key exists in the target runtime before live-broadcast activation.
 - Website placement is verified after deployment on the intended Virality Music surface.
 - Provider-side password rotation is completed after any credential exposure.
