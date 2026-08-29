@@ -19,8 +19,15 @@ class PentaReleaseAwarenessProviderRecoveryTests(unittest.TestCase):
         self.assertIn('gh_retry gh release upload', self.workflow)
         self.assertIn('READBACK=$(gh_retry gh release view', self.workflow)
 
+    def test_retry_exhaustion_preserves_the_failed_command_status(self):
+        self.assertIn('else\n                # Capture the failing command', self.workflow)
+        self.assertIn('rc=$?', self.workflow)
+        self.assertIn('return "$rc"', self.workflow)
+        self.assertNotIn('fi\n              rc=$?', self.workflow)
+
     def test_governance_stays_fail_closed(self):
         self.assertIn('PentaRelease HOLD: governed merge gate did not pass', self.workflow)
+        self.assertIn('PentaRelease HOLD: provider readback remained unavailable after bounded retry', self.workflow)
         self.assertIn('test "$success" = true', self.workflow)
         self.assertIn('D3/breaking-authority changes remain HOLD for human governance', self.workflow)
 
