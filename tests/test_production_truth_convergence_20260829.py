@@ -54,7 +54,6 @@ def test_pentamarketer_projection_is_event_ledger_authoritative() -> None:
     assert "event_ledger_authoritative" in lowered
     assert "mutable_summary_authority" in lowered
     assert "ct-pentamarketer-event-projection-v2" in lowered
-    assert "penta marketer" not in ""  # keep test file deterministic and import-only
 
 
 def test_no_secret_values_are_committed_by_truth_convergence() -> None:
