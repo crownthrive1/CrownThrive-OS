@@ -110,14 +110,43 @@ jobs:
           if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "repository_dispatch" || "${{ github.event_name }}" == "push" || "${{ github.event_name }}" == "issues" || "${{ github.event_name }}" == "release" ]]; then APPLY=true; fi
           echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
 
-      - name: Reconcile Projects v2 and milestones on trusted lanes
+      - id: provider
+        name: Reconcile Projects v2 and milestones on trusted lanes
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         run: |
           if [[ "${{ steps.mode.outputs.apply }}" == "true" ]]; then
             python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --apply
           else
             python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}"
           fi
+
+      - name: Classify trusted provider reconciliation outcome
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          PROVIDER_OUTCOME: ${{ steps.provider.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$PROVIDER_OUTCOME" == "success" ]]; then
+            echo "PentaPM provider reconciliation passed."
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('artifacts/penta-pm/latest.json')
+          if not path.exists():
+              raise SystemExit('PentaPM provider reconciliation failed without a receipt')
+          payload=json.loads(path.read_text())
+          holds=payload.get('holds') or []
+          provider=[h for h in holds if h.get('type') in {'projects_v2_provider_authority','project_item_provider_authority'}]
+          if not provider:
+              raise SystemExit('PentaPM provider reconciliation failed for an unclassified reason')
+          print('::warning::PentaPM is DEGRADED only for GitHub Projects v2 authority. Milestone and other repository-native reconciliation remains active; Projects retry on the next trusted cycle.')
+          for hold in provider:
+              print(f"::warning::{hold.get('type')}: {hold.get('message','provider authority unavailable')}")
+          PY
 
       - name: Upload immutable-style PentaPM receipt
         if: always()
