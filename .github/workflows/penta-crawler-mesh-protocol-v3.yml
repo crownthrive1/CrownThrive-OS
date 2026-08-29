@@ -6,11 +6,14 @@ on:
       - "supabase/migrations/20260829032500_penta_crawler_mesh_protocol_v3.sql"
       - "supabase/migrations/20260829032600_penta_discovery_packet_normalization_v3.sql"
       - "supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql"
+      - "supabase/migrations/20260829032800_pentas_cookie_capability_routing_v3.sql"
+      - "supabase/migrations/20260829032900_pentas_cookie_routing_failclosed_v3.sql"
       - "supabase/functions/penta-crawler/**"
       - "schemas/penta/penta-cookie-v1.schema.json"
       - "schemas/penta/pentas-packet-v1.schema.json"
       - "penta/crawler/**"
       - "tests/test_penta_crawler_mesh_protocol_v3.py"
+      - "tests/test_pentas_cookie_routing_v3.py"
       - ".github/workflows/penta-crawler-mesh-protocol-v3.yml"
   workflow_dispatch:
 
@@ -32,13 +35,20 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run PentaCrawler mesh contract tests
-        run: python -m unittest tests.test_penta_crawler_mesh_protocol_v3
+        run: python -m unittest tests.test_penta_crawler_mesh_protocol_v3 tests.test_pentas_cookie_routing_v3
       - name: Confirm Supabase pgcrypto schema binding
         shell: bash
         run: |
           set -euo pipefail
           grep -Fq 'extensions.digest' supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql
           grep -Fq 'set search_path = pg_catalog, public, extensions' supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql
+      - name: Confirm fail-closed cookie routing final state
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'else -1' supabase/migrations/20260829032900_pentas_cookie_routing_failclosed_v3.sql
+          grep -Fq 'v_effective_rank:=least(v_declared_rank,v_cookie_rank)' supabase/migrations/20260829032900_pentas_cookie_routing_failclosed_v3.sql
+          grep -Fq "when v_dead>0 and v_delivered>0 then 'held'" supabase/migrations/20260829032900_pentas_cookie_routing_failclosed_v3.sql
 
   public-safe-source:
     name: Public-safe source checks
@@ -55,7 +65,10 @@ jobs:
             supabase/migrations/20260829032500_penta_crawler_mesh_protocol_v3.sql
             supabase/migrations/20260829032600_penta_discovery_packet_normalization_v3.sql
             supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql
+            supabase/migrations/20260829032800_pentas_cookie_capability_routing_v3.sql
+            supabase/migrations/20260829032900_pentas_cookie_routing_failclosed_v3.sql
             penta/crawler/README.md
+            penta/crawler/PENTAS-ROUTING.md
           )
           if grep -Ein '(sk_live_[A-Za-z0-9]+|sk_test_[A-Za-z0-9]+|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----)' "${files[@]}"; then
             echo "Potential credential material detected in PentaCrawler v3 source." >&2
@@ -69,6 +82,8 @@ jobs:
             supabase/migrations/20260829032500_penta_crawler_mesh_protocol_v3.sql \
             supabase/migrations/20260829032600_penta_discovery_packet_normalization_v3.sql \
             supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql \
+            supabase/migrations/20260829032800_pentas_cookie_capability_routing_v3.sql \
+            supabase/migrations/20260829032900_pentas_cookie_routing_failclosed_v3.sql \
             supabase/functions/penta-crawler/index.ts; then
             echo "PentaCrawler v3 must reuse existing temporal fabric; duplicate clock found." >&2
             exit 1
