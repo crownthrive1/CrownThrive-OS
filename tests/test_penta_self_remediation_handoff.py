@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -96,6 +94,30 @@ class PentaSelfRemediationHandoffTests(unittest.TestCase):
 
     def test_owner_slug_is_deterministic(self) -> None:
         self.assertEqual(owner_slug("Penta Build / Recovery"), "penta-build-recovery")
+
+    def test_repository_dispatch_uses_single_finding_envelope(self) -> None:
+        workflow = Path(".github/workflows/penta-self-remediation-handoff.yml").read_text(encoding="utf-8")
+        migration = Path(
+            "supabase/migrations/20260920013100_penta_self_repository_dispatch_envelope_hotfix.sql"
+        ).read_text(encoding="utf-8")
+        self.assertIn("github.event.client_payload.finding.finding_id", workflow)
+        self.assertEqual(
+            workflow.count('(event.get("client_payload") or {}).get("finding") or {}'),
+            2,
+        )
+        self.assertIn("'client_payload',jsonb_build_object('finding',v_row.payload)", migration)
+        self.assertNotIn("'client_payload',v_row.payload", migration)
+
+    def test_resolved_or_nonpersistent_problems_are_not_replayed(self) -> None:
+        migration = Path(
+            "supabase/migrations/20260920013100_penta_self_repository_dispatch_envelope_hotfix.sql"
+        ).read_text(encoding="utf-8")
+        self.assertIn("'skipped'", migration)
+        self.assertIn("not replayed: PentaSELF problem resolved/closed", migration)
+        self.assertIn("not dispatched: PentaSELF problem resolved/closed", migration)
+        self.assertGreaterEqual(migration.count("p.persistent is true"), 4)
+        self.assertGreaterEqual(migration.count("p.state not in ('resolved','closed')"), 4)
+        self.assertIn("when penta_self.remediation_handoffs_v1.state = 'skipped'", migration)
 
 
 if __name__ == "__main__":
