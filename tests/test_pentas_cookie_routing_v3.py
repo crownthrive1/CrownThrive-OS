@@ -70,8 +70,9 @@ class PentasCookieRoutingV3Tests(unittest.TestCase):
         self.assertIn("v_broadcast_count>250", self.routing.replace(" ", ""))
 
     def test_claims_use_visibility_timeout_and_skip_locked(self) -> None:
+        normalized = self.routing.replace(" ", "")
         self.assertIn("pentas_claim_v1", self.routing)
-        self.assertIn("lease_expires_at=now()+interval '5 minutes'", self.routing.replace(" ", ""))
+        self.assertIn("lease_expires_at=now()+interval'5minutes'", normalized)
         self.assertIn("for update of d skip locked", self.routing.lower())
         self.assertIn("lease_expired", self.routing)
 
