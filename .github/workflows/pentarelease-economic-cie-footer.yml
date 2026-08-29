@@ -1,0 +1,100 @@
+name: PentaRelease Economic + CIE Footer
+
+on:
+  repository_dispatch:
+    types: [penta-release-evidence-footer]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pentarelease-footer-${{ github.event.client_payload.release_version }}-${{ github.event.client_payload.pr_number || github.event.client_payload.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  project-footer:
+    name: Project governed PentaRelease footer
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RELEASE_VERSION: ${{ github.event.client_payload.release_version }}
+      RELEASE_TAG: ${{ github.event.client_payload.release_tag }}
+      PR_NUMBER: ${{ github.event.client_payload.pr_number }}
+      FOOTER_MARKDOWN: ${{ github.event.client_payload.footer_markdown }}
+      EVIDENCE_SHA256: ${{ github.event.client_payload.evidence_sha256 }}
+    steps:
+      - name: Validate governed payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${RELEASE_VERSION:-}"
+          test -n "${FOOTER_MARKDOWN:-}"
+          test "${#EVIDENCE_SHA256}" -eq 64
+          if [[ -z "${RELEASE_TAG:-}" && -z "${PR_NUMBER:-}" ]]; then
+            echo "release_tag_or_pr_number_required" >&2
+            exit 1
+          fi
+          if [[ "${FOOTER_MARKDOWN}" != *"PentaRelease Economic + CIE Evidence"* ]]; then
+            echo "invalid_footer_contract" >&2
+            exit 1
+          fi
+
+      - name: Project managed footer block
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, re, urllib.request, urllib.error
+
+          repo = os.environ['REPO']
+          token = os.environ['GH_TOKEN']
+          release_tag = os.environ.get('RELEASE_TAG', '').strip()
+          pr_number = os.environ.get('PR_NUMBER', '').strip()
+          footer = os.environ['FOOTER_MARKDOWN'].rstrip()
+          evidence = os.environ['EVIDENCE_SHA256'].strip()
+
+          start = '<!-- ct:penta-release-footer:start -->'
+          end = '<!-- ct:penta-release-footer:end -->'
+          block = f"{start}\n{footer}\n{end}"
+          pattern = re.compile(re.escape(start) + r'.*?' + re.escape(end), re.S)
+
+          def api(method, path, body=None):
+              url = f'https://api.github.com/repos/{repo}/{path}'
+              data = None if body is None else json.dumps(body).encode()
+              req = urllib.request.Request(url, data=data, method=method)
+              req.add_header('Authorization', f'Bearer {token}')
+              req.add_header('Accept', 'application/vnd.github+json')
+              req.add_header('X-GitHub-Api-Version', '2022-11-28')
+              req.add_header('User-Agent', 'CrownThrive-PentaRelease-Footer/1')
+              if data is not None:
+                  req.add_header('Content-Type', 'application/json')
+              with urllib.request.urlopen(req, timeout=20) as res:
+                  payload = res.read().decode()
+                  return json.loads(payload) if payload else {}
+
+          def replace_managed(existing):
+              existing = existing or ''
+              if pattern.search(existing):
+                  return pattern.sub(block, existing).rstrip() + '\n'
+              if existing.strip():
+                  return existing.rstrip() + '\n\n' + block + '\n'
+              return block + '\n'
+
+          results = []
+          if pr_number:
+              pr = api('GET', f'pulls/{int(pr_number)}')
+              new_body = replace_managed(pr.get('body'))
+              api('PATCH', f'pulls/{int(pr_number)}', {'body': new_body})
+              results.append({'surface':'pull_request','number':int(pr_number),'evidence_sha256':evidence})
+
+          if release_tag:
+              rel = api('GET', f'releases/tags/{release_tag}')
+              new_body = replace_managed(rel.get('body'))
+              api('PATCH', f"releases/{rel['id']}", {'body': new_body})
+              results.append({'surface':'release','tag':release_tag,'evidence_sha256':evidence})
+
+          print(json.dumps({'state':'PROJECTED','results':results}, sort_keys=True))
+          PY
