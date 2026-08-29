@@ -8,10 +8,14 @@ and GitHub-native planning surfaces:
   existing penta_pm_reconcile.py engine after this script runs.
 - PentaMilestone: release-train milestone is handled by the existing engine.
 - PentaIssues: parent/sub-issue and blocked-by relationships are materialized
-  through GitHub's issue relationship APIs.
+  through GitHub's issue relationship APIs when both endpoints are Issues.
 - PentaDevelopment: every governed PR gets a native Development link. Terminal
   work links directly with a closing keyword. Partial multi-PR work receives an
-  idempotent PR-scoped child issue, preserving the umbrella issue with Refs.
+  idempotent PR-scoped child issue, preserving umbrella tracking references.
+
+GitHub issue relationships do not accept pull requests as parent/sub-issue or
+dependency endpoints. PR references remain valid cross-references, but native
+relationship mutation is attempted only for true Issues.
 
 The script is idempotent and may be run for one PR or across all open governed
 PRs. It never merges or closes work itself; GitHub closing keywords become
@@ -49,6 +53,7 @@ class GH:
         self.token = token or os.environ.get("PENTA_PM_GITHUB_TOKEN") or os.environ["GITHUB_TOKEN"]
         self._issues_cache: list[dict[str, Any]] | None = None
         self._labels_cache: set[str] | None = None
+        self._entity_cache: dict[int, dict[str, Any]] = {}
 
     def req(self, method: str, path: str, body: Any | None = None) -> Any:
         data = None if body is None else json.dumps(body).encode("utf-8")
@@ -60,7 +65,7 @@ class GH:
                 "Authorization": f"Bearer {self.token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": API_VERSION,
-                "User-Agent": "CrownThrive-PentaPM-PR-Convergence/1.0",
+                "User-Agent": "CrownThrive-PentaPM-PR-Convergence/1.1",
             },
         )
         try:
@@ -99,9 +104,12 @@ class GH:
                 for item in self.paginate(f"/repos/{self.repo}/issues?state=all", max_pages=20)
                 if "pull_request" not in item
             ]
+            for item in self._issues_cache:
+                self._entity_cache[int(item["number"])] = item
         return self._issues_cache
 
     def remember_issue(self, issue: dict[str, Any]) -> None:
+        self._entity_cache[int(issue["number"])] = issue
         cache = self.all_issues()
         number = int(issue["number"])
         for index, current in enumerate(cache):
@@ -135,6 +143,18 @@ def label_names(item: dict[str, Any]) -> set[str]:
 
 def governed(labels: set[str]) -> bool:
     return any(name.startswith(("penta:", "penta-")) for name in labels)
+
+
+def is_issue_entity(item: dict[str, Any] | None) -> bool:
+    return bool(item) and "pull_request" not in item
+
+
+def select_issue_reference(entities: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Prefer a true Issue for native Relationships/Development semantics."""
+    for item in entities:
+        if is_issue_entity(item):
+            return item
+    return entities[0] if entities else None
 
 
 def replace_tracking_with_terminal(body: str, issue_number: int) -> str:
@@ -171,11 +191,15 @@ def ensure_labels(gh: GH, number: int, labels: set[str]) -> None:
 
 
 def get_issue(gh: GH, number: int) -> dict[str, Any]:
-    return gh.get(f"/repos/{gh.repo}/issues/{number}")
+    if number in gh._entity_cache:
+        return gh._entity_cache[number]
+    item = gh.get(f"/repos/{gh.repo}/issues/{number}")
+    gh._entity_cache[number] = item
+    return item
 
 
 def get_pr_issue(gh: GH, number: int) -> dict[str, Any]:
-    return gh.get(f"/repos/{gh.repo}/issues/{number}")
+    return get_issue(gh, number)
 
 
 def current_parent(gh: GH, child_number: int) -> dict[str, Any] | None:
@@ -189,7 +213,10 @@ def current_parent(gh: GH, child_number: int) -> dict[str, Any] | None:
 
 def ensure_sub_issue(gh: GH, parent_number: int, child: dict[str, Any]) -> bool:
     child_number = int(child["number"])
-    if parent_number == child_number:
+    if parent_number == child_number or not is_issue_entity(child):
+        return False
+    parent_entity = get_issue(gh, parent_number)
+    if not is_issue_entity(parent_entity):
         return False
     parent = current_parent(gh, child_number)
     if parent and int(parent.get("number") or 0) == parent_number:
@@ -202,6 +229,9 @@ def ensure_sub_issue(gh: GH, parent_number: int, child: dict[str, Any]) -> bool:
 
 
 def ensure_blocked_by(gh: GH, issue_number: int, blocker: dict[str, Any]) -> bool:
+    subject = get_issue(gh, issue_number)
+    if not is_issue_entity(subject) or not is_issue_entity(blocker):
+        return False
     existing = gh.get(f"/repos/{gh.repo}/issues/{issue_number}/dependencies/blocked_by?per_page=100")
     existing_ids = {int(item["id"]) for item in existing}
     blocker_id = int(blocker["id"])
@@ -260,20 +290,26 @@ def find_child_for_pr(gh: GH, pr_number: int) -> dict[str, Any] | None:
 def ensure_pr_child(
     gh: GH,
     pr: dict[str, Any],
-    parent_issue: dict[str, Any],
+    parent_issue: dict[str, Any] | None,
+    tracking_entity: dict[str, Any],
     pr_labels: set[str],
 ) -> dict[str, Any]:
     pr_number = int(pr["number"])
     child = find_child_for_pr(gh, pr_number)
     marker = CHILD_MARKER.format(pr_number=pr_number)
+    if parent_issue is not None:
+        relationship_line = f"Parent work: #{parent_issue['number']}"
+        relationship_copy = "the umbrella parent remains referenced for multi-PR completion tracking."
+    else:
+        relationship_line = f"Related tracked PR: #{tracking_entity['number']}"
+        relationship_copy = "the related PR remains a cross-reference because GitHub does not permit PRs as sub-issue parents."
     title = f"[PentaDevelopment] PR #{pr_number}: {str(pr.get('title') or '')[:105]}"
     body = (
         f"{marker}\n\n"
-        f"Parent work: #{parent_issue['number']}\n"
+        f"{relationship_line}\n"
         f"Development PR: #{pr_number}\n\n"
         "This child issue is the terminal unit for this PR. PentaDevelopment "
-        "may close this child when the governed PR merges; the umbrella parent "
-        "remains referenced for multi-PR completion tracking."
+        f"may close this child when the governed PR merges; {relationship_copy}"
     )
     if child is None:
         child = gh.post(f"/repos/{gh.repo}/issues", {"title": title, "body": body})
@@ -298,12 +334,15 @@ def ensure_pr_child(
             "penta:entity:issue",
         },
     )
-    ensure_sub_issue(gh, int(parent_issue["number"]), child)
+    if parent_issue is not None:
+        ensure_sub_issue(gh, int(parent_issue["number"]), child)
     gh.remember_issue(child)
     return child
 
 
 def apply_explicit_relationships(gh: GH, issue: dict[str, Any]) -> int:
+    if not is_issue_entity(issue):
+        return 0
     body = str(issue.get("body") or "")
     changed = 0
     for parent_number in issue_numbers(PARENT_RE, body):
@@ -337,11 +376,21 @@ def converge_pr(gh: GH, pr_number: int, *, apply: bool) -> dict[str, Any]:
         result["development_action"] = "missing-reference"
         return result
 
-    source = get_issue(gh, refs[0])
-    result["relationship_changes"] += apply_explicit_relationships(gh, source) if apply else 0
+    referenced_entities = [get_issue(gh, number) for number in refs]
+    source = select_issue_reference(referenced_entities)
+    if source is None:
+        result["development_action"] = "missing-reference"
+        return result
+    source_is_issue = is_issue_entity(source)
+    result["reference_source"] = int(source["number"])
+    result["reference_source_kind"] = "issue" if source_is_issue else "pull_request"
+    result["relationship_changes"] += apply_explicit_relationships(gh, source) if apply and source_is_issue else 0
 
     if PENTASELF_MARKER in body:
         result["relationship_kind"] = "pentaself-root"
+        if not source_is_issue:
+            result["development_action"] = "missing-issue-reference"
+            return result
         if apply:
             root = ensure_self_root(gh)
             result["relationship_changes"] += int(ensure_sub_issue(gh, int(root["number"]), source))
@@ -359,11 +408,15 @@ def converge_pr(gh: GH, pr_number: int, *, apply: bool) -> dict[str, Any]:
         result["development_action"] = "terminal-link-present"
         return result
 
-    # Tracking-only references mean the PR is not allowed to close the umbrella
-    # issue. Create a PR-scoped child issue and close that child instead.
-    result["development_action"] = f"create-or-reuse-child-under:{source['number']}"
+    # Tracking-only references mean the PR is not allowed to close an umbrella
+    # Issue or a related PR. A PR-scoped child issue becomes the terminal unit.
+    parent_issue = source if source_is_issue else None
+    if parent_issue is not None:
+        result["development_action"] = f"create-or-reuse-child-under:{source['number']}"
+    else:
+        result["development_action"] = f"create-or-reuse-child-related-to-pr:{source['number']}"
     if apply:
-        child = ensure_pr_child(gh, pr, source, labels)
+        child = ensure_pr_child(gh, pr, parent_issue, source, labels)
         result["child_issue"] = int(child["number"])
         new_body = body.rstrip() + f"\n\nCloses #{child['number']}\n"
         gh.patch(f"/repos/{gh.repo}/pulls/{pr_number}", {"body": new_body})
