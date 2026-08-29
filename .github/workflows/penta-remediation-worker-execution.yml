@@ -1,0 +1,83 @@
+name: Penta Remediation Worker Execution
+
+on:
+  repository_dispatch:
+    types: [penta-remediation-execute]
+  workflow_dispatch:
+    inputs:
+      number:
+        description: Optional remediation PR number; blank performs a bounded sweep
+        required: false
+        default: ''
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: penta-remediation-worker-${{ github.event.client_payload.finding_id || github.event.inputs.number || 'sweep' }}
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    name: Penta assigned remediation execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout canonical Penta control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Require trusted worker credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in PENTA_PM_GITHUB_TOKEN SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::$name is unavailable; refusing remediation execution."
+              exit 78
+            fi
+          done
+
+      - name: Validate execution bridge contracts
+        run: |
+          python -m py_compile scripts/penta_remediation_worker_execute.py scripts/penta_pm_remediation_assign.py
+          python -m unittest tests.test_penta_remediation_worker_execute tests.test_penta_self_remediation_handoff -v
+
+      - name: Execute assigned remediation workers
+        shell: bash
+        env:
+          DISPATCH_NUMBER: ${{ github.event.inputs.number }}
+        run: |
+          set -euo pipefail
+          args=(--repo "$GITHUB_REPOSITORY" --limit 5)
+          if [[ -n "${DISPATCH_NUMBER:-}" ]]; then
+            args+=(--pr "$DISPATCH_NUMBER")
+          fi
+          python scripts/penta_remediation_worker_execute.py "${args[@]}" | tee penta-remediation-worker-summary.json
+
+      - name: Upload execution evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-remediation-worker-${{ github.run_id }}
+          path: penta-remediation-worker-summary.json
+          if-no-files-found: warn
+          retention-days: 90
