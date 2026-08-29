@@ -108,6 +108,17 @@ class PentaSelfRemediationHandoffTests(unittest.TestCase):
         self.assertIn("'client_payload',jsonb_build_object('finding',v_row.payload)", migration)
         self.assertNotIn("'client_payload',v_row.payload", migration)
 
+    def test_resolved_or_nonpersistent_problems_are_not_replayed(self) -> None:
+        migration = Path(
+            "supabase/migrations/20260920013100_penta_self_repository_dispatch_envelope_hotfix.sql"
+        ).read_text(encoding="utf-8")
+        self.assertIn("'skipped'", migration)
+        self.assertIn("not replayed: PentaSELF problem resolved/closed", migration)
+        self.assertIn("not dispatched: PentaSELF problem resolved/closed", migration)
+        self.assertGreaterEqual(migration.count("p.persistent is true"), 4)
+        self.assertGreaterEqual(migration.count("p.state not in ('resolved','closed')"), 4)
+        self.assertIn("when penta_self.remediation_handoffs_v1.state = 'skipped'", migration)
+
 
 if __name__ == "__main__":
     unittest.main()
