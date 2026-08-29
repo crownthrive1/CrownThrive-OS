@@ -1,0 +1,58 @@
+{
+  "schema": "crownthrive.penta.serialized.git-receipt/v1",
+  "receipt_id": "ct.penta.serialized.remediation-worker-oidc.20260829.v1",
+  "created_at": "2026-08-29T19:00:00Z",
+  "actor": "CrownThrive Penta repair operator",
+  "reason": "Remove the unavailable Supabase Actions-secret dependency from the Penta remediation execution worker by binding the trusted main-branch workflow to a strictly claim-validated GitHub OIDC bridge in ThriveBase.",
+  "changes": [
+    {
+      "path": ".github/workflows/penta-remediation-worker-execution.yml",
+      "operation": "modify",
+      "previous_blob_sha": "10faf02805f049ad69fbf28a44c550814ae38fe5",
+      "new_blob_sha": "9134cf500d4509c740952650f3b22cc85a6626b0",
+      "reason": "Add id-token write authority, mint an audience-scoped GitHub OIDC token, and remove SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY secret dependencies while preserving the existing PENTA_PM_GITHUB_TOKEN GitHub mutation lane.",
+      "rollback_ref": "4444553d3fdd46c086480557071ee617364a172a"
+    },
+    {
+      "path": "scripts/penta_remediation_worker_execute.py",
+      "operation": "modify",
+      "previous_blob_sha": "b100316330b408d18c4fb602f7c7e47cfa474d23",
+      "new_blob_sha": "4bebdd922f5ede431238ee9c380d3cbdb5693c66",
+      "reason": "Route the existing allowlisted remediation RPC calls through the OIDC Edge-function broker instead of placing a Supabase service-role credential in GitHub Actions.",
+      "rollback_ref": "4444553d3fdd46c086480557071ee617364a172a"
+    }
+  ],
+  "provider_binding": {
+    "provider": "ThriveBase/Supabase Edge Functions",
+    "function": "penta-remediation-worker-oidc",
+    "version": 1,
+    "state": "ACTIVE",
+    "ezbr_sha256": "6ec08a80b1ddcc29ff6dfe21552571d94fd71025e43551717ba01d5a83e5b21e",
+    "audience": "crownthrive-penta-remediation",
+    "allowed_workflow": "crownthrive1/CrownThrive-OS/.github/workflows/penta-remediation-worker-execution.yml@refs/heads/main",
+    "allowed_events": ["repository_dispatch", "schedule", "workflow_dispatch"],
+    "raw_oidc_token_persisted": false,
+    "service_role_exposed_to_github": false
+  },
+  "continuity": {
+    "silent_replacement": false,
+    "silent_delete": false,
+    "rollback_preserved": true,
+    "existing_penta_pm_github_token_retained": true,
+    "d3_authority_expanded": false
+  },
+  "evidence": {
+    "failed_worker_run_id": 33269611137,
+    "failed_worker_job_id": 99145619934,
+    "failure": "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY were unavailable in GitHub Actions",
+    "edge_function_active": true,
+    "independent_exact_head_gates_required": true
+  },
+  "exclusions": [
+    "No Supabase service-role secret is added to GitHub Actions.",
+    "No existing GitHub token is rotated, replaced, or removed.",
+    "No D3 authority is granted or inferred.",
+    "OIDC acceptance does not substitute for remediation verification or PentaCertify evidence.",
+    "penta:hold remains removable only after provider-side execution state is verified."
+  ]
+}
