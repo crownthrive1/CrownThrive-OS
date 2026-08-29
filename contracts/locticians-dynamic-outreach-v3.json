@@ -1,6 +1,6 @@
 {
   "contract": "ct.pentamarketer.locticians.dynamic-outreach.v3",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "status": "production",
   "campaign": "ct.pentamarketer.locticians.claim.20260827.v1",
   "provider_authority": "ct.locticians.brilliant-directories.api-fabric.v3",
@@ -52,8 +52,10 @@
     }
   },
   "provider_failover": {
-    "state": "WARM_PRIMARY_CUSTODY_REDUNDANT",
+    "state": "WARM_INDEPENDENT_FAILOVER",
     "router": "locticians-bd-router-v2:v2/runtime-3.0.0",
+    "custody_edge": "locticians-bd-independent-key-custody-v3",
+    "custody_rpc": "integration_control.locticians_bd_store_provider_key_v3(integer,text,text,text,text)",
     "primary_lane": "ct.locticians.bd.hot.a.v3",
     "selector": "integration_control.locticians_bd_select_warm_credential_v3(text)",
     "reconcile": "integration_control.locticians_bd_warm_failover_reconcile_v3()",
@@ -64,11 +66,13 @@
     "primary_provider_canary_http_status": 200,
     "same_credential_custody_copies": 2,
     "independent_candidates": [
-      {"provider_key_id": 13, "provider_key_name": "PentaMailer", "target_lane": "ct.locticians.bd.hot.b.v3", "state": "provider_issued_unbound"},
-      {"provider_key_id": 14, "provider_key_name": "PentaMailer 2", "target_lane": "ct.locticians.bd.cold.reserve.v3", "state": "provider_issued_unbound"}
+      {"provider_key_id": 13, "provider_key_name": "PentaMailer", "target_lane": "ct.locticians.bd.hot.b.v3", "state": "WARM_STANDBY"},
+      {"provider_key_id": 14, "provider_key_name": "PentaMailer 2", "target_lane": "ct.locticians.bd.cold.reserve.v3", "state": "WARM_STANDBY"}
     ],
-    "independent_standbys_ready": 0,
+    "independent_standbys_ready": 2,
     "promotion_rule": "distinct_vault_material_plus_provider_read_canary",
+    "provider_to_vault_transfer": "server_side_only",
+    "raw_token_exposed": false,
     "vault_alias_failure_may_use_same_credential_copy": true,
     "provider_auth_failure_requires_distinct_verified_standby": true,
     "shared_provider_quota": true,
