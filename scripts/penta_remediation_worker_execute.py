@@ -50,7 +50,7 @@ class GH:
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
             "Content-Type": "application/json",
-            "User-Agent": "CrownThrive-PentaRemediationWorker/1.0",
+            "User-Agent": "CrownThrive-PentaRemediationWorker/1.1",
         }
 
     def req(self, method: str, path: str, body: Any | None = None, *, allow_404: bool = False) -> Any:
@@ -89,7 +89,7 @@ class Supabase:
             "Authorization": f"Bearer {service_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "CrownThrive-PentaRemediationWorker/1.0",
+            "User-Agent": "CrownThrive-PentaRemediationWorker/1.1",
         }
 
     def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
@@ -325,7 +325,7 @@ def main() -> int:
         if current_head != item.get("head_sha"):
             adopt_pr(gh, sb, number)
             continue
-        result = sb.rpc("penta_remediation_execute_known_v1", {"p_execution_id": item["execution_id"]})
+        result = sb.rpc("penta_remediation_execute_known_v2", {"p_execution_id": item["execution_id"]})
         executed.append(result)
         finalize_pr(gh, sb, number)
 
