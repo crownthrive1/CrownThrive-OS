@@ -2,9 +2,10 @@
 """PentaPM remediation assignment and reassignment controller.
 
 Consumes a PentaSELF finding plus its GitHub issue/PR numbers. PentaPM computes
-the full required Penta worker set, reconciles assignment labels, and writes a
-stable assignment packet to both artifacts. Re-running with changed conditions
-replaces stale assignments rather than accumulating them.
+the full required Penta worker set, reconciles assignment labels, writes a stable
+assignment packet, and dispatches the trusted remediation execution bridge.
+Re-running with changed conditions replaces stale assignments rather than
+accumulating them.
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ API = "https://api.github.com"
 ASSIGN_PREFIX = "penta:assigned:"
 MARKER_PREFIX = "<!-- penta-pm-assignment:"
 DEFAULT_OWNER = "PentaBuild"
+EXECUTION_EVENT = "penta-remediation-execute"
 
 
 class GH:
@@ -39,7 +41,7 @@ class GH:
                 "Authorization": f"Bearer {self.token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "CrownThrive-PentaPM-Remediation/1.0",
+                "User-Agent": "CrownThrive-PentaPM-Remediation/1.1",
             },
         )
         try:
@@ -95,8 +97,7 @@ def normalize_explicit_owners(payload: dict[str, Any]) -> set[str]:
     raw = payload.get("required_pentas") or []
     if not isinstance(raw, list):
         raise ValueError("required_pentas_must_be_array")
-    owners = {str(item).strip()[:80] for item in raw if str(item).strip()}
-    return owners
+    return {str(item).strip()[:80] for item in raw if str(item).strip()}
 
 
 def desired_owners(payload: dict[str, Any], policy: dict[str, Any]) -> list[str]:
@@ -213,7 +214,7 @@ def _assignment_body(payload: dict[str, Any], owners: list[str], issue_number: i
         "### Required Penta workers\n"
         f"{owner_lines}\n\n"
         "PentaPM owns this worker set. Re-running this controller replaces stale `penta:assigned:*` labels with the current required set. "
-        "The bootstrap `penta:hold` remains until the actual repair, tests, evidence, and existing governed release gates are satisfied."
+        "The bootstrap `penta:hold` remains until actual worker execution, tests, evidence, and existing governed release gates are satisfied."
     )
 
 
@@ -225,6 +226,30 @@ def upsert_assignment_comment(gh: GH, number: int, payload: dict[str, Any], owne
         gh.patch(f"/repos/{gh.repo}/issues/comments/{existing['id']}", {"body": body})
     else:
         gh.post(f"/repos/{gh.repo}/issues/{number}/comments", {"body": body})
+
+
+def dispatch_execution(gh: GH, payload: dict[str, Any], owners: list[str], issue_number: int, pr_number: int) -> dict[str, Any]:
+    pull = gh.get(f"/repos/{gh.repo}/pulls/{pr_number}")
+    if pull.get("state") != "open":
+        raise RuntimeError(f"remediation_pr_not_open:{pr_number}")
+    head = pull.get("head") or {}
+    if ((head.get("repo") or {}).get("full_name")) != gh.repo:
+        raise RuntimeError(f"external_fork_remediation_execution_refused:{pr_number}")
+    envelope = {
+        "finding_id": payload.get("finding_id"),
+        "issue_number": issue_number,
+        "pr_number": pr_number,
+        "head_sha": head.get("sha"),
+        "target_ref": payload.get("target_ref"),
+        "lane": payload.get("lane") or "general",
+        "risk": payload.get("risk") or "D1",
+        "assigned_pentas": owners,
+    }
+    gh.post(
+        f"/repos/{gh.repo}/dispatches",
+        {"event_type": EXECUTION_EVENT, "client_payload": envelope},
+    )
+    return envelope
 
 
 def main() -> None:
@@ -248,10 +273,11 @@ def main() -> None:
     pr_delta = reconcile_assignments(gh, args.pr, owners)
     upsert_assignment_comment(gh, args.issue, payload, owners, args.issue, args.pr)
     upsert_assignment_comment(gh, args.pr, payload, owners, args.issue, args.pr)
+    execution_dispatch = dispatch_execution(gh, payload, owners, args.issue, args.pr)
     print(
         json.dumps(
             {
-                "state": "ASSIGNED",
+                "state": "ASSIGNED_AND_DISPATCHED",
                 "authority": "PentaPM",
                 "finding_id": payload.get("finding_id"),
                 "issue_number": args.issue,
@@ -259,6 +285,8 @@ def main() -> None:
                 "owners": owners,
                 "issue_delta": issue_delta,
                 "pr_delta": pr_delta,
+                "execution_event": EXECUTION_EVENT,
+                "execution_dispatch": execution_dispatch,
                 "bootstrap_hold_preserved": True,
             },
             sort_keys=True,
