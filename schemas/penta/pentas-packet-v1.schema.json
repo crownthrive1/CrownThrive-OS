@@ -1,0 +1,234 @@
+{
+  "$id": "https://crownthrive.com/schemas/penta/pentas-packet-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "risk_class": {
+            "const": "D3"
+          }
+        },
+        "required": [
+          "risk_class"
+        ]
+      },
+      "then": {
+        "properties": {
+          "authority_class": {
+            "const": "human_reserved"
+          }
+        }
+      }
+    }
+  ],
+  "description": "Content-addressed bounded message envelope used by Pentas to exchange information across the CrownThrive mesh.",
+  "properties": {
+    "authority_class": {
+      "maxLength": 64,
+      "minLength": 1,
+      "type": "string"
+    },
+    "causation_id": {
+      "format": "uuid",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "content_address": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "correlation_id": {
+      "format": "uuid",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "dedupe_key": {
+      "maxLength": 512,
+      "minLength": 1,
+      "type": "string"
+    },
+    "delivered_at": {
+      "format": "date-time",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "hop_count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "max_hops": {
+      "maximum": 32,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "network_epoch": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "origin_node_ref": {
+      "maxLength": 512,
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "packet_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "packet_state": {
+      "enum": [
+        "pending",
+        "routed",
+        "delivered",
+        "held",
+        "expired",
+        "dead_letter"
+      ]
+    },
+    "packet_type": {
+      "enum": [
+        "heartbeat",
+        "discovery.raise",
+        "discovery.observation",
+        "help.raise",
+        "help.response",
+        "health.signal",
+        "fault.detected",
+        "tag.proposal",
+        "remediation.request",
+        "oracle.observation",
+        "oracle.mutation.proposal",
+        "mesh.ack",
+        "governance.escalation"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    },
+    "payload_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "priority": {
+      "maximum": 100,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "protocol_id": {
+      "const": "ct.pentas.packet.v1"
+    },
+    "protocol_version": {
+      "const": "1.0.0"
+    },
+    "risk_class": {
+      "enum": [
+        "D0",
+        "D1",
+        "D2",
+        "D3"
+      ]
+    },
+    "route_lane": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "signature_ref": {
+      "maxLength": 512,
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "signature_state": {
+      "enum": [
+        "unsigned",
+        "attested",
+        "verified",
+        "rejected"
+      ]
+    },
+    "source_cookie_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "source_cookie_revision": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source_system_key": {
+      "maxLength": 160,
+      "minLength": 1,
+      "type": "string"
+    },
+    "target_kind": {
+      "enum": [
+        "system",
+        "capability",
+        "mesh_lane",
+        "broadcast"
+      ]
+    },
+    "target_ref": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "ttl_seconds": {
+      "maximum": 604800,
+      "minimum": 30,
+      "type": "integer"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "required": [
+    "packet_id",
+    "protocol_id",
+    "protocol_version",
+    "packet_type",
+    "source_system_key",
+    "source_cookie_id",
+    "source_cookie_revision",
+    "target_kind",
+    "target_ref",
+    "route_lane",
+    "risk_class",
+    "authority_class",
+    "priority",
+    "hop_count",
+    "max_hops",
+    "ttl_seconds",
+    "expires_at",
+    "payload",
+    "payload_sha256",
+    "content_address",
+    "signature_state",
+    "network_epoch",
+    "dedupe_key",
+    "packet_state",
+    "created_at"
+  ],
+  "title": "Pentas Packet Protocol v1",
+  "type": "object"
+}
