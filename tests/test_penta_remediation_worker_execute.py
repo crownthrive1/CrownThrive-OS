@@ -25,13 +25,24 @@ class PentaRemediationWorkerExecutionTests(unittest.TestCase):
             ["pentabuild", "pentacertify"],
         )
 
-    def test_trusted_worker_has_event_and_sweep_paths(self) -> None:
+    def test_trusted_worker_has_event_sweep_and_oidc_paths(self) -> None:
         workflow = Path(".github/workflows/penta-remediation-worker-execution.yml").read_text(encoding="utf-8")
         self.assertIn("types: [penta-remediation-execute]", workflow)
         self.assertIn("cron: '*/5 * * * *'", workflow)
         self.assertIn("PENTA_PM_GITHUB_TOKEN", workflow)
-        self.assertIn("SUPABASE_SERVICE_ROLE_KEY", workflow)
+        self.assertIn("id-token: write", workflow)
+        self.assertIn("crownthrive-penta-remediation", workflow)
+        self.assertIn("ACTIONS_ID_TOKEN_REQUEST_URL", workflow)
+        self.assertIn("PENTA_REMEDIATION_OIDC_TOKEN", workflow)
+        self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", workflow)
+        self.assertNotIn("secrets.SUPABASE_URL", workflow)
         self.assertIn("scripts/penta_remediation_worker_execute.py", workflow)
+
+        worker = Path("scripts/penta_remediation_worker_execute.py").read_text(encoding="utf-8")
+        self.assertIn("penta-remediation-worker-oidc", worker)
+        self.assertIn("PENTA_REMEDIATION_OIDC_TOKEN", worker)
+        self.assertNotIn("SUPABASE_SERVICE_ROLE_KEY", worker)
+        self.assertNotIn("/rest/v1/rpc/", worker)
 
     def test_assignment_dispatches_execution_after_metadata(self) -> None:
         source = Path("scripts/penta_pm_remediation_assign.py").read_text(encoding="utf-8")
