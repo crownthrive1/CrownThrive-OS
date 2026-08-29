@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "manifest_id": "ct.manifest.penta-dnd.v1",
+  "system_key": "penta.dnd",
+  "canonical_name": "PentaDND",
+  "semantic_version": "1.0.0",
+  "lifecycle_state": "production_active_with_typed_holds",
+  "program_id": "ct.program.cos-v1.hourly-convergence-dnd",
+  "protocol_id": "ct.penta.protocol.dnd.v1",
+  "scope": {
+    "kind": "workstream",
+    "ref": "ct.workstream.cos-v1.deep-discovery",
+    "reasoning_workstream": "ct.workstream.cos-v1.deep-discovery.pro-reasoning",
+    "global_maintenance_required": false,
+    "separate_chat_created": false,
+    "isolation_mechanism": "PentaDND scoped lease and capability preflight"
+  },
+  "authority": {
+    "ceiling": "D2",
+    "d3_human_reserved": true,
+    "manufactures_authority": false,
+    "money_movement": false,
+    "credential_export": false,
+    "destructive_restore": false
+  },
+  "preservation": {
+    "no_silent_delete": true,
+    "supersession_mode": "append_only_higher_generation",
+    "historical_failures_retained": true,
+    "historical_clock_contract_generation_2_retained": true
+  },
+  "hourly_clock": {
+    "jobname": "penta-mail-state-architecture-hourly-v1",
+    "jobid": 832,
+    "schedule_utc": "43 * * * *",
+    "command": "select public.penta_dnd_hourly_orchestrator_v1();",
+    "clock_key": "ct.clock.penta-dnd.hourly",
+    "desired_generation": 202608292700,
+    "monotonic_contract_key": "ct.pentaself.job.cos-hourly-audit",
+    "monotonic_generation": 3,
+    "duplicate_clock_prohibited": true,
+    "email_after_each_pass": true,
+    "recipient_ref": "founder-primary-email"
+  },
+  "redundancy": {
+    "profile": "hot-warm-dual-cold-v1",
+    "virtual_router": "penta.vrouter.failover",
+    "lines": [
+      {
+        "line_key": "hot",
+        "system_key": "penta.vswitch.hot",
+        "node_ref": "node:cos.vswitch.hot",
+        "class": "HOT",
+        "purpose": "Primary live internal execution and current-state readback"
+      },
+      {
+        "line_key": "warm",
+        "system_key": "penta.vswitch.warm",
+        "node_ref": "node:cos.vswitch.warm",
+        "class": "WARM",
+        "purpose": "Direct provider, API and webhook standby continuity"
+      },
+      {
+        "line_key": "cold_a",
+        "system_key": "penta.vswitch.cold-a",
+        "node_ref": "node:cos.vswitch.cold-a",
+        "class": "COLD_A",
+        "purpose": "Immutable DAIL ledger-lineage checkpoint and exact readback",
+        "current_hold": "independent Drive-custodied ledger-lineage export is stale"
+      },
+      {
+        "line_key": "cold_b",
+        "system_key": "penta.vswitch.cold-b",
+        "node_ref": "node:cos.vswitch.cold-b",
+        "class": "COLD_B",
+        "purpose": "Independent broad institutional recovery/export and restore-path readback"
+      }
+    ]
+  },
+  "registered_components": [
+    "penta.dnd",
+    "penta.vswitch",
+    "penta.vrouter",
+    "penta.redundancy",
+    "penta.backup",
+    "penta.restore"
+  ],
+  "public_wrappers": [
+    {
+      "function": "public.penta_dnd_hourly_orchestrator_v1()",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true,
+      "postgres_execute": true
+    },
+    {
+      "function": "public.penta_dnd_status_v1()",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true,
+      "postgres_execute": true
+    },
+    {
+      "function": "public.penta_dnd_preflight_v1(text,text,text,text,boolean,boolean,boolean)",
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true,
+      "postgres_execute": true
+    }
+  ],
+  "data_contracts": {
+    "schema": "penta_dnd",
+    "tables": [
+      "phase_catalog_v1",
+      "programs_v1",
+      "leases_v1",
+      "passes_v1",
+      "line_profiles_v1",
+      "line_state_v1",
+      "receipts_v1"
+    ],
+    "forced_rls": true,
+    "append_only_delete_guard": true,
+    "service_role_policy": true
+  },
+  "current_cursor": {
+    "pass_counter": 1,
+    "current_phase_key": "identity_alias_reconciliation",
+    "next_phase_key": "chlom_did_fingerprint_binding",
+    "source": "direct ThriveBase readback",
+    "note": "The runtime cursor is authoritative over older narrative projections."
+  },
+  "first_pass": {
+    "state": "complete_with_holds",
+    "global_maintenance_entered": false,
+    "active_lease_after_close": false,
+    "automatic_hour_replay": "idempotent",
+    "email_provider_status": 200,
+    "signed_pentas_emitted": true,
+    "dail_event_recorded": true
+  },
+  "migration_ledger": [
+    {"version":"20260829221916","name":"penta_dnd_core_v1","bytes":18401,"sha256":"52a14f1beefe4d3e09f88bc5261826e0a995519baefcb584c405362b55c82078"},
+    {"version":"20260829222237","name":"penta_dnd_topology_v1","bytes":29094,"sha256":"a28a0ea2cc6e9a79c95272d054256334960bb34a3e72e426a754640db075aa0c"},
+    {"version":"20260829222334","name":"penta_dnd_leases_redundancy_v1","bytes":13268,"sha256":"4effb8701fb500093f76c48a12426988827852ee1bc6640ca442bca3f8bebd2f"},
+    {"version":"20260829222538","name":"penta_dnd_hourly_pass_v1","bytes":19509,"sha256":"a2ec89c09d7e0a10f96949975f69b5c0f60c3463468707c1fb343ec83834f954"},
+    {"version":"20260829222630","name":"penta_dnd_hourly_wiring_v1","bytes":8703,"sha256":"199726b1b70b1e9ef176c6b67e61ce22b43d716b53755fc408eda852b2ef187e"},
+    {"version":"20260829224200","name":"penta_dnd_hourly_clock_rebind_v2","bytes":14456,"sha256":"690e4651281d02453ea158d7f339536f842f0c6fb72900b9facb9af778298e69"},
+    {"version":"20260829224743","name":"penta_dnd_monotonic_hourly_contract_v3","bytes":5101,"sha256":"25499d3ec400121b1b20e72a2697d6826e278f32b56b3c428af69e73cbdb0f7f"},
+    {"version":"20260829225159","name":"penta_dnd_execution_privilege_hardening_v1","bytes":3631,"sha256":"a68a6b0a44ba4455a418ccbab5edcf3acf20062f8f9cb710fa3403c0ec783769"}
+  ],
+  "source_control": {
+    "repository": "crownthrive1/CrownThrive-OS",
+    "base_sha": "9ad01190507f86d0267bf08a4e7322f263fa1ffb",
+    "branch": "build/penta-dnd-hourly-convergence-v1-r2-20260829",
+    "original_reserved_branch_preserved": "build/penta-dnd-hourly-convergence-v1",
+    "bootstrap_exact_body_state": "provider_ledger_recoverable_repository_export_in_progress",
+    "provider_ledger_guard": "supabase/migrations/20260829230000_penta_dnd_provider_ledger_guard_v1.sql",
+    "extraction_utility": "scripts/export_penta_dnd_migration_ledger.sql"
+  },
+  "typed_holds": [
+    {
+      "hold_key": "penta-dnd.cold-a.ledger-lineage-stale",
+      "class": "evidence_collection",
+      "route": ["penta.backup", "penta.restore", "penta.certify"],
+      "closure_rule": "fresh immutable ledger-lineage export plus exact byte/hash/readback and restore-path verification"
+    },
+    {
+      "hold_key": "penta-dnd.bootstrap-source-export",
+      "class": "factory_repairable",
+      "route": ["penta.factory", "penta.release", "penta.certify"],
+      "closure_rule": "export exact provider-ledger SQL bodies to repository and verify per-migration SHA-256"
+    }
+  ]
+}
