@@ -6,23 +6,22 @@ workflow introduced before substantive Wave 6. The contract is cumulative: every
 new governed substantive wave must extend REQUIRED rather than allowing prior
 routes to fall out of PentaDocs navigation.
 
-PentaDocs has used two valid Mintlify tab shapes over its lifetime:
+PentaDocs has used multiple valid Mintlify tab shapes over its lifetime:
 
-1. tabs with a top-level ``groups`` array; and
-2. tabs with a ``pages`` array containing group objects (plus, optionally,
-   standalone page routes).
+1. tabs with a top-level ``groups`` array;
+2. tabs with a ``pages`` array containing group objects and standalone routes; and
+3. nested groups used to keep large documentation estates bounded on mobile.
 
-This validator accepts both shapes while preserving the same cumulative route
-continuity guarantees. It does not force the current Production + Convergence
-navigation back into a historical representation merely to satisfy an old
-validator assumption.
+This validator accepts all three while preserving the same cumulative route
+continuity guarantees. Nested presentation structure never weakens route,
+backing-page, or ordering invariants.
 """
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs.json"
@@ -77,33 +76,56 @@ def tab(data: dict[str, Any], name: str) -> dict[str, Any]:
     raise KeyError(f"missing navigation tab: {name}")
 
 
-def navigation_items(tab_obj: dict[str, Any]) -> list[Any]:
-    """Return the mutable container that owns group objects for a tab."""
-    groups = tab_obj.get("groups")
+def navigation_items(container: dict[str, Any]) -> list[Any]:
+    """Return a container's navigation children for current or legacy schemas."""
+    groups = container.get("groups")
     if isinstance(groups, list):
         return groups
-    pages = tab_obj.get("pages")
+    pages = container.get("pages")
     if isinstance(pages, list):
         return pages
     raise KeyError(
-        f"navigation tab {tab_obj.get('tab')!r} has neither a groups nor pages array"
+        f"navigation container {container.get('tab') or container.get('group')!r} "
+        "has neither a groups nor pages array"
     )
 
 
-def group_items(tab_obj: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return only group objects, ignoring standalone page routes."""
-    return [
-        item
-        for item in navigation_items(tab_obj)
-        if isinstance(item, dict) and isinstance(item.get("group"), str)
-    ]
+def iter_group_locations(
+    container: dict[str, Any],
+) -> Iterable[tuple[dict[str, Any], list[Any]]]:
+    """Yield every descendant group together with its owning sibling list."""
+    try:
+        items = navigation_items(container)
+    except KeyError:
+        return
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if isinstance(item.get("group"), str):
+            yield item, items
+        yield from iter_group_locations(item)
 
 
 def group(tab_obj: dict[str, Any], name: str) -> dict[str, Any]:
-    for item in group_items(tab_obj):
-        if item.get("group") == name:
-            return item
-    raise KeyError(f"missing navigation group {name!r} in tab {tab_obj.get('tab')!r}")
+    matches = [item for item, _ in iter_group_locations(tab_obj) if item.get("group") == name]
+    if not matches:
+        raise KeyError(f"missing navigation group {name!r} in tab {tab_obj.get('tab')!r}")
+    if len(matches) > 1:
+        raise KeyError(f"duplicate navigation group {name!r} in tab {tab_obj.get('tab')!r}")
+    return matches[0]
+
+
+def group_location(tab_obj: dict[str, Any], name: str) -> tuple[dict[str, Any], list[Any]]:
+    matches = [
+        (item, owner)
+        for item, owner in iter_group_locations(tab_obj)
+        if item.get("group") == name
+    ]
+    if not matches:
+        raise KeyError(f"missing navigation group {name!r} in tab {tab_obj.get('tab')!r}")
+    if len(matches) > 1:
+        raise KeyError(f"duplicate navigation group {name!r} in tab {tab_obj.get('tab')!r}")
+    return matches[0]
 
 
 def backing_page_exists(route: str) -> bool:
@@ -122,28 +144,18 @@ def reconcile(data: dict[str, Any]) -> int:
                     pages.append(route)
                     added += 1
 
-    # Keep Changelog and Decisions the final *group* without moving or deleting
-    # any standalone page routes that a tab may intentionally contain.
+    # Changelog and Decisions must remain the final group among its siblings.
+    # The parent may be the tab itself or a native nested wrapper group.
     crown_tab = tab(data, "CrownThrive OS")
-    items = navigation_items(crown_tab)
-    changelog_index = next(
-        (
-            i
-            for i, item in enumerate(items)
-            if isinstance(item, dict) and item.get("group") == "Changelog and Decisions"
-        ),
-        None,
-    )
-    if changelog_index is None:
-        raise KeyError("missing Changelog and Decisions group")
-
+    changelog, items = group_location(crown_tab, "Changelog and Decisions")
+    changelog_index = items.index(changelog)
     later_group_indexes = [
         i
         for i, item in enumerate(items)
         if i > changelog_index and isinstance(item, dict) and item.get("group")
     ]
     if later_group_indexes:
-        changelog = items.pop(changelog_index)
+        items.pop(changelog_index)
         last_group_index = max(
             i for i, item in enumerate(items) if isinstance(item, dict) and item.get("group")
         )
@@ -175,12 +187,17 @@ def validate(data: dict[str, Any]) -> list[str]:
                     errors.append(f"required backing page missing: {route}")
 
     try:
-        crown_groups = group_items(tab(data, "CrownThrive OS"))
+        changelog, owner = group_location(tab(data, "CrownThrive OS"), "Changelog and Decisions")
     except KeyError as exc:
         errors.append(str(exc))
     else:
-        if not crown_groups or crown_groups[-1].get("group") != "Changelog and Decisions":
-            errors.append("Changelog and Decisions must remain the final CrownThrive OS group")
+        sibling_groups = [
+            item for item in owner if isinstance(item, dict) and isinstance(item.get("group"), str)
+        ]
+        if not sibling_groups or sibling_groups[-1] is not changelog:
+            errors.append(
+                "Changelog and Decisions must remain the final group within its CrownThrive OS parent"
+            )
 
     if not errors:
         print("PASS_DOCUMENTATION_NAVIGATION_CONTINUITY")

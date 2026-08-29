@@ -31,24 +31,31 @@ def require(text: str, fragment: str, source: Path) -> None:
 
 
 def navigation_pages(nav: dict) -> list[str]:
-    """Return string routes from both legacy and current PentaDocs tab schemas.
+    """Return every string route from the native Mintlify navigation tree.
 
-    The repository historically used ``tab.groups[]``. PentaDocs now stores
-    group objects under ``tab.pages[]``. The validator must fail closed on the
-    governed routes themselves, not on a superseded navigation container key.
+    CrownThrive has used tabs with ``groups`` and tabs with group objects under
+    ``pages``. Large documentation estates now also use nested groups so mobile
+    sidebars remain bounded. Route-count validation must recurse through those
+    valid presentation containers while preserving the exact-one-route gate.
     """
     routes: list[str] = []
-    for tab in nav.get("navigation", {}).get("tabs", []):
-        groups = tab.get("groups")
-        if not isinstance(groups, list):
-            candidate = tab.get("pages", [])
-            groups = candidate if isinstance(candidate, list) else []
-        for group in groups:
-            if not isinstance(group, dict):
-                continue
-            for page in group.get("pages", []):
-                if isinstance(page, str):
-                    routes.append(page)
+
+    def walk(node: object) -> None:
+        if isinstance(node, str):
+            routes.append(node)
+            return
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+        for key in ("pages", "groups", "tabs", "dropdowns", "products", "versions", "languages"):
+            value = node.get(key)
+            if value is not None:
+                walk(value)
+
+    walk(nav.get("navigation", {}).get("tabs", []))
     return routes
 
 
