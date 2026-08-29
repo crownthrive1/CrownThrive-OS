@@ -90,19 +90,21 @@ def run_check(check: dict[str, Any], timeout: float) -> dict[str, Any]:
         return result
 
     result["http_status"] = status
-    if error:
-        result["error"] = error
-        return result
-
     expected_http = set(check.get("expected_http", [200]))
+
     if status not in expected_http:
-        result["error"] = f"unexpected_http_status: {status}"
+        result["error"] = error or f"unexpected_http_status: {status}"
         return result
 
     # An explicitly accepted non-2xx observational response means the public
-    # API is reachable but the optional resource is not presently available.
+    # API was reached but the optional resource is not presently available.
+    # Its error body is not required to be JSON.
     if status is not None and not (200 <= status < 300):
         result["state"] = "observed_absent"
+        return result
+
+    if error:
+        result["error"] = error
         return result
 
     if check.get("expect_json") and payload is None:
