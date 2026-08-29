@@ -1,0 +1,83 @@
+{
+  "contract": "ct.production-gap-closure.20260829.v3",
+  "version": "3.0.0",
+  "authority_ceiling": "D2",
+  "d3_human_reserved": true,
+  "production_applied_before_projection": true,
+  "penta_self": {
+    "resolution_registry": "penta_self.certified_problem_resolutions_v2",
+    "regression_registry": "penta_self.problem_regression_events_v2",
+    "certify_resolution": "penta_self.certify_problem_resolution_v2",
+    "certify_regression": "penta_self.certify_problem_regression_v2",
+    "critical_cron_registry": "penta_self.critical_cron_state_v2",
+    "scheduler_reconciler": "penta_self.reconcile_critical_crons_v2",
+    "reconcile_cron": "ct-penta-self-monotonic-reconcile-v2",
+    "rules": {
+      "stale_reopen": false,
+      "fresh_verified_regression_required": true,
+      "active_drift_overwrite": false,
+      "missing_exact_job_restore": true,
+      "inactive_exact_job_reactivate": true,
+      "successor_requires_higher_version": true
+    }
+  },
+  "stripe": {
+    "contract": "ct.stripe.webhook.fabric.v3",
+    "endpoints": {
+      "thrivetickets": "thrive-tickets-stripe-webhook",
+      "kjv_sermon_toolkit": "kjv-sermon-toolkit-stripe-webhook"
+    },
+    "receipt_ledger": "integration_control.stripe_event_receipts_v3",
+    "restricted_payload_custody": "integration_control.stripe_event_payloads_v3",
+    "provider_reconcile": "integration_control.stripe_webhook_reconcile_v3",
+    "signed_canary": "integration_control.stripe_webhook_signed_canary_v3",
+    "certifier": "integration_control.stripe_webhook_certify_and_resolve_v3",
+    "product_crosswalk": "integration_control.stripe_product_crosswalk_v3",
+    "guards": {
+      "signature_required": true,
+      "idempotent_provider_event_id": true,
+      "body_max_bytes": 1048576,
+      "timestamp_tolerance_seconds": 300,
+      "money_movement": false,
+      "problem_closes_only_after_provider_endpoint_and_signed_receipt": true
+    }
+  },
+  "paypal": {
+    "contract": "ct.paypal.webhook.fabric.v3",
+    "endpoint": "paypal-webhook-v3",
+    "receipt_ledger": "integration_control.paypal_event_receipts_v3",
+    "restricted_payload_custody": "integration_control.paypal_event_payloads_v3",
+    "provider_reconcile": "integration_control.paypal_webhook_reconcile_v3",
+    "provider_simulator": "integration_control.paypal_webhook_simulate_v3",
+    "certifier": "integration_control.paypal_webhook_certify_and_resolve_v3",
+    "guards": {
+      "provider_signature_verification_required": true,
+      "paypal_cert_domain_required": true,
+      "idempotent_provider_event_id": true,
+      "money_movement": false,
+      "problem_closes_only_after_success_receipt": true
+    }
+  },
+  "brilliant_directories": {
+    "execution_authority": "ct.locticians.brilliant-directories.api-fabric.v3",
+    "promoter_edge": "locticians-bd-key-promote-v3",
+    "vault_writer": "integration_control.store_locticians_bd_standby_secret_v3",
+    "provider_key_ids": [13, 14],
+    "provider_key_names": ["PentaMailer", "PentaMailer 2"],
+    "promotion_rule": "exact provider identity + active state + token presence + distinctness + Vault custody + read-only provider canary",
+    "raw_secret_projection": false,
+    "switch_on_429": false,
+    "shared_provider_quota": true
+  },
+  "source_custody": {
+    "public_contract_and_migrations": "crownthrive1/CrownThrive-OS",
+    "restricted_runtime": "crownthrive1/PRIVATE-PentaOS",
+    "raw_credentials_in_git": false
+  },
+  "remaining_human_or_provider_boundaries": [
+    "crownthrive.tech registrant email verification",
+    "Radio.co live-broadcast credential rotation",
+    "Gmail/Outlook unattended push subscription consent when not exposed by connector",
+    "GitGuardian provider finding resolution/readback"
+  ]
+}
