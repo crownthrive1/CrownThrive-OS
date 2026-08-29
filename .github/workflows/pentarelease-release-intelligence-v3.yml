@@ -47,6 +47,7 @@ jobs:
           python3 -m py_compile \
             scripts/pentarelease/release_surface.py \
             scripts/pentarelease/enrich_release_intelligence.py \
+            scripts/pentarelease/build_cie_subject.py \
             scripts/pentarelease/pentadocs_group.py \
             scripts/validate_docs.py
           python3 -m json.tool .pentarelease/state/release-surface.json >/dev/null
@@ -69,6 +70,7 @@ jobs:
           VERSION="${TAG#v}"
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
           PAYLOAD_BYTES=$(jq '[.assets[]?.size] | add // 0' <<<"$RELEASE")
+          printf '%s\n' "$RELEASE" > /tmp/pentarelease-provider-release.json
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "payload_bytes=$PAYLOAD_BYTES" >> "$GITHUB_OUTPUT"
@@ -83,10 +85,34 @@ jobs:
           set -euo pipefail
           rm -rf /tmp/pentarelease-source
           mkdir -p /tmp/pentarelease-source
-          for NAME in MANIFEST.json RELEASE_NOTES.md COSTS.json PENTARELEASE_COSTS.json; do
+          for NAME in MANIFEST.json RELEASE_NOTES.md SHA256SUMS COSTS.json PENTARELEASE_COSTS.json; do
             gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$NAME" --dir /tmp/pentarelease-source --clobber || true
           done
           test -s /tmp/pentarelease-source/MANIFEST.json
+          test -s /tmp/pentarelease-source/RELEASE_NOTES.md
+
+      - name: Materialize governed release CIE evidence
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/pentarelease/build_cie_subject.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --version "$RELEASE_VERSION" \
+            --manifest /tmp/pentarelease-source/MANIFEST.json \
+            --release-notes /tmp/pentarelease-source/RELEASE_NOTES.md \
+            --provider-release /tmp/pentarelease-provider-release.json \
+            --sha256sums /tmp/pentarelease-source/SHA256SUMS \
+            --output /tmp/pentarelease-source/PENTARELEASE_CIE_SUBJECT.json
+          jq -e '.subject_type == "release"' /tmp/pentarelease-source/PENTARELEASE_CIE_SUBJECT.json >/dev/null
+          for DIM in identity_fit community_value story_alignment brand_safety legacy_impact; do
+            jq -e --arg dim "$DIM" '.dimension_evidence[$dim] | type == "array" and length > 0' \
+              /tmp/pentarelease-source/PENTARELEASE_CIE_SUBJECT.json >/dev/null
+          done
+          jq -e '.findings == []' /tmp/pentarelease-source/PENTARELEASE_CIE_SUBJECT.json >/dev/null
 
       - name: Mint governed OIDC identity
         id: oidc
@@ -113,7 +139,8 @@ jobs:
             --arg release_version "$RELEASE_VERSION" \
             --arg release_tag "$RELEASE_TAG" \
             --argjson payload_bytes "$PAYLOAD_BYTES" \
-            '{release_version:$release_version,release_tag:$release_tag,pr_number:null,payload_bytes:$payload_bytes}' \
+            --slurpfile cie_subject /tmp/pentarelease-source/PENTARELEASE_CIE_SUBJECT.json \
+            '{release_version:$release_version,release_tag:$release_tag,pr_number:null,payload_bytes:$payload_bytes,cie_subject:$cie_subject[0]}' \
             > /tmp/pentarelease-evidence-request.json
           curl --fail-with-body --silent --show-error \
             -X POST "$PENTARELEASE_EVIDENCE_ENDPOINT" \
@@ -124,6 +151,9 @@ jobs:
           jq . /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json
           test "$(jq -r '.ok' /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json)" = "true"
           test -n "$(jq -r '.result.projected.footer.evidence_sha256 // .result.footer.evidence_sha256 // empty' /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json)"
+          jq -e '.result.projected.footer.cie.score | type == "number"' /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json >/dev/null
+          jq -e '.result.projected.footer.cie.evidence.dimension_scores | length == 5' /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json >/dev/null
+          jq -e '.result.projected.footer.cie.evidence.algorithm_id == "ct.algorithm.cie.v1"' /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json >/dev/null
 
       - name: Materialize and enrich every release surface
         env:
@@ -154,8 +184,16 @@ jobs:
           done
           test "$(find dist/pentarelease-surface -maxdepth 1 -type f | wc -l)" -eq 8
           grep -Fq '## Release intelligence' dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
+          grep -Fq '| **Who** |' dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
+          grep -Fq '| **What** |' dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
+          grep -Fq '| **When** |' dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
+          grep -Fq '| **Where** |' dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
+          grep -Fq '| **Why** |' dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
+          grep -Fq '| **What to expect** |' dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
           grep -Fq 'Cost calculation and methodology' dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
           grep -Fq 'CIE dimension' dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
+          jq -e '.cie_score.score | type == "number"' dist/pentarelease-surface/PENTARELEASE_RELEASE_RECORD.json >/dev/null
+          jq -e '.release_intelligence.costs.methodology | type == "object"' dist/pentarelease-surface/PENTARELEASE_RELEASE_RECORD.json >/dev/null
 
       - name: Publish rich release record and assets
         env:
@@ -171,6 +209,7 @@ jobs:
           jq -e '.body | contains("pentarelease:comprehensive-release:start")' <<<"$READBACK" >/dev/null
           jq -e '.body | contains("Cost calculation and methodology")' <<<"$READBACK" >/dev/null
           jq -e '.body | contains("Cultural Imprint Engine (CIE)")' <<<"$READBACK" >/dev/null
+          jq -e '.body | contains("What to expect")' <<<"$READBACK" >/dev/null
           for EXPECTED in PENTARELEASE_COMPREHENSIVE_RELEASE.md PENTARELEASE_RELEASE_RECORD.json PENTARELEASE_COSTS.json PENTARELEASE_CIE_SCORE.json PENTARELEASE_DATA_CATALOG.json PENTARELEASE_EVIDENCE.json PENTARELEASE_FAQ.md PENTARELEASE_CHANGELOG.md; do
             jq -e --arg n "$EXPECTED" '.assets[] | select(.name == $n)' <<<"$READBACK" >/dev/null
           done
@@ -244,7 +283,15 @@ jobs:
           git show origin/main:README.md | grep -Fq "Latest PentaRelease — $TAG"
           git show origin/main:.pentarelease/state/release-surface.json | jq -e --arg tag "$TAG" '.last_release == $tag' >/dev/null
           git show origin/main:pentarelease/latest.mdx | grep -Fq 'Cost calculation and methodology'
-          git show origin/main:pentarelease/cie.mdx | grep -Fq '/100'
+          git show origin/main:pentarelease/latest.mdx | grep -Fq 'What to expect'
+          git show origin/main:pentarelease/cie.mdx | grep -Eq 'Overall score:.*[0-9]+.*\/100'
+          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Identity Fit'
+          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Community Value'
+          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Story Alignment'
+          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Brand Safety'
+          git show origin/main:pentarelease/cie.mdx | grep -Fq 'Legacy Impact'
+          python3 scripts/pentarelease/pentadocs_group.py --root . --policy .pentarelease/policy.json --check
           READBACK=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body)
           jq -e '.body | contains("Release intelligence")' <<<"$READBACK" >/dev/null
+          jq -e '.body | test("Overall score:[^0-9]*[0-9]+(?:\\.[0-9]+)?/100")' <<<"$READBACK" >/dev/null
           test "$(jq '[.assets[] | select(.name|startswith("PENTARELEASE_"))] | length' <<<"$READBACK")" -ge 8
