@@ -241,11 +241,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.commit.outputs.branch }}
+          HEAD_SHA: ${{ steps.commit.outputs.sha }}
         run: |
           set -euo pipefail
           PR_URL="$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
             --title "CHLOM governed publication batch" \
-            --body "Bounded CHLOM publication commands were provider-digest verified, deterministically normalized through the canonical PentaDocs quality engine, disposition-bound, and committed with their page-profile projection. Required repository governance runs on this PR; no direct protected-main push, force-push, admin bypass, credential mutation, or authority expansion is requested.")"
+            --body "Bounded CHLOM publication commands were provider-digest verified, deterministically normalized through the canonical PentaDocs quality engine, disposition-bound, and committed with their page-profile projection. The canonical governed merge gate is explicitly dispatched on this exact head because GITHUB_TOKEN-originated pull_request events are non-recursive. No direct protected-main push, force-push, admin bypass, credential mutation, or authority expansion is requested.")"
+
+          # GITHUB_TOKEN-created PRs do not recursively execute normal pull_request workflows.
+          # workflow_dispatch is the bounded exception, so explicitly invoke the canonical gate
+          # against the exact publication head and require its exact-head PASS before auto-merge.
+          gh workflow run governed-merge-gate.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+
+          GATE_RUN_ID=""
+          for _ in $(seq 1 12); do
+            sleep 10
+            GATE_RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" \
+              --workflow governed-merge-gate.yml --branch "$BRANCH" --event workflow_dispatch \
+              --limit 10 --json databaseId,headSha,createdAt \
+              --jq '[.[] | select(.headSha == env.HEAD_SHA)] | sort_by(.createdAt) | last | .databaseId // empty')"
+            if [ -n "$GATE_RUN_ID" ]; then break; fi
+          done
+          test -n "$GATE_RUN_ID"
+          gh run watch "$GATE_RUN_ID" --repo "$GITHUB_REPOSITORY" --exit-status
+
+          GATE_STATE="$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+            --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')"
+          echo "Governed publication gate: $GATE_STATE"
+          test "$GATE_STATE" = "completed:success"
 
           gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --auto --squash \
             --subject "docs(chlom): autonomous governed publication batch"
@@ -316,10 +339,16 @@ jobs:
         if: steps.claim.outputs.count != '0' && success()
         shell: bash
         env:
-          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
           COMMIT_SHA: ${{ steps.readback.outputs.sha }}
         run: |
           set -euo pipefail
+          # The initial claim token can expire while governance/merge checks run.
+          # Mint a fresh bounded token immediately before the terminal provider write.
+          raw="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=chlom-publication-publisher")"
+          OIDC_TOKEN="$(jq -r '.value' <<<"$raw")"
+          test -n "$OIDC_TOKEN" && test "$OIDC_TOKEN" != "null"
           ids="$(cat /tmp/chlom-command-ids.json)"
           test -n "$COMMIT_SHA"
           jq -n --argjson ids "$ids" --arg sha "$COMMIT_SHA" \
@@ -335,16 +364,22 @@ jobs:
         if: steps.claim.outputs.count != '0' && failure()
         continue-on-error: true
         shell: bash
-        env:
-          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
         run: |
           set -euo pipefail
           test -s /tmp/chlom-command-ids.json || exit 0
+          # Recovery can also occur long after the original claim token expires.
+          # Mint a fresh token so release is an authenticated terminal state change.
+          raw="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=chlom-publication-publisher")"
+          OIDC_TOKEN="$(jq -r '.value' <<<"$raw")"
+          test -n "$OIDC_TOKEN" && test "$OIDC_TOKEN" != "null"
           ids="$(cat /tmp/chlom-command-ids.json)"
           jq -n --argjson ids "$ids" \
             '{action:"release",command_ids:$ids,reason:"github_provider_job_failed"}' > /tmp/chlom-release-body.json
-          curl --silent --show-error \
+          curl --fail --silent --show-error \
             -X POST "$CHLOM_BRIDGE_URL" \
             -H "Authorization: Bearer $OIDC_TOKEN" \
             -H 'Content-Type: application/json' \
-            --data @/tmp/chlom-release-body.json >/dev/null
+            --data @/tmp/chlom-release-body.json > /tmp/chlom-release.json
+          jq -e '.ok == true' /tmp/chlom-release.json >/dev/null
