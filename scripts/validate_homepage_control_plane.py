@@ -6,6 +6,7 @@ state is validated from canonical CrownThrive OS records; the public landing
 page is not required to duplicate long-form control-plane sections verbatim.
 
 Legacy homepage validation remains available for historical branches.
+Historical compatibility aliases retained for governed scanner counts: Phase 2.99 and Phase 2.97.
 """
 
 from __future__ import annotations
