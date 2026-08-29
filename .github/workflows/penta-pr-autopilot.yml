@@ -32,6 +32,10 @@ jobs:
     name: PentaPR autopilot
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
     steps:
       - name: Checkout canonical Penta control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,10 +50,31 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Verify trusted PentaPR provider scope
+        if: github.event_name == 'pull_request_target'
+        shell: bash
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]]; then
+            echo "External fork PR: PentaPR provider mutation remains fail-closed."
+            exit 78
+          fi
+
+      - name: Require dedicated PentaPR provider credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${PENTA_PM_GITHUB_TOKEN}" ]]; then
+            echo "::error::PENTA_PM_GITHUB_TOKEN is unavailable; refusing PentaPR provider mutation."
+            exit 78
+          fi
+
       - name: Resolve autonomous target and exact head
         id: target
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -160,7 +185,7 @@ jobs:
         id: settle
         if: ${{ steps.target.outputs.skip != 'true' && steps.target.outputs.wait_for_settle == 'true' && steps.target.outputs.number != '' }}
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PENTA_NUMBER: ${{ steps.target.outputs.number }}
           PENTA_HEAD_SHA: ${{ steps.target.outputs.head_sha }}
@@ -266,7 +291,7 @@ jobs:
           set -euo pipefail
           gate_status=0
           python penta-control/scripts/penta_gate.py --root penta-control --output "$RUNNER_TEMP/pentagate-pr-autopilot.json" || gate_status=$?
-          python penta-control/scripts/penta_heal.py --root penta-control --gate-report "$RUNNER_TEMP/pentagate-pr-autopilot.json" --output "$RUNNER_TEMP/pentaheal-pr-autopilot.json" || true
+          python penta-control/scripts/penta_heal.py --root penta-control --gate-report "$RUNNER_TEMP/pentaheal-pr-autopilot.json" --output "$RUNNER_TEMP/pentaheal-pr-autopilot.json" || true
           if [[ "$gate_status" -ne 0 ]]; then
             echo 'PentaGate blocked autonomous PR terminal authority.'
             cat "$RUNNER_TEMP/pentagate-pr-autopilot.json"
@@ -277,7 +302,7 @@ jobs:
         id: tagger
         if: ${{ steps.target.outputs.skip != 'true' && (steps.target.outputs.wait_for_settle != 'true' || steps.settle.outputs.settled == 'true') }}
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PENTA_NUMBER: ${{ steps.target.outputs.number }}
         shell: bash
@@ -305,7 +330,7 @@ jobs:
         id: converge
         if: ${{ steps.target.outputs.skip != 'true' && (steps.target.outputs.wait_for_settle != 'true' || steps.settle.outputs.settled == 'true') && steps.tagger.outputs.deferred != 'true' }}
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PENTA_NUMBER: ${{ steps.target.outputs.number }}
           ALLOW_DEADLINE_CLOSE: ${{ steps.target.outputs.allow_close }}
@@ -324,7 +349,7 @@ jobs:
       - name: Passive terminal provider readback
         if: ${{ always() && steps.target.outputs.skip != 'true' && steps.tagger.outputs.deferred != 'true' && steps.converge.outcome == 'success' && steps.target.outputs.number != '' }}
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PENTA_NUMBER: ${{ steps.target.outputs.number }}
         shell: bash
