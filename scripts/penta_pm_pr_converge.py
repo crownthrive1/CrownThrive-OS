@@ -47,6 +47,8 @@ class GH:
     def __init__(self, repo: str, token: str | None = None) -> None:
         self.repo = repo
         self.token = token or os.environ.get("PENTA_PM_GITHUB_TOKEN") or os.environ["GITHUB_TOKEN"]
+        self._issues_cache: list[dict[str, Any]] | None = None
+        self._labels_cache: set[str] | None = None
 
     def req(self, method: str, path: str, body: Any | None = None) -> Any:
         data = None if body is None else json.dumps(body).encode("utf-8")
@@ -90,6 +92,33 @@ class GH:
                 break
         return items
 
+    def all_issues(self) -> list[dict[str, Any]]:
+        if self._issues_cache is None:
+            self._issues_cache = [
+                item
+                for item in self.paginate(f"/repos/{self.repo}/issues?state=all", max_pages=20)
+                if "pull_request" not in item
+            ]
+        return self._issues_cache
+
+    def remember_issue(self, issue: dict[str, Any]) -> None:
+        cache = self.all_issues()
+        number = int(issue["number"])
+        for index, current in enumerate(cache):
+            if int(current["number"]) == number:
+                cache[index] = issue
+                return
+        cache.append(issue)
+
+    def repo_labels(self) -> set[str]:
+        if self._labels_cache is None:
+            self._labels_cache = {
+                str(item.get("name") or "")
+                for item in self.paginate(f"/repos/{self.repo}/labels", max_pages=10)
+                if item.get("name")
+            }
+        return self._labels_cache
+
 
 def issue_numbers(pattern: re.Pattern[str], body: str) -> list[int]:
     return list(dict.fromkeys(int(value) for value in pattern.findall(body or "")))
@@ -121,8 +150,24 @@ def replace_tracking_with_terminal(body: str, issue_number: int) -> str:
 
 
 def ensure_labels(gh: GH, number: int, labels: set[str]) -> None:
-    if labels:
-        gh.post(f"/repos/{gh.repo}/issues/{number}/labels", {"labels": sorted(labels)})
+    if not labels:
+        return
+    existing = gh.repo_labels()
+    for name in sorted(labels.difference(existing)):
+        try:
+            gh.post(
+                f"/repos/{gh.repo}/labels",
+                {
+                    "name": name,
+                    "color": "ededed",
+                    "description": "CrownThrive Penta governance metadata",
+                },
+            )
+        except RuntimeError as exc:
+            if "422" not in str(exc):
+                raise
+        existing.add(name)
+    gh.post(f"/repos/{gh.repo}/issues/{number}/labels", {"labels": sorted(labels)})
 
 
 def get_issue(gh: GH, number: int) -> dict[str, Any]:
@@ -170,10 +215,8 @@ def ensure_blocked_by(gh: GH, issue_number: int, blocker: dict[str, Any]) -> boo
 
 
 def ensure_self_root(gh: GH) -> dict[str, Any]:
-    for issue in gh.paginate(f"/repos/{gh.repo}/issues?state=open"):
-        if "pull_request" in issue:
-            continue
-        if SELF_ROOT_MARKER in str(issue.get("body") or ""):
+    for issue in gh.all_issues():
+        if str(issue.get("state") or "").lower() == "open" and SELF_ROOT_MARKER in str(issue.get("body") or ""):
             return issue
     body = (
         f"{SELF_ROOT_MARKER}\n\n"
@@ -202,14 +245,13 @@ def ensure_self_root(gh: GH) -> dict[str, Any]:
             "penta:entity:issue",
         },
     )
+    gh.remember_issue(issue)
     return issue
 
 
 def find_child_for_pr(gh: GH, pr_number: int) -> dict[str, Any] | None:
     marker = CHILD_MARKER.format(pr_number=pr_number)
-    for issue in gh.paginate(f"/repos/{gh.repo}/issues?state=all"):
-        if "pull_request" in issue:
-            continue
+    for issue in gh.all_issues():
         if marker in str(issue.get("body") or ""):
             return issue
     return None
@@ -257,6 +299,7 @@ def ensure_pr_child(
         },
     )
     ensure_sub_issue(gh, int(parent_issue["number"]), child)
+    gh.remember_issue(child)
     return child
 
 
