@@ -1,0 +1,51 @@
+{
+  "contract": "ct.pentaself.scheduler-permanence.v2",
+  "version": "2.0.0",
+  "status": "production-runtime-applied",
+  "purpose": "Prevent stale scheduler snapshots or older repair generations from rolling back verified production clocks.",
+  "authority": {
+    "owner": ["PentaSELF", "PentaTime", "PentaSerialized", "PentaAssure"],
+    "risk_ceiling": "D2",
+    "d3_human_reserved": true,
+    "creates_provider_authority": false,
+    "creates_credential_authority": false,
+    "creates_money_movement_authority": false
+  },
+  "state_model": {
+    "desired_state_table": "integration_control.scheduler_desired_jobs_v2",
+    "append_only_event_table": "integration_control.scheduler_reconcile_events_v2",
+    "upsert_rpc": "integration_control.scheduler_desired_job_upsert_v2",
+    "reconcile_rpc": "integration_control.scheduler_permanence_reconcile_v2",
+    "guard_job": "ct-scheduler-permanence-guard-v2",
+    "guard_cadence": "* * * * *",
+    "generation_rule": "Only an equal or higher generation may replace a job's desired definition.",
+    "restore_rule": "Missing, inactive, command-drifted or schedule-drifted protected jobs are restored from the newest desired definition.",
+    "rollback_rule": "Rollback requires a new higher generation declaring the rollback; an older snapshot cannot overwrite the current generation."
+  },
+  "protected_lanes": [
+    "PentaSELF",
+    "PentaFactory continuity",
+    "PentaFactory daily fleet",
+    "PentaCensus",
+    "PentaMarketer intake",
+    "PentaMarketer persona execution",
+    "Locticians native monitoring",
+    "Locticians cold-outreach planner/scheduler when present",
+    "Locticians article dispatch/verifier",
+    "Brilliant Directories reference/failover receipts"
+  ],
+  "security": {
+    "rls": true,
+    "service_role_only": true,
+    "anon_execute": false,
+    "authenticated_execute": false,
+    "raw_secret_material": false,
+    "append_only_repair_receipts": true
+  },
+  "production_evidence": {
+    "migration": "pentaself_scheduler_permanence_guard_v2",
+    "generation": 2026082901,
+    "runtime_reconcile_invoked": true,
+    "source_convergence_required": true
+  }
+}
