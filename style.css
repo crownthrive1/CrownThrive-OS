@@ -1,0 +1,272 @@
+/* ct.pentadocs.presentation-contract.v2
+ * CrownThrive PentaDocs structural containment and responsive polish.
+ *
+ * The rules below repair two separate failure modes:
+ * 1. desktop navigation content painting outside its rail; and
+ * 2. mobile navigation/breadcrumb content entering the article paint layer.
+ *
+ * Mintlify owns the application shell. This file only establishes hard layout,
+ * overflow, opacity, and stacking boundaries around that shell.
+ */
+
+:root {
+  --ct-docs-brand: #7a1731;
+  --ct-docs-accent: #d4af37;
+  --ct-docs-surface: #ffffff;
+  --ct-docs-surface-dark: #09090b;
+  --ct-docs-text: #18181b;
+  --ct-docs-text-dark: #f4f4f5;
+  --ct-docs-border: rgba(122, 23, 49, 0.18);
+  --ct-docs-shadow: 0 24px 64px rgba(15, 23, 42, 0.26);
+}
+
+html,
+body {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+#body-content,
+#content-area,
+#content,
+main,
+article,
+mdx-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+mdx-content img,
+mdx-content video,
+mdx-content svg,
+article img,
+article video,
+article svg {
+  max-width: 100%;
+  height: auto;
+}
+
+mdx-content pre,
+mdx-content table,
+article pre,
+article table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Desktop rail containment. Long institutional labels may wrap, but they may
+ * never paint over the article canvas. */
+#sidebar {
+  min-width: 0;
+  isolation: isolate;
+  contain: layout paint;
+}
+
+#sidebar-content {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip !important;
+  overscroll-behavior-x: none;
+}
+
+#sidebar-content li,
+#sidebar-content a,
+#sidebar-content button,
+#sidebar-content span,
+sidebar-group,
+sidebar-title,
+sidebar-group-header {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#sidebar-content a,
+#sidebar-content button,
+#sidebar-content span,
+sidebar-title,
+sidebar-group-header {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+/* Keep the CrownThrive wordmark from forcing the mobile header wider than the
+ * viewport. Mintlify still controls the header layout and accessible label. */
+header a[href="/"] {
+  min-width: 0;
+  max-width: min(19.375rem, 66vw);
+}
+
+header a[href="/"] img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Mobile/tablet hard boundary. The desktop sidebar and table-of-contents must
+ * own zero layout, paint, focus, or pointer space below the desktop breakpoint.
+ * The compact mobile trigger remains in normal flow; an opened drawer receives
+ * an opaque, isolated, scrollable surface instead of a transparent overlay.
+ */
+@media (max-width: 1023.98px) {
+  body #sidebar,
+  body #table-of-contents {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    transform: translateX(-200vw) !important;
+  }
+
+  #body-content,
+  #content-area,
+  #content,
+  main,
+  article,
+  mdx-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-inline: 0 !important;
+    transform: none !important;
+  }
+
+  /* Replace the oversized breadcrumb slab with a bounded menu trigger. */
+  #mobile-nav {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: 40 !important;
+    transform: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: 3.5rem !important;
+    min-width: 3.5rem !important;
+    max-width: 3.5rem !important;
+    height: 3.25rem !important;
+    min-height: 3.25rem !important;
+    margin: 0.5rem 0 0.75rem 0.75rem !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    font-size: 0 !important;
+    border: 0 !important;
+    border-radius: 0.875rem !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    isolation: isolate;
+    overscroll-behavior: contain;
+  }
+
+  #mobile-nav::before,
+  #mobile-nav::after {
+    display: none !important;
+  }
+
+  #mobile-nav button,
+  #mobile-nav [role="button"] {
+    flex: 0 0 3.25rem !important;
+    width: 3.25rem !important;
+    min-width: 3.25rem !important;
+    max-width: 3.25rem !important;
+    height: 3.25rem !important;
+    min-height: 3.25rem !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 1rem !important;
+  }
+
+  /* Mintlify controls open/closed transforms and visibility. These rules do not
+   * force the drawer open; they make the drawer safe whenever it is rendered. */
+  #mobile-nav-content {
+    width: min(88vw, 22rem) !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 1rem) !important;
+    max-height: 100dvh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    isolation: isolate;
+    contain: layout paint;
+    z-index: 2147483000 !important;
+    background-color: var(--ct-docs-surface) !important;
+    color: var(--ct-docs-text) !important;
+    border-right: 1px solid var(--ct-docs-border) !important;
+    box-shadow: var(--ct-docs-shadow) !important;
+  }
+
+  #mobile-nav-content > div {
+    min-width: 0;
+    max-width: 100%;
+    background-color: inherit;
+  }
+
+  #mobile-nav-content li,
+  #mobile-nav-content a,
+  #mobile-nav-content button,
+  #mobile-nav-content span,
+  #mobile-nav-content sidebar-group,
+  #mobile-nav-content sidebar-title,
+  #mobile-nav-content sidebar-group-header {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  html.dark #mobile-nav-content,
+  .dark #mobile-nav-content,
+  [data-theme="dark"] #mobile-nav-content,
+  [data-color-mode="dark"] #mobile-nav-content {
+    background-color: var(--ct-docs-surface-dark) !important;
+    color: var(--ct-docs-text-dark) !important;
+    border-right-color: rgba(212, 175, 55, 0.24) !important;
+  }
+
+  header a[href="/"] {
+    max-width: min(15rem, 62vw);
+  }
+}
+
+@media (max-width: 420px) {
+  header a[href="/"] {
+    max-width: 58vw;
+  }
+
+  #mobile-nav-content {
+    width: min(92vw, 21rem) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #mobile-nav,
+  #mobile-nav-content,
+  #sidebar {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
