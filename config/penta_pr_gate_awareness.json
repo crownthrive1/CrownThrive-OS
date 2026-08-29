@@ -1,0 +1,66 @@
+{
+  "schema": "ct.penta.pr-gate-awareness.policy.v1",
+  "version": "1.0.0",
+  "status": "production_candidate",
+  "applies_to": "all_same_repository_pull_requests",
+  "owner": "PentaPR",
+  "self_certification": {
+    "required": true,
+    "state_name": "SELF_CERTIFIED",
+    "meaning": "The originating Penta or PR authority has produced an exact-source, hash-bound candidate evidence packet and accepts responsibility for the evidence it submitted.",
+    "does_not_replace": [
+      "required provider checks",
+      "PentaSerialized continuity validation",
+      "security and policy gates",
+      "exact destination readback",
+      "DAIL institutional binding",
+      "D3 or human-reserved authority when applicable"
+    ],
+    "evidence_path": "penta/evidence/pr-self-cert/pr-{number}.json",
+    "continuity_receipt_path": "penta/continuity/receipts/pr-{number}-self-certification.json",
+    "projection_model": "source_head_plus_evidence_projection_commit"
+  },
+  "gate_awareness": {
+    "required": true,
+    "required_contexts": [
+      "CrownThrive governed merge gate",
+      "PentaSerialized Continuity Assurance",
+      "Security Governance",
+      "Documentation Governance",
+      "PentaPM Governance"
+    ],
+    "missing_gate_action": "route_or_dispatch_without_bypass",
+    "failed_gate_action": "hold_and_route_to_owner",
+    "pending_gate_action": "wait_or_retry_bounded",
+    "head_change_action": "invalidate_prior_self_certification_and_regenerate"
+  },
+  "metadata_healing": {
+    "development_link_required": true,
+    "same_repo_missing_development_link_action": "create_pr_scoped_pentadevelopment_issue_and_bind_refs",
+    "external_fork_action": "fail_closed_without_provider_mutation"
+  },
+  "evidence": {
+    "hash": "sha256",
+    "canonical_json": true,
+    "exact_base_required": true,
+    "exact_subject_head_required": true,
+    "git_blob_identity_required": true,
+    "rollback_ref_required": true,
+    "changed_file_manifest_required": true,
+    "originator_identity_required": true,
+    "self_certifier_identity_required": true,
+    "provider_gate_results_are_provider_truth": true,
+    "dail_binding_required_before_institutional_certification": true
+  },
+  "authority": {
+    "risk_ceiling": "D2",
+    "originator_may_self_certify_candidate_evidence": true,
+    "originator_may_submit_own_evidence": true,
+    "originator_may_write_evidence_blobs": true,
+    "originator_may_write_continuity_receipts": true,
+    "originator_may_not_forge_provider_results": true,
+    "originator_may_not_bypass_required_checks": true,
+    "originator_may_not_manufacture_d3_authority": true,
+    "final_institutional_pass_requires_required_gates_and_readback": true
+  }
+}

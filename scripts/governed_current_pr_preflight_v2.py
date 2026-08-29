@@ -3,13 +3,18 @@
 
 Closes #121 by classifying only an exact registry of inert Help Center evidence
 transport as neutral while keeping every unknown or material data path fail-closed.
-This is provider CI evidence only and can never manufacture sovereign authority.
+Every pull request must also carry an exact-head originator self-certification
+projection; that self-certification is candidate evidence and never substitutes
+for provider gates, DAIL binding, or human-reserved authority.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 from typing import Any
 
 from governed_merge_decision import (
@@ -35,7 +40,7 @@ from governed_current_pr_preflight import (
 
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_CONTRACT = ROOT / "developers/manifests/governed-evidence-data-classification.v1.json"
-PREFLIGHT_VERSION = "2.0.0"
+PREFLIGHT_VERSION = "2.1.0"
 
 
 def evidence_contract() -> dict[str, Any]:
@@ -112,6 +117,47 @@ def classifications_for(trusted_files: set[str], policy: dict[str, Any], contrac
     return classifications, domains
 
 
+def validate_originator_self_certification(git_base: str, git_head: str) -> dict[str, Any]:
+    """Require a current self-cert packet on GitHub pull_request executions."""
+    if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
+        return {"state": "NOT_APPLICABLE", "reason": "non_pull_request_execution"}
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if not event_path:
+        raise SystemExit("ERROR: GITHUB_EVENT_PATH missing for pull_request self-certification gate")
+    try:
+        event = json.loads(Path(event_path).read_text(encoding="utf-8"))
+        number = int(event["pull_request"]["number"])
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise SystemExit("ERROR: unable to resolve pull request number for self-certification gate") from exc
+
+    command = [
+        sys.executable,
+        str(ROOT / "scripts" / "penta_pr_gate_awareness.py"),
+        "validate",
+        "--repo",
+        str(ROOT),
+        "--repository",
+        os.environ.get("GITHUB_REPOSITORY", "crownthrive1/CrownThrive-OS"),
+        "--base",
+        git_base,
+        "--head",
+        git_head,
+        "--pr-number",
+        str(number),
+    ]
+    proc = subprocess.run(command, cwd=ROOT, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout).strip()
+        raise SystemExit(f"ERROR: Penta originator self-certification HOLD: {detail[:1500]}")
+    try:
+        result = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise SystemExit("ERROR: self-certification validator emitted invalid JSON") from exc
+    if result.get("state") != "PASS":
+        raise SystemExit("ERROR: originator self-certification did not return PASS")
+    return result
+
+
 def self_test(policy: dict[str, Any], contract: dict[str, Any]) -> None:
     expected_neutral = {"institutional_general"}
     for path in contract["registered_neutral_paths"]:
@@ -151,6 +197,7 @@ def self_test(policy: dict[str, Any], contract: dict[str, Any]) -> None:
         "material_negative_vectors": len(material_vectors),
         "unknown_data_fail_closed": True,
         "extension_only_neutrality": False,
+        "originator_self_certification_gate": True,
         "self_test": "PASS",
     }, sort_keys=True))
 
@@ -170,6 +217,7 @@ def main() -> int:
     if not args.git_base or not args.git_head:
         raise SystemExit("ERROR: --git-base and --git-head are required unless --self-test is used")
 
+    self_certification = validate_originator_self_certification(args.git_base, args.git_head)
     trusted_files = trusted_changed_files_from_git(args.git_base, args.git_head)
     classifications, domains = classifications_for(trusted_files, policy, contract)
     required_specialists = required_specialists_for(domains, policy)
@@ -189,6 +237,7 @@ def main() -> int:
         "mode": "ci_operational_preflight_non_sovereign_authority",
         "preflight_version": PREFLIGHT_VERSION,
         "evidence_contract": contract["contract_id"],
+        "originator_self_certification": self_certification,
         "sovereign_authority": False,
         "trusted_changed_files_count": len(trusted_files),
         "trusted_changed_files_digest": changed_file_digest(trusted_files),
