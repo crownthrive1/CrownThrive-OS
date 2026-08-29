@@ -1,0 +1,68 @@
+{
+  "contract": "ct.stripe.institutional-webhook.v1",
+  "version": "1.0.0",
+  "status": "production",
+  "owner": "PentaHook/PentaCertify/PentaLedger",
+  "lanes": [
+    {
+      "lane_key": "thrivetickets",
+      "system_ref": "ThriveTickets",
+      "canonical_receiver": "stripe-institutional-webhook-v1?lane=thrivetickets",
+      "prior_failure": "HTTP 404",
+      "state": "production"
+    },
+    {
+      "lane_key": "sermon-toolkit",
+      "system_ref": "KJV/Sermon Toolkit",
+      "canonical_receiver": "stripe-institutional-webhook-v1?lane=sermon-toolkit",
+      "prior_failure": "HTTP 503",
+      "state": "production"
+    }
+  ],
+  "provider_repair": {
+    "provider": "Stripe",
+    "inventory": "integration_control.stripe_webhook_inventory_refresh_v1()",
+    "repair_edge": "stripe-webhook-repair-v1",
+    "replacement_rule": "create signed canonical endpoint, store whsec server-side, execute signed canary, read endpoint back from Stripe, then disable the old broken endpoint",
+    "provider_readback_required": true,
+    "signed_canary_required": true,
+    "old_endpoint_retirement_required": true
+  },
+  "receiver": {
+    "edge": "stripe-institutional-webhook-v1",
+    "jwt_required": false,
+    "stripe_signature_required": true,
+    "signature_tolerance_seconds": 300,
+    "max_body_bytes": 1048576,
+    "fixed_lanes_only": true,
+    "dedupe_key": ["lane_key", "stripe_event_id"],
+    "raw_event_persisted": false,
+    "raw_event_returned": false,
+    "safe_receipt_table": "integration_control.stripe_institutional_event_receipts_v1",
+    "handoff_table": "integration_control.stripe_event_handoffs_v1"
+  },
+  "evidence": {
+    "production_lanes": 2,
+    "provider_endpoint_state": "enabled",
+    "signed_canary_http_status": 200,
+    "institutional_ledger_created": true,
+    "real_provider_event_receipt_required_for_delivery_certification": true,
+    "canary_is_not_real_payment_evidence": true
+  },
+  "authority": {
+    "money_movement": false,
+    "entitlement_grant_from_unprocessed_receipt": false,
+    "d3_bypass": false,
+    "provider_secret_projection": false,
+    "fulfillment_requires_registered_downstream_handler": true
+  },
+  "permanence": {
+    "pentaself_repairs": [
+      "ct.repair.stripe-webhook.thrivetickets.v1",
+      "ct.repair.stripe-webhook.sermon-toolkit.v1",
+      "ct.repair.stripe-institutional-ledger-created.v1"
+    ],
+    "stale_endpoint_evidence_may_reopen_resolved_p0": false,
+    "newer_provider_or_signed_canary_failure_may_open_regression": true
+  }
+}
