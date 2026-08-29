@@ -1,0 +1,63 @@
+{
+  "contract": "ct.pentaself.production-repair-pack.20260829.v1",
+  "status": "production-runtime-applied-source-convergence",
+  "authority_ceiling": "D2",
+  "d3_human_reserved": true,
+  "migrations": [
+    "pentaself_scheduler_permanence_guard_v2",
+    "pentaself_current_truth_and_phase_reconciliation_v2",
+    "penta_marketer_event_derived_projection_v2b",
+    "penta_census_production_observability_certification_v2",
+    "stripe_webhook_resilient_ingress_v3",
+    "stripe_webhook_signed_canary_v3",
+    "stripe_webhook_provider_reconcile_v3",
+    "pentaself_monotonic_problem_resolution_fence_v2"
+  ],
+  "runtime_components": {
+    "scheduler_permanence": {
+      "desired_state": "integration_control.scheduler_desired_jobs_v2",
+      "reconciler": "integration_control.scheduler_permanence_reconcile_v2",
+      "cron": "ct-scheduler-permanence-guard-v2",
+      "cadence": "every_minute",
+      "generation": 2026082901
+    },
+    "current_truth": {
+      "reconciler": "penta_self.reconcile_current_truth_v2",
+      "cron": "ct-pentaself-current-truth-v2",
+      "cadence": "every_5_minutes"
+    },
+    "problem_resolution_fence": {
+      "registry": "penta_self.problem_resolution_fences_v2",
+      "fresh_recurrence_rule": "observed_after_resolution_only"
+    },
+    "penta_marketer_projection": {
+      "projection": "crm.penta_marketer_campaign_projection_v2",
+      "source": "crm.penta_marketer_campaign_events_v1",
+      "cron": "ct-pentamarketer-event-projection-v2"
+    },
+    "penta_census": {
+      "maturity": "production_observability",
+      "execution_eligible": false,
+      "certifier": "integration_control.penta_census_certify_production_observability_v2",
+      "cron": "ct-penta-census-certify-v2"
+    },
+    "stripe_webhooks": {
+      "contract": "ct.stripe.webhook.resilient-ingress.v3",
+      "router": "stripe-webhook-router-v3",
+      "lanes": ["thrivetickets", "sermon-toolkit"],
+      "provider_reconciler": "integration_control.stripe_webhook_provider_reconcile_v3",
+      "route_cron": "ct-stripe-webhook-route-v3",
+      "provider_cron": "ct-stripe-webhook-provider-reconcile-v3",
+      "money_movement": false
+    }
+  },
+  "safety": {
+    "raw_secret_projection": false,
+    "rate_limit_bypass": false,
+    "provider_permission_manufacture": false,
+    "money_movement": false,
+    "rights_grant": false,
+    "direct_main_bypass": false,
+    "historical_evidence_rewrite": false
+  }
+}
