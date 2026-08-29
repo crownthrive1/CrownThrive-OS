@@ -1,6 +1,14 @@
 name: PentaPM PR Metadata Convergence
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/penta-pm-pr-convergence.yml"
+      - "scripts/penta_pm_pr_converge.py"
+      - "tests/test_penta_pm_pr_converge.py"
+      - "config/penta_pm_policy.json"
+      - "scripts/penta_pm_reconcile.py"
   pull_request_target:
     types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
   workflow_run:
@@ -91,9 +99,9 @@ jobs:
             fi
             echo "args=--pr ${MANUAL_PR}" >> "$GITHUB_OUTPUT"
           else
-            # workflow_run is the deterministic follow-through for bot-created
-            # PentaSELF PRs because GITHUB_TOKEN-originated events may not spawn
-            # a second workflow. The reconciler is idempotent across all open PRs.
+            # main activation and PentaSELF workflow completion both reconcile
+            # all open governed PRs. This is the PentaRetro/PentaWatch catch-up
+            # path and is idempotent.
             echo "args=--all-open" >> "$GITHUB_OUTPUT"
           fi
 
