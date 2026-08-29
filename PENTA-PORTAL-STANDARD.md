@@ -152,3 +152,7 @@ PentaStatus SHALL flag a Penta when the production version, portal behavior, pro
 No future `Penta*` name is complete until PentaScribe registers its terminology/mark, the master Penta registry receives its identity and role, PentaDocs receives its guide, its family/layer/job/lifecycle/audience classifications are projected, the agent manifest receives its record, CrownThrive IO receives the dedicated route, PentaStatus receives a producer/status contract, accountable ownership/escalation exists, and the applicable build/certify/release/security/governance controls are bound.
 
 Any newly registered canonical Penta or governed `data/penta/systems*.json` extension SHALL be picked up by the portal/operational generator on the next governed docs reconciliation. Other named Penta references MUST first enter the candidate namespace so they are preserved without silent authority or maturity promotion.
+
+## Navigation containment and mobile rendering
+
+Large PentaDocs estates SHALL use Mintlify-native nested navigation groups when required to keep mobile and desktop sidebars bounded. Nesting is presentation structure only: it MUST preserve every canonical route, page identity, ownership, audience/profile semantics, evidence boundary, and authority constraint. Deterministic validators SHALL recurse through nested groups and fail closed on missing or duplicate governed groups rather than forcing a flat navigation layout.
