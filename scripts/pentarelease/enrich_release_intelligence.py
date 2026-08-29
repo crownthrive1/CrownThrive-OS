@@ -19,8 +19,8 @@ from typing import Any
 
 START = "<!-- pentarelease:managed-release-surface:start -->"
 END = "<!-- pentarelease:managed-release-surface:end -->"
-RELEASE_START = "<!-- pentarelease:comprehensive-release:start -->"
-RELEASE_END = "<!-- pentarelease:comprehensive-release:end -->"
+RELEASE_START = "{/* pentarelease:comprehensive-release:start */}"
+RELEASE_END = "{/* pentarelease:comprehensive-release:end */}"
 
 
 def load(path: Path, default: Any = None) -> Any:
