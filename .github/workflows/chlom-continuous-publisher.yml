@@ -339,10 +339,16 @@ jobs:
         if: steps.claim.outputs.count != '0' && success()
         shell: bash
         env:
-          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
           COMMIT_SHA: ${{ steps.readback.outputs.sha }}
         run: |
           set -euo pipefail
+          # The initial claim token can expire while governance/merge checks run.
+          # Mint a fresh bounded token immediately before the terminal provider write.
+          raw="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=chlom-publication-publisher")"
+          OIDC_TOKEN="$(jq -r '.value' <<<"$raw")"
+          test -n "$OIDC_TOKEN" && test "$OIDC_TOKEN" != "null"
           ids="$(cat /tmp/chlom-command-ids.json)"
           test -n "$COMMIT_SHA"
           jq -n --argjson ids "$ids" --arg sha "$COMMIT_SHA" \
@@ -358,16 +364,22 @@ jobs:
         if: steps.claim.outputs.count != '0' && failure()
         continue-on-error: true
         shell: bash
-        env:
-          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
         run: |
           set -euo pipefail
           test -s /tmp/chlom-command-ids.json || exit 0
+          # Recovery can also occur long after the original claim token expires.
+          # Mint a fresh token so release is an authenticated terminal state change.
+          raw="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=chlom-publication-publisher")"
+          OIDC_TOKEN="$(jq -r '.value' <<<"$raw")"
+          test -n "$OIDC_TOKEN" && test "$OIDC_TOKEN" != "null"
           ids="$(cat /tmp/chlom-command-ids.json)"
           jq -n --argjson ids "$ids" \
             '{action:"release",command_ids:$ids,reason:"github_provider_job_failed"}' > /tmp/chlom-release-body.json
-          curl --silent --show-error \
+          curl --fail --silent --show-error \
             -X POST "$CHLOM_BRIDGE_URL" \
             -H "Authorization: Bearer $OIDC_TOKEN" \
             -H 'Content-Type: application/json' \
-            --data @/tmp/chlom-release-body.json >/dev/null
+            --data @/tmp/chlom-release-body.json > /tmp/chlom-release.json
+          jq -e '.ok == true' /tmp/chlom-release.json >/dev/null
