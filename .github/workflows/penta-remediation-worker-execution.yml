@@ -17,6 +17,7 @@ permissions:
   issues: write
   pull-requests: write
   actions: read
+  id-token: write
 
 concurrency:
   group: penta-remediation-worker-${{ github.event.client_payload.finding_id || github.event.inputs.number || 'sweep' }}
@@ -31,8 +32,8 @@ jobs:
       PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
       GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PENTA_REMEDIATION_OIDC_ENDPOINT: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-remediation-worker-oidc
+      PENTA_REMEDIATION_OIDC_AUDIENCE: crownthrive-penta-remediation
     steps:
       - name: Checkout canonical Penta control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,16 +46,46 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Require trusted worker credentials
+      - name: Require trusted worker GitHub and OIDC authority
         shell: bash
         run: |
           set -euo pipefail
-          for name in PENTA_PM_GITHUB_TOKEN SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+          for name in PENTA_PM_GITHUB_TOKEN PENTA_REMEDIATION_OIDC_ENDPOINT PENTA_REMEDIATION_OIDC_AUDIENCE ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN; do
             if [[ -z "${!name:-}" ]]; then
               echo "::error::$name is unavailable; refusing remediation execution."
               exit 78
             fi
           done
+
+      - name: Mint bounded GitHub OIDC credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          request_url = os.environ['ACTIONS_ID_TOKEN_REQUEST_URL']
+          audience = os.environ['PENTA_REMEDIATION_OIDC_AUDIENCE']
+          separator = '&' if '?' in request_url else '?'
+          url = request_url + separator + 'audience=' + urllib.parse.quote(audience, safe='')
+          request = urllib.request.Request(
+              url,
+              headers={
+                  'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN'],
+                  'Accept': 'application/json',
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              token = json.load(response).get('value') or ''
+          if not token:
+              raise SystemExit('github_oidc_token_missing')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as handle:
+              handle.write('PENTA_REMEDIATION_OIDC_TOKEN=' + token + '\n')
+          print('GitHub OIDC credential minted for bounded Penta remediation audience; raw token not logged.')
+          PY
 
       - name: Validate execution bridge contracts
         run: |
