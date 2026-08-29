@@ -64,6 +64,13 @@ def money(value: Any) -> str:
         return "not available"
 
 
+def dimension_summary(value: Any) -> str:
+    """Render CIE dimensions as deterministic MDX-safe inline text."""
+    if not isinstance(value, dict) or not value:
+        return "not available"
+    return ", ".join(f"{key}={value[key]}" for key in sorted(value))
+
+
 def strip_block(text: str, start: str, end: str) -> str:
     return re.sub(re.escape(start) + r".*?" + re.escape(end) + r"\n?", "", text, flags=re.S).rstrip()
 
@@ -322,6 +329,7 @@ def main() -> None:
     }
     write_json(dist / "PENTARELEASE_EVIDENCE.json", ev)
 
+    cie_dimensions = dimension_summary(intel["cie"].get("dimension_scores"))
     faq = f"""# Release FAQ — {record.get('tag')}
 
 ## Who released it?
@@ -331,13 +339,13 @@ def main() -> None:
 {len(record.get('what_changed') or [])} changed path(s). {record.get('why')}
 
 ## What did it cost?
-Provider actual: {money(intel['costs'].get('provider_actual_usd'))}. Recognized release exposure: {money(intel['costs'].get('recognized_release_exposure_usd'))}. Direct usage calculation status: {nested(intel,'costs','direct_usage_calculation','cost_status',default='not_available')}. The direct calculation only exists when certified usage bindings and rate cards exist.
+Provider actual: {money(intel['costs'].get('provider_actual_usd'))}. Recognized release exposure: {money(intel['costs'].get('recognized_release_exposure_usd'))}. Direct usage calculation status: `{nested(intel,'costs','direct_usage_calculation','cost_status',default='not_available')}`. The direct calculation only exists when certified usage bindings and rate cards exist.
 
 ## What is the CIE result?
-{intel['cie'].get('status')} — {intel['cie'].get('score')}/100. Dimension scores: {json.dumps(intel['cie'].get('dimension_scores') or {}, sort_keys=True)}.
+{intel['cie'].get('status')} — {intel['cie'].get('score')}/100. Dimension scores: `{cie_dimensions}`.
 
 ## What should I expect?
-The GitHub Release, attached evidence assets, README-managed block, and PentaDocs release pages should all converge on the same release version and evidence hash.
+The GitHub Release, attached evidence assets, README-managed block, Google Drive mirror, and PentaDocs release pages should all converge on the same release version and evidence hash.
 """
     (dist / "PENTARELEASE_FAQ.md").write_text(faq, encoding="utf-8")
     (dist / "PENTARELEASE_CHANGELOG.md").write_text(
