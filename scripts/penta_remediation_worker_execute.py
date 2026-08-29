@@ -21,6 +21,7 @@ from typing import Any
 
 GITHUB_API = "https://api.github.com"
 DEFAULT_OIDC_ENDPOINT = "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-remediation-worker-oidc"
+DEFAULT_OIDC_AUDIENCE = "crownthrive-penta-remediation"
 MARKER_RE = re.compile(r"penta-self-remediation:([0-9a-fA-F-]{36})")
 EXEC_MARKER = "<!-- penta-remediation-execution:{execution_id} -->"
 
@@ -43,6 +44,33 @@ def request_json(method: str, url: str, headers: dict[str, str], body: Any | Non
         raise HTTPError(f"{method} {url} -> {exc.code}: {detail[:1000]}") from exc
 
 
+def mint_github_oidc_token(audience: str) -> str:
+    """Mint a fresh short-lived GitHub OIDC token without logging or persisting it."""
+    request_url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL") or ""
+    request_token = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN") or ""
+    if not request_url or not request_token:
+        raise RuntimeError("github_oidc_refresh_authority_unavailable")
+    separator = "&" if "?" in request_url else "?"
+    url = request_url + separator + "audience=" + urllib.parse.quote(audience, safe="")
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": "Bearer " + request_token,
+            "Accept": "application/json",
+            "User-Agent": "CrownThrive-PentaRemediationWorker/1.3",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            token = str((json.load(response) or {}).get("value") or "")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")
+        raise RuntimeError(f"github_oidc_refresh_failed:{exc.code}:{detail[:200]}") from exc
+    if not token:
+        raise RuntimeError("github_oidc_refresh_token_missing")
+    return token
+
+
 class GH:
     def __init__(self, repo: str, token: str) -> None:
         self.repo = repo
@@ -51,7 +79,7 @@ class GH:
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
             "Content-Type": "application/json",
-            "User-Agent": "CrownThrive-PentaRemediationWorker/1.2",
+            "User-Agent": "CrownThrive-PentaRemediationWorker/1.3",
         }
 
     def req(self, method: str, path: str, body: Any | None = None, *, allow_404: bool = False) -> Any:
@@ -85,26 +113,44 @@ class GH:
 class Supabase:
     """OIDC-authenticated RPC façade. No Supabase service-role secret enters Actions."""
 
-    def __init__(self, endpoint: str, oidc_token: str) -> None:
+    def __init__(self, endpoint: str, oidc_token: str, audience: str = DEFAULT_OIDC_AUDIENCE) -> None:
         self.endpoint = endpoint.rstrip("/")
+        self.audience = audience
         self.headers = {
             "Authorization": f"Bearer {oidc_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "CrownThrive-PentaRemediationWorker/1.2",
+            "User-Agent": "CrownThrive-PentaRemediationWorker/1.3",
         }
+        self.refresh_count = 0
+
+    @staticmethod
+    def _is_expired_oidc_error(exc: HTTPError) -> bool:
+        text = str(exc).lower()
+        return (
+            "exp\" claim timestamp check failed" in text
+            or "exp' claim timestamp check failed" in text
+            or "token expired" in text
+            or "jwt expired" in text
+        )
+
+    def _refresh_oidc(self) -> None:
+        token = mint_github_oidc_token(self.audience)
+        self.headers["Authorization"] = f"Bearer {token}"
+        self.refresh_count += 1
 
     def rpc(self, name: str, payload: dict[str, Any] | None = None) -> Any:
-        envelope = request_json(
-            "POST",
-            self.endpoint,
-            self.headers,
-            {"op": name, "args": payload or {}},
-        )
+        body = {"op": name, "args": payload or {}}
+        try:
+            envelope = request_json("POST", self.endpoint, self.headers, body)
+        except HTTPError as exc:
+            if not self._is_expired_oidc_error(exc):
+                raise
+            self._refresh_oidc()
+            envelope = request_json("POST", self.endpoint, self.headers, body)
         if not isinstance(envelope, dict) or not envelope.get("ok"):
             raise RuntimeError(f"penta_remediation_oidc_rpc_rejected:{name}")
-        result = envelope.get("result")
-        return result if isinstance(result, dict) else result
+        return envelope.get("result")
 
 
 def now_iso() -> str:
@@ -271,8 +317,8 @@ def mark_verified_pr(gh: GH, pr: dict[str, Any], execution: dict[str, Any]) -> N
 
 
 def finalize_pr(gh: GH, sb: Supabase, number: int) -> None:
-    readback = sb.rpc("penta_remediation_execution_read_v1", {"p_pr_number": number})
-    for execution in (readback or {}).get("items", []):
+    readback = sb.rpc("penta_remediation_execution_read_v1", {"p_pr_number": number}) or {}
+    for execution in readback.get("items", []):
         pr = gh.get(f"/pulls/{number}")
         state = execution.get("state")
         if state == "verified":
@@ -302,10 +348,11 @@ def main() -> int:
     token = os.environ.get("PENTA_PM_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN")
     oidc_token = os.environ.get("PENTA_REMEDIATION_OIDC_TOKEN")
     oidc_endpoint = os.environ.get("PENTA_REMEDIATION_OIDC_ENDPOINT") or DEFAULT_OIDC_ENDPOINT
+    oidc_audience = os.environ.get("PENTA_REMEDIATION_OIDC_AUDIENCE") or DEFAULT_OIDC_AUDIENCE
     if not token or not oidc_token:
         raise SystemExit("trusted_remediation_github_and_oidc_credentials_required")
     gh = GH(args.repo, token)
-    sb = Supabase(oidc_endpoint, oidc_token)
+    sb = Supabase(oidc_endpoint, oidc_token, oidc_audience)
 
     requested = args.pr or event_pr_number()
     adopted: list[int] = []
@@ -341,7 +388,15 @@ def main() -> int:
         finalize_pr(gh, sb, number)
 
     status = sb.rpc("penta_remediation_execution_status_v1", {}) or {}
-    print(json.dumps({"state": "COMPLETE", "adopted_prs": adopted, "reconcile": reconcile, "claimed": claim.get("count", 0), "executed": executed, "status": status}, sort_keys=True))
+    print(json.dumps({
+        "state": "COMPLETE",
+        "adopted_prs": adopted,
+        "reconcile": reconcile,
+        "claimed": claim.get("count", 0),
+        "executed": executed,
+        "oidc_refresh_count": sb.refresh_count,
+        "status": status,
+    }, sort_keys=True))
     return 0
 
 
