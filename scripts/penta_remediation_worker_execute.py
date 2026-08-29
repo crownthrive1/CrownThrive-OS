@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Trusted Penta remediation worker execution bridge.
-
-PentaPM assignment is authoritative metadata. This worker turns that assignment
-into a durable ThriveBase execution task, runs only registered bounded handlers,
-writes an evidence receipt to the existing remediation PR branch, and releases
-the bootstrap hold only after provider-side verification.
-"""
+"""Trusted Penta remediation worker execution bridge."""
 from __future__ import annotations
 
 import argparse
@@ -44,8 +38,7 @@ def request_json(method: str, url: str, headers: dict[str, str], body: Any | Non
         raise HTTPError(f"{method} {url} -> {exc.code}: {detail[:1000]}") from exc
 
 
-def mint_github_oidc_token(audience: str) -> str:
-    """Mint a fresh short-lived GitHub OIDC token without logging or persisting it."""
+def mint_github_oidc_token(audience: str = DEFAULT_OIDC_AUDIENCE) -> str:
     request_url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL") or ""
     request_token = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN") or ""
     if not request_url or not request_token:
@@ -111,7 +104,7 @@ class GH:
 
 
 class Supabase:
-    """OIDC-authenticated RPC façade. No Supabase service-role secret enters Actions."""
+    """OIDC-authenticated RPC facade. No Supabase service-role secret enters Actions."""
 
     def __init__(self, endpoint: str, oidc_token: str, audience: str = DEFAULT_OIDC_AUDIENCE) -> None:
         self.endpoint = endpoint.rstrip("/")
@@ -126,10 +119,10 @@ class Supabase:
 
     @staticmethod
     def _is_expired_oidc_error(exc: HTTPError) -> bool:
-        text = str(exc).lower()
+        text = str(exc).lower().replace("\\\"", '"').replace("\\'", "'")
         return (
-            "exp\" claim timestamp check failed" in text
-            or "exp' claim timestamp check failed" in text
+            '"exp" claim timestamp check failed' in text
+            or "'exp' claim timestamp check failed" in text
             or "token expired" in text
             or "jwt expired" in text
         )
@@ -317,8 +310,8 @@ def mark_verified_pr(gh: GH, pr: dict[str, Any], execution: dict[str, Any]) -> N
 
 
 def finalize_pr(gh: GH, sb: Supabase, number: int) -> None:
-    readback = sb.rpc("penta_remediation_execution_read_v1", {"p_pr_number": number}) or {}
-    for execution in readback.get("items", []):
+    readback = sb.rpc("penta_remediation_execution_read_v1", {"p_pr_number": number})
+    for execution in (readback or {}).get("items", []):
         pr = gh.get(f"/pulls/{number}")
         state = execution.get("state")
         if state == "verified":
@@ -348,11 +341,11 @@ def main() -> int:
     token = os.environ.get("PENTA_PM_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN")
     oidc_token = os.environ.get("PENTA_REMEDIATION_OIDC_TOKEN")
     oidc_endpoint = os.environ.get("PENTA_REMEDIATION_OIDC_ENDPOINT") or DEFAULT_OIDC_ENDPOINT
-    oidc_audience = os.environ.get("PENTA_REMEDIATION_OIDC_AUDIENCE") or DEFAULT_OIDC_AUDIENCE
+    audience = os.environ.get("PENTA_REMEDIATION_OIDC_AUDIENCE") or DEFAULT_OIDC_AUDIENCE
     if not token or not oidc_token:
         raise SystemExit("trusted_remediation_github_and_oidc_credentials_required")
     gh = GH(args.repo, token)
-    sb = Supabase(oidc_endpoint, oidc_token, oidc_audience)
+    sb = Supabase(oidc_endpoint, oidc_token, audience)
 
     requested = args.pr or event_pr_number()
     adopted: list[int] = []
@@ -394,8 +387,8 @@ def main() -> int:
         "reconcile": reconcile,
         "claimed": claim.get("count", 0),
         "executed": executed,
-        "oidc_refresh_count": sb.refresh_count,
         "status": status,
+        "oidc_refresh_count": sb.refresh_count,
     }, sort_keys=True))
     return 0
 
