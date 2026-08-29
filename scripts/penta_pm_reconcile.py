@@ -24,6 +24,15 @@ POLICY = ROOT / "config" / "penta_pm_policy.json"
 RECEIPT_DIR = ROOT / "artifacts" / "penta-pm"
 LINK_RE = re.compile(r"(?im)^\s*(closes|fixes|resolves|refs|references)\s+#(\d+)\b")
 PROJECT_STATE_QUERY = """query($id:ID!){node(id:$id){... on ProjectV2{fields(first:100){nodes{... on ProjectV2FieldCommon{id name dataType}}} items(first:100){nodes{id content{... on Issue{id number} ... on PullRequest{id number}}}}}}}"""
+API_VERSION = "2026-03-10"
+
+
+class ProjectsCompatibilityError(RuntimeError):
+    """A Projects-v2 owner/token/API transport mismatch, not a generic scope claim."""
+
+    def __init__(self, reason_code, message):
+        super().__init__(message)
+        self.reason_code = reason_code
 
 
 def request(method, url, token, payload=None):
@@ -31,8 +40,8 @@ def request(method, url, token, payload=None):
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {token}",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "CrownThrive-PentaPM/1.0",
+        "X-GitHub-Api-Version": API_VERSION,
+        "User-Agent": "CrownThrive-PentaPM/1.1",
     }
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
@@ -77,14 +86,27 @@ def ensure_milestones(api, token, policy, apply):
     return current, actions
 
 
-def owner_project_context(token, owner, repo):
-    """Resolve the Projects-v2 host through the authenticated principal.
+def normalize_user_projects(projects):
+    """Normalize the REST user-owned Projects representation to GraphQL shape."""
+    nodes = []
+    for project in projects:
+        node_id = project.get("node_id")
+        title = project.get("title")
+        number = project.get("number")
+        if node_id and title and number is not None:
+            nodes.append({"id": node_id, "title": title, "number": number})
+    return nodes
 
-    Fine-grained PATs can legitimately access a user's own Projects v2 surface
-    through ``viewer`` while GitHub rejects the same project traversal through
-    ``repository.owner.projectsV2``. Resolve identity first, then query the
-    canonical host explicitly. Organization-owned projects continue to use the
-    organization Projects v2 surface.
+
+def owner_project_context(token, owner, repo):
+    """Resolve Projects v2 by repository-owner type and supported API transport.
+
+    User-owned Projects have a distinct REST surface. PentaPM probes that explicit
+    owner path first, then falls back to ``user(login).projectsV2`` GraphQL. This
+    avoids treating a rejected ``viewer.projectsV2`` traversal as proof that the
+    configured token is missing permissions.
+
+    Organization-owned Projects keep the organization GraphQL path.
     """
     identity_q = """
     query($owner:String!,$repo:String!){
@@ -95,28 +117,61 @@ def owner_project_context(token, owner, repo):
     }
     """
     identity = graphql(token, identity_q, {"owner": owner, "repo": repo})
-    repo_owner = identity["repository"]["owner"]
+    repository = identity.get("repository")
+    if not repository or not repository.get("owner"):
+        raise RuntimeError(f"PentaPM cannot resolve repository owner for {owner}/{repo}")
+    repo_owner = repository["owner"]
     viewer = identity["viewer"]
 
     if repo_owner["__typename"] == "User":
         if repo_owner["login"].lower() != viewer["login"].lower():
-            raise RuntimeError(
+            raise ProjectsCompatibilityError(
+                "user_owner_viewer_mismatch",
                 "PentaPM Projects v2 user-owner mismatch: "
-                f"repository owner={repo_owner['login']} authenticated viewer={viewer['login']}"
+                f"repository owner={repo_owner['login']} authenticated viewer={viewer['login']}",
             )
-        q = """
-        query{
-          viewer{
+
+        rest_url = f"https://api.github.com/users/{repo_owner['login']}/projectsV2?per_page=100"
+        rest_error = None
+        try:
+            projects = request("GET", rest_url, token)
+            if not isinstance(projects, list):
+                raise RuntimeError(f"Expected list from {rest_url}")
+            return {
+                "repository_owner": repo_owner,
+                "project_host": {
+                    "id": repo_owner["id"],
+                    "login": repo_owner["login"],
+                    "projectsV2": {"nodes": normalize_user_projects(projects)},
+                },
+                "access_path": "user.projectsV2.rest",
+            }
+        except RuntimeError as exc:
+            rest_error = exc
+
+        user_q = """
+        query($login:String!){
+          user(login:$login){
             id
             login
             projectsV2(first:100){nodes{id title number}}
           }
         }
         """
+        try:
+            host = graphql(token, user_q, {"login": repo_owner["login"]})["user"]
+        except RuntimeError as gql_error:
+            raise ProjectsCompatibilityError(
+                "user_owned_projects_token_or_transport_compatibility",
+                "GitHub rejected both supported user-owned Projects v2 discovery paths. "
+                "This does not by itself prove the configured Projects permissions are missing. "
+                f"REST /users/{repo_owner['login']}/projectsV2: {rest_error}; "
+                f"GraphQL user(login).projectsV2: {gql_error}",
+            ) from gql_error
         return {
             "repository_owner": repo_owner,
-            "project_host": graphql(token, q)["viewer"],
-            "access_path": "viewer.projectsV2",
+            "project_host": host,
+            "access_path": "user.projectsV2.graphql",
         }
 
     if repo_owner["__typename"] == "Organization":
@@ -256,12 +311,24 @@ def main():
             actions += ensure_project_fields(token, project["id"], policy["project_fields"], args.apply)
             pstate = project_items_and_fields(token, project["id"])
             existing = {n["content"]["number"] for n in pstate["items"]["nodes"] if n.get("content") and n["content"].get("number")}
+    except ProjectsCompatibilityError as exc:
+        provider_hold = True
+        holds.append({
+            "type": "projects_v2_provider_authority",
+            "provider": "github",
+            "required_secret": "PENTA_PM_GITHUB_TOKEN",
+            "reason_code": exc.reason_code,
+            "repository_owner": owner,
+            "message": str(exc),
+        })
     except RuntimeError as exc:
         provider_hold = True
         holds.append({
             "type": "projects_v2_provider_authority",
             "provider": "github",
             "required_secret": "PENTA_PM_GITHUB_TOKEN",
+            "reason_code": "provider_request_rejected",
+            "repository_owner": owner,
             "message": str(exc),
         })
 

@@ -65,7 +65,7 @@ class GH:
                 "Authorization": f"Bearer {self.token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": API_VERSION,
-                "User-Agent": "CrownThrive-PentaPM-PR-Convergence/1.1",
+                "User-Agent": "CrownThrive-PentaPM-PR-Convergence/1.2",
             },
         )
         try:
@@ -291,7 +291,7 @@ def ensure_pr_child(
     gh: GH,
     pr: dict[str, Any],
     parent_issue: dict[str, Any] | None,
-    tracking_entity: dict[str, Any],
+    tracking_entity: dict[str, Any] | None,
     pr_labels: set[str],
 ) -> dict[str, Any]:
     pr_number = int(pr["number"])
@@ -300,9 +300,12 @@ def ensure_pr_child(
     if parent_issue is not None:
         relationship_line = f"Parent work: #{parent_issue['number']}"
         relationship_copy = "the umbrella parent remains referenced for multi-PR completion tracking."
-    else:
+    elif tracking_entity is not None:
         relationship_line = f"Related tracked PR: #{tracking_entity['number']}"
         relationship_copy = "the related PR remains a cross-reference because GitHub does not permit PRs as sub-issue parents."
+    else:
+        relationship_line = "Relationship: PR-scoped terminal Development unit"
+        relationship_copy = "no upstream issue was supplied, so no parent or dependency relationship is invented."
     title = f"[PentaDevelopment] PR #{pr_number}: {str(pr.get('title') or '')[:105]}"
     body = (
         f"{marker}\n\n"
@@ -373,13 +376,23 @@ def converge_pr(gh: GH, pr_number: int, *, apply: bool) -> dict[str, Any]:
     tracking = issue_numbers(TRACKING_RE, body)
     refs = list(dict.fromkeys(terminal + tracking))
     if not refs:
-        result["development_action"] = "missing-reference"
+        result["development_action"] = "create-or-reuse-unparented-child"
+        if apply:
+            child = ensure_pr_child(gh, pr, None, None, labels)
+            result["child_issue"] = int(child["number"])
+            new_body = body.rstrip() + f"\n\nCloses #{child['number']}\n"
+            gh.patch(f"/repos/{gh.repo}/pulls/{pr_number}", {"body": new_body})
         return result
 
     referenced_entities = [get_issue(gh, number) for number in refs]
     source = select_issue_reference(referenced_entities)
     if source is None:
-        result["development_action"] = "missing-reference"
+        result["development_action"] = "create-or-reuse-unparented-child"
+        if apply:
+            child = ensure_pr_child(gh, pr, None, None, labels)
+            result["child_issue"] = int(child["number"])
+            new_body = body.rstrip() + f"\n\nCloses #{child['number']}\n"
+            gh.patch(f"/repos/{gh.repo}/pulls/{pr_number}", {"body": new_body})
         return result
     source_is_issue = is_issue_entity(source)
     result["reference_source"] = int(source["number"])

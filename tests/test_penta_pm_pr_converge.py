@@ -64,6 +64,12 @@ class PentaPMPRConvergeTests(unittest.TestCase):
         issue = {"number": 20}
         self.assertEqual(mod.select_issue_reference([pr, issue]), issue)
 
+    def test_no_reference_gets_pr_scoped_child_contract(self):
+        gh = FakeGH(pr_body="Governed change without explicit work item", labels=["penta:pm"])
+        result = mod.converge_pr(gh, 77, apply=False)
+        self.assertTrue(result["governed"])
+        self.assertEqual(result["development_action"], "create-or-reuse-unparented-child")
+
     def test_pentaself_tracking_link_is_terminal_candidate(self):
         gh = FakeGH(
             pr_body="<!-- penta-self-remediation:abc -->\n\nRefs #20",
