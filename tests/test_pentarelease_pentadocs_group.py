@@ -65,6 +65,45 @@ class PentaReleasePentaDocsGroupTests(unittest.TestCase):
             self.assertIn("Human Group", groups)
             self.assertEqual(groups.count("PentaRelease"), 1)
 
+    def test_supports_canonical_groups_navigation_shape(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            p = policy()
+            p["release_surface"]["pentadocs"]["tab"] = "Releases & Evidence"
+            value = {
+                "navigation": {
+                    "tabs": [
+                        {
+                            "tab": "Releases & Evidence",
+                            "groups": [
+                                {"group": "Release Overview", "pages": ["releases/index"]},
+                                {
+                                    "group": "PentaRelease",
+                                    "icon": "box-archive",
+                                    "pages": ["pentarelease/latest", "pentarelease/evidence"],
+                                },
+                            ],
+                        }
+                    ]
+                }
+            }
+            self.write_fixture(root, docs_value=value, policy_value=p)
+            result = pg.sync(root, root / ".pentarelease/policy.json")
+            self.assertEqual(result["navigation_key"], "groups")
+            self.assertTrue(result["unique_route_ownership_verified"])
+            self.assertTrue(pg.inspect(root, root / ".pentarelease/policy.json")["healthy"])
+
+    def test_duplicate_route_outside_canonical_group_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            value = docs()
+            value["navigation"]["tabs"][1]["pages"] = [
+                {"group": "Other", "pages": ["pentarelease/latest"]}
+            ]
+            self.write_fixture(root, docs_value=value)
+            with self.assertRaises(RuntimeError):
+                pg.sync(root, root / ".pentarelease/policy.json")
+
     def test_conflicting_unmanaged_group_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
