@@ -80,7 +80,7 @@ jobs:
             expected="$(jq -r '.content_sha256' <<<"$command")"
             actual="$(sha256sum "$path" | awk '{print $1}')"
             if [[ "$expected" != "$actual" ]]; then
-              echo "Digest mismatch for $path" >&2
+              echo "Provider digest mismatch for $path" >&2
               exit 20
             fi
           done
@@ -153,9 +153,6 @@ jobs:
           if not targets:
               raise SystemExit('Claim contained no governed CHLOM MDX targets')
 
-          # A generated page must have exactly one current disposition. If a target
-          # becomes navigated, remove its direct-link disposition; otherwise bind it
-          # to the canonical public-safe operational direct-link category.
           for category in sorted(expected_categories):
               pages = dispositions.get(category)
               if not isinstance(pages, list) or any(not isinstance(page, str) for page in pages):
@@ -176,6 +173,38 @@ jobs:
               print(f'{path}: {disposition}')
           PY
 
+      - name: Apply canonical PentaDocs quality standard
+        if: steps.claim.outputs.count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/pentadocs_quality.py --apply
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          claim = json.loads(Path('/tmp/chlom-claim.json').read_text(encoding='utf-8'))
+          records = []
+          for command in claim.get('result', {}).get('commands', []):
+              path = command.get('file_path')
+              if not isinstance(path, str) or not path.startswith('chlom/') or not path.endswith('.mdx'):
+                  continue
+              data = Path(path).read_bytes()
+              records.append({
+                  'file_path': path,
+                  'provider_content_sha256': command.get('content_sha256'),
+                  'canonical_content_sha256': hashlib.sha256(data).hexdigest(),
+              })
+          if not records:
+              raise SystemExit('No canonical CHLOM digest records were generated')
+          Path('/tmp/chlom-canonical-digests.json').write_text(
+              json.dumps(records, sort_keys=True, separators=(',', ':')) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(records, indent=2, sort_keys=True))
+          PY
+
       - name: Commit governed publication candidate
         id: commit
         if: steps.claim.outputs.count != '0'
@@ -189,7 +218,8 @@ jobs:
           git checkout -b "$BRANCH"
           git add \
             chlom/ \
-            developers/manifests/pentadocs-unlisted-page-dispositions.v1.json
+            developers/manifests/pentadocs-unlisted-page-dispositions.v1.json \
+            data/documentation/pentadocs-page-profiles.v1.json
           if git diff --cached --quiet; then
             echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
             echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
@@ -211,37 +241,48 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.commit.outputs.branch }}
-          HEAD_SHA: ${{ steps.commit.outputs.sha }}
         run: |
           set -euo pipefail
-          gh workflow run governed-merge-gate.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
-          PASS=false
-          for _ in $(seq 1 60); do
-            sleep 10
-            STATE="$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
-              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')"
-            echo "Governed publication gate: $STATE"
-            if [ "$STATE" = "completed:success" ]; then PASS=true; break; fi
-            if [[ "$STATE" == completed:* ]] && [ "$STATE" != "completed:success" ]; then exit 44; fi
-          done
-          test "$PASS" = true
           PR_URL="$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
             --title "CHLOM governed publication batch" \
-            --body "Bounded CHLOM publication commands materialized with per-file SHA-256 verification and governed PentaDocs disposition binding. This PR uses the canonical governed merge gate; no direct protected-main push, force-push, admin bypass, credential mutation, or authority expansion is requested.")"
-          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --auto --squash --subject "docs(chlom): autonomous governed publication batch"
+            --body "Bounded CHLOM publication commands were provider-digest verified, deterministically normalized through the canonical PentaDocs quality engine, disposition-bound, and committed with their page-profile projection. Required repository governance runs on this PR; no direct protected-main push, force-push, admin bypass, credential mutation, or authority expansion is requested.")"
+
+          gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --auto --squash \
+            --subject "docs(chlom): autonomous governed publication batch"
+
           MERGED=false
-          for _ in $(seq 1 60); do
-            sleep 10
-            STATE="$(gh pr view "$PR_URL" --repo "$GITHUB_REPOSITORY" --json state --jq '.state')"
-            echo "Publication PR state: $STATE"
-            if [ "$STATE" = "MERGED" ]; then MERGED=true; break; fi
-            if [ "$STATE" = "CLOSED" ]; then exit 45; fi
+          for _ in $(seq 1 30); do
+            sleep 30
+            git fetch --quiet origin main
+            DEST_SHA="$(git rev-parse origin/main)"
+            READY=true
+            while IFS= read -r record; do
+              path="$(jq -r '.file_path' <<<"$record")"
+              expected="$(jq -r '.canonical_content_sha256' <<<"$record")"
+              if ! git cat-file -e "${DEST_SHA}:${path}" 2>/dev/null; then
+                READY=false
+                break
+              fi
+              actual="$(git show "${DEST_SHA}:${path}" | sha256sum | awk '{print $1}')"
+              if [ "$expected" != "$actual" ]; then
+                READY=false
+                break
+              fi
+            done < <(jq -c '.[]' /tmp/chlom-canonical-digests.json)
+            if [ "$READY" = true ]; then
+              MERGED=true
+              break
+            fi
           done
-          test "$MERGED" = true
-          MERGE_SHA="$(gh pr view "$PR_URL" --repo "$GITHUB_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid // empty')"
-          test "$MERGE_SHA" != ""
+          if [ "$MERGED" != true ]; then
+            set +e
+            gh pr checks "$PR_URL" --repo "$GITHUB_REPOSITORY" --required
+            gh pr view "$PR_URL" --repo "$GITHUB_REPOSITORY" --json state,mergeStateStatus
+            set -e
+            exit 46
+          fi
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
-          echo "sha=$MERGE_SHA" >> "$GITHUB_OUTPUT"
+          echo "sha=$DEST_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Verify exact destination commit
         id: readback
@@ -261,13 +302,14 @@ jobs:
           test -n "$DEST_SHA"
           git fetch origin main
           git cat-file -e "${DEST_SHA}^{commit}"
-          jq -c '.result.commands[]' /tmp/chlom-claim.json | while IFS= read -r command; do
-            path="$(jq -r '.file_path' <<<"$command")"
-            expected="$(jq -r '.content_sha256' <<<"$command")"
+          while IFS= read -r record; do
+            path="$(jq -r '.file_path' <<<"$record")"
+            expected="$(jq -r '.canonical_content_sha256' <<<"$record")"
             git show "${DEST_SHA}:${path}" > /tmp/chlom-destination-readback.mdx
             actual="$(sha256sum /tmp/chlom-destination-readback.mdx | awk '{print $1}')"
             test "$expected" = "$actual"
-          done
+          done < <(jq -c '.[]' /tmp/chlom-canonical-digests.json)
+          python scripts/pentadocs_quality.py --check
           echo "sha=$DEST_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Acknowledge destination commit
