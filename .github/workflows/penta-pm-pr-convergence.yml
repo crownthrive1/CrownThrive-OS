@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/penta-pm-pr-convergence.yml"
+      - ".github/workflows/penta-pm-governance.yml"
       - "scripts/penta_pm_pr_converge.py"
       - "tests/test_penta_pm_pr_converge.py"
       - "config/penta_pm_policy.json"
@@ -115,11 +116,39 @@ jobs:
             ${{ steps.scope.outputs.args }} \
             --apply | tee artifacts/penta-pm/pr-convergence.json
 
-      - name: Materialize Project, Milestone, owner, lane, risk, stage and evidence
+      - id: provider
+        name: Materialize Project, Milestone, owner, lane, risk, stage and evidence
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python scripts/penta_pm_reconcile.py --repo "$GITHUB_REPOSITORY" --apply
+
+      - name: Classify provider reconciliation outcome
+        shell: bash
+        env:
+          PROVIDER_OUTCOME: ${{ steps.provider.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$PROVIDER_OUTCOME" == "success" ]]; then
+            echo "PentaPM provider reconciliation passed."
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('artifacts/penta-pm/latest.json')
+          if not path.exists():
+              raise SystemExit('PentaPM provider reconciliation failed without a receipt')
+          payload=json.loads(path.read_text())
+          holds=payload.get('holds') or []
+          provider=[h for h in holds if h.get('type') in {'projects_v2_provider_authority','project_item_provider_authority'}]
+          if not provider:
+              raise SystemExit('PentaPM provider reconciliation failed for an unclassified reason')
+          print('::warning::GitHub Projects v2 remains externally authority-gated; safe repository-native reconciliation continues and the provider lane will retry.')
+          for hold in provider:
+              print(f"::warning::{hold.get('type')}: {hold.get('message','provider authority unavailable')}")
+          PY
 
       - name: Verify post-apply Development contract
         shell: bash
