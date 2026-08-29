@@ -241,11 +241,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.commit.outputs.branch }}
+          HEAD_SHA: ${{ steps.commit.outputs.sha }}
         run: |
           set -euo pipefail
           PR_URL="$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
             --title "CHLOM governed publication batch" \
-            --body "Bounded CHLOM publication commands were provider-digest verified, deterministically normalized through the canonical PentaDocs quality engine, disposition-bound, and committed with their page-profile projection. Required repository governance runs on this PR; no direct protected-main push, force-push, admin bypass, credential mutation, or authority expansion is requested.")"
+            --body "Bounded CHLOM publication commands were provider-digest verified, deterministically normalized through the canonical PentaDocs quality engine, disposition-bound, and committed with their page-profile projection. The canonical governed merge gate is explicitly dispatched on this exact head because GITHUB_TOKEN-originated pull_request events are non-recursive. No direct protected-main push, force-push, admin bypass, credential mutation, or authority expansion is requested.")"
+
+          # GITHUB_TOKEN-created PRs do not recursively execute normal pull_request workflows.
+          # workflow_dispatch is the bounded exception, so explicitly invoke the canonical gate
+          # against the exact publication head and require its exact-head PASS before auto-merge.
+          gh workflow run governed-merge-gate.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+
+          GATE_RUN_ID=""
+          for _ in $(seq 1 12); do
+            sleep 10
+            GATE_RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" \
+              --workflow governed-merge-gate.yml --branch "$BRANCH" --event workflow_dispatch \
+              --limit 10 --json databaseId,headSha,createdAt \
+              --jq '[.[] | select(.headSha == env.HEAD_SHA)] | sort_by(.createdAt) | last | .databaseId // empty')"
+            if [ -n "$GATE_RUN_ID" ]; then break; fi
+          done
+          test -n "$GATE_RUN_ID"
+          gh run watch "$GATE_RUN_ID" --repo "$GITHUB_REPOSITORY" --exit-status
+
+          GATE_STATE="$(gh api "/repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+            --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')"
+          echo "Governed publication gate: $GATE_STATE"
+          test "$GATE_STATE" = "completed:success"
 
           gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --auto --squash \
             --subject "docs(chlom): autonomous governed publication batch"
