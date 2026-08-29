@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "manifest_id": "ct.manifest.penta.dnd.v1",
+  "system_id": "ct.penta.dnd.v1",
+  "canonical_name": "PentaDND",
+  "display_name": "PentaDND™",
+  "system_class": "scoped_maintenance_and_redundancy_control",
+  "program_id": "ct.cos.convergence.production.v1",
+  "protocol_id": "ct.protocol.pentadnd.scoped-maintenance.v1",
+  "semantic_version": "1.0.0",
+  "lifecycle_state": "implementation_candidate",
+  "authority": {
+    "autonomy_class": "A2",
+    "decision_ceiling": "D2",
+    "d3_human_reserved": true,
+    "vote_eligible": false,
+    "self_approval_allowed": false,
+    "money_movement_allowed": false,
+    "rights_grant_allowed": false,
+    "credential_export_allowed": false,
+    "destructive_delete_allowed": false
+  },
+  "identity": {
+    "cos_uuid_required": true,
+    "chlom_identity_required": true,
+    "did_required": true,
+    "fingerprint_required": true,
+    "penta_cookie_required": true,
+    "penta_route_address_required": true,
+    "workload_signature_required": true
+  },
+  "modes": [
+    "workstream_isolation",
+    "repository_isolation",
+    "provider_isolation",
+    "scheduler_isolation",
+    "release_isolation",
+    "read_only",
+    "full_maintenance"
+  ],
+  "lease_states": [
+    "requested",
+    "preflight",
+    "redundancy_ready",
+    "active",
+    "draining",
+    "verifying",
+    "released",
+    "hold",
+    "failed_safe",
+    "expired"
+  ],
+  "critical_services_preserved": [
+    "ct.penta.self",
+    "ct.penta.health",
+    "ct.penta.heartbeat",
+    "ct.penta.time",
+    "ct.penta.clock",
+    "ct.penta.tick",
+    "ct.penta.crons",
+    "ct.penta.dispatch",
+    "ct.penta.wire",
+    "ct.penta.route",
+    "ct.penta.queue",
+    "ct.penta.retry",
+    "ct.penta.load",
+    "ct.penta.balancer",
+    "ct.penta.certify",
+    "ct.penta.closer",
+    "ct.penta.help",
+    "ct.system.dail",
+    "ct.system.chlom"
+  ],
+  "resilience_lines": [
+    {
+      "line_id": "ct.line.hot.primary.v1",
+      "class": "hot",
+      "ordinal": 1,
+      "mode": "active_execution",
+      "write_policy": "certified_bounded_write",
+      "promotion_policy": "already_primary"
+    },
+    {
+      "line_id": "ct.line.warm.standby.v1",
+      "class": "warm",
+      "ordinal": 2,
+      "mode": "shadow_standby",
+      "write_policy": "read_shadow_until_promoted",
+      "promotion_policy": "automatic_bounded_after_health_route_and_authority_gates"
+    },
+    {
+      "line_id": "ct.line.cold.a.living-recovery.v1",
+      "class": "cold_a",
+      "ordinal": 3,
+      "mode": "living_recovery",
+      "write_policy": "append_or_snapshot_only",
+      "promotion_policy": "restore_test_and_independent_certification_required"
+    },
+    {
+      "line_id": "ct.line.cold.b.disaster-immutable.v1",
+      "class": "cold_b",
+      "ordinal": 4,
+      "mode": "disaster_immutable",
+      "write_policy": "immutable_delayed_or_logically_isolated",
+      "promotion_policy": "dual_control_restore_and_independent_certification_required"
+    }
+  ],
+  "network_primitives": [
+    "virtual_switch",
+    "virtual_router",
+    "tunnel",
+    "edge_gateway",
+    "node",
+    "link",
+    "route",
+    "queue",
+    "lease",
+    "load_observer",
+    "balancer",
+    "retry_controller",
+    "circuit_breaker",
+    "health_sentinel"
+  ],
+  "hourly_job": {
+    "job_id": "ct.job.cos-convergence.hourly.v1",
+    "context_id": "ct.context.sol-ultra.pro-hourly.v1",
+    "schedule": "17 * * * *",
+    "timezone": "America/New_York",
+    "dnd_scope": "cos-v1-convergence-hourly",
+    "collision_safe": true,
+    "write_next_phase": true,
+    "send_completion_email": true,
+    "recipient": "contact@crownthrive.com",
+    "continue_planning_when_execution_gated": true
+  },
+  "required_receipts": [
+    "claim",
+    "preflight",
+    "redundancy",
+    "execution",
+    "verification",
+    "next_phase",
+    "email_projection",
+    "dnd_release"
+  ],
+  "preservation": {
+    "no_silent_delete": true,
+    "no_silent_overwrite": true,
+    "archive_before_retirement": true,
+    "supersession_pointer_required": true,
+    "historical_failure_receipts_retained": true,
+    "current_term_replacement": {
+      "from": "Kulture",
+      "to": "Melanated",
+      "historical_source_text_preserved": true
+    }
+  },
+  "promotion_gates": [
+    "identity_bound",
+    "chlom_fingerprint_bound",
+    "cookie_current",
+    "wire_connected",
+    "route_addressable",
+    "scheduler_owned",
+    "duplicate_clock_absent",
+    "four_line_canary_pass",
+    "failover_drill_pass",
+    "restore_drill_pass",
+    "email_canary_pass",
+    "dail_receipts_complete",
+    "independent_certification_pass",
+    "rollback_pass",
+    "production_readback_pass"
+  ]
+}
