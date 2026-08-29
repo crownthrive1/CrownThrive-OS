@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "effective_date": "2026-08-28",
   "provider": {
     "name": "Radio.co",
@@ -42,6 +42,17 @@
     "mobile_64kbps_mp3": "https://streams.radio.co/s0831f6c44/low",
     "playlist_192kbps_m3u": "http://streams.radio.co/s0831f6c44/listen.m3u"
   },
+  "public_api": {
+    "base_url": "https://public.radio.co",
+    "station_metadata": "https://public.radio.co/api/v2/s0831f6c44",
+    "station_status": "https://public.radio.co/api/v2/s0831f6c44/status",
+    "station_full_status": "https://public.radio.co/stations/s0831f6c44/status",
+    "current_source": "https://public.radio.co/api/v2/s0831f6c44/source",
+    "current_track": "https://public.radio.co/api/v2/s0831f6c44/track/current",
+    "next_track": "https://public.radio.co/api/v2/s0831f6c44/track/next",
+    "track_history_template": "https://public.radio.co/api/v2/s0831f6c44/track/history?limit={limit}&hours={hours}",
+    "credential_requirement": "none_for_public_readback"
+  },
   "live_broadcast": {
     "host": "s0831f6c44.dj.radio.co",
     "port": 80,
@@ -49,7 +60,29 @@
     "credential_policy": "secret_store_only_never_commit_plaintext"
   },
   "documentation": {
-    "custom_branded_players": "https://help.radio.co/en/articles/899717-create-custom-branded-players"
+    "custom_branded_players": "https://help.radio.co/en/articles/899717-create-custom-branded-players",
+    "playout_api": "https://www.radio.co/api",
+    "public_api_v2": "https://developers-84608658bd058c817.radio.co/api-reference/openapi_specs/public-v2"
+  },
+  "verification": {
+    "contract": "verification-contract.json",
+    "runner": "verify_public_readback.py",
+    "network_scope": "public_readback_only",
+    "secret_access": "forbidden",
+    "required_checks": [
+      "station_metadata",
+      "station_status"
+    ],
+    "observational_checks": [
+      "current_track",
+      "next_track",
+      "track_history"
+    ],
+    "status_values": [
+      "onair",
+      "offair"
+    ],
+    "execution_policy": "run_on_deploy_provider_change_incident_or_scheduler_request"
   },
   "institutional_awareness": {
     "corridor": "media",
@@ -60,9 +93,12 @@
       "schedule_publication",
       "low_bandwidth_mobile_stream",
       "playlist_directory_distribution",
-      "live_broadcast_ingest"
+      "live_broadcast_ingest",
+      "public_station_readback",
+      "now_playing_readback",
+      "track_history_readback"
     ],
-    "public_projection": "non_secret_endpoints_and_embed_ids_only",
+    "public_projection": "non_secret_endpoints_embed_ids_and_public_api_only",
     "secret_projection": "forbidden",
     "canonical_control_plane": "CrownThrive-OS"
   }
