@@ -85,6 +85,97 @@ jobs:
             fi
           done
 
+      - name: Bind governed unlisted-page dispositions
+        if: steps.claim.outputs.count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          claim = json.loads(Path('/tmp/chlom-claim.json').read_text(encoding='utf-8'))
+          docs = json.loads(Path('docs.json').read_text(encoding='utf-8'))
+          manifest_path = Path('developers/manifests/pentadocs-unlisted-page-dispositions.v1.json')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+
+          if manifest.get('schema_version') != '1.0.0':
+              raise SystemExit('Unexpected unlisted-page disposition schema')
+          if manifest.get('owner') != 'penta_docs_governance':
+              raise SystemExit('Unexpected unlisted-page disposition owner')
+
+          expected_categories = {
+              'historical_change_evidence',
+              'certification_evidence',
+              'generated_build_evidence',
+              'specialist_reconciliation_evidence',
+              'operational_reference_direct_link',
+          }
+          dispositions = manifest.get('dispositions', {})
+          if set(dispositions) != expected_categories:
+              raise SystemExit('Unlisted-page disposition categories drifted')
+
+          def iter_pages(node):
+              if isinstance(node, str):
+                  yield node
+                  return
+              if isinstance(node, list):
+                  for item in node:
+                      yield from iter_pages(item)
+                  return
+              if not isinstance(node, dict):
+                  return
+              for key in ('pages', 'groups', 'tabs', 'dropdowns', 'products', 'versions', 'languages'):
+                  value = node.get(key)
+                  if value is not None:
+                      yield from iter_pages(value)
+
+          navigation = docs.get('navigation', {})
+          primary = navigation.get('groups') or navigation.get('pages') or navigation
+          navigated = set()
+          for page in iter_pages(primary):
+              if page.startswith(('http://', 'https://', 'mailto:')):
+                  continue
+              normalized = page.split('#', 1)[0].split('?', 1)[0].strip('/')
+              if not normalized.endswith(('.md', '.mdx')):
+                  normalized += '.mdx'
+              navigated.add(normalized)
+
+          commands = claim.get('result', {}).get('commands', [])
+          targets = {
+              command.get('file_path')
+              for command in commands
+              if isinstance(command, dict)
+              and isinstance(command.get('file_path'), str)
+              and command['file_path'].startswith('chlom/')
+              and command['file_path'].endswith('.mdx')
+          }
+          if not targets:
+              raise SystemExit('Claim contained no governed CHLOM MDX targets')
+
+          # A generated page must have exactly one current disposition. If a target
+          # becomes navigated, remove its direct-link disposition; otherwise bind it
+          # to the canonical public-safe operational direct-link category.
+          for category in sorted(expected_categories):
+              pages = dispositions.get(category)
+              if not isinstance(pages, list) or any(not isinstance(page, str) for page in pages):
+                  raise SystemExit(f'Invalid disposition list: {category}')
+              dispositions[category] = sorted({page for page in pages if page not in targets})
+
+          direct = set(dispositions['operational_reference_direct_link'])
+          direct.update(path for path in targets if path not in navigated)
+          dispositions['operational_reference_direct_link'] = sorted(direct)
+
+          manifest_path.write_text(
+              json.dumps(manifest, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+
+          for path in sorted(targets):
+              disposition = 'navigated' if path in navigated else 'operational_reference_direct_link'
+              print(f'{path}: {disposition}')
+          PY
+
       - name: Commit governed publication candidate
         id: commit
         if: steps.claim.outputs.count != '0'
@@ -96,7 +187,9 @@ jobs:
           BASE_SHA="$(git rev-parse HEAD)"
           BRANCH="chlom/publication-${BASE_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git checkout -b "$BRANCH"
-          git add chlom/
+          git add \
+            chlom/ \
+            developers/manifests/pentadocs-unlisted-page-dispositions.v1.json
           if git diff --cached --quiet; then
             echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
             echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
@@ -134,7 +227,7 @@ jobs:
           test "$PASS" = true
           PR_URL="$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
             --title "CHLOM governed publication batch" \
-            --body "Bounded CHLOM publication commands materialized with per-file SHA-256 verification. This PR uses the canonical governed merge gate; no direct protected-main push, force-push, admin bypass, credential mutation, or authority expansion is requested.")"
+            --body "Bounded CHLOM publication commands materialized with per-file SHA-256 verification and governed PentaDocs disposition binding. This PR uses the canonical governed merge gate; no direct protected-main push, force-push, admin bypass, credential mutation, or authority expansion is requested.")"
           gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --auto --squash --subject "docs(chlom): autonomous governed publication batch"
           MERGED=false
           for _ in $(seq 1 60); do
