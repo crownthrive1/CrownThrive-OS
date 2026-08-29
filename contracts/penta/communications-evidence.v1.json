@@ -1,8 +1,8 @@
 {
   "schema": "ct.communications-evidence.contract.v1",
   "canonical_name": "CrownThrive Communications Evidence",
-  "version": "1.0.0",
-  "state": "IMPLEMENTED_TESTING",
+  "version": "1.0.1",
+  "state": "PRODUCTION",
   "owner": "PentaMail",
   "purpose": "Governed acquisition, classification, custody, reconciliation, restoration and fail-closed provider purge of eligible CrownThrive business/system communications.",
   "source_systems": ["gmail", "outlook"],
@@ -12,26 +12,16 @@
     "operational": "Verified current actionable state projected to authorized Pentas."
   },
   "lifecycle": [
-    "DISCOVERED",
-    "ACQUIRED",
-    "NORMALIZED",
-    "CLASSIFIED",
-    "FINGERPRINTED",
-    "CHLOM_BOUND",
-    "DAIL_INGESTED",
-    "MIRRORED",
-    "RECONCILED",
-    "RESTORE_VERIFIED",
-    "PURGE_ELIGIBLE",
-    "PROVIDER_DELETED",
-    "DELETION_VERIFIED"
+    "DISCOVERED", "ACQUIRED", "NORMALIZED", "CLASSIFIED", "FINGERPRINTED", "CHLOM_BOUND", "DAIL_INGESTED", "MIRRORED", "RECONCILED", "RESTORE_VERIFIED", "PURGE_ELIGIBLE", "PROVIDER_TRASHED", "PROVIDER_DELETED", "DELETION_VERIFIED"
   ],
   "hold_prefix": "HOLD_",
   "canonical_identity": {
     "dedupe_key": ["provider", "mailbox_ref", "provider_message_id"],
     "fingerprint_algorithm": "sha256",
     "required_digests": ["canonical_headers_sha256", "body_sha256", "manifest_sha256"],
-    "raw_source_immutable": true,
+    "source_fidelity": ["PROVIDER_RAW", "CANONICALIZED", "PARTIAL"],
+    "partial_source_blocks_purge": true,
+    "raw_or_canonicalized_source_immutable": true,
     "derived_interpretations_versioned": true
   },
   "classification_ontology": {
@@ -61,12 +51,13 @@
     "PentaCensus": "coverage and completeness accounting",
     "PentaDocs": "human institutional projection",
     "CHLOM/DAIL": "governance, provenance and chronology",
-    "PentaCertifier": "independent certification; cannot certify its own originating mutation"
+    "PentaCertifier": "independent production certification; cannot certify its own originating mutation"
   },
   "purge_gates": {
-    "raw_source_acquired": true,
+    "source_acquired_at_acceptable_fidelity": true,
     "all_required_attachments_acquired": true,
     "all_required_hashes_verified": true,
+    "core_classification_present": true,
     "chlom_bound": true,
     "dail_append_and_readback_verified": true,
     "required_mirrors_verified": true,
@@ -80,6 +71,26 @@
     "successful_download_is_deletion_authority": false,
     "default": "FAIL_CLOSED"
   },
+  "certification": {
+    "production_default": "INDEPENDENT",
+    "independence_requires_explicit_verified_evidence": true,
+    "actor_name_difference_alone_is_not_independence": true,
+    "wave1_founder_self_test": {
+      "mode": "FOUNDER_AUTHORIZED_WAVE1_SELF_TEST",
+      "max_passes": 1,
+      "scope": "wave1-canary only",
+      "counts_as_independent_certification": false,
+      "can_generalize_to_production": false
+    }
+  },
+  "provider_deletion": {
+    "SOFT_DELETE_TRASH": "Provider message moved to Trash/Deleted Items and verified there; this is not hard absence.",
+    "HARD_DELETE": "Provider message is no longer provider-resident and hard absence has been independently read back.",
+    "gmail_connector_current_semantics": "SOFT_DELETE_TRASH",
+    "trash_counts_as_hard_delete": false,
+    "trash_guarantees_immediate_quota_recovery": false,
+    "deletion_verified_requires_hard_absence": true
+  },
   "reconciliation": {
     "historical_evidence_never_overwritten": true,
     "current_truth_is_projection": true,
@@ -91,7 +102,11 @@
     "providers": ["gmail", "outlook"],
     "required_shapes": ["attachment", "thread", "duplicate_or_cross_mailbox_reference", "superseding_operational_fact", "routine_system", "business_or_commercial"],
     "zero_silent_loss": true,
-    "provider_deletion_requires_post_delete_readback": true
+    "provider_deletion_requires_post_delete_readback": true,
+    "first_real_delete_canary_completed": true,
+    "first_real_delete_semantics": "SOFT_DELETE_TRASH",
+    "first_real_delete_independent_certification": false,
+    "first_real_delete_authority": "one-time founder-authorized Wave 1 self-test"
   },
   "invariants": {
     "no_provider_delete_before_all_gates": true,
@@ -104,7 +119,9 @@
     "unexplained_census_variance_blocks_purge": true,
     "provider_delete_is_separate_from_purge_eligibility": true,
     "provider_delete_requires_terminal_dail_event": true,
+    "soft_delete_never_claimed_as_hard_delete": true,
+    "one_time_self_test_cannot_unlock_regular_production_purge": true,
     "secrets_and_raw_sensitive_bodies_must_not_be_written_to_dail": true
   },
-  "production_gate": "Schema/runtime tests, DAIL readback, representative Gmail+Outlook canary ingestion, custody/readback, restoration evidence, zero unexplained census variance and independent certification must pass before provider deletion is enabled."
+  "production_gate": "Production runtime is active. Normal provider purge requires independent PentaCertifier evidence plus all custody, restore, census, CHLOM/DAIL, retention and reconciliation gates. The one-time Wave 1 founder-authorized self-test cannot satisfy later production purge eligibility."
 }
