@@ -32,13 +32,15 @@ jobs:
           set -euo pipefail
 
           REPO="$GITHUB_REPOSITORY"
-          LATEST=$(gh release list --repo "$REPO" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
+          gh api "repos/$REPO/releases?per_page=100" >/tmp/pentarelease-releases.json
+          LATEST=$(jq -r '[.[] | select(.draft == false and .prerelease == false)][0].tag_name // empty' /tmp/pentarelease-releases.json)
           if [ -z "$LATEST" ]; then
             echo 'No published release exists; nothing may be retired.'
             exit 0
           fi
 
-          gh release view "$LATEST" --repo "$REPO" --json tagName,isDraft,isPrerelease,url >/tmp/pentarelease-latest.json
+          jq --arg tag "$LATEST" '.[] | select(.tag_name == $tag) | {tagName: .tag_name, isDraft: .draft, isPrerelease: .prerelease, url: .html_url}' \
+            /tmp/pentarelease-releases.json >/tmp/pentarelease-latest.json
           test "$(jq -r '.isDraft' /tmp/pentarelease-latest.json)" = "false"
           test "$(jq -r '.isPrerelease' /tmp/pentarelease-latest.json)" = "false"
 
@@ -54,24 +56,24 @@ jobs:
               pentarelease/auto-*)
                 version=${title#PentaRelease autonomous release }
                 tag="v${version#v}"
-                if ! gh release view "$tag" --repo "$REPO" --json tagName,isDraft,isPrerelease,assets >/tmp/pentarelease-candidate.json 2>/dev/null; then
+                if ! gh api "repos/$REPO/releases/tags/$tag" >/tmp/pentarelease-candidate.json 2>/dev/null; then
                   echo "KEEP #$number: no provider release readback for $tag"
                   continue
                 fi
-                test "$(jq -r '.isDraft' /tmp/pentarelease-candidate.json)" = "false"
-                test "$(jq -r '.isPrerelease' /tmp/pentarelease-candidate.json)" = "false"
+                test "$(jq -r '.draft' /tmp/pentarelease-candidate.json)" = "false"
+                test "$(jq -r '.prerelease' /tmp/pentarelease-candidate.json)" = "false"
                 jq -e '[.assets[].name] | index("MANIFEST.json") != null' /tmp/pentarelease-candidate.json >/dev/null
                 jq -e '[.assets[].name] | index("RELEASE_NOTES.md") != null' /tmp/pentarelease-candidate.json >/dev/null
                 ;;
 
               pentarelease/surface-*)
                 tag=${title#PentaRelease comprehensive surface }
-                if ! gh release view "$tag" --repo "$REPO" --json tagName,isDraft,isPrerelease,assets >/tmp/pentarelease-candidate.json 2>/dev/null; then
+                if ! gh api "repos/$REPO/releases/tags/$tag" >/tmp/pentarelease-candidate.json 2>/dev/null; then
                   echo "KEEP #$number: no provider release readback for $tag"
                   continue
                 fi
-                test "$(jq -r '.isDraft' /tmp/pentarelease-candidate.json)" = "false"
-                test "$(jq -r '.isPrerelease' /tmp/pentarelease-candidate.json)" = "false"
+                test "$(jq -r '.draft' /tmp/pentarelease-candidate.json)" = "false"
+                test "$(jq -r '.prerelease' /tmp/pentarelease-candidate.json)" = "false"
                 jq -e '[.assets[].name] | index("PENTARELEASE_COMPREHENSIVE_RELEASE.md") != null' /tmp/pentarelease-candidate.json >/dev/null
                 jq -e '[.assets[].name] | index("PENTARELEASE_EVIDENCE.json") != null' /tmp/pentarelease-candidate.json >/dev/null
                 ;;
