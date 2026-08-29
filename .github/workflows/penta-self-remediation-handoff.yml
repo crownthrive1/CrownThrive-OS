@@ -16,7 +16,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: penta-self-remediation-${{ github.event.client_payload.finding_id || github.run_id }}
+  group: penta-self-remediation-${{ github.event.client_payload.finding.finding_id || github.event.client_payload.finding_id || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -44,7 +44,8 @@ jobs:
           from pathlib import Path
           if os.environ.get("GITHUB_EVENT_NAME") == "repository_dispatch":
               event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
-              payload = event.get("client_payload") or {}
+              client_payload = event.get("client_payload") or {}
+              payload = client_payload.get("finding") or client_payload
           else:
               payload = json.loads(os.environ.get("MANUAL_FINDING_JSON") or "{}")
           if not isinstance(payload, dict) or not payload.get("finding_id") or not payload.get("symptom"):
@@ -82,7 +83,8 @@ jobs:
           from pathlib import Path
           if os.environ.get("GITHUB_EVENT_NAME") == "repository_dispatch":
               event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
-              payload = event.get("client_payload") or {}
+              client_payload = event.get("client_payload") or {}
+              payload = client_payload.get("finding") or client_payload
           else:
               payload = json.loads(os.environ.get("MANUAL_FINDING_JSON") or "{}")
           Path("/tmp/penta-self-finding.json").write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
