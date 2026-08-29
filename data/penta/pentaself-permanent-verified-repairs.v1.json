@@ -1,0 +1,47 @@
+{
+  "contract": "ct.penta.self.permanent-repair-fabric.v1",
+  "version": "1.0.0",
+  "status": "production_runtime_applied_source_candidate",
+  "owner": "PentaSELF/PentaAssure/PentaSerialized/PentaTime",
+  "purpose": "Preserve independently verified repairs and exact critical scheduler definitions against stale-state regression.",
+  "invariants": {
+    "verified_repair_is_monotonic": true,
+    "stale_or_unversioned_evidence_may_regress_resolved_state": false,
+    "bootstrap_defaults_may_override_newer_verified_state": false,
+    "automatic_rollback_allowed": false,
+    "rollback_requires_newer_independently_verified_failure": true,
+    "rollback_requires_explicit_handle": true,
+    "evidence_is_append_only": true,
+    "d3_bypass": false
+  },
+  "runtime": {
+    "repair_registry": "penta_self.permanent_repairs_v1",
+    "append_only_events": "penta_self.permanent_repair_events_v1",
+    "cron_desired_state": "penta_self.permanent_cron_desired_state_v1",
+    "reconciler": "penta_self.reconcile_permanent_repairs_v1()",
+    "cron": "ct-penta-self-permanent-repair-reconcile-v1",
+    "schedule": "* * * * *",
+    "regression_guard": "penta_self.guard_permanent_repair_regression_v1()"
+  },
+  "scheduler_policy": {
+    "exact": "Critical production clocks are restored to their verified schedule and command when missing, inactive or stale.",
+    "missing_or_inactive": "Noncritical clocks are restored for availability without overwriting a newer explicit command revision.",
+    "observe": "Observation-only clocks are reported but not rewritten."
+  },
+  "protected_control_state": [
+    {
+      "component": "ct.pentamarketer.persona-execution-bridge",
+      "required_certification_state": "production",
+      "desired": {"active": true, "automation_enabled": true, "kill_switch": false}
+    }
+  ],
+  "safety": {
+    "history_deleted": false,
+    "provider_evidence_manufactured": false,
+    "credential_material_stored_in_source": false,
+    "money_movement_granted": false,
+    "rights_granted": false,
+    "rollback_removed": false,
+    "rollback_semantics": "Rollback remains available for a newer independently verified regression through the recorded rollback handle; it is not triggered by stale snapshots."
+  }
+}
