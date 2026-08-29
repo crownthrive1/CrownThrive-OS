@@ -1,8 +1,11 @@
 """Governed self-build contract for every registered Penta Family member.
 
 The runtime turns a capability gap into a bounded PentaFactory candidate and
-evaluates build/test/certification/release evidence. It never writes code or
-promotes a candidate by itself; provider writes and D3 authority remain gated.
+evaluates build/test/self-certification/final-certification/release evidence.
+Every originating Penta must self-certify its own exact candidate evidence before
+institutional gates evaluate it. That self-certification never fabricates provider
+truth and never replaces final independent certification, provider readback, DAIL,
+or D3/human-reserved authority.
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ class PentaSelfBuildError(ValueError):
 
 
 STAGES = {"specify", "build", "test", "certify", "release"}
+SELF_CERT_STAGES = {"build", "test", "certify", "release"}
 
 
 def _canonical(value: Any) -> str:
@@ -53,7 +57,8 @@ def validate_candidate(packet: Mapping[str, Any]) -> None:
     for key in (
         "candidate_id", "source_system", "gap_id", "gap_statement", "requested_stage",
         "risk_class", "exact_source_ref", "idempotency_key", "rollback_plan",
-        "license_provenance_ref", "security_review_ref",
+        "license_provenance_ref", "security_review_ref", "builder_system",
+        "self_certifier_system", "certifier_system",
     ):
         _required_string(packet, key)
     if packet["requested_stage"] not in STAGES:
@@ -78,12 +83,37 @@ def validate_candidate(packet: Mapping[str, Any]) -> None:
 def evaluate_candidate(packet: Mapping[str, Any], *, registered_members: Mapping[str, Any]) -> dict[str, Any]:
     validate_candidate(packet)
     reasons: list[str] = []
-    if packet["source_system"] not in registered_members:
+    source_system = packet["source_system"]
+    builder_system = packet.get("builder_system")
+    self_certifier_system = packet.get("self_certifier_system")
+    final_certifier_system = packet.get("certifier_system")
+
+    if source_system not in registered_members:
         reasons.append("source_system is not a registered Penta Family member")
-    if packet.get("builder_system") != "penta.factory":
+    if builder_system != "penta.factory":
         reasons.append("PentaFactory must own candidate construction")
-    if packet.get("certifier_system") == packet.get("builder_system") and packet["requested_stage"] in {"certify", "release"}:
-        reasons.append("independent certification cannot be performed by the builder")
+    if self_certifier_system != source_system:
+        reasons.append("originator self-certification must be issued by the source Penta itself")
+
+    if packet["requested_stage"] in SELF_CERT_STAGES:
+        self_ref = packet.get("self_certification_ref")
+        self_sha = packet.get("self_certification_sha256")
+        gate_ref = packet.get("gate_awareness_ref")
+        if not isinstance(self_ref, str) or not self_ref.strip():
+            reasons.append("originator self-certification evidence is required")
+        if not isinstance(self_sha, str) or len(self_sha) != 64 or any(ch not in "0123456789abcdef" for ch in self_sha.lower()):
+            reasons.append("originator self-certification SHA-256 is required")
+        if not isinstance(gate_ref, str) or not gate_ref.strip():
+            reasons.append("PR gate-awareness evidence is required")
+
+    if packet["requested_stage"] in {"certify", "release"}:
+        if final_certifier_system in {builder_system, source_system}:
+            reasons.append("final institutional certification must remain independent from builder and source Penta")
+        if not packet.get("independent_certification_ref"):
+            reasons.append("independent final certification evidence is required")
+        if not packet.get("exact_artifact_sha256") or len(str(packet.get("exact_artifact_sha256"))) != 64:
+            reasons.append("exact artifact SHA-256 is required")
+
     expected_tests = set(packet["acceptance_tests"] + packet["negative_tests"] + packet["stress_tests"])
     reported = set(packet["test_results"])
     if packet["requested_stage"] in {"test", "certify", "release"}:
@@ -93,11 +123,7 @@ def evaluate_candidate(packet: Mapping[str, Any], *, registered_members: Mapping
             reasons.append("test results missing: " + ", ".join(missing))
         if failed:
             reasons.append("tests failed: " + ", ".join(failed))
-    if packet["requested_stage"] in {"certify", "release"}:
-        if not packet.get("independent_certification_ref"):
-            reasons.append("independent certification evidence is required")
-        if not packet.get("exact_artifact_sha256") or len(str(packet.get("exact_artifact_sha256"))) != 64:
-            reasons.append("exact artifact SHA-256 is required")
+
     human = packet["human_gate"]
     if packet["risk_class"] == "D3":
         if not (human.get("required") is True and human.get("satisfied") is True and human.get("approver_refs")):
@@ -115,18 +141,27 @@ def evaluate_candidate(packet: Mapping[str, Any], *, registered_members: Mapping
 
     stage_ready = {
         "specify": "SPECIFICATION_READY",
-        "build": "BUILD_CANDIDATE_READY",
-        "test": "TEST_EVIDENCE_READY",
-        "certify": "CERTIFICATION_READY",
+        "build": "SELF_CERTIFIED_BUILD_CANDIDATE_READY",
+        "test": "SELF_CERTIFIED_TEST_EVIDENCE_READY",
+        "certify": "FINAL_CERTIFICATION_READY",
         "release": "RELEASE_READY",
     }[packet["requested_stage"]]
+    originator_self_certified = packet["requested_stage"] in SELF_CERT_STAGES and not any(
+        reason.startswith("originator self-certification") or reason.startswith("PR gate-awareness")
+        for reason in reasons
+    ) and self_certifier_system == source_system
     result = {
-        "schema": "ct.penta.self-build-decision.v1",
+        "schema": "ct.penta.self-build-decision.v2",
         "candidate_id": packet["candidate_id"],
-        "source_system": packet["source_system"],
+        "source_system": source_system,
         "requested_stage": packet["requested_stage"],
         "disposition": "HOLD_FAIL_CLOSED" if reasons else stage_ready,
         "reasons": reasons,
+        "originator_self_certified": originator_self_certified,
+        "originator_may_submit_own_evidence": True,
+        "originator_may_write_own_evidence_blobs": True,
+        "final_independent_certification_required": packet["requested_stage"] in {"certify", "release"},
+        "provider_truth_manufactured": False,
         "code_written": False,
         "production_promoted": False,
         "authority_manufactured": False,
@@ -137,27 +172,47 @@ def evaluate_candidate(packet: Mapping[str, Any], *, registered_members: Mapping
 
 def coverage_report(root: Path) -> dict[str, Any]:
     registry, snapshot = load_family(root)
-    contract = registry.get("self_build_contract")
-    if not isinstance(contract, dict):
+    family_contract = registry.get("self_build_contract")
+    if not isinstance(family_contract, dict):
         raise PentaSelfBuildError("family self_build_contract is missing")
     required_true = (
         "applies_to_all_registered_members", "typed_gap_required", "penta_factory_builder_required",
         "independent_certification_required", "negative_and_stress_tests_required",
         "rollback_required", "authority_never_manufactured", "d3_human_reserved",
     )
-    missing_flags = [key for key in required_true if contract.get(key) is not True]
+    missing_flags = [key for key in required_true if family_contract.get(key) is not True]
     if missing_flags:
         raise PentaSelfBuildError("self-build invariants missing: " + ", ".join(missing_flags))
+
+    contract_path = root / str(family_contract.get("contract_path") or "")
+    if not contract_path.exists():
+        raise PentaSelfBuildError("self-build production contract is missing")
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    required_gates = contract.get("required_gates") or {}
+    new_required = (
+        "originator_self_certification_required",
+        "originator_evidence_blob_required",
+        "gate_awareness_required",
+        "independent_final_certification_required",
+        "dail_binding_required_before_institutional_pass",
+    )
+    missing_new = [key for key in new_required if required_gates.get(key) is not True]
+    if missing_new:
+        raise PentaSelfBuildError("self-build self-certification invariants missing: " + ", ".join(missing_new))
+
     members = sorted(snapshot["members"])
     result = {
-        "schema": "ct.penta.self-build-coverage.v1",
+        "schema": "ct.penta.self-build-coverage.v2",
         "disposition": "PASS",
         "member_count": len(members),
         "covered_member_count": len(members),
         "members": members,
-        "candidate_schema_path": contract.get("candidate_schema_path"),
-        "runtime_path": contract.get("runtime_path"),
-        "truth_rule": "coverage enables governed candidate routing; it does not authorize autonomous production promotion",
+        "candidate_schema_path": family_contract.get("candidate_schema_path"),
+        "runtime_path": family_contract.get("runtime_path"),
+        "originator_self_certification_required": True,
+        "independent_final_certification_required": True,
+        "gate_awareness_required": True,
+        "truth_rule": "every Penta self-certifies its own exact candidate evidence; final institutional PASS still requires required provider gates, readback and DAIL",
     }
     result["receipt_sha256"] = _digest(result)
     return result
