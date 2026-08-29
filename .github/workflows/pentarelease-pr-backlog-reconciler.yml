@@ -46,6 +46,7 @@ jobs:
             --json number,title,headRefName > /tmp/pentarelease-open-prs.json
 
           retired=0
+          retained_branches=0
           while IFS=$'\t' read -r number title head; do
             [ -n "$number" ] || continue
 
@@ -86,10 +87,11 @@ jobs:
               continue
             fi
 
-            NOTE="PentaRelease reconciler: provider readback proves $tag is published and its required evidence assets exist. Provider REST identity also proves this generated PR was authored by github-actions[bot]. This release shell is therefore retired to prevent backlog; branch protection and release evidence remain unchanged."
-            gh pr close "$number" --repo "$REPO" --comment "$NOTE" --delete-branch
-            echo "RETIRED #$number ($tag)"
+            NOTE="PentaRelease reconciler: provider readback proves $tag is published and its required evidence assets exist. Provider REST identity also proves this generated PR was authored by github-actions[bot]. This release shell is therefore retired to prevent backlog; branch protection and release evidence remain unchanged. Generated branch deletion is intentionally not required under the reconciler's read-only contents authority."
+            gh pr close "$number" --repo "$REPO" --comment "$NOTE"
+            echo "RETIRED #$number ($tag); generated branch retained under least-privilege contents:read authority."
             retired=$((retired + 1))
+            retained_branches=$((retained_branches + 1))
           done < <(jq -r '.[] | [.number,.title,.headRefName] | @tsv' /tmp/pentarelease-open-prs.json)
 
           {
@@ -98,8 +100,10 @@ jobs:
             echo "- Trigger: $GITHUB_EVENT_NAME"
             echo "- Latest published release: $LATEST"
             echo "- Generated PR shells retired: $retired"
+            echo "- Generated branches retained under least privilege: $retained_branches"
             echo '- Safety invariant: no release PR is retired without provider release + required-asset readback.'
             echo '- Generated-PR identity is verified from the provider REST pull-request record.'
+            echo '- PR-shell retirement is the backlog SLA; remote branch deletion is advisory and not granted to this workflow.'
             echo '- Upstream workflow conclusion is advisory only; provider evidence is authoritative for cleanup.'
             echo '- Main-branch rules are not bypassed or weakened.'
           } >> "$GITHUB_STEP_SUMMARY"

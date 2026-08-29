@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 COMPREHENSIVE_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-comprehensive-release-surface.yml"
 AWARENESS_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-autonomous-awareness.yml"
+RECONCILER_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-pr-backlog-reconciler.yml"
 
 
 class PentaReleaseWorkflowContractTests(unittest.TestCase):
@@ -11,6 +12,7 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls.text = COMPREHENSIVE_WORKFLOW.read_text(encoding="utf-8")
         cls.awareness_text = AWARENESS_WORKFLOW.read_text(encoding="utf-8")
+        cls.reconciler_text = RECONCILER_WORKFLOW.read_text(encoding="utf-8")
 
     def test_never_direct_pushes_protected_main(self):
         self.assertNotIn('git push origin "$HEAD_SHA":refs/heads/main', self.text)
@@ -61,9 +63,31 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
             self.assertIn(name, self.text)
 
     def test_generated_pentadocs_are_normalized_before_governance(self):
+        self.assertIn("python3 scripts/pentarelease/pentadocs_group.py", self.text)
         self.assertIn("python3 scripts/pentadocs_quality.py --apply", self.text)
         self.assertIn("python3 scripts/validate_docs.py", self.text)
         self.assertIn("data/documentation/pentadocs-page-profiles.v1.json", self.text)
+
+    def test_release_surface_uses_existing_canonical_tab_without_ninth_tab(self):
+        self.assertIn("PentaDocs top-level tabs: <=8", self.text)
+        self.assertIn("managed PentaRelease group inside the existing CrownThrive OS PentaDocs tab", self.text)
+        self.assertIn("pentadocs_group.inspect", self.text)
+        self.assertNotIn('names.count("Releases & Evidence") == 1', self.text)
+
+    def test_reconciler_keeps_least_privilege_and_does_not_fail_on_branch_retention(self):
+        self.assertIn("contents: read", self.reconciler_text)
+        self.assertIn('gh pr close "$number" --repo "$REPO" --comment "$NOTE"', self.reconciler_text)
+        self.assertNotIn("--delete-branch", self.reconciler_text)
+        self.assertIn("PR-shell retirement is the backlog SLA", self.reconciler_text)
+        self.assertIn("Generated branches retained under least privilege", self.reconciler_text)
+
+    def test_reconciler_still_requires_release_evidence_and_bot_identity(self):
+        self.assertIn('index("MANIFEST.json")', self.reconciler_text)
+        self.assertIn('index("RELEASE_NOTES.md")', self.reconciler_text)
+        self.assertIn('index("PENTARELEASE_COMPREHENSIVE_RELEASE.md")', self.reconciler_text)
+        self.assertIn('index("PENTARELEASE_EVIDENCE.json")', self.reconciler_text)
+        self.assertIn('author=$(gh api "repos/$REPO/pulls/$number"', self.reconciler_text)
+        self.assertIn('github-actions[bot]', self.reconciler_text)
 
     def test_secret_gate_allows_public_templates_but_still_blocks_real_env_files(self):
         self.assertIn(r"\.env\.(example|sample|template)$", self.awareness_text)

@@ -1,0 +1,38 @@
+name: PentaSELF Remediation PR Check
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/penta-self-remediation-handoff.yml'
+      - '.github/workflows/penta-self-remediation-pr-check.yml'
+      - 'config/penta_pm_policy.json'
+      - 'scripts/penta_self_remediation_handoff.py'
+      - 'scripts/penta_pm_remediation_assign.py'
+      - 'tests/test_penta_self_remediation_handoff.py'
+      - 'supabase/migrations/*penta_self_pr_pm_remediation_handoff*.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remediation-contract:
+    name: PentaSELF remediation contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Compile remediation controllers
+        run: |
+          python -m py_compile \
+            scripts/penta_self_remediation_handoff.py \
+            scripts/penta_pm_remediation_assign.py
+      - name: Validate PentaPM remediation policy
+        run: python -m json.tool config/penta_pm_policy.json >/dev/null
+      - name: Run remediation routing regression suite
+        run: python -m unittest tests.test_penta_self_remediation_handoff -v

@@ -10,6 +10,7 @@ on:
       - '.github/workflows/pentarelease-comprehensive-release-surface.yml'
       - '.pentarelease/policy.json'
       - 'scripts/pentarelease/release_surface.py'
+      - 'scripts/pentarelease/pentadocs_group.py'
   schedule:
     - cron: '47 5 * * *'
   workflow_dispatch:
@@ -46,11 +47,12 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m json.tool .pentarelease/policy.json >/dev/null
-          python3 -m py_compile scripts/pentarelease/release_surface.py scripts/pentadocs_quality.py scripts/validate_docs.py
-          python3 -m unittest tests.test_pentarelease_release_surface tests.test_pentarelease_workflow_contract
+          python3 -m py_compile scripts/pentarelease/release_surface.py scripts/pentarelease/pentadocs_group.py scripts/pentadocs_quality.py scripts/validate_docs.py
+          python3 -m unittest tests.test_pentarelease_release_surface tests.test_pentarelease_pentadocs_group tests.test_pentarelease_workflow_contract
           test "$(jq -r '.release_surface.enabled' .pentarelease/policy.json)" = "true"
           test "$(jq -r '.release_surface.max_repository_surfaces' .pentarelease/policy.json)" -le 7
           test "$(jq -r '.release_surface.repository_surfaces | length' .pentarelease/policy.json)" -le 7
+          test "$(jq -r '.release_surface.max_pentadocs_tabs' .pentarelease/policy.json)" -le 8
 
       - name: Resolve canonical release
         id: release
@@ -79,6 +81,7 @@ jobs:
           python3 - "$TAG" <<'PY' > /tmp/pentarelease-local-health.json
           import json, sys
           from pathlib import Path
+          from scripts.pentarelease import pentadocs_group
 
           tag=sys.argv[1]
           result={"healthy":False,"reason":"unknown"}
@@ -100,22 +103,9 @@ jobs:
                   text=p.read_text(encoding='utf-8')
                   if start not in text or end not in text:
                       raise RuntimeError(f'missing_managed_block:{p}')
-              docs=json.load(open((cfg.get('pentadocs') or {}).get('config','docs.json')))
-              tabs=(docs.get('navigation') or {}).get('tabs') or []
-              if len(tabs) > int(cfg.get('max_pentadocs_tabs',7)):
-                  raise RuntimeError('pentadocs_tab_limit_exceeded')
-              tab_name=(cfg.get('pentadocs') or {}).get('tab','Releases & Evidence')
-              matches=[x for x in tabs if isinstance(x,dict) and x.get('tab') == tab_name]
-              if len(matches) != 1:
-                  raise RuntimeError('release_tab_missing_or_duplicate')
-              expected=list((cfg.get('pentadocs') or {}).get('pages') or [])
-              groups=matches[0].get('groups') or []
-              penta_group=next((g for g in groups if isinstance(g,dict) and g.get('group')=='PentaRelease'),None)
-              if not penta_group or list(penta_group.get('pages') or []) != expected:
-                  raise RuntimeError('release_tab_pages_mismatch')
-              for page in expected:
-                  if not Path(page + '.mdx').is_file():
-                      raise RuntimeError(f'missing_pentadocs_page:{page}')
+              docs_health=pentadocs_group.inspect(Path('.').resolve(), Path('.pentarelease/policy.json').resolve())
+              if not docs_health.get('healthy'):
+                  raise RuntimeError(str(docs_health.get('reason') or 'pentadocs_group_unhealthy'))
               result={"healthy":True,"reason":"current_release_surface_present"}
           except Exception as exc:
               result={"healthy":False,"reason":str(exc)[:240]}
@@ -180,11 +170,13 @@ jobs:
             --outdir dist/pentarelease-surface \
             "${EXTRA[@]}"
 
-          # Release-surface pages must be normalized into the current PentaDocs
-          # contract before any governed branch can be created.
+          # PentaRelease is managed as a group inside the existing canonical
+          # CrownThrive OS tab. It never creates a ninth top-level PentaDocs tab.
           if [ "$LOCAL_READY" != "true" ]; then
+            python3 scripts/pentarelease/pentadocs_group.py --root . --policy .pentarelease/policy.json
             python3 scripts/pentadocs_quality.py --apply
             python3 scripts/validate_docs.py
+            python3 scripts/pentarelease/pentadocs_group.py --root . --policy .pentarelease/policy.json --check
           fi
 
           for JSON in PENTARELEASE_RELEASE_RECORD.json PENTARELEASE_COSTS.json PENTARELEASE_CIE_SCORE.json PENTARELEASE_DATA_CATALOG.json PENTARELEASE_EVIDENCE.json; do
@@ -219,6 +211,7 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
+          from scripts.pentarelease import pentadocs_group
 
           policy=json.load(open(".pentarelease/policy.json"))
           state=json.load(open(".pentarelease/state/release-surface.json"))
@@ -229,8 +222,12 @@ jobs:
           docs=json.load(open("docs.json"))
           tabs=docs["navigation"]["tabs"]
           assert len(tabs) <= policy["release_surface"]["max_pentadocs_tabs"]
-          names=[x.get("tab") for x in tabs if isinstance(x,dict)]
-          assert names.count("Releases & Evidence") == 1
+          assert len(tabs) <= 8
+          health=pentadocs_group.inspect(Path('.').resolve(), Path('.pentarelease/policy.json').resolve())
+          assert health.get('healthy') is True, health
+          group_state=state.get('pentadocs_group') or {}
+          assert group_state.get('managed_by_pentarelease') is True
+          assert group_state.get('top_level_tab_created') is False
 
           for path, meta in state["repository_surfaces"].items():
               p=Path(path)
@@ -321,7 +318,7 @@ jobs:
           if [ -z "$PR_URL" ]; then
             if ! PR_URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
                 --title "PentaRelease comprehensive surface $TAG" \
-                --body "Synchronizes the bounded seven-file release surface, PentaDocs Release & Evidence tab, canonical release URL, comprehensive release notes, CIE/cost/data disclosure, FAQ, changelog, and evidence. Only PentaRelease-owned files/blocks are removable." 2>/tmp/pentarelease-pr.err); then
+                --body "Synchronizes the bounded seven repository release surfaces and the managed PentaRelease group inside the existing CrownThrive OS PentaDocs tab, plus canonical release URL, comprehensive notes, CIE/cost/data disclosure, FAQ, changelog, and evidence. No ninth top-level docs tab is created; only PentaRelease-owned files/blocks/group state are managed." 2>/tmp/pentarelease-pr.err); then
               cat /tmp/pentarelease-pr.err || true
               echo "::warning title=PentaRelease provider promotion HOLD::GitHub Actions cannot create the protected-main PR. The exact gated PentaRelease-owned branch is preserved for an authorized PR provider identity."
               echo "promotion_state=HOLD_PR_PROVIDER_IDENTITY" >> "$GITHUB_OUTPUT"
@@ -409,10 +406,10 @@ jobs:
             echo "- State: $STATE"
             echo "- Provider comprehensive release readback: verified"
             echo "- Repository surfaces: 7 maximum / policy-enforced"
-            echo "- PentaDocs tabs: <=7 / policy-enforced"
+            echo "- PentaDocs top-level tabs: <=8 / policy-enforced; PentaRelease is a managed group inside CrownThrive OS"
             echo "- Cost disclosure: explicit; unknown values never fabricated"
             echo "- CIE disclosure: explicit; missing scores remain unavailable"
-            echo "- Deletion boundary: only PentaRelease-created files/blocks are removable; unmanaged content preserved"
+            echo "- Deletion boundary: only PentaRelease-created files/blocks/group state are managed; unmanaged content preserved"
             echo "- Protected main: no direct-push fallback; normal PR path only"
             if [ -n "$PENDING_BRANCH" ]; then echo "- Pending governed branch: $PENDING_BRANCH"; fi
             if [ -n "$PR_URL" ]; then echo "- Promotion PR: $PR_URL"; fi
