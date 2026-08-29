@@ -1,0 +1,168 @@
+{
+  "topology_id": "ct.topology.penta.virtual-network.v1",
+  "canonical_name": "CrownThrive COS Virtual Network and Four-Line Resilience Topology",
+  "semantic_version": "1.0.0",
+  "lifecycle_state": "implementation_candidate",
+  "canonical_truth_rule": "All lines and audience projections resolve to one COS identity graph and DAIL lineage; no line creates a competing sovereign truth.",
+  "owners": {
+    "connectivity": "ct.penta.wire",
+    "distribution": "ct.penta.mesh",
+    "routing": "ct.penta.route",
+    "tunneling": "ct.penta.tun",
+    "edge_policy": "ct.penta.edge",
+    "load": "ct.penta.load",
+    "balancing": "ct.penta.balancer",
+    "leases": "ct.penta.queue",
+    "health": "ct.penta.self",
+    "time": "ct.penta.time",
+    "dnd": "ct.penta.dnd.v1"
+  },
+  "lines": [
+    {
+      "id": "ct.line.hot.primary.v1",
+      "name": "HOT Primary",
+      "temperature": "hot",
+      "role": "active_execution",
+      "audience_views": ["human", "machine", "hybrid"],
+      "governance_views": ["centralized", "decentralized", "bridge"],
+      "default_route_weight": 100,
+      "write_enabled_when_certified": true
+    },
+    {
+      "id": "ct.line.warm.standby.v1",
+      "name": "WARM Standby",
+      "temperature": "warm",
+      "role": "shadow_and_bounded_failover",
+      "audience_views": ["human", "machine", "hybrid"],
+      "governance_views": ["centralized", "decentralized", "bridge"],
+      "default_route_weight": 0,
+      "promotion_canary_required": true
+    },
+    {
+      "id": "ct.line.cold.a.living-recovery.v1",
+      "name": "COLD-A Living Recovery",
+      "temperature": "cold",
+      "role": "continuously_verified_recovery",
+      "audience_views": ["human", "machine", "hybrid"],
+      "governance_views": ["centralized", "decentralized", "bridge"],
+      "read_only_default": true,
+      "periodic_restore_test_required": true
+    },
+    {
+      "id": "ct.line.cold.b.disaster-immutable.v1",
+      "name": "COLD-B Disaster Immutable",
+      "temperature": "cold",
+      "role": "isolated_disaster_recovery",
+      "audience_views": ["human", "machine", "hybrid"],
+      "governance_views": ["centralized", "decentralized", "bridge"],
+      "immutable_default": true,
+      "dual_control_restore_required": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ct.node.vswitch.core.hot.v1",
+      "kind": "virtual_switch",
+      "line": "ct.line.hot.primary.v1",
+      "owner": "ct.penta.wire",
+      "purpose": "Connect active certified COS nodes inside the HOT line."
+    },
+    {
+      "id": "ct.node.vswitch.core.warm.v1",
+      "kind": "virtual_switch",
+      "line": "ct.line.warm.standby.v1",
+      "owner": "ct.penta.wire",
+      "purpose": "Maintain shadow connectivity and accept bounded promotion."
+    },
+    {
+      "id": "ct.node.vswitch.core.cold-a.v1",
+      "kind": "virtual_switch",
+      "line": "ct.line.cold.a.living-recovery.v1",
+      "owner": "ct.penta.wire",
+      "purpose": "Expose read-only living recovery paths for integrity and restore testing."
+    },
+    {
+      "id": "ct.node.vswitch.core.cold-b.v1",
+      "kind": "virtual_switch",
+      "line": "ct.line.cold.b.disaster-immutable.v1",
+      "owner": "ct.penta.wire",
+      "purpose": "Expose only dual-control disaster restore paths."
+    },
+    {
+      "id": "ct.node.vrouter.cos.core.v1",
+      "kind": "virtual_router",
+      "owner": "ct.penta.route",
+      "purpose": "Resolve destinations by capability, health, authority, load, cost, locality and evidence freshness."
+    },
+    {
+      "id": "ct.node.gateway.cos.edge.v1",
+      "kind": "edge_gateway",
+      "owner": "ct.penta.edge",
+      "purpose": "Enforce ingress, egress, provider and data-class boundaries."
+    },
+    {
+      "id": "ct.node.failover.cos.v1",
+      "kind": "failover_controller",
+      "owner": "ct.penta.dnd.v1",
+      "purpose": "Coordinate scoped failover without claiming global maintenance authority."
+    },
+    {
+      "id": "ct.node.health.cos.v1",
+      "kind": "health_sentinel",
+      "owner": "ct.penta.self",
+      "purpose": "Verify liveness, readiness, evidence freshness and regression state."
+    }
+  ],
+  "links": [
+    {
+      "id": "ct.link.hot-to-warm.v1",
+      "from": "ct.line.hot.primary.v1",
+      "to": "ct.line.warm.standby.v1",
+      "mode": "continuous_shadow",
+      "direction": "one_way_plus_verified_readback"
+    },
+    {
+      "id": "ct.link.warm-to-cold-a.v1",
+      "from": "ct.line.warm.standby.v1",
+      "to": "ct.line.cold.a.living-recovery.v1",
+      "mode": "governed_snapshot_and_evidence_projection",
+      "direction": "one_way"
+    },
+    {
+      "id": "ct.link.cold-a-to-cold-b.v1",
+      "from": "ct.line.cold.a.living-recovery.v1",
+      "to": "ct.line.cold.b.disaster-immutable.v1",
+      "mode": "delayed_immutable_checkpoint",
+      "direction": "one_way"
+    }
+  ],
+  "dnd_failover_policy": {
+    "scope_only": true,
+    "global_maintenance_default": false,
+    "preserve_p0_paths": true,
+    "deflected_work_disposition": "queue_with_receipt_and_ttl",
+    "ambiguous_mutation_retry": false,
+    "automatic_warm_promotion": "bounded_only_after_health_route_authority_and_readback",
+    "cold_a_promotion": "manual_or_preapproved_drill_with_independent_certification",
+    "cold_b_restore": "dual_control_only"
+  },
+  "required_census_fields": [
+    "cos_uuid",
+    "stable_id",
+    "entity_kind",
+    "line_id",
+    "audience_view",
+    "governance_view",
+    "lifecycle_state",
+    "health_state",
+    "capacity_state",
+    "authority_ceiling",
+    "route_address",
+    "cookie_revision",
+    "evidence_age_seconds",
+    "dail_lineage",
+    "chlom_identity_ref",
+    "repair_route",
+    "last_verified_at"
+  ]
+}
