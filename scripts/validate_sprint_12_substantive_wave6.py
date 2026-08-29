@@ -42,20 +42,29 @@ def require_text(path: str, terms: list[str]) -> None:
         assert term in text, f"{path}: missing required term {term!r}"
 
 
-def nav_groups(tab: dict) -> list[dict]:
-    """Return group objects from legacy or current PentaDocs navigation schema."""
-    groups = tab.get("groups")
-    if isinstance(groups, list):
-        return [g for g in groups if isinstance(g, dict)]
-    pages = tab.get("pages")
-    if isinstance(pages, list):
-        return [g for g in pages if isinstance(g, dict)]
-    return []
+def nav_groups(container: dict) -> list[dict]:
+    """Return all descendant groups from legacy, current, or nested Mintlify nav."""
+    found: list[dict] = []
+    for key in ("groups", "pages"):
+        children = container.get(key)
+        if not isinstance(children, list):
+            continue
+        for child in children:
+            if not isinstance(child, dict):
+                continue
+            if isinstance(child.get("group"), str):
+                found.append(child)
+            found.extend(nav_groups(child))
+    return found
 
 
 def nav_group(data: dict, tab_name: str, group_name: str) -> dict:
     tab = next(t for t in data["navigation"]["tabs"] if t.get("tab") == tab_name)
-    return next(g for g in nav_groups(tab) if g.get("group") == group_name)
+    matches = [g for g in nav_groups(tab) if g.get("group") == group_name]
+    assert len(matches) == 1, (
+        f"expected exactly one {group_name!r} group in {tab_name!r}; found {len(matches)}"
+    )
+    return matches[0]
 
 
 def main() -> None:
