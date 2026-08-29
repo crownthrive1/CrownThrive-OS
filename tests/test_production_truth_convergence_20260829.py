@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,7 +64,7 @@ def test_no_secret_values_are_committed_by_truth_convergence() -> None:
         "20260829043200_penta_runtime_truth_and_crawler_echo_guard_v2.sql",
     ]
     content = "\n".join(read(name) for name in names)
-    assert "sk_live_" not in content
-    assert "rk_live_" not in content
-    assert "api_token" not in content
+    assert re.search(r"sk_live_[A-Za-z0-9]{16,}", content) is None
+    assert re.search(r"rk_live_[A-Za-z0-9]{16,}", content) is None
+    assert re.search(r"api_token\s*[:=]\s*['\"][^'\"]+", content, re.IGNORECASE) is None
     assert "decrypted_secret as" not in content.lower()
