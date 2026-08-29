@@ -1,0 +1,161 @@
+name: PentaRelease — Economic + CIE Convergence
+
+on:
+  workflow_run:
+    workflows:
+      - PentaRelease — Autonomous Release Awareness
+    types: [completed]
+  schedule:
+    - cron: '12 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+  id-token: write
+
+concurrency:
+  group: pentarelease-economic-cie-convergence
+  cancel-in-progress: false
+
+env:
+  PENTARELEASE_EVIDENCE_ENDPOINT: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-release-evidence-oidc
+  PENTARELEASE_OIDC_AUDIENCE: crownthrive-pentarelease
+
+jobs:
+  resolve-project-readback:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve latest published PentaRelease target
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE=$(gh api "/repos/${GITHUB_REPOSITORY}/releases/latest")
+          TAG=$(jq -r '.tag_name // empty' <<<"$RELEASE")
+          VERSION="${TAG#v}"
+          test -n "$TAG"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+
+          PAYLOAD_BYTES=$(jq '[.assets[]?.size] | add // 0' <<<"$RELEASE")
+          PR_NUMBER=$(gh api --method GET /search/issues \
+            -f q="repo:${GITHUB_REPOSITORY} is:pr in:title \"PentaRelease autonomous release ${VERSION}\"" \
+            --jq '.items[0].number // empty' 2>/dev/null || true)
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "payload_bytes=$PAYLOAD_BYTES" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+          {
+            echo '## PentaRelease economic/CIE convergence target'
+            echo
+            echo "- Release: $TAG"
+            echo "- Version: $VERSION"
+            echo "- Governed release PR: ${PR_NUMBER:-none discovered}"
+            echo "- Release asset bytes: $PAYLOAD_BYTES"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Mint GitHub OIDC identity
+        id: oidc
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE=$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${PENTARELEASE_OIDC_AUDIENCE}")
+          TOKEN=$(jq -r '.value // empty' <<<"$RESPONSE")
+          test -n "$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo 'Raw OIDC token is transient and is not persisted by PentaRelease.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve once and project everywhere
+        id: project
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          RELEASE_VERSION: ${{ steps.target.outputs.version }}
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+          PR_NUMBER: ${{ steps.target.outputs.pr_number }}
+          PAYLOAD_BYTES: ${{ steps.target.outputs.payload_bytes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PR_JSON=null
+          if [ -n "$PR_NUMBER" ]; then PR_JSON="$PR_NUMBER"; fi
+
+          jq -n \
+            --arg release_version "$RELEASE_VERSION" \
+            --arg release_tag "$RELEASE_TAG" \
+            --argjson pr_number "$PR_JSON" \
+            --argjson payload_bytes "$PAYLOAD_BYTES" \
+            '{release_version:$release_version,release_tag:$release_tag,pr_number:$pr_number,payload_bytes:$payload_bytes}' \
+            > /tmp/pentarelease-evidence-request.json
+
+          curl --fail-with-body --silent --show-error \
+            -X POST "$PENTARELEASE_EVIDENCE_ENDPOINT" \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/pentarelease-evidence-request.json \
+            > /tmp/pentarelease-evidence-response.json
+
+          jq . /tmp/pentarelease-evidence-response.json
+          test "$(jq -r '.ok' /tmp/pentarelease-evidence-response.json)" = "true"
+          EVIDENCE_SHA=$(jq -r '.result.projected.footer.evidence_sha256 // empty' /tmp/pentarelease-evidence-response.json)
+          test -n "$EVIDENCE_SHA"
+          echo "evidence_sha=$EVIDENCE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Require GitHub managed-footer readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.target.outputs.tag }}
+          PR_NUMBER: ${{ steps.target.outputs.pr_number }}
+          EVIDENCE_SHA: ${{ steps.project.outputs.evidence_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_OK=false
+          for _ in $(seq 1 30); do
+            BODY=$(gh release view "$RELEASE_TAG" --json body --jq '.body // ""')
+            if grep -Fq '<!-- ct:penta-release-footer:start -->' <<<"$BODY" \
+               && grep -Fq "$EVIDENCE_SHA" <<<"$BODY" \
+               && grep -Fq 'PentaCosts:' <<<"$BODY" \
+               && grep -Fq 'PentaPay:' <<<"$BODY" \
+               && grep -Fq 'USD release exposure:' <<<"$BODY" \
+               && grep -Fq 'CIE:' <<<"$BODY"; then
+              RELEASE_OK=true
+              break
+            fi
+            sleep 2
+          done
+          test "$RELEASE_OK" = true
+
+          PR_STATE=not_applicable
+          if [ -n "$PR_NUMBER" ]; then
+            PR_OK=false
+            for _ in $(seq 1 30); do
+              PR_BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body // ""' 2>/dev/null || true)
+              if grep -Fq '<!-- ct:penta-release-footer:start -->' <<<"$PR_BODY" \
+                 && grep -Fq "$EVIDENCE_SHA" <<<"$PR_BODY"; then
+                PR_OK=true
+                break
+              fi
+              sleep 2
+            done
+            test "$PR_OK" = true
+            PR_STATE=verified
+          fi
+
+          {
+            echo '## PentaRelease economic/CIE projection proof'
+            echo
+            echo "- Release managed footer: verified"
+            echo "- PR managed footer: $PR_STATE"
+            echo "- Evidence SHA-256: $EVIDENCE_SHA"
+            echo "- PentaPay/PentaCosts provider monetary values: USD-normalized"
+            echo "- Internal Penta execution units: explicitly not currency"
+            echo "- CIE: exact governed evidence or fail-closed HOLD; never fabricated"
+          } >> "$GITHUB_STEP_SUMMARY"
