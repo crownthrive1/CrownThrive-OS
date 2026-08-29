@@ -7,15 +7,24 @@ class FakeGH:
     repo = "crownthrive1/CrownThrive-OS"
 
     def __init__(self, *, pr_body: str, labels: list[str]) -> None:
+        self._entity_cache = {}
         self.pr = {"number": 77, "title": "test governed PR", "body": pr_body}
         self.pr_issue = {
             "number": 77,
             "labels": [{"name": name} for name in labels],
             "body": pr_body,
+            "pull_request": {"url": "https://example.invalid/pr/77"},
         }
         self.issues = {
             10: {"id": 1010, "number": 10, "title": "umbrella", "body": ""},
             20: {"id": 1020, "number": 20, "title": "remediation", "body": ""},
+            30: {
+                "id": 1030,
+                "number": 30,
+                "title": "older PR",
+                "body": "",
+                "pull_request": {"url": "https://example.invalid/pr/30"},
+            },
         }
 
     def get(self, path: str):
@@ -46,6 +55,15 @@ class PentaPMPRConvergeTests(unittest.TestCase):
         self.assertTrue(mod.governed({"penta-development"}))
         self.assertFalse(mod.governed({"bug", "documentation"}))
 
+    def test_issue_entity_rejects_pull_requests(self):
+        self.assertTrue(mod.is_issue_entity({"number": 10}))
+        self.assertFalse(mod.is_issue_entity({"number": 30, "pull_request": {}}))
+
+    def test_reference_selection_prefers_issue_over_pr(self):
+        pr = {"number": 30, "pull_request": {}}
+        issue = {"number": 20}
+        self.assertEqual(mod.select_issue_reference([pr, issue]), issue)
+
     def test_pentaself_tracking_link_is_terminal_candidate(self):
         gh = FakeGH(
             pr_body="<!-- penta-self-remediation:abc -->\n\nRefs #20",
@@ -55,11 +73,25 @@ class PentaPMPRConvergeTests(unittest.TestCase):
         self.assertTrue(result["governed"])
         self.assertEqual(result["relationship_kind"], "pentaself-root")
         self.assertEqual(result["development_action"], "promote-to-closes:20")
+        self.assertEqual(result["reference_source_kind"], "issue")
 
     def test_partial_tracking_link_gets_child_issue_contract(self):
         gh = FakeGH(pr_body="Refs #10", labels=["penta:pm"])
         result = mod.converge_pr(gh, 77, apply=False)
         self.assertEqual(result["development_action"], "create-or-reuse-child-under:10")
+
+    def test_pr_then_issue_reference_uses_issue_as_parent(self):
+        gh = FakeGH(pr_body="Refs #30\nRefs #10", labels=["penta:pm"])
+        result = mod.converge_pr(gh, 77, apply=False)
+        self.assertEqual(result["reference_source"], 10)
+        self.assertEqual(result["reference_source_kind"], "issue")
+        self.assertEqual(result["development_action"], "create-or-reuse-child-under:10")
+
+    def test_only_pr_reference_uses_cross_reference_child_contract(self):
+        gh = FakeGH(pr_body="Refs #30", labels=["penta:pm"])
+        result = mod.converge_pr(gh, 77, apply=False)
+        self.assertEqual(result["reference_source_kind"], "pull_request")
+        self.assertEqual(result["development_action"], "create-or-reuse-child-related-to-pr:30")
 
     def test_existing_terminal_link_is_preserved(self):
         gh = FakeGH(pr_body="Closes #10", labels=["penta:pm"])
