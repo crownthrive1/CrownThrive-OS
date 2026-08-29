@@ -63,19 +63,17 @@ For business, licensing, development, media, partnership, ecosystem, research, o
 This is a public-safe professional and institutional profile. It does not disclose private contracts, restricted evidence, protected algorithms, confidential economic schedules, credentials, private customer data, unpublished source assets, or other restricted CrownThrive material.
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.49.1.0
+## Latest PentaRelease — v3.49.2.0
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.49.1.0
-- **Release title:** CrownThrive OS 3.49.1.0 — Autonomous PentaRelease
-- **Who:** PentaRelease / provider actor github-actions[bot]
+
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.49.2.0
+- **Release title:** CrownThrive OS 3.49.2.0 — Autonomous PentaRelease
 - **Why:** production fix/hardening delta
-- **Changed paths:** 20
-- **Provider actual cost:** $0.00 USD
-- **Recognized release exposure:** $0.00 USD
-- **Direct usage calculation:** `not_available`
-- **CIE:** **PASS — 100/100**
-- **CIE dimensions:** brand_safety=20, identity_fit=20, legacy_impact=20, community_value=20, story_alignment=20
-- **Evidence:** `c1243dd4f79f8973d709f320599de3f8d12568529cf95c0642dd7ee1a5421c70`
+- **Changed paths:** 2
+- **Penta components:** PentaRelease
+- **Direct USD payload cost:** not available
+- **CIE score:** not available
+- **Data/evidence:** comprehensive record, FAQ, changelog, costs, CIE status, data catalog, and evidence are attached to the official release.
 
-PentaRelease maintains this bounded block. Content outside the markers remains under its existing ownership and editorial authority.
+This section is maintained by PentaRelease. Content outside the managed markers remains under its existing ownership and editorial authority.
 <!-- pentarelease:managed-release-surface:end -->
