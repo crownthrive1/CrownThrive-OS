@@ -1,0 +1,68 @@
+{
+  "contract": "ct.stripe.webhook-ingress.v2",
+  "version": "2.0.1",
+  "status": "production",
+  "owner": ["PentaHook", "PentaLedger", "PentaCertify", "PentaCredentials"],
+  "targets": [
+    {
+      "target_key": "thrivetickets",
+      "system_ref": "ct.system.thrivetickets",
+      "endpoint_path": "/functions/v1/stripe-webhook-ingress-v2/thrivetickets"
+    },
+    {
+      "target_key": "sermon_toolkit",
+      "system_ref": "ct.system.kjv-sermon-toolkit",
+      "endpoint_path": "/functions/v1/stripe-webhook-ingress-v2/sermon_toolkit"
+    }
+  ],
+  "security": {
+    "stripe_signature_required": true,
+    "signature_tolerance_seconds": 300,
+    "constant_time_comparison": true,
+    "max_request_bytes": 2097152,
+    "provider_generated_signing_secrets": true,
+    "vault_custody": true,
+    "raw_secret_projection": false,
+    "anon_database_access": false,
+    "authenticated_database_access": false
+  },
+  "reliability": {
+    "idempotency_key": "stripe_event_id",
+    "append_only_event_evidence": true,
+    "append_only_receipts": true,
+    "dail_projection": true,
+    "durable_downstream_outbox": true,
+    "signed_local_canary": true,
+    "retire_broken_predecessor_after_canary": true,
+    "ambiguous_provider_outcome": "hold_and_reconcile"
+  },
+  "provider_bootstrap": {
+    "edge_function": "stripe-webhook-bootstrap-v2",
+    "live_stripe_key": "resolved_by_server_side_vault_alias",
+    "idempotent": true,
+    "stores_signing_secret_in_vault": true,
+    "returns_signing_secret": false,
+    "retains_retirement_history": true
+  },
+  "event_semantics": {
+    "real_provider_event_source": "stripe_provider",
+    "local_canary_source": "bootstrap_canary",
+    "canary_is_not_real_provider_event": true,
+    "live_event_receipt_requires_real_stripe_signature_delivery": true
+  },
+  "non_authorities": [
+    "no_money_movement",
+    "no_fulfillment_without_downstream_entitlement_handler",
+    "no_checkout_activation",
+    "no_d3",
+    "no_signature_bypass",
+    "no_secret_export"
+  ],
+  "source": {
+    "schema_migration": "supabase/migrations/20260829023000_stripe_webhook_ingress_fabric_v2.sql",
+    "retirement_history_migration": "supabase/migrations/20260829023100_stripe_webhook_bootstrap_retirement_history_v2.sql",
+    "ingress": "supabase/functions/stripe-webhook-ingress-v2/index.ts",
+    "bootstrap": "supabase/functions/stripe-webhook-bootstrap-v2/index.ts",
+    "tests": "tests/test_stripe_webhook_ingress_v2.py"
+  }
+}
