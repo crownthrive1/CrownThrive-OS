@@ -99,7 +99,7 @@ jobs:
                   number = run_number
                   wait_for_settle = True
                   if not number and run_head:
-                      pulls = get(f'/commits/{urllib.parse.quote(run_head)}/pulls')
+                      pulls = get('/pulls?state=open&base=main&per_page=100')
                       candidates = [
                           p for p in pulls
                           if p.get('state') == 'open'
@@ -108,7 +108,7 @@ jobs:
                       ]
                       if len(candidates) == 1:
                           number = str(candidates[0]['number'])
-                          source = 'workflow_run:head_sha_fallback'
+                          source = 'workflow_run:open_pr_sweep'
                       else:
                           skip = True
                           source = f'workflow_run:unresolved_head:{len(candidates)}'
