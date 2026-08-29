@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """Validate CrownThrive homepage control-plane and pull-propagation invariants.
 
-This validator is intentionally standard-library only. It supports the current
-Phase 3 Production + Convergence homepage while preserving validation of the
-older readiness-projection shape for historical branches.
+The homepage is a governed summary and routing surface. Current institutional
+state is validated from canonical CrownThrive OS records; the public landing
+page is not required to duplicate long-form control-plane sections verbatim.
 
-A current production homepage must not be forced to re-project a superseded
-Phase 2.99/Phase 3-entry token. Instead it must explicitly declare the Phase 3
-production baseline, evidence-scoped promotion, and the fact that the old
-blanket NO-GO homepage posture is superseded.
+Legacy homepage validation remains available for historical branches.
 """
 
 from __future__ import annotations
@@ -20,6 +17,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "index.mdx"
 READINESS = ROOT / "technology/phase-3-readiness-gate.mdx"
+CURRENT_STATE = ROOT / "docs/phase3/CURRENT_STATE.md"
+PUBLIC_CURRENT_STATE = ROOT / "start-here/current-operational-state.mdx"
+PENTA_FAMILY = ROOT / "automation/penta-family.mdx"
+PHASE3_BOOTSTRAP = ROOT / "changelog/2026-08-26-phase3-entry-bootstrap-v2.mdx"
 DOCS_STANDARD = ROOT / "standards/documentation-source-of-truth-and-autonomous-governance.mdx"
 NON_NEGOTIABLES = ROOT / "standards/non-negotiables.mdx"
 PR_TEMPLATE = ROOT / ".github/pull_request_template.md"
@@ -42,10 +43,10 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def validate_markers(index: str, markers: dict[str, str], errors: list[str]) -> None:
+def validate_markers(text: str, markers: dict[str, str], errors: list[str], *, surface: str) -> None:
     for label, marker in markers.items():
-        if marker not in index:
-            errors.append(f"Homepage missing {label}: {marker!r}")
+        if marker not in text:
+            errors.append(f"{surface} missing {label}: {marker!r}")
 
 
 def parse_readiness_decision(readiness: str, errors: list[str]) -> str | None:
@@ -60,24 +61,84 @@ def parse_readiness_decision(readiness: str, errors: list[str]) -> str | None:
     return decision_match.group(1).strip()
 
 
-def validate_production_convergence(index: str, readiness: str, errors: list[str]) -> None:
-    required = {
+def validate_production_convergence(
+    index: str,
+    readiness: str,
+    current_state: str,
+    public_current_state: str,
+    penta_family: str,
+    phase3_bootstrap: str,
+    errors: list[str],
+) -> None:
+    # The homepage proves its role as a concise governed summary/routing surface.
+    homepage_required = {
         "Production + Convergence page identity": PRODUCTION_MARKERS[0],
-        "current production posture": "CURRENT OPERATING STATE — PRODUCTION \\+ CONVERGENCE.",
-        "Penta operating model": "## The Penta Model",
-        "institutional pulse": "## Current institutional pulse",
-        "Phase 3 production baseline": "institutional_phase: phase_3_production_baseline",
-        "evidence-scoped status promotion": "status_promotion_rule: evidence_scoped_fail_closed",
-        "universal-activation warning": "**Production does not mean universal activation.**",
-        "Phase 3 bootstrap lineage": "/changelog/2026-08-26-phase3-entry-bootstrap-v2",
-        "superseded readiness posture": "old homepage posture that presented Phase 2.99 as the active state and Phase 3 as a blanket `NO-GO` is superseded",
-        "evidence-over-appearance section": "## Evidence over appearance",
+        "concise convergent-ecosystem identity": "**One convergent ecosystem. Governed execution. Cultural continuity.**",
+        "current production posture": "**Current posture: Production \\+ Convergence.**",
+        "current-state route": 'href="/start-here/current-operational-state"',
+        "Penta Family route": 'href="/automation/penta-family"',
+        "evidence/release route": 'href="/pentarelease/latest"',
+        "deep-reference boundary": "The public landing experience stays simple; the institutional depth remains available underneath it.",
+        "provider boundary": "Mintlify is the current presentation, navigation, search, and hosting layer.",
     }
-    validate_markers(index, required, errors)
+    validate_markers(index, homepage_required, errors, surface="Homepage")
+
+    # Canonical institutional state owns the long-form control-plane invariants.
+    current_state_required = {
+        "Phase 3 canonical identity": "# CrownThrive Phase 3 Current State",
+        "institutional generation": "**Institutional generation:** Phase 3 / CrownThrive OS 3.x",
+        "source-of-truth authority": "**CrownThrive OS is the authoritative institutional source of truth.**",
+        "evidence-scoped execution": "it does not restart the ecosystem, discard earlier releases, or automatically promote every subsystem into production",
+        "non-universal activation boundary": "Phase 3 does **not** mean:",
+        "fail-closed HOLD semantics": "`HOLD`",
+        "current documentation evidence rule": "Current OS documents must state the **real-life picture**",
+        "authority boundary": "## Authority boundary",
+    }
+    validate_markers(
+        current_state,
+        current_state_required,
+        errors,
+        surface="Canonical Phase 3 current-state record",
+    )
+
+    public_state_required = {
+        "public Phase 3 snapshot": "**Institutional phase:** Phase 3 — Execute",
+        "no blanket production promotion": "**Operating posture:** Operational by subsystem and evidence scope; no blanket production promotion",
+        "downstream projection rule": "PentaDocs, websites, storefronts, and other public surfaces are downstream projections and may not override the OS.",
+        "hard-boundary section": "## Hard boundaries still in force",
+    }
+    validate_markers(
+        public_current_state,
+        public_state_required,
+        errors,
+        surface="Public current-state projection",
+    )
+
+    penta_required = {
+        "Penta production control-plane identity": "## Penta Family™ // Production Control Plane",
+        "Penta scoped production status": "**Status: `production` — scope: `institutional_control_plane`.**",
+        "independent-child invariant": "**Canonical invariant:** Penta Family can be production while an individual Penta member is not.",
+        "member-specific downstream gates": "member-specific authority + provider gates",
+        "universal-child-production prohibition": "FAMILY PRODUCTION ≠ UNIVERSAL CHILD PRODUCTION",
+        "fail-closed Penta boundary": "**Fail closed.**",
+    }
+    validate_markers(penta_family, penta_required, errors, surface="Canonical Penta Family record")
+
+    bootstrap_required = {
+        "historical bootstrap page type": 'page_type: "changelog"',
+        "historical bootstrap state": 'content_state: "historical"',
+        "Phase 3 bootstrap lineage": "## Phase 3 Entry Bootstrap v2",
+        "non-activation boundary": "No downstream system may infer Phase 3 activation from this page alone.",
+    }
+    validate_markers(
+        phase3_bootstrap,
+        bootstrap_required,
+        errors,
+        surface="Phase 3 bootstrap lineage record",
+    )
 
     # The old readiness artifact remains historical lineage and must stay
-    # parseable, but its old decision token is deliberately not projected as
-    # the live homepage state after Phase 3 production activation.
+    # parseable, but its decision token is not projected as the live homepage.
     parse_readiness_decision(readiness, errors)
 
     stale_for_production = {
@@ -101,7 +162,7 @@ def validate_legacy_projection(index: str, readiness: str, errors: list[str]) ->
         "Phase 3 readiness link": "/technology/phase-3-readiness-gate",
         "governance standard link": "/standards/documentation-source-of-truth-and-autonomous-governance",
     }
-    validate_markers(index, required_homepage_markers, errors)
+    validate_markers(index, required_homepage_markers, errors, surface="Legacy homepage")
 
     decision_text = parse_readiness_decision(readiness, errors)
     if decision_text is None:
@@ -127,7 +188,17 @@ def validate_legacy_projection(index: str, readiness: str, errors: list[str]) ->
 def main() -> int:
     errors: list[str] = []
 
-    required_files = [INDEX, READINESS, DOCS_STANDARD, NON_NEGOTIABLES, PR_TEMPLATE]
+    required_files = [
+        INDEX,
+        READINESS,
+        CURRENT_STATE,
+        PUBLIC_CURRENT_STATE,
+        PENTA_FAMILY,
+        PHASE3_BOOTSTRAP,
+        DOCS_STANDARD,
+        NON_NEGOTIABLES,
+        PR_TEMPLATE,
+    ]
     for path in required_files:
         if not path.is_file():
             errors.append(f"Missing required control-plane file: {path.relative_to(ROOT)}")
@@ -139,20 +210,32 @@ def main() -> int:
 
     index = read(INDEX)
     readiness = read(READINESS)
+    current_state = read(CURRENT_STATE)
+    public_current_state = read(PUBLIC_CURRENT_STATE)
+    penta_family = read(PENTA_FAMILY)
+    phase3_bootstrap = read(PHASE3_BOOTSTRAP)
     docs_standard = read(DOCS_STANDARD)
     non_negotiables = read(NON_NEGOTIABLES)
     pr_template = read(PR_TEMPLATE)
 
     if contains_any(index, PRODUCTION_MARKERS):
         mode = "phase_3_production_convergence"
-        validate_production_convergence(index, readiness, errors)
+        validate_production_convergence(
+            index,
+            readiness,
+            current_state,
+            public_current_state,
+            penta_family,
+            phase3_bootstrap,
+            errors,
+        )
     elif contains_any(index, LEGACY_CONTROL_MARKERS):
         mode = "legacy_readiness_projection"
         validate_legacy_projection(index, readiness, errors)
     else:
         mode = "unknown"
         errors.append(
-            "Homepage has neither the current Production + Convergence H1 nor the legacy control-plane H1"
+            "Homepage has neither the current Production + Convergence identity nor the legacy control-plane identity"
         )
 
     forbidden_stale_homepage_markers = {
@@ -167,6 +250,8 @@ def main() -> int:
         errors.append("Documentation governance standard lacks homepage projection rule")
     if "## Pull-driven source propagation rule" not in docs_standard:
         errors.append("Documentation governance standard lacks pull-driven propagation rule")
+    if "governed institutional summary surface, not decorative marketing copy" not in docs_standard:
+        errors.append("Documentation governance standard does not define the homepage as a governed summary surface")
     if "## 30. The homepage is a governed control surface" not in non_negotiables:
         errors.append("Non-negotiables lack governed-homepage rule")
     if "## 31. Pull requests propagate institutional meaning" not in non_negotiables:
@@ -191,9 +276,11 @@ def main() -> int:
     print("CrownThrive homepage control-plane validation PASSED")
     print(f"- homepage mode: {mode}")
     if mode == "phase_3_production_convergence":
-        print("- current homepage declares Phase 3 Production + Convergence")
-        print("- legacy readiness decision remains historical lineage, not live homepage state")
-        print("- evidence-scoped fail-closed promotion remains explicit")
+        print("- homepage remains a concise public-safe summary and routing surface")
+        print("- canonical Phase 3 state owns detailed institutional truth")
+        print("- Penta Family owns detailed Penta production/authority invariants")
+        print("- bootstrap/readiness records remain governed historical lineage")
+        print("- evidence-scoped fail-closed promotion remains enforced without homepage duplication")
     else:
         print("- legacy homepage projects the authoritative readiness decision")
     print("- pull/source propagation governance remains present")
