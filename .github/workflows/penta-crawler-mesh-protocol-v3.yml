@@ -3,6 +3,7 @@ name: PentaCrawler Mesh Protocol v3
 on:
   pull_request:
     paths:
+      - "supabase/migrations/20260829032400_penta_protocol_pgcrypto_bootstrap_v3.sql"
       - "supabase/migrations/20260829032500_penta_crawler_mesh_protocol_v3.sql"
       - "supabase/migrations/20260829032600_penta_discovery_packet_normalization_v3.sql"
       - "supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql"
@@ -36,12 +37,15 @@ jobs:
           python-version: "3.12"
       - name: Run PentaCrawler mesh contract tests
         run: python -m unittest tests.test_penta_crawler_mesh_protocol_v3 tests.test_pentas_cookie_routing_v3
-      - name: Confirm Supabase pgcrypto schema binding
+      - name: Confirm Supabase pgcrypto binding lifecycle
         shell: bash
         run: |
           set -euo pipefail
+          grep -Fq 'extensions.digest' supabase/migrations/20260829032400_penta_protocol_pgcrypto_bootstrap_v3.sql
+          grep -Fq 'revoke all on function public.digest(bytea,text) from public, anon, authenticated, service_role' supabase/migrations/20260829032400_penta_protocol_pgcrypto_bootstrap_v3.sql
           grep -Fq 'extensions.digest' supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql
           grep -Fq 'set search_path = pg_catalog, public, extensions' supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql
+          grep -Fq 'drop function if exists public.digest(bytea,text)' supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql
       - name: Confirm fail-closed cookie routing final state
         shell: bash
         run: |
@@ -62,6 +66,7 @@ jobs:
           set -euo pipefail
           files=(
             supabase/functions/penta-crawler/index.ts
+            supabase/migrations/20260829032400_penta_protocol_pgcrypto_bootstrap_v3.sql
             supabase/migrations/20260829032500_penta_crawler_mesh_protocol_v3.sql
             supabase/migrations/20260829032600_penta_discovery_packet_normalization_v3.sql
             supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql
@@ -79,6 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           if grep -Ein '(cron\.schedule|pg_cron)' \
+            supabase/migrations/20260829032400_penta_protocol_pgcrypto_bootstrap_v3.sql \
             supabase/migrations/20260829032500_penta_crawler_mesh_protocol_v3.sql \
             supabase/migrations/20260829032600_penta_discovery_packet_normalization_v3.sql \
             supabase/migrations/20260829032700_penta_protocol_pgcrypto_resolution_v3.sql \
