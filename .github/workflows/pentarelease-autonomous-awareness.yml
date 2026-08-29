@@ -177,8 +177,13 @@ jobs:
             while true; do
               if "$@"; then
                 return 0
+              else
+                # Capture the failing command inside the else branch. The exit
+                # status of an `if` with no matching branch is 0 in Bash, so
+                # reading `$?` after `fi` would incorrectly turn exhaustion into
+                # success and violate fail-closed provider semantics.
+                rc=$?
               fi
-              rc=$?
               if [ "$attempt" -ge "$max_attempts" ]; then
                 echo "PentaRelease provider retry exhausted after $attempt attempts: $*" >&2
                 return "$rc"
