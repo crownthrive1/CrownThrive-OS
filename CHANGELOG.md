@@ -19,9 +19,9 @@
 - **Provider actual cost:** $0.00 USD
 - **Recognized release exposure:** $0.00 USD
 - **Direct usage calculation:** `not_available`
-- **CIE:** **HOLD_INSUFFICIENT_EVIDENCE**
-- **Evidence:** `9cc479d40250f3dd1e274e20a123c90b793f1d450cb46c5bdf0fab2a9d1a1026`
-- **Projection payload:** `189028dd44cac9084e90c0e0bbe4ad6c0fec30b19878de3974ba4ab0a481be83`
+- **CIE:** **PASS — 100.0000/100**
+- **Evidence:** `4f079fe8aae79cad511ec2bfd0286ac67060e7fe2bd582f1e9af40deaa01a23b`
+- **Projection payload:** `67257d52753463cfb8554482e6d267dd2e232382bfce671ab5b426f761042ec1`
 
 PentaRelease maintains this bounded block. Content outside the markers remains under its existing ownership and editorial authority.
 <!-- pentarelease:managed-release-surface:end -->
