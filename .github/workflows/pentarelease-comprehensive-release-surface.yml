@@ -10,6 +10,7 @@ on:
       - '.github/workflows/pentarelease-comprehensive-release-surface.yml'
       - '.pentarelease/policy.json'
       - 'scripts/pentarelease/release_surface.py'
+      - 'scripts/pentarelease/provider_release.py'
       - 'scripts/pentarelease/pentadocs_group.py'
   schedule:
     - cron: '47 5 * * *'
@@ -47,8 +48,17 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m json.tool .pentarelease/policy.json >/dev/null
-          python3 -m py_compile scripts/pentarelease/release_surface.py scripts/pentarelease/pentadocs_group.py scripts/pentadocs_quality.py scripts/validate_docs.py
-          python3 -m unittest tests.test_pentarelease_release_surface tests.test_pentarelease_pentadocs_group tests.test_pentarelease_workflow_contract
+          python3 -m py_compile \
+            scripts/pentarelease/release_surface.py \
+            scripts/pentarelease/provider_release.py \
+            scripts/pentarelease/pentadocs_group.py \
+            scripts/pentadocs_quality.py \
+            scripts/validate_docs.py
+          python3 -m unittest \
+            tests.test_pentarelease_release_surface \
+            tests.test_pentarelease_provider_release \
+            tests.test_pentarelease_pentadocs_group \
+            tests.test_pentarelease_workflow_contract
           test "$(jq -r '.release_surface.enabled' .pentarelease/policy.json)" = "true"
           test "$(jq -r '.release_surface.max_repository_surfaces' .pentarelease/policy.json)" -le 7
           test "$(jq -r '.release_surface.repository_surfaces | length' .pentarelease/policy.json)" -le 7
@@ -62,18 +72,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="${REQUESTED_TAG:-}"
-          if [ -z "$TAG" ]; then
-            TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          rm -f /tmp/pentarelease-release.json
+          ARGS=(
+            read
+            --repository "$GITHUB_REPOSITORY"
+            --output /tmp/pentarelease-release.json
+          )
+          if [ -n "${REQUESTED_TAG:-}" ]; then
+            ARGS+=(--tag "$REQUESTED_TAG")
           fi
+
+          # Select from the fetched local version tags, then independently verify
+          # that exact release through bounded provider readback. Provider
+          # unavailability is HOLD, never "release not found" and never PASS.
+          python3 scripts/pentarelease/provider_release.py "${ARGS[@]}"
+
+          TAG=$(jq -r '.tag_name // empty' /tmp/pentarelease-release.json)
           test -n "$TAG"
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName,name,url,targetCommitish,isDraft,isPrerelease | jq .
+          test "$TAG" != "null"
+          jq '{tag_name,name,html_url,target_commitish,draft,prerelease,published_at}' \
+            /tmp/pentarelease-release.json
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Determine reconciliation need
         id: preflight
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
@@ -114,7 +137,7 @@ jobs:
 
           LOCAL_READY=$(jq -r '.healthy' /tmp/pentarelease-local-health.json)
           LOCAL_REASON=$(jq -r '.reason' /tmp/pentarelease-local-health.json)
-          READBACK=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body,url)
+          READBACK=$(cat /tmp/pentarelease-release.json)
           PROVIDER_READY=$(jq -r '
             (((.body // "") | contains("pentarelease:comprehensive-release:start"))) and
             ([.assets[].name] as $n |
@@ -144,14 +167,34 @@ jobs:
           set -euo pipefail
           rm -rf /tmp/pentarelease-source
           mkdir -p /tmp/pentarelease-source
+
+          gh_retry() {
+            local attempt rc
+            for attempt in $(seq 1 8); do
+              if "$@"; then
+                return 0
+              else
+                rc=$?
+              fi
+              if [ "$attempt" -ge 8 ]; then return "$rc"; fi
+              sleep $((attempt * 3))
+            done
+          }
+
           for NAME in MANIFEST.json RELEASE_NOTES.md COSTS.json PENTARELEASE_COSTS.json; do
-            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$NAME" --dir /tmp/pentarelease-source --clobber || true
+            if jq -e --arg n "$NAME" '.assets[]? | select(.name == $n)' \
+              /tmp/pentarelease-release.json >/dev/null; then
+              gh_retry gh release download "$TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --pattern "$NAME" \
+                --dir /tmp/pentarelease-source \
+                --clobber
+            fi
           done
 
       - name: Materialize comprehensive release + bounded surfaces
         if: steps.preflight.outputs.needs_sync == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
           LOCAL_READY: ${{ steps.preflight.outputs.local_ready }}
         shell: bash
@@ -162,7 +205,12 @@ jobs:
           if [ "$LOCAL_READY" = "true" ]; then
             EXTRA+=(--no-sync-repository)
           fi
-          python3 scripts/pentarelease/release_surface.py \
+
+          # Reuse the exact provider payload verified by Resolve canonical release.
+          # release_surface.py must not perform a second, potentially divergent
+          # provider lookup while materializing the same release.
+          python3 scripts/pentarelease/provider_release.py surface \
+            --release-json /tmp/pentarelease-release.json \
             --repository "$GITHUB_REPOSITORY" \
             --tag "$TAG" \
             --policy .pentarelease/policy.json \
@@ -192,12 +240,37 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" dist/pentarelease-surface/* --clobber
-          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
 
-          READBACK=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json tagName,url,assets,body)
-          echo "$READBACK" | jq .
-          test "$(echo "$READBACK" | jq -r '.tagName')" = "$TAG"
+          gh_retry() {
+            local attempt rc
+            for attempt in $(seq 1 8); do
+              if "$@"; then
+                return 0
+              else
+                rc=$?
+              fi
+              if [ "$attempt" -ge 8 ]; then return "$rc"; fi
+              sleep $((attempt * 3))
+            done
+          }
+
+          gh_retry gh release upload "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            dist/pentarelease-surface/* \
+            --clobber
+          gh_retry gh release edit "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --notes-file dist/pentarelease-surface/PENTARELEASE_COMPREHENSIVE_RELEASE.md
+
+          # Independent bounded provider readback after mutation.
+          python3 scripts/pentarelease/provider_release.py read \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$TAG" \
+            --output /tmp/pentarelease-release.json
+
+          READBACK=$(cat /tmp/pentarelease-release.json)
+          echo "$READBACK" | jq '{tag_name,html_url,assets:[.assets[].name]}'
+          test "$(echo "$READBACK" | jq -r '.tag_name')" = "$TAG"
           echo "$READBACK" | jq -e '.body | contains("pentarelease:comprehensive-release:start")' >/dev/null
           for EXPECTED in PENTARELEASE_COMPREHENSIVE_RELEASE.md PENTARELEASE_RELEASE_RECORD.json PENTARELEASE_COSTS.json PENTARELEASE_CIE_SCORE.json PENTARELEASE_DATA_CATALOG.json PENTARELEASE_EVIDENCE.json PENTARELEASE_FAQ.md PENTARELEASE_CHANGELOG.md; do
             echo "$READBACK" | jq -e --arg n "$EXPECTED" '.assets[] | select(.name == $n)' >/dev/null
@@ -382,8 +455,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          URL=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq '.url')
-          READBACK=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body)
+          test -n "$TAG"
+
+          # Final independent provider proof; same bounded read contract, fresh
+          # after every possible provider mutation.
+          python3 scripts/pentarelease/provider_release.py read \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$TAG" \
+            --output /tmp/pentarelease-release.json
+
+          URL=$(jq -r '.html_url // empty' /tmp/pentarelease-release.json)
+          READBACK=$(cat /tmp/pentarelease-release.json)
           PROVIDER_READY=$(jq -r '
             (((.body // "") | contains("pentarelease:comprehensive-release:start"))) and
             ([.assets[].name] as $n |
