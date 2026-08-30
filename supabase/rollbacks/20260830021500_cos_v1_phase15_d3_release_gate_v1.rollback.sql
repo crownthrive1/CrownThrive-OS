@@ -16,6 +16,7 @@ end
 $$;
 
 drop function if exists integration_control.cos_phase_bind_d3_approval_v1(uuid,text);
+drop index if exists integration_control.cos_phase_gate_receipts_d3_once_idx;
 
 delete from integration_control.cos_phase_gate_requirements_v1
 where phase_id='15' and gate_name='d3_human_release_approval';
