@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPREHENSIVE_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-comprehensive-release-surface.yml"
 AWARENESS_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-autonomous-awareness.yml"
 RECONCILER_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-pr-backlog-reconciler.yml"
+DECISION_ENGINE = ROOT / "scripts" / "pentarelease" / "decide.py"
 
 
 class PentaReleaseWorkflowContractTests(unittest.TestCase):
@@ -13,6 +14,7 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         cls.text = COMPREHENSIVE_WORKFLOW.read_text(encoding="utf-8")
         cls.awareness_text = AWARENESS_WORKFLOW.read_text(encoding="utf-8")
         cls.reconciler_text = RECONCILER_WORKFLOW.read_text(encoding="utf-8")
+        cls.decision_text = DECISION_ENGINE.read_text(encoding="utf-8")
 
     def test_never_direct_pushes_protected_main(self):
         self.assertNotIn('git push origin "$HEAD_SHA":refs/heads/main', self.text)
@@ -103,6 +105,15 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("source >= candidate", self.reconciler_text)
         self.assertIn("same release or a newer forward-only projection", self.reconciler_text)
         self.assertNotIn("provider evidence is authoritative for cleanup", self.reconciler_text)
+
+    def test_source_surface_squash_merge_cannot_create_recursive_release(self):
+        self.assertIn('"PentaRelease comprehensive surface "', self.decision_text)
+        self.assertIn('"PentaRelease surface "', self.decision_text)
+        self.assertIn("GENERATED_SURFACE_MERGE_PREFIXES", self.decision_text)
+        self.assertIn("generated_release_commit_guard", self.decision_text)
+        combined_guard = self.decision_text.index("generated_prefixes =")
+        decision_diff = self.decision_text.index('files = [x for x in sh("git", "diff"')
+        self.assertLess(combined_guard, decision_diff)
 
     def test_secret_gate_allows_public_templates_but_still_blocks_real_env_files(self):
         self.assertIn(r"\.env\.(example|sample|template)$", self.awareness_text)
