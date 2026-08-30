@@ -18,7 +18,7 @@ COS does not equate convergence with indiscriminate activation. One hundred perc
 
 The authoritative release state is resolved at runtime from `integration_control.cos_release_registry_v1`, `integration_control.cos_phase_registry_v1`, the latest phase execution, direct GitHub `main` readback and applicable provider/deployment readback. This document intentionally does **not** hard-code a supposedly current Git SHA because any later governed merge would immediately stale that literal.
 
-COS V1 is **not released** unless the release registry is `released` and both `production_sha` and `released_at` are bound by the Phase 15 finalizer. A historical pre-release certification, a source-validation PASS, a merged pull request, a deployment success, or a provider receipt alone cannot substitute for the complete phase chain.
+COS V1 is **not released** unless the release registry is `released` and both `production_sha` and `released_at` are bound by the Phase 15 finalizer. A historical pre-release certification, a source-validation PASS, a merged pull request, a deployment success, or a provider receipt alone cannot substitute for the complete phase chain. During the current Phase 00 convergence state, `production_sha` and `released_at` remain null.
 
 Phase execution is exact-source and monotonic. When canonical `main` advances after a phase execution begins, the older execution is preserved as historical HOLD/superseded evidence and may not receive a stale PASS. A replacement execution must bind the new exact `main` SHA and independently re-establish source-sensitive gates.
 
