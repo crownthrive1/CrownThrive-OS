@@ -1,4 +1,4 @@
-name: Penta PR Lifecycle Reusable
+name: Penta PR Lifecycle Reusable — Classification & Projection
 
 on:
   workflow_call:
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: pr, merge, or closer
+        description: pr, merge, or closer compatibility request; all modes are classification-only
         required: true
         default: pr
       number:
@@ -23,7 +23,7 @@ on:
         default: ''
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
   issues: write
   checks: read
@@ -65,12 +65,12 @@ jobs:
           python penta-control/scripts/penta_gate.py --root penta-control --output "$RUNNER_TEMP/pentagate-pr-lifecycle.json" || gate_status=$?
           python penta-control/scripts/penta_heal.py --root penta-control --gate-report "$RUNNER_TEMP/pentagate-pr-lifecycle.json" --output "$RUNNER_TEMP/pentaheal-pr-lifecycle.json" || true
           if [[ "$gate_status" -ne 0 ]]; then
-            echo 'PentaGate blocked terminal PR authority.'
+            echo 'PentaGate blocked PR lifecycle projection.'
             cat "$RUNNER_TEMP/pentagate-pr-lifecycle.json"
             exit "$gate_status"
           fi
 
-      - name: Preflight PentaTagger before terminal authority
+      - name: Preflight PentaTagger before terminal classification
         id: tagger-preflight
         if: ${{ env.PENTA_MODE == 'merge' || env.PENTA_MODE == 'closer' }}
         env:
@@ -108,16 +108,16 @@ jobs:
           payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
           if payload.get("status") != "DEFERRED":
               raise SystemExit("exit 75 requires a DEFERRED PentaTagger receipt")
-          print("PASS: terminal authority remains deferred without workflow crash")
+          print("PASS: lifecycle classification remains deferred without provider mutation")
           PY
             echo "deferred=true" >> "$GITHUB_OUTPUT"
-            echo "::warning title=PentaTagger terminal preflight deferred::Provider request budget was preserved. PentaMerge/PentaCloser will not execute in this pass."
+            echo "::warning title=PentaTagger lifecycle preflight deferred::Provider request budget was preserved. No terminal provider write is available to this workflow."
             exit 0
           fi
           echo "deferred=false" >> "$GITHUB_OUTPUT"
           exit "$status"
 
-      - name: Run PentaPR, PentaMerge, or PentaCloser
+      - name: Run PentaPR classification and projection compatibility
         if: ${{ success() && steps.tagger-preflight.outputs.deferred != 'true' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -129,7 +129,7 @@ jobs:
           if [[ -n "${PENTA_NUMBER:-}" ]]; then
             args+=(--number "$PENTA_NUMBER")
           fi
-          python penta-control/scripts/penta_pr_lifecycle.py "${args[@]}"
+          python penta-control/scripts/penta_pr_lifecycle_v4.py "${args[@]}"
 
       - name: Project final lifecycle through PentaTagger and verify provider readback
         id: tagger-final
@@ -183,15 +183,17 @@ jobs:
         shell: bash
         run: |
           {
-            echo '## Penta PR Lifecycle'
+            echo '## Penta PR Lifecycle v4'
             echo
-            echo "- Authority invoked: **${PENTA_MODE:-unknown}**"
+            echo "- Compatibility request: **${PENTA_MODE:-unknown}**"
             echo "- Target PR: **${PENTA_NUMBER:-repository sweep}**"
+            echo "- Workflow authority: **classification, labels, comments, and evidence projection only**"
+            echo "- Provider merge/close authority: **ct.penta.pr-terminalization.v4 only**"
+            echo "- Required provider-write gate: **completed exact-head assignment + three DAIL + PentaDocs + Drive Human/Hybrid/Machine + independent certification + OS readback + current DAIL chain PASS**"
             echo "- Bounded PentaTagger sweep: **${PENTA_TAGGER_SWEEP_MAX_ITEMS} entities / ${PENTA_TAGGER_REQUEST_BUDGET} requests**"
             echo "- Terminal preflight state: **${{ steps.tagger-preflight.outputs.deferred == 'true' && 'DEFERRED' || 'COMPLETE_OR_NOT_REQUIRED' }}**"
             echo "- Final projection state: **${{ steps.tagger-final.outputs.deferred == 'true' && 'DEFERRED' || 'COMPLETE' }}**"
-            echo '- Preflight chain: PentaGate → PentaHeal packet (if needed) → PentaTagger'
-            echo '- Terminal chain: PentaMerge/PentaCloser → PentaTagger terminal readback'
+            echo '- Native terminal chain: Assignment Fabric → PentaDocs/Drive/three-DAIL → PentaCertify → OS/chain readback → PentaPR terminal provider → provider readback'
             echo
             if [[ -f "$RUNNER_TEMP/pentagate-pr-lifecycle.json" ]]; then
               echo '### PentaGate'
