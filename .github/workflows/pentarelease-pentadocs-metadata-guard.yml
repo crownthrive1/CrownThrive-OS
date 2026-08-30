@@ -1,0 +1,119 @@
+name: PentaRelease — PentaDocs Metadata Guard
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: pentarelease-pentadocs-metadata-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: PentaRelease PentaDocs metadata reconciliation
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'pentarelease/surface-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PENTA_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      PENTA_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PENTA_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      PENTA_PROVIDER_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+
+    steps:
+      - name: Require bounded same-repository target and provider credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PENTA_HEAD_REPO" = "$GITHUB_REPOSITORY"
+          case "$PENTA_HEAD_REF" in
+            pentarelease/surface-*) ;;
+            *) echo "::error::unexpected PentaRelease branch: $PENTA_HEAD_REF"; exit 78 ;;
+          esac
+          if [[ -z "$PENTA_PROVIDER_TOKEN" ]]; then
+            echo "::error::PENTA_PM_GITHUB_TOKEN unavailable; refusing provider mutation."
+            exit 78
+          fi
+
+      - name: Checkout canonical metadata reconciler
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: crownthrive1/CrownThrive-OS
+          ref: main
+          persist-credentials: false
+          path: penta-control
+
+      - name: Checkout exact PentaRelease head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          token: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+          persist-credentials: true
+          path: release-head
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Reconcile the seven bounded PentaDocs release pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python penta-control/scripts/pentarelease/reconcile_pentadocs_metadata.py \
+            --root release-head \
+            --write | tee "$RUNNER_TEMP/pentarelease-pentadocs-metadata-write.json"
+          python penta-control/scripts/pentarelease/reconcile_pentadocs_metadata.py \
+            --root release-head \
+            --check | tee "$RUNNER_TEMP/pentarelease-pentadocs-metadata-check.json"
+
+      - name: Commit exact metadata delta when required
+        id: commit
+        working-directory: release-head
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- pentarelease; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo 'PentaDocs release metadata already converged.'
+            exit 0
+          fi
+
+          git config user.name 'PentaRelease'
+          git config user.email 'contact@crownthrive.com'
+          git add -- \
+            pentarelease/latest.mdx \
+            pentarelease/faq.mdx \
+            pentarelease/changelog.mdx \
+            pentarelease/costs.mdx \
+            pentarelease/cie.mdx \
+            pentarelease/data.mdx \
+            pentarelease/evidence.mdx
+          git diff --cached --check
+          git commit -m 'fix(pentarelease): reconcile PentaDocs structured metadata'
+          git push origin "HEAD:$PENTA_HEAD_REF"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Record bounded guard summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### PentaRelease PentaDocs Metadata Guard'
+            echo
+            echo "- PR: #${{ github.event.pull_request.number }}"
+            echo "- Observed head: \`$PENTA_HEAD_SHA\`"
+            echo "- Branch: \`$PENTA_HEAD_REF\`"
+            echo "- Metadata commit emitted: \`${{ steps.commit.outputs.changed || 'false' }}\`"
+            echo '- Scope: seven PentaRelease MDX pages only'
+            echo '- Invariant: `sidebarTitle == title`'
+            echo '- Authority expansion: false'
+            echo '- Provider/release state manufactured: false'
+          } >> "$GITHUB_STEP_SUMMARY"
