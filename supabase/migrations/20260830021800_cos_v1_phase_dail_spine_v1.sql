@@ -79,8 +79,9 @@ begin
   if not found then raise exception 'unknown_phase_execution:%',new.execution_id; end if;
 
   v_receipt:=chlom_runtime.append_dail_event(
-    'cos.phase.gate.recorded','cos_phase_gate',new.phase_id||':'||new.gate_name,
+    'cos.phase.gate.recorded','cos_phase_gate_receipt',new.receipt_id::text,
     jsonb_build_object(
+      'receipt_id',new.receipt_id,
       'release_id',v_release_id,
       'phase_id',new.phase_id,
       'execution_id',new.execution_id,
@@ -92,9 +93,9 @@ begin
       'evidence_sha256',new.evidence_sha256,
       'observed_at',new.observed_at
     ),
-    new.verifier_actor,null,'ct.cos.phase-control','cos-v1-phase-'||new.phase_id,
+    new.verifier_actor,null,'ct.cos.phase-control',new.gate_name,
     v_release_id,new.execution_id::text,
-    'COS V1 gate evidence; DAIL records digest/provenance rather than protected evidence bodies.',
+    'COS V1 gate evidence; DAIL records stable receipt identity plus digest/provenance rather than protected evidence bodies.',
     null,'restricted'
   );
 
