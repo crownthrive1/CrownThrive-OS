@@ -2,9 +2,10 @@
 """Trusted pull_request_target adapter for collision governance v2.
 
 This adapter preserves the read-only/fail-closed collision engine while avoiding
-an unnecessary `/commits/{branch}` dependency in the trusted PR path. The start
-fence is supplied by GitHub's trusted event payload (`base.sha`); the end fence
-is read from the candidate pull request's current `base.sha`.
+an unnecessary `/commits/{branch}` dependency in the trusted PR path. Both the
+start and end main-branch fences are independently read from GitHub's live Git
+ref endpoint. The webhook PR `base.sha` is retained only as audit context because
+it can represent historical PR ancestry rather than the current branch head.
 
 GitHub may also return HTTP 403 for primary/secondary rate limits. Those cases
 receive bounded retry/backoff. Permission/authentication 403s remain terminal.
@@ -17,6 +18,7 @@ import json
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -63,33 +65,38 @@ def _retry_delay(exc: urllib.error.HTTPError, attempt: int) -> int:
 
 
 class TrustedCandidateClient(agent.GitHubClient):
-    """GitHub client with event-bound base SHA and bounded 403 rate-limit retry."""
+    """GitHub client with live Git-ref fencing and bounded 403 rate-limit retry."""
 
     def __init__(
         self,
         repository: str,
         token: str | None,
         *,
-        expected_main_sha: str,
+        event_base_sha: str,
         candidate: int,
     ) -> None:
         super().__init__(repository, token)
-        if not expected_main_sha:
-            raise agent.GitHubReadError("trusted_expected_main_sha_required")
-        self.expected_main_sha = expected_main_sha
+        if not event_base_sha:
+            raise agent.GitHubReadError("trusted_event_base_sha_required")
+        self.event_base_sha = event_base_sha
         self.candidate = candidate
-        self._main_sha_reads = 0
+
+    def live_branch_sha(self, branch: str) -> str:
+        encoded_branch = urllib.parse.quote(branch, safe="")
+        data = self.get(f"/git/ref/heads/{encoded_branch}")
+        try:
+            object_record = data["object"]
+            if str(object_record.get("type")) != "commit":
+                raise agent.GitHubReadError("trusted_live_ref_not_commit")
+            sha = str(object_record["sha"])
+        except (KeyError, TypeError, AttributeError) as exc:
+            raise agent.GitHubReadError("trusted_live_ref_sha_missing") from exc
+        if not sha:
+            raise agent.GitHubReadError("trusted_live_ref_sha_empty")
+        return sha
 
     def main_sha(self, branch: str) -> str:
-        del branch
-        self._main_sha_reads += 1
-        if self._main_sha_reads == 1:
-            return self.expected_main_sha
-        pull = self.pull(self.candidate)
-        try:
-            return str(pull["base"]["sha"])
-        except (KeyError, TypeError) as exc:
-            raise agent.GitHubReadError("trusted_candidate_base_sha_missing") from exc
+        return self.live_branch_sha(branch)
 
     def _request(self, url: str) -> tuple[Any, Mapping[str, str]]:
         headers = {
@@ -134,7 +141,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN"))
     parser.add_argument("--branch", default="main")
     parser.add_argument("--candidate", type=int, required=True)
-    parser.add_argument("--expected-main-sha", required=True)
+    parser.add_argument("--event-base-sha", required=True)
     parser.add_argument("--event-action", default=os.environ.get("GITHUB_EVENT_ACTION"))
     parser.add_argument("--output", default="collision-governance-v2-report.json")
     parser.add_argument("--fail-on-severity", type=int, default=2)
@@ -147,7 +154,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         client = TrustedCandidateClient(
             args.repository,
             args.token,
-            expected_main_sha=args.expected_main_sha,
+            event_base_sha=args.event_base_sha,
             candidate=args.candidate,
         )
         report = agent.analyze_snapshot(
@@ -156,8 +163,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             candidate=args.candidate,
             event_action=args.event_action,
         )
-        report["trusted_base_fence_source"] = "pull_request_target_event_base_sha"
-        report["trusted_end_fence_source"] = "candidate_pull_current_base_sha"
+        report["trusted_event_base_sha"] = args.event_base_sha
+        report["trusted_base_fence_source"] = "git_ref_live_branch_sha"
+        report["trusted_end_fence_source"] = "git_ref_live_branch_sha"
         agent.write_report(report, args.output)
         decision = report.get("decision")
         if isinstance(decision, Mapping) and int(decision.get("max_severity", 0)) >= args.fail_on_severity:
