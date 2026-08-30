@@ -24,6 +24,7 @@ jobs:
       RELEASE_TAG: ${{ github.event.client_payload.release_tag }}
       PR_NUMBER: ${{ github.event.client_payload.pr_number }}
       FOOTER_MARKDOWN: ${{ github.event.client_payload.footer_markdown }}
+      FOOTER_JSON: ${{ toJson(github.event.client_payload.footer) }}
       EVIDENCE_SHA256: ${{ github.event.client_payload.evidence_sha256 }}
     steps:
       - name: Validate governed payload
@@ -32,6 +33,7 @@ jobs:
           set -euo pipefail
           test -n "${RELEASE_VERSION:-}"
           test -n "${FOOTER_MARKDOWN:-}"
+          test -n "${FOOTER_JSON:-}"
           test "${#EVIDENCE_SHA256}" -eq 64
           if [[ -z "${RELEASE_TAG:-}" && -z "${PR_NUMBER:-}" ]]; then
             echo "release_tag_or_pr_number_required" >&2
@@ -41,6 +43,15 @@ jobs:
             echo "invalid_footer_contract" >&2
             exit 1
           fi
+          printf '%s\n' "$FOOTER_JSON" | jq -e '
+            .schema == "ct.pentarelease.evidence-footer.v1" and
+            (.cie.score | type) == "number" and
+            (.cie.status | type) == "string" and
+            (.cie.evidence_hash | type) == "string" and
+            (.evidence_sha256 | type) == "string"
+          ' >/dev/null
+          test "$(printf '%s\n' "$FOOTER_JSON" | jq -r '.release_version')" = "$RELEASE_VERSION"
+          test "$(printf '%s\n' "$FOOTER_JSON" | jq -r '.evidence_sha256')" = "$EVIDENCE_SHA256"
 
       - name: Project managed footer block
         shell: bash
@@ -98,3 +109,58 @@ jobs:
 
           print(json.dumps({'state':'PROJECTED','results':results}, sort_keys=True))
           PY
+
+      - name: Persist machine-readable CIE evidence
+        if: env.RELEASE_TAG != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORK=$(mktemp -d)
+          mkdir -p "$WORK/source"
+
+          printf '%s\n' "$FOOTER_JSON" | jq . > "$WORK/PENTARELEASE_CIE_SCORE.json"
+          SCORE=$(jq -r '.cie.score' "$WORK/PENTARELEASE_CIE_SCORE.json")
+          STATUS=$(jq -r '.cie.status' "$WORK/PENTARELEASE_CIE_SCORE.json")
+          CIE_SOURCE=$(jq -r '.cie.source' "$WORK/PENTARELEASE_CIE_SCORE.json")
+          CIE_EVIDENCE_HASH=$(jq -r '.cie.evidence_hash' "$WORK/PENTARELEASE_CIE_SCORE.json")
+
+          gh release download "$RELEASE_TAG" --repo "$REPO" --pattern MANIFEST.json --dir "$WORK/source" --clobber || true
+          if [ -f "$WORK/source/MANIFEST.json" ]; then
+            jq \
+              --argjson score "$SCORE" \
+              --arg status "$STATUS" \
+              --arg source "$CIE_SOURCE" \
+              --arg cie_hash "$CIE_EVIDENCE_HASH" \
+              --arg footer_hash "$EVIDENCE_SHA256" \
+              '.cie_score = $score
+               | .cie_status = $status
+               | .cie_source = $source
+               | .cie_evidence_sha256 = $cie_hash
+               | .pentarelease_footer_evidence_sha256 = $footer_hash' \
+              "$WORK/source/MANIFEST.json" > "$WORK/source/MANIFEST.next.json"
+            mv "$WORK/source/MANIFEST.next.json" "$WORK/source/MANIFEST.json"
+            python3 -m json.tool "$WORK/source/MANIFEST.json" >/dev/null
+            gh release upload "$RELEASE_TAG" --repo "$REPO" "$WORK/source/MANIFEST.json" --clobber
+          else
+            echo "::warning title=PentaRelease manifest unavailable::MANIFEST.json was not present; CIE evidence asset will still be projected."
+          fi
+
+          gh release upload "$RELEASE_TAG" --repo "$REPO" "$WORK/PENTARELEASE_CIE_SCORE.json" --clobber
+
+          READBACK=$(gh release view "$RELEASE_TAG" --repo "$REPO" --json assets)
+          echo "$READBACK" | jq -e '.assets[] | select(.name == "PENTARELEASE_CIE_SCORE.json")' >/dev/null
+          if [ -f "$WORK/source/MANIFEST.json" ]; then
+            echo "$READBACK" | jq -e '.assets[] | select(.name == "MANIFEST.json")' >/dev/null
+          fi
+
+          {
+            echo '## Governed machine-readable CIE projection'
+            echo
+            echo "- Release: $RELEASE_TAG"
+            echo "- CIE: $STATUS — $SCORE/100"
+            echo "- CIE evidence: $CIE_EVIDENCE_HASH"
+            echo "- Footer evidence: $EVIDENCE_SHA256"
+            echo '- PENTARELEASE_CIE_SCORE.json: provider readback verified'
+            if [ -f "$WORK/source/MANIFEST.json" ]; then echo '- MANIFEST.json: bounded CIE fields updated and provider readback verified'; fi
+            echo '- Historical release rewriting: false'
+          } >> "$GITHUB_STEP_SUMMARY"
