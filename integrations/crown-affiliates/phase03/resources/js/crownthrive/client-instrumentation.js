@@ -174,7 +174,9 @@ window.CrownAffiliatesInstrumentation = Object.freeze({
     requestPushPermission,
     state: () => ({
         initialized: state.initialized,
-        providers: structuredClone ? structuredClone(state.providers) : JSON.parse(JSON.stringify(state.providers)),
+        providers: typeof structuredClone === 'function'
+            ? structuredClone(state.providers)
+            : JSON.parse(JSON.stringify(state.providers)),
         eventCount: state.events.length,
     }),
 });
