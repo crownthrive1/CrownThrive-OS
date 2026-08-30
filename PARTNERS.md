@@ -1,19 +1,19 @@
 # Partners
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.62.0.0
+## Latest PentaRelease — v3.62.1.0
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.62.0.0
-- **Release title:** CrownThrive OS 3.62.0.0 — Autonomous PentaRelease
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.62.1.0
+- **Release title:** CrownThrive OS 3.62.1.0 — Autonomous PentaRelease
 - **Who:** PentaRelease / provider actor github-actions[bot]
-- **Why:** new executable capability or runtime delta
-- **Changed paths:** 3
+- **Why:** production fix/hardening delta
+- **Changed paths:** 20
 - **Provider actual cost:** $0.00 USD
 - **Recognized release exposure:** $0.00 USD
 - **Direct usage calculation:** `not_available`
-- **CIE:** **PASS — 100.0000/100**
-- **Evidence:** `9cc8c307308dcb96c2e153f54ebb26d8f7fdb0d237ce76a8a1eb27ed854c576e`
-- **Projection payload:** `78c30c577c9ac803ad3b04ce9dd59d8d8cbe789425e87fbef51a1761b755895b`
+- **CIE:** **PASS — 100/100**
+- **CIE dimensions:** brand_safety=20, identity_fit=20, legacy_impact=20, community_value=20, story_alignment=20
+- **Evidence:** `9bd415c1fdf5cd424079b39a26b1ff6134bbc57d87a7c9938bee48300a248f6f`
 
 PentaRelease maintains this bounded block. Content outside the markers remains under its existing ownership and editorial authority.
 <!-- pentarelease:managed-release-surface:end -->
