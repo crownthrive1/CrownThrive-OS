@@ -5,6 +5,8 @@
 --   * bind provider readback to the caller-supplied exact GitHub main SHA;
 --   * verify main remains stable across the readback, commit signature, branch
 --     protection, check-runs, and legacy commit-status contexts;
+--   * collapse GitHub reruns to the latest logical check so superseded cancelled
+--     runs cannot create a permanent false HOLD;
 --   * emit append-only provider evidence for independent PentaCertifier use;
 --   * NEVER accept source, certify, deploy, release, or exercise D3 authority.
 --
@@ -12,7 +14,8 @@
 --   sha256(pg_get_functiondef(...)) =
 --   2e59ac0c18d54c2dadfa1ac42ea41fc39534ecf9f1d8b82c15c18da9f43887a0
 --
--- Rollback is bounded by the companion exact-prestate rollback artifact.
+-- Bounded rollback while this change is unmerged: close the repair PR and delete
+-- the isolated branch. Runtime is intentionally untouched by this source patch.
 
 create or replace function integration_control.cos_v1_github_release_readback_v1(
   p_expected_source_sha text
@@ -36,6 +39,7 @@ declare
   v_branch_protected boolean:=false;
   v_commit_verified boolean:=false;
   v_check_total integer:=0;
+  v_check_effective_total integer:=0;
   v_check_pending integer:=0;
   v_check_failed integer:=0;
   v_status_total integer:=0;
@@ -141,21 +145,38 @@ begin
       'release_authority',false,'source_acceptance',false,'certification',false);
   end;
 
+  if v_check_total>100 then
+    return jsonb_build_object('ok',false,'state','hold','reason','github_check_runs_pagination_required',
+      'expected_source_sha',lower(p_expected_source_sha),'check_run_total',v_check_total,
+      'page_capacity',100,'release_authority',false,'source_acceptance',false,'certification',false);
+  end if;
+
+  -- GitHub retains rerun history. Assess only the newest run for each logical
+  -- check identity (name + GitHub App slug), using the monotonically increasing
+  -- run id as the deterministic latest-run discriminator.
+  with latest as (
+    select distinct on (coalesce(r->>'name',''),coalesce(r#>>'{app,slug}','')) r
+    from jsonb_array_elements(coalesce(v_checks->'check_runs','[]'::jsonb)) r
+    order by coalesce(r->>'name',''),coalesce(r#>>'{app,slug}',''),coalesce((r->>'id')::bigint,0) desc
+  )
   select
+    count(*),
     count(*) filter (where coalesce(r->>'status','')<>'completed'),
     count(*) filter (where coalesce(r->>'status','')='completed'
       and coalesce(r->>'conclusion','') not in ('success','neutral','skipped'))
-  into v_check_pending,v_check_failed
-  from jsonb_array_elements(coalesce(v_checks->'check_runs','[]'::jsonb)) r;
+  into v_check_effective_total,v_check_pending,v_check_failed
+  from latest;
 
-  if v_check_total<=0 then
+  if v_check_total<=0 or v_check_effective_total<=0 then
     return jsonb_build_object('ok',false,'state','hold','reason','github_check_runs_missing',
       'expected_source_sha',lower(p_expected_source_sha),'check_run_total',v_check_total,
+      'effective_check_run_total',v_check_effective_total,
       'release_authority',false,'source_acceptance',false,'certification',false);
   end if;
   if v_check_pending>0 or v_check_failed>0 then
     return jsonb_build_object('ok',false,'state','hold','reason','github_check_runs_not_green',
       'expected_source_sha',lower(p_expected_source_sha),'check_run_total',v_check_total,
+      'effective_check_run_total',v_check_effective_total,
       'check_run_pending',v_check_pending,'check_run_failed',v_check_failed,
       'release_authority',false,'source_acceptance',false,'certification',false);
   end if;
@@ -230,6 +251,7 @@ begin
     'branch_protected',v_branch_protected,
     'commit_verified',v_commit_verified,
     'check_run_total',v_check_total,
+    'effective_check_run_total',v_check_effective_total,
     'check_run_pending',v_check_pending,
     'check_run_failed',v_check_failed,
     'status_context_total',v_status_total,
@@ -254,7 +276,8 @@ begin
       'ok',true,'state','idempotent_ready_for_pentacertifier',
       'source_sha',lower(p_expected_source_sha),'production_main_sha',lower(v_main_sha),
       'branch_protected',v_branch_protected,'commit_verified',v_commit_verified,
-      'check_run_total',v_check_total,'check_run_pending',v_check_pending,'check_run_failed',v_check_failed,
+      'check_run_total',v_check_total,'effective_check_run_total',v_check_effective_total,
+      'check_run_pending',v_check_pending,'check_run_failed',v_check_failed,
       'status_context_total',v_status_total,'combined_status',v_status_state,
       'evidence_sha256',v_evidence_sha,
       'release_authority',false,'source_acceptance',false,'certification',false,'D3_human_reserved',true
@@ -269,7 +292,8 @@ begin
           'expected_source_sha',lower(p_expected_source_sha),
           'initial_main_sha',lower(v_main_sha),'confirmed_main_sha',lower(v_confirm_sha),
           'branch_protected',v_branch_protected,'commit_verified',v_commit_verified,
-          'check_run_total',v_check_total,'check_run_pending',v_check_pending,'check_run_failed',v_check_failed,
+          'check_run_total',v_check_total,'effective_check_run_total',v_check_effective_total,
+          'check_run_pending',v_check_pending,'check_run_failed',v_check_failed,
           'status_context_total',v_status_total,'combined_status',v_status_state,
           'evidence_sha256',v_evidence_sha,'observed_at',clock_timestamp(),
           'release_authority',false,'source_acceptance',false,'certification',false,
@@ -284,7 +308,8 @@ begin
       'contract','ct.cos.v1.github-source-readback.v2',
       'source_sha',lower(p_expected_source_sha),'production_main_sha',lower(v_main_sha),
       'branch_protected',v_branch_protected,'commit_verified',v_commit_verified,
-      'check_run_total',v_check_total,'check_run_pending',v_check_pending,'check_run_failed',v_check_failed,
+      'check_run_total',v_check_total,'effective_check_run_total',v_check_effective_total,
+      'check_run_pending',v_check_pending,'check_run_failed',v_check_failed,
       'status_context_total',v_status_total,'combined_status',v_status_state,
       'evidence_sha256',v_evidence_sha,'three_dail_logical_phase','DAIL-EVIDENCE',
       'next_owner','PentaCertify','release_authority',false,'source_acceptance',false,
@@ -299,7 +324,8 @@ begin
     'ok',true,'state','ready_for_pentacertifier',
     'source_sha',lower(p_expected_source_sha),'production_main_sha',lower(v_main_sha),
     'branch_protected',v_branch_protected,'commit_verified',v_commit_verified,
-    'check_run_total',v_check_total,'check_run_pending',v_check_pending,'check_run_failed',v_check_failed,
+    'check_run_total',v_check_total,'effective_check_run_total',v_check_effective_total,
+    'check_run_pending',v_check_pending,'check_run_failed',v_check_failed,
     'status_context_total',v_status_total,'combined_status',v_status_state,
     'evidence_sha256',v_evidence_sha,'dail',v_event,
     'next_owner','PentaCertify','release_authority',false,'source_acceptance',false,
