@@ -1,7 +1,10 @@
 from pathlib import Path
+import io
+import json
 import sys
 import unittest
 import urllib.error
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +36,39 @@ class StubTrustedClient(trusted.TrustedCandidateClient):
     def assert_live_ref_path(path: str) -> None:
         if path != "/git/ref/heads/main":
             raise AssertionError(f"unexpected trusted ref path {path}")
+
+
+class FakeResponse:
+    def __init__(self, payload: object, headers: dict[str, str] | None = None) -> None:
+        self.payload = payload
+        self.headers = headers or {"X-RateLimit-Remaining": "59"}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+    def read(self) -> bytes:
+        return json.dumps(self.payload).encode("utf-8")
+
+
+def http_error(
+    status: int,
+    body: str,
+    *,
+    remaining: str = "100",
+) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError(
+        "https://api.github.com/repos/crownthrive1/CrownThrive-OS/git/ref/heads/main",
+        status,
+        "Forbidden",
+        {
+            "X-RateLimit-Remaining": remaining,
+            "X-GitHub-Request-Id": "REQ-123",
+        },
+        io.BytesIO(body.encode("utf-8")),
+    )
 
 
 class CollisionTrustedObserverTests(unittest.TestCase):
@@ -86,6 +122,81 @@ class CollisionTrustedObserverTests(unittest.TestCase):
             trusted._retry_delay(limited, 0),
             trusted.MAX_RATE_LIMIT_SLEEP_SECONDS,
         )
+
+    def test_authenticated_403_can_degrade_to_exact_public_provider_read(self) -> None:
+        client = trusted.TrustedCandidateClient(
+            "crownthrive1/CrownThrive-OS",
+            "test-token",
+            event_base_sha="a" * 40,
+            candidate=1474,
+        )
+        payload = {"object": {"type": "commit", "sha": "b" * 40}}
+        with patch.object(
+            trusted.urllib.request,
+            "urlopen",
+            side_effect=[
+                http_error(403, "Resource not accessible by integration"),
+                FakeResponse(payload),
+                FakeResponse(payload),
+            ],
+        ):
+            self.assertEqual(client.main_sha("main"), "b" * 40)
+            self.assertEqual(client.main_sha("main"), "b" * 40)
+
+        evidence = client.transport_evidence()
+        self.assertTrue(evidence["public_read_mode"])
+        self.assertEqual(evidence["authenticated_requests"], 1)
+        self.assertEqual(evidence["public_fallback_requests"], 2)
+        self.assertEqual(evidence["last_transport"], "public-fallback")
+
+    def test_public_fallback_failure_remains_fail_closed(self) -> None:
+        client = trusted.TrustedCandidateClient(
+            "crownthrive1/CrownThrive-OS",
+            "test-token",
+            event_base_sha="a" * 40,
+            candidate=1474,
+        )
+        with patch.object(
+            trusted.urllib.request,
+            "urlopen",
+            side_effect=[
+                http_error(403, "Resource not accessible by integration"),
+                http_error(403, "API rate limit exceeded", remaining="0"),
+                http_error(403, "API rate limit exceeded", remaining="0"),
+                http_error(403, "API rate limit exceeded", remaining="0"),
+                http_error(403, "API rate limit exceeded", remaining="0"),
+                http_error(403, "API rate limit exceeded", remaining="0"),
+            ],
+        ), patch.object(trusted.time, "sleep", return_value=None):
+            with self.assertRaises(trusted.agent.GitHubReadError):
+                client.main_sha("main")
+
+        self.assertFalse(client.public_read_mode)
+        self.assertEqual(client.authenticated_requests, 1)
+        self.assertEqual(client.public_fallback_requests, trusted.MAX_HTTP_ATTEMPTS)
+
+    def test_public_fallback_request_budget_is_hard_bounded(self) -> None:
+        client = trusted.TrustedCandidateClient(
+            "crownthrive1/CrownThrive-OS",
+            "test-token",
+            event_base_sha="a" * 40,
+            candidate=1474,
+        )
+        client.public_read_mode = True
+        client.public_fallback_requests = trusted.MAX_PUBLIC_FALLBACK_REQUESTS
+        with self.assertRaises(trusted.agent.GitHubReadError) as ctx:
+            client.main_sha("main")
+        self.assertIn("public_fallback_request_budget_exceeded", str(ctx.exception))
+
+    def test_transport_evidence_contains_no_token(self) -> None:
+        client = trusted.TrustedCandidateClient(
+            "crownthrive1/CrownThrive-OS",
+            "super-secret-token",
+            event_base_sha="a" * 40,
+            candidate=1474,
+        )
+        rendered = json.dumps(client.transport_evidence())
+        self.assertNotIn("super-secret-token", rendered)
 
     def test_wrapper_preserves_fail_closed_and_no_authority_expansion(self) -> None:
         text = (SCRIPTS / "governed_collision_agent_v2_trusted.py").read_text(encoding="utf-8")
