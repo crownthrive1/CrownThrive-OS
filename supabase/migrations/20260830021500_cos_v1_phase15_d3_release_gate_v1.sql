@@ -102,6 +102,11 @@ begin
     into v_binding,v_founder_ref
   from penta_runtime.d3_campaign_bindings_v1 b
   where b.campaign_id=p_campaign_id
+    and b.founder_ref='ct.person.founder.kavonte-jones-sr'
+    and nullif(btrim(coalesce(b.directive_id,'')),'') is not null
+    and b.directive_source_sha256 ~ '^[0-9a-f]{64}$'
+    and b.scope_sha256 ~ '^[0-9a-f]{64}$'
+    and b.max_cost_minor=0
     and clock_timestamp() >= b.starts_at
     and clock_timestamp() < b.expires_at
     and b.nonrenewing is true
@@ -122,8 +127,8 @@ begin
   if v_binding is null then
     raise exception 'no_current_exact_source_d3_release_authority:%',p_campaign_id;
   end if;
-  if nullif(btrim(coalesce(v_founder_ref,'')),'') is null then
-    raise exception 'd3_founder_ref_required';
+  if v_founder_ref <> 'ct.person.founder.kavonte-jones-sr' then
+    raise exception 'canonical_d3_founder_ref_required';
   end if;
 
   v_evidence_sha256:=encode(extensions.digest(convert_to(v_binding::text,'UTF8'),'sha256'),'hex');
@@ -163,7 +168,7 @@ begin
       'authority','cos.production_release'
     )),
     v_evidence_sha256,
-    'Bound from current governed D3 campaign; generic gate recording is prohibited.'
+    'Bound from current governed D3 campaign with canonical founder identity and exact directive/scope/source evidence; generic gate recording is prohibited.'
   ) returning receipt_id into v_receipt_id;
 
   update integration_control.cos_phase_executions_v1
@@ -209,6 +214,11 @@ begin
       select 1
       from penta_runtime.d3_campaign_bindings_v1 b
       where b.campaign_id=v_d3_approval_ref
+        and b.founder_ref='ct.person.founder.kavonte-jones-sr'
+        and nullif(btrim(coalesce(b.directive_id,'')),'') is not null
+        and b.directive_source_sha256 ~ '^[0-9a-f]{64}$'
+        and b.scope_sha256 ~ '^[0-9a-f]{64}$'
+        and b.max_cost_minor=0
         and clock_timestamp() >= b.starts_at
         and clock_timestamp() < b.expires_at
         and b.nonrenewing is true
