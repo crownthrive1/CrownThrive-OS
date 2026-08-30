@@ -62,28 +62,35 @@ create table if not exists penta_translate.projections_v1 (
 );
 create index if not exists penta_translate_projections_source_idx on penta_translate.projections_v1(source_sha256,created_at desc);
 
-create or replace function penta_task_runtime.reject_immutable_mutation_v1()
+create or replace function penta_task_runtime.guard_snapshot_pointer_bind_v1()
 returns trigger
 language plpgsql
 security definer
 set search_path='pg_catalog'
 as $$
 begin
+  if tg_op='DELETE' then raise exception 'append_only_evidence_object'; end if;
+  if old.dail_event_id is null and new.dail_event_id is not null and
+     row(old.scope_kind,old.scope_ref,old.source_state,old.source_sha256,old.rollback_plan,old.rollback_sha256,old.actor_ref,old.authority_basis,old.correlation_id,old.created_at)
+     is not distinct from
+     row(new.scope_kind,new.scope_ref,new.source_state,new.source_sha256,new.rollback_plan,new.rollback_sha256,new.actor_ref,new.authority_basis,new.correlation_id,new.created_at)
+  then return new; end if;
   raise exception 'append_only_evidence_object';
 end;
 $$;
 
-revoke all on function penta_task_runtime.reject_immutable_mutation_v1() from public, anon, authenticated;
-
-DROP TRIGGER IF EXISTS penta_task_runtime_snapshots_immutable_v1 ON penta_task_runtime.snapshots_v1;
-create trigger penta_task_runtime_snapshots_immutable_v1
-before update or delete on penta_task_runtime.snapshots_v1
-for each row execute function penta_task_runtime.reject_immutable_mutation_v1();
-
-DROP TRIGGER IF EXISTS penta_translate_projections_immutable_v1 ON penta_translate.projections_v1;
-create trigger penta_translate_projections_immutable_v1
-before update or delete on penta_translate.projections_v1
-for each row execute function penta_task_runtime.reject_immutable_mutation_v1();
+create or replace function penta_translate.guard_projection_pointer_bind_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path='pg_catalog'
+as $$
+begin
+  if tg_op='DELETE' then raise exception 'append_only_evidence_object'; end if;
+  if current_setting('penta_translate.pointer_bind',true)='on' and old.dail_event_id is null and new.dail_event_id is not null then return new; end if;
+  raise exception 'append_only_evidence_object';
+end;
+$$;
 
 alter table penta_task_runtime.components_v1 enable row level security;
 alter table penta_task_runtime.components_v1 force row level security;
@@ -99,16 +106,31 @@ grant select,insert,update on penta_task_runtime.components_v1 to service_role;
 grant select,insert on penta_task_runtime.snapshots_v1 to service_role;
 grant select,insert on penta_translate.projections_v1 to service_role;
 
+drop policy if exists penta_task_runtime_components_service_v1 on penta_task_runtime.components_v1;
 create policy penta_task_runtime_components_service_v1 on penta_task_runtime.components_v1
   for all to service_role using (true) with check (true);
+drop policy if exists penta_task_runtime_snapshots_service_v1 on penta_task_runtime.snapshots_v1;
 create policy penta_task_runtime_snapshots_service_v1 on penta_task_runtime.snapshots_v1
   for select to service_role using (true);
+drop policy if exists penta_task_runtime_snapshots_insert_service_v1 on penta_task_runtime.snapshots_v1;
 create policy penta_task_runtime_snapshots_insert_service_v1 on penta_task_runtime.snapshots_v1
   for insert to service_role with check (true);
+drop policy if exists penta_translate_projections_service_v1 on penta_translate.projections_v1;
 create policy penta_translate_projections_service_v1 on penta_translate.projections_v1
   for select to service_role using (true);
+drop policy if exists penta_translate_projections_insert_service_v1 on penta_translate.projections_v1;
 create policy penta_translate_projections_insert_service_v1 on penta_translate.projections_v1
   for insert to service_role with check (true);
+
+DROP TRIGGER IF EXISTS penta_task_runtime_snapshots_immutable_v1 ON penta_task_runtime.snapshots_v1;
+create trigger penta_task_runtime_snapshots_immutable_v1
+before update or delete on penta_task_runtime.snapshots_v1
+for each row execute function penta_task_runtime.guard_snapshot_pointer_bind_v1();
+
+DROP TRIGGER IF EXISTS penta_translate_projections_immutable_v1 ON penta_translate.projections_v1;
+create trigger penta_translate_projections_immutable_v1
+before update or delete on penta_translate.projections_v1
+for each row execute function penta_translate.guard_projection_pointer_bind_v1();
 
 create or replace function penta_task_runtime.capture_snapshot_v1(
   p_scope_kind text,
@@ -147,28 +169,6 @@ begin
   return jsonb_build_object('ok',true,'snapshot_id',v_snapshot.snapshot_id,'source_sha256',v_source_hash,'rollback_sha256',v_rollback_hash,'dail',v_event);
 end;
 $$;
-
--- The snapshot row itself is append-only; only the one-time DAIL pointer bind is permitted.
-create or replace function penta_task_runtime.guard_snapshot_pointer_bind_v1()
-returns trigger
-language plpgsql
-security definer
-set search_path='pg_catalog'
-as $$
-begin
-  if tg_op='DELETE' then raise exception 'append_only_evidence_object'; end if;
-  if old.dail_event_id is null and new.dail_event_id is not null and
-     row(old.scope_kind,old.scope_ref,old.source_state,old.source_sha256,old.rollback_plan,old.rollback_sha256,old.actor_ref,old.authority_basis,old.correlation_id,old.created_at)
-     is not distinct from
-     row(new.scope_kind,new.scope_ref,new.source_state,new.source_sha256,new.rollback_plan,new.rollback_sha256,new.actor_ref,new.authority_basis,new.correlation_id,new.created_at)
-  then return new; end if;
-  raise exception 'append_only_evidence_object';
-end;
-$$;
-DROP TRIGGER IF EXISTS penta_task_runtime_snapshots_immutable_v1 ON penta_task_runtime.snapshots_v1;
-create trigger penta_task_runtime_snapshots_immutable_v1
-before update or delete on penta_task_runtime.snapshots_v1
-for each row execute function penta_task_runtime.guard_snapshot_pointer_bind_v1();
 
 create or replace function penta_translate.record_projection_v1(
   p_idempotency_key text,
@@ -220,23 +220,6 @@ begin
   return jsonb_build_object('ok',true,'projection_id',v_row.projection_id,'round_trip_verified',v_row.round_trip_verified,'dail',v_event);
 end;
 $$;
-
-create or replace function penta_translate.guard_projection_pointer_bind_v1()
-returns trigger
-language plpgsql
-security definer
-set search_path='pg_catalog'
-as $$
-begin
-  if tg_op='DELETE' then raise exception 'append_only_evidence_object'; end if;
-  if current_setting('penta_translate.pointer_bind',true)='on' and old.dail_event_id is null and new.dail_event_id is not null then return new; end if;
-  raise exception 'append_only_evidence_object';
-end;
-$$;
-DROP TRIGGER IF EXISTS penta_translate_projections_immutable_v1 ON penta_translate.projections_v1;
-create trigger penta_translate_projections_immutable_v1
-before update or delete on penta_translate.projections_v1
-for each row execute function penta_translate.guard_projection_pointer_bind_v1();
 
 -- Upgrade PentaDND in-place with priority/heartbeat/max lifetime while retaining v1 compatibility.
 alter table penta_dnd.leases_v1 add column if not exists priority smallint not null default 50 check (priority between 0 and 100);
@@ -334,6 +317,8 @@ select jsonb_build_object(
   'production_certified',false
 ); $$;
 
+revoke all on function penta_task_runtime.guard_snapshot_pointer_bind_v1() from public, anon, authenticated;
+revoke all on function penta_translate.guard_projection_pointer_bind_v1() from public, anon, authenticated;
 revoke all on function penta_task_runtime.capture_snapshot_v1(text,text,jsonb,jsonb,text,text,text) from public, anon, authenticated;
 revoke all on function penta_translate.record_projection_v1(text,text,text,text,text,text,text,text,text,text,boolean,numeric,text,jsonb,text,text) from public, anon, authenticated;
 revoke all on function penta_dnd.open_lease_v2(text,text,text,text,text,smallint,integer,text,text,text[],text[]) from public, anon, authenticated;
@@ -356,12 +341,16 @@ on conflict(component_id) do nothing;
 
 insert into integration_control.penta_identity_registry_v1(identity_key,canonical_name,identity_class,docs_path,docs_namespace,family_key,family_name,role,axis,kind,maturity,registration_state,activation_state,runtime_state,labels,source_refs,current,active,metadata)
 values
-('ct.penta.super.v1','PentaSuper','penta','penta/super/README.md','penta/super','ct.penta.family.supervision','Supervision','system supervisory intelligence','orchestration','penta','bootstrap','source_controlled','candidate','source_bootstrap',array['supervisor','non-sovereign'],jsonb_build_object('pr',1388,'source','penta/super/README.md'),true,true,jsonb_build_object('no_self_certification',true,'d3_human_reserved',true)),
-('ct.penta.dnd.v1','PentaDND','penta','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','scoped do-not-disturb lease control','runtime-control','penta','production_candidate','registered','active','runtime_active_unverified',array['dnd','ttl','priority'],jsonb_build_object('pr',1388,'runtime','penta_dnd.open_lease_v2'),true,true,jsonb_build_object('global_shutdown',false,'priority_preemption',false)),
-('ct.penta.snapshot.v1','PentaSnapshot','penta','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','bounded rollback snapshot evidence','continuity','penta','production_candidate','registered','active','runtime_active_unverified',array['snapshot','rollback'],jsonb_build_object('pr',1388,'runtime','penta_task_runtime.capture_snapshot_v1'),true,true,jsonb_build_object('append_only',true)),
-('ct.penta.lease.v1','PentaLease','penta','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','fenced resource ownership leases','coordination','penta','production_candidate','registered','active','runtime_active_unverified',array['lease','fencing','cas'],jsonb_build_object('pr',1388,'runtime','institutional_federation.collision_domain_leases_v2'),true,true,jsonb_build_object('duplicate_runtime_created',false)),
-('ct.penta.collision.v1','PentaCollision','penta','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','collision and rogue-writer detection','coordination','penta','production_candidate','registered','active','runtime_active_unverified',array['collision','incident'],jsonb_build_object('pr',1388,'runtime','institutional_federation.collision_events_v2'),true,true,jsonb_build_object('counter_mutation',false)),
-('ct.penta.translate.v1','PentaTranslate','penta','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','governed translation projection provenance','translation','penta','production_candidate','registered','active','runtime_active_unverified',array['translate','provenance','round-trip'],jsonb_build_object('pr',1388,'runtime','penta_translate.record_projection_v1'),true,true,jsonb_build_object('protected_mapping_public',false,'source_body_stored',false))
+('ct.penta.super.v1','PentaSuper','CANDIDATE','penta/super/README.md','penta/super','ct.penta.family.supervision','Supervision','system supervisory intelligence','orchestration','penta','bootstrap','source_controlled','CANDIDATE','SOURCE_BOOTSTRAP',array['supervisor','non-sovereign'],jsonb_build_object('pr',1388,'source','penta/super/README.md'),true,true,jsonb_build_object('no_self_certification',true,'d3_human_reserved',true)),
+('ct.penta.dnd.v1','PentaDND','CANDIDATE','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','scoped do-not-disturb lease control','runtime-control','penta','production_candidate','registered','ACTIVE','RUNTIME_ACTIVE_UNVERIFIED',array['dnd','ttl','priority'],jsonb_build_object('pr',1388,'runtime','penta_dnd.open_lease_v2'),true,true,jsonb_build_object('global_shutdown',false,'priority_preemption',false)),
+('ct.penta.snapshot.v1','PentaSnapshot','CANDIDATE','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','bounded rollback snapshot evidence','continuity','penta','production_candidate','registered','ACTIVE','RUNTIME_ACTIVE_UNVERIFIED',array['snapshot','rollback'],jsonb_build_object('pr',1388,'runtime','penta_task_runtime.capture_snapshot_v1'),true,true,jsonb_build_object('append_only',true)),
+('ct.penta.lease.v1','PentaLease','CANDIDATE','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','fenced resource ownership leases','coordination','penta','production_candidate','registered','ACTIVE','RUNTIME_ACTIVE_UNVERIFIED',array['lease','fencing','cas'],jsonb_build_object('pr',1388,'runtime','institutional_federation.collision_domain_leases_v2'),true,true,jsonb_build_object('duplicate_runtime_created',false)),
+('ct.penta.collision.v1','PentaCollision','CANDIDATE','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','collision and rogue-writer detection','coordination','penta','production_candidate','registered','ACTIVE','RUNTIME_ACTIVE_UNVERIFIED',array['collision','incident'],jsonb_build_object('pr',1388,'runtime','institutional_federation.collision_events_v2'),true,true,jsonb_build_object('counter_mutation',false)),
+('ct.penta.translate.v1','PentaTranslate','CANDIDATE','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','governed translation projection provenance','translation','penta','production_candidate','registered','ACTIVE','RUNTIME_ACTIVE_UNVERIFIED',array['translate','provenance','round-trip'],jsonb_build_object('pr',1388,'runtime','penta_translate.record_projection_v1'),true,true,jsonb_build_object('protected_mapping_public',false,'source_body_stored',false)),
+('ct.penta.translate.encode.v1','PentaTranslate Encode','CANDIDATE','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','machine-projection encoding subcapability','translation','subcomponent','specified','registered','HOLD_PARENT','INSTITUTIONAL_ONLY',array['translate','encode'],jsonb_build_object('pr',1388,'parent','ct.penta.translate.v1'),true,true,jsonb_build_object('authority_created',false)),
+('ct.penta.translate.decode.v1','PentaTranslate Decode','CANDIDATE','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','human-language projection decoding subcapability','translation','subcomponent','specified','registered','HOLD_PARENT','INSTITUTIONAL_ONLY',array['translate','decode'],jsonb_build_object('pr',1388,'parent','ct.penta.translate.v1'),true,true,jsonb_build_object('authority_created',false)),
+('ct.penta.translate.project.v1','PentaTranslate Project','CANDIDATE','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','projection materialization subcapability','translation','subcomponent','specified','registered','HOLD_PARENT','INSTITUTIONAL_ONLY',array['translate','project'],jsonb_build_object('pr',1388,'parent','ct.penta.translate.v1'),true,true,jsonb_build_object('authority_created',false)),
+('ct.penta.translate.verify.v1','PentaTranslate Verify','CANDIDATE','penta/super/task-runtime-acceptance-v1.md','penta/super','ct.penta.task-runtime-family.v1','Task Runtime','non-originating translation verification subcapability','translation','subcomponent','specified','registered','HOLD_PARENT','INSTITUTIONAL_ONLY',array['translate','verify'],jsonb_build_object('pr',1388,'parent','ct.penta.translate.v1','independent_verifier_required',true),true,true,jsonb_build_object('authority_created',false,'no_self_certification',true))
 on conflict(identity_key) do nothing;
 
 select chlom_runtime.append_dail_event('penta.super.task-runtime.runtime-installed','penta_super_runtime','ct.penta.task-runtime-family.v1',
