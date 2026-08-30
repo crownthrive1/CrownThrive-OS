@@ -1,0 +1,34 @@
+name: PentaCertifier Release Topology
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/penta_release_topology_certifier.py'
+      - 'tests/test_penta_release_topology_certifier.py'
+      - 'penta/security/PENTA-RELEASE-TOPOLOGY-CERTIFIER-V1.md'
+      - '.github/workflows/penta-release-topology-certifier.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/penta_release_topology_certifier.py'
+      - 'tests/test_penta_release_topology_certifier.py'
+      - 'penta/security/PENTA-RELEASE-TOPOLOGY-CERTIFIER-V1.md'
+      - '.github/workflows/penta-release-topology-certifier.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-negative-adversarial:
+    name: Deterministic negative and adversarial topology tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Compile verifier
+        run: python -m py_compile scripts/penta_release_topology_certifier.py
+      - name: Run topology regression suite
+        run: python -m unittest -v tests.test_penta_release_topology_certifier
