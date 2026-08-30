@@ -30,8 +30,8 @@ jobs:
     timeout-minutes: 25
     env:
       PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
-      GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
       PENTA_REMEDIATION_OIDC_ENDPOINT: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-remediation-worker-oidc
       PENTA_REMEDIATION_OIDC_AUDIENCE: crownthrive-penta-remediation
     steps:
@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in PENTA_PM_GITHUB_TOKEN PENTA_REMEDIATION_OIDC_ENDPOINT PENTA_REMEDIATION_OIDC_AUDIENCE ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN; do
+          for name in PENTA_PM_GITHUB_TOKEN GITHUB_TOKEN PENTA_REMEDIATION_OIDC_ENDPOINT PENTA_REMEDIATION_OIDC_AUDIENCE ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN; do
             if [[ -z "${!name:-}" ]]; then
               echo "::error::$name is unavailable; refusing remediation execution."
               exit 78
@@ -89,7 +89,7 @@ jobs:
 
       - name: Validate execution bridge contracts
         run: |
-          python -m py_compile scripts/penta_remediation_worker_execute.py scripts/penta_pm_remediation_assign.py
+          python -m py_compile scripts/penta_remediation_worker_execute.py scripts/penta_remediation_worker_execute_native.py scripts/penta_pm_remediation_assign.py
           python -m unittest tests.test_penta_remediation_worker_execute tests.test_penta_self_remediation_handoff -v
 
       - name: Execute assigned remediation workers
@@ -102,7 +102,7 @@ jobs:
           if [[ -n "${DISPATCH_NUMBER:-}" ]]; then
             args+=(--pr "$DISPATCH_NUMBER")
           fi
-          python scripts/penta_remediation_worker_execute.py "${args[@]}" | tee penta-remediation-worker-summary.json
+          python scripts/penta_remediation_worker_execute_native.py "${args[@]}" | tee penta-remediation-worker-summary.json
 
       - name: Upload execution evidence
         if: always()
