@@ -1,0 +1,31 @@
+name: COS Phase 00 Cron Activation Fence
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/20260830035900_cos_phase00_cron_activation_fence_v1.sql"
+      - "supabase/rollbacks/20260830035900_cos_phase00_cron_activation_fence_v1.rollback.sql"
+      - "scripts/validate_cos_phase00_cron_activation_fence.py"
+      - ".github/workflows/cos-phase00-cron-activation-fence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Validate COS Phase 00 cron fence
+        run: python scripts/validate_cos_phase00_cron_activation_fence.py
+      - name: Whitespace integrity
+        run: git diff --check
