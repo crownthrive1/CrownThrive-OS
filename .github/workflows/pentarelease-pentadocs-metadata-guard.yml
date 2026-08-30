@@ -1,47 +1,32 @@
 name: PentaRelease — PentaDocs Metadata Guard
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
+  workflow_run:
+    workflows: ["Governed Merge Gate"]
+    types: [completed]
 
-permissions:
-  contents: write
-  pull-requests: read
+permissions: {}
 
 concurrency:
-  group: pentarelease-pentadocs-metadata-${{ github.event.pull_request.number }}
+  group: pentarelease-pentadocs-metadata-${{ github.event.pull_request.number || github.event.workflow_run.head_sha || github.run_id }}
   cancel-in-progress: false
 
 jobs:
-  reconcile:
-    name: PentaRelease PentaDocs metadata reconciliation
+  audit-candidate:
+    name: PentaRelease PentaDocs metadata audit
     if: >-
+      github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.event.pull_request.head.ref, 'pentarelease/surface-')
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      PENTA_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-      PENTA_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      PENTA_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-      PENTA_PROVIDER_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
 
     steps:
-      - name: Require bounded same-repository target and provider credential
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$PENTA_HEAD_REPO" = "$GITHUB_REPOSITORY"
-          case "$PENTA_HEAD_REF" in
-            pentarelease/surface-*) ;;
-            *) echo "::error::unexpected PentaRelease branch: $PENTA_HEAD_REF"; exit 78 ;;
-          esac
-          if [[ -z "$PENTA_PROVIDER_TOKEN" ]]; then
-            echo "::error::PENTA_PM_GITHUB_TOKEN unavailable; refusing provider mutation."
-            exit 78
-          fi
-
-      - name: Checkout canonical metadata reconciler
+      - name: Checkout canonical verifier
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: crownthrive1/CrownThrive-OS
@@ -49,71 +34,147 @@ jobs:
           persist-credentials: false
           path: penta-control
 
-      - name: Checkout exact PentaRelease head
+      - name: Checkout exact candidate as read-only data
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository }}
           ref: ${{ github.event.pull_request.head.sha }}
-          token: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
-          persist-credentials: true
-          path: release-head
+          persist-credentials: false
+          path: candidate
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
 
-      - name: Reconcile the seven bounded PentaDocs release pages
+      - name: Require exact seven-page metadata convergence
         shell: bash
         run: |
           set -euo pipefail
           python penta-control/scripts/pentarelease/reconcile_pentadocs_metadata.py \
-            --root release-head \
-            --write | tee "$RUNNER_TEMP/pentarelease-pentadocs-metadata-write.json"
-          python penta-control/scripts/pentarelease/reconcile_pentadocs_metadata.py \
-            --root release-head \
-            --check | tee "$RUNNER_TEMP/pentarelease-pentadocs-metadata-check.json"
+            --root candidate \
+            --check
 
-      - name: Commit exact metadata delta when required
-        id: commit
-        working-directory: release-head
+  trusted-provider-reconcile:
+    name: PentaRelease trusted metadata provider reconciliation
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'pentarelease/surface-')
+    permissions:
+      contents: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PENTA_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      PENTA_RUN_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+      PENTA_PROVIDER_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout protected-main provider control
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: crownthrive1/CrownThrive-OS
+          ref: main
+          persist-credentials: false
+          path: penta-control
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Require dedicated provider credential
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- pentarelease; then
-            echo 'changed=false' >> "$GITHUB_OUTPUT"
-            echo 'PentaDocs release metadata already converged.'
-            exit 0
+          if [[ -z "$PENTA_PROVIDER_TOKEN" ]]; then
+            echo "::error::PENTA_PM_GITHUB_TOKEN unavailable; refusing provider mutation."
+            exit 78
           fi
 
-          git config user.name 'PentaRelease'
-          git config user.email 'contact@crownthrive.com'
-          git add -- \
-            pentarelease/latest.mdx \
-            pentarelease/faq.mdx \
-            pentarelease/changelog.mdx \
-            pentarelease/costs.mdx \
-            pentarelease/cie.mdx \
-            pentarelease/data.mdx \
-            pentarelease/evidence.mdx
-          git diff --cached --check
-          git commit -m 'fix(pentarelease): reconcile PentaDocs structured metadata'
-          git push origin "HEAD:$PENTA_HEAD_REF"
-          echo 'changed=true' >> "$GITHUB_OUTPUT"
+      - name: Resolve exact open candidate
+        id: target
+        env:
+          GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
 
-      - name: Record bounded guard summary
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          expected = os.environ['PENTA_RUN_HEAD_SHA'].strip()
+          number = os.environ.get('PENTA_RUN_PR_NUMBER', '').strip()
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'CrownThrive-PentaRelease-Metadata-Target/1.0',
+          }
+
+          def get(path):
+              req = urllib.request.Request(f'https://api.github.com/repos/{repo}{path}', headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          if number:
+              pull = get(f'/pulls/{int(number)}')
+              candidates = [pull]
+          else:
+              candidates = [
+                  pull for pull in get('/pulls?state=open&base=main&per_page=100')
+                  if ((pull.get('head') or {}).get('sha') or '') == expected
+              ]
+
+          candidates = [
+              pull for pull in candidates
+              if pull.get('state') == 'open'
+              and ((pull.get('head') or {}).get('sha') or '') == expected
+              and ((pull.get('head') or {}).get('repo') or {}).get('full_name') == repo
+              and str((pull.get('head') or {}).get('ref') or '').startswith('pentarelease/surface-')
+          ]
+          if len(candidates) != 1:
+              raise SystemExit(f'exact_candidate_resolution_failed:{len(candidates)}')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"number={candidates[0]['number']}\n")
+          print(json.dumps({
+              'number': candidates[0]['number'],
+              'head_sha': expected,
+              'head_ref': (candidates[0].get('head') or {}).get('ref'),
+          }, sort_keys=True))
+          PY
+
+      - name: Reconcile through trusted exact-head provider transport
+        env:
+          GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python penta-control/scripts/pentarelease/reconcile_pentadocs_metadata_provider.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --number "${{ steps.target.outputs.number }}" \
+            --expected-head "$PENTA_RUN_HEAD_SHA"
+
+      - name: Record trusted transport boundary
         if: always()
         shell: bash
         run: |
           {
             echo '### PentaRelease PentaDocs Metadata Guard'
             echo
-            echo "- PR: #${{ github.event.pull_request.number }}"
-            echo "- Observed head: \`$PENTA_HEAD_SHA\`"
-            echo "- Branch: \`$PENTA_HEAD_REF\`"
-            echo "- Metadata commit emitted: \`${{ steps.commit.outputs.changed || 'false' }}\`"
-            echo '- Scope: seven PentaRelease MDX pages only'
-            echo '- Invariant: `sidebarTitle == title`'
+            echo "- Governed Merge Gate head: \`$PENTA_RUN_HEAD_SHA\`"
+            echo "- Candidate PR: #${{ steps.target.outputs.number || 'unresolved' }}"
+            echo '- Candidate checkout under write authority: false'
+            echo '- Executed code source: protected `main` only'
+            echo '- Mutation scope: seven PentaRelease MDX metadata files only'
+            echo '- Exact-head ref update: force=false'
             echo '- Authority expansion: false'
-            echo '- Provider/release state manufactured: false'
           } >> "$GITHUB_STEP_SUMMARY"
