@@ -2,7 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const GH = "https://api.github.com";
-const VERSION = "3.1.0";
+const VERSION = "3.2.0";
+const DEFAULT_REPO = "crownthrive1/CrownThrive-OS";
 const sb = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -26,7 +27,8 @@ async function token() {
   if (tokenCache) return tokenCache;
   const value = await rpc("penta_pm_github_token");
   if (!value) throw new Error("github_token_unavailable");
-  return tokenCache = String(value);
+  tokenCache = String(value);
+  return tokenCache;
 }
 
 async function gh(repo: string, path: string, init: RequestInit = {}) {
@@ -37,7 +39,7 @@ async function gh(repo: string, path: string, init: RequestInit = {}) {
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
       "Content-Type": "application/json",
-      "User-Agent": "CrownThrive-PentaPR-Terminal/3.1",
+      "User-Agent": "CrownThrive-PentaPR-Terminal/3.2",
       ...(init.headers || {}),
     },
   });
@@ -60,6 +62,21 @@ async function read(repo: string, pr: number) {
     state: String(result.body?.state ?? ""),
     merged: !!result.body?.merged,
     draft: !!result.body?.draft,
+  };
+}
+
+function listSnapshot(pr: any) {
+  return {
+    ok: true,
+    status: 200,
+    head: String(pr?.head?.sha ?? ""),
+    state: String(pr?.state ?? ""),
+    merged: !!pr?.merged_at,
+    draft: !!pr?.draft,
+    body: {
+      merge_commit_sha: pr?.merge_commit_sha ?? null,
+      updated_at: pr?.updated_at ?? null,
+    },
   };
 }
 
@@ -114,6 +131,7 @@ async function recordTruth(repo: string, pr: number, result: any) {
       head_sha: result.head,
       merge_commit_sha: result.body?.merge_commit_sha ?? null,
       updated_at: result.body?.updated_at ?? null,
+      retroactive_capable: true,
     },
   });
 }
@@ -173,19 +191,86 @@ async function mergeExact(repo: string, pr: number, expected: string, evidence: 
   return { ok: success, state: success ? "MERGED" : "FAILED", write_status: write.status, read_status: after.status, head: after.head, merged: after.merged, message: write.body?.message ?? null };
 }
 
-async function reconcile(repo = "crownthrive1/CrownThrive-OS", limit = 100) {
+async function reconcileCurrent(repo = DEFAULT_REPO, limit = 100) {
   if (!await allowed(repo)) throw new Error("repository_not_allowed");
   const result = await gh(repo, `/pulls?state=open&per_page=${Math.min(Math.max(limit, 1), 100)}&sort=updated&direction=asc`);
   if (!result.ok) throw new Error(`open_pr_list_failed:${result.status}`);
   const terminal: any[] = [];
-  for (const pr of (Array.isArray(result.body) ? result.body : [])) {
-    const number = Number(pr.number);
-    const head = String(pr.head?.sha ?? "");
-    if (!number || !head) continue;
-    const z: any = await zeroEvidence(repo, number, head);
-    if (z?.eligible) terminal.push({ pr: number, ...await closeExact(repo, number, head, "VERIFIED_ZERO_DELTA", "PentaSELF verified zero-code-delta; terminal close without merge", { source: "PentaPR terminal reconcile v3.1", verification_mode: z.mode }) });
+  let truthRecorded = 0;
+  for (const item of (Array.isArray(result.body) ? result.body : [])) {
+    const pr = Number(item.number);
+    const head = String(item.head?.sha ?? "");
+    if (!pr || !head) continue;
+    await recordTruth(repo, pr, listSnapshot(item));
+    truthRecorded += 1;
+    const z: any = await zeroEvidence(repo, pr, head);
+    if (z?.eligible) terminal.push({ pr, ...await closeExact(repo, pr, head, "VERIFIED_ZERO_DELTA", "PentaSELF verified zero-code-delta; terminal close without merge", { source: "PentaPR terminal reconcile v3.2", verification_mode: z.mode }) });
   }
-  return { ok: true, service: "ct.penta-pr-terminal-reconciliation.v3", version: VERSION, repo, examined: Array.isArray(result.body) ? result.body.length : 0, terminal_actions: terminal.length, results: terminal };
+  return { repo, examined: Array.isArray(result.body) ? result.body.length : 0, truth_recorded: truthRecorded, terminal_actions: terminal.length, results: terminal };
+}
+
+async function backfillStep() {
+  const claim: any = await rpc("penta_pr_claim_retroactive_backfill_v3");
+  if (!claim?.claimed) return { state: "NO_PENDING_BACKFILL", claimed: false };
+  const repo = String(claim.repo);
+  const page = Math.max(1, Number(claim.page ?? 1));
+  const perPage = Math.min(Math.max(Number(claim.per_page ?? 100), 1), 100);
+  if (!await allowed(repo)) throw new Error("repository_not_allowed");
+
+  const result = await gh(repo, `/pulls?state=all&per_page=${perPage}&page=${page}&sort=created&direction=asc`);
+  if (!result.ok) throw new Error(`historical_pr_list_failed:${result.status}`);
+  const items = Array.isArray(result.body) ? result.body : [];
+  let truthRecorded = 0;
+  let zeroDeltaClosed = 0;
+  const terminal: any[] = [];
+
+  for (const item of items) {
+    const pr = Number(item.number);
+    const head = String(item.head?.sha ?? "");
+    if (!pr || !head) continue;
+    const snapshot = listSnapshot(item);
+    await recordTruth(repo, pr, snapshot);
+    truthRecorded += 1;
+
+    // Retroactive mutation is closure-only. Historical merges are never manufactured.
+    if (snapshot.state === "open") {
+      const z: any = await zeroEvidence(repo, pr, head);
+      if (z?.eligible) {
+        const closed: any = await closeExact(repo, pr, head, "VERIFIED_ZERO_DELTA", "retroactive PentaSELF verified zero-code-delta; terminal close without merge", { source: "PentaPR retroactive backfill v3.2", backfill_page: page, verification_mode: z.mode });
+        terminal.push({ pr, ...closed });
+        if (closed?.ok && closed?.state === "CLOSED") zeroDeltaClosed += 1;
+      }
+    }
+  }
+
+  const hasMore = items.length === perPage;
+  const advance: any = await rpc("penta_pr_advance_retroactive_backfill_v3", {
+    p_repo: repo,
+    p_page: page,
+    p_page_count: items.length,
+    p_truth_backfilled: truthRecorded,
+    p_zero_delta_closed: zeroDeltaClosed,
+    p_has_more: hasMore,
+    p_evidence: {
+      service: "ct.penta-pr-terminal-reconciliation.v3",
+      version: VERSION,
+      mode: "RETROACTIVE_TRUTH_AND_SAFE_CLOSE",
+      retroactive_merge: false,
+      last_page: page,
+      last_page_count: items.length,
+      provider_read_after_write: true,
+    },
+  });
+
+  return { state: "BACKFILL_PAGE_PROCESSED", claimed: true, repo, page, per_page: perPage, examined: items.length, truth_recorded: truthRecorded, zero_delta_closed: zeroDeltaClosed, has_more: hasMore, terminal, cursor: advance };
+}
+
+async function reconcile(repo = DEFAULT_REPO, limit = 100) {
+  const current = await reconcileCurrent(repo, limit);
+  let retroactive: any;
+  try { retroactive = await backfillStep(); }
+  catch (error) { retroactive = { state: "BACKFILL_STEP_FAILED", error: String((error as Error)?.message ?? error) }; }
+  return { ok: true, service: "ct.penta-pr-terminal-reconciliation.v3", version: VERSION, current, retroactive, retroactive_merge: false };
 }
 
 Deno.serve(async (req) => {
@@ -193,13 +278,15 @@ Deno.serve(async (req) => {
     if (req.method !== "POST") return Response.json({ error: "method_not_allowed" }, { status: 405 });
     const input = await req.json().catch(() => ({}));
     const op = String(input.op ?? "reconcile");
-    if (op === "probe") return Response.json({ ok: true, service: "ct.penta-pr-terminal-reconciliation.v3", version: VERSION });
+    if (op === "probe") return Response.json({ ok: true, service: "ct.penta-pr-terminal-reconciliation.v3", version: VERSION, retroactive_backfill: true, retroactive_merge: false });
     if (op === "read") {
       const repo = need(input.repo, "repo");
       if (!await allowed(repo)) throw new Error("repository_not_allowed");
       return Response.json(await read(repo, Number(input.pr_number)));
     }
-    if (op === "reconcile") return Response.json(await reconcile(String(input.repo ?? "crownthrive1/CrownThrive-OS"), Number(input.limit ?? 100)));
+    if (op === "reconcile") return Response.json(await reconcile(String(input.repo ?? DEFAULT_REPO), Number(input.limit ?? 100)));
+    if (op === "backfill_step") return Response.json({ ok: true, service: "ct.penta-pr-terminal-reconciliation.v3", version: VERSION, retroactive: await backfillStep(), retroactive_merge: false });
+    if (op === "backfill_status") return Response.json({ ok: true, service: "ct.penta-pr-terminal-reconciliation.v3", version: VERSION, status: await rpc("penta_pr_retroactive_backfill_status_v3") });
     if (op === "close_exact") return Response.json(await closeExact(need(input.repo, "repo"), Number(input.pr_number), need(input.expected_head_sha, "expected_head_sha"), need(input.classification, "classification"), String(input.reason ?? "governed terminal close"), input.evidence ?? {}));
     if (op === "merge_exact") return Response.json(await mergeExact(need(input.repo, "repo"), Number(input.pr_number), need(input.expected_head_sha, "expected_head_sha"), input.evidence ?? {}));
     return Response.json({ error: "unsupported_operation", op }, { status: 400 });
