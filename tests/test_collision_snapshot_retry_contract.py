@@ -28,11 +28,22 @@ def test_retry_predicate_only_tolerates_subthreshold_awareness() -> None:
     assert "and candidate_stable" in workflow
 
 
-def test_retry_exhaustion_and_material_failures_remain_fail_closed() -> None:
+def test_nonretryable_and_material_failures_remain_fail_closed() -> None:
     workflow = workflow_text()
-    assert 'if [[ "$retryable" != "true" || "$attempt" -ge "$max_attempts" ]]' in workflow
+    assert 'if [[ "$retryable" != "true" ]]' in workflow
     assert 'exit "$status"' in workflow
     assert '--fail-on-severity 2' in workflow
+
+
+def test_bounded_candidate_fence_can_resolve_only_transient_global_churn() -> None:
+    workflow = workflow_text()
+    assert 'if [[ "$attempt" -ge "$max_attempts" ]]' in workflow
+    assert 'global_snapshot_churn_accepted_after_bounded_candidate_fence' in workflow
+    assert 'candidate_bounded_snapshot_resolution' in workflow
+    assert 'candidate_bounded_fence_after_transient_global_churn' in workflow
+    assert '"material_collision_count": sum(1 for item in collisions if int(item.get("severity") or 0) >= 2)' in workflow
+    assert '"inspection_error_count": len(report.get("inspection_errors") or {})' in workflow
+    assert 'decision["max_severity"] = observed_max' in workflow
 
 
 def test_each_attempt_recomputes_and_preserves_evidence() -> None:
