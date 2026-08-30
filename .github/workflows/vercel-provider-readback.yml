@@ -20,8 +20,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  activation-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      READBACK_REF: ${{ github.ref }}
+    steps:
+      - name: Require exact main lineage
+        shell: bash
+        run: |
+          if [ "$READBACK_REF" != 'refs/heads/main' ]; then
+            echo 'PentaVercel production readback — HOLD: exact main is required.' >> "$GITHUB_STEP_SUMMARY"
+            exit 78
+          fi
+          echo 'PentaVercel production readback — exact main lineage accepted.' >> "$GITHUB_STEP_SUMMARY"
+
   verify:
     name: Verify all Vercel production planes
+    needs: activation-gate
+    if: needs.activation-gate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -34,6 +51,7 @@ jobs:
           import hashlib
           import json
           import os
+          import re
           import time
           import urllib.error
           import urllib.request
@@ -48,6 +66,36 @@ jobs:
               "mcp_gateway": "https://crown-thrive-os.vercel.app/api/mcp?selftest=1",
               "pentafabric": "https://crown-thrive-os.vercel.app/api/penta?selftest=1",
           }
+          expected_projects = {
+              "crownthrive_os": {
+                  "project_id": "prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN",
+                  "repository": "crownthrive1/CrownThrive-OS",
+              },
+              "private_penta_os": {
+                  "project_id": "prj_bokKbkKjxSq4jKYRtBjxhwEE4xbS",
+                  "repository": "crownthrive1/PRIVATE-PentaOS",
+              },
+              "private_penta_execution": {
+                  "project_id": "prj_d1uyuhNZHXfANgZv9zTEiaIlcZer",
+                  "repository": "crownthrive1/PRIVATE-PentaExecution",
+              },
+              "chlom_protocol": {
+                  "project_id": "prj_HewLgMjUiVBNCl0FADFbSggSp2QN",
+                  "repository": "crownthrive1/chlom-protocol",
+              },
+          }
+
+          class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+          opener = urllib.request.build_opener(NoRedirectHandler())
+
+          def read_json_limited(response) -> dict:
+              raw = response.read(1024 * 1024 + 1)
+              if len(raw) > 1024 * 1024:
+                  raise ValueError("provider readback exceeded one MiB")
+              return json.loads(raw.decode("utf-8"))
 
           def parse_body(raw: str) -> dict:
               try:
@@ -64,14 +112,14 @@ jobs:
                   },
               )
               try:
-                  with urllib.request.urlopen(request, timeout=10) as response:
+                  with opener.open(request, timeout=10) as response:
                       return {
                           "url": url,
                           "http_status": response.status,
-                          "body": json.loads(response.read().decode("utf-8")),
+                          "body": read_json_limited(response),
                       }
               except urllib.error.HTTPError as error:
-                  raw = error.read().decode("utf-8", errors="replace")
+                  raw = error.read(1024 * 1024 + 1).decode("utf-8", errors="replace")
                   return {
                       "url": url,
                       "http_status": error.code,
@@ -96,14 +144,14 @@ jobs:
                   },
               )
               try:
-                  with urllib.request.urlopen(request, timeout=10) as response:
+                  with opener.open(request, timeout=10) as response:
                       return {
                           "url": url,
                           "http_status": response.status,
-                          "body": json.loads(response.read().decode("utf-8")),
+                          "body": read_json_limited(response),
                       }
               except urllib.error.HTTPError as error:
-                  raw = error.read().decode("utf-8", errors="replace")
+                  raw = error.read(1024 * 1024 + 1).decode("utf-8", errors="replace")
                   return {
                       "url": url,
                       "http_status": error.code,
@@ -149,6 +197,15 @@ jobs:
                       failures.append(
                           f"{key}: pass_manufactured invariant failed"
                       )
+                  expected = expected_projects[key]
+                  if body.get("project_id") != expected["project_id"]:
+                      failures.append(f"{key}: exact project_id mismatch")
+                  if body.get("repository") != expected["repository"]:
+                      failures.append(f"{key}: exact repository mismatch")
+                  if not re.fullmatch(r"[a-f0-9]{40}", str(body.get("build_sha") or "")):
+                      failures.append(f"{key}: canonical build SHA is unavailable")
+                  if not re.fullmatch(r"dpl_[A-Za-z0-9]+", str(body.get("deployment_id") or "")):
+                      failures.append(f"{key}: canonical deployment ID is unavailable")
 
               control = results.get("crownthrive_os", {}).get("body", {})
               if control.get("build_sha") != os.getenv("GITHUB_SHA"):
@@ -169,10 +226,45 @@ jobs:
                   failures.append(
                       "execution_fabric: operational project count is not 4"
                   )
-              if fabric.get("evidence", {}).get("sink_bound") is not True:
+              fabric_projects = {
+                  item.get("key"): item
+                  for item in fabric.get("projects", [])
+                  if isinstance(item, dict)
+              }
+              if set(fabric_projects) != set(expected_projects):
                   failures.append(
-                      "execution_fabric: evidence sink is not bound"
+                      "execution_fabric: exact project identity set mismatch"
                   )
+              for key, expected in expected_projects.items():
+                  project = fabric_projects.get(key, {})
+                  health = project.get("health") or {}
+                  if project.get("state") != "PASS":
+                      failures.append(f"execution_fabric: {key} is not PASS")
+                  if project.get("project_id") != expected["project_id"]:
+                      failures.append(f"execution_fabric: {key} binding project_id mismatch")
+                  if project.get("repository") != expected["repository"]:
+                      failures.append(f"execution_fabric: {key} binding repository mismatch")
+                  if health.get("project_id") != expected["project_id"]:
+                      failures.append(f"execution_fabric: {key} health project_id mismatch")
+                  if health.get("repository") != expected["repository"]:
+                      failures.append(f"execution_fabric: {key} health repository mismatch")
+              fabric_evidence = fabric.get("evidence", {})
+              if fabric_evidence.get("sink_bound") is not False:
+                  failures.append(
+                      "execution_fabric: OIDC GET state incorrectly claims a bound sink"
+                  )
+              if fabric_evidence.get("sink_mode") != "VERCEL_OIDC_PRESENT_UNVERIFIED":
+                  failures.append(
+                      "execution_fabric: OIDC is not the configured unverified primary route"
+                  )
+              if fabric_evidence.get("oidc_token_present") is not True:
+                  failures.append("execution_fabric: OIDC token is not present")
+              if fabric_evidence.get("oidc_token_verified") is not False:
+                  failures.append("execution_fabric: GET manufactured OIDC verification")
+              if fabric_evidence.get("oidc_ingest_configuration_valid") is not True:
+                  failures.append("execution_fabric: OIDC ingest configuration is invalid")
+              if fabric_evidence.get("persistence_state") != "PROVIDER_VALIDATION_REQUIRED_ON_DELIVERY":
+                  failures.append("execution_fabric: persistence boundary is not delivery-gated")
               if (
                   fabric.get("governance", {}).get("pass_manufactured")
                   is not False
@@ -194,6 +286,15 @@ jobs:
                   failures.append(
                       "mcp_gateway: POST protocol self-test did not pass"
                   )
+              if mcp.get("self_test", {}).get("callback_build_sha") != os.getenv("GITHUB_SHA"):
+                  failures.append("mcp_gateway: callback build SHA does not match GITHUB_SHA")
+              callback_origin = str(mcp.get("self_test", {}).get("callback_origin") or "")
+              if not re.fullmatch(r"https://crown-thrive-os-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.vercel\.app", callback_origin):
+                  failures.append("mcp_gateway: callback origin is not an exact CrownThrive deployment")
+              if mcp.get("self_test", {}).get("callback_deployment_id") != control.get("deployment_id"):
+                  failures.append("mcp_gateway: callback deployment ID does not match health readback")
+              if mcp.get("self_test", {}).get("exact_deployment_origin") is not True:
+                  failures.append("mcp_gateway: callback did not preserve exact deployment origin")
 
               penta = results.get("pentafabric", {}).get("body", {})
               if penta.get("status") != "OPERATIONAL":
@@ -204,10 +305,29 @@ jobs:
                   failures.append(
                       "pentafabric: packet self-test did not pass"
                   )
-              if penta.get("evidence_sink", {}).get("bound") is not True:
+              penta_sink = penta.get("evidence_sink", {})
+              if penta_sink.get("bound") is not False:
                   failures.append(
-                      "pentafabric: evidence sink is not bound"
+                      "pentafabric: OIDC GET state incorrectly claims a bound sink"
                   )
+              if penta_sink.get("mode") != "VERCEL_OIDC_PRESENT_UNVERIFIED":
+                  failures.append("pentafabric: OIDC is not the configured unverified primary route")
+              if penta_sink.get("primary_route") != "VERCEL_OIDC":
+                  failures.append("pentafabric: OIDC is not the primary persistence route")
+              if penta_sink.get("oidc_token_present") is not True:
+                  failures.append("pentafabric: OIDC token is not present")
+              if penta_sink.get("oidc_token_verified") is not False:
+                  failures.append("pentafabric: GET manufactured OIDC verification")
+              if penta_sink.get("oidc_ingest_configuration_valid") is not True:
+                  failures.append("pentafabric: OIDC ingest configuration is invalid")
+              if penta.get("fabric", {}).get("signing") != "HMAC_SHA256_BOUND":
+                  failures.append("pentafabric: HMAC signing binding is unavailable")
+              if penta.get("fabric", {}).get("secret_bound") is not True:
+                  failures.append("pentafabric: signing secret is not bound")
+              if penta.get("fabric", {}).get("build_sha") != os.getenv("GITHUB_SHA"):
+                  failures.append("pentafabric: signing build SHA does not match GITHUB_SHA")
+              if penta.get("self_test", {}).get("assurance") != "HMAC-SHA256":
+                  failures.append("pentafabric: self-test did not use HMAC-SHA256")
               if penta.get("write_authorization", {}).get("required") is not True:
                   failures.append(
                       "pentafabric: write authorization is not required"
@@ -259,8 +379,10 @@ jobs:
                   time.sleep(10)
 
           envelope = {
-              "schema": "ct.penta.vercel.provider-readback-ci.20260827.v3",
+              "schema": "ct.penta.vercel.provider-readback-ci.20260830.v4",
               "status": "PASS" if not failures else "HOLD",
+              "pentafabric_persistence_proof": "SEPARATE_PROTECTED_CANARY_REQUIRED",
+              "pentafabric_persistence_claimed": False,
               "attempts": attempt,
               "results": results,
               "failures": failures,
@@ -318,8 +440,11 @@ jobs:
                       f"`{fabric.get('operational_project_count', 'unknown')}`\n"
                   )
                   summary.write(
-                      "- Evidence sink: "
+                      "- OIDC configuration state: "
                       f"`{fabric.get('evidence', {}).get('sink_mode', 'unknown')}`\n"
+                  )
+                  summary.write(
+                      "- Persistence proof: `SEPARATE_PROTECTED_CANARY_REQUIRED`\n"
                   )
                   summary.write(
                       "- MCP self-test: "

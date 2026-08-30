@@ -34,13 +34,17 @@ const MCP_ERROR = Object.freeze({
   UNSUPPORTED_PROTOCOL_VERSION: -32022,
   AUTHORIZATION_FAILED: -32030,
 });
+const CONTROL_PLANE_CANONICAL_ORIGIN = 'https://crown-thrive-os.vercel.app';
+const CONTROL_PLANE_CANONICAL_HOST = 'crown-thrive-os.vercel.app';
+const CONTROL_PLANE_DEPLOYMENT_HOST =
+  /^crown-thrive-os-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.vercel\.app$/;
 const SERVER_INFO = Object.freeze({
   name: 'crownthrive-vercel-fabric',
   title: 'CrownThrive Vercel + CHLOM Fabric',
   version: '1.1.0',
   description:
     'Read-only CrownThrive Vercel, PentaFabric, and governed CHLOM chain-evidence control surface.',
-  websiteUrl: 'https://crown-thrive-os.vercel.app',
+  websiteUrl: CONTROL_PLANE_CANONICAL_ORIGIN,
 });
 
 const READ_ONLY_TOOL = Object.freeze({
@@ -322,11 +326,27 @@ function classifyProtocol(request, body) {
   return 'legacy';
 }
 
-function baseUrl(request) {
-  const protocol = requestHeader(request, 'x-forwarded-proto') || 'https';
-  const host = requestHeader(request, 'x-forwarded-host') || requestHeader(request, 'host');
-  if (!host) throw new Error('Unable to resolve MCP gateway host.');
-  return `${protocol}://${host}`;
+function controlPlaneOrigin({ exactDeploymentRequired = false } = {}) {
+  const deploymentHost = String(process.env.VERCEL_URL || '').trim().toLowerCase();
+  if (!deploymentHost || deploymentHost === CONTROL_PLANE_CANONICAL_HOST) {
+    if (exactDeploymentRequired) {
+      throw new Error('MCP exact deployment callback requires a generated VERCEL_URL host.');
+    }
+    return CONTROL_PLANE_CANONICAL_ORIGIN;
+  }
+  if (!CONTROL_PLANE_DEPLOYMENT_HOST.test(deploymentHost)) {
+    throw new Error('MCP candidate callback host is not an approved CrownThrive Vercel deployment.');
+  }
+  return `https://${deploymentHost}`;
+}
+
+function controlPlaneUrl(path, options = {}) {
+  const origin = controlPlaneOrigin(options);
+  const url = new URL(path, `${origin}/`);
+  if (url.origin !== origin || url.username || url.password) {
+    throw new Error('MCP internal callback URL must remain on the current control-plane deployment origin.');
+  }
+  return url.toString();
 }
 
 async function fetchJson(url, options = {}, timeoutMs = 5000) {
@@ -341,6 +361,7 @@ async function fetchJson(url, options = {}, timeoutMs = 5000) {
         ...(options.headers || {}),
       },
       cache: 'no-store',
+      redirect: 'error',
       signal: controller.signal,
     });
     const body = await response.json();
@@ -354,7 +375,7 @@ async function fetchJson(url, options = {}, timeoutMs = 5000) {
 }
 
 function fabricOptions(request) {
-  return { oidcTokenBound: hasVercelOidcToken(request) };
+  return { oidcTokenPresent: hasVercelOidcToken(request) };
 }
 
 function toolResponse(payload, modern) {
@@ -401,7 +422,7 @@ async function callTool(name, args, request, modern) {
     }, modern);
   }
   if (name === 'run_pentafabric_self_test') {
-    return toolResponse(await fetchJson(`${baseUrl(request)}/api/penta?selftest=1`), modern);
+    return toolResponse(await fetchJson(controlPlaneUrl('/api/penta?selftest=1')), modern);
   }
   if (name === 'get_chlom_chain_evidence_health') {
     return toolResponse(await fetchChlomHealth(), modern);
@@ -430,8 +451,8 @@ function modernMeta() {
   };
 }
 
-async function postSelfTestRpc(request, method, id) {
-  return fetchJson(`${baseUrl(request)}/api/mcp`, {
+async function postSelfTestRpc(method, id) {
+  return fetchJson(controlPlaneUrl('/api/mcp', { exactDeploymentRequired: true }), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -447,16 +468,38 @@ async function postSelfTestRpc(request, method, id) {
   });
 }
 
-async function runGatewaySelfTest(request) {
-  const discover = await postSelfTestRpc(request, 'server/discover', 'pentavercel-discover');
-  const tools = await postSelfTestRpc(request, 'tools/list', 'pentavercel-tools');
+async function runGatewaySelfTest() {
+  const callbackOrigin = controlPlaneOrigin({ exactDeploymentRequired: true });
+  const exactDeploymentOrigin = CONTROL_PLANE_DEPLOYMENT_HOST.test(
+    new URL(callbackOrigin).hostname,
+  );
+  if (!exactDeploymentOrigin) {
+    throw new Error('MCP callback did not bind to an exact generated deployment origin.');
+  }
+  const discover = await postSelfTestRpc('server/discover', 'pentavercel-discover');
+  const tools = await postSelfTestRpc('tools/list', 'pentavercel-tools');
   const returnedTools = tools?.result?.tools || [];
+  const returnedNames = returnedTools.map((tool) => tool?.name).sort();
+  const expectedNames = TOOLS.map((tool) => tool.name).sort();
+  const discoveredServerInfo =
+    discover?.result?._meta?.['io.modelcontextprotocol/serverInfo'];
   const failures = [];
-  if (!(discover?.result?.supportedVersions || []).includes(MODERN_VERSION)) {
-    failures.push('modern protocol version was not discovered');
+  const discoveredVersions = [...(discover?.result?.supportedVersions || [])].sort();
+  const expectedVersions = [...SUPPORTED_VERSIONS].sort();
+  if (JSON.stringify(discoveredVersions) !== JSON.stringify(expectedVersions)) {
+    failures.push('discovered protocol versions did not exactly match the local catalog');
+  }
+  if (
+    discoveredServerInfo?.name !== SERVER_INFO.name ||
+    discoveredServerInfo?.version !== SERVER_INFO.version
+  ) {
+    failures.push('discovered server identity did not exactly match the local server');
   }
   if (returnedTools.length !== TOOLS.length) {
     failures.push(`tool count ${returnedTools.length} does not equal ${TOOLS.length}`);
+  }
+  if (JSON.stringify(returnedNames) !== JSON.stringify(expectedNames)) {
+    failures.push('returned tool names did not exactly match the local catalog');
   }
   if (returnedTools.some((tool) => tool?.annotations?.readOnlyHint !== true || tool?.annotations?.destructiveHint !== false)) {
     failures.push('one or more tools violated the read-only contract');
@@ -468,10 +511,16 @@ async function runGatewaySelfTest(request) {
   return {
     status: 'PASS',
     protocol_version: MODERN_VERSION,
+    server_name: SERVER_INFO.name,
+    server_version: SERVER_INFO.version,
     tool_count: returnedTools.length,
     protected_tool_count: PROTECTED_TOOLS.size,
     write_tools: 0,
     read_only: true,
+    callback_origin: callbackOrigin,
+    callback_build_sha: process.env.VERCEL_GIT_COMMIT_SHA || null,
+    callback_deployment_id: process.env.VERCEL_DEPLOYMENT_ID || null,
+    exact_deployment_origin: exactDeploymentOrigin,
     pass_manufactured: false,
   };
 }
@@ -533,7 +582,7 @@ export default async function handler(request, response) {
     const selfTestRequested = requestQueryParam(request, 'selftest') === '1';
     if (!selfTestRequested) return sendJson(request, response, 200, descriptor());
     try {
-      return sendJson(request, response, 200, descriptor(await runGatewaySelfTest(request)));
+      return sendJson(request, response, 200, descriptor(await runGatewaySelfTest()));
     } catch (error) {
       return sendJson(request, response, 503, {
         ...descriptor(),
@@ -541,6 +590,7 @@ export default async function handler(request, response) {
         self_test: {
           status: 'HOLD',
           error: String(error?.message || error).slice(0, 300),
+          exact_deployment_origin: false,
           pass_manufactured: false,
         },
       });

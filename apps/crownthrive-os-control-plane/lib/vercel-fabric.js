@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 
 export const VERCEL_TEAM_ID = 'team_v4xkGtBZSrZXnJtLEJhra5nd';
+const SUPABASE_PROJECT_ORIGIN =
+  'https://tzajnzshmtzjenqulehq.supabase.co';
+const PENTAFABRIC_INGEST_PATH = '/functions/v1/pentafabric-ingest';
+const DEFAULT_PENTAFABRIC_INGEST_URL =
+  `${SUPABASE_PROJECT_ORIGIN}${PENTAFABRIC_INGEST_PATH}`;
 
 export const PROJECT_BINDINGS = Object.freeze([
   {
@@ -18,9 +23,7 @@ export const PROJECT_BINDINGS = Object.freeze([
     service: 'private-penta-os',
     project_id: 'prj_bokKbkKjxSq4jKYRtBjxhwEE4xbS',
     repository: 'crownthrive1/PRIVATE-PentaOS',
-    health_url:
-      process.env.PRIVATE_PENTA_OS_HEALTH_URL ||
-      'https://private-penta-os.vercel.app/health',
+    health_url: 'https://private-penta-os.vercel.app/health',
     visibility: 'private',
     required: true,
     lanes: ['control_plane'],
@@ -30,9 +33,7 @@ export const PROJECT_BINDINGS = Object.freeze([
     service: 'private-penta-execution',
     project_id: 'prj_d1uyuhNZHXfANgZv9zTEiaIlcZer',
     repository: 'crownthrive1/PRIVATE-PentaExecution',
-    health_url:
-      process.env.PRIVATE_PENTA_EXECUTION_HEALTH_URL ||
-      'https://private-penta-execution.vercel.app/health',
+    health_url: 'https://private-penta-execution.vercel.app/health',
     visibility: 'private',
     required: true,
     lanes: ['platform_api', 'control_plane'],
@@ -42,9 +43,7 @@ export const PROJECT_BINDINGS = Object.freeze([
     service: 'chlom-protocol',
     project_id: 'prj_HewLgMjUiVBNCl0FADFbSggSp2QN',
     repository: 'crownthrive1/chlom-protocol',
-    health_url:
-      process.env.CHLOM_PROTOCOL_HEALTH_URL ||
-      'https://chlom-protocol.vercel.app/health',
+    health_url: 'https://chlom-protocol.vercel.app/health',
     visibility: 'public',
     required: true,
     lanes: ['platform_api', 'control_plane'],
@@ -96,6 +95,86 @@ function firstDefined(...values) {
   return values.find((value) => value !== undefined && value !== null);
 }
 
+function manufacturedPassState(...values) {
+  if (values.some((value) => value === true)) return true;
+  if (values.some((value) => value === false)) return false;
+  return null;
+}
+
+function canonicalSupabaseOrigin(value) {
+  const raw = String(value || '');
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+  return (
+    (raw === SUPABASE_PROJECT_ORIGIN || raw === `${SUPABASE_PROJECT_ORIGIN}/`) &&
+    parsed.protocol === 'https:' &&
+    parsed.origin === SUPABASE_PROJECT_ORIGIN &&
+    !parsed.username &&
+    !parsed.password &&
+    !parsed.port &&
+    parsed.pathname === '/' &&
+    !parsed.search &&
+    !parsed.hash
+  );
+}
+
+function canonicalPentafabricIngest(value) {
+  const raw = String(value || DEFAULT_PENTAFABRIC_INGEST_URL);
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+  return (
+    raw === DEFAULT_PENTAFABRIC_INGEST_URL &&
+    parsed.protocol === 'https:' &&
+    parsed.origin === SUPABASE_PROJECT_ORIGIN &&
+    !parsed.username &&
+    !parsed.password &&
+    !parsed.port &&
+    parsed.pathname === PENTAFABRIC_INGEST_PATH &&
+    !parsed.search &&
+    !parsed.hash
+  );
+}
+
+export function supabaseEvidenceBindingState({ oidcTokenPresent = false } = {}) {
+  const origin =
+    process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRolePresent = Boolean(
+    origin && process.env.SUPABASE_SERVICE_ROLE_KEY,
+  );
+  const serviceRoleConfigured = Boolean(
+    serviceRolePresent && canonicalSupabaseOrigin(origin),
+  );
+  const oidcIngestConfigurationValid = canonicalPentafabricIngest(
+    process.env.PENTAFABRIC_INGEST_URL,
+  );
+  return {
+    service_role_present: serviceRolePresent,
+    service_role_configuration_valid: serviceRoleConfigured,
+    service_role_fallback_available: serviceRoleConfigured,
+    oidc_token_present: oidcTokenPresent,
+    oidc_ingest_configuration_valid: oidcIngestConfigurationValid,
+    bound: oidcTokenPresent ? false : serviceRoleConfigured,
+    mode: oidcTokenPresent
+      ? oidcIngestConfigurationValid
+        ? 'VERCEL_OIDC_PRESENT_UNVERIFIED'
+        : 'VERCEL_OIDC_INGEST_CONFIGURATION_HOLD'
+      : serviceRoleConfigured
+        ? 'SERVICE_ROLE'
+        : serviceRolePresent
+          ? 'SERVICE_ROLE_CONFIGURATION_HOLD'
+          : 'UNBOUND',
+  };
+}
+
 export function safeHealthProjection(payload = {}) {
   return {
     schema: payload.schema || null,
@@ -130,8 +209,10 @@ export function safeHealthProjection(payload = {}) {
     capabilities: Array.isArray(payload.capabilities)
       ? payload.capabilities
       : [],
-    pass_manufactured:
-      payload.pass_manufactured === true || payload.passManufactured === true,
+    pass_manufactured: manufacturedPassState(
+      payload.pass_manufactured,
+      payload.passManufactured,
+    ),
   };
 }
 
@@ -180,6 +261,7 @@ async function probeProject(binding, timeoutMs) {
         'User-Agent': 'CrownThrive-PentaVercel/1.0',
       },
       cache: 'no-store',
+      redirect: 'error',
       signal: controller.signal,
     });
     const contentType = response.headers.get('content-type') || '';
@@ -192,11 +274,7 @@ async function probeProject(binding, timeoutMs) {
     const health = safeHealthProjection(payload);
     const pass =
       response.ok &&
-      health.status === 'OPERATIONAL' &&
-      health.release === 'production' &&
-      health.provider_readback === true &&
-      health.provider_state === 'BOUND_PRODUCTION' &&
-      health.pass_manufactured === false;
+      healthMatchesBinding(binding, health);
 
     return {
       ...binding,
@@ -228,27 +306,35 @@ async function probeProject(binding, timeoutMs) {
 function projectPass(project) {
   return (
     project.state === 'PASS' &&
-    project.health?.status === 'OPERATIONAL' &&
-    project.health?.provider_readback === true &&
-    project.health?.pass_manufactured === false
+    healthMatchesBinding(project, project.health)
+  );
+}
+
+function healthMatchesBinding(binding, health) {
+  return Boolean(
+    health &&
+    health.status === 'OPERATIONAL' &&
+    health.release === 'production' &&
+    health.provider_readback === true &&
+    health.provider_state === 'BOUND_PRODUCTION' &&
+    health.project_id === binding.project_id &&
+    health.repository === binding.repository &&
+    /^[a-f0-9]{40}$/.test(String(health.build_sha || '')) &&
+    /^dpl_[A-Za-z0-9]+$/.test(String(health.deployment_id || '')) &&
+    typeof health.pass_manufactured === 'boolean' &&
+    health.pass_manufactured === false
   );
 }
 
 export async function collectVercelFabric({
   timeoutMs = 3500,
-  oidcTokenBound = false,
+  oidcTokenPresent = false,
 } = {}) {
   const selfBinding = PROJECT_BINDINGS[0];
   const selfHealth = safeHealthProjection(localProjectState());
   const selfProject = {
     ...selfBinding,
-    state:
-      selfHealth.status === 'OPERATIONAL' &&
-      selfHealth.release === 'production' &&
-      selfHealth.provider_readback &&
-      !selfHealth.pass_manufactured
-        ? 'PASS'
-        : 'HOLD',
+    state: healthMatchesBinding(selfBinding, selfHealth) ? 'PASS' : 'HOLD',
     reachable: true,
     http_status: 200,
     latency_ms: 0,
@@ -268,17 +354,9 @@ export async function collectVercelFabric({
     operationalProjects.length === requiredProjects.length;
   const environment = process.env.VERCEL_ENV || 'local';
   const writeBound = Boolean(process.env.VERCEL_AUTOMATION_TOKEN);
-  const serviceRoleBound = Boolean(
-    (process.env.SUPABASE_URL ||
-      process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-  );
-  const evidenceSinkBound = serviceRoleBound || oidcTokenBound;
-  const evidenceSinkMode = serviceRoleBound
-    ? 'SERVICE_ROLE'
-    : oidcTokenBound
-      ? 'VERCEL_OIDC_RS256'
-      : 'UNBOUND';
+  const serviceRoleState = supabaseEvidenceBindingState({ oidcTokenPresent });
+  const evidenceSinkBound = serviceRoleState.bound;
+  const evidenceSinkMode = serviceRoleState.mode;
 
   const receiptSubject = {
     schema: 'ct.penta.vercel.execution-fabric.receipt-subject.v1',
@@ -357,9 +435,25 @@ export async function collectVercelFabric({
       sink: 'supabase:pentafabric_events',
       sink_bound: evidenceSinkBound,
       sink_mode: evidenceSinkMode,
+      service_role_present: serviceRoleState.service_role_present,
+      service_role_configuration_valid:
+        serviceRoleState.service_role_configuration_valid,
+      service_role_fallback_available:
+        serviceRoleState.service_role_fallback_available,
+      oidc_token_present: oidcTokenPresent,
+      oidc_token_verified: false,
+      oidc_ingest_configuration_valid:
+        serviceRoleState.oidc_ingest_configuration_valid,
       persistence_state: evidenceSinkBound
         ? 'AVAILABLE_THROUGH_PENTAFABRIC'
-        : 'GATED_SINK_BINDING_REQUIRED',
+        : oidcTokenPresent &&
+            !serviceRoleState.oidc_ingest_configuration_valid
+          ? 'GATED_OIDC_INGEST_CONFIGURATION_REQUIRED'
+        : oidcTokenPresent
+          ? 'PROVIDER_VALIDATION_REQUIRED_ON_DELIVERY'
+        : serviceRoleState.service_role_present
+          ? 'GATED_SINK_CONFIGURATION_REQUIRED'
+          : 'GATED_SINK_BINDING_REQUIRED',
     },
     governance: {
       authority: 'CHLOM + PentaRG + PentaRelease',

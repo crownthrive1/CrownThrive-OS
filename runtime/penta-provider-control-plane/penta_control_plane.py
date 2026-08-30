@@ -16,11 +16,33 @@ import secrets
 import sys
 from typing import Any
 import urllib.error
+import urllib.parse
 import urllib.request
 
 UTC = dt.timezone.utc
 SOFTWARE_PRIORITY = "software"
 SCHEMA_VERSION = "ct.penta.provider-control-plane.v1"
+PENTAMAIL_CORRELATION_TAG = "ct_correlation_sha256"
+PENTAMAIL_IDEMPOTENCY_TAG = "ct_idempotency_sha256"
+PENTAMAIL_BODY_TAG = "ct_body_sha256"
+PENTAMAIL_CORRELATION_HEADER = "X-CrownThrive-Correlation-ID"
+PENTAMAIL_IDEMPOTENCY_HEADER = "X-CrownThrive-Idempotency-Key"
+SUPABASE_ALLOWED_ORIGIN = "https://tzajnzshmtzjenqulehq.supabase.co"
+SUPABASE_PROBE_PATH = "/rest/v1/"
+
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject redirects so provider credentials never cross an origin hop."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_NO_REDIRECT_OPENER = urllib.request.build_opener(NoRedirectHandler())
+
+
+def open_no_redirect(request: urllib.request.Request, *, timeout: int):
+    return _NO_REDIRECT_OPENER.open(request, timeout=timeout)
 
 
 def now() -> str:
@@ -33,6 +55,42 @@ def sha256_bytes(data: bytes) -> str:
 
 def canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def normalized_resend_tags(value: Any) -> dict[str, str] | None:
+    """Normalize provider-returned tags while rejecting duplicates/ambiguity."""
+    if not isinstance(value, list):
+        return None
+    normalized: dict[str, str] = {}
+    for item in value:
+        if not isinstance(item, dict):
+            return None
+        name = item.get("name")
+        tag_value = item.get("value")
+        if not isinstance(name, str) or not isinstance(tag_value, str):
+            return None
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,256}", name):
+            return None
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,256}", tag_value):
+            return None
+        if name in normalized:
+            return None
+        normalized[name] = tag_value
+    return normalized
+
+
+def normalized_provider_headers(value: Any) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    normalized: dict[str, str] = {}
+    for name, header_value in value.items():
+        if not isinstance(name, str) or not isinstance(header_value, str):
+            return None
+        key = name.strip().lower()
+        if not key or key in normalized:
+            return None
+        normalized[key] = header_value
+    return normalized
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -284,25 +342,69 @@ class PentaCertify:
             return {}
         raise ValueError(f"unsupported auth type: {kind}")
 
+    @staticmethod
+    def _validate_probe_url(provider_id: str, url: str) -> None:
+        parsed = urllib.parse.urlsplit(url)
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.fragment
+        ):
+            raise ValueError("provider probe URL failed HTTPS authority validation")
+        if provider_id == "supabase" and not (
+            parsed.hostname == "tzajnzshmtzjenqulehq.supabase.co"
+            and parsed.port is None
+            and parsed.path == SUPABASE_PROBE_PATH
+            and not parsed.query
+            and f"{parsed.scheme}://{parsed.hostname}" == SUPABASE_ALLOWED_ORIGIN
+        ):
+            raise ValueError("Supabase probe URL is outside the approved project origin/path")
+
     def _probe(self, provider_id: str, provider: dict[str, Any]) -> dict[str, Any]:
         probe = provider.get("certification_probe")
         if not probe:
-            return {"operation": None, "result": "SKIP", "readback": False, "reason": "no certification probe registered", "observed_at": now()}
+            return {
+                "operation": None,
+                "result": "SKIP",
+                "readback": False,
+                "evidence_source": "penta_certify_live_probe",
+                "reason": "no certification probe registered",
+                "observed_at": now(),
+            }
         operation = probe["operation"]
         if os.environ.get("PENTA_DISABLE_NETWORK_PROBES") == "1":
-            return {"operation": operation, "result": "SKIP", "readback": False, "reason": "network probes disabled", "observed_at": now()}
+            return {
+                "operation": operation,
+                "result": "SKIP",
+                "readback": False,
+                "evidence_source": "penta_certify_live_probe",
+                "reason": "network probes disabled",
+                "observed_at": now(),
+            }
         missing = [name for name in probe.get("required_env", []) if not safe_env_present(name)]
         if missing:
-            return {"operation": operation, "result": "HOLD", "readback": False, "reason": "missing non-secret probe environment: " + ",".join(missing), "observed_at": now()}
+            return {
+                "operation": operation,
+                "result": "HOLD",
+                "readback": False,
+                "evidence_source": "penta_certify_live_probe",
+                "reason": "missing non-secret probe environment: " + ",".join(missing),
+                "observed_at": now(),
+            }
         try:
             url = self._expand_template(probe["url_template"])
+            # Validate the credential destination before materializing any
+            # Authorization/apikey header, especially the service-role key.
+            self._validate_probe_url(provider_id, url)
             headers = {"User-Agent": "CrownThrive-PentaCertify/1.1"}
             headers.update(probe.get("headers", {}))
             headers.update(self._auth_headers(probe.get("auth", {})))
             body_value = probe.get("body")
             body = body_value.encode("utf-8") if body_value is not None else None
             request = urllib.request.Request(url, data=body, headers=headers, method=probe.get("method", "GET"))
-            with urllib.request.urlopen(request, timeout=12) as response:
+            with open_no_redirect(request, timeout=12) as response:
                 status = int(response.status)
                 payload = response.read(1024 * 1024)
             semantic_ok = True
@@ -315,16 +417,292 @@ class PentaCertify:
                 "operation": operation,
                 "result": "PASS" if passed else "FAIL",
                 "readback": bool(passed),
+                "evidence_source": "penta_certify_live_probe",
                 "http_status": status,
                 "semantic_check": bool(semantic_ok),
                 "observed_at": now(),
             }
         except urllib.error.HTTPError as exc:
-            return {"operation": operation, "result": "FAIL", "readback": False, "http_status": int(exc.code), "reason": redact(str(exc.reason)), "observed_at": now()}
+            return {
+                "operation": operation,
+                "result": "FAIL",
+                "readback": False,
+                "evidence_source": "penta_certify_live_probe",
+                "http_status": int(exc.code),
+                "reason": redact(str(exc.reason)),
+                "observed_at": now(),
+            }
         except Exception as exc:
-            return {"operation": operation, "result": "FAIL", "readback": False, "reason": redact(f"{type(exc).__name__}: {exc}"), "observed_at": now()}
+            return {
+                "operation": operation,
+                "result": "FAIL",
+                "readback": False,
+                "evidence_source": "penta_certify_live_probe",
+                "reason": redact(f"{type(exc).__name__}: {exc}"),
+                "observed_at": now(),
+            }
 
-    def certify(self, provider_id: str, live_evidence: list[dict[str, Any]] | None = None) -> CertificationReceipt:
+    def _verify_provider_receipt(
+        self,
+        provider_id: str,
+        receipt: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Re-read a provider receipt through a narrow, provider-owned proof path.
+
+        Caller-supplied result/readback flags are deliberately ignored.  A
+        side-effecting operation is certified only from evidence generated by
+        this verifier after it independently reads the provider object.
+        """
+        operation = receipt.get("operation") if isinstance(receipt, dict) else None
+        base = {
+            "provider": provider_id,
+            "operation": operation,
+            "result": "FAIL",
+            "readback": False,
+            "evidence_source": "penta_certify_provider_receipt_verifier",
+            "observed_at": now(),
+        }
+        if not isinstance(receipt, dict):
+            return {**base, "reason": "provider receipt request must be an object"}
+        if receipt.get("provider") != provider_id:
+            return {**base, "reason": "provider receipt does not match certification provider"}
+        if provider_id != "resend" or operation != "email_send":
+            return {**base, "reason": "no trusted provider receipt verifier registered for operation"}
+        message_id = receipt.get("provider_message_id")
+        if not isinstance(message_id, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,256}", message_id):
+            return {**base, "reason": "invalid provider receipt identifier"}
+        workflow_run_id = receipt.get("workflow_run_id")
+        if not isinstance(workflow_run_id, str) or not re.fullmatch(r"[0-9]{1,32}", workflow_run_id):
+            return {**base, "reason": "invalid provider receipt workflow run id"}
+        if os.environ.get("GITHUB_RUN_ID") != workflow_run_id:
+            return {**base, "reason": "provider receipt is not bound to the active workflow run"}
+        correlation_id = receipt.get("correlation_id")
+        idempotency_key = receipt.get("idempotency_key")
+        expected_run_key = "pentamail-live-" + workflow_run_id
+        if correlation_id != expected_run_key or idempotency_key != expected_run_key:
+            return {**base, "reason": "provider receipt correlation/idempotency binding mismatch"}
+        authority_ref = receipt.get("authority_ref")
+        if not isinstance(authority_ref, str) or not re.fullmatch(
+            r"founder-directive-[A-Za-z0-9._:/-]{8,230}", authority_ref
+        ):
+            return {**base, "reason": "provider receipt authority lineage is invalid"}
+        expected_hashes = {
+            "recipient": receipt.get("recipient_sha256"),
+            "sender": receipt.get("sender_sha256"),
+            "subject": receipt.get("subject_sha256"),
+            "body": receipt.get("body_sha256"),
+            "correlation_tag": receipt.get("correlation_tag_sha256"),
+            "idempotency_tag": receipt.get("idempotency_tag_sha256"),
+            "body_tag": receipt.get("body_tag_sha256"),
+        }
+        if any(not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value) for value in expected_hashes.values()):
+            return {**base, "reason": "provider receipt content binding is invalid"}
+        if expected_hashes["correlation_tag"] != sha256_bytes(
+            canonical_json(correlation_id).encode("utf-8")
+        ):
+            return {**base, "reason": "provider receipt correlation tag hash is invalid"}
+        if expected_hashes["idempotency_tag"] != sha256_bytes(
+            canonical_json(idempotency_key).encode("utf-8")
+        ):
+            return {**base, "reason": "provider receipt idempotency tag hash is invalid"}
+        if expected_hashes["body_tag"] != expected_hashes["body"]:
+            return {**base, "reason": "provider receipt body tag hash is invalid"}
+        try:
+            requested_at = dt.datetime.fromisoformat(str(receipt["requested_at"]).replace("Z", "+00:00"))
+            recorded_at = dt.datetime.fromisoformat(str(receipt["recorded_at"]).replace("Z", "+00:00"))
+        except (KeyError, TypeError, ValueError):
+            return {**base, "reason": "provider receipt timestamps are invalid"}
+        if requested_at.tzinfo is None or recorded_at.tzinfo is None:
+            return {**base, "reason": "provider receipt timestamps require timezone"}
+        checked_at = dt.datetime.now(UTC)
+        if requested_at > recorded_at or recorded_at > checked_at + dt.timedelta(minutes=5):
+            return {**base, "reason": "provider receipt timestamp ordering is invalid"}
+        if checked_at - recorded_at > dt.timedelta(minutes=30):
+            return {**base, "reason": "provider receipt is stale"}
+        if os.environ.get("PENTA_DISABLE_NETWORK_PROBES") == "1":
+            return {**base, "result": "SKIP", "reason": "network probes disabled"}
+        if not safe_env_present("RESEND_API_KEY"):
+            return {**base, "result": "HOLD", "reason": "trusted verifier credential unavailable"}
+        try:
+            encoded_id = urllib.parse.quote(message_id, safe="")
+            request = urllib.request.Request(
+                "https://api.resend.com/emails/" + encoded_id,
+                headers={
+                    "Authorization": "Bearer " + os.environ["RESEND_API_KEY"],
+                    "Accept": "application/json",
+                    "User-Agent": "CrownThrive-PentaCertify/1.1",
+                },
+                method="GET",
+            )
+            with open_no_redirect(request, timeout=12) as response:
+                status = int(response.status)
+                payload = json.loads(response.read(1024 * 1024).decode("utf-8"))
+            same_id = isinstance(payload, dict) and payload.get("id") == message_id
+            try:
+                created_at = dt.datetime.fromisoformat(str(payload["created_at"]).replace("Z", "+00:00"))
+            except (KeyError, TypeError, ValueError):
+                created_at = None
+            lifecycle = str(payload.get("last_event") or "unknown").lower() if isinstance(payload, dict) else "unknown"
+            allowed_lifecycle = lifecycle in {"queued", "sent", "delivered", "delivery_delayed"}
+            to_values = payload.get("to") if isinstance(payload, dict) else None
+            recipient_matches = (
+                isinstance(to_values, list)
+                and len(to_values) == 1
+                and sha256_bytes(canonical_json(to_values[0]).encode("utf-8")) == expected_hashes["recipient"]
+            )
+            sender_matches = (
+                isinstance(payload, dict)
+                and sha256_bytes(canonical_json(payload.get("from")).encode("utf-8")) == expected_hashes["sender"]
+            )
+            subject_matches = (
+                isinstance(payload, dict)
+                and sha256_bytes(canonical_json(payload.get("subject")).encode("utf-8")) == expected_hashes["subject"]
+            )
+            body_matches = (
+                isinstance(payload, dict)
+                and sha256_bytes(canonical_json(payload.get("text")).encode("utf-8")) == expected_hashes["body"]
+            )
+            provider_tags = normalized_resend_tags(payload.get("tags") if isinstance(payload, dict) else None)
+            tags_returned = provider_tags is not None
+            correlation_tag_matches = bool(
+                provider_tags
+                and provider_tags.get(PENTAMAIL_CORRELATION_TAG) == expected_hashes["correlation_tag"]
+            )
+            idempotency_tag_matches = bool(
+                provider_tags
+                and provider_tags.get(PENTAMAIL_IDEMPOTENCY_TAG) == expected_hashes["idempotency_tag"]
+            )
+            body_tag_matches = bool(
+                provider_tags
+                and provider_tags.get(PENTAMAIL_BODY_TAG) == expected_hashes["body_tag"]
+            )
+            raw_provider_headers = payload.get("headers") if isinstance(payload, dict) else None
+            headers_exposed = raw_provider_headers is not None
+            provider_headers = normalized_provider_headers(raw_provider_headers)
+            exposed_correlation_header_matches = bool(
+                provider_headers
+                and provider_headers.get(PENTAMAIL_CORRELATION_HEADER.lower()) == correlation_id
+            )
+            exposed_idempotency_header_matches = bool(
+                provider_headers
+                and provider_headers.get(PENTAMAIL_IDEMPOTENCY_HEADER.lower()) == idempotency_key
+            )
+            exposed_headers_consistent = bool(
+                not headers_exposed
+                or (exposed_correlation_header_matches and exposed_idempotency_header_matches)
+            )
+            fresh = bool(
+                created_at
+                and created_at.tzinfo is not None
+                and requested_at - dt.timedelta(minutes=5) <= created_at <= recorded_at + dt.timedelta(minutes=5)
+                and created_at <= checked_at + dt.timedelta(minutes=5)
+                and checked_at - created_at <= dt.timedelta(minutes=30)
+            )
+            passed = bool(
+                status == 200
+                and same_id
+                and allowed_lifecycle
+                and recipient_matches
+                and sender_matches
+                and subject_matches
+                and body_matches
+                and correlation_tag_matches
+                and idempotency_tag_matches
+                and body_tag_matches
+                and exposed_headers_consistent
+                and fresh
+            )
+            failures = []
+            if not same_id:
+                failures.append("provider_message_id_mismatch")
+            if not allowed_lifecycle:
+                failures.append("provider_lifecycle_not_successful")
+            if not recipient_matches:
+                failures.append("recipient_binding_mismatch")
+            if not sender_matches:
+                failures.append("sender_binding_mismatch")
+            if not subject_matches:
+                failures.append("subject_binding_mismatch")
+            if not body_matches:
+                failures.append("body_binding_mismatch")
+            if not tags_returned:
+                failures.append("provider_binding_tags_not_returned")
+            if not correlation_tag_matches:
+                failures.append("correlation_tag_binding_mismatch")
+            if not idempotency_tag_matches:
+                failures.append("idempotency_tag_binding_mismatch")
+            if not body_tag_matches:
+                failures.append("body_hash_tag_binding_mismatch")
+            if not exposed_headers_consistent:
+                failures.append("provider_returned_header_binding_mismatch")
+            if not fresh:
+                failures.append("provider_message_not_fresh")
+            return {
+                **base,
+                "result": "PASS" if passed else "FAIL",
+                "readback": bool(passed),
+                "http_status": status,
+                "provider_message_id": message_id,
+                "provider_event": lifecycle,
+                "workflow_run_id": workflow_run_id,
+                "correlation_id": correlation_id,
+                "authority_ref": authority_ref,
+                "provider_binding_channel": "resend_tags",
+                "provider_binding_tags_returned": tags_returned,
+                "body_binding_verified": body_matches,
+                "correlation_binding_verified": correlation_tag_matches,
+                "idempotency_binding_verified": idempotency_tag_matches,
+                "body_hash_binding_verified": body_tag_matches,
+                "provider_returned_headers_exposed": headers_exposed,
+                "provider_returned_headers_consistent": exposed_headers_consistent,
+                "custom_header_readback_state": (
+                    "NOT_EXPOSED_BY_RESEND_RETRIEVE_API"
+                    if not headers_exposed
+                    else "VERIFIED"
+                    if exposed_headers_consistent
+                    else "MISMATCH"
+                ),
+                "content_binding_verified": bool(
+                    recipient_matches
+                    and sender_matches
+                    and subject_matches
+                    and body_matches
+                    and correlation_tag_matches
+                    and idempotency_tag_matches
+                    and body_tag_matches
+                    and exposed_headers_consistent
+                ),
+                "freshness_verified": fresh,
+                **({"reason": ",".join(failures)} if failures else {}),
+                "observed_at": now(),
+            }
+        except urllib.error.HTTPError as exc:
+            return {
+                **base,
+                "http_status": int(exc.code),
+                "reason": redact(str(exc.reason)),
+                "observed_at": now(),
+            }
+        except Exception as exc:
+            return {
+                **base,
+                "reason": redact(f"{type(exc).__name__}: {exc}"),
+                "observed_at": now(),
+            }
+
+    def certify(
+        self,
+        provider_id: str,
+        *,
+        provider_receipts: list[dict[str, Any]] | None = None,
+        live_evidence: list[dict[str, Any]] | None = None,
+    ) -> CertificationReceipt:
+        if live_evidence is not None:
+            raise ValueError(
+                "untrusted live_evidence dictionaries are forbidden; submit a minimal provider receipt locator"
+            )
+        if provider_receipts is not None and not isinstance(provider_receipts, list):
+            raise ValueError("provider_receipts must be a list")
         provider = self.registry.provider(provider_id)
         adapter = provider["adapter"]
         build = read_json(self.state_dir / "build" / f"{provider_id}.json", None)
@@ -356,12 +734,21 @@ class PentaCertify:
         bound = bool(binding and binding.get("bound"))
         if bound:
             tests.append("credential_binding_present")
-        evidence = list(live_evidence or [])
+        evidence: list[dict[str, Any]] = []
         if bound and provider.get("certification_probe"):
             evidence.append(self._probe(provider_id, provider))
+        for provider_receipt in provider_receipts or []:
+            evidence.append(self._verify_provider_receipt(provider_id, provider_receipt))
+        trusted_sources = {
+            "penta_certify_live_probe",
+            "penta_certify_provider_receipt_verifier",
+        }
         certified_operations = sorted({
             item["operation"] for item in evidence
-            if item.get("operation") in expected_ops and item.get("result") == "PASS" and item.get("readback") is True
+            if item.get("evidence_source") in trusted_sources
+            and item.get("operation") in expected_ops
+            and item.get("result") == "PASS"
+            and item.get("readback") is True
         })
         probe_operation = (provider.get("certification_probe") or {}).get("operation")
         probe_passed = bool(probe_operation and probe_operation in certified_operations)
@@ -544,6 +931,17 @@ class ProductionGate:
 
 def validate_registry(registry: Registry) -> list[str]:
     errors: list[str] = []
+    required = registry.raw.get("policy", {}).get("required_provider_certifications")
+    if not isinstance(required, list) or not required:
+        errors.append("policy.required_provider_certifications must be a non-empty list")
+        required = []
+    elif any(not isinstance(provider_id, str) or not provider_id for provider_id in required):
+        errors.append("policy.required_provider_certifications entries must be non-empty strings")
+    if len(set(required)) != len(required):
+        errors.append("policy.required_provider_certifications contains duplicates")
+    unknown_required = sorted(set(required) - set(registry.providers))
+    if unknown_required:
+        errors.append("policy.required_provider_certifications contains unknown providers: " + ",".join(unknown_required))
     seen_adapters: set[str] = set()
     for provider_id, provider in sorted(registry.providers.items()):
         if provider.get("priority") != SOFTWARE_PRIORITY:
@@ -590,15 +988,27 @@ def validate_registry(registry: Registry) -> list[str]:
     return errors
 
 
+def required_provider_ids(registry: Registry) -> list[str]:
+    required = registry.raw.get("policy", {}).get("required_provider_certifications")
+    if not isinstance(required, list) or not required:
+        raise ValueError("required provider certification policy is missing")
+    if any(not isinstance(provider_id, str) or provider_id not in registry.providers for provider_id in required):
+        raise ValueError("required provider certification policy is invalid")
+    return sorted(set(required))
+
+
 def matrix(registry: Registry, state_dir: Path) -> dict[str, Any]:
     rows = []
     gate = ProductionGate(registry, state_dir)
+    required_ids = set(required_provider_ids(registry))
+    required_holds: list[dict[str, Any]] = []
     for provider_id, provider in sorted(registry.providers.items()):
         credential = read_json(state_dir / "credentials" / f"{provider_id}.json", {})
         cert = read_json(state_dir / "certification" / f"{provider_id}.json", {})
         nurture = read_json(state_dir / "nurture" / f"{provider_id}.json", {})
         row = {
             "provider_id": provider_id,
+            "required": provider_id in required_ids,
             "priority": provider.get("priority"),
             "credential": "BOUND" if credential.get("bound") else "HOLD_UNBOUND",
             "certification": cert.get("state", "MISSING"),
@@ -608,8 +1018,34 @@ def matrix(registry: Registry, state_dir: Path) -> dict[str, Any]:
         }
         for op in provider["adapter"].get("operations", []):
             row["operations"][op["operation"]] = gate.decide(provider_id, op["operation"])
+        if provider_id in required_ids:
+            probe_operation = (provider.get("certification_probe") or {}).get("operation")
+            probe_gate = row["operations"].get(probe_operation, {})
+            reasons: list[str] = []
+            if cert.get("state") not in {"CERTIFIED", "WRITE_VERIFIED"}:
+                reasons.append("required_certification_not_current:" + str(cert.get("state", "MISSING")))
+            if nurture.get("health") != "HEALTHY":
+                reasons.append("required_nurture_health_not_current:" + str(nurture.get("health", "UNKNOWN")))
+            if not probe_gate.get("eligible"):
+                reasons.extend("required_probe_gate:" + reason for reason in probe_gate.get("reasons", []))
+            if reasons:
+                required_holds.append({
+                    "provider_id": provider_id,
+                    "certification": cert.get("state", "MISSING"),
+                    "reasons": sorted(set(reasons)),
+                })
         rows.append(row)
-    return {"schema": "ct.penta.provider-readiness-matrix.v1", "generated_at": now(), "priority": SOFTWARE_PRIORITY, "providers": rows}
+    return {
+        "schema": "ct.penta.provider-readiness-matrix.v1",
+        "generated_at": now(),
+        "priority": SOFTWARE_PRIORITY,
+        "required_gate": {
+            "passed": not required_holds,
+            "required_provider_ids": sorted(required_ids),
+            "holds": required_holds,
+        },
+        "providers": rows,
+    }
 
 
 def run_all(registry: Registry, state_dir: Path) -> int:
@@ -625,6 +1061,17 @@ def run_all(registry: Registry, state_dir: Path) -> int:
     result = matrix(registry, state_dir)
     write_json(state_dir / "readiness-matrix.json", result)
     print(json.dumps(result, indent=2))
+    required_gate = result["required_gate"]
+    if not required_gate["passed"]:
+        for hold in required_gate["holds"]:
+            print(
+                "HOLD_REQUIRED_PROVIDER "
+                + hold["provider_id"]
+                + " "
+                + ",".join(hold["reasons"]),
+                file=sys.stderr,
+            )
+        return 3
     return 0
 
 

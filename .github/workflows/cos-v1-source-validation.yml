@@ -1,0 +1,121 @@
+name: COS V1 Source Validation
+
+on:
+  pull_request:
+    paths:
+      - "apps/crownthrive-os-control-plane/**"
+      - "data/penta/**"
+      - "docs/COS_V1_CONVERGENCE_ARCHITECTURE.md"
+      - "developers/manifests/github-actions-runtime-policy.v1.json"
+      - "developers/manifests/phase4-gate-contract.v4.json"
+      - "developers/manifests/penta-runtime-suite.v1.json"
+      - "penta/registry/**"
+      - "runtime/penta-provider-control-plane/**"
+      - "runtime/penta_*.py"
+      - "requirements/cos-v1-validation.txt"
+      - "schemas/penta/**"
+      - "scripts/build_penta_os_v1.py"
+      - "scripts/run_function_tests.py"
+      - "scripts/validate_gate_registry_v4.py"
+      - "scripts/validate_github_actions_runtime_policy.py"
+      - "scripts/validate_cos_v1.py"
+      - "scripts/validate_penta_provider_control_plane.py"
+      - "supabase/migrations/20260829070000_cos_v1_convergence_guard.sql"
+      - "supabase/migrations/20260830010000_pentafabric_signed_build_binding.sql"
+      - "supabase/config.toml"
+      - "supabase/functions/pentafabric-ingest/**"
+      - "tests/test_cos_v1_convergence_core_contract.py"
+      - "tests/test_penta_context.py"
+      - "tests/test_penta_convergence_certifier.py"
+      - "tests/test_penta_family.py"
+      - "tests/test_penta_institutional_services.py"
+      - "tests/test_penta_mail.py"
+      - "tests/test_penta_os_v1.py"
+      - "tests/test_penta_provider_control_plane.py"
+      - "tests/test_penta_protocol_suite.py"
+      - "tests/test_penta_runtime_suite.py"
+      - "tests/test_run_function_tests.py"
+      - ".github/workflows/**"
+      - "standards/github-actions-runtime-supply-chain-standard.md"
+  push:
+    branches: [main]
+    paths:
+      - "apps/crownthrive-os-control-plane/**"
+      - "data/penta/**"
+      - "docs/COS_V1_CONVERGENCE_ARCHITECTURE.md"
+      - "developers/manifests/github-actions-runtime-policy.v1.json"
+      - "developers/manifests/phase4-gate-contract.v4.json"
+      - "developers/manifests/penta-runtime-suite.v1.json"
+      - "penta/registry/**"
+      - "runtime/penta-provider-control-plane/**"
+      - "runtime/penta_*.py"
+      - "requirements/cos-v1-validation.txt"
+      - "schemas/penta/**"
+      - "scripts/build_penta_os_v1.py"
+      - "scripts/run_function_tests.py"
+      - "scripts/validate_gate_registry_v4.py"
+      - "scripts/validate_github_actions_runtime_policy.py"
+      - "scripts/validate_cos_v1.py"
+      - "scripts/validate_penta_provider_control_plane.py"
+      - "supabase/migrations/20260829070000_cos_v1_convergence_guard.sql"
+      - "supabase/migrations/20260830010000_pentafabric_signed_build_binding.sql"
+      - "supabase/config.toml"
+      - "supabase/functions/pentafabric-ingest/**"
+      - "tests/test_cos_v1_convergence_core_contract.py"
+      - "tests/test_penta_context.py"
+      - "tests/test_penta_convergence_certifier.py"
+      - "tests/test_penta_family.py"
+      - "tests/test_penta_institutional_services.py"
+      - "tests/test_penta_mail.py"
+      - "tests/test_penta_os_v1.py"
+      - "tests/test_penta_provider_control_plane.py"
+      - "tests/test_penta_protocol_suite.py"
+      - "tests/test_penta_runtime_suite.py"
+      - "tests/test_run_function_tests.py"
+      - ".github/workflows/**"
+      - "standards/github-actions-runtime-supply-chain-standard.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cos-v1-source-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install pinned COS V1 validation dependencies
+        run: python3 -m pip install --disable-pip-version-check -r requirements/cos-v1-validation.txt
+
+      - name: Validate COS V1 and core Penta source contracts
+        run: python3 scripts/validate_cos_v1.py --root .
+
+      - name: Record the evidence boundary
+        if: always()
+        run: |
+          {
+            echo "## COS V1 source validation"
+            echo
+            echo "This gate validates repository source and tests only."
+            echo "It does not mutate providers or claim deployment readback or production certification."
+          } >> "$GITHUB_STEP_SUMMARY"

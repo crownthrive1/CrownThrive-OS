@@ -1,0 +1,174 @@
+name: PentaFabric Production Canary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentafabric-production-canary
+  cancel-in-progress: false
+
+jobs:
+  activation-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      CANARY_ENABLED: ${{ vars.PENTAFABRIC_PRODUCTION_CANARY_ENABLED }}
+      DISPATCH_REF: ${{ github.ref }}
+    steps:
+      - name: Record activation disposition
+        shell: bash
+        run: |
+          if [ "$DISPATCH_REF" != 'refs/heads/main' ]; then
+            echo 'PentaFabric production canary — HOLD: exact main is required.' >> "$GITHUB_STEP_SUMMARY"
+            exit 78
+          fi
+          if [ "$CANARY_ENABLED" != 'true' ]; then
+            echo 'PentaFabric production canary — BUILT_HOLD_EXTERNAL_ACTIVATION.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'The repository enable variable has not been proven true.' >> "$GITHUB_STEP_SUMMARY"
+            exit 78
+          fi
+          echo 'PentaFabric production canary — READY_FOR_PROTECTED_ENVIRONMENT_REVIEW.' >> "$GITHUB_STEP_SUMMARY"
+
+  exact-production-canary:
+    needs: activation-gate
+    if: needs.activation-gate.result == 'success'
+    runs-on: ubuntu-latest
+    environment: pentafabric-production
+    timeout-minutes: 5
+    env:
+      PENTAFABRIC_URL: https://crown-thrive-os.vercel.app/api/penta
+      EXPECTED_SOURCE_SHA: ${{ github.sha }}
+      CANARY_RUN_ATTEMPT: ${{ github.run_attempt }}
+      CANARY_RUN_ID: ${{ github.run_id }}
+      CANARY_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Write one signed canary and verify exact provider readback
+        id: canary
+        shell: bash
+        env:
+          PENTAFABRIC_WRITE_TOKEN: ${{ secrets.PENTAFABRIC_WRITE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "${#PENTAFABRIC_WRITE_TOKEN}" -lt 32 ]; then
+            echo 'PentaFabric production write binding is unavailable.' >&2
+            exit 78
+          fi
+          request_file="$(mktemp)"
+          response_file="$(mktemp)"
+          trap 'rm -f "$request_file" "$response_file"' EXIT
+          python3 - "$request_file" <<'PY'
+          import json
+          import os
+          import sys
+
+          body = {
+              "protocol": "PentaFabricProductionCanary",
+              "payload": {
+                  "probe": True,
+                  "expected_source_sha": os.environ["EXPECTED_SOURCE_SHA"],
+                  "repository": os.environ["CANARY_REPOSITORY"],
+                  "workflow_run_id": os.environ["CANARY_RUN_ID"],
+                  "workflow_run_attempt": os.environ["CANARY_RUN_ATTEMPT"],
+              },
+              "source": "urn:crownthrive:pentafabric:production-canary",
+              "subject": "pentafabric-production-canary",
+              "route": "production-canary",
+              "corridor": "runtime-assurance",
+              "lane": "hot",
+              "ttl_seconds": 120,
+              "chlom_intent_id": "chlom-intent-pentafabric-production-canary-v1",
+              "chlom_policy_refs": ["ct.chlom.pentafabric.v1"],
+              "rights_scope": "runtime-assurance-only",
+          }
+          with open(sys.argv[1], "w", encoding="utf-8") as handle:
+              json.dump(body, handle, separators=(",", ":"), sort_keys=True)
+          PY
+          http_status="$(curl --silent --show-error \
+            --proto '=https' \
+            --tlsv1.2 \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --max-filesize 262144 \
+            --max-redirs 0 \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer ${PENTAFABRIC_WRITE_TOKEN}" \
+            --data-binary "@${request_file}" \
+            --output "${response_file}" \
+            --write-out '%{http_code}' \
+            "${PENTAFABRIC_URL}")"
+          if [ "$http_status" != '202' ]; then
+            echo "PentaFabric production canary held with HTTP ${http_status}." >&2
+            exit 1
+          fi
+          python3 - "$response_file" <<'PY'
+          import json
+          import os
+          import re
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              result = json.load(handle)
+          expected = os.environ["EXPECTED_SOURCE_SHA"]
+          penta = result.get("penta") or {}
+          receipt = result.get("receipt") or {}
+          persistence = receipt.get("persistence") or {}
+          persistence_workload = persistence.get("workload") or {}
+          edge = persistence.get("receipt") or {}
+          edge_workload = edge.get("workload") or {}
+          payload = (penta.get("data") or {}).get("payload") or {}
+          checks = {
+              "source_sha_shape": bool(re.fullmatch(r"[a-f0-9]{40}", expected)),
+              "delivered": receipt.get("status") == "DELIVERED",
+              "hmac": (penta.get("integrity") or {}).get("algorithm") == "HMAC-SHA256",
+              "packet_source": (penta.get("integrity") or {}).get("build_sha") == expected,
+              "receipt_source": receipt.get("signing_build_sha") == expected,
+              "persister_source": receipt.get("persisting_build_sha") == expected,
+              "oidc_path": persistence.get("authentication") == "VERCEL_OIDC_RS256",
+              "persistence_owner": persistence_workload.get("owner_id") == "team_v4xkGtBZSrZXnJtLEJhra5nd",
+              "persistence_project": persistence_workload.get("project_id") == "prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN",
+              "persistence_environment": persistence_workload.get("environment") == "production",
+              "edge_authentication": edge.get("authentication") == "VERCEL_OIDC_RS256",
+              "readback": persistence.get("status") == "PERSISTED_READBACK_VERIFIED" and persistence.get("exact_readback") is True,
+              "edge_source": edge.get("signing_build_sha") == expected,
+              "edge_owner": edge_workload.get("owner_id") == "team_v4xkGtBZSrZXnJtLEJhra5nd",
+              "edge_project": edge_workload.get("project_id") == "prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN",
+              "edge_environment": edge_workload.get("environment") == "production",
+              "identity": receipt.get("penta_id") == penta.get("id") == edge.get("penta_id"),
+              "digest": (penta.get("integrity") or {}).get("digest") == edge.get("integrity_digest"),
+              "repository": payload.get("repository") == os.environ["CANARY_REPOSITORY"] == "crownthrive1/CrownThrive-OS",
+              "workflow_run": payload.get("workflow_run_id") == os.environ["CANARY_RUN_ID"],
+              "workflow_attempt": payload.get("workflow_run_attempt") == os.environ["CANARY_RUN_ATTEMPT"],
+          }
+          failed = sorted(name for name, passed in checks.items() if not passed)
+          if failed:
+              raise SystemExit("PentaFabric exact production canary HOLD: " + ",".join(failed))
+          print(json.dumps({
+              "status": "PASS",
+              "source_sha": expected,
+              "penta_id": penta["id"],
+              "transport": persistence["authentication"],
+              "exact_readback": True,
+              "pass_manufactured": False,
+          }, sort_keys=True))
+          PY
+
+      - name: Record canary boundary
+        if: always()
+        shell: bash
+        run: |
+          if [ '${{ steps.canary.outcome }}' = 'success' ]; then
+            disposition='PASS'
+          else
+            disposition='HOLD'
+          fi
+          {
+            echo "## PentaFabric production canary — $disposition"
+            echo
+            echo 'This protected job writes one D1 runtime-assurance event only.'
+            echo 'It requires exact-main source lineage, HMAC, Vercel OIDC, and Supabase exact readback.'
+            echo 'It grants no commerce, email, rights, D3, or money-movement authority.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -24,7 +24,20 @@ from penta_pr_gate_awareness import (  # noqa: E402
 
 class GateAwarenessTests(unittest.TestCase):
     def git(self, repo: Path, *args: str) -> str:
-        return subprocess.check_output(["git", *args], cwd=repo, text=True).strip()
+        return subprocess.check_output(
+            [
+                "git",
+                "-c",
+                "gc.auto=0",
+                "-c",
+                "maintenance.auto=false",
+                "-c",
+                "maintenance.autoDetach=false",
+                *args,
+            ],
+            cwd=repo,
+            text=True,
+        ).strip()
 
     def fixture(self) -> tuple[Path, str, str, tempfile.TemporaryDirectory[str]]:
         temp = tempfile.TemporaryDirectory()

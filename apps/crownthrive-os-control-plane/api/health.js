@@ -1,5 +1,8 @@
 import { chlomBridgeState } from '../lib/chlom-fabric.js';
 
+const CROWNTHRIVE_OS_PROJECT_ID = 'prj_x6AcQaYdt6lkuyoWkdzv9TSL9lAN';
+const CROWNTHRIVE_OS_REPOSITORY = 'crownthrive1/CrownThrive-OS';
+
 export default function handler(request, response) {
   if (!['GET', 'HEAD'].includes(request.method)) {
     response.setHeader('Allow', 'GET, HEAD');
@@ -26,9 +29,8 @@ export default function handler(request, response) {
     status: 'OPERATIONAL',
     mode: process.env.PENTA_RG_MODE || 'FULL_AUTONOMOUS_GOVERNED',
     release,
-    repository:
-      process.env.CROWNTHRIVE_OS_REPOSITORY ||
-      'crownthrive1/CrownThrive-OS',
+    project_id: CROWNTHRIVE_OS_PROJECT_ID,
+    repository: CROWNTHRIVE_OS_REPOSITORY,
     vercel_provider_state: providerState,
     build_sha: process.env.VERCEL_GIT_COMMIT_SHA || 'local-candidate',
     deployment_id: process.env.VERCEL_DEPLOYMENT_ID || null,
