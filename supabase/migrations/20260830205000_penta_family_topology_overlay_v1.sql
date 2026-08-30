@@ -102,10 +102,10 @@ create trigger ct_dail_route_v1
 after insert or update or delete or truncate on integration_control.penta_family_topology_history_v1
 for each statement execute function chlom_runtime.dail_route_capture_v1();
 
--- Seed only the existing constitutional 15-family set.  This source remains
+-- Seed only the existing constitutional 15-family set. This source remains
 -- pentamocracy.families_v1 + the production label crosswalk; no new state is inferred.
 insert into integration_control.penta_family_topology_v1(
-  family_key,topology_class,constitional_family_key,constitutional_state,
+  family_key,topology_class,constitutional_family_key,constitutional_state,
   representation_eligible,source_ref,evidence,current
 )
 select
@@ -140,7 +140,7 @@ on conflict(family_key) do update set
 -- the 15-family constitutional crosswalk. Preserve it as an operational
 -- subfamily while leaving its constitutional parent unresolved.
 insert into integration_control.penta_family_topology_v1(
-  family_key,topology_class,constitional_family_key,constitutional_state,
+  family_key,topology_class,constitutional_family_key,constitutional_state,
   representation_eligible,source_ref,evidence,current
 )
 select
@@ -185,6 +185,7 @@ set metadata = metadata || jsonb_build_object(
       'top_level_constitutional_authority',false,
       'canonical_parent_inferred',false,
       'history_preserved',true,
+      'pm_execution_eligible',false,
       'authority_expansion',false
     ),
     labels = array(
@@ -192,7 +193,8 @@ set metadata = metadata || jsonb_build_object(
       from unnest(coalesce(labels,'{}'::text[]) || array[
         'topology:operational-subfamily',
         'constitutional-parent:provisional',
-        'representation:ineligible-until-parent-resolved'
+        'representation:ineligible-until-parent-resolved',
+        'penta:pm-nonexecutable'
       ]) x
       order by x
     ),
@@ -208,6 +210,7 @@ set metadata = metadata || jsonb_build_object(
       'top_level_constitutional_authority',false,
       'canonical_parent_inferred',false,
       'history_preserved',true,
+      'pm_execution_eligible',false,
       'authority_expansion',false
     ),
     labels = array(
@@ -215,7 +218,8 @@ set metadata = metadata || jsonb_build_object(
       from unnest(coalesce(labels,'{}'::text[]) || array[
         'topology:operational-subfamily',
         'constitutional-parent:provisional',
-        'representation:ineligible-until-parent-resolved'
+        'representation:ineligible-until-parent-resolved',
+        'penta:pm-nonexecutable'
       ]) x
       order by x
     ),
@@ -230,22 +234,32 @@ set metadata = metadata || jsonb_build_object(
       'representation_eligible',false,
       'canonical_parent_inferred',false,
       'runtime_authority_preserved',true,
+      'pm_execution_eligible',false,
       'authority_expansion',false
+    ),
+    labels = array(
+      select distinct x
+      from unnest(coalesce(labels,'{}'::text[]) || array[
+        'topology:operational-subfamily-member',
+        'constitutional-parent:provisional',
+        'representation:ineligible-until-parent-resolved',
+        'penta:pm-nonexecutable'
+      ]) x
+      order by x
     ),
     updated_at=now()
 where current and identity_key in ('penta.surgeon','penta.chart','penta.rounds');
 
+-- Synchronize the machine label registry from the identity rows, including
+-- the explicit topology and PentaPM eligibility labels above. No existing
+-- label history is deleted or rewritten.
 insert into integration_control.penta_identity_labels_v1(
   identity_key,label,label_class,source_ref,active
 )
-select i.identity_key,l.label,split_part(l.label,':',1),
+select i.identity_key,l,split_part(l,':',1),
        'ct.penta.family-topology-overlay.v1',true
 from integration_control.penta_identity_registry_v1 i
-cross join lateral (values
-  ('topology:operational-subfamily'),
-  ('constitutional-parent:provisional'),
-  ('representation:ineligible-until-parent-resolved')
-) l(label)
+cross join lateral unnest(coalesce(i.labels,'{}'::text[])) l
 where i.current
   and i.identity_key in ('penta.family.surgical-care','penta.surgeon','penta.chart','penta.rounds')
 on conflict(identity_key,label) do update set
