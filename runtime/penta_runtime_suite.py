@@ -98,7 +98,7 @@ def implementation_signals(root: Path, machine_key: str) -> list[str]:
         "penta.mail": [
             root / "runtime" / "penta_mail.py",
             root / "tests" / "test_penta_mail.py",
-            root / ".github" / "workflows" / "penta-mail-live-certification.yml",
+            root / ".github" / "workflows" / "penta-provider-control-plane.yml",
         ],
         "penta.status": [root / "runtime" / "penta_mail.py"],
         "penta.credentials": [root / "runtime" / "penta-provider-control-plane" / "penta_control_plane.py"],

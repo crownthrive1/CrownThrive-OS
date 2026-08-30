@@ -40,7 +40,7 @@ export default async function handler(request, response) {
 
   try {
     const fabric = await collectVercelFabric({
-      oidcTokenBound: hasVercelOidcToken(request),
+      oidcTokenPresent: hasVercelOidcToken(request),
     });
     return send(
       response,

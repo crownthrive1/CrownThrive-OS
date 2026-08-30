@@ -18,10 +18,9 @@ The current runtime floor is **Node 24**. **Node 20 action runtime is prohibited
 | --- | --- | --- | --- | --- |
 | `actions/checkout` | `v7.0.1` | `3d3c42e5aac5ba805825da76410c181273ba90b1` | Node 24 | repository checkout |
 | `actions/setup-python` | `v7` | `5fda3b95a4ea91299a34e894583c3862153e4b97` | Node 24 | Python toolchain |
-| `actions/setup-node` | `v6.5.0` | `249970729cb0ef3589644e2896645e5dc5ba9c38` | Node 24 | governed Node/TypeScript toolchain |
+| `actions/setup-node` | `v7.0.0` | `820762786026740c76f36085b0efc47a31fe5020` | Node 24 | governed Node/TypeScript toolchain |
 | `actions/dependency-review-action` | `v5.0.0` | `a1d282b36b6f3519aa1f3fc636f609c47dddb294` | Node 24 | dependency-change review |
-| `actions/upload-artifact` | `v7.0.1` | `043fb46c780ffb56dc0cd67821f98d1f9c8c2cbf` | Node 24 | governed evidence upload |
-| `actions/attest-build-provenance` | `v4.1.1` | `15e5d137e173a95636557f19f96715f6f45570be` | Node 24 | provenance attestation for certification evidence |
+| `actions/upload-artifact` | `v7.0.1` | `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` | Node 24 | governed evidence upload |
 
 GitHub CodeQL remains **provider-managed default setup** for this repository. While that provider mode is enabled, CrownThrive must not add a duplicate `github/codeql-action/*` advanced workflow simply to satisfy a local workflow checklist.
 

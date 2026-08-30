@@ -3,16 +3,22 @@ name: Penta Provider Control Plane
 on:
   workflow_dispatch:
     inputs:
-      pentamail_recipient:
-        description: 'Authorized PentaMail certification recipient'
+      authorize_pentamail_send:
+        description: 'Request PentaMail readiness; live send remains authority-held'
+        type: boolean
+        required: true
+        default: false
+      pentamail_authority_ref:
+        description: 'Current founder directive reference for the D1 send'
         required: false
-        default: 'jones.usmc.kj@gmail.com'
+        default: ''
   pull_request:
     paths:
       - 'runtime/penta-provider-control-plane/**'
       - 'runtime/penta_mail.py'
       - 'runtime/penta_runtime_suite.py'
       - 'tests/test_penta_mail.py'
+      - 'tests/test_penta_provider_control_plane.py'
       - 'tests/test_penta_runtime_suite.py'
       - 'scripts/validate_penta_provider_control_plane.py'
       - 'data/penta/**'
@@ -26,6 +32,7 @@ on:
       - 'runtime/penta_mail.py'
       - 'runtime/penta_runtime_suite.py'
       - 'tests/test_penta_mail.py'
+      - 'tests/test_penta_provider_control_plane.py'
       - 'tests/test_penta_runtime_suite.py'
       - 'scripts/validate_penta_provider_control_plane.py'
       - 'data/penta/**'
@@ -49,6 +56,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Enforce pull-request authority isolation
         shell: bash
@@ -59,10 +68,18 @@ jobs:
           pre_jobs = text.split('\njobs:\n', 1)[0]
           if 'id-token: write' in pre_jobs:
               raise SystemExit('workflow-level id-token: write is forbidden')
-          if "software-provider-control:\n    if: github.event_name != 'pull_request'" not in text:
-              raise SystemExit('provider credential job is not isolated from pull_request')
-          if "provider-live-readback:\n    if: github.event_name != 'pull_request'" not in text:
-              raise SystemExit('provider live-readback job is not isolated from pull_request')
+          exact_main = "github.event_name != 'pull_request' && github.ref == 'refs/heads/main'"
+          provider_live_gate = exact_main + " && vars.PENTA_PROVIDER_READBACK_ENABLED == 'true'"
+          if f"software-provider-control:\n    if: {exact_main}" not in text:
+              raise SystemExit('provider source-control job is not restricted to exact main')
+          if f"provider-live-readback:\n    if: {provider_live_gate}" not in text:
+              raise SystemExit('provider live-readback job lacks exact-main and explicit activation gates')
+          if "environment: provider-readback" not in text:
+              raise SystemExit('provider live readback lacks its protected environment')
+          if "environment: pentamail-production" not in text:
+              raise SystemExit('PentaMail live send lacks its protected environment')
+          if "pentamail-live-certification:\n    # BUILT_HOLD_AUTHORITY" not in text or "\n      false &&\n" not in text:
+              raise SystemExit('PentaMail live send must remain hard-held pending an adopted authority receipt channel')
           PY
 
       - name: Validate Penta provider contracts
@@ -77,39 +94,33 @@ jobs:
 
       - name: Run PR-safe runtime regression suite
         run: |
+          python3 -m unittest discover -s tests -p 'test_penta_provider_control_plane.py' -v
           python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
           python3 -m unittest discover -s tests -p 'test_penta_runtime_suite.py' -v
           python3 tests/test_penta_family.py
           python3 -m unittest discover -s tests -p 'test_penta_institutional_services.py' -v
 
   software-provider-control:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env: &provider-env
-      GITHUB_TOKEN: ${{ github.token }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-      MAILGUN_API_KEY: ${{ secrets.MAILGUN_API_KEY }}
-      MAILGUN_DOMAIN: ${{ secrets.MAILGUN_DOMAIN }}
-      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-      PENTA_NURTURE_COOKIE_SIGNING_KEY: ${{ secrets.PENTA_NURTURE_COOKIE_SIGNING_KEY }}
-      PENTAMAIL_FROM: ${{ secrets.PENTAMAIL_FROM }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Validate Penta provider contracts
         run: python3 scripts/validate_penta_provider_control_plane.py
 
-      - name: Build, bind, certify, nurture
+      - name: Build adapters and record credential-free HOLD matrix
+        env:
+          PENTA_DISABLE_NETWORK_PROBES: '1'
         run: |
           set -euo pipefail
           python3 runtime/penta-provider-control-plane/penta_control_plane.py \
-            --state .penta/provider-control-plane all \
+            --state .penta/provider-control-plane build
+          python3 runtime/penta-provider-control-plane/penta_control_plane.py \
+            --state .penta/provider-control-plane matrix \
             | tee penta-provider-readiness.json
 
       - name: Publish readiness summary
@@ -121,7 +132,7 @@ jobs:
             echo
             echo '**Priority:** software'
             echo
-            echo 'Missing credentials remain `HOLD_UNBOUND`; bound credentials without successful live readback remain `AUTH_BOUND_PENDING_READBACK`.'
+            echo 'This job is source/build validation only and receives no provider credentials. Live certification runs per provider in the protected readback matrix.'
             echo
             if [ -f .penta/provider-control-plane/readiness-matrix.json ]; then
               echo '```json'
@@ -136,6 +147,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Compile shared Penta runtime
         run: |
@@ -146,6 +159,7 @@ jobs:
 
       - name: Run Penta runtime regression suite
         run: |
+          python3 -m unittest discover -s tests -p 'test_penta_provider_control_plane.py' -v
           python3 -m unittest discover -s tests -p 'test_penta_mail.py' -v
           python3 -m unittest discover -s tests -p 'test_penta_runtime_suite.py' -v
           python3 tests/test_penta_family.py
@@ -176,25 +190,28 @@ jobs:
           PY
 
   provider-live-readback:
-    if: github.event_name != 'pull_request'
-    needs: software-provider-control
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.PENTA_PROVIDER_READBACK_ENABLED == 'true'
+    needs: penta-runtime-suite
     runs-on: ubuntu-latest
+    environment: provider-readback
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         provider: [github, supabase, vercel, stripe, resend, mailgun, slack, elevenlabs]
-    env: *provider-env
     name: certify / ${{ matrix.provider }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Live certify ${{ matrix.provider }}
         id: certify
-        continue-on-error: true
         shell: bash
         env:
           PROVIDER_ID: ${{ matrix.provider }}
+          PENTA_PROVIDER_SECRET: ${{ matrix.provider == 'github' && github.token || matrix.provider == 'supabase' && secrets.SUPABASE_ANON_KEY || matrix.provider == 'vercel' && secrets.VERCEL_TOKEN || matrix.provider == 'stripe' && secrets.STRIPE_SECRET_KEY || matrix.provider == 'resend' && secrets.RESEND_API_KEY || matrix.provider == 'mailgun' && secrets.MAILGUN_API_KEY || matrix.provider == 'slack' && secrets.SLACK_BOT_TOKEN || matrix.provider == 'elevenlabs' && secrets.ELEVENLABS_API_KEY || '' }}
+          PENTA_PROVIDER_CONTEXT: ${{ matrix.provider == 'supabase' && secrets.SUPABASE_URL || matrix.provider == 'mailgun' && secrets.MAILGUN_DOMAIN || '' }}
         run: |
           python3 - <<'PY'
           import importlib.util
@@ -212,6 +229,20 @@ jobs:
           spec.loader.exec_module(mod)
 
           provider_id = os.environ['PROVIDER_ID']
+          secret_names = {
+              'github': 'GITHUB_TOKEN',
+              'supabase': 'SUPABASE_ANON_KEY',
+              'vercel': 'VERCEL_TOKEN',
+              'stripe': 'STRIPE_SECRET_KEY',
+              'resend': 'RESEND_API_KEY',
+              'mailgun': 'MAILGUN_API_KEY',
+              'slack': 'SLACK_BOT_TOKEN',
+              'elevenlabs': 'ELEVENLABS_API_KEY',
+          }
+          context_names = {'supabase': 'SUPABASE_URL', 'mailgun': 'MAILGUN_DOMAIN'}
+          os.environ[secret_names[provider_id]] = os.environ.pop('PENTA_PROVIDER_SECRET', '')
+          if provider_id in context_names:
+              os.environ[context_names[provider_id]] = os.environ.pop('PENTA_PROVIDER_CONTEXT', '')
           registry = mod.Registry(registry_path)
           state = root / '.penta' / ('provider-' + provider_id)
           binding = mod.PentaCredentials(registry, state).bind(provider_id)
@@ -231,7 +262,7 @@ jobs:
               'probe_eligible': gate['eligible'],
           }
           print(json.dumps(result, sort_keys=True))
-          if cert.state not in {'CERTIFIED', 'WRITE_VERIFIED'}:
+          if cert.state not in {'CERTIFIED', 'WRITE_VERIFIED'} or not gate['eligible']:
               raise SystemExit(78)
           PY
 
@@ -248,24 +279,65 @@ jobs:
           fi
 
   pentamail-live-certification:
+    # BUILT_HOLD_AUTHORITY: no adopted, single-use authority receipt channel or
+    # verified protected-environment readback exists. Keep the executable lane
+    # source-visible and tested, but never release its secrets or provider write.
     needs: [penta-runtime-suite]
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[pentamail-live-certify]'))
+    if: >-
+      false &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.authorize_pentamail_send == true
     runs-on: ubuntu-latest
+    environment: pentamail-production
     timeout-minutes: 10
-    env: *provider-env
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Resolve authorized recipient
-        shell: bash
+      - name: Validate manual authority, actor, recipient, and exact source
+        env:
+          PENTAMAIL_RECIPIENT: ${{ secrets.PENTAMAIL_CERTIFICATION_RECIPIENT }}
+          PENTAMAIL_FROM: ${{ secrets.PENTAMAIL_FROM }}
+          PENTAMAIL_AUTHORIZED_ACTORS: ${{ vars.PENTAMAIL_AUTHORIZED_ACTORS }}
+          PENTAMAIL_AUTHORITY_REF: ${{ inputs.pentamail_authority_ref }}
+          PENTAMAIL_DISPATCH_ACTOR: ${{ github.actor }}
         run: |
-          if [ '${{ github.event_name }}' = 'workflow_dispatch' ] && [ -n '${{ github.event.inputs.pentamail_recipient }}' ]; then
-            printf 'PENTAMAIL_RECIPIENT=%s\n' '${{ github.event.inputs.pentamail_recipient }}' >> "$GITHUB_ENV"
-          else
-            echo 'PENTAMAIL_RECIPIENT=jones.usmc.kj@gmail.com' >> "$GITHUB_ENV"
-          fi
+          python3 - <<'PY'
+          import os
+          import re
+
+          actor = os.environ.get('PENTAMAIL_DISPATCH_ACTOR', '').strip()
+          allowed = {
+              item.strip()
+              for item in os.environ.get('PENTAMAIL_AUTHORIZED_ACTORS', '').split(',')
+              if item.strip()
+          }
+          recipient = os.environ.get('PENTAMAIL_RECIPIENT', '').strip()
+          sender = os.environ.get('PENTAMAIL_FROM', '').strip()
+          authority_ref = os.environ.get('PENTAMAIL_AUTHORITY_REF', '').strip()
+          if os.environ.get('GITHUB_REF') != 'refs/heads/main':
+              raise SystemExit('PentaMail live certification requires exact main')
+          if not re.fullmatch(r'[a-f0-9]{40}', os.environ.get('GITHUB_SHA', '')):
+              raise SystemExit('PentaMail exact source SHA is unavailable')
+          if not allowed or actor not in allowed:
+              raise SystemExit('dispatch actor is not in the governed PentaMail allowlist')
+          if not re.fullmatch(r'[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+', recipient) or len(recipient) > 320:
+              raise SystemExit('governed PentaMail recipient binding is missing or invalid')
+          sender_address = sender
+          if '<' in sender or '>' in sender:
+              match = re.fullmatch(r'.*<([^<>]+)>', sender)
+              sender_address = match.group(1).strip() if match else ''
+          if not re.fullmatch(r'[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+', sender_address) or len(sender) > 320:
+              raise SystemExit('governed PentaMail sender binding is missing or invalid')
+          if not re.fullmatch(r'founder-directive-[A-Za-z0-9._:/-]{8,230}', authority_ref):
+              raise SystemExit('current PentaMail founder authority reference is missing or invalid')
+          PY
 
       - name: Establish Resend read-only certification
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
           python3 - <<'PY'
           import importlib.util
@@ -299,6 +371,13 @@ jobs:
           PY
 
       - name: Send PentaStatus owner report through PentaMail
+        id: pentamail_send
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          PENTAMAIL_FROM: ${{ secrets.PENTAMAIL_FROM }}
+          PENTAMAIL_RECIPIENT: ${{ secrets.PENTAMAIL_CERTIFICATION_RECIPIENT }}
+          PENTAMAIL_AUTHORITY_REF: ${{ inputs.pentamail_authority_ref }}
+          PENTAMAIL_DISPATCH_ACTOR: ${{ github.actor }}
         run: |
           python3 - <<'PY'
           import importlib.util
@@ -324,17 +403,21 @@ jobs:
           report += '\nExecution lane: registered Penta Provider Control Plane bridge.'
           report += '\nNo unrelated Penta maturity is promoted by this transport proof.'
 
-          sender = (os.environ.get('PENTAMAIL_FROM') or '').strip() or 'CrownThrive PentaMail <contact@crownthrive.com>'
+          sender = (os.environ.get('PENTAMAIL_FROM') or '').strip()
+          if not sender:
+              raise SystemExit('governed PentaMail sender binding is missing')
           recipient = os.environ['PENTAMAIL_RECIPIENT'].strip()
-          correlation = 'pentamail-live-' + os.environ['GITHUB_RUN_ID']
-          authority_ref = 'founder-directive-2026-08-26-pentamail-live-certification'
+          workflow_run_id = os.environ['GITHUB_RUN_ID']
+          correlation = 'pentamail-live-' + workflow_run_id
+          authority_ref = os.environ['PENTAMAIL_AUTHORITY_REF'].strip()
+          actor = os.environ['PENTAMAIL_DISPATCH_ACTOR'].strip()
           envelope = pm.build_envelope(
               origin_penta='penta.status',
               purpose='owner_execution_report',
               classification='internal',
               recipient=recipient,
               sender_identity=sender,
-              subject='[PentaMail Production Validation] Penta Mesh Report — 2026-08-26',
+              subject=f'[PentaMail Production Validation {workflow_run_id}] Penta Mesh Report',
               body_text=report,
               correlation_id=correlation,
               authority_ref=authority_ref,
@@ -345,7 +428,7 @@ jobs:
           )
           authorization = pm.AuthorizationContext(
               authorized=True,
-              authorized_by='Founding Member execution directive 2026-08-26',
+              authorized_by=f'approved manual workflow_dispatch actor {actor}',
               authority_ref=authority_ref,
               authority_class='D1',
           )
@@ -365,10 +448,14 @@ jobs:
           PY
 
       - name: Promote exact email_send operation only after readback
+        id: pentamail_promote
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
           python3 - <<'PY'
           import importlib.util
           import json
+          import os
           from pathlib import Path
           import sys
 
@@ -379,9 +466,27 @@ jobs:
           sys.modules[spec.name] = mod
           spec.loader.exec_module(mod)
           receipt = json.loads(Path('pentamail-live-receipt.json').read_text())
+          binding = receipt['verification_binding']
           registry = mod.Registry(root / 'runtime' / 'penta-provider-control-plane' / 'providers.json')
           state = root / '.penta' / 'pentamail-provider-control'
-          cert = mod.PentaCertify(registry, state).certify('resend', live_evidence=receipt['live_evidence'])
+          cert = mod.PentaCertify(registry, state).certify('resend', provider_receipts=[{
+              'provider': receipt['provider'],
+              'operation': 'email_send',
+              'provider_message_id': receipt['provider_message_id'],
+              'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+              'correlation_id': binding['correlation_id'],
+              'idempotency_key': binding['idempotency_key'],
+              'authority_ref': binding['authority_ref'],
+              'requested_at': binding['requested_at'],
+              'recorded_at': binding['recorded_at'],
+              'recipient_sha256': binding['recipient_sha256'],
+              'sender_sha256': binding['sender_sha256'],
+              'subject_sha256': binding['subject_sha256'],
+              'body_sha256': binding['body_sha256'],
+              'correlation_tag_sha256': binding['correlation_tag_sha256'],
+              'idempotency_tag_sha256': binding['idempotency_tag_sha256'],
+              'body_tag_sha256': binding['body_tag_sha256'],
+          }])
           nurture = mod.PentaNurture(registry, state).observe('resend')
           gate = mod.ProductionGate(registry, state).decide('resend', 'email_send')
           result = {
@@ -401,9 +506,15 @@ jobs:
         if: always()
         shell: bash
         run: |
+          if [ '${{ steps.pentamail_send.outcome }}' = 'success' ] && [ '${{ steps.pentamail_promote.outcome }}' = 'success' ]; then
+            disposition='PASS'
+            detail='Provider send and exact readback promotion both passed.'
+          else
+            disposition='HOLD'
+            detail='No production certification is claimed; authority, send, or exact readback did not pass.'
+          fi
           {
-            echo '## PentaMail Production Certification'
+            echo "## PentaMail Production Certification — $disposition"
             echo
-            echo 'Live send is governed by explicit D1 authority and exact provider readback.'
-            echo 'The provider receipt and certification disposition are printed in the job log.'
+            echo "$detail"
           } >> "$GITHUB_STEP_SUMMARY"

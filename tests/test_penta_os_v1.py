@@ -306,11 +306,8 @@ class PentaOSV15Tests(unittest.TestCase):
         stale = {**body, "receipt_sha256": runtime_module.sha256(body)}
         self.assertFalse(self.runtime.verify_receipt(stale)["valid"])
 
-    def test_json_schema_accepts_generated_registry_when_jsonschema_available(self):
-        try:
-            import jsonschema
-        except ImportError:
-            self.skipTest("jsonschema is not installed")
+    def test_json_schema_accepts_generated_registry(self):
+        import jsonschema
         schema = json.loads((ROOT / "schemas/penta/os-v1-registry.schema.json").read_text(encoding="utf-8"))
         jsonschema.Draft202012Validator(schema).validate(self.registry)
 

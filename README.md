@@ -23,6 +23,18 @@ It records the current institutional generation, governance, stable identities, 
 7. **CHLOM** — [`chlom/overview.mdx`](chlom/overview.mdx)
 8. **Cultural Imprint Engine** — [`doctrine/cultural-imprint-engine.mdx`](doctrine/cultural-imprint-engine.mdx)
 9. **Developer Platform** — [`developers/overview.mdx`](developers/overview.mdx)
+10. **COS V1 Convergence and Release Gate** — [`docs/COS_V1_CONVERGENCE_ARCHITECTURE.md`](docs/COS_V1_CONVERGENCE_ARCHITECTURE.md)
+
+The reproducible COS V1 source gate is:
+
+```bash
+python3 -m pip install -r requirements/cos-v1-validation.txt
+python3 scripts/validate_cos_v1.py --root .
+```
+
+It validates pinned schema dependencies, all GitHub Actions YAML, JavaScript syntax and tests, COS/Penta function contracts, provider-control contracts, and Python runtime tests. It does not mutate a provider or claim deployment/readback certification.
+
+The protected `PentaFabric Production Canary` is the separate production proof lane. It remains disabled until external settings readback proves required reviewers, prevent-self-review, a main-only deployment policy, an environment-scoped write token, and `PENTAFABRIC_PRODUCTION_CANARY_ENABLED=true`. When authorized, it writes one runtime-assurance event and requires HMAC, exact source lineage, Vercel OIDC, and Supabase read-after-write evidence. Source-gate PASS alone never claims that production proof.
 
 ## PENTA: one doctrine, five institutional functions
 

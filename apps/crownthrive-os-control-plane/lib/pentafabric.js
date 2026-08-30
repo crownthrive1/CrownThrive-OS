@@ -5,33 +5,49 @@ export const PENTAFABRIC_SCHEMA = 'crownthrive.pentafabric.v1';
 export const PENTA_EVENT_CONTRACT = 'crownthrive.penta.event.v1';
 export const CHLOM_BINDING = 'crownthrive.chlom.pentafabric.v1';
 
-const signingSecret = () =>
-  process.env.PENTAFABRIC_SIGNING_SECRET ||
-  process.env.CHLOM_SIGNING_SECRET ||
-  process.env.PENTA_SIGNING_SECRET ||
-  null;
+// PentaFabric uses one dedicated key on every signing and verification surface.
+// Do not grant legacy CHLOM/Penta credentials authority over persistence receipts.
+const signingSecret = () => process.env.PENTAFABRIC_SIGNING_SECRET || null;
+
+const PROHIBITED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === 'object') {
-    return Object.keys(value)
-      .sort()
-      .reduce((result, key) => {
-        result[key] = stable(value[key]);
-        return result;
-      }, {});
+    const result = Object.create(null);
+    for (const key of Object.keys(value).sort()) {
+      if (PROHIBITED_KEYS.has(key)) {
+        throw new Error(`Penta contains prohibited object key: ${key}`);
+      }
+      result[key] = stable(value[key]);
+    }
+    return result;
   }
   return value;
 }
 
 function canonicalBytes(event) {
-  const { integrity: _integrity, ...unsigned } = event;
-  return Buffer.from(JSON.stringify(stable(unsigned)), 'utf8');
+  const {
+    digest: _digest,
+    signature: _signature,
+    ...signedIntegrity
+  } = event.integrity || {};
+  return Buffer.from(JSON.stringify(stable({
+    ...event,
+    integrity: signedIntegrity,
+  })), 'utf8');
+}
+
+export function canonicalPentaJson(event) {
+  return JSON.stringify(stable(event));
 }
 
 function safeEqualHex(left, right) {
   if (typeof left !== 'string' || typeof right !== 'string') return false;
-  if (!/^[a-f0-9]+$/i.test(left) || !/^[a-f0-9]+$/i.test(right)) return false;
+  // Buffer.from(hex) silently truncates an odd trailing nibble. Require the
+  // canonical wire encoding before decoding so alternate representations can
+  // never compare equal to a valid digest or HMAC.
+  if (!/^[a-f0-9]{64}$/.test(left) || !/^[a-f0-9]{64}$/.test(right)) return false;
   const a = Buffer.from(left, 'hex');
   const b = Buffer.from(right, 'hex');
   return a.length === b.length && timingSafeEqual(a, b);
@@ -124,17 +140,18 @@ export function emitPenta(input = {}) {
     },
   };
 
-  const canonical = canonicalBytes(event);
-  const digest = createHash('sha256').update(canonical).digest('hex');
   const secret = signingSecret();
   const secretReady = secret && Buffer.byteLength(secret, 'utf8') >= 32;
   event.integrity = {
     algorithm: secretReady ? 'HMAC-SHA256' : 'SHA-256',
     key_id: secretReady ? 'pentafabric-v1' : 'vercel-build-digest-v1',
-    digest,
-    signature: secretReady ? createHmac('sha256', secret).update(canonical).digest('hex') : null,
     build_sha: process.env.VERCEL_GIT_COMMIT_SHA || null,
   };
+  const canonical = canonicalBytes(event);
+  event.integrity.digest = createHash('sha256').update(canonical).digest('hex');
+  event.integrity.signature = secretReady
+    ? createHmac('sha256', secret).update(canonical).digest('hex')
+    : null;
   return event;
 }
 
@@ -149,18 +166,29 @@ export function verifyPenta(event, { requireSignature = false } = {}) {
   if (event.mesh?.chlom?.binding !== CHLOM_BINDING || event.mesh?.chlom?.governed !== true || !event.mesh?.chlom?.intent_id) throw new Error('CHLOM binding is missing or invalid');
   const expires = Date.parse(event.mesh?.fabric?.expires_at || '');
   if (!Number.isFinite(expires) || Date.now() > expires) throw new Error('Penta expired');
+  const algorithm = event.integrity?.algorithm;
+  const keyId = event.integrity?.key_id;
+  if (!['HMAC-SHA256', 'SHA-256'].includes(algorithm)) throw new Error('Penta integrity algorithm is invalid');
+  if (algorithm === 'HMAC-SHA256' && keyId !== 'pentafabric-v1') throw new Error('Penta HMAC key_id is invalid');
+  if (algorithm === 'SHA-256' && keyId !== 'vercel-build-digest-v1') throw new Error('Penta digest key_id is invalid');
+  const buildSha = event.integrity?.build_sha;
+  if (buildSha !== null && !/^[a-f0-9]{40}$/.test(String(buildSha || ''))) {
+    throw new Error('Penta build_sha is invalid');
+  }
   const canonical = canonicalBytes(event);
   const expectedDigest = createHash('sha256').update(canonical).digest('hex');
   if (!safeEqualHex(String(event.integrity?.digest || ''), expectedDigest)) throw new Error('Penta digest mismatch');
   const secret = signingSecret();
   const secretReady = secret && Buffer.byteLength(secret, 'utf8') >= 32;
   if (requireSignature && !secretReady) throw new Error('PentaFabric signing secret is not bound');
-  if (event.integrity?.algorithm === 'HMAC-SHA256') {
+  if (algorithm === 'HMAC-SHA256') {
     if (!secretReady) throw new Error('HMAC Penta cannot be verified without signing secret');
     const expectedSignature = createHmac('sha256', secret).update(canonical).digest('hex');
     if (!safeEqualHex(String(event.integrity?.signature || ''), expectedSignature)) throw new Error('Penta signature mismatch');
   } else if (requireSignature) {
     throw new Error('signed Penta required');
+  } else if (event.integrity?.signature !== null) {
+    throw new Error('digest-only Penta must not include a signature');
   }
   return event;
 }

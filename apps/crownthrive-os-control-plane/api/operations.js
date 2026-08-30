@@ -1,6 +1,7 @@
 const WINDOW_HOURS = 24;
 const SAMPLE_LIMIT = 250;
 const RECENT_LIMIT = 30;
+const CANONICAL_SUPABASE_ORIGIN = 'https://tzajnzshmtzjenqulehq.supabase.co';
 
 function setHeaders(response) {
   response.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -42,9 +43,16 @@ function publicRow(row) {
     lane: row.lane || 'unknown',
     route: row.route || 'unknown',
     chlom_binding: row.chlom_binding || null,
-    build_sha: row.build_sha || null,
+    signing_build_sha: row.build_sha || null,
     received_at: row.received_at || null,
   };
+}
+
+function canonicalSupabaseOrigin(value) {
+  if (value === CANONICAL_SUPABASE_ORIGIN || value === `${CANONICAL_SUPABASE_ORIGIN}/`) {
+    return CANONICAL_SUPABASE_ORIGIN;
+  }
+  return null;
 }
 
 async function readLedger() {
@@ -59,9 +67,13 @@ async function readLedger() {
       windowStart: new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString(),
     };
   }
+  const supabaseOrigin = canonicalSupabaseOrigin(supabaseUrl);
+  if (!supabaseOrigin) {
+    throw new Error('SUPABASE_ORIGIN_NOT_CANONICAL');
+  }
 
   const windowStart = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString();
-  const url = new URL(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/pentafabric_events`);
+  const url = new URL('/rest/v1/pentafabric_events', supabaseOrigin);
   url.searchParams.set(
     'select',
     'penta_id,trace_id,protocol,lane,route,chlom_binding,build_sha,received_at',
@@ -81,11 +93,11 @@ async function readLedger() {
       'Range-Unit': 'items',
     },
     cache: 'no-store',
+    redirect: 'error',
   });
 
   if (!result.ok) {
-    const detail = await result.text();
-    throw new Error(`Pentafabric ledger read failed (${result.status}): ${detail.slice(0, 180)}`);
+    throw new Error('PENTAFABRIC_LEDGER_READBACK_FAILED');
   }
 
   const rows = await result.json();
@@ -140,7 +152,8 @@ export default async function handler(request, response) {
       },
       instrumentation: {
         pentafabric_event_ledger: ledger.status,
-        vercel_provider_readback: 'BOUND_VIA_FABRIC',
+        vercel_provider_readback:
+          ledger.status === 'BOUND' ? 'BOUND_VIA_FABRIC' : 'UNBOUND',
         vercel_runtime_management: 'PROVIDER_CONNECTOR_ONLY',
         vercel_agent_runs: 'NOT_INSTRUMENTED',
         unobserved_activity_claimed: false,
@@ -149,13 +162,12 @@ export default async function handler(request, response) {
       pass_manufactured: false,
     };
     return send(response, 200, payload, head);
-  } catch (error) {
+  } catch {
     return send(response, 503, {
       schema: 'ct.penta.os.operations.v1',
       service: 'crownthrive-os-control-plane',
       status: 'DEGRADED',
       error: 'operations_readback_failed',
-      detail: String(error?.message || error),
       instrumentation: {
         pentafabric_event_ledger: 'READBACK_FAILED',
         unobserved_activity_claimed: false,

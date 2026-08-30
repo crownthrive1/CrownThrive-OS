@@ -44,17 +44,36 @@ def main() -> int:
             failed += 1
             continue
         module = load_module(path, index)
-        tests = [
+        candidates = [
             (name, function)
             for name, function in sorted(vars(module).items())
             if name.startswith("test_")
             and inspect.isfunction(function)
             and function.__module__ == module.__name__
-            and not inspect.signature(function).parameters
+        ]
+        unsupported = [
+            name
+            for name, function in candidates
+            if inspect.signature(function).parameters
+            or inspect.iscoroutinefunction(function)
+            or inspect.isgeneratorfunction(function)
+            or inspect.isasyncgenfunction(function)
+        ]
+        for name in unsupported:
+            print(
+                f"FAIL unsupported function test signature/type: {raw}::{name}",
+                file=sys.stderr,
+            )
+            failed += 1
+        tests = [
+            (name, function)
+            for name, function in candidates
+            if name not in unsupported
         ]
         if not tests:
-            print(f"FAIL no zero-argument function tests discovered: {raw}", file=sys.stderr)
-            failed += 1
+            if not unsupported:
+                print(f"FAIL no zero-argument function tests discovered: {raw}", file=sys.stderr)
+                failed += 1
             continue
         for name, function in tests:
             try:

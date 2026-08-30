@@ -206,6 +206,189 @@ test('MCP tool catalog hardwires CHLOM without exposing broadcast or private key
   assert.equal(response.payload.result.tools.every((tool) => tool.annotations.readOnlyHint === true), true);
 });
 
+test('PentaFabric self-test callback ignores untrusted forwarding headers', async () => {
+  const originalFetch = global.fetch;
+  const requestedUrls = [];
+  global.fetch = async (url) => {
+    requestedUrls.push(url);
+    return new Response(JSON.stringify({ status: 'PASS', pass_manufactured: false }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  try {
+    const request = modernRequest('tools/call', 8, {
+      name: 'run_pentafabric_self_test',
+      arguments: {},
+    });
+    request.headers.host = 'attacker.example';
+    request.headers['x-forwarded-host'] = '169.254.169.254';
+    request.headers['x-forwarded-proto'] = 'http';
+    const response = mockResponse();
+    await mcpHandler(request, response);
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.payload.result.isError, false);
+    assert.deepEqual(requestedUrls, [
+      'https://crown-thrive-os.vercel.app/api/penta?selftest=1',
+    ]);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('gateway self-test holds when an exact generated deployment host is unavailable', async () => {
+  const originalFetch = global.fetch;
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    throw new Error('must not be called');
+  };
+  try {
+    for (const vercelUrl of [undefined, 'crown-thrive-os.vercel.app']) {
+      await withEnv({ VERCEL_URL: vercelUrl }, async () => {
+        const response = mockResponse();
+        await mcpHandler({
+          method: 'GET',
+          url: '/api/mcp?selftest=1',
+          headers: {
+            host: 'attacker.example',
+            'x-forwarded-host': '169.254.169.254',
+            'x-forwarded-proto': 'http',
+          },
+        }, response);
+        assert.equal(response.statusCode, 503);
+        assert.equal(response.payload.self_test.status, 'HOLD');
+        assert.equal(response.payload.self_test.exact_deployment_origin, false);
+        assert.match(response.payload.self_test.error, /generated VERCEL_URL host/i);
+      });
+    }
+    assert.equal(calls, 0);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('gateway self-test rejects a same-size substituted tool catalog', async () => {
+  const catalogResponse = mockResponse();
+  await mcpHandler(modernRequest('tools/list'), catalogResponse);
+  const tools = structuredClone(catalogResponse.payload.result.tools);
+  tools[0].name = 'get_substituted_catalog_tool';
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    const result = body.method === 'server/discover'
+      ? {
+          supportedVersions: ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26'],
+          _meta: {
+            'io.modelcontextprotocol/serverInfo': {
+              name: 'crownthrive-vercel-fabric',
+              version: '1.1.0',
+            },
+          },
+        }
+      : { tools };
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  try {
+    await withEnv({ VERCEL_URL: 'crown-thrive-os-preview-abc123.vercel.app' }, async () => {
+      const response = mockResponse();
+      await mcpHandler({
+        method: 'GET',
+        url: '/api/mcp?selftest=1',
+        headers: { host: 'crown-thrive-os.vercel.app' },
+      }, response);
+      assert.equal(response.statusCode, 503);
+      assert.equal(response.payload.self_test.status, 'HOLD');
+      assert.match(response.payload.self_test.error, /tool names did not exactly match/i);
+    });
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('preview self-test callbacks bind to the validated candidate deployment', async () => {
+  const catalogResponse = mockResponse();
+  await mcpHandler(modernRequest('tools/list'), catalogResponse);
+  const tools = catalogResponse.payload.result.tools;
+  const originalFetch = global.fetch;
+  const requestedUrls = [];
+  global.fetch = async (url, options) => {
+    requestedUrls.push(url);
+    const body = JSON.parse(options.body);
+    const result = body.method === 'server/discover'
+      ? {
+          supportedVersions: ['2026-07-28', '2025-11-25', '2025-06-18', '2025-03-26'],
+          _meta: {
+            'io.modelcontextprotocol/serverInfo': {
+              name: 'crownthrive-vercel-fabric',
+              version: '1.1.0',
+            },
+          },
+        }
+      : { tools };
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  try {
+    await withEnv({
+      VERCEL_URL: 'crown-thrive-os-preview-abc123.vercel.app',
+      VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40),
+    }, async () => {
+      const response = mockResponse();
+      await mcpHandler({
+        method: 'GET',
+        url: '/api/mcp?selftest=1',
+        headers: {
+          host: 'attacker.example',
+          'x-forwarded-host': '169.254.169.254',
+        },
+      }, response);
+      assert.equal(response.statusCode, 200);
+      assert.equal(
+        response.payload.self_test.callback_origin,
+        'https://crown-thrive-os-preview-abc123.vercel.app',
+      );
+      assert.equal(response.payload.self_test.callback_build_sha, 'a'.repeat(40));
+      assert.equal(response.payload.self_test.exact_deployment_origin, true);
+      assert.deepEqual(requestedUrls, [
+        'https://crown-thrive-os-preview-abc123.vercel.app/api/mcp',
+        'https://crown-thrive-os-preview-abc123.vercel.app/api/mcp',
+      ]);
+    });
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('unapproved candidate callback host fails closed without a request', async () => {
+  const originalFetch = global.fetch;
+  let calls = 0;
+  global.fetch = async () => {
+    calls += 1;
+    throw new Error('must not be called');
+  };
+  try {
+    await withEnv({ VERCEL_URL: 'attacker.vercel.app' }, async () => {
+      const response = mockResponse();
+      await mcpHandler({
+        method: 'GET',
+        url: '/api/mcp?selftest=1',
+        headers: { host: 'attacker.example' },
+      }, response);
+      assert.equal(response.statusCode, 503);
+      assert.equal(response.payload.self_test.status, 'HOLD');
+      assert.equal(calls, 0);
+    });
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('protected CHLOM MCP tool remains hold without the inbound control binding', async () => {
   await withEnv({ CROWNTHRIVE_CONTROL_TOKEN: undefined }, async () => {
     const request = modernRequest('tools/call', 7, {

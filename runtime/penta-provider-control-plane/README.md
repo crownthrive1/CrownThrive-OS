@@ -13,6 +13,14 @@ Credential presence is not live authentication. An adapter is not `CERTIFIED` un
 
 A provider operation is executable only when the runtime can prove the required credential binding, build receipt, live certification, current nurture health, and exact-operation readback when the operation contract requires it. All initial operation contracts require readback.
 
+The `all` command exits non-zero whenever any provider listed in `policy.required_provider_certifications` remains unbound, uncertified, expired, unhealthy, or ineligible at its registered probe operation. The readiness matrix is still written before exit so a failed automation run preserves its exact HOLD reasons. Pull-request validation remains credential-free and never invokes `all` or a live provider probe.
+
+Caller-supplied `result=PASS` or `readback=true` dictionaries are not certification evidence. PentaCertify rejects the legacy `live_evidence` input. Side-effect certification accepts only a minimal provider receipt locator for an explicitly implemented verifier; PentaCertify then re-reads that object from the provider with its own credential and generates the evidence itself. Operations without a trusted provider-receipt verifier remain fail-closed.
+
+Live credential jobs execute only from exact `main`, require the explicit `PENTA_PROVIDER_READBACK_ENABLED=true` repository gate, and run inside the `provider-readback` GitHub environment. The provider matrix receives one selected provider credential per job. The environment's reviewers, prevent-self-review rule, exact-main deployment policy, variables, and scoped secrets still require external settings readback before that gate may be enabled.
+
+The PentaMail write job is **BUILT_HOLD_AUTHORITY** and hard-disabled in source. A shaped manual input is not founder authority. Activation requires an adopted, current, scoped, expiring and single-use authority receipt channel plus verified `pentamail-production` environment controls. Resend receipt verification remains implemented and tested so it cannot promote substituted, failed, stale or unrelated messages when a legitimate authority channel is later adopted.
+
 `HOLD_UNBOUND` and `AUTH_BOUND_PENDING_READBACK` are intentional. Missing credentials or failed/unavailable provider probes are never converted into passing states.
 
 ## Lifecycle integration
@@ -40,7 +48,7 @@ Generated state defaults to `.penta/provider-control-plane/` and is evidence/out
 The initial registry can bind these runtime aliases when present:
 
 - GitHub: `GITHUB_TOKEN`
-- Supabase native REST: `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
+- Supabase read-only REST probe: `SUPABASE_URL` + `SUPABASE_ANON_KEY`
 - Vercel: `VERCEL_TOKEN`
 - Stripe: `STRIPE_SECRET_KEY`
 - Resend: `RESEND_API_KEY`
@@ -55,7 +63,7 @@ These aliases are contract names, not claims that the corresponding secret is cu
 ## Initial certification probes
 
 - GitHub — repository metadata read.
-- Supabase — REST/OpenAPI root read using service-role authentication.
+- Supabase — REST/OpenAPI root read using the least-privilege anonymous key; service-role authority is not released to the health probe.
 - Vercel — authenticated current-user read.
 - Stripe — authenticated balance read.
 - Resend — authenticated domain list read.
@@ -78,5 +86,6 @@ PentaBuild alone stops at `BUILT_PENDING_INDEPENDENT_VERIFICATION`.
 - Adapter compilation is not live-provider proof.
 - Read certification does not grant write authority.
 - A write operation is never inherited from a different certified operation.
+- Caller-authored evidence flags cannot promote an operation.
 - Certification expires and must be renewed.
 - D3/reserved authority is not self-created.
