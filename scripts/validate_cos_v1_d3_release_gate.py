@@ -40,6 +40,7 @@ def main() -> None:
         "finalizer_requires_binding": "phase15_d3_approval_not_bound" in forward,
         "standing_campaign_not_hardcoded": "ct.penta.flow-control.20260826.v1" not in forward,
         "rollback_blocks_existing_phase15_history": "rollback_blocked_phase15_execution_history_exists" in rollback,
+        "rollback_drops_d3_unique_index": "drop index if exists integration_control.cos_phase_gate_receipts_d3_once_idx" in rollback,
         "rollback_disables_phase15_release": "phase15_release_disabled_after_d3_hardening_rollback" in rollback,
         "rollback_does_not_release": "state='released'" not in rollback,
     }
