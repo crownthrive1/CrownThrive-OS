@@ -108,19 +108,19 @@ For a public-safe moderation issue, reference the relevant issue/PR and request 
 This conduct standard does not replace `LICENSE`, licensing addenda, `CONTRIBUTING.md`, `SECURITY.md`, `AGENTS.md`, applicable law, binding agreements, or governing CrownThrive records. Participation does not create ownership, a license, compensation, partnership, employment, certification, governance authority, or other institutional rights not separately granted.
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.62.0.0
+## Latest PentaRelease — v3.62.3.0
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.62.0.0
-- **Release title:** CrownThrive OS 3.62.0.0 — Autonomous PentaRelease
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.62.3.0
+- **Release title:** CrownThrive OS 3.62.3.0 — Autonomous PentaRelease
 - **Who:** PentaRelease / provider actor github-actions[bot]
-- **Why:** new executable capability or runtime delta
+- **Why:** production fix/hardening delta
 - **Changed paths:** 3
 - **Provider actual cost:** $0.00 USD
 - **Recognized release exposure:** $0.00 USD
 - **Direct usage calculation:** `not_available`
-- **CIE:** **PASS — 100.0000/100**
-- **Evidence:** `9cc8c307308dcb96c2e153f54ebb26d8f7fdb0d237ce76a8a1eb27ed854c576e`
-- **Projection payload:** `78c30c577c9ac803ad3b04ce9dd59d8d8cbe789425e87fbef51a1761b755895b`
+- **CIE:** **PASS — 100/100**
+- **CIE dimensions:** brand_safety=20, identity_fit=20, legacy_impact=20, community_value=20, story_alignment=20
+- **Evidence:** `63cb4026a94c4efae6122f06565afc4ad5d551fe1472d06724c1668a2f18ca4b`
 
 PentaRelease maintains this bounded block. Content outside the markers remains under its existing ownership and editorial authority.
 <!-- pentarelease:managed-release-surface:end -->
