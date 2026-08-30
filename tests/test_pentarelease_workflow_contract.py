@@ -74,12 +74,12 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("pentadocs_group.inspect", self.text)
         self.assertNotIn('names.count("Releases & Evidence") == 1', self.text)
 
-    def test_reconciler_keeps_least_privilege_and_does_not_fail_on_branch_retention(self):
+    def test_reconciler_keeps_least_privilege_and_retains_branches(self):
         self.assertIn("contents: read", self.reconciler_text)
         self.assertIn('gh pr close "$number" --repo "$REPO" --comment "$NOTE"', self.reconciler_text)
         self.assertNotIn("--delete-branch", self.reconciler_text)
-        self.assertIn("PR-shell retirement is the backlog SLA", self.reconciler_text)
         self.assertIn("Generated branches retained under least privilege", self.reconciler_text)
+        self.assertIn("Remote branch deletion remains advisory", self.reconciler_text)
 
     def test_reconciler_still_requires_release_evidence_and_bot_identity(self):
         self.assertIn('index("MANIFEST.json")', self.reconciler_text)
@@ -88,6 +88,21 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn('index("PENTARELEASE_EVIDENCE.json")', self.reconciler_text)
         self.assertIn('author=$(gh api "repos/$REPO/pulls/$number"', self.reconciler_text)
         self.assertIn('github-actions[bot]', self.reconciler_text)
+
+    def test_reconciler_requires_managed_source_convergence_before_retirement(self):
+        self.assertIn(".pentarelease/state/release-surface.json?ref=main", self.reconciler_text)
+        self.assertIn("pentarelease/latest.mdx?ref=main", self.reconciler_text)
+        self.assertIn("source_covers_tag", self.reconciler_text)
+        self.assertIn("source projection not converged", self.reconciler_text)
+        self.assertIn("provider publication/assets alone never authorize PR-shell retirement", self.reconciler_text)
+        source_guard = self.reconciler_text.index('if [ -z "$SOURCE_TAG" ] || ! source_covers_tag "$SOURCE_TAG" "$tag"; then')
+        close_call = self.reconciler_text.index('gh pr close "$number" --repo "$REPO" --comment "$NOTE"')
+        self.assertLess(source_guard, close_call)
+
+    def test_reconciler_accepts_only_forward_source_coverage(self):
+        self.assertIn("source >= candidate", self.reconciler_text)
+        self.assertIn("same release or a newer forward-only projection", self.reconciler_text)
+        self.assertNotIn("provider evidence is authoritative for cleanup", self.reconciler_text)
 
     def test_secret_gate_allows_public_templates_but_still_blocks_real_env_files(self):
         self.assertIn(r"\.env\.(example|sample|template)$", self.awareness_text)
