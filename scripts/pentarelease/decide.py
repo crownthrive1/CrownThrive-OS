@@ -3,6 +3,17 @@ import argparse, json, os, re, subprocess
 from pathlib import Path
 
 
+# Source-convergence PRs are generated PentaRelease bookkeeping, not a new
+# product/runtime delta. GitHub squash merges these PRs using the canonical PR
+# title as the commit subject. Keep these reserved prefixes in the decision
+# engine itself so a policy edit cannot accidentally turn source convergence
+# into another autonomous release and create an infinite release/projection loop.
+GENERATED_SURFACE_MERGE_PREFIXES = (
+    "PentaRelease comprehensive surface ",
+    "PentaRelease surface ",
+)
+
+
 def sh(*args):
     return subprocess.check_output(args, text=True).strip()
 
@@ -54,7 +65,8 @@ def main():
         return
 
     head_msg = sh("git", "log", "-1", "--pretty=%B")
-    if any(head_msg.startswith(p) for p in policy.get('generated_commit_prefixes', [])):
+    generated_prefixes = tuple(policy.get('generated_commit_prefixes', [])) + GENERATED_SURFACE_MERGE_PREFIXES
+    if any(head_msg.startswith(p) for p in generated_prefixes):
         decision = {"decision":"hold","reason":"generated_release_commit_guard","release":False,"latest_tag":latest}
         Path(args.output).write_text(json.dumps(decision, indent=2)+"\n")
         return
