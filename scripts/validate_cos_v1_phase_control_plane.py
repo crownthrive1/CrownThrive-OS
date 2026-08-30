@@ -113,6 +113,8 @@ def main() -> None:
     require("rollback_blocked_phase15_execution_history_exists" in d3_rollback, "D3 rollback is not Phase-15-history-safe")
     require("create or replace function integration_control.cos_phase_record_gate_v1" in d3_rollback, "D3 rollback does not restore generic gate function deterministically")
     require("create or replace function integration_control.cos_phase_finalize_v1" in d3_rollback, "D3 rollback does not restore finalizer deterministically")
+    require("phase15_release_disabled_after_d3_hardening_rollback" in d3_rollback, "D3 rollback would resurrect Phase 15 release authority")
+    require("state='released'" not in d3_rollback, "D3 rollback contains a release mutation")
     require("rollback_blocked_cos_phase_execution_history_exists" in release_rollback, "release-state rollback is not history-safe")
     require("drop trigger if exists cos_phase_execution_release_sync_v1" in release_rollback, "release-state rollback missing execution trigger cleanup")
     require("drop trigger if exists cos_phase_execution_hold_sync_v1" in release_rollback, "release-state rollback missing HOLD trigger cleanup")
