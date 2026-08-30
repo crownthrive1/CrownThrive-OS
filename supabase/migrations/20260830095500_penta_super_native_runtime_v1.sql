@@ -135,7 +135,7 @@ begin
       'pentasuper.remediation.'||v_top_problem.problem_id::text,
       'PentaSuper supervised remediation: '||coalesce(v_top_problem.title,v_top_problem.source_ref),
       coalesce(v_top_problem.summary,'Unresolved PentaSELF problem requiring supervised continuation or precise HOLD.'),
-      case when v_top_problem.authority_class='D3' then 'blocked' else 'open' end,
+      case when v_top_problem.authority_class='D3' then 'hold' else 'open' end,
       null,
       jsonb_build_object(
         'owner','ct.penta.super.v1','native_healer_owner',v_top_problem.owner_penta,'handler_key',v_top_problem.handler_key,
@@ -207,7 +207,6 @@ $$;
 revoke all on function penta_runtime.penta_super_native_tick_v1(text) from public, anon, authenticated;
 grant execute on function penta_runtime.penta_super_native_tick_v1(text) to service_role;
 
--- Register desired state first. This is the canonical scheduler intent used by PentaSELF/PentaTime reconciliation.
 select integration_control.scheduler_desired_job_upsert_v2(
   'ct-pentasuper-native-v1',
   '1,6,11,16,21,26,31,36,41,46,51,56 * * * *',
