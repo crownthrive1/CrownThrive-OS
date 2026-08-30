@@ -1,5 +1,7 @@
 -- Guarded rollback for Phase 15 D3 release-authority hardening.
 -- Valid only before any Phase 15 execution exists.
+-- Security rollback rule: nonfinal phases remain operable; Phase 15 release is
+-- disabled until an approved D3 release-authority mechanism is restored.
 
 begin;
 
@@ -80,7 +82,6 @@ declare
   v_release_id text;
   v_source_sha text;
   v_dail jsonb;
-  v_phase_state text;
 begin
   if current_user not in ('postgres','service_role') then raise exception 'service_role_required'; end if;
   v_eval:=integration_control.cos_phase_evaluate_v1(p_execution_id);
@@ -90,27 +91,25 @@ begin
   select phase_id,release_id,source_sha into v_phase_id,v_release_id,v_source_sha
   from integration_control.cos_phase_executions_v1 where execution_id=p_execution_id for update;
   if not found then raise exception 'unknown_execution'; end if;
-  v_phase_state:=case when v_phase_id='15' then 'production_certified' else 'certified' end;
+
+  if v_phase_id='15' then
+    raise exception 'phase15_release_disabled_after_d3_hardening_rollback';
+  end if;
+
   v_dail:=chlom_runtime.append_dail_event(
     'cos.phase.certified','cos_phase',v_phase_id,
-    jsonb_build_object('release_id',v_release_id,'execution_id',p_execution_id,'source_sha',v_source_sha,'evaluation',v_eval,'phase_state',v_phase_state),
+    jsonb_build_object('release_id',v_release_id,'execution_id',p_execution_id,'source_sha',v_source_sha,'evaluation',v_eval,'phase_state','certified'),
     p_actor,null,'ct.penta.certifier','cos-v1-phase-'||v_phase_id,v_release_id,p_execution_id::text,
-    case when v_phase_id='15' then 'D3 human-reserved final release authority plus independently satisfied technical gates' else 'COS V1 immutable phase protocol' end,
+    'COS V1 immutable phase protocol; Phase 15 remains disabled after D3 hardening rollback.',
     null,'restricted'
   );
   update integration_control.cos_phase_executions_v1
   set state='passed',ended_at=now(),dail_event_id=v_dail->>'event_id',updated_at=now()
   where execution_id=p_execution_id;
   update integration_control.cos_phase_registry_v1
-  set state=v_phase_state,latest_dail_event_id=v_dail->>'event_id',source_sha=v_source_sha,updated_at=now()
+  set state='certified',latest_dail_event_id=v_dail->>'event_id',source_sha=v_source_sha,updated_at=now()
   where phase_id=v_phase_id;
-  if v_phase_id='15' then
-    update integration_control.cos_release_registry_v1
-    set state='released',production_sha=v_source_sha,released_at=now(),updated_at=now(),
-        metadata=metadata || jsonb_build_object('cos_phase_15_execution_id',p_execution_id,'cos_phase_15_dail_event_id',v_dail->>'event_id','production_certification',true)
-    where release_id=v_release_id;
-  end if;
-  return jsonb_build_object('ok',true,'phase_id',v_phase_id,'phase_state',v_phase_state,'dail_receipt',v_dail,'evaluation',v_eval);
+  return jsonb_build_object('ok',true,'phase_id',v_phase_id,'phase_state','certified','dail_receipt',v_dail,'evaluation',v_eval);
 end
 $$;
 
