@@ -6,12 +6,12 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE_MIGRATION = ROOT / "supabase/migrations/20260830030000_cos_v1_phase_control_plane_v1.sql"
-BASE_ROLLBACK = ROOT / "supabase/rollbacks/20260830030000_cos_v1_phase_control_plane_v1.rollback.sql"
-D3_MIGRATION = ROOT / "supabase/migrations/20260830030100_cos_v1_phase15_d3_release_gate_v1.sql"
-D3_ROLLBACK = ROOT / "supabase/rollbacks/20260830030100_cos_v1_phase15_d3_release_gate_v1.rollback.sql"
-RELEASE_MIGRATION = ROOT / "supabase/migrations/20260830030200_cos_v1_release_candidate_state_machine_v1.sql"
-RELEASE_ROLLBACK = ROOT / "supabase/rollbacks/20260830030200_cos_v1_release_candidate_state_machine_v1.rollback.sql"
+BASE_MIGRATION = ROOT / "supabase/migrations/20260830024523_cos_v1_phase_control_plane_v1.sql"
+BASE_ROLLBACK = ROOT / "supabase/rollbacks/20260830024523_cos_v1_phase_control_plane_v1.rollback.sql"
+D3_MIGRATION = ROOT / "supabase/migrations/20260830024610_cos_v1_phase15_d3_release_gate_v1.sql"
+D3_ROLLBACK = ROOT / "supabase/rollbacks/20260830024610_cos_v1_phase15_d3_release_gate_v1.rollback.sql"
+RELEASE_MIGRATION = ROOT / "supabase/migrations/20260830024638_cos_v1_release_candidate_state_machine_v1.sql"
+RELEASE_ROLLBACK = ROOT / "supabase/rollbacks/20260830024638_cos_v1_release_candidate_state_machine_v1.rollback.sql"
 
 EXPECTED_PHASES = [f"{n:02d}" for n in range(16)]
 EXPECTED_COMMON_GATES = {
