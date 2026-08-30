@@ -1,0 +1,48 @@
+name: COS V1 Phase Control Plane
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/20260830021400_cos_v1_phase_control_plane_v1.sql"
+      - "supabase/rollbacks/20260830021400_cos_v1_phase_control_plane_v1.rollback.sql"
+      - "supabase/migrations/20260830021500_cos_v1_phase15_d3_release_gate_v1.sql"
+      - "supabase/rollbacks/20260830021500_cos_v1_phase15_d3_release_gate_v1.rollback.sql"
+      - "supabase/migrations/20260830021600_cos_v1_release_candidate_state_machine_v1.sql"
+      - "supabase/rollbacks/20260830021600_cos_v1_release_candidate_state_machine_v1.rollback.sql"
+      - "supabase/migrations/20260830021700_cos_v1_stale_execution_guard_v1.sql"
+      - "supabase/rollbacks/20260830021700_cos_v1_stale_execution_guard_v1.rollback.sql"
+      - "supabase/migrations/20260830021800_cos_v1_phase_dail_spine_v1.sql"
+      - "supabase/rollbacks/20260830021800_cos_v1_phase_dail_spine_v1.rollback.sql"
+      - "scripts/validate_cos_v1_phase_control_plane.py"
+      - "scripts/validate_cos_v1_d3_release_gate.py"
+      - "scripts/validate_cos_v1_stale_execution_guard.py"
+      - "scripts/validate_cos_v1_phase_dail_spine.py"
+      - ".github/workflows/cos-v1-phase-control-plane.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Validate COS V1 phase control plane
+        run: python scripts/validate_cos_v1_phase_control_plane.py
+      - name: Validate Phase 15 D3 release authority
+        run: python scripts/validate_cos_v1_d3_release_gate.py
+      - name: Validate stale-execution protections
+        run: python scripts/validate_cos_v1_stale_execution_guard.py
+      - name: Validate phase DAIL evidence spine
+        run: python scripts/validate_cos_v1_phase_dail_spine.py
+      - name: Whitespace integrity
+        run: git diff --check
