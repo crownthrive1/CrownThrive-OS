@@ -1,0 +1,95 @@
+---
+title: "Google Workspace Capability Truth"
+sidebarTitle: "Google Workspace Capability Truth"
+description: "Current governed Google Drive, Sheets, Service Usage and API Keys capability state for PentaDrive and ThriveBase."
+icon: "table-cells"
+---
+
+# Google Workspace Capability Truth
+
+**State date:** 2026-08-30<br />**Authority:** PentaDrive / PentaCredentials / PentaWire / PentaCertify<br />**Runtime source:** ThriveBase production project `tzajnzshmtzjenqulehq`
+
+This page records observed provider capability. Documentation does not manufacture provider, credential, deployment, certification, financial or D3 authority.
+
+## Current provider state
+
+| Surface | Current state | Production disposition |
+| --- | --- | --- |
+| Google Drive API | `ENABLED` | production read/write capability verified |
+| Google Sheets API | `ENABLED` | OAuth/service-account read/write capability verified |
+| Service Usage API | `ENABLED` | production read capability verified |
+| Google API Keys API | `ENABLED` | API surface present; key metadata/admin remains IAM-gated |
+| Enabled Google services | `96` | current provider inventory |
+
+Private Drive and Sheets access is authorized with OAuth/service-account scopes or the connected user connector. An API key by itself does **not** grant access to private Drive files or Sheets.
+
+## Sheets ownership model
+
+The governed living-mirror model is:
+
+`user-owned native Sheet -> governed Drive folder -> inherited service-identity writer -> ThriveBase population -> independent readback`
+
+This avoids the service identity's direct Drive ownership quota while retaining machine write/readback capability.
+
+A production canary created a user-owned Sheet for `penta_discovery.automation_bindings_v1`, bound table UUID `00785438-657d-4fc9-ae32-7dfe60307d88`, and service-account OAuth successfully wrote the `DATA` header. Independent connector readback observed the exact written header. The provider capability is therefore verified separately from the larger mirror orchestrator.
+
+## ThriveBase Living Sheets Mirror
+
+Each source table receives:
+
+- canonical table UUID;
+- DID `did:ct:thrivebase:table:<uuid>`;
+- source-schema SHA-256;
+- governed-machine fingerprint SHA-256;
+- sensitivity/mirror classification;
+- primary-key and column contract;
+- Penta Tabular Language encoding under `ct.penta.lang.tabular.v1`.
+
+The canonical spreadsheet layout is `__PENTA_META__`, `DATA`, `SCHEMA`, `PENTA`, and `HISTORY`.
+
+### Current orchestrator hold
+
+The 1,592-table mirror fleet is **not yet globally certified**. A worker defect was isolated: connector-preprovisioned Sheets were reused before worker bootstrap created the canonical tabs. Provision-aware queue claiming is deployed, but the bootstrap/terminal worker path remains `HOLD_BOOTSTRAP_TERMINAL_PATH` until repaired and rerun across bounded canaries.
+
+This hold does not revoke the independently verified Google Sheets OAuth read/write capability.
+
+## API-key inspection and rotation
+
+Both governed service identities currently have **zero** `apikeys.keys.*` IAM permissions. `keys.list` returns provider `PERMISSION_DENIED` even though `apikeys.googleapis.com` is enabled.
+
+Current dispositions:
+
+- API-key inspection: `HOLD_IAM`
+- API-key rotation: `HOLD_IAM_D3`
+
+Rotation must not begin by deleting the existing key. When IAM and a fresh CHLOM D3 invocation are present, the required sequence is:
+
+1. create the replacement key;
+2. apply exact API/application restrictions;
+3. bind all governed consumers;
+4. perform provider and runtime readback;
+5. supersede the old key in PentaCredentials/CHLOM/DAIL;
+6. retire the old key only after the overlap/readback window passes.
+
+Raw key strings, OAuth tokens and service-account private keys are prohibited from PentaDocs, GitHub, DAIL payloads and ordinary logs.
+
+## Runtime capability labels
+
+Production capability registry keys include:
+
+- `provider.google.drive.oauth.read`
+- `provider.google.drive.oauth.write`
+- `provider.google.sheets.oauth.read`
+- `provider.google.sheets.oauth.write`
+- `provider.google.sheets.create.user_owned`
+- `provider.google.serviceusage.read`
+
+Intentional holds include:
+
+- `provider.google.sheets.create.service_owned` -\> `HOLD_PROVIDER_QUOTA`
+- `provider.google.api_keys.inspect` -\> `HOLD_IAM`
+- `provider.google.api_keys.rotate` -\> `HOLD_IAM_D3`
+
+## Evidence and source custody
+
+The production capability reconciliation is DAIL-bound. GitHub source custody uses provider-issued migration versions and SHA-256 evidence; no migration replay or production-history rewrite is permitted.
