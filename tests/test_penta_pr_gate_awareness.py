@@ -1,4 +1,4 @@
-"""Tests for universal Penta PR gate-awareness and self-certification projection."""
+"""Tests for universal Penta PR gate-awareness originator-readiness projection."""
 
 from __future__ import annotations
 
@@ -15,9 +15,12 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from penta_pr_gate_awareness import (  # noqa: E402
     GateAwarenessError,
+    LEGACY_SELF_CERT_STATE,
+    READINESS_STATE,
     evidence_path,
     prepare,
     receipt_path,
+    sha256_json,
     validate_projection,
 )
 
@@ -40,9 +43,6 @@ class GateAwarenessTests(unittest.TestCase):
         ).strip()
 
     def fixture(self) -> tuple[Path, str, str, tempfile.TemporaryDirectory[str]]:
-        # The disposable fixture repo can briefly retain Git filesystem entries
-        # after a completed subprocess on hosted runners. Cleanup must never turn
-        # an otherwise passing behavioral test into a CI failure.
         temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         repo = Path(temp.name)
         self.git(repo.parent, "init", str(repo))
@@ -52,8 +52,14 @@ class GateAwarenessTests(unittest.TestCase):
         (repo / "penta" / "registry").mkdir(parents=True)
         shutil.copytree(ROOT / "penta" / "runtime", repo / "penta" / "runtime")
         (repo / "penta" / "__init__.py").write_text("", encoding="utf-8")
-        shutil.copy2(ROOT / "config" / "penta_pr_gate_awareness.json", repo / "config" / "penta_pr_gate_awareness.json")
-        shutil.copy2(ROOT / "penta" / "registry" / "serialized-suite.json", repo / "penta" / "registry" / "serialized-suite.json")
+        shutil.copy2(
+            ROOT / "config" / "penta_pr_gate_awareness.json",
+            repo / "config" / "penta_pr_gate_awareness.json",
+        )
+        shutil.copy2(
+            ROOT / "penta" / "registry" / "serialized-suite.json",
+            repo / "penta" / "registry" / "serialized-suite.json",
+        )
         workflow = repo / ".github" / "workflows" / "sample.yml"
         workflow.parent.mkdir(parents=True)
         workflow.write_text("name: sample\n", encoding="utf-8")
@@ -66,7 +72,7 @@ class GateAwarenessTests(unittest.TestCase):
         subject = self.git(repo, "rev-parse", "HEAD")
         return repo, base, subject, temp
 
-    def test_prepare_writes_exact_head_self_cert_and_continuity_receipt(self) -> None:
+    def prepare_fixture(self, number: int):
         repo, base, subject, temp = self.fixture()
         self.addCleanup(temp.cleanup)
         result = prepare(
@@ -74,39 +80,47 @@ class GateAwarenessTests(unittest.TestCase):
             repository="crownthrive1/CrownThrive-OS",
             base=base,
             head=subject,
-            number=42,
+            number=number,
             originator="penta.sample",
             policy_path=repo / "config" / "penta_pr_gate_awareness.json",
             serialized_policy_path=repo / "penta" / "registry" / "serialized-suite.json",
         )
+        return repo, base, subject, result
+
+    def test_prepare_records_readiness_without_certification_authority(self) -> None:
+        repo, base, subject, result = self.prepare_fixture(42)
         self.assertTrue(result["changed"])
         packet = json.loads((repo / evidence_path(42)).read_text(encoding="utf-8"))
         receipt = json.loads((repo / receipt_path(42)).read_text(encoding="utf-8"))
-        self.assertEqual(packet["self_certification_state"], "SELF_CERTIFIED")
-        self.assertEqual(packet["originator_identity"], "penta.sample")
-        self.assertEqual(packet["self_certifier_identity"], "penta.sample")
+
+        self.assertEqual(packet["originator_readiness_state"], READINESS_STATE)
+        self.assertEqual(packet["self_certification_state"], LEGACY_SELF_CERT_STATE)
+        self.assertNotEqual(packet["self_certification_state"], "SELF_CERTIFIED")
+        self.assertEqual(packet["actor_class"], "originator_same_lane")
+        self.assertFalse(packet["independent_certification"])
+        self.assertFalse(packet["authority_created"])
+        self.assertFalse(packet["merge_authority"])
+        self.assertFalse(packet["release_authority"])
+        self.assertTrue(packet["requires_pentacertifier"])
+        self.assertFalse(packet["provider_results_manufactured"])
+        self.assertFalse(packet["required_gate_bypass"])
         self.assertEqual(packet["subject_head_sha"], subject)
         self.assertEqual(packet["base_sha"], base)
-        self.assertFalse(packet["provider_results_manufactured"])
+
+        self.assertEqual(receipt["originator_readiness"]["state"], READINESS_STATE)
+        self.assertEqual(receipt["self_certification"]["state"], LEGACY_SELF_CERT_STATE)
+        self.assertTrue(receipt["self_certification"]["legacy_alias_only"])
+        self.assertFalse(receipt["self_certification"]["independent_certification"])
+        self.assertFalse(receipt["self_certification"]["merge_authority"])
+        self.assertTrue(receipt["self_certification"]["requires_pentacertifier"])
         self.assertEqual(len(receipt["changes"]), 1)
         self.assertEqual(receipt["changes"][0]["path"], ".github/workflows/sample.yml")
         self.assertEqual(receipt["changes"][0]["rollback_ref"], base)
 
-    def test_projection_validates_after_evidence_commit(self) -> None:
-        repo, base, subject, temp = self.fixture()
-        self.addCleanup(temp.cleanup)
-        prepare(
-            repo=repo,
-            repository="crownthrive1/CrownThrive-OS",
-            base=base,
-            head=subject,
-            number=43,
-            originator="penta.sample",
-            policy_path=repo / "config" / "penta_pr_gate_awareness.json",
-            serialized_policy_path=repo / "penta" / "registry" / "serialized-suite.json",
-        )
+    def test_projection_validates_after_readiness_commit(self) -> None:
+        repo, base, subject, _ = self.prepare_fixture(43)
         self.git(repo, "add", ".")
-        self.git(repo, "commit", "-m", "evidence projection")
+        self.git(repo, "commit", "-m", "readiness evidence projection")
         projection = self.git(repo, "rev-parse", "HEAD")
         result = validate_projection(
             repo=repo,
@@ -119,22 +133,60 @@ class GateAwarenessTests(unittest.TestCase):
         self.assertEqual(result["state"], "PASS")
         self.assertEqual(result["subject_head_sha"], subject)
         self.assertEqual(result["projection_head_sha"], projection)
-
-    def test_non_evidence_change_after_projection_invalidates_self_cert(self) -> None:
-        repo, base, subject, temp = self.fixture()
-        self.addCleanup(temp.cleanup)
-        prepare(
-            repo=repo,
-            repository="crownthrive1/CrownThrive-OS",
-            base=base,
-            head=subject,
-            number=44,
-            originator="penta.sample",
-            policy_path=repo / "config" / "penta_pr_gate_awareness.json",
-            serialized_policy_path=repo / "penta" / "registry" / "serialized-suite.json",
+        self.assertFalse(result["independent_certification"])
+        self.assertFalse(result["merge_authority"])
+        self.assertFalse(result["release_authority"])
+        self.assertTrue(result["requires_pentacertifier"])
+        self.assertEqual(
+            result["final_institutional_certification"],
+            "NOT_GRANTED_REQUIRES_INDEPENDENT_PENTACERTIFIER_AND_DAIL",
         )
+
+    def test_legacy_self_certified_state_is_rejected(self) -> None:
+        repo, base, _, _ = self.prepare_fixture(44)
+        packet_path = repo / evidence_path(44)
+        packet = json.loads(packet_path.read_text(encoding="utf-8"))
+        packet["self_certification_state"] = "SELF_CERTIFIED"
+        packet["evidence_sha256"] = sha256_json({k: v for k, v in packet.items() if k != "evidence_sha256"})
+        packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         self.git(repo, "add", ".")
-        self.git(repo, "commit", "-m", "evidence projection")
+        self.git(repo, "commit", "-m", "legacy ambiguous evidence")
+        head = self.git(repo, "rev-parse", "HEAD")
+        with self.assertRaises(GateAwarenessError):
+            validate_projection(
+                repo=repo,
+                base=base,
+                head=head,
+                number=44,
+                policy_path=repo / "config" / "penta_pr_gate_awareness.json",
+                serialized_policy_path=repo / "penta" / "registry" / "serialized-suite.json",
+            )
+
+    def test_attempted_certification_or_authority_claim_is_rejected(self) -> None:
+        repo, base, _, _ = self.prepare_fixture(45)
+        packet_path = repo / evidence_path(45)
+        packet = json.loads(packet_path.read_text(encoding="utf-8"))
+        packet["independent_certification"] = True
+        packet["merge_authority"] = True
+        packet["evidence_sha256"] = sha256_json({k: v for k, v in packet.items() if k != "evidence_sha256"})
+        packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        self.git(repo, "add", ".")
+        self.git(repo, "commit", "-m", "attempt authority escalation")
+        head = self.git(repo, "rev-parse", "HEAD")
+        with self.assertRaises(GateAwarenessError):
+            validate_projection(
+                repo=repo,
+                base=base,
+                head=head,
+                number=45,
+                policy_path=repo / "config" / "penta_pr_gate_awareness.json",
+                serialized_policy_path=repo / "penta" / "registry" / "serialized-suite.json",
+            )
+
+    def test_non_evidence_change_after_projection_invalidates_readiness(self) -> None:
+        repo, base, _, _ = self.prepare_fixture(46)
+        self.git(repo, "add", ".")
+        self.git(repo, "commit", "-m", "readiness evidence projection")
         (repo / "sample.txt").write_text("head moved\n", encoding="utf-8")
         self.git(repo, "add", "sample.txt")
         self.git(repo, "commit", "-m", "head moved")
@@ -144,7 +196,7 @@ class GateAwarenessTests(unittest.TestCase):
                 repo=repo,
                 base=base,
                 head=head,
-                number=44,
+                number=46,
                 policy_path=repo / "config" / "penta_pr_gate_awareness.json",
                 serialized_policy_path=repo / "penta" / "registry" / "serialized-suite.json",
             )
