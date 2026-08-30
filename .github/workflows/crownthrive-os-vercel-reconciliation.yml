@@ -1,0 +1,90 @@
+name: CrownThrive OS Vercel Reconciliation
+
+on:
+  schedule:
+    - cron: '17 13 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crownthrive-os-vercel-reconciliation
+  cancel-in-progress: true
+
+jobs:
+  reconcile-production-projection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PRODUCTION_PROOF_URL: https://crown-thrive-os.vercel.app/build.json
+    steps:
+      - name: Check out canonical main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Compare canonical Git SHA with live Vercel proof
+        id: proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANONICAL_SHA="$(git rev-parse HEAD)"
+          LIVE_SHA="$(curl --fail --silent --show-error --max-time 20 "$PRODUCTION_PROOF_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("commit", ""))' 2>/dev/null || true)"
+
+          echo "canonical_sha=$CANONICAL_SHA" >> "$GITHUB_OUTPUT"
+          echo "live_sha=$LIVE_SHA" >> "$GITHUB_OUTPUT"
+
+          if [[ "$LIVE_SHA" == "$CANONICAL_SHA" ]]; then
+            echo "reconcile=false" >> "$GITHUB_OUTPUT"
+            echo "Production proof already matches canonical main: $CANONICAL_SHA"
+          else
+            echo "reconcile=true" >> "$GITHUB_OUTPUT"
+            echo "Projection drift detected. canonical=$CANONICAL_SHA live=${LIVE_SHA:-unavailable}"
+          fi
+
+      - name: Trigger provider-native Vercel redeploy through Git integration
+        if: steps.proof.outputs.reconcile == 'true'
+        id: trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore(vercel): reconcile production projection"
+          git push origin HEAD:main
+          NEW_SHA="$(git rev-parse HEAD)"
+          echo "sha=$NEW_SHA" >> "$GITHUB_OUTPUT"
+          echo "Triggered Vercel Git deployment for $NEW_SHA"
+
+      - name: Verify recovered production proof
+        if: steps.proof.outputs.reconcile == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_SHA="${{ steps.trigger.outputs.sha }}"
+          for attempt in $(seq 1 18); do
+            LIVE_SHA="$(curl --fail --silent --show-error --max-time 15 "$PRODUCTION_PROOF_URL" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("commit", ""))' 2>/dev/null || true)"
+            if [[ "$LIVE_SHA" == "$EXPECTED_SHA" ]]; then
+              echo "Vercel production proof reconciled to $EXPECTED_SHA"
+              exit 0
+            fi
+            echo "Attempt $attempt/18: waiting for projection proof; live=${LIVE_SHA:-unavailable} expected=$EXPECTED_SHA"
+            sleep 10
+          done
+          echo "Production proof did not reconcile to $EXPECTED_SHA within the verification window." >&2
+          exit 1
+
+      - name: Reconciliation receipt
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## CrownThrive OS Vercel reconciliation"
+            echo "- Canonical source: crownthrive1/CrownThrive-OS@main"
+            echo "- Production proof: $PRODUCTION_PROOF_URL"
+            echo "- Canonical SHA at check: ${{ steps.proof.outputs.canonical_sha }}"
+            echo "- Live SHA at check: ${{ steps.proof.outputs.live_sha || 'unavailable' }}"
+            echo "- Redeploy required: ${{ steps.proof.outputs.reconcile }}"
+          } >> "$GITHUB_STEP_SUMMARY"
