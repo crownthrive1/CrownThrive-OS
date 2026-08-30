@@ -1,19 +1,17 @@
 # FAQ
 
 <!-- pentarelease:managed-release-surface:start -->
-## Latest PentaRelease — v3.61.3.0
+## Latest PentaRelease — v3.62.0.0
 
-- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.61.3.0
-- **Release title:** CrownThrive OS 3.61.3.0 — Autonomous PentaRelease
-- **Who:** PentaRelease / provider actor github-actions[bot]
-- **Why:** production fix/hardening delta
-- **Changed paths:** 24
-- **Provider actual cost:** $0.00 USD
-- **Recognized release exposure:** $0.00 USD
-- **Direct usage calculation:** `not_available`
-- **CIE:** **PASS — 100.0000/100**
-- **Evidence:** `4f079fe8aae79cad511ec2bfd0286ac67060e7fe2bd582f1e9af40deaa01a23b`
-- **Projection payload:** `67257d52753463cfb8554482e6d267dd2e232382bfce671ab5b426f761042ec1`
 
-PentaRelease maintains this bounded block. Content outside the markers remains under its existing ownership and editorial authority.
+- **Official release:** https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.62.0.0
+- **Release title:** CrownThrive OS 3.62.0.0 — Autonomous PentaRelease
+- **Why:** new executable capability or runtime delta
+- **Changed paths:** 3
+- **Penta components:** PentaRelease
+- **Direct USD payload cost:** not available
+- **CIE score:** not available
+- **Data/evidence:** comprehensive record, FAQ, changelog, costs, CIE status, data catalog, and evidence are attached to the official release.
+
+This section is maintained by PentaRelease. Content outside the managed markers remains under its existing ownership and editorial authority.
 <!-- pentarelease:managed-release-surface:end -->
