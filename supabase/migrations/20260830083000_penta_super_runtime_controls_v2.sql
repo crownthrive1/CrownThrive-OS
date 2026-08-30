@@ -184,15 +184,18 @@ end;
 $$;
 
 insert into penta_dnd.programs_v1(program_id,canonical_name,semantic_version,state,enabled,cron_expression,recipient,scope_kind,scope_ref,current_phase_key,next_phase_key,pass_counter,dnd_ttl_seconds,redundancy_profile,auto_renew,authority_ceiling,d3_human_reserved,no_silent_delete,metadata)
-values('ct.program.penta-super-build-dnd','PentaSuper Scoped Build DND','1.0.0','active',true,null,'contact@crownthrive.com','penta_super_build','ct.penta.super.v1','task_runtime_hardening','acceptance_canary',0,1800,'hot-warm-dual-cold-v1',false,'D2',true,true,jsonb_build_object('scheduler_created',false,'global_maintenance',false,'priority_required',true,'ttl_required',true,'snapshot_required',true,'no_self_certification',true,'source_ref','PR#1388/supabase/migrations/20260830083000_penta_super_runtime_controls_v2.sql'))
+values('ct.program.penta-super-build-dnd','PentaSuper Scoped Build DND','1.0.0','active',true,'0 0 31 2 *','contact@crownthrive.com','penta_super_build','ct.penta.super.v1','source_discovery','certify_hold_classify',0,1800,'hot-warm-dual-cold-v1',false,'D2',true,true,jsonb_build_object('scheduler_created',false,'cron_expression_inert_metadata_only',true,'global_maintenance',false,'priority_required',true,'ttl_required',true,'snapshot_required',true,'no_self_certification',true,'source_ref','PR#1388/supabase/migrations/20260830083000_penta_super_runtime_controls_v2.sql'))
 on conflict(program_id) do update set
   canonical_name=excluded.canonical_name,
   semantic_version=excluded.semantic_version,
   state=excluded.state,
   enabled=excluded.enabled,
+  cron_expression=excluded.cron_expression,
   recipient=excluded.recipient,
   scope_kind=excluded.scope_kind,
   scope_ref=excluded.scope_ref,
+  current_phase_key=excluded.current_phase_key,
+  next_phase_key=excluded.next_phase_key,
   dnd_ttl_seconds=excluded.dnd_ttl_seconds,
   auto_renew=excluded.auto_renew,
   authority_ceiling=excluded.authority_ceiling,
@@ -266,8 +269,8 @@ begin
     (v_run,'translate_transport_round_trip',coalesce((v_translate->>'round_trip_verified')::boolean,false),v_translate-'record'),
     (v_run,'translate_transport_no_confidentiality_claim',coalesce((v_translate->>'confidentiality')::boolean,true)=false,jsonb_build_object('confidentiality',v_translate->'confidentiality'));
 
-  perform penta_dnd.close_lease_v1((v_unrelated->>'lease_id')::uuid,'acceptance_unrelated_complete') where coalesce(v_unrelated->>'lease_id','')<>'';
-  perform penta_dnd.close_lease_v1((v_dnd->>'lease_id')::uuid,'acceptance_complete') where coalesce(v_dnd->>'lease_id','')<>'';
+  if coalesce(v_unrelated->>'lease_id','')<>'' then perform penta_dnd.close_lease_v1((v_unrelated->>'lease_id')::uuid,'acceptance_unrelated_complete'); end if;
+  if coalesce(v_dnd->>'lease_id','')<>'' then perform penta_dnd.close_lease_v1((v_dnd->>'lease_id')::uuid,'acceptance_complete'); end if;
 
   select bool_and(passed),count(*) into v_pass,v_assertions from penta_task_runtime.acceptance_assertions_v1 where run_id=v_run;
   v_execution:=chlom_runtime.append_dail_event('penta.super.task-runtime.acceptance.completed','penta_super_acceptance',v_run::text,jsonb_build_object('passed',coalesce(v_pass,false),'assertion_count',v_assertions,'snapshot_id',v_snapshot_id,'three_dail_logical_phase','DAIL-EXECUTION','production_certification',false),p_actor_ref,null,'PentaSuper','1.0.0','ctcorr:penta-super:acceptance:'||v_run::text,v_decision->>'event_id','D2',null,'internal');
