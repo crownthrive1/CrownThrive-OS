@@ -47,6 +47,12 @@ class CollisionSnapshotRetryContractTests(unittest.TestCase):
         self.assertIn('"inspection_error_count": len(report.get("inspection_errors") or {})', workflow)
         self.assertIn('decision["max_severity"] = observed_max', workflow)
 
+    def test_trusted_checkout_uses_control_plane_event_commit(self) -> None:
+        workflow = workflow_text()
+        self.assertIn('ref: ${{ github.sha }}', workflow)
+        self.assertNotIn('ref: ${{ github.event.pull_request.base.sha }}', workflow)
+        self.assertIn('Checkout trusted control-plane commit without credentials', workflow)
+
     def test_each_attempt_recomputes_and_preserves_evidence(self) -> None:
         workflow = workflow_text()
         self.assertIn('report="collision-governance-v2-report-attempt-${attempt}.json"', workflow)
