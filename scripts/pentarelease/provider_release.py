@@ -7,14 +7,18 @@ This adapter keeps provider availability separate from release truth:
 - authenticated GitHub REST is the hot read path;
 - rate-limited authenticated reads may fail over once to the unauthenticated public
   GitHub REST endpoint for the same exact tag; that warm path is read-only;
+- exact release assets may be recovered through their provider-verified public
+  GitHub download URLs without consuming installation API quota;
 - 403/429/5xx and network failures remain bounded and ultimately fail closed;
-- authenticated 404, mismatched tags, and draft releases fail closed immediately;
+- authenticated 404, mismatched tags, drafts, asset identity drift, size drift, and
+  digest drift fail closed immediately;
 - the verified provider payload can be reused by release_surface.py without a
   second provider lookup that could disagree because of rate limits or API lag.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -102,10 +106,17 @@ def _read_error_body(exc: urllib.error.HTTPError) -> str:
         return ""
 
 
-def _provider_release_url(repository: str, tag: str) -> str:
-    if "/" not in repository:
+def _split_repository(repository: str) -> tuple[str, str]:
+    if repository.count("/") != 1:
         raise ProviderReleaseError(f"invalid_repository:{repository}")
     owner, name = repository.split("/", 1)
+    if not owner or not name:
+        raise ProviderReleaseError(f"invalid_repository:{repository}")
+    return owner, name
+
+
+def _provider_release_url(repository: str, tag: str) -> str:
+    owner, name = _split_repository(repository)
     return (
         "https://api.github.com/repos/"
         f"{urllib.parse.quote(owner, safe='')}/{urllib.parse.quote(name, safe='')}"
@@ -301,6 +312,139 @@ def load_verified_release(path: Path, expected_tag: str) -> dict[str, Any]:
     return validate_provider_release(payload, expected_tag)
 
 
+def _select_verified_asset(
+    payload: dict[str, Any],
+    expected_tag: str,
+    asset_name: str,
+) -> dict[str, Any]:
+    validate_provider_release(payload, expected_tag)
+    if not asset_name or "/" in asset_name or "\\" in asset_name:
+        raise ProviderReleaseError(f"invalid_release_asset_name:{asset_name}")
+    matches = [
+        asset for asset in (payload.get("assets") or [])
+        if isinstance(asset, dict) and asset.get("name") == asset_name
+    ]
+    if not matches:
+        raise ProviderReleaseError(
+            f"verified_release_asset_missing:{expected_tag}:{asset_name}"
+        )
+    if len(matches) != 1:
+        raise ProviderReleaseError(
+            f"verified_release_asset_ambiguous:{expected_tag}:{asset_name}"
+        )
+    return matches[0]
+
+
+def _verified_asset_url(
+    repository: str,
+    tag: str,
+    asset_name: str,
+    asset: dict[str, Any],
+) -> str:
+    url = asset.get("browser_download_url")
+    if not isinstance(url, str) or not url:
+        raise ProviderReleaseError(
+            f"verified_release_asset_url_missing:{tag}:{asset_name}"
+        )
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() != "github.com":
+        raise ProviderReleaseError(
+            f"verified_release_asset_url_untrusted:{tag}:{asset_name}"
+        )
+    if parsed.query or parsed.fragment or parsed.username or parsed.password or parsed.port:
+        raise ProviderReleaseError(
+            f"verified_release_asset_url_untrusted:{tag}:{asset_name}"
+        )
+    owner, repo = _split_repository(repository)
+    decoded_path = urllib.parse.unquote(parsed.path)
+    expected_path = f"/{owner}/{repo}/releases/download/{tag}/{asset_name}"
+    if decoded_path != expected_path:
+        raise ProviderReleaseError(
+            f"verified_release_asset_url_mismatch:{tag}:{asset_name}"
+        )
+    return url
+
+
+def download_verified_release_asset(
+    release_json: Path,
+    repository: str,
+    tag: str,
+    asset_name: str,
+    output: Path,
+    *,
+    timeout: int = 30,
+    opener: Callable[..., Any] = urllib.request.urlopen,
+) -> dict[str, Any]:
+    """Recover one exact asset from an already provider-verified public release.
+
+    The initial URL is constrained to the canonical GitHub release download path
+    for the exact repository/tag/name. No installation token is sent. Provider
+    size and optional SHA-256 digest are independently checked before atomic write.
+    """
+    payload = load_verified_release(release_json, tag)
+    asset = _select_verified_asset(payload, tag, asset_name)
+    url = _verified_asset_url(repository, tag, asset_name, asset)
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "CrownThrive-PentaRelease"},
+        method="GET",
+    )
+    try:
+        with opener(request, timeout=timeout) as response:
+            data = response.read()
+    except urllib.error.HTTPError as exc:
+        body = _read_error_body(exc)
+        raise ProviderReleaseError(
+            f"provider_asset_http_{exc.code}:{tag}:{asset_name}:{body}"
+        ) from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise ProviderReleaseError(
+            f"provider_asset_network_error:{tag}:{asset_name}:{exc}"
+        ) from exc
+
+    if not isinstance(data, (bytes, bytearray)) or not data:
+        raise ProviderReleaseError(
+            f"provider_asset_empty:{tag}:{asset_name}"
+        )
+    data = bytes(data)
+
+    expected_size = asset.get("size")
+    if not isinstance(expected_size, int) or expected_size < 0:
+        raise ProviderReleaseError(
+            f"provider_asset_size_missing:{tag}:{asset_name}"
+        )
+    if len(data) != expected_size:
+        raise ProviderReleaseError(
+            f"provider_asset_size_mismatch:{tag}:{asset_name}:expected={expected_size}:actual={len(data)}"
+        )
+
+    digest = asset.get("digest")
+    if digest is not None:
+        if not isinstance(digest, str) or not digest.startswith("sha256:"):
+            raise ProviderReleaseError(
+                f"provider_asset_digest_unsupported:{tag}:{asset_name}"
+            )
+        expected_digest = digest.removeprefix("sha256:")
+        actual_digest = hashlib.sha256(data).hexdigest()
+        if expected_digest != actual_digest:
+            raise ProviderReleaseError(
+                f"provider_asset_digest_mismatch:{tag}:{asset_name}"
+            )
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temp = output.with_suffix(output.suffix + ".tmp")
+    temp.write_bytes(data)
+    temp.replace(output)
+    return {
+        "status": "verified_asset_downloaded",
+        "tag": tag,
+        "name": asset_name,
+        "size": len(data),
+        "digest": digest,
+        "url": url,
+    }
+
+
 def normalize_for_release_surface(payload: dict[str, Any], expected_tag: str) -> dict[str, Any]:
     payload = validate_provider_release(payload, expected_tag)
     return {
@@ -367,6 +511,13 @@ def build_parser() -> argparse.ArgumentParser:
     read.add_argument("--tag")
     read.add_argument("--output", required=True)
 
+    asset = sub.add_parser("asset")
+    asset.add_argument("--release-json", required=True)
+    asset.add_argument("--repository", required=True)
+    asset.add_argument("--tag", required=True)
+    asset.add_argument("--name", required=True)
+    asset.add_argument("--output", required=True)
+
     surface = sub.add_parser("surface")
     surface.add_argument("--release-json", required=True)
     surface.add_argument("--repository", required=True)
@@ -397,6 +548,15 @@ def main() -> None:
                 "draft": payload.get("draft"),
                 "prerelease": payload.get("prerelease"),
             }, indent=2))
+        elif args.command == "asset":
+            result = download_verified_release_asset(
+                Path(args.release_json),
+                args.repository,
+                args.tag,
+                args.name,
+                Path(args.output),
+            )
+            print(json.dumps(result, indent=2, sort_keys=True))
         else:
             run_verified_surface(args)
     except ProviderReleaseError as exc:
