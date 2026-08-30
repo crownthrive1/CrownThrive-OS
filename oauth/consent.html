@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>CrownThrive ID — Authorize</title>
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#090b10;color:#f6f7fb}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at top,#1b2030 0,#090b10 52%)}main{width:min(560px,100%);background:#11151f;border:1px solid #2a3142;border-radius:20px;padding:32px;box-shadow:0 24px 80px #0008}h1{margin:.3rem 0 .5rem;font-size:1.65rem}p{color:#b8c0d1;line-height:1.55}.brand{font-weight:800;letter-spacing:.06em}.panel{margin:22px 0;padding:18px;border-radius:14px;background:#0b0e15;border:1px solid #252c3a}.row{margin:9px 0;word-break:break-word}.label{color:#8993a8;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}.scopes{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.scope{background:#1d2431;border:1px solid #313b4e;border-radius:999px;padding:6px 10px;font-size:.86rem}.actions{display:flex;gap:12px}.actions button{flex:1;border:0;border-radius:12px;padding:13px 16px;font-weight:750;cursor:pointer}.approve{background:#f3f5f8;color:#0a0d12}.deny{background:#222936;color:#f5f6fa}.status{min-height:1.4em;color:#ffb4b4;margin-top:14px}.muted{font-size:.82rem;color:#7f899d}button:disabled{opacity:.55;cursor:not-allowed}</style>
+</head>
+<body>
+<main>
+  <div class="brand">CROWNTHRIVE ID</div>
+  <h1>Authorize application</h1>
+  <p id="intro">Loading authorization request…</p>
+  <section class="panel" id="details" hidden>
+    <div class="row"><div class="label">Application</div><div id="client"></div></div>
+    <div class="row"><div class="label">Redirect</div><div id="redirect"></div></div>
+    <div class="row"><div class="label">Requested permissions</div><div class="scopes" id="scopes"></div></div>
+  </section>
+  <div class="actions" id="actions" hidden>
+    <button class="deny" id="deny">Deny</button>
+    <button class="approve" id="approve">Authorize</button>
+  </div>
+  <div class="status" id="status"></div>
+  <p class="muted">CrownThrive ID uses ThriveBase authentication. Only authorize applications you recognize.</p>
+</main>
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+  const SUPABASE_URL='https://tzajnzshmtzjenqulehq.supabase.co';
+  const authorizationId=new URLSearchParams(location.search).get('authorization_id');
+  const status=document.querySelector('#status');
+  const intro=document.querySelector('#intro');
+  const details=document.querySelector('#details');
+  const actions=document.querySelector('#actions');
+  const setError=(m)=>{status.textContent=m;};
+  if(!authorizationId){intro.textContent='Invalid authorization request.';setError('Missing authorization_id.');throw new Error('Missing authorization_id');}
+  let publishableKey;
+  try {
+    const r=await fetch('/api/public-config',{headers:{accept:'application/json'}});
+    if(r.ok){const j=await r.json();publishableKey=j.supabasePublishableKey||j.supabaseAnonKey;}
+  } catch (_) {}
+  if(!publishableKey){intro.textContent='CrownThrive ID configuration is incomplete.';setError('Public authentication configuration is unavailable.');throw new Error('Missing publishable key');}
+  const supabase=createClient(SUPABASE_URL,publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  const {data:{user}}=await supabase.auth.getUser();
+  if(!user){const returnTo=`/oauth/consent?authorization_id=${encodeURIComponent(authorizationId)}`;location.replace(`/login?redirect=${encodeURIComponent(returnTo)}`);}
+  const {data,error}=await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+  if(error||!data){intro.textContent='Authorization request could not be loaded.';setError(error?.message||'Invalid authorization request.');throw error||new Error('Invalid authorization request');}
+  if(!('authorization_id' in data)){location.replace(data.redirect_url);}
+  document.querySelector('#client').textContent=data.client?.name||data.client_id||'Application';
+  document.querySelector('#redirect').textContent=data.redirect_uri||'';
+  const scopeList=(data.scope||'').trim().split(/\s+/).filter(Boolean);
+  const scopeBox=document.querySelector('#scopes');
+  (scopeList.length?scopeList:['email']).forEach(s=>{const e=document.createElement('span');e.className='scope';e.textContent=s;scopeBox.appendChild(e);});
+  intro.textContent=`${data.client?.name||'This application'} is requesting access to your CrownThrive ID.`;
+  details.hidden=false;actions.hidden=false;
+  async function decide(approve){
+    actions.querySelectorAll('button').forEach(b=>b.disabled=true);status.textContent=approve?'Authorizing…':'Denying…';
+    const result=approve?await supabase.auth.oauth.approveAuthorization(authorizationId):await supabase.auth.oauth.denyAuthorization(authorizationId);
+    if(result.error){setError(result.error.message);actions.querySelectorAll('button').forEach(b=>b.disabled=false);return;}
+    location.replace(result.data.redirect_url);
+  }
+  document.querySelector('#approve').onclick=()=>decide(true);
+  document.querySelector('#deny').onclick=()=>decide(false);
+</script>
+</body>
+</html>
