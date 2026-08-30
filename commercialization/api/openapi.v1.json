@@ -1,0 +1,134 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CrownThrive COS Commercialization Interface",
+    "version": "1.0.0-rc.1",
+    "description": "Source contract for public-safe catalog reads and governed commercialization requests. No live server is asserted by this document."
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "x-crownthrive-component-id": "ct.cos.commercialization-fabric",
+  "x-crownthrive-state": "BUILT_UNDEPLOYED_CONTROLLED_TEST",
+  "x-crownthrive-routing-ref": "commercialization/routing/mesh-routing.v1.json",
+  "x-crownthrive-no-live-server-assertion": true,
+  "paths": {
+    "/commercialization/v1/catalog": {
+      "get": {
+        "operationId": "listCommercialCatalog",
+        "x-crownthrive-mesh-operation": "commercial.catalog.list",
+        "responses": {
+          "200": {
+            "description": "Public-safe catalog projection",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CatalogProjection"}}}
+          }
+        }
+      }
+    },
+    "/commercialization/v1/catalog/{component_id}": {
+      "get": {
+        "operationId": "getCommercialCatalogComponent",
+        "x-crownthrive-mesh-operation": "commercial.catalog.get",
+        "parameters": [
+          {"name": "component_id", "in": "path", "required": true, "schema": {"type": "string", "minLength": 3}},
+          {"name": "version", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Exact source-bound component projection", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ComponentProjection"}}}},
+          "404": {"description": "No admitted component/version"}
+        }
+      }
+    },
+    "/commercialization/v1/offers": {
+      "get": {
+        "operationId": "listCommercialOffers",
+        "x-crownthrive-mesh-operation": "commercial.offer.list",
+        "responses": {
+          "200": {"description": "Visible offers; an offer does not by itself create a license", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/OfferProjection"}}}}}
+        }
+      }
+    },
+    "/commercialization/v1/install/{component_id}": {
+      "get": {
+        "operationId": "resolveCommercialInstall",
+        "x-crownthrive-mesh-operation": "commercial.install.resolve",
+        "parameters": [
+          {"name": "component_id", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "version", "in": "query", "required": true, "schema": {"type": "string"}},
+          {"name": "ecosystem", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Immutable Git/archive/OCI/native-adapter coordinates", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InstallResolution"}}}}
+        }
+      }
+    },
+    "/commercialization/v1/license/quotes": {
+      "post": {
+        "operationId": "requestCommercialLicenseQuote",
+        "x-crownthrive-mesh-operation": "commercial.license.quote.request",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}, {"$ref": "#/components/parameters/SourceSha"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/QuoteRequest"}}}},
+        "responses": {
+          "202": {"description": "Governed quote request accepted; no license or price is implied", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DispatchReceipt"}}}},
+          "409": {"description": "Authority, rights, evidence, idempotency, or state gate failed"}
+        }
+      }
+    },
+    "/commercialization/v1/wallet/intents": {
+      "post": {
+        "operationId": "prepareCommercialWalletIntent",
+        "x-crownthrive-mesh-operation": "commercial.wallet.intent.create",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}, {"$ref": "#/components/parameters/SourceSha"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WalletIntentRequest"}}}},
+        "responses": {
+          "202": {"description": "Secret-free wallet handoff prepared; no transaction broadcast or entitlement", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DispatchReceipt"}}}},
+          "409": {"description": "ECAC, wallet, license, quote, amount, or authority gate failed"}
+        }
+      }
+    },
+    "/commercialization/v1/publication/requests": {
+      "post": {
+        "operationId": "requestCommercialPublication",
+        "x-crownthrive-mesh-operation": "commercial.publication.request",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}, {"$ref": "#/components/parameters/SourceSha"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublicationRequest"}}}},
+        "responses": {
+          "202": {"description": "PentaRelease request prepared; provider readback remains required", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DispatchReceipt"}}}}
+        }
+      }
+    },
+    "/commercialization/v1/release/readbacks/reconcile": {
+      "post": {
+        "operationId": "reconcileCommercialReleaseReadback",
+        "x-crownthrive-mesh-operation": "commercial.release.readback.reconcile",
+        "security": [{"bearerAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}, {"$ref": "#/components/parameters/SourceSha"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReadbackRequest"}}}},
+        "responses": {
+          "202": {"description": "Readback reconciliation queued or recorded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DispatchReceipt"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "opaque runtime credential"}
+    },
+    "parameters": {
+      "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 8}},
+      "SourceSha": {"name": "X-CrownThrive-Source-SHA", "in": "header", "required": true, "schema": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"}}
+    },
+    "schemas": {
+      "CatalogProjection": {"type": "object", "required": ["source_sha", "components", "withheld"], "properties": {"source_sha": {"type": "string"}, "components": {"type": "array", "items": {"$ref": "#/components/schemas/ComponentProjection"}}, "withheld": {"type": "array", "items": {"type": "object"}}}},
+      "ComponentProjection": {"type": "object", "required": ["component_id", "version", "source_sha", "source_fingerprint"], "properties": {"component_id": {"type": "string"}, "version": {"type": "string"}, "source_sha": {"type": "string"}, "source_fingerprint": {"type": "string"}, "catalog_state": {"type": "string"}}},
+      "OfferProjection": {"type": "object", "required": ["offer_id", "component_id", "offer_state", "price_mode"], "properties": {"offer_id": {"type": "string"}, "component_id": {"type": "string"}, "offer_state": {"type": "string"}, "price_mode": {"type": "string"}, "amount_minor": {"type": ["integer", "null"]}, "license_id": {"type": "string"}}},
+      "InstallResolution": {"type": "object", "required": ["component_id", "version", "source_sha", "coordinates"], "properties": {"component_id": {"type": "string"}, "version": {"type": "string"}, "source_sha": {"type": "string"}, "coordinates": {"type": "array", "items": {"type": "object"}, "minItems": 1}, "publication_authorized": {"const": false}}},
+      "QuoteRequest": {"type": "object", "required": ["principal_did", "component_id", "component_version", "field_of_use"], "properties": {"principal_did": {"type": "string"}, "component_id": {"type": "string"}, "component_version": {"type": "string"}, "field_of_use": {"type": "string"}, "users": {"type": ["integer", "null"], "minimum": 1}, "environments": {"type": "array", "items": {"type": "string"}}, "data_model_rights_requested": {"type": "boolean"}}},
+      "WalletIntentRequest": {"type": "object", "required": ["principal_did", "offer_id", "license_id", "amount_minor", "currency", "quote_fingerprint", "ecac_state"], "properties": {"principal_did": {"type": "string"}, "offer_id": {"type": "string"}, "license_id": {"type": "string"}, "amount_minor": {"type": "integer", "minimum": 0}, "currency": {"type": "string"}, "quote_fingerprint": {"type": "string"}, "ecac_state": {"const": "PASS"}}},
+      "PublicationRequest": {"type": "object", "required": ["release_id", "tag", "package", "source_sha"], "properties": {"release_id": {"type": "string"}, "tag": {"type": "string"}, "package": {"type": "string"}, "source_sha": {"type": "string"}, "prerelease": {"type": "boolean"}}},
+      "ReadbackRequest": {"type": "object", "required": ["release_id", "source_sha", "provider_release_id", "asset_checksums"], "properties": {"release_id": {"type": "string"}, "source_sha": {"type": "string"}, "provider_release_id": {"type": "string"}, "asset_checksums": {"type": "object", "additionalProperties": {"type": "string"}}}},
+      "DispatchReceipt": {"type": "object", "required": ["envelope_id", "operation", "lane", "source_sha", "request_fingerprint", "state"], "properties": {"envelope_id": {"type": "string"}, "operation": {"type": "string"}, "lane": {"enum": ["hot", "warm", "cold"]}, "source_sha": {"type": "string"}, "request_fingerprint": {"type": "string"}, "state": {"type": "string"}, "provider_execution_performed": {"const": false}}}
+    }
+  }
+}

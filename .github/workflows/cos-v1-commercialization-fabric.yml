@@ -1,0 +1,179 @@
+name: COS V1 Commercialization Fabric
+
+on:
+  pull_request:
+    paths:
+      - "commercialization/**"
+      - "scripts/commercialization/**"
+      - "tests/test_cos_commercialization_*.py"
+      - "developers/manifests/cos-v1-commercialization-fabric.v1.json"
+      - "penta/continuity/receipts/20260830-cos-v1-commercialization-fabric-candidate-v1.json"
+      - "releases/cos-commercialization-fabric-v1.0.0-rc.1/**"
+      - ".github/release-requests/cos-commercialization-fabric-v1.0.0-rc.1.json"
+      - ".github/workflows/cos-v1-commercialization-fabric.yml"
+      - ".pentarelease/policy.json"
+  push:
+    branches: [main]
+    paths:
+      - "commercialization/**"
+      - "scripts/commercialization/**"
+      - "tests/test_cos_commercialization_*.py"
+      - "developers/manifests/cos-v1-commercialization-fabric.v1.json"
+      - "releases/cos-commercialization-fabric-v1.0.0-rc.1/**"
+      - ".github/release-requests/cos-commercialization-fabric-v1.0.0-rc.1.json"
+  workflow_dispatch:
+    inputs:
+      require_eligible:
+        description: Fail when no explicitly certified catalog entry is eligible
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cos-commercialization-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-build-package:
+    name: Validate, catalog, and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile commercialization tooling
+        run: python3 -m compileall -q scripts/commercialization tests/test_cos_commercialization_*.py
+
+      - name: Run scope tests
+        run: python3 -m unittest -v tests.test_cos_commercialization_fabric
+
+      - name: Validate source JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          roots = [
+              Path("commercialization"),
+              Path("developers/manifests/cos-v1-commercialization-fabric.v1.json"),
+              Path("penta/continuity/receipts/20260830-cos-v1-commercialization-fabric-candidate-v1.json"),
+              Path("releases/cos-commercialization-fabric-v1.0.0-rc.1/MANIFEST.json"),
+              Path(".github/release-requests/cos-commercialization-fabric-v1.0.0-rc.1.json"),
+          ]
+          files = []
+          for root in roots:
+              if root.is_dir():
+                  files.extend(root.rglob("*.json"))
+              elif root.exists():
+                  files.append(root)
+          for path in sorted(set(files)):
+              json.loads(path.read_text(encoding="utf-8"))
+              print(path)
+          PY
+
+      - name: Build evidence-derived catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            --repo-root .
+            --output dist/commercialization
+            --source-sha "${GITHUB_SHA}"
+            --require-clean-sources
+          )
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" || "${{ inputs.require_eligible }}" == "true" ]]; then
+            args+=(--require-eligible)
+          fi
+          python3 scripts/commercialization/build_catalog.py "${args[@]}"
+
+      - name: Generate native registry adapter packages
+        run: >-
+          python3 scripts/commercialization/generate_adapters.py
+          --catalog dist/commercialization/catalog.json
+          --output dist/commercialization/registry-adapters
+
+      - name: Build deterministic release artifacts
+        run: >-
+          python3 scripts/commercialization/package_release.py
+          --repo-root .
+          --output dist/release
+          --version 1.0.0-rc.1
+          --source-sha "${GITHUB_SHA}"
+          --catalog-dir dist/commercialization
+          --release-notes releases/cos-commercialization-fabric-v1.0.0-rc.1/RELEASE_NOTES.md
+
+      - name: Verify checksums
+        working-directory: dist/release
+        run: sha256sum --check SHA256SUMS
+
+      - name: Secret-pattern guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from scripts.commercialization.package_release import scan_text_secret
+
+          roots = [Path("commercialization"), Path("scripts/commercialization"), Path("dist")]
+          for root in roots:
+              for path in sorted(root.rglob("*")):
+                  if not path.is_file() or path.suffix in {".pyc", ".zip", ".gz"}:
+                      continue
+                  scan_text_secret(path, path.read_bytes())
+                  print(path)
+          PY
+
+      - name: Upload catalog and release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cos-commercialization-${{ github.sha }}
+          path: |
+            dist/commercialization/**
+            dist/release/**
+          if-no-files-found: error
+          retention-days: 30
+
+  publication-boundary:
+    name: Verify publication remains governed
+    runs-on: ubuntu-latest
+    needs: validate-build-package
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert PentaRelease handoff and no direct registry publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .github/release-requests/cos-commercialization-fabric-v1.0.0-rc.1.json
+          test -f releases/cos-commercialization-fabric-v1.0.0-rc.1/MANIFEST.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          workflow_text = Path('.github/workflows/cos-v1-commercialization-fabric.yml').read_text()
+          prohibited = [
+              "npm" + " publish",
+              "twine" + " upload",
+              "cargo" + " publish",
+              "dotnet" + " nuget push",
+              "gem" + " push",
+              "docker" + " push",
+          ]
+          assert not any(token in workflow_text for token in prohibited)
+          request = json.loads(Path('.github/release-requests/cos-commercialization-fabric-v1.0.0-rc.1.json').read_text())
+          manifest = json.loads(Path('releases/cos-commercialization-fabric-v1.0.0-rc.1/MANIFEST.json').read_text())
+          assert request['publisher'] == 'PentaRelease'
+          assert request['prerelease'] is True
+          assert manifest['governance']['production_certification'] == 'HOLD'
+          assert manifest['governance']['provider_readback_required'] is True
+          PY
