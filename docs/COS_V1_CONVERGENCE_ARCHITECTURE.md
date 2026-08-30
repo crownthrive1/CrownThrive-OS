@@ -14,11 +14,17 @@ For consequential mutations, the required lineage is:
 
 COS does not equate convergence with indiscriminate activation. One hundred percent convergence means one hundred percent discovered, identified, classified, governed, evidence-addressable and repair-routable—with each capability intentionally active, intentionally gated, retired, superseded or human-reserved.
 
-## Current release gate — verified 2026-08-30
+## Current release gate — live phase-control semantics
 
-The live COS status runtime reports `certifiable`, and the release registry records a pre-release certification. COS V1 is **not released**: `production_sha` and `released_at` remain null. The pre-release receipt names source SHA `a85ee697c7d51dbb89cb2a9ecf6974efca68a72a`, but that SHA was not present in the fetched GitHub references during source reconciliation. The currently deployed public control plane still reports main SHA `09745d070c8664edb1a8c408eb670b3b59b8e320`.
+The authoritative release state is resolved at runtime from `integration_control.cos_release_registry_v1`, `integration_control.cos_phase_registry_v1`, the latest phase execution, direct GitHub `main` readback and applicable provider/deployment readback. This document intentionally does **not** hard-code a supposedly current Git SHA because any later governed merge would immediately stale that literal.
 
-Therefore source acceptance and production readback remain `HOLD`. Release promotion requires a governed merge, deployment of that exact accepted main SHA, independent endpoint/provider readback, and a new release-readback certification. A runtime `certifiable` result or pre-release PASS cannot substitute for that chain.
+COS V1 is **not released** unless the release registry is `released` and both `production_sha` and `released_at` are bound by the Phase 15 finalizer. A historical pre-release certification, a source-validation PASS, a merged pull request, a deployment success, or a provider receipt alone cannot substitute for the complete phase chain.
+
+Phase execution is exact-source and monotonic. When canonical `main` advances after a phase execution begins, the older execution is preserved as historical HOLD/superseded evidence and may not receive a stale PASS. A replacement execution must bind the new exact `main` SHA and independently re-establish source-sensitive gates.
+
+During founder-supervised COS build maintenance, schedulers may be intentionally quiesced. `PAUSED_FOR_TARGETED_MAINTENANCE` or the equivalent COS build-session pause is therefore intentional state, not production-health evidence and not permission to manufacture an active-clock claim. Reactivation is a separately governed, read-back transition.
+
+Phase 00 remains `converging` until every required constitutional gate is proven, including regression closure, retirement/supersession cleanup and governed documentation projection. Phase 15 remains the only release path and additionally requires an exact-source, current, unheld founder D3 `cos.production_release` authority binding.
 
 ## Reproducible source validation
 
@@ -178,7 +184,7 @@ PentaPlanner converts repairable conditions into deduplicated work packets. Pent
 
 ## PentaPlanner continuous mode
 
-PentaPlanner remains active during weekends and outside business delivery windows.
+PentaPlanner remains active during weekends and outside business delivery windows under normal production operation. During an explicit governed maintenance/quiescence event, its schedule may be intentionally paused with the rest of the affected execution domain.
 
 Business mode may route executable work. Weekend and overnight mode is `plan_and_prepare`, including:
 
@@ -250,49 +256,51 @@ Fallback execution cannot silently become the primary authority. Every fallback 
 
 ## Canonical clocks
 
-COS adds only two orchestration clocks and reuses specialist clocks:
+Normal production topology uses two COS orchestration clock families while reusing specialist clocks:
 
 - `ct-dail-trust-checkpoint-v2` — minutes 7, 22, 37 and 52;
 - `ct-cos-v1-convergence-v2` — minutes 9, 19, 29, 39, 49 and 59.
 
-PentaPlanner, PersonaFactory, Pentas routing, software factory, PentaWire, PentaCensus, PentaSELF and provider-specific jobs retain their specialist clocks. Exact duplicate/superseded COS, checkpoint and Pentas-router clocks are retired and prevented from auto-restoring.
+PentaPlanner, PersonaFactory, Pentas routing, software factory, PentaWire, PentaCensus, PentaSELF and provider-specific jobs retain their specialist ownership in normal operation. Exact duplicate/superseded COS, checkpoint and Pentas-router clocks are retired and prevented from auto-restoring.
+
+A governed maintenance/quiescence event may intentionally pause all or part of this topology. A paused clock is not failed merely because it is paused, and it is not considered production-active until reactivation and scheduler readback prove that state.
 
 ## Certification
 
-`public.cos_v1_certify_v1` has two stages:
+The COS V1 phase-control plane supersedes any interpretation that a pre-release status function can itself release the operating system. `integration_control.cos_phase_begin_v1`, gate receipts, exact-source readback, independent certification and `integration_control.cos_phase_finalize_v1` govern Phase 00–15 progression.
 
-1. **Pre-release certification** records the submitted source SHA and a scoped PASS/HOLD receipt. Separate GitHub readback must prove that the SHA belongs to the governed source lineage.
-2. **Release readback certification** binds the verified production SHA after merge and promotes the release to `released` only when the runtime remains certifiable.
+Phase 15 alone may bind `production_sha` and `released_at`, and only after all technical gates plus a separately governed exact-source founder D3 `cos.production_release` approval are current and unheld. The generic gate API cannot manufacture that D3 receipt.
 
-The first stage is currently recorded; the source-lineage readback and second stage remain held. No production release claim is made by this document.
+Source validation, provider canaries and earlier `public.cos_v1_certify_v1` receipts remain evidence inputs. They do not override the phase-control plane or manufacture a production release.
 
-The source-controlled `PentaFabric Production Canary` is built but remains `BUILT_HOLD_EXTERNAL_ACTIVATION`. A legitimate run must come from exact `main`, pass the protected `pentafabric-production` environment, emit an HMAC-bound event through Vercel OIDC, and receive exact Supabase readback. Its signed event is durable in `public.pentafabric_events`. Release promotion still requires the external registry verifier behind the release-readback stage to re-read that exact event and bind its signing SHA to both accepted Git source and observed Vercel production. A workflow result, step summary, enable variable, request field, or caller boolean cannot promote COS V1.
+The source-controlled `PentaFabric Production Canary` remains a separately governed external-activation capability. A legitimate run must come from exact accepted `main`, pass its protected environment, emit an HMAC-bound event through the certified workload identity path, and receive exact durable readback. A workflow result, step summary, enable variable, request field, or caller boolean cannot promote COS V1.
 
 Load-bearing checks include:
 
 - seven typed-truth authorities;
-- all 34 entity kinds registered and populated;
-- no unresolved lifecycle entities;
-- 14/14 repositories provider-observed, federated and runtime-accounted;
+- all required Census entity classes registered and accounted;
+- no unexplained lifecycle entities;
+- repository provider observations reconciled into the canonical federation/runtime inventory;
 - scheduler unknown count zero;
-- zero unknown site truth states and zero unrouted non-current surfaces;
-- all factories production-enabled, none offline, every factory repair-routable;
-- current Pentas epoch `cos-v1` and full signed end-to-end canary PASS;
-- signed DAIL checkpoints and valid Merkle inclusion proof;
-- bounded uncheckpointed tail;
-- PentaWire PASS with zero provider holds and zero tool-contract drift;
-- OpenAI Penta Inference ready;
-- current PentaOFAC evidence PASS;
-- PentaMail serialized receipt epoch verified;
-- PentaPlanner and PentaPersonaFactory production active;
-- factory fleet operational;
-- PentaSELF production;
-- canonical COS clocks active and predecessor clocks absent.
+- zero unknown site truth states and every non-current surface intentionally routed or held;
+- every active factory repair-routable and every candidate-only factory explicitly classified;
+- current Pentas epoch `cos-v1` with signed end-to-end evidence;
+- signed DAIL checkpoints and valid inclusion proof where the phase requires them;
+- bounded uncheckpointed DAIL tail;
+- PentaWire/provider contracts free of unexplained drift;
+- PentaInference capability routing ready without hard-coding a model into business logic;
+- current compliance/OFAC evidence where applicable;
+- PentaMail receipt lineage verified where applicable;
+- PentaPlanner and PentaPersonaFactory intentionally active in normal operation or intentionally paused by a governed maintenance event;
+- factory fleet state explicitly accounted;
+- PentaSELF state explicitly accounted;
+- canonical scheduler topology restored and read back before final production certification, with superseded clocks unable to regain authority.
 
 ## Human-reserved D3 boundaries
 
 COS surfaces, but does not bypass, human-reserved decisions. Current categories include:
 
+- final COS production release authority at Phase 15;
 - production-chain anchoring for DAIL checkpoints;
 - domain registrant verification or provider-account actions requiring the human account holder;
 - public surfaces whose policy is explicitly `human_approval`;
@@ -313,4 +321,4 @@ COS V1 does not create:
 - blind retries after ambiguous mutations;
 - source-control disclosure of secrets or runtime tokens.
 
-The convergence definition is satisfied when the operating estate is fully accounted, classified, governed, evidence-addressable and repair-routable—not when every intentionally gated capability has been switched on. The software release additionally requires accepted source, exact-SHA deployment, production readback and release certification.
+The convergence definition is satisfied when the operating estate is fully accounted, classified, governed, evidence-addressable and repair-routable—not when every intentionally gated capability has been switched on. The software release additionally requires the complete Phase 00–15 chain, accepted exact source, exact-SHA deployment, production/provider readback, restoration/continuity evidence and Phase 15 D3 release certification.
