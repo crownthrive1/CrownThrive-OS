@@ -1,0 +1,77 @@
+{
+  "schema": "ct.crown-affiliates.phase03.deployment-contract.v1",
+  "program_id": "ct.crown-affiliates.native-commerce-growth.v1",
+  "phase": "03",
+  "production_root": "/home/crownaffiliates/public_html",
+  "abort_on_prestate_drift": true,
+  "prestate_evidence_sha256": "bc0b3a909766888bf16796e99478d25e6cb0bc6bdf7a26a4875e2e637838831d",
+  "expected_prestate": {
+    "resources/js/app.js": "9ec6c07992a4ac51739fe8e4b98e719944791c3a71a583f79e251a3f4894ba12",
+    "resources/views/layouts/app.blade.php": "06033a93e30daf5272311ff3d84ff355163c648aa5f14bcad63fc5865a8ecbf0",
+    "resources/views/components/layouts/app.blade.php": "1d6d332221e8865af3b6b38f24eacab3d42e4bc17b875481175080cc8e44b6f1",
+    "thrivepusher.js": null
+  },
+  "copy": [
+    {
+      "source": "app/CrownThriveCos/ClientInstrumentationManifest.php",
+      "target": "app/CrownThriveCos/ClientInstrumentationManifest.php"
+    },
+    {
+      "source": "resources/js/crownthrive/client-instrumentation.js",
+      "target": "resources/js/crownthrive/client-instrumentation.js"
+    },
+    {
+      "source": "resources/views/components/crownthrive/client-instrumentation.blade.php",
+      "target": "resources/views/components/crownthrive/client-instrumentation.blade.php"
+    }
+  ],
+  "patches": [
+    {
+      "target": "resources/js/app.js",
+      "operation": "append_once",
+      "marker": "./crownthrive/client-instrumentation",
+      "content": "\nimport './crownthrive/client-instrumentation';\n"
+    },
+    {
+      "target": "resources/views/layouts/app.blade.php",
+      "operation": "insert_before_closing_body_once",
+      "marker": "<x-crownthrive.client-instrumentation",
+      "content": "\n    <x-crownthrive.client-instrumentation />\n"
+    },
+    {
+      "target": "resources/views/components/layouts/app.blade.php",
+      "operation": "insert_before_closing_body_once",
+      "marker": "<x-crownthrive.client-instrumentation",
+      "content": "\n    <x-crownthrive.client-instrumentation />\n"
+    }
+  ],
+  "thrivepusher": {
+    "target": "thrivepusher.js",
+    "expected_sha256": "19970f0e27cb3eb4d17fb093a25fb0efd7208b36e1336578616d96d8d6ef4788",
+    "copy_only_if_exact_source_hash_matches": true,
+    "source_currently_resolved": false,
+    "deploy_if_unresolved": false
+  },
+  "post_deploy_gates": [
+    "php lint ClientInstrumentationManifest.php",
+    "npm/vite build or equivalent production JS compilation",
+    "Laravel boot",
+    "root HTTP 200",
+    "programs HTTP 200",
+    "pricing HTTP 200",
+    "blog HTTP 200",
+    "/.env HTTP 403",
+    "CSP present",
+    "HSTS present",
+    "instrumentation marker emitted once per rendered page",
+    "no provider script emitted while provider state is gated",
+    "no Notification.requestPermission call without explicit user action",
+    "no new Laravel ERROR/CRITICAL entries",
+    "canonical runnable crons remain four"
+  ],
+  "authority": {
+    "provider_writes": false,
+    "money_movement": false,
+    "d3_effect": false
+  }
+}
