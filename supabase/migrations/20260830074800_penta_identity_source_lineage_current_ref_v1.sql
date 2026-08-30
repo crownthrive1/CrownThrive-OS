@@ -31,8 +31,6 @@ BEGIN
     RAISE EXCEPTION 'expected Penta OS registry source snapshot missing';
   END IF;
 
-  -- Preserve the prior exact snapshot. Add a new observation for the current main ref
-  -- only because the source bytes are independently known to be unchanged.
   INSERT INTO integration_control.penta_identity_source_snapshots_v1(
     snapshot_id, source_type, source_ref, source_version,
     source_sha256, source_count, payload, observed_at
@@ -47,31 +45,12 @@ BEGIN
   ON CONFLICT DO NOTHING;
 
   v_new_def := v_def;
-  v_new_def := replace(
-    v_new_def,
-    'snap jsonb; snap_sha text; snap_version text; run_id uuid:=gen_random_uuid();',
-    'snap jsonb; snap_sha text; snap_version text; snap_ref text; run_id uuid:=gen_random_uuid();'
-  );
-  v_new_def := replace(
-    v_new_def,
-    'select payload,source_sha256,source_version into snap,snap_sha,snap_version from integration_control.penta_identity_source_snapshots_v1',
-    'select payload,source_sha256,source_version,source_ref into snap,snap_sha,snap_version,snap_ref from integration_control.penta_identity_source_snapshots_v1'
-  );
-  v_new_def := replace(
-    v_new_def,
-    '''penta_os_registry'',''crownthrive1/CrownThrive-OS@845deac432b3210e73f61dffde8e335a84d24837''',
-    '''penta_os_registry'',snap_ref'
-  );
-  v_new_def := replace(
-    v_new_def,
-    'source_refs=integration_control.penta_identity_registry_v1.source_refs||excluded.source_refs',
-    'source_refs=integration_control.penta_identity_registry_v1.source_refs||jsonb_strip_nulls(jsonb_build_object(''penta_os_registry_previous'',case when integration_control.penta_identity_registry_v1.source_refs->>''penta_os_registry'' is distinct from excluded.source_refs->>''penta_os_registry'' then integration_control.penta_identity_registry_v1.source_refs->>''penta_os_registry'' else integration_control.penta_identity_registry_v1.source_refs->>''penta_os_registry_previous'' end))||excluded.source_refs'
-  );
+  v_new_def := replace(v_new_def,'snap jsonb; snap_sha text; snap_version text; run_id uuid:=gen_random_uuid();','snap jsonb; snap_sha text; snap_version text; snap_ref text; run_id uuid:=gen_random_uuid();');
+  v_new_def := replace(v_new_def,'select payload,source_sha256,source_version into snap,snap_sha,snap_version from integration_control.penta_identity_source_snapshots_v1','select payload,source_sha256,source_version,source_ref into snap,snap_sha,snap_version,snap_ref from integration_control.penta_identity_source_snapshots_v1');
+  v_new_def := replace(v_new_def,'''penta_os_registry'',''crownthrive1/CrownThrive-OS@845deac432b3210e73f61dffde8e335a84d24837''','''penta_os_registry'',snap_ref');
+  v_new_def := replace(v_new_def,'source_refs=integration_control.penta_identity_registry_v1.source_refs||excluded.source_refs','source_refs=integration_control.penta_identity_registry_v1.source_refs||jsonb_strip_nulls(jsonb_build_object(''penta_os_registry_previous'',case when integration_control.penta_identity_registry_v1.source_refs->>''penta_os_registry'' is distinct from excluded.source_refs->>''penta_os_registry'' then integration_control.penta_identity_registry_v1.source_refs->>''penta_os_registry'' else integration_control.penta_identity_registry_v1.source_refs->>''penta_os_registry_previous'' end))||excluded.source_refs');
 
-  IF v_new_def = v_def
-     OR position('snap_ref text' in v_new_def) = 0
-     OR position('''penta_os_registry'',snap_ref' in v_new_def) = 0
-     OR position('penta_os_registry_previous' in v_new_def) = 0 THEN
+  IF v_new_def = v_def OR position('snap_ref text' in v_new_def)=0 OR position('''penta_os_registry'',snap_ref' in v_new_def)=0 OR position('penta_os_registry_previous' in v_new_def)=0 THEN
     RAISE EXCEPTION 'penta_identity_refresh_v1 exact patch failed';
   END IF;
 
