@@ -1,0 +1,64 @@
+{
+  "schema": "ct.penta.task-runtime-family.v1",
+  "parent": "ct.penta.super.v1",
+  "status": "implementation_candidate",
+  "production_claim": false,
+  "components": [
+    {
+      "id": "ct.penta.dnd.v1",
+      "name": "PentaDND",
+      "role": "scoped do-not-disturb lease and mutation-isolation controller",
+      "required_fields": ["lease_id","resource_scope","owner","reason","priority","created_at","expires_at","ttl_seconds","heartbeat_at","rollback_snapshot_ref","release_condition","state"],
+      "states": ["REQUESTED","ACTIVE","RENEWED","RELEASING","RELEASED","EXPIRED","HOLD"],
+      "invariants": ["resource_scoped_not_system_shutdown","ttl_required","priority_arbitration","no_indefinite_lock","security_and_emergency_recovery_not_suppressed","exact_readback_before_mutation","release_and_resume_readback_required"]
+    },
+    {
+      "id": "ct.penta.snapshot.v1",
+      "name": "PentaSnapshot",
+      "role": "bounded pre-mutation rollback checkpoint coordinator",
+      "required_evidence": ["git_head_tree_branch_pr","database_schema_runtime","queue_lease_state","provider_object_state_when_applicable","drive_manifest_refs","dail_cursor","penta_context_cursor","digest","rollback_procedure"],
+      "invariants": ["snapshot_before_mutation","exact_scope","fingerprinted","readback_verified","rollback_test_required_for_production"]
+    },
+    {
+      "id": "ct.penta.translate.v1",
+      "name": "PentaTranslate",
+      "role": "governed reversible translation between immutable source evidence, protected internal machine representation and human-language projections",
+      "family": ["ct.penta.translate.encode.v1","ct.penta.translate.decode.v1","ct.penta.translate.project.v1","ct.penta.translate.verify.v1"],
+      "invariants": ["source_evidence_immutable","derived_views_never_replace_source","protected_mapping_not_public","no_raw_keys_or_cipher_maps_in_dail_drive_public_git_logs","translation_provenance_required","round_trip_verification_required"]
+    },
+    {
+      "id": "ct.penta.lease.v1",
+      "name": "PentaLease",
+      "role": "work-item and resource ownership lease controller",
+      "invariants": ["single_active_mutation_owner_per_scope","compare_and_swap","ttl","heartbeat","handoff","idempotency","stale_owner_recovery"]
+    },
+    {
+      "id": "ct.penta.collision.v1",
+      "name": "PentaCollision",
+      "role": "detect and fail-close duplicate or conflicting agent mutations",
+      "invariants": ["do_not_counter_mutate_rogue_writer","incident_to_dail","quarantine_exact_scope_only","route_to_super_self_pm_security_certifier"]
+    }
+  ],
+  "mandatory_integration": {
+    "census": "PentaCensus must register identities, family, role, maturity, runtime and evidence lineage",
+    "three_dail": ["DAIL-EVIDENCE","DAIL-DECISION","DAIL-EXECUTION"],
+    "chlom": "all material state transitions require governed CHLOM/DAIL provenance",
+    "penta_context": "continuity and outcome learning only; creates no authority",
+    "drive": "human/hybrid manifests and rollback/translation evidence mirrored to governed program custody",
+    "certification": "originator cannot independently certify its own component"
+  },
+  "production_gates": [
+    "schema_and_runtime_implementation",
+    "least_privilege",
+    "idempotency_and_replay_tests",
+    "concurrency_and_collision_tests",
+    "ttl_expiry_and_stale_lease_recovery",
+    "rollback_and_restore_test",
+    "three_dail_append_readback_chain",
+    "penta_census_readback",
+    "negative_authority_tests",
+    "independent_security_review",
+    "independent_penta_certification",
+    "production_runtime_readback"
+  ]
+}
