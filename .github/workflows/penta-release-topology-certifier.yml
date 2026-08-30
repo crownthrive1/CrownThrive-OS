@@ -4,7 +4,11 @@ on:
   pull_request:
     paths:
       - 'scripts/penta_release_topology_certifier.py'
+      - 'scripts/penta_pr_gate_awareness.py'
+      - 'scripts/governed_current_pr_preflight_v2.py'
       - 'tests/test_penta_release_topology_certifier.py'
+      - 'tests/test_penta_pr_gate_awareness.py'
+      - 'tests/test_penta_pr_legacy_readiness_bootstrap.py'
       - 'penta/security/PENTA-RELEASE-TOPOLOGY-CERTIFIER-V1.md'
       - '.github/workflows/penta-release-topology-certifier.yml'
   push:
@@ -12,7 +16,11 @@ on:
       - main
     paths:
       - 'scripts/penta_release_topology_certifier.py'
+      - 'scripts/penta_pr_gate_awareness.py'
+      - 'scripts/governed_current_pr_preflight_v2.py'
       - 'tests/test_penta_release_topology_certifier.py'
+      - 'tests/test_penta_pr_gate_awareness.py'
+      - 'tests/test_penta_pr_legacy_readiness_bootstrap.py'
       - 'penta/security/PENTA-RELEASE-TOPOLOGY-CERTIFIER-V1.md'
       - '.github/workflows/penta-release-topology-certifier.yml'
 
@@ -28,7 +36,14 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
-      - name: Compile verifier
-        run: python -m py_compile scripts/penta_release_topology_certifier.py
+      - name: Compile verifiers
+        run: |
+          python -m py_compile scripts/penta_release_topology_certifier.py
+          python -m py_compile scripts/penta_pr_gate_awareness.py
+          python -m py_compile scripts/governed_current_pr_preflight_v2.py
       - name: Run topology regression suite
-        run: python -m unittest -v tests.test_penta_release_topology_certifier
+        run: |
+          python -m unittest -v \
+            tests.test_penta_release_topology_certifier \
+            tests.test_penta_pr_gate_awareness \
+            tests.test_penta_pr_legacy_readiness_bootstrap
