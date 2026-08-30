@@ -40,7 +40,10 @@ class GateAwarenessTests(unittest.TestCase):
         ).strip()
 
     def fixture(self) -> tuple[Path, str, str, tempfile.TemporaryDirectory[str]]:
-        temp = tempfile.TemporaryDirectory()
+        # The disposable fixture repo can briefly retain Git filesystem entries
+        # after a completed subprocess on hosted runners. Cleanup must never turn
+        # an otherwise passing behavioral test into a CI failure.
+        temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         repo = Path(temp.name)
         self.git(repo.parent, "init", str(repo))
         self.git(repo, "config", "user.email", "ci@crownthrive.invalid")
