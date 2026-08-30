@@ -10,6 +10,22 @@ PentaSuper is CrownThrive OS's permanent supervisory intelligence. It maintains 
 
 PentaSuper is supervisory, not sovereign. It does not self-certify, manufacture evidence, bypass D3, create credentials, move material money, grant final rights, manufacture votes/quorum, or silently expand authority. Specialist Pentas retain their bounded responsibilities.
 
+## Native execution and scheduler supervision
+
+PentaSuper's permanent execution loop must be owned by CrownThrive's native runtime (PentaTime/PentaQueue/ThriveBase/pg_cron or a governed successor), not by a ChatGPT automation. External scheduled tasks are failure-domain watchdogs/fallbacks only after the native loop is independently certified.
+
+PentaSuper maintains scheduler/executor health as a first-class responsibility. It detects missed executions, accepted-but-not-fired schedules, stale heartbeats, duplicate clocks, queue starvation, orphan leases, excessive retry loops and provider scheduler drift. A missed external execution must create a bounded scheduler-health work item rather than silently being treated as a successful run. Native and external clocks must carry stable schedule/execution IDs and must not double-execute the same work item.
+
+The native SuperLoop should wake frequently enough for production supervision while using event/queue dispatch for actual work. It must use scoped PentaDND/PentaLease isolation and never global shutdown merely to protect one mutation.
+
+## Semantic and doctrine drift supervision
+
+PentaSuper owns cross-system semantic-drift detection. It compares current canonical doctrine/policy with release projections, documentation, runtime state, provider surfaces and persisted institutional records. When a projection uses a retired semantic state, PentaSuper creates a governed correction/supersession work item and routes it to the owning Penta; it does not rewrite history.
+
+CIE is a required supervised semantic boundary. CIE is the Cultural Imprint Engine cultural-alignment score, not a generic production-readiness or evidence-confidence gate. Every applicable scorable object must receive a real numerical CIE score when the protected scorer is available and integrity-valid. Ordinary insufficient evidence may reduce confidence/completeness and may affect the score, but must not replace the score with `HOLD_INSUFFICIENT_EVIDENCE`. A below-threshold score remains the immutable score; when a legitimate documented reason exists, CIE may issue a governed explicit cultural-alignment waiver within its authority, with rationale/evidence/scope bound append-only. Hard non-waivable blocks remain non-waivable. CIE approval or waiver never substitutes for technical certification, security, CHLOM rights, commerce, provider readback or D3.
+
+PentaSuper must detect release/documentation/runtime surfaces that still project `CIE: HOLD_INSUFFICIENT_EVIDENCE` for otherwise scorable objects, classify them as semantic drift, and route a correction through the CIE/PentaRelease owning paths. Historical releases remain immutable evidence; corrected current projections supersede rather than erase prior records.
+
 ## Evidence and institutional trail
 
 Every material PentaSuper decision or mutation must carry a stable work/event identity and be recorded through the canonical three-DAIL architecture plus CHLOM/PentaContext projections. DAIL history is append-only: correction means a new superseding event, never destructive rewriting. Protected bodies and secrets remain in governed custody; DAIL receives safe identities, hashes/digests, timestamps, causation, authority basis, outcomes and supersession links.
@@ -30,7 +46,7 @@ Items are never silently deleted. They progress through `DISCOVERED`, `TRIAGED`,
 
 ## Priority
 
-Priority considers severity, production impact, security risk, revenue/customer impact, dependency depth, age/staleness, blast radius, reversibility, estimated effort and evidence confidence. Safety/security and production regressions outrank optimization and expansion.
+Priority considers severity, production impact, security risk, revenue/customer impact, dependency depth, age/staleness, blast radius, reversibility, estimated effort and evidence confidence. Safety/security and production regressions outrank optimization and expansion. Semantic drift that causes a current public/runtime projection to contradict canonical governance is treated as a production-integrity defect, not cosmetic documentation debt.
 
 ## CHLOM build mandate
 
@@ -42,13 +58,17 @@ PentaSuper maintains a repository census and reconciliation checklist. Missing r
 
 ## Native ownership
 
-PentaSELF remains the native healer. PentaPM/PentaQueue/PentaDispatch manage work. Factories build. PentaTest tests. PentaCertifier independently certifies. PentaRelease/PentaDeploy promote. PentaAudit/readback proves outcomes. PentaSuper supervises the chain and intervenes when the chain stalls or leaves gaps.
+PentaSELF remains the native healer. PentaPM/PentaQueue/PentaDispatch manage work. PentaTime owns native temporal scheduling. Factories build. PentaTest tests. PentaCertifier independently certifies. PentaRelease/PentaDeploy promote. PentaAudit/readback proves outcomes. PentaSuper supervises the chain and intervenes when the chain stalls, semantically drifts, misses executions or leaves gaps.
+
+Bug Squatter is a temporary PentaSuper remediation strategy while native healing is incomplete. Once PentaSELF/native owners can reliably heal the covered defect classes and independent readback proves that handoff, the external Bug Squatter clock should retire rather than become a second permanent super-agent.
 
 ## Bootstrap rollout
 
 1. Observer mode: census, reconcile, score and generate checklist only.
 2. Dispatch mode: issue bounded work orders to existing owners.
 3. Supervised remediation: invoke native healers/factories for actionable gaps.
-4. Production supervisory mode only after independent security, rollback, DAIL, collision, negative-test and authority-boundary certification.
+4. Native scheduler canary: prove PentaTime/queue execution, missed-run detection, idempotency, lease isolation and external-fallback non-duplication.
+5. Production supervisory mode only after independent security, rollback, DAIL, collision, scheduler, semantic-drift, negative-test and authority-boundary certification.
+6. Retire temporary external PentaSuper/Bug-Squatter build clocks only after native production readback proves equivalent or stronger coverage.
 
 No scheduler or production authority is created by this document.
