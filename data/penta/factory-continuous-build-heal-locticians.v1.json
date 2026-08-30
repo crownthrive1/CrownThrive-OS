@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "ct.penta.factory-continuous-build-heal.v1",
+  "state": "production_active",
+  "purpose": "Continuously verify, build, heal, self-test, independently certify, and supervise every registered factory while feeding governed editorial and digital-product work into Locticians.",
+  "runtime": {
+    "cycle_function": "public.penta_factory_continuous_build_heal_cycle_v1",
+    "status_function": "public.penta_factory_continuous_build_heal_status_v1",
+    "run_table": "integration_control.penta_factory_continuous_build_heal_runs_v1",
+    "jobname": "ct-penta-factory-continuous-build-heal-locticians-v1",
+    "schedule": "25,55 * * * *",
+    "auto_restore_registry": "integration_control.scheduler_desired_jobs_v2"
+  },
+  "factory_contract": {
+    "expected_factories": 16,
+    "production_ready_required": true,
+    "fresh_canary_max_age_hours": 7,
+    "canary_job": "ct-penta-factory-production-canary-v1",
+    "canary_schedule": "17 */6 * * *",
+    "required_canary_results": {
+      "produced": 16,
+      "self_attested": 16,
+      "independently_certified": 16,
+      "holds": 0
+    },
+    "failure_action": "degrade_and_route_to_planner_supervisor_or_hold_closure"
+  },
+  "locticians_editorial": {
+    "heal_function": "public.locticians_editorial_heal_tick_v2",
+    "content_normalizer": "integration_control.locticians_editorial_content_normalize_v2",
+    "revision_authority": "integration_control.locticians_editorial_revision_authorize_v1",
+    "provider_user_id": 5,
+    "per_cycle_limit": 1,
+    "required_flow": [
+      "generate_or_reuse_rights-cleared image",
+      "verify public asset",
+      "normalize links and CTA",
+      "independent package audit",
+      "bounded provider update",
+      "exact provider readback",
+      "publish or schedule",
+      "DAIL receipt"
+    ],
+    "blind_retry": false
+  },
+  "locticians_digital_products": {
+    "stripe_sync_job": {
+      "jobname": "ct-stripe-payment-link-sync-v4",
+      "schedule": "1 */6 * * *"
+    },
+    "checkout_verify_job": {
+      "jobname": "ct-locticians-digital-products-checkout-v1",
+      "schedule": "7 */2 * * *"
+    },
+    "orchestration_job": {
+      "jobname": "ct-locticians-digital-products-orchestration-v1",
+      "schedule": "9,19,29,39,49,59 * * * *"
+    },
+    "nurture_job": {
+      "jobname": "ct-locticians-digital-products-nurture-v1",
+      "schedule": "11,26,41,56 * * * *"
+    },
+    "unverified_product_policy": "hold_or_quarantine",
+    "payment_authority": "verified external Stripe Payment Links",
+    "money_movement_by_control_plane": false
+  },
+  "cycle_states": {
+    "pass": "all factories are production-ready, the factory canary passes, and Locticians editorial and digital-product feeds have no active release hold",
+    "partial": "factories and canary pass, but one or more Locticians feed items remain in governed audit, checkout, release, or quarantine work",
+    "hold": "one or more factories, canary attestations, independent certifications, or mandatory convergence controls fail"
+  },
+  "authority_boundaries": {
+    "autonomous_ceiling": "D2",
+    "D3": "human_reserved",
+    "money_movement": false,
+    "credential_export": false,
+    "provider_delete": false,
+    "automatic_top_level_persona_creation": false,
+    "ambiguous_provider_mutation_retry": false
+  }
+}
