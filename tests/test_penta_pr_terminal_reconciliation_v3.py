@@ -39,6 +39,24 @@ class PentaPRTerminalV3Tests(unittest.TestCase):
         self.assertIn('historical_vergence_non_authoritative', text)
         self.assertIn("'D3_human_reserved',true", text)
 
+    def test_retroactive_backfill_is_resumable_and_never_auto_merges(self):
+        provider = (ROOT / "supabase/functions/penta-pr-terminal-provider/index.ts").read_text()
+        migration = (ROOT / "supabase/migrations/20260830034200_penta_pr_retroactive_backfill_v3_2.sql").read_text()
+        self.assertIn('backfillStep', provider)
+        self.assertIn('state=all', provider)
+        self.assertIn('retroactive_merge: false', provider)
+        self.assertIn('Historical merges are never manufactured', provider)
+        self.assertIn('penta_pr.retroactive_backfill_v3', migration)
+        self.assertIn('for update of b skip locked', migration)
+        self.assertIn("lease_until=now()+interval '90 seconds'", migration)
+
+    def test_historical_truth_repairs_lifecycle_holes(self):
+        migration = (ROOT / "supabase/migrations/20260830034200_penta_pr_retroactive_backfill_v3_2.sql").read_text()
+        self.assertIn('insert into penta_pr.lifecycle', migration)
+        self.assertIn('on conflict(repo,pr_number) do update', migration)
+        self.assertIn("'retroactive_provider_truth',true", migration)
+        self.assertIn('github_pr_truth_receipts_v2', migration)
+
 
 if __name__ == "__main__":
     unittest.main()
