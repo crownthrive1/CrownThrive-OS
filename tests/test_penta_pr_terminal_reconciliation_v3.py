@@ -23,6 +23,15 @@ class PentaPRTerminalV3Tests(unittest.TestCase):
         self.assertIn('terminal close without merge', text)
         self.assertIn('close_classification_not_allowed', text)
 
+    def test_worker_does_not_mutate_zero_delta_branch(self):
+        worker = (ROOT / "scripts/penta_remediation_worker_execute_native.py").read_text()
+        workflow = (ROOT / ".github/workflows/penta-remediation-worker-execution.yml").read_text()
+        self.assertIn('if bool(receipt.get("no_code_delta")):', worker)
+        self.assertIn('return None', worker)
+        self.assertIn('"penta:hold" in labels', worker)
+        self.assertIn('penta_remediation_worker_execute_native.py', workflow)
+        self.assertIn('GITHUB_TOKEN: ${{ github.token }}', workflow)
+
     def test_scheduler_contract_is_source_controlled(self):
         text = (ROOT / "supabase/migrations/20260830032100_penta_pr_exact_head_terminal_reconciliation_v3.sql").read_text()
         self.assertIn('penta_pr_terminal_reconcile', text)
