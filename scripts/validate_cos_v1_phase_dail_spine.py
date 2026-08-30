@@ -3,8 +3,8 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FORWARD = ROOT / "supabase/migrations/20260830021800_cos_v1_phase_dail_spine_v1.sql"
-ROLLBACK = ROOT / "supabase/rollbacks/20260830021800_cos_v1_phase_dail_spine_v1.rollback.sql"
+FORWARD = ROOT / "supabase/migrations/20260830030400_cos_v1_phase_dail_spine_v1.sql"
+ROLLBACK = ROOT / "supabase/rollbacks/20260830030400_cos_v1_phase_dail_spine_v1.rollback.sql"
 
 
 def require(value: bool, message: str) -> None:
