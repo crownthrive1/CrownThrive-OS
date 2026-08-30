@@ -16,7 +16,7 @@ PentaSuper's permanent execution loop must be owned by CrownThrive's native runt
 
 PentaSuper maintains scheduler/executor health as a first-class responsibility. It detects missed executions, accepted-but-not-fired schedules, stale heartbeats, duplicate clocks, queue starvation, orphan leases, excessive retry loops and provider scheduler drift. A missed external execution must create a bounded scheduler-health work item rather than silently being treated as a successful run. Native and external clocks must carry stable schedule/execution IDs and must not double-execute the same work item.
 
-The native SuperLoop should wake frequently enough for production supervision while using event/queue dispatch for actual work. It must use scoped PentaDND/PentaLease isolation and never global shutdown merely to protect one mutation.
+The native SuperLoop should wake frequently enough for production supervision while using event/queue dispatch for actual work. Ordinary read-only supervision does not require PentaDND. PentaSuper uses PentaLease/CAS/collision fencing as the normal exact-resource ownership primitive for mutations. PentaDND is an on-demand, scoped TTL maintenance/isolation window opened only when a specific planned mutation genuinely needs temporary no-disturb protection. A scheduler tick never creates or renews DND ownership, and PentaSuper remains operational when no DND lease exists. DND must never become global shutdown merely to protect one mutation and must be released immediately after its protected mutation/readback boundary completes.
 
 ## Semantic and doctrine drift supervision
 
@@ -67,7 +67,7 @@ Bug Squatter is a temporary PentaSuper remediation strategy while native healing
 1. Observer mode: census, reconcile, score and generate checklist only.
 2. Dispatch mode: issue bounded work orders to existing owners.
 3. Supervised remediation: invoke native healers/factories for actionable gaps.
-4. Native scheduler canary: prove PentaTime/queue execution, missed-run detection, idempotency, lease isolation and external-fallback non-duplication.
+4. Native scheduler canary: prove PentaTime/queue execution, missed-run detection, idempotency, PentaLease/CAS ownership, on-demand DND isolation when explicitly required, and external-fallback non-duplication.
 5. Production supervisory mode only after independent security, rollback, DAIL, collision, scheduler, semantic-drift, negative-test and authority-boundary certification.
 6. Retire temporary external PentaSuper/Bug-Squatter build clocks only after native production readback proves equivalent or stronger coverage.
 
