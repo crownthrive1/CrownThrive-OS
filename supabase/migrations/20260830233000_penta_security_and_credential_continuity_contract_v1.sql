@@ -76,9 +76,7 @@ begin
     if v_count=0 then v_disposition:='HOLD_RUNTIME_NOT_FOUND';
     elsif v_security_definer and (v_public or v_anon or v_authenticated) then v_disposition:='HOLD_SECURITY_DEFINER_EXECUTE_EXPOSURE';
     else v_disposition:='PASS'; end if;
-  elsif v_disposition is null then
-    v_disposition:='HOLD_PROVIDER_OR_UNSUPPORTED_RUNTIME_REQUIRES_SPECIALIST';
-  end if;
+  elsif v_disposition is null then v_disposition:='HOLD_PROVIDER_OR_UNSUPPORTED_RUNTIME_REQUIRES_SPECIALIST'; end if;
   v_payload:=jsonb_build_object(
     'contract','ct.penta.security.runtime-review.v1','system_key',v_row.system_key,'canonical_name',v_row.canonical_name,
     'system_version',v_row.version,'runtime_ref',v_row.runtime_ref,'runtime_target',v_target,'risk_ceiling',v_row.risk_ceiling,
@@ -118,7 +116,6 @@ grant execute on function penta_security.review_system_v1(text) to service_role;
 revoke all on function penta_security.status_v1() from public,anon,authenticated;
 grant execute on function penta_security.status_v1() to service_role;
 
--- Source custody for the hardened credential-continuity v3 contract.
 create table if not exists integration_control.credential_continuity_scheduler_receipts_v3 (
   receipt_id uuid primary key default gen_random_uuid(), execution_key text not null unique,
   execution_kind text not null, function_ref text not null, scheduler_jobname text,
@@ -188,7 +185,6 @@ end $fn$;
 revoke all on function pentatime.executor_credential_continuity_v3() from public,anon,authenticated;
 grant execute on function pentatime.executor_credential_continuity_v3() to service_role;
 
--- Operation registry must exist before its executor because of the FK contract.
 insert into pentatime.operation_registry_v2(operation_key,domain_key,owner_penta,enabled,base_backoff_seconds,max_backoff_seconds,metadata,updated_at)
 values('credential_continuity','credentials','PentaCredentials',true,15,900,
   jsonb_build_object('family','PentaCredentials/PentaTime/PentaCrons','contract','ct.penta.credentials.continuity-cycle.v3',
@@ -250,7 +246,7 @@ begin
 end $do$;
 update integration_control.scheduler_desired_jobs_v2
 set schedule='23 */6 * * *',command='select pentatime.execute_guarded_v3(''credential_continuity'');',
-    generation=greatest(generation,2026083023),source_ref='ct.penta.credentials.continuity-cycle.v3',active=true,allow_auto_restore=true,
+    generation=generation+1,source_ref='ct.penta.credentials.continuity-cycle.v3',active=true,allow_auto_restore=true,
     metadata=coalesce(metadata,'{}'::jsonb)||jsonb_build_object('owner','PentaCredentials/PentaTime/PentaCrons',
       'contract','ct.penta.credentials.continuity-cycle.v3','single_native_clock',true,'authority_expansion',false),updated_at=now()
 where jobname='crownthrive_credential_continuity_daily';
