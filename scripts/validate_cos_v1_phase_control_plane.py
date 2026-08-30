@@ -10,6 +10,8 @@ BASE_MIGRATION = ROOT / "supabase/migrations/20260830021400_cos_v1_phase_control
 BASE_ROLLBACK = ROOT / "supabase/rollbacks/20260830021400_cos_v1_phase_control_plane_v1.rollback.sql"
 D3_MIGRATION = ROOT / "supabase/migrations/20260830021500_cos_v1_phase15_d3_release_gate_v1.sql"
 D3_ROLLBACK = ROOT / "supabase/rollbacks/20260830021500_cos_v1_phase15_d3_release_gate_v1.rollback.sql"
+RELEASE_MIGRATION = ROOT / "supabase/migrations/20260830021600_cos_v1_release_candidate_state_machine_v1.sql"
+RELEASE_ROLLBACK = ROOT / "supabase/rollbacks/20260830021600_cos_v1_release_candidate_state_machine_v1.rollback.sql"
 
 EXPECTED_PHASES = [f"{n:02d}" for n in range(16)]
 EXPECTED_COMMON_GATES = {
@@ -49,7 +51,9 @@ def main() -> None:
     base_rollback = read(BASE_ROLLBACK)
     d3 = read(D3_MIGRATION)
     d3_rollback = read(D3_ROLLBACK)
-    lower = (base + "\n" + d3).lower()
+    release = read(RELEASE_MIGRATION)
+    release_rollback = read(RELEASE_ROLLBACK)
+    lower = (base + "\n" + d3 + "\n" + release).lower()
 
     phase_ids = sorted(set(re.findall(r"\('([01][0-9])',\s*\d+,", base)))
     require(phase_ids == EXPECTED_PHASES, f"phase seed drift: {phase_ids}")
@@ -76,6 +80,15 @@ def main() -> None:
     require("state='released',production_sha=v_source_sha,released_at=now()" in d3, "Phase 15 does not bind production SHA/release")
     require("ct.penta.flow-control.20260826.v1" not in d3, "hard-coded standing campaign would expand authority")
 
+    require("github_release_source_sha_must_be_40_hex" in release, "release candidate does not enforce exact Git SHA")
+    require("release_not_mutable" in release, "released/superseded releases are not immutable")
+    require("state='converging'" in release, "phase begin does not move release to converging")
+    require("state='hold'" in release, "phase failure/HOLD does not propagate to release")
+    require("state='certification_pending'" in release, "certified nonfinal phase does not move release to certification_pending")
+    require("cos_phase_execution_release_sync_v1" in release, "missing phase-to-release execution synchronizer")
+    require("cos_phase_execution_hold_sync_v1" in release, "missing phase-to-release HOLD synchronizer")
+    require("cos_phase_certified_release_sync_v1" in release, "missing phase-to-release certification synchronizer")
+
     for table in (
         "cos_phase_registry_v1",
         "cos_phase_executions_v1",
@@ -100,8 +113,13 @@ def main() -> None:
     require("rollback_blocked_phase15_execution_history_exists" in d3_rollback, "D3 rollback is not Phase-15-history-safe")
     require("create or replace function integration_control.cos_phase_record_gate_v1" in d3_rollback, "D3 rollback does not restore generic gate function deterministically")
     require("create or replace function integration_control.cos_phase_finalize_v1" in d3_rollback, "D3 rollback does not restore finalizer deterministically")
+    require("rollback_blocked_cos_phase_execution_history_exists" in release_rollback, "release-state rollback is not history-safe")
+    require("drop trigger if exists cos_phase_execution_release_sync_v1" in release_rollback, "release-state rollback missing execution trigger cleanup")
+    require("drop trigger if exists cos_phase_execution_hold_sync_v1" in release_rollback, "release-state rollback missing HOLD trigger cleanup")
+    require("drop trigger if exists cos_phase_certified_release_sync_v1" in release_rollback, "release-state rollback missing certification trigger cleanup")
     require("drop table" not in base.lower(), "base forward migration must be additive")
     require("drop table" not in d3.lower(), "D3 forward migration must be additive")
+    require("drop table" not in release.lower(), "release-state forward migration must be additive")
 
     print("COS V1 phase control plane static validation: PASS")
     print(f"phases={len(phase_ids)} common_gates={len(common_gates)} phase15_extra_gates=1 total_requirement_rows={len(phase_ids)*len(common_gates)+1}")
