@@ -52,7 +52,8 @@ class CollisionSnapshotRetryContractTests(unittest.TestCase):
         self.assertIn('report="collision-governance-v2-report-attempt-${attempt}.json"', workflow)
         self.assertEqual(workflow.count("python3 scripts/governed_collision_agent_v2_trusted.py"), 1)
         self.assertEqual(workflow.count("python3 scripts/governed_collision_agent_v2.py"), 1)
-        self.assertIn('--expected-main-sha "${{ github.event.pull_request.base.sha }}"', workflow)
+        self.assertIn('--event-base-sha "${{ github.event.pull_request.base.sha }}"', workflow)
+        self.assertNotIn('--expected-main-sha', workflow)
         self.assertIn('cp "$report" collision-governance-v2-report.json', workflow)
         self.assertIn("recomputing from fresh provider state", workflow)
 
