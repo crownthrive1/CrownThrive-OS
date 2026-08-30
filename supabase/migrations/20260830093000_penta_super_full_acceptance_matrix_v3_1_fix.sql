@@ -2,7 +2,7 @@
 -- Root cause: v3 used an unsupported collision target_kind and referenced
 -- explicit acceptance workers that were not registered in the agent template fabric.
 -- This patch does not weaken collision constraints. It registers bounded non-voting
--- canary actors and rewrites only the v3 canary target literal to runtime_packet.
+-- canary actors and rewrites only the two v3 target-kind argument literals.
 
 insert into chlom_runtime.agent_templates(
   agent_id,parent_agent_id,canonical_name,agent_class,autonomy_class,authority_ceiling,
@@ -60,17 +60,19 @@ do $penta_super_acceptance_fix$
 declare
   v_def text;
   v_fixed text;
+  v_needle text := ',''acceptance_canary'',''penta-super-task-runtime''';
+  v_replacement text := ',''runtime_packet'',''penta-super-task-runtime''';
   v_occurrences integer;
 begin
   select pg_get_functiondef('penta_task_runtime.run_full_acceptance_matrix_v3(text)'::regprocedure)
     into v_def;
 
-  v_occurrences := (length(v_def)-length(replace(v_def,'''acceptance_canary''','')))/length('''acceptance_canary''');
+  v_occurrences := (length(v_def)-length(replace(v_def,v_needle,'')))/length(v_needle);
   if v_occurrences <> 2 then
-    raise exception 'unexpected_acceptance_canary_literal_count:%',v_occurrences;
+    raise exception 'unexpected_acceptance_target_literal_count:%',v_occurrences;
   end if;
 
-  v_fixed := replace(v_def,'''acceptance_canary''','''runtime_packet''');
+  v_fixed := replace(v_def,v_needle,v_replacement);
   execute v_fixed;
 end
 $penta_super_acceptance_fix$;
@@ -81,7 +83,7 @@ select chlom_runtime.append_dail_event(
   'ct.penta.task-runtime-family.v1',
   jsonb_build_object(
     'root_cause','unsupported collision target_kind plus unregistered synthetic canary actors',
-    'fix','register bounded non-voting canary identities and map synthetic collision target to runtime_packet',
+    'fix','register bounded non-voting canary identities and map only synthetic collision target arguments to runtime_packet',
     'collision_constraint_weakened',false,
     'production_certified',false,
     'independent_certification_required',true,
