@@ -40,6 +40,16 @@ def http_error(code, body=b'{"message":"provider unavailable"}'):
     )
 
 
+def provider_payload(tag="v3.63.3.0"):
+    return {
+        "tag_name": tag,
+        "draft": False,
+        "prerelease": False,
+        "html_url": f"https://github.com/crownthrive1/CrownThrive-OS/releases/tag/{tag}",
+        "assets": [],
+    }
+
+
 class ProviderReleaseTests(unittest.TestCase):
     def test_select_latest_version_tag_uses_numeric_version_order(self):
         tags = ["v3.9.0.0", "v3.63.2.0", "v3.63.3.0", "not-a-release", "v3.10.0.0"]
@@ -48,20 +58,15 @@ class ProviderReleaseTests(unittest.TestCase):
             "v3.63.3.0",
         )
 
-    def test_provider_403_retries_then_verifies_exact_release(self):
+    def test_rate_limited_authenticated_read_uses_public_warm_provider_truth(self):
         calls = []
         sleeps = []
-        payload = {
-            "tag_name": "v3.63.3.0",
-            "draft": False,
-            "prerelease": False,
-            "html_url": "https://github.com/crownthrive1/CrownThrive-OS/releases/tag/v3.63.3.0",
-            "assets": [],
-        }
+        payload = provider_payload()
 
         def opener(request, timeout=20):
-            calls.append(request.full_url)
-            if len(calls) == 1:
+            authenticated = request.get_header("Authorization") is not None
+            calls.append(authenticated)
+            if authenticated:
                 raise http_error(403)
             return FakeResponse(payload)
 
@@ -74,11 +79,88 @@ class ProviderReleaseTests(unittest.TestCase):
             opener=opener,
         )
         self.assertEqual(result["tag_name"], "v3.63.3.0")
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls, [True, False])
+        self.assertEqual(sleeps, [])
+
+    def test_public_warm_failure_preserves_bounded_authenticated_retry(self):
+        auth_calls = 0
+        public_calls = 0
+        sleeps = []
+        payload = provider_payload()
+
+        def opener(request, timeout=20):
+            nonlocal auth_calls, public_calls
+            if request.get_header("Authorization") is not None:
+                auth_calls += 1
+                if auth_calls == 1:
+                    raise http_error(403)
+                return FakeResponse(payload)
+            public_calls += 1
+            raise http_error(403)
+
+        result = provider_release.fetch_provider_release(
+            "crownthrive1/CrownThrive-OS",
+            "v3.63.3.0",
+            "token",
+            attempts=2,
+            sleep_fn=sleeps.append,
+            opener=opener,
+        )
+        self.assertEqual(result["tag_name"], "v3.63.3.0")
+        self.assertEqual(auth_calls, 2)
+        self.assertEqual(public_calls, 1)
         self.assertEqual(sleeps, [1])
 
-    def test_provider_retry_exhaustion_is_hold(self):
+    def test_missing_token_can_verify_public_release_without_private_claim(self):
+        calls = []
+
         def opener(request, timeout=20):
+            calls.append(request.get_header("Authorization"))
+            return FakeResponse(provider_payload())
+
+        result = provider_release.fetch_provider_release(
+            "crownthrive1/CrownThrive-OS",
+            "v3.63.3.0",
+            "",
+            opener=opener,
+        )
+        self.assertEqual(result["tag_name"], "v3.63.3.0")
+        self.assertEqual(calls, [None])
+
+    def test_public_warm_semantic_mismatch_fails_closed(self):
+        calls = []
+
+        def opener(request, timeout=20):
+            authenticated = request.get_header("Authorization") is not None
+            calls.append(authenticated)
+            if authenticated:
+                raise http_error(403)
+            return FakeResponse(provider_payload("v3.63.2.0"))
+
+        with self.assertRaisesRegex(
+            provider_release.ProviderReleaseError,
+            "provider_release_tag_mismatch",
+        ):
+            provider_release.fetch_provider_release(
+                "crownthrive1/CrownThrive-OS",
+                "v3.63.3.0",
+                "token",
+                attempts=2,
+                sleep_fn=lambda _: None,
+                opener=opener,
+            )
+        self.assertEqual(calls, [True, False])
+
+    def test_provider_retry_exhaustion_is_hold(self):
+        auth_calls = 0
+        public_calls = 0
+
+        def opener(request, timeout=20):
+            nonlocal auth_calls, public_calls
+            if request.get_header("Authorization") is not None:
+                auth_calls += 1
+            else:
+                public_calls += 1
             raise http_error(403)
 
         with self.assertRaisesRegex(
@@ -93,9 +175,14 @@ class ProviderReleaseTests(unittest.TestCase):
                 sleep_fn=lambda _: None,
                 opener=opener,
             )
+        self.assertEqual(auth_calls, 2)
+        self.assertEqual(public_calls, 1)
 
-    def test_provider_404_does_not_fall_back_to_older_release(self):
+    def test_provider_404_does_not_fall_back_to_public_or_older_release(self):
+        calls = []
+
         def opener(request, timeout=20):
+            calls.append(request.get_header("Authorization") is not None)
             raise http_error(404, b'{"message":"Not Found"}')
 
         with self.assertRaisesRegex(
@@ -110,6 +197,7 @@ class ProviderReleaseTests(unittest.TestCase):
                 sleep_fn=lambda _: None,
                 opener=opener,
             )
+        self.assertEqual(calls, [True])
 
     def test_mismatched_or_draft_release_fails_closed(self):
         with self.assertRaisesRegex(
