@@ -21,6 +21,10 @@ on conflict (phase_id,gate_name) do update set
   description=excluded.description,
   updated_at=now();
 
+create unique index if not exists cos_phase_gate_receipts_d3_once_idx
+  on integration_control.cos_phase_gate_receipts_v1(execution_id,evidence_sha256)
+  where gate_name='d3_human_release_approval';
+
 create or replace function integration_control.cos_phase_record_gate_v1(
   p_execution_id uuid,
   p_gate_name text,
@@ -77,17 +81,22 @@ as $$
 declare
   v_phase_id text;
   v_source_sha text;
+  v_existing_d3_approval_ref text;
   v_founder_ref text;
   v_binding jsonb;
   v_evidence_sha256 text;
   v_receipt_id uuid;
 begin
-  select phase_id,source_sha into v_phase_id,v_source_sha
+  select phase_id,source_sha,d3_approval_ref
+    into v_phase_id,v_source_sha,v_existing_d3_approval_ref
   from integration_control.cos_phase_executions_v1
   where execution_id=p_execution_id
   for update;
   if not found then raise exception 'unknown_execution'; end if;
   if v_phase_id <> '15' then raise exception 'd3_release_approval_phase15_only'; end if;
+  if v_existing_d3_approval_ref is not null and v_existing_d3_approval_ref <> p_campaign_id then
+    raise exception 'd3_release_approval_already_bound:%',v_existing_d3_approval_ref;
+  end if;
 
   select to_jsonb(b),b.founder_ref
     into v_binding,v_founder_ref
@@ -118,6 +127,30 @@ begin
   end if;
 
   v_evidence_sha256:=encode(extensions.digest(convert_to(v_binding::text,'UTF8'),'sha256'),'hex');
+
+  select receipt_id into v_receipt_id
+  from integration_control.cos_phase_gate_receipts_v1
+  where execution_id=p_execution_id
+    and gate_name='d3_human_release_approval'
+    and gate_state='PASS'
+    and evidence_sha256=v_evidence_sha256
+    and evidence_refs @> jsonb_build_array(jsonb_build_object(
+      'campaign_id',p_campaign_id,
+      'repository','crownthrive1/CrownThrive-OS',
+      'source_sha',v_source_sha,
+      'authority','cos.production_release'
+    ))
+  order by observed_at desc,created_at desc
+  limit 1;
+
+  if v_receipt_id is not null then
+    if v_existing_d3_approval_ref is null then
+      update integration_control.cos_phase_executions_v1
+      set d3_approval_ref=p_campaign_id,updated_at=now()
+      where execution_id=p_execution_id;
+    end if;
+    return v_receipt_id;
+  end if;
 
   insert into integration_control.cos_phase_gate_receipts_v1(
     execution_id,phase_id,gate_name,gate_state,verifier_actor,evidence_refs,evidence_sha256,notes
