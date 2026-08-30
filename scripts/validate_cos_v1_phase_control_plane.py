@@ -6,10 +6,10 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE_MIGRATION = ROOT / "supabase/migrations/20260830020500_cos_v1_phase_control_plane_v1.sql"
-BASE_ROLLBACK = ROOT / "supabase/rollbacks/20260830020500_cos_v1_phase_control_plane_v1.rollback.sql"
-D3_MIGRATION = ROOT / "supabase/migrations/20260830021100_cos_v1_phase15_d3_release_gate_v1.sql"
-D3_ROLLBACK = ROOT / "supabase/rollbacks/20260830021100_cos_v1_phase15_d3_release_gate_v1.rollback.sql"
+BASE_MIGRATION = ROOT / "supabase/migrations/20260830021400_cos_v1_phase_control_plane_v1.sql"
+BASE_ROLLBACK = ROOT / "supabase/rollbacks/20260830021400_cos_v1_phase_control_plane_v1.rollback.sql"
+D3_MIGRATION = ROOT / "supabase/migrations/20260830021500_cos_v1_phase15_d3_release_gate_v1.sql"
+D3_ROLLBACK = ROOT / "supabase/rollbacks/20260830021500_cos_v1_phase15_d3_release_gate_v1.rollback.sql"
 
 EXPECTED_PHASES = [f"{n:02d}" for n in range(16)]
 EXPECTED_COMMON_GATES = {
@@ -65,7 +65,6 @@ def main() -> None:
     require("phase_execution_already_active" in base, "missing duplicate-active-execution guard")
     require("cos_phase_gate_receipts_are_append_only" in base, "missing append-only gate receipt guard")
 
-    # D3 release authority must never be a caller-supplied PASS string.
     require("use_cos_phase_bind_d3_approval_v1" in d3, "generic receipt path can record D3 approval")
     require("cos_phase_bind_d3_approval_v1" in d3, "missing governed D3 binding function")
     require("'cos.production_release' = any(b.authorized_actions)" in d3, "D3 campaign lacks explicit COS release action check")
@@ -75,8 +74,6 @@ def main() -> None:
     require("phase15_d3_approval_expired_held_or_drifted" in d3, "Phase 15 finalizer does not revalidate D3 authority")
     require("phase15_d3_approval_not_bound" in d3, "Phase 15 finalizer does not require bound D3 authority")
     require("state='released',production_sha=v_source_sha,released_at=now()" in d3, "Phase 15 does not bind production SHA/release")
-
-    # Existing standing D3 campaign must not accidentally satisfy this contract by name.
     require("ct.penta.flow-control.20260826.v1" not in d3, "hard-coded standing campaign would expand authority")
 
     for table in (
