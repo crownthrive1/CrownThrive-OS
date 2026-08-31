@@ -27,13 +27,16 @@ CROWNTHRIVE_GROUP_ROUTES = {
     ],
 }
 
-PENTA_ANCHOR = "pentas/canonical/penta-mail"
+PENTA_GROUP = "Communications, Personas & Advertising"
 PENTA_ROUTES = [
-    "pentas/canonical/penta-mailer",
-    "pentas/canonical/penta-personas",
-    "pentas/canonical/penta-persona-execution",
-    "pentas/canonical/penta-persona-factory",
-    "pentas/canonical/penta-ads",
+    "pentas/candidates/penta-mailer",
+    "pentas/candidates/penta-personas",
+    "pentas/candidates/penta-persona-execution",
+    "pentas/candidates/penta-persona-factory",
+    "pentas/candidates/penta-communications-factory",
+    "pentas/candidates/penta-ads",
+    "pentas/candidates/penta-ads-factory",
+    "pentas/candidates/penta-ads-placement-os",
 ]
 
 
@@ -69,19 +72,6 @@ def find_groups(node: Any, group_name: str) -> list[dict[str, Any]]:
     return found
 
 
-def find_anchor_lists(node: Any, anchor: str) -> list[list[Any]]:
-    found: list[list[Any]] = []
-    if isinstance(node, list):
-        if anchor in node:
-            found.append(node)
-        for item in node:
-            found.extend(find_anchor_lists(item, anchor))
-    elif isinstance(node, dict):
-        for value in node.values():
-            found.extend(find_anchor_lists(value, anchor))
-    return found
-
-
 def ensure_absent_or_once(document: dict[str, Any], route: str) -> bool:
     count = sum(1 for value in iter_string_routes(document) if value == route)
     if count > 1:
@@ -94,34 +84,40 @@ def add_group_route(document: dict[str, Any], tab: dict[str, Any], group: str, r
         return
     matches = find_groups(tab, group)
     if len(matches) != 1:
-        raise SystemExit(f"expected one {group!r} group in CrownThrive OS tab; found {len(matches)}")
+        raise SystemExit(f"expected one {group!r} group in {tab.get('tab')!r}; found {len(matches)}")
     matches[0]["pages"].append(route)
 
 
-def add_penta_route(document: dict[str, Any], route: str, offset: int) -> None:
-    if ensure_absent_or_once(document, route):
-        return
-    matches = find_anchor_lists(document, PENTA_ANCHOR)
-    if len(matches) != 1:
-        raise SystemExit(f"expected one navigation list containing {PENTA_ANCHOR!r}; found {len(matches)}")
-    pages = matches[0]
-    anchor_index = pages.index(PENTA_ANCHOR)
-    pages.insert(anchor_index + 1 + offset, route)
+def ensure_penta_group(document: dict[str, Any], penta_tab: dict[str, Any]) -> dict[str, Any]:
+    groups = penta_tab.get("groups")
+    if not isinstance(groups, list):
+        raise SystemExit("Pentas tab does not expose a top-level groups list")
+    matches = [group for group in groups if isinstance(group, dict) and group.get("group") == PENTA_GROUP]
+    if len(matches) > 1:
+        raise SystemExit(f"duplicate {PENTA_GROUP!r} groups: {len(matches)}")
+    if matches:
+        group = matches[0]
+        if not isinstance(group.get("pages"), list):
+            raise SystemExit(f"{PENTA_GROUP!r} pages is not a list")
+        return group
+    group = {"group": PENTA_GROUP, "pages": []}
+    groups.append(group)
+    return group
 
 
 def main() -> None:
     document = json.loads(DOCS.read_text(encoding="utf-8"))
     crownthrive_tab = find_tab(document, "CrownThrive OS")
+    penta_tab = find_tab(document, "Pentas")
 
     for group, routes in CROWNTHRIVE_GROUP_ROUTES.items():
         for route in routes:
             add_group_route(document, crownthrive_tab, group, route)
 
-    inserted = 0
+    penta_group = ensure_penta_group(document, penta_tab)
     for route in PENTA_ROUTES:
         if not ensure_absent_or_once(document, route):
-            add_penta_route(document, route, inserted)
-            inserted += 1
+            penta_group["pages"].append(route)
 
     required = [route for routes in CROWNTHRIVE_GROUP_ROUTES.values() for route in routes] + PENTA_ROUTES
     counts = {route: sum(1 for value in iter_string_routes(document) if value == route) for route in required}
