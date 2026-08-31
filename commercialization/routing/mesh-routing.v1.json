@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0.0",
+  "routing_id": "ct.routing.cos-commercialization-mesh.v1",
+  "policy": "hot_warm_cold",
+  "mcp_server_refs": {
+    "crownthrive_os": ".mcp.json#mcpServers/crownthrive-os",
+    "chlom_chain_evidence": ".mcp.json#mcpServers/chlom-chain-evidence"
+  },
+  "lanes": {
+    "hot": {
+      "side_effects_allowed": false,
+      "cache_ttl_seconds": 60,
+      "operations": [
+        "commercial.catalog.list",
+        "commercial.catalog.get",
+        "commercial.offer.list",
+        "commercial.offer.get",
+        "commercial.install.resolve",
+        "commercial.entitlement.verify",
+        "commercial.health"
+      ],
+      "required_controls": [
+        "public-safe response filtering",
+        "bounded cache",
+        "request fingerprint",
+        "no provider mutation"
+      ]
+    },
+    "warm": {
+      "side_effects_allowed": true,
+      "operations": [
+        "commercial.license.quote.request",
+        "commercial.license.accept",
+        "commercial.wallet.intent.create",
+        "commercial.wallet.intent.authorize",
+        "commercial.entitlement.issue",
+        "commercial.package.build",
+        "commercial.publication.request"
+      ],
+      "required_controls": [
+        "authenticated principal",
+        "idempotency key",
+        "exact component and version",
+        "CHLOM rights decision",
+        "ECAC authorization for paid operations",
+        "DAIL receipt",
+        "read-after-write",
+        "rollback or compensation"
+      ]
+    },
+    "cold": {
+      "side_effects_allowed": true,
+      "operations": [
+        "commercial.settlement.reconcile",
+        "commercial.refund.reconcile",
+        "commercial.reversal.record",
+        "commercial.license.revoke",
+        "commercial.provenance.archive",
+        "commercial.sbom.archive",
+        "commercial.evidence.export",
+        "commercial.release.readback.reconcile"
+      ],
+      "required_controls": [
+        "append-only evidence",
+        "dual authorization where required",
+        "independent verification",
+        "immutable source binding",
+        "retention and archive policy"
+      ]
+    }
+  },
+  "fallback": {
+    "hot_read_miss": "warm_read_rebuild",
+    "warm_retry_exhausted": "cold_reconciliation_queue",
+    "cold_failure": "HOLD_and_operator_evidence",
+    "automatic_side_effect_lane_escalation": false,
+    "automatic_money_movement_fallback": false
+  },
+  "circuit_breakers": {
+    "wallet_provider_unavailable": "quote_only_no_settlement",
+    "chlom_unavailable": "deny_new_license_and_preserve_existing_entitlements",
+    "dail_unavailable": "deny_side_effects",
+    "release_provider_unavailable": "build_artifacts_but_do_not_claim_publication"
+  }
+}
