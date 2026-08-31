@@ -8,7 +8,7 @@ on:
       - penta/evidence/pentadocs-pr1988-quality-apply.ready
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pentadocs-quality-apply-pr1988
@@ -56,6 +56,118 @@ jobs:
             /tmp/pentadocs-pr1988-quality-output.tar.gz \
             > /tmp/pentadocs-pr1988-quality-output.sha256
 
+      - name: Create unattached verified commit object
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import subprocess
+          import urllib.request
+          from pathlib import Path
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+          api = f"https://api.github.com/repos/{repository}"
+          paths = [
+              "changelog/crownthrive-app-factory-rc1-institutionalization-2026-08-30.mdx",
+              "pentas/app-factory-orchestration.mdx",
+              "platforms/app-factory/architecture.mdx",
+              "platforms/app-factory/operations-certification.mdx",
+              "platforms/app-factory/overview.mdx",
+              "platforms/app-factory/provider-activation.mdx",
+              "platforms/app-factory/source-release-custody.mdx",
+              "platforms/app-factory/thriveapps-boundary.mdx",
+              "data/documentation/pentadocs-page-profiles.v1.json",
+          ]
+
+          def request(method, endpoint, payload=None):
+              body = None if payload is None else json.dumps(payload).encode("utf-8")
+              req = urllib.request.Request(
+                  f"{api}{endpoint}",
+                  data=body,
+                  method=method,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Accept": "application/vnd.github+json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "Content-Type": "application/json",
+                      "User-Agent": "CrownThrive-PentaDocs-Quality/1.0",
+                  },
+              )
+              with urllib.request.urlopen(req, timeout=60) as response:
+                  return json.loads(response.read().decode("utf-8"))
+
+          parent = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          base_tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip()
+          tree_entries = []
+          file_receipts = []
+
+          for relative in paths:
+              content = Path(relative).read_bytes()
+              blob = request(
+                  "POST",
+                  "/git/blobs",
+                  {
+                      "content": base64.b64encode(content).decode("ascii"),
+                      "encoding": "base64",
+                  },
+              )
+              tree_entries.append(
+                  {
+                      "path": relative,
+                      "mode": "100644",
+                      "type": "blob",
+                      "sha": blob["sha"],
+                  }
+              )
+              file_receipts.append(
+                  {
+                      "path": relative,
+                      "bytes": len(content),
+                      "blob_sha": blob["sha"],
+                  }
+              )
+
+          tree = request(
+              "POST",
+              "/git/trees",
+              {"base_tree": base_tree, "tree": tree_entries},
+          )
+          commit = request(
+              "POST",
+              "/git/commits",
+              {
+                  "message": "docs: conform App Factory pages to PentaDocs v2 governance",
+                  "tree": tree["sha"],
+                  "parents": [parent],
+              },
+          )
+
+          receipt = {
+              "schema": "crownthrive.pentadocs.unattached-commit/v1",
+              "pull_request": 1988,
+              "repository": repository,
+              "branch": "admin-mcp/app-factory-rc1-source-import-a044d93",
+              "parent_sha": parent,
+              "base_tree_sha": base_tree,
+              "verified_commit_sha": commit["sha"],
+              "verified_tree_sha": tree["sha"],
+              "files": file_receipts,
+              "verification": "PENTADOCS_QUALITY_APPLY_AND_FULL_CORPUS_CHECK_PASS",
+              "ref_updated": False,
+          }
+          Path("/tmp/pentadocs-pr1988-remote-commit.json").write_text(
+              json.dumps(receipt, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(receipt, indent=2))
+          PY
+
       - name: Upload verified migration artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -64,5 +176,6 @@ jobs:
             /tmp/pentadocs-pr1988-quality-output.patch
             /tmp/pentadocs-pr1988-quality-output.tar.gz
             /tmp/pentadocs-pr1988-quality-output.sha256
+            /tmp/pentadocs-pr1988-remote-commit.json
           if-no-files-found: error
           retention-days: 7
