@@ -1,6 +1,6 @@
 -- Transactional acceptance for the #1962 direct-callable write-surface expansion.
--- The test is intentionally bounded to four newly classified public-schema writes.
--- It does not assert closure of the broader PentaCertifier 182-function role-EXECUTE
+-- The test is intentionally bounded to five newly classified public-schema writes.
+-- It does not assert closure of the broader PentaCertifier/catalog role-EXECUTE
 -- finding. Private-schema reachability and intentionally public/authenticated reads
 -- remain separate owner-policy classification work.
 
@@ -15,7 +15,8 @@ declare
     'public.thrivebase_sheet_mirror_record_failure_v1(uuid,uuid,text,text,jsonb)',
     'public.thrivebase_sheet_mirror_record_folder_v1(text,text,text,jsonb)',
     'public.thrivebase_sheet_mirror_record_progress_v1(uuid,uuid,text,text,integer,integer,bigint,boolean,text,text,jsonb)',
-    'public.thrivebase_sheet_mirror_record_provision_v1(uuid,uuid,integer,text,text,text,jsonb)'
+    'public.thrivebase_sheet_mirror_record_provision_v1(uuid,uuid,integer,text,text,text,jsonb)',
+    'public.penta_ads_scan_ingest_v1(bigint,text,integer,text,text,jsonb,text,jsonb)'
   ];
 begin
   foreach v_sig in array v_required loop
