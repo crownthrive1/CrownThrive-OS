@@ -22,6 +22,10 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
+      - name: Admit institutional identities into the canonical family fabric
+        run: |
+          python scripts/pr2070_family_repair.py
+          python runtime/penta_families.py --portal-index > /tmp/penta-families-pre.json
       - name: Generate canonical Penta portal projection
         run: python scripts/penta_portal_docs.py --write
       - name: Place institutional pages in governed navigation
@@ -43,7 +47,7 @@ jobs:
           git diff --check
       - name: Commit generated repair only
         run: |
-          git rm -f scripts/pr2070_docs_repair.py .github/workflows/pr2070-docs-repair.yml
+          git rm -f scripts/pr2070_docs_repair.py scripts/pr2070_family_repair.py .github/workflows/pr2070-docs-repair.yml
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           git config user.name "CrownThrive PentaDocs"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
