@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "ct.contract.chlom-wallet-commercialization-bridge.v1",
+  "component_id": "ct.chlom.wallet-commercialization-bridge",
+  "version": "1.0.0-rc.1",
+  "state": "CONTROLLED_TEST",
+  "existing_runner_ref": "runners/chlom-agent-wallet",
+  "existing_policy_ref": "runners/chlom-agent-wallet/config/policy.base-usdc.json",
+  "authority": {
+    "ceiling": "D2",
+    "d3_human_reserved": true,
+    "exact_ecac_required": true,
+    "unattended_value_minor": 0,
+    "provider_success_creates_entitlement": false,
+    "wallet_signature_creates_license": false
+  },
+  "supported_flows": [
+    {
+      "flow": "FREE_EVALUATION",
+      "money_movement": false,
+      "required_states": [
+        "OFFER_RESOLVED",
+        "LICENSE_ACCEPTED",
+        "ENTITLEMENT_ISSUED",
+        "DAIL_RECORDED"
+      ]
+    },
+    {
+      "flow": "NEGOTIATED_COMMERCIAL",
+      "money_movement": true,
+      "required_states": [
+        "OFFER_RESOLVED",
+        "QUOTE_APPROVED",
+        "LICENSE_ACCEPTED",
+        "ECAC_AUTHORIZED",
+        "WALLET_INTENT_AUTHORIZED",
+        "PROVIDER_EXECUTION_READBACK",
+        "SETTLEMENT_RECONCILED",
+        "ENTITLEMENT_ISSUED",
+        "DAIL_RECORDED"
+      ]
+    },
+    {
+      "flow": "REFUND_OR_REVERSAL",
+      "money_movement": true,
+      "required_states": [
+        "ORIGINAL_TRANSACTION_LINKED",
+        "REFUND_OR_REVERSAL_AUTHORIZED",
+        "PROVIDER_READBACK",
+        "ENTITLEMENT_RECONCILED",
+        "DAIL_RECORDED"
+      ]
+    }
+  ],
+  "intent_required_fields": [
+    "intent_id",
+    "idempotency_key",
+    "principal_did",
+    "component_id",
+    "component_version",
+    "offer_id",
+    "license_id",
+    "amount_minor",
+    "currency",
+    "purpose",
+    "source_sha",
+    "quote_fingerprint",
+    "requested_at"
+  ],
+  "public_safe_output_fields": [
+    "intent_id",
+    "idempotency_key",
+    "public_wallet_address",
+    "chain_id",
+    "asset_symbol",
+    "amount_minor",
+    "currency",
+    "transaction_hash",
+    "state",
+    "policy_digest",
+    "receipt_fingerprint"
+  ],
+  "prohibited_output_fields": [
+    "private_key",
+    "mnemonic",
+    "wallet_password",
+    "api_secret",
+    "access_token"
+  ],
+  "state_machine": {
+    "DRAFT": ["QUOTED", "CANCELLED"],
+    "QUOTED": ["AUTHORIZED", "EXPIRED", "CANCELLED"],
+    "AUTHORIZED": ["RESERVED", "SETTLED", "CANCELLED"],
+    "RESERVED": ["SETTLED", "RELEASED", "CANCELLED"],
+    "SETTLED": ["ENTITLED", "REFUND_PENDING", "REVERSAL_PENDING"],
+    "ENTITLED": ["REFUND_PENDING", "REVERSAL_PENDING", "REVOKED"],
+    "REFUND_PENDING": ["REFUNDED", "HOLD"],
+    "REVERSAL_PENDING": ["REVERSED", "HOLD"],
+    "REFUNDED": ["ENTITLEMENT_RECONCILED"],
+    "REVERSED": ["ENTITLEMENT_RECONCILED"],
+    "HOLD": [],
+    "CANCELLED": [],
+    "EXPIRED": [],
+    "REVOKED": [],
+    "ENTITLEMENT_RECONCILED": []
+  }
+}
