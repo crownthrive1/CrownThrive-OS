@@ -4,11 +4,18 @@ import json
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pr_control_plane_janitor import classify_branch, load_policy  # noqa: E402
+from pr_control_plane_janitor import (  # noqa: E402
+    JanitorError,
+    classify_branch,
+    load_policy,
+    paginate,
+    pagination_request_paths,
+)
 
 
 class PRControlPlaneJanitorTests(unittest.TestCase):
@@ -84,6 +91,54 @@ class PRControlPlaneJanitorTests(unittest.TestCase):
         self.assertTrue(invariants["delete_only_if_not_open_pr_head_or_base"])
         self.assertTrue(invariants["closed_unmerged_unique_work_is_not_deleted"])
         self.assertTrue(invariants["preserve_commit_and_pr_history"])
+
+    def test_pagination_uses_repository_relative_numeric_pages(self) -> None:
+        calls: list[str] = []
+
+        def fake_api_request(*, repo_full_name, token, path, method="GET"):
+            self.assertEqual(repo_full_name, "crownthrive1/CrownThrive-OS")
+            self.assertEqual(token, "token")
+            self.assertEqual(method, "GET")
+            calls.append(path)
+            if path.endswith("page=1"):
+                return (
+                    [{"name": "a"}, {"name": "b"}],
+                    {
+                        "Link": (
+                            '<https://api.github.com/repositories/1336348391/branches'
+                            '?per_page=2&page=2>; rel="next"'
+                        )
+                    },
+                    200,
+                )
+            return ([{"name": "c"}], {}, 200)
+
+        with patch("pr_control_plane_janitor.api_request", side_effect=fake_api_request):
+            rows = paginate(
+                "crownthrive1/CrownThrive-OS",
+                "token",
+                "/branches?per_page=2",
+            )
+
+        self.assertEqual([row["name"] for row in rows], ["a", "b", "c"])
+        self.assertEqual(
+            calls,
+            ["/branches?per_page=2&page=1", "/branches?per_page=2&page=2"],
+        )
+
+    def test_pagination_rejects_absolute_caller_path(self) -> None:
+        with self.assertRaises(JanitorError):
+            pagination_request_paths(
+                "https://api.github.com/repositories/1336348391/branches?per_page=100"
+            )
+
+    def test_pagination_bounds_per_page(self) -> None:
+        with self.assertRaises(JanitorError):
+            pagination_request_paths("/branches?per_page=101")
+
+    def test_pagination_rejects_duplicate_page_parameter(self) -> None:
+        with self.assertRaises(JanitorError):
+            pagination_request_paths("/branches?page=1&page=2")
 
 
 if __name__ == "__main__":

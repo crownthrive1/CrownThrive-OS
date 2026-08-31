@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_POLICY = ROOT / "config/pr_control_plane_janitor.json"
 API_VERSION = "2022-11-28"
 USER_AGENT = "CrownThrive-PR-Control-Plane-Janitor/1.0"
+MAX_PAGINATION_PAGES = 100
 
 
 class JanitorError(RuntimeError):
@@ -170,29 +171,92 @@ def api_request(
         raise JanitorError(f"GitHub API {method} {path} failed {exc.code}: {detail[:800]}") from exc
 
 
+def pagination_request_paths(path: str) -> tuple[str, list[tuple[str, str]], int, int]:
+    """Normalize a repository-relative list endpoint for deterministic paging.
+
+    GitHub may emit absolute Link targets using its numeric ``/repositories/{id}``
+    canonical form even when the request entered through ``/repos/{owner}/{repo}``.
+    Those provider-generated URLs are valid but are intentionally not trusted as
+    future request authority. We instead retain the caller's already-bounded
+    repository-relative endpoint and advance only the integer ``page`` parameter.
+    """
+    parsed = urllib.parse.urlsplit(path)
+    if parsed.scheme or parsed.netloc or not parsed.path.startswith("/") or parsed.path.startswith("//"):
+        raise JanitorError("pagination path must remain repository-relative")
+    if parsed.fragment:
+        raise JanitorError("pagination path fragments are not supported")
+
+    pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    base_pairs: list[tuple[str, str]] = []
+    page = 1
+    per_page = 100
+    seen_page = False
+    seen_per_page = False
+    for key, value in pairs:
+        if key == "page":
+            if seen_page:
+                raise JanitorError("duplicate pagination page parameter")
+            seen_page = True
+            try:
+                page = int(value)
+            except ValueError as exc:
+                raise JanitorError("pagination page must be an integer") from exc
+            continue
+        if key == "per_page":
+            if seen_per_page:
+                raise JanitorError("duplicate pagination per_page parameter")
+            seen_per_page = True
+            try:
+                per_page = int(value)
+            except ValueError as exc:
+                raise JanitorError("pagination per_page must be an integer") from exc
+            continue
+        base_pairs.append((key, value))
+
+    if page < 1:
+        raise JanitorError("pagination page must be positive")
+    if per_page < 1 or per_page > 100:
+        raise JanitorError("pagination per_page must be between 1 and 100")
+    return parsed.path, base_pairs, page, per_page
+
+
+def paged_path(
+    endpoint: str,
+    base_pairs: list[tuple[str, str]],
+    page: int,
+    per_page: int,
+) -> str:
+    query = urllib.parse.urlencode([
+        *base_pairs,
+        ("per_page", str(per_page)),
+        ("page", str(page)),
+    ])
+    return f"{endpoint}?{query}" if query else endpoint
+
+
 def paginate(repo_full_name: str, token: str, path: str) -> list[dict[str, Any]]:
+    """Read every list page without following provider-supplied absolute URLs."""
+    endpoint, base_pairs, page, per_page = pagination_request_paths(path)
     rows: list[dict[str, Any]] = []
-    next_path: str | None = path
-    while next_path:
-        body, headers, _ = api_request(
+    pages_read = 0
+    while True:
+        if pages_read >= MAX_PAGINATION_PAGES:
+            raise JanitorError(
+                f"pagination exceeded bounded page cap ({MAX_PAGINATION_PAGES}) for {endpoint}"
+            )
+        request_path = paged_path(endpoint, base_pairs, page, per_page)
+        body, _, _ = api_request(
             repo_full_name=repo_full_name,
             token=token,
-            path=next_path,
+            path=request_path,
         )
         if not isinstance(body, list):
-            raise JanitorError(f"expected list response from {next_path}")
+            raise JanitorError(f"expected list response from {request_path}")
         rows.extend(item for item in body if isinstance(item, dict))
-        next_path = None
-        link = headers.get("Link", "")
-        for segment in link.split(","):
-            if 'rel="next"' not in segment:
-                continue
-            target = segment.split(";", 1)[0].strip().strip("<>")
-            prefix = f"https://api.github.com/repos/{repo_full_name}"
-            if not target.startswith(prefix):
-                raise JanitorError("pagination target escaped repository API scope")
-            next_path = target[len(prefix):]
+        pages_read += 1
+        if len(body) < per_page:
             break
+        page += 1
     return rows
 
 
