@@ -4,7 +4,20 @@
   "title": "Penta PR Admission Contract v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["repo","subject_key","owner_lane","base_sha","head_sha","authority_class","changed_files","tests","rollback","evidence","post_open_obligations"],
+  "required": [
+    "repo",
+    "subject_key",
+    "owner_lane",
+    "base_sha",
+    "head_sha",
+    "authority_class",
+    "changed_files",
+    "tests",
+    "rollback",
+    "evidence",
+    "post_open_obligations",
+    "reconciliation"
+  ],
   "properties": {
     "repo": {"type":"string","minLength":3},
     "subject_key": {"type":"string","minLength":3,"description":"Stable semantic work identity. One subject maps to one canonical open PR owner lane."},
@@ -12,11 +25,62 @@
     "release_candidate_key": {"type":["string","null"],"description":"For releases: repo + version + canonical base generation. Must be idempotent."},
     "base_sha": {"type":"string","pattern":"^[0-9a-f]{40}$"},
     "head_sha": {"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "base_relationship": {"enum":["current_main","stacked_owner"],"default":"current_main"},
+    "stacked_on_pr": {"type":["integer","null"],"minimum":1},
     "authority_class": {"enum":["D0","D1","D2","D3"]},
     "changed_files": {"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string"}},
     "tests": {"type":"object","required":["status"],"properties":{"status":{"enum":["PASS","HOLD"]},"evidence_refs":{"type":"array","items":{"type":"string"}}},"additionalProperties":true},
     "rollback": {"type":"object","required":["defined"],"properties":{"defined":{"const":true},"procedure":{"type":"string","minLength":3}},"additionalProperties":true},
     "evidence": {"type":"object","required":["claims"],"properties":{"claims":{"type":"array","items":{"type":"object","required":["name","state"],"properties":{"name":{"type":"string"},"state":{"enum":["PASS","HOLD","NOT_APPLICABLE"]},"exact_head":{"type":"boolean"},"provider_receipt":{"type":["string","null"]}},"additionalProperties":false}}},"additionalProperties":true},
+    "reconciliation": {
+      "type":"object",
+      "additionalProperties":true,
+      "required":[
+        "current_main_sha",
+        "checked_at",
+        "topology_snapshot_ref",
+        "current_changes_checked",
+        "open_prs_checked",
+        "active_owners_checked",
+        "production_truth_checked",
+        "founder_intent_checked",
+        "behavior_change_review_complete",
+        "affected_surfaces",
+        "current_change_refs",
+        "production_truth_refs",
+        "active_owner_refs",
+        "behavior_changes"
+      ],
+      "properties": {
+        "current_main_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+        "checked_at":{"type":"string","minLength":10},
+        "topology_snapshot_ref":{"type":"string","minLength":3},
+        "current_changes_checked":{"const":true},
+        "open_prs_checked":{"const":true},
+        "active_owners_checked":{"const":true},
+        "production_truth_checked":{"const":true},
+        "founder_intent_checked":{"const":true},
+        "behavior_change_review_complete":{"const":true},
+        "affected_surfaces":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}},
+        "current_change_refs":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},
+        "production_truth_refs":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},
+        "active_owner_refs":{"type":"array","items":{"type":"string"}},
+        "behavior_changes":{
+          "type":"array",
+          "items":{
+            "type":"object",
+            "required":["behavior_key","observed_state","desired_state"],
+            "properties":{
+              "behavior_key":{"type":"string","minLength":1},
+              "observed_state":{},
+              "desired_state":{},
+              "authority_ref":{"type":["string","null"]}
+            },
+            "additionalProperties":true
+          }
+        }
+      }
+    },
     "supersedes_pr": {"type":["integer","null"],"minimum":1},
     "existing_owner_pr": {"type":["integer","null"],"minimum":1},
     "post_open_obligations": {"type":"array","items":{"type":"string"}},
