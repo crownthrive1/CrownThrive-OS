@@ -207,6 +207,52 @@ The outer continuous status remains `partial` only because the separate Locticia
 
 No raw credential values were copied into documentation or institutional mirrors.
 
+## Persona-key promotion and universal BD webhook certification
+
+The five independent Brilliant Directories persona/fallback credentials are now permission-complete and production-verified. Each passed six bounded canaries with HTTP 200: Site Info, user fields, data categories, filtered member lookup, member-by-ID and member categories.
+
+Runtime priority is now:
+
+1. `ct.locticians.bd.personas.hot.v1` — Personas 1 Hot — **WARM\_PRIMARY** — provider record 19 (`Personas 1`).
+2. `ct.locticians.bd.personas.warm.v1` — Personas 2 Warm — **WARM\_STANDBY** — provider record 21 (`Personas 2`).
+3. `ct.locticians.bd.personas.cold.v1` — Personas 3 Cold — **WARM\_STANDBY** — provider record 22 (`Personas 3`).
+4. `ct.locticians.bd.personas.emergency.1.v1` — Emergency Penta Fallback 1 — **WARM\_STANDBY** — provider record 23 (`Emergency Penta Fallback`).
+5. `ct.locticians.bd.personas.emergency.2.v1` — Emergency Penta Fallback 2 — **WARM\_STANDBY** — provider record 24 (`Emergency Penta Fallback 2`).
+6. The prior legacy/master credential remains a later standby rather than being deleted.
+
+The provider does not re-display one-time API tokens after creation, so provider-record identity is preserved by provider name/record/creation evidence; token equality is **not** asserted after the creation window. Raw API tokens remain Vault-only.
+
+### Universal Brilliant Directories webhook ingress
+
+Canonical contract: `ct.locticians.brilliant-directories.webhook-fabric.v1`.
+
+Runtime endpoint slug: `locticians-bd-webhook-v1`. The provider-facing POST URL uses a generated opaque hook binding ID that is intentionally **not** stored in GitHub, PentaDocs, Drive, Sheets or DAIL.
+
+Certification readback:
+
+- Edge version: 2; SHA-256 `29412ea2f6fd363ebc315b6d6aff78d800763216adf70eb4f23c4321052850e9`;
+- binding state: **active / production\_verified**;
+- health GET: HTTP 200;
+- invalid binding POST: HTTP 401;
+- valid form POST: HTTP 202;
+- identical replay POST: HTTP 202, with downstream duplicate suppression verified;
+- durable fast-intake queue: active;
+- worker: `ct-locticians-bd-webhook-intake-worker-v1`, every minute;
+- enabled BD routes: **34/34**;
+- routes with downstream targets: **34/34**;
+- D2 evidence routes: 12; D3 webhook routes: 0;
+- sensitive-field redaction: verified, including `login_token` and password-class keys;
+- queued/retry/failed intake at final certification: 0/0/0;
+- provider signature headers are not represented as documented by the inspected BD contract, so CrownThrive uses the opaque provider URL binding plus server-side validation, payload hash, replay/idempotency controls and source fingerprints;
+- Member Login Token webhook inclusion remains disabled;
+- webhook receipts do not authorize payment, refund, payout, settlement, provider mutation, destructive delete or D3 action.
+
+The ingress accepts JSON, URL-encoded forms and multipart forms, acknowledges after durable intake, then performs DAIL recording and deterministic fan-out behind the acknowledgment. The public PentaWire projection is GET health only under `ct.locticians.bd.webhook.health.v1`; the inbound POST binding is not public-safe and does not forward credentials.
+
+Final PentaWire scan after webhook registration: **PASS**, provider-contract holds **0**, unresolved tools **0**.
+
+DAIL webhook certification event: `cbe17279-04db-46f7-8c41-6fc8a57df9f6`.
+
 ## Authority and evidence rule
 
 A provider record, PR, Vault alias, documentation page, or factory self-report does not create authority by itself. Promotion requires exact runtime or provider evidence appropriate to the operation. D3, destructive provider actions, credential export, financial movement, and other reserved actions remain separately governed.
