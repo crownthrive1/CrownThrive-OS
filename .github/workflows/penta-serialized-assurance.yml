@@ -35,9 +35,11 @@ on:
 permissions:
   contents: read
 
+# Exact-head work supersedes stale work for the same PR/ref. Continuity must
+# protect the current candidate, not consume runner time certifying old heads.
 concurrency:
-  group: penta-serialized-${{ github.ref }}
-  cancel-in-progress: false
+  group: penta-serialized-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   serialized-assurance:
@@ -78,6 +80,146 @@ jobs:
           python -m penta.runtime.serialized snapshot "$store" --actor ci --reason 'smoke recovery baseline' > "${RUNNER_TEMP}/snapshot.json"
           python -m penta.runtime.serialized doctor "$store" > "${RUNNER_TEMP}/doctor.json"
 
+      - name: Derive exact-head workflow continuity projection
+        id: workflow_receipt
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import datetime as dt
+          import fnmatch
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          repo = Path('.').resolve()
+          event_name = os.environ['EVENT_NAME']
+          if event_name == 'pull_request':
+              base = os.environ['PR_BASE']
+              head = os.environ['PR_HEAD']
+          else:
+              base = os.environ['PUSH_BASE']
+              head = os.environ['PUSH_HEAD']
+
+          def git(*args: str, required: bool = True) -> str | None:
+              proc = subprocess.run(
+                  ['git', *args], cwd=repo, text=True,
+                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+              )
+              if proc.returncode != 0:
+                  if required:
+                      raise SystemExit(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
+                  return None
+              return proc.stdout.strip()
+
+          checkout_sha = git('rev-parse', 'HEAD')
+          policy = json.loads((repo / 'penta/registry/serialized-suite.json').read_text(encoding='utf-8'))
+          patterns = policy.get('protected_patterns') or []
+          changed = git('diff', '--name-status', '--find-renames', f'{base}...{head}') or ''
+          entries = []
+
+          for raw in changed.splitlines():
+              if not raw:
+                  continue
+              parts = raw.split('\t')
+              code = parts[0][0]
+              if code == 'R':
+                  operation, path = 'rename', parts[2]
+              else:
+                  path = parts[1]
+                  operation = {'A': 'add', 'M': 'modify', 'D': 'delete'}.get(code, 'modify')
+
+              # Machine-derived continuity is intentionally narrow: it may satisfy
+              # exact-lineage evidence for in-place workflow modifications only.
+              # Deletes/renames and every other protected family still require an
+              # explicit committed continuity receipt.
+              if operation != 'modify' or not path.startswith('.github/workflows/'):
+                  continue
+              if not any(fnmatch.fnmatch(path, pattern) for pattern in patterns):
+                  continue
+
+              previous = git('rev-parse', f'{base}:{path}', required=False)
+              current = git('rev-parse', f'{head}:{path}', required=False)
+              if not previous or not current:
+                  raise SystemExit(f'exact workflow lineage unresolved for {path}')
+              entries.append({
+                  'path': path,
+                  'operation': 'modify',
+                  'previous_blob_sha': previous,
+                  'new_blob_sha': current,
+                  'reason': (
+                      'CI-derived exact-head continuity projection for an in-place '
+                      'GitHub Actions workflow modification; lineage/rollback evidence '
+                      'only and not merge, release, certification, or provider authority.'
+                  ),
+                  'rollback_ref': base,
+              })
+
+          output = Path(os.environ['GITHUB_OUTPUT'])
+          with output.open('a', encoding='utf-8') as fh:
+              fh.write(f'base={base}\n')
+              fh.write(f'head={head}\n')
+              fh.write(f'checkout_sha={checkout_sha}\n')
+
+          if not entries:
+              with output.open('a', encoding='utf-8') as fh:
+                  fh.write('generated=false\n')
+              print('No eligible in-place workflow modifications need a CI continuity projection.')
+              raise SystemExit(0)
+
+          run_id = os.environ['RUN_ID']
+          attempt = os.environ['RUN_ATTEMPT']
+          receipt = {
+              'schema': 'crownthrive.penta.serialized.git-receipt/v1',
+              'receipt_id': f'ct.penta.serialized.ci-workflow-projection.{run_id}.{attempt}',
+              'created_at': dt.datetime.now(dt.timezone.utc).isoformat().replace('+00:00', 'Z'),
+              'actor': 'github-actions[bot]',
+              'reason': (
+                  'Exact-head machine-derived continuity projection for modified GitHub '
+                  'Actions workflow blobs. This record proves lineage and rollback only; '
+                  'it grants zero independent approval or merge authority.'
+              ),
+              'changes': entries,
+              'continuity': {
+                  'silent_replacement': False,
+                  'silent_delete': False,
+                  'tombstones': [],
+                  'successors': [],
+                  'rollback_preserved': True,
+                  'projection_scope': 'modified_existing_github_workflows_only',
+              },
+              'exclusions': [
+                  'No delete or rename is auto-receipted.',
+                  'No non-workflow protected path is auto-receipted.',
+                  'No merge, release, certification, provider, credential, rights, or financial authority is manufactured.',
+                  'The receipt is ephemeral workflow evidence and is never committed back to the candidate branch.',
+              ],
+          }
+
+          repo_path = repo / 'penta/continuity/receipts' / f'ci-workflow-projection-{run_id}-{attempt}.json'
+          repo_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          artifact_dir = Path(os.environ['RUNNER_TEMP']) / 'penta-serialized-ci'
+          artifact_dir.mkdir(parents=True, exist_ok=True)
+          artifact_path = artifact_dir / 'continuity-receipt.json'
+          artifact_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+
+          with output.open('a', encoding='utf-8') as fh:
+              fh.write('generated=true\n')
+              fh.write(f'repo_path={repo_path.relative_to(repo).as_posix()}\n')
+              fh.write(f'artifact_path={artifact_path.as_posix()}\n')
+          print(json.dumps(receipt, sort_keys=True))
+          PY
+
       - name: Gate Git continuity receipts
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
         env:
@@ -103,6 +245,32 @@ jobs:
             --policy penta/registry/serialized-suite.json \
             > "${RUNNER_TEMP}/git-gate.json"
 
+      - name: Upload exact-head continuity projection
+        if: always() && steps.workflow_receipt.outputs.generated == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-serialized-workflow-continuity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.workflow_receipt.outputs.artifact_path }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Remove ephemeral receipt and prove source purity
+        if: always() && steps.workflow_receipt.outputs.generated == 'true'
+        env:
+          RECEIPT_PATH: ${{ steps.workflow_receipt.outputs.repo_path }}
+          CHECKOUT_SHA: ${{ steps.workflow_receipt.outputs.checkout_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "$RECEIPT_PATH"
+          test "$(git rev-parse HEAD)" = "$CHECKOUT_SHA"
+          dirty="$(git status --porcelain)"
+          if [[ -n "$dirty" ]]; then
+            echo "::error::Continuity assurance mutated the checked-out source tree"
+            printf '%s\n' "$dirty"
+            exit 79
+          fi
+
       - name: Publish PentaStatus summary
         if: always()
         shell: bash
@@ -113,6 +281,8 @@ jobs:
           echo '- Hard delete API: disabled/absent' >> "$GITHUB_STEP_SUMMARY"
           echo '- Mutation model: expected-revision + append-only hash chain + tombstones' >> "$GITHUB_STEP_SUMMARY"
           echo '- Git gate: deletions, renames, and protected modifications require continuity receipts' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Modified workflow continuity: exact-head CI projection allowed; artifact-only, never pushed to candidate branches' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Workflow deletes/renames and non-workflow protected modifications: explicit committed receipt still required' >> "$GITHUB_STEP_SUMMARY"
           if [ -s "${RUNNER_TEMP}/verify.json" ]; then
             python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json, os
