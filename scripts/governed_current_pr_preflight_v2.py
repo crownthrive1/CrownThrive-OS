@@ -3,13 +3,15 @@
 
 Closes #121 by classifying only an exact registry of inert Help Center evidence
 transport as neutral while keeping every unknown or material data path fail-closed.
-Every pull request must also carry an exact-head originator self-certification
-projection; that self-certification is candidate evidence and never substitutes
-for provider gates, DAIL binding, or human-reserved authority.
+Every pull request must also carry exact-head originator readiness evidence. That
+evidence may be projected ephemerally in CI when doing so does not weaken the
+explicit continuity contract; it never substitutes for provider gates, DAIL
+binding, or human-reserved authority.
 """
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 from pathlib import Path
@@ -40,7 +42,8 @@ from governed_current_pr_preflight import (
 
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_CONTRACT = ROOT / "developers/manifests/governed-evidence-data-classification.v1.json"
-PREFLIGHT_VERSION = "2.1.0"
+SERIALIZED_POLICY = ROOT / "penta/registry/serialized-suite.json"
+PREFLIGHT_VERSION = "2.2.0"
 
 
 def evidence_contract() -> dict[str, Any]:
@@ -117,8 +120,58 @@ def classifications_for(trusted_files: set[str], policy: dict[str, Any], contrac
     return classifications, domains
 
 
+def _self_cert_paths(number: int) -> tuple[Path, Path]:
+    return (
+        ROOT / f"penta/evidence/pr-self-cert/pr-{number}.json",
+        ROOT / f"penta/continuity/receipts/pr-{number}-self-certification.json",
+    )
+
+
+def _ephemeral_self_certification_eligible(git_base: str, git_head: str) -> tuple[bool, str]:
+    """Keep automatic CI projection inside the same narrow continuity boundary.
+
+    Deletes and renames always need explicit committed continuity evidence.
+    Protected non-workflow modifications also remain explicit. In-place GitHub
+    workflow modifications may use the exact-head PentaSerialized projection,
+    and unprotected/additive changes do not need a continuity receipt.
+    """
+    serialized = load_json(SERIALIZED_POLICY)
+    protected = [str(value) for value in serialized.get("protected_patterns", [])]
+    proc = subprocess.run(
+        ["git", "diff", "--name-status", "--find-renames", f"{git_base}...{git_head}"],
+        cwd=ROOT,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if proc.returncode != 0:
+        return False, f"trusted Git diff unavailable: {proc.stderr.strip()}"
+
+    for line in proc.stdout.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        code = parts[0][0]
+        if code == "R":
+            return False, f"workflow/source rename requires committed continuity: {parts[-1]}"
+        path = parts[1]
+        if code == "D":
+            return False, f"delete requires committed tombstone continuity: {path}"
+        if code == "M" and any(fnmatch.fnmatch(path, pattern) for pattern in protected):
+            if not path.startswith(".github/workflows/"):
+                return False, f"protected non-workflow modification requires committed continuity: {path}"
+    return True, "exact-head ephemeral projection permitted"
+
+
 def validate_originator_self_certification(git_base: str, git_head: str) -> dict[str, Any]:
-    """Require a current self-cert packet on GitHub pull_request executions."""
+    """Require exact-head originator readiness without forcing a candidate commit.
+
+    Existing committed packets continue to validate for backward compatibility.
+    When both packet files are absent, CI may build and validate a temporary pair
+    only if the diff stays within the narrow automatic-continuity boundary. The
+    files are deleted in ``finally`` and are never pushed to the PR branch.
+    """
     if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
         return {"state": "NOT_APPLICABLE", "reason": "non_pull_request_execution"}
     event_path = os.environ.get("GITHUB_EVENT_PATH")
@@ -127,8 +180,61 @@ def validate_originator_self_certification(git_base: str, git_head: str) -> dict
     try:
         event = json.loads(Path(event_path).read_text(encoding="utf-8"))
         number = int(event["pull_request"]["number"])
+        originator = str(
+            event["pull_request"].get("user", {}).get("login")
+            or os.environ.get("GITHUB_ACTOR")
+            or "unknown-originator"
+        )
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise SystemExit("ERROR: unable to resolve pull request number for self-certification gate") from exc
+        raise SystemExit("ERROR: unable to resolve pull request identity for self-certification gate") from exc
+
+    evidence_file, receipt_file = _self_cert_paths(number)
+    evidence_exists = evidence_file.exists()
+    receipt_exists = receipt_file.exists()
+    if evidence_exists != receipt_exists:
+        raise SystemExit(
+            "ERROR: partial originator readiness projection found; evidence and continuity receipt must be paired"
+        )
+
+    ephemeral = False
+    if not evidence_exists:
+        eligible, reason = _ephemeral_self_certification_eligible(git_base, git_head)
+        if not eligible:
+            raise SystemExit(
+                "ERROR: committed originator readiness evidence required; "
+                f"source-pure CI projection is not eligible: {reason}"
+            )
+        prepare_command = [
+            sys.executable,
+            str(ROOT / "scripts" / "penta_pr_gate_awareness.py"),
+            "prepare",
+            "--repo",
+            str(ROOT),
+            "--repository",
+            os.environ.get("GITHUB_REPOSITORY", "crownthrive1/CrownThrive-OS"),
+            "--base",
+            git_base,
+            "--head",
+            git_head,
+            "--pr-number",
+            str(number),
+            "--originator",
+            originator,
+        ]
+        prepared = subprocess.run(
+            prepare_command,
+            cwd=ROOT,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if prepared.returncode != 0:
+            detail = (prepared.stderr or prepared.stdout).strip()
+            raise SystemExit(f"ERROR: ephemeral originator readiness projection failed: {detail[:1500]}")
+        if not evidence_file.exists() or not receipt_file.exists():
+            raise SystemExit("ERROR: ephemeral originator readiness projection emitted no paired evidence")
+        ephemeral = True
 
     command = [
         sys.executable,
@@ -145,17 +251,31 @@ def validate_originator_self_certification(git_base: str, git_head: str) -> dict
         "--pr-number",
         str(number),
     ]
-    proc = subprocess.run(command, cwd=ROOT, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout).strip()
-        raise SystemExit(f"ERROR: Penta originator self-certification HOLD: {detail[:1500]}")
     try:
-        result = json.loads(proc.stdout)
-    except json.JSONDecodeError as exc:
-        raise SystemExit("ERROR: self-certification validator emitted invalid JSON") from exc
-    if result.get("state") != "PASS":
-        raise SystemExit("ERROR: originator self-certification did not return PASS")
-    return result
+        proc = subprocess.run(
+            command,
+            cwd=ROOT,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout).strip()
+            raise SystemExit(f"ERROR: Penta originator self-certification HOLD: {detail[:1500]}")
+        try:
+            result = json.loads(proc.stdout)
+        except json.JSONDecodeError as exc:
+            raise SystemExit("ERROR: self-certification validator emitted invalid JSON") from exc
+        if result.get("state") != "PASS":
+            raise SystemExit("ERROR: originator self-certification did not return PASS")
+        result["ephemeral_projection"] = ephemeral
+        result["candidate_branch_mutated"] = False
+        return result
+    finally:
+        if ephemeral:
+            evidence_file.unlink(missing_ok=True)
+            receipt_file.unlink(missing_ok=True)
 
 
 def self_test(policy: dict[str, Any], contract: dict[str, Any]) -> None:
@@ -198,6 +318,8 @@ def self_test(policy: dict[str, Any], contract: dict[str, Any]) -> None:
         "unknown_data_fail_closed": True,
         "extension_only_neutrality": False,
         "originator_self_certification_gate": True,
+        "source_pure_ephemeral_originator_projection": True,
+        "ephemeral_projection_forbids_delete_rename_and_protected_nonworkflow_modify": True,
         "self_test": "PASS",
     }, sort_keys=True))
 
