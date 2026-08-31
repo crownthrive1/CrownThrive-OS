@@ -2,7 +2,7 @@
 -- Additive identity/docs/alias convergence only. No provider write, money, rights, credentials, D3 or certification.
 -- Source candidate: github:crownthrive1/CrownThrive-OS@sol/penta-communications-personas-ads-institutionalization-v1-20260831
 -- Source parent: 89eb1e65131d6d5b3655c23da63646429451829d
--- PentaAds source pin: d40ef4a3b4e4eba7b136447d54abf661f0060414
+-- Current PentaAds source pin after no-loss convergence: 47f31106c815ff303e02b28900ae4d7de4c59b84
 
 begin;
 
@@ -61,7 +61,7 @@ values
  array['advertising','adluxe','placement','inventory','commerce','provider-bounded','d3-human-reserved'],
  jsonb_build_object(
    'source_authority','github:crownthrive1/PentaAds-Placement-OS',
-   'source_sha','d40ef4a3b4e4eba7b136447d54abf661f0060414',
+   'source_sha','47f31106c815ff303e02b28900ae4d7de4c59b84',
    'institutionalization_source','github:crownthrive1/CrownThrive-OS@sol/penta-communications-personas-ads-institutionalization-v1-20260831',
    'contract','contracts/ads/penta-ads.v2.json'
  ),
@@ -99,7 +99,7 @@ set canonical_name=excluded.canonical_name,
 
 insert into integration_control.penta_identity_aliases_v1(alias_key,identity_key,alias_type,source_ref,metadata)
 values
-('pentaads','penta.ads','compatibility_alias','github:crownthrive1/PentaAds-Placement-OS@d40ef4a3b4e4eba7b136447d54abf661f0060414','{"non_competing_identity":true}'::jsonb),
+('pentaads','penta.ads','compatibility_alias','github:crownthrive1/PentaAds-Placement-OS@47f31106c815ff303e02b28900ae4d7de4c59b84','{"non_competing_identity":true}'::jsonb),
 ('ct.penta.ads.v1','penta.ads','contract_alias','github:crownthrive1/CrownThrive-OS@sol/penta-communications-personas-ads-institutionalization-v1-20260831','{"non_competing_identity":true}'::jsonb),
 ('penta.mailer','penta.mail','subcomponent_alias','github:crownthrive1/CrownThrive-OS@sol/penta-communications-personas-ads-institutionalization-v1-20260831','{"independent_peer_identity":false}'::jsonb),
 ('pentamailer','penta.mail','compatibility_alias','github:crownthrive1/CrownThrive-OS@sol/penta-communications-personas-ads-institutionalization-v1-20260831','{"independent_peer_identity":false}'::jsonb),
