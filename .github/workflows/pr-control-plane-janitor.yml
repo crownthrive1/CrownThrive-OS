@@ -1,0 +1,140 @@
+name: PR Control Plane Janitor
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Audit or apply bounded safe branch cleanup
+        required: true
+        default: audit
+        type: choice
+        options:
+          - audit
+          - apply
+      max_delete:
+        description: Maximum safe generated branch refs to retire in one run
+        required: true
+        default: '75'
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - 'config/pr_control_plane_janitor.json'
+      - 'scripts/pr_control_plane_janitor.py'
+      - 'tests/test_pr_control_plane_janitor.py'
+      - '.github/workflows/pr-control-plane-janitor.yml'
+  schedule:
+    - cron: '17 5 * * 0'
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: crownthrive-pr-control-plane-janitor
+  cancel-in-progress: false
+
+jobs:
+  branch-hygiene:
+    if: github.repository == 'crownthrive1/CrownThrive-OS'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout complete repository lineage
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Prove deletion and archival safety invariants
+        run: |
+          python -m py_compile scripts/pr_control_plane_janitor.py tests/test_pr_control_plane_janitor.py
+          python -m unittest -v tests.test_pr_control_plane_janitor
+          python -m json.tool config/pr_control_plane_janitor.json >/dev/null
+
+      - name: Resolve bounded execution mode
+        id: execution
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_MAX_DELETE: ${{ inputs.max_delete }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            mode="${INPUT_MODE:-audit}"
+            max_delete="${INPUT_MAX_DELETE:-75}"
+          else
+            # A merge of the janitor itself performs a bounded cleanup wave;
+            # the weekly schedule then keeps generated branch debt bounded.
+            mode="apply"
+            max_delete="75"
+          fi
+          [[ "$mode" == "audit" || "$mode" == "apply" ]]
+          [[ "$max_delete" =~ ^[0-9]+$ ]]
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "max_delete=$max_delete" >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile safe generated branch refs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/pr_control_plane_janitor.py \
+            --mode '${{ steps.execution.outputs.mode }}' \
+            --max-delete '${{ steps.execution.outputs.max_delete }}' \
+            --report /tmp/pr-control-plane-janitor-report.json
+
+      - name: Publish branch hygiene report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-control-plane-janitor-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/pr-control-plane-janitor-report.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Publish exact cleanup summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ ! -s /tmp/pr-control-plane-janitor-report.json ]]; then
+            echo '## PR Control Plane Janitor' >> "$GITHUB_STEP_SUMMARY"
+            echo >> "$GITHUB_STEP_SUMMARY"
+            echo '- State: HOLD — no report emitted' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          d = json.loads(Path('/tmp/pr-control-plane-janitor-report.json').read_text())
+          print('## PR Control Plane Janitor')
+          print()
+          print(f"- Mode: {d['mode']}")
+          print(f"- Branches scanned: {d['branches_scanned']}")
+          print(f"- Open-PR refs preserved: {d['open_pr_refs_preserved']}")
+          print(f"- Eligible generated refs: {d['eligible']}")
+          print(f"- Direct-main eligible: {d['direct_main_eligible']}")
+          print(f"- Archive-required eligible: {d['archive_required_eligible']}")
+          print(f"- Deletion attempts: {d['attempted']}")
+          print(f"- Unique tips anchored this run: {d['attempted_archive']}")
+          print(f"- Deleted refs: {d['deleted']}")
+          print(f"- Delete failures: {len(d['failures'])}")
+          archive = d.get('archive')
+          if archive:
+              print(f"- Archive branch: `{archive['archive_branch']}`")
+              print(f"- Archive anchor: `{archive['archive_anchor_sha']}`")
+              print(f"- Archive exact ref readback: {str(archive['exact_ref_readback']).lower()}")
+              print(f"- Archive source-tree mutation: {str(archive['source_tree_changed']).lower()}")
+          print('- Unique unmerged work deleted: false')
+          print('- Git/PR history rewritten: false')
+          if d['deleted_refs']:
+              print()
+              print('Retired generated refs:')
+              for name in d['deleted_refs'][:75]:
+                  print(f'- `{name}`')
+          PY

@@ -11,7 +11,7 @@ on:
       - ".github/workflows/penta-pm-governance.yml"
       - "tests/test_penta_pm_reconcile.py"
   pull_request:
-    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
   issues:
     types: [opened, reopened, edited, labeled, unlabeled]
   release:
@@ -28,21 +28,103 @@ on:
   schedule:
     - cron: "17 * * * *"
 
-permissions:
-  contents: read
-  issues: write
-  pull-requests: write
-  repository-projects: write
-
+# Single-writer contract:
+# - PR metadata creation/mutation belongs only to PentaPM PR Metadata Convergence.
+# - This workflow is read-only on pull_request and may not heal/edit PR metadata.
+# - Trusted non-PR lanes retain provider reconciliation authority.
 concurrency:
-  group: penta-pm-${{ github.repository }}
-  cancel-in-progress: false
+  group: penta-pm-${{ github.repository }}-${{ github.event.pull_request.number || github.event_name }}
+  cancel-in-progress: true
 
 jobs:
-  reconcile:
-    name: PentaPM reconcile
+  pr-validation:
+    name: PentaPM PR validation
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate PentaPM policy and unit tests
+        run: |
+          python -m json.tool config/penta_pm_policy.json >/dev/null
+          python -m json.tool config/penta_credential_bindings.json >/dev/null
+          python -m unittest tests.test_penta_pm_reconcile -v
+
+      - name: Observe PR Development linkage without mutation
+        shell: bash
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/penta-pm
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import time
+
+          body = os.environ.get("PR_BODY") or ""
+          match = re.search(
+              r"(?mi)^\s*(?:refs?|references?|closes?|fix(?:e[sd])?|resolves?)\s*:?\s*#(\d+)\b",
+              body,
+          )
+          issue_number = int(match.group(1)) if match else None
+          receipt = {
+              "schema": "ct.penta.pm.pr-validation-receipt.v3",
+              "repo": os.environ["REPOSITORY"],
+              "pr_number": int(os.environ["PR_NUMBER"]),
+              "head_sha": os.environ.get("HEAD_SHA") or None,
+              "mode": "pull_request_validation_read_only",
+              "development_issue_observed": issue_number,
+              "development_link_state": "observed" if issue_number else "delegated_to_penta_pm_pr_metadata_convergence",
+              "metadata_owner": "PentaPM PR Metadata Convergence",
+              "provider_mutation": False,
+              "provider_authority_manufactured": False,
+              "state": "pass",
+              "generated_at_epoch": int(time.time()),
+          }
+          receipt["receipt_sha256"] = hashlib.sha256(
+              json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+          ).hexdigest()
+          with open("artifacts/penta-pm/latest.json", "w", encoding="utf-8") as fh:
+              fh.write(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(receipt, sort_keys=True))
+          PY
+
+      - name: Upload immutable-style PentaPM PR receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-pm-pr-validation-${{ github.run_id }}
+          path: artifacts/penta-pm/latest.json
+          if-no-files-found: error
+          retention-days: 90
+
+  provider-reconcile:
+    name: PentaPM provider reconcile
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      repository-projects: write
     env:
       PENTA_PM_GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
       GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
@@ -61,101 +143,20 @@ jobs:
           python -m json.tool config/penta_credential_bindings.json >/dev/null
           python -m unittest tests.test_penta_pm_reconcile -v
 
-      - name: Ensure PR Development linkage and bind validation receipt
-        if: github.event_name == 'pull_request'
+      - name: Require dedicated PentaPM Projects credential
         shell: bash
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          REPOSITORY: ${{ github.repository }}
-          BUILTIN_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p artifacts/penta-pm
-          python - <<'PY'
-          import hashlib
-          import json
-          import os
-          import re
-          import time
-          import urllib.error
-          import urllib.request
-
-          repo = os.environ['REPOSITORY']
-          head_repo = os.environ.get('HEAD_REPO') or ''
-          number = int(os.environ['PR_NUMBER'])
-          body = os.environ.get('PR_BODY') or ''
-          title = os.environ.get('PR_TITLE') or 'governed change'
-          token = os.environ.get('BUILTIN_TOKEN') or ''
-          match = re.search(r'(?mi)^\s*(refs|closes|fixes)\s+#(\d+)\b', body)
-          state = 'existing'
-          issue_number = int(match.group(2)) if match else None
-
-          def request(method, path, payload=None):
-              if not token:
-                  raise RuntimeError('repository workflow token unavailable')
-              data = None if payload is None else json.dumps(payload).encode()
-              headers = {
-                  'Accept': 'application/vnd.github+json',
-                  'Authorization': f'Bearer {token}',
-                  'Content-Type': 'application/json',
-                  'X-GitHub-Api-Version': '2022-11-28',
-                  'User-Agent': 'CrownThrive-PentaPM-Gate-Healer',
-              }
-              req = urllib.request.Request(f'https://api.github.com/repos/{repo}{path}', headers=headers, data=data, method=method)
-              with urllib.request.urlopen(req, timeout=30) as response:
-                  raw = response.read()
-                  return json.loads(raw or b'null')
-
-          if issue_number is None:
-              if head_repo != repo:
-                  raise SystemExit('PentaPM HOLD: external-fork PR is missing explicit Development linkage; provider mutation remains fail-closed')
-              issue = request('POST', '/issues', {
-                  'title': f'[PentaDevelopment] PR #{number}: {title}',
-                  'body': (
-                      f'Relationship: PR-scoped Development unit\nDevelopment PR: #{number}\n\n'
-                      'PentaPM created this bounded metadata/evidence unit because the PR arrived without an explicit Development linkage. '
-                      'This relationship grants no additional execution, D3, provider, rights, or financial authority.'
-                  ),
-              })
-              issue_number = int(issue['number'])
-              body = body.rstrip() + f'\n\nRefs #{issue_number}\n'
-              request('PATCH', f'/pulls/{number}', {'body': body})
-              state = 'created_and_bound'
-
-          receipt = {
-              'schema': 'ct.penta.pm.pr-validation-receipt.v2',
-              'repo': repo,
-              'pr_number': number,
-              'mode': 'pull_request_validation_and_bounded_metadata_heal',
-              'development_issue': issue_number,
-              'development_link_state': state,
-              'provider_mutation': state == 'created_and_bound',
-              'provider_authority_manufactured': False,
-              'state': 'pass',
-              'generated_at_epoch': int(time.time()),
-          }
-          receipt['receipt_sha256'] = hashlib.sha256(json.dumps(receipt, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-          open('artifacts/penta-pm/latest.json', 'w', encoding='utf-8').write(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
-          print(json.dumps(receipt, sort_keys=True))
-          PY
-
-      - name: Require dedicated PentaPM Projects credential
-        if: github.event_name != 'pull_request'
-        shell: bash
-        run: |
           if [[ -z "${PENTA_PM_GITHUB_TOKEN}" ]]; then
             echo "::error::PENTA_PM_GITHUB_TOKEN is unavailable to trusted PentaPM provider reconciliation."
             exit 78
           fi
 
       - name: Determine reconciliation mode
-        if: github.event_name != 'pull_request'
         id: mode
         shell: bash
         run: |
+          set -euo pipefail
           APPLY=false
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.apply }}" == "true" ]]; then APPLY=true; fi
           if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event_name }}" == "repository_dispatch" || "${{ github.event_name }}" == "push" || "${{ github.event_name }}" == "issues" || "${{ github.event_name }}" == "release" ]]; then APPLY=true; fi
@@ -163,9 +164,9 @@ jobs:
 
       - id: provider
         name: Reconcile Projects v2 and milestones on trusted lanes
-        if: github.event_name != 'pull_request'
         continue-on-error: true
         run: |
+          mkdir -p artifacts/penta-pm
           if [[ "${{ steps.mode.outputs.apply }}" == "true" ]]; then
             python scripts/penta_pm_reconcile.py --repo "${GITHUB_REPOSITORY}" --apply
           else
@@ -173,7 +174,6 @@ jobs:
           fi
 
       - name: Classify trusted provider reconciliation outcome
-        if: github.event_name != 'pull_request'
         shell: bash
         env:
           PROVIDER_OUTCOME: ${{ steps.provider.outcome }}
@@ -186,17 +186,23 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          path=Path('artifacts/penta-pm/latest.json')
+          path = Path("artifacts/penta-pm/latest.json")
           if not path.exists():
-              raise SystemExit('PentaPM provider reconciliation failed without a receipt')
-          payload=json.loads(path.read_text())
-          holds=payload.get('holds') or []
-          provider=[h for h in holds if h.get('type') in {'projects_v2_provider_authority','project_item_provider_authority'}]
+              raise SystemExit("PentaPM provider reconciliation failed without a receipt")
+          payload = json.loads(path.read_text())
+          holds = payload.get("holds") or []
+          provider = [
+              hold for hold in holds
+              if hold.get("type") in {
+                  "projects_v2_provider_authority",
+                  "project_item_provider_authority",
+              }
+          ]
           if not provider:
-              raise SystemExit('PentaPM provider reconciliation failed for an unclassified reason')
-          print('::warning::PentaPM is DEGRADED only for GitHub Projects v2 authority. Milestone and other repository-native reconciliation remains active; Projects retry on the next trusted cycle.')
+              raise SystemExit("PentaPM provider reconciliation failed for an unclassified reason")
+          print("::warning::PentaPM is DEGRADED only for GitHub Projects v2 authority. Repository-native reconciliation remains active; Projects retry on the next trusted cycle.")
           for hold in provider:
-              print(f"::warning::{hold.get('type')}: {hold.get('message','provider authority unavailable')}")
+              print(f"::warning::{hold.get('type')}: {hold.get('message', 'provider authority unavailable')}")
           PY
 
       - name: Upload immutable-style PentaPM receipt
@@ -211,8 +217,10 @@ jobs:
   gate:
     name: PentaPM governed metadata gate
     if: github.event_name == 'pull_request'
-    needs: reconcile
+    needs: pr-validation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: PentaPM PR gate passed
-        run: echo "Source metadata and Development linkage are present or were healed in-band. GitHub Projects v2 provider reconciliation remains separately fail-closed on trusted lanes."
+        run: echo "PentaPM source validation passed. PR Development metadata mutation is delegated to the single-writer PentaPM PR Metadata Convergence workflow."

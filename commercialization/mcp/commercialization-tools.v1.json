@@ -1,0 +1,193 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "ct.mcp.cos-commercialization-tools.v1",
+  "protocol_version": "2026-07-28",
+  "state": "CONTROLLED_TEST",
+  "routing_ref": "commercialization/routing/mesh-routing.v1.json",
+  "router_ref": "scripts/commercialization/mesh_router.py",
+  "server_refs": {
+    "crownthrive_os": ".mcp.json#mcpServers/crownthrive-os",
+    "chlom_chain_evidence": ".mcp.json#mcpServers/chlom-chain-evidence"
+  },
+  "global_controls": {
+    "exact_source_sha_required": true,
+    "request_fingerprint_required": true,
+    "secrets_allowed": false,
+    "provider_execution_in_router": false,
+    "d3_human_reserved": true,
+    "side_effect_authorization_separate_from_model_confidence": true,
+    "read_after_write_required": true,
+    "rollback_or_compensation_required": true
+  },
+  "tools": [
+    {
+      "name": "commercial.catalog.get",
+      "lane": "hot",
+      "side_effects": false,
+      "data_class": "public_safe",
+      "description": "Read one exact component/version catalog record."
+    },
+    {
+      "name": "commercial.catalog.list",
+      "lane": "hot",
+      "side_effects": false,
+      "data_class": "public_safe",
+      "description": "List evidence-admitted and withheld commercialization records."
+    },
+    {
+      "name": "commercial.entitlement.issue",
+      "lane": "warm",
+      "side_effects": true,
+      "data_class": "entitlement",
+      "approval_class": "license_and_settlement_reconciliation",
+      "description": "Issue a scoped entitlement only after independent license and settlement predicates pass."
+    },
+    {
+      "name": "commercial.entitlement.verify",
+      "lane": "hot",
+      "side_effects": false,
+      "data_class": "entitlement_projection",
+      "description": "Verify an existing scoped entitlement using sanitized evidence."
+    },
+    {
+      "name": "commercial.evidence.export",
+      "lane": "cold",
+      "side_effects": true,
+      "data_class": "sanitized_evidence_export",
+      "approval_class": "visibility_and_custody",
+      "description": "Export only the authorized public-safe or recipient-scoped evidence package."
+    },
+    {
+      "name": "commercial.health",
+      "lane": "hot",
+      "side_effects": false,
+      "data_class": "public_safe",
+      "description": "Read commercialization control-plane and circuit-breaker health."
+    },
+    {
+      "name": "commercial.install.resolve",
+      "lane": "hot",
+      "side_effects": false,
+      "data_class": "public_safe",
+      "description": "Resolve immutable Git, archive, OCI, and native-registry adapter coordinates."
+    },
+    {
+      "name": "commercial.license.accept",
+      "lane": "warm",
+      "side_effects": true,
+      "data_class": "rights_and_agreement",
+      "approval_class": "exact_CHLOM_authority_required",
+      "description": "Record acceptance of an exact authorized license instrument."
+    },
+    {
+      "name": "commercial.license.quote.request",
+      "lane": "warm",
+      "side_effects": true,
+      "data_class": "member_or_business",
+      "approval_class": "D2_bounded_reversible",
+      "description": "Create an idempotent CHLOM commercial scope and quote request; no license is granted."
+    },
+    {
+      "name": "commercial.license.revoke",
+      "lane": "cold",
+      "side_effects": true,
+      "data_class": "rights_and_remedies",
+      "approval_class": "exact_CHLOM_remedy_authority",
+      "description": "Record an authorized revocation and downstream reconciliation requirement."
+    },
+    {
+      "name": "commercial.offer.get",
+      "lane": "hot",
+      "side_effects": false,
+      "data_class": "public_safe",
+      "description": "Read one exact offer without creating rights or entitlement."
+    },
+    {
+      "name": "commercial.offer.list",
+      "lane": "hot",
+      "side_effects": false,
+      "data_class": "public_safe",
+      "description": "List visible free, request-quote, fixed, or metered offers admitted by policy."
+    },
+    {
+      "name": "commercial.package.build",
+      "lane": "warm",
+      "side_effects": true,
+      "data_class": "public_safe_release",
+      "approval_class": "PentaRelease_candidate",
+      "description": "Build deterministic source, catalog, registry-adapter, SBOM, provenance, and checksum assets."
+    },
+    {
+      "name": "commercial.provenance.archive",
+      "lane": "cold",
+      "side_effects": true,
+      "data_class": "release_evidence",
+      "approval_class": "custody_and_retention",
+      "description": "Archive immutable provenance for an exact source-bound package."
+    },
+    {
+      "name": "commercial.publication.request",
+      "lane": "warm",
+      "side_effects": true,
+      "data_class": "release_control",
+      "approval_class": "PentaRelease_and_provider_environment",
+      "description": "Request governed publication; provider readback remains mandatory."
+    },
+    {
+      "name": "commercial.refund.reconcile",
+      "lane": "cold",
+      "side_effects": true,
+      "data_class": "financial_and_entitlement_evidence",
+      "approval_class": "CHLOM_ECAC_finance",
+      "description": "Reconcile refunds and affected entitlements using append-only evidence."
+    },
+    {
+      "name": "commercial.release.readback.reconcile",
+      "lane": "cold",
+      "side_effects": true,
+      "data_class": "release_evidence",
+      "approval_class": "independent_verification",
+      "description": "Reconcile release and provider-asset readback against the exact source SHA."
+    },
+    {
+      "name": "commercial.reversal.record",
+      "lane": "cold",
+      "side_effects": true,
+      "data_class": "financial_and_entitlement_evidence",
+      "approval_class": "CHLOM_ECAC_finance",
+      "description": "Append reversal evidence and require downstream entitlement reconciliation."
+    },
+    {
+      "name": "commercial.sbom.archive",
+      "lane": "cold",
+      "side_effects": true,
+      "data_class": "supply_chain_evidence",
+      "approval_class": "custody_and_security",
+      "description": "Archive the exact SPDX SBOM and checksum binding."
+    },
+    {
+      "name": "commercial.settlement.reconcile",
+      "lane": "cold",
+      "side_effects": true,
+      "data_class": "financial_evidence",
+      "approval_class": "CHLOM_ECAC_finance",
+      "description": "Reconcile provider transaction evidence without treating provider success as entitlement."
+    },
+    {
+      "name": "commercial.wallet.intent.authorize",
+      "lane": "warm",
+      "side_effects": true,
+      "data_class": "economic_authorization",
+      "approval_class": "ECAC_wallet_and_human_policy",
+      "description": "Authorize an exact wallet intent within the current zero-unattended-value ceiling."
+    },
+    {
+      "name": "commercial.wallet.intent.create",
+      "lane": "warm",
+      "side_effects": true,
+      "data_class": "economic_intent_public_safe_projection",
+      "approval_class": "ECAC_and_wallet_policy",
+      "description": "Prepare a secret-free CHLOM Wallet intent envelope; no broadcast occurs in this tool."
+    }
+  ]
+}
