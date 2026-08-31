@@ -75,6 +75,26 @@ Therefore:
 
 A provider-side secret rotation attempt from this execution session was blocked by the execution safety boundary before a verified provider mutation could be established. No PASS or active failover state is asserted from that blocked attempt.
 
+## Persona-specific BD priority lanes
+
+Five new provider-issued credentials were delivered for the PentaPersona fabric on August 31, 2026 and were immediately placed into restricted ThriveBase Vault custody. Raw credential values are intentionally absent from source, PentaDocs, Drive, Sheets, and DAIL.
+
+The staged routing order is:
+
+| Priority after promotion | Lane | Vault reference | Current state | Current canaries |
+| --: | --- | --- | --- | --- |
+| 1 | Personas 1 Hot | `locticians_bd_personas_hot_v1` | `HOLD_PENDING_PERMISSION` | `user/fields=200`, `data_categories=200`, `site_info=403` |
+| 2 | Personas 2 Warm | `locticians_bd_personas_warm_v1` | `HOLD_PENDING_PERMISSION` | `user/fields=200`, `data_categories=200`, `site_info=403` |
+| 3 | Personas 3 Cold | `locticians_bd_personas_cold_v1` | `HOLD_PENDING_PERMISSION` | `user/fields=200`, `data_categories=200`, `site_info=403` |
+| 4 | Emergency Penta Fallback 1 | `locticians_bd_emergency_penta_fallback_1_v1` | `HOLD_PENDING_PERMISSION` | `user/fields=200`, `data_categories=200`, `site_info=403` |
+| 5 | Emergency Penta Fallback 2 | `locticians_bd_emergency_penta_fallback_2_v1` | `HOLD_PENDING_PERMISSION` | `user/fields=200`, `data_categories=200`, `site_info=403` |
+
+The five credentials therefore **authenticate successfully**; their remaining 403 is a provider-permission boundary, not a bad-token failure. All five are registered as disabled, `provider_authenticated_pending_permission`, `failover_ready=false`, with only bounded GET authority staged. D3/delete remains reserved.
+
+After provider permissions are changed, promotion must run exact canaries and then enable the lanes in priority order 1–5. The current legacy/master credential remains active until that promotion readback succeeds, and remains available as a later fallback rather than being rotated preemptively.
+
+Fingerprints only are stored outside Vault. Source convergence for these five lane references is captured additively in PR #2195; no secret value is present in the migration.
+
 ## Persona production convergence
 
 Current persona execution readback after cleanup:
@@ -154,9 +174,9 @@ PR state did not cause the production cold-email outage. Open PRs contributed go
 
 ## Current unresolved items
 
-1. **BD independent credential continuity:** provider records 13–16 do not authenticate and are not failover-ready.
+1. **BD persona credential permissions:** five new persona/fallback credentials now authenticate on bounded reads and are securely vaulted, but remain disabled with `HOLD_PENDING_PERMISSION` until the required provider permissions are granted and promotion canaries pass. Historical provider records 13–16 remain non-authoritative 401 evidence and are not used.
 2. **BD bulk user-list route:** isolated `provider_degraded`; bounded routes remain healthy.
-3. **Source convergence:** production runtime DDL/repair deltas are captured in CrownThrive-OS PR #2195; that PR remains open pending normal CI and independent certification, so source convergence is not yet a merge claim.
+3. **Source convergence:** production runtime DDL/repair deltas and the five persona priority-lane references are captured in CrownThrive-OS PR #2195; that PR remains open pending normal CI and independent certification, so source convergence is not yet a merge claim.
 4. **Locticians digital-products lane:** the outer continuous-build status remains `partial` because this separate lane is `degraded` with 7 held/quarantined items. This is not a Penta convergence failure.
 
 ## Convergence closure readback
