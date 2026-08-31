@@ -45,6 +45,20 @@ begin
 end;
 $$;
 
+create or replace function penta_runtime.penta_memory_canonical_family_key_v1(p_family_key text)
+returns text
+language sql
+immutable
+strict
+set search_path = pg_catalog
+as $$
+  select case upper(btrim(p_family_key))
+    when 'KNOWLEDGE_DATA' then 'KNOWLEDGE_SEMANTICS_DATA'
+    when 'ROUTING_INTEROP' then 'ROUTING_INTEROPERABILITY'
+    else upper(btrim(p_family_key))
+  end;
+$$;
+
 create or replace function penta_runtime.penta_memory_profile_v1(
   p_identity_key text,
   p_family_key text,
@@ -81,15 +95,15 @@ as $$
         'classification_ceiling', 'internal',
         'write_enabled', false,
         'memory_state', 'COLD_RESERVED',
-        'semantic_determinism', case when upper(p_family_key) in ('AUTOMATION_AGENTIC','INTELLIGENCE_RESEARCH','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE') then 'bounded-semantic-v1' else 'strict-v1' end,
-        'model_dependency', case when upper(p_family_key) in ('AUTOMATION_AGENTIC','INTELLIGENCE_RESEARCH','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE') then 'optional_replaceable' else 'none' end,
-        'model_version_required', upper(p_family_key) in ('AUTOMATION_AGENTIC','INTELLIGENCE_RESEARCH','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE'),
-        'degraded_without_model', upper(p_family_key) in ('AUTOMATION_AGENTIC','INTELLIGENCE_RESEARCH','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE'),
-        'brain_mesh_role', case upper(p_family_key)
+        'semantic_determinism', case when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('AUTOMATION_AGENTIC','INTELLIGENCE_RESEARCH','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE') then 'bounded-semantic-v1' else 'strict-v1' end,
+        'model_dependency', case when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('AUTOMATION_AGENTIC','INTELLIGENCE_RESEARCH','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE') then 'optional_replaceable' else 'none' end,
+        'model_version_required', penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('AUTOMATION_AGENTIC','INTELLIGENCE_RESEARCH','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE'),
+        'degraded_without_model', penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('AUTOMATION_AGENTIC','INTELLIGENCE_RESEARCH','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE'),
+        'brain_mesh_role', case penta_runtime.penta_memory_canonical_family_key_v1(p_family_key)
           when 'OBSERVABILITY_ORGANIC' then 'family_observation'
-          when 'KNOWLEDGE_DATA' then 'verified_context_read'
+          when 'KNOWLEDGE_SEMANTICS_DATA' then 'verified_context_read'
           when 'SECURITY_TRUST' then 'policy_and_classification_guard'
-          when 'ROUTING_INTEROP' then 'governed_addressability'
+          when 'ROUTING_INTEROPERABILITY' then 'governed_addressability'
           when 'RESILIENCE_CONTINUITY' then 'checkpoint_replay_recovery'
           when 'INTELLIGENCE_RESEARCH' then 'bounded_analysis'
           when 'AUTOMATION_AGENTIC' then 'bounded_orchestration'
@@ -98,16 +112,16 @@ as $$
           else null
         end
       )
-    when upper(p_family_key) = 'KNOWLEDGE_DATA' then
+    when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) = 'KNOWLEDGE_SEMANTICS_DATA' then
       jsonb_build_object('profile','knowledge-v1','hard_quota_bytes',268435456,'working_set_bytes',67108864,'retention_days',2555,'classification_ceiling','restricted','write_enabled',true,'memory_state','ACTIVE_FAIL_CLOSED','semantic_determinism','strict-v1','model_dependency','none','model_version_required',false,'degraded_without_model',false,'brain_mesh_role','verified_context_read')
-    when upper(p_family_key) = 'INTELLIGENCE_RESEARCH' then
+    when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) = 'INTELLIGENCE_RESEARCH' then
       jsonb_build_object('profile','intelligence-v1','hard_quota_bytes',268435456,'working_set_bytes',67108864,'retention_days',1095,'classification_ceiling','confidential','write_enabled',true,'memory_state','ACTIVE_FAIL_CLOSED','semantic_determinism','bounded-semantic-v1','model_dependency','optional_replaceable','model_version_required',true,'degraded_without_model',true,'brain_mesh_role','bounded_analysis')
-    when upper(p_family_key) = 'OBSERVABILITY_ORGANIC' then
+    when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) = 'OBSERVABILITY_ORGANIC' then
       jsonb_build_object('profile','observability-v1','hard_quota_bytes',134217728,'working_set_bytes',33554432,'retention_days',730,'classification_ceiling','confidential','write_enabled',true,'memory_state','ACTIVE_FAIL_CLOSED','semantic_determinism','strict-v1','model_dependency','none','model_version_required',false,'degraded_without_model',false,'brain_mesh_role','family_observation')
-    when upper(p_family_key) in ('RESILIENCE_CONTINUITY','IMMUNE_SYSTEM','SURGICAL_CARE') then
-      jsonb_build_object('profile','continuity-v1','hard_quota_bytes',134217728,'working_set_bytes',33554432,'retention_days',2555,'classification_ceiling','confidential','write_enabled',true,'memory_state','ACTIVE_FAIL_CLOSED','semantic_determinism','strict-v1','model_dependency','none','model_version_required',false,'degraded_without_model',false,'brain_mesh_role',case when upper(p_family_key)='RESILIENCE_CONTINUITY' then 'checkpoint_replay_recovery' else null end)
-    when upper(p_family_key) in ('SECURITY_TRUST','GOVERNANCE_LEGAL') then
-      jsonb_build_object('profile','security-v1','hard_quota_bytes',67108864,'working_set_bytes',16777216,'retention_days',2555,'classification_ceiling','restricted','write_enabled',true,'memory_state','ACTIVE_FAIL_CLOSED','semantic_determinism','strict-v1','model_dependency','none','model_version_required',false,'degraded_without_model',false,'brain_mesh_role',case when upper(p_family_key)='SECURITY_TRUST' then 'policy_and_classification_guard' else null end)
+    when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('RESILIENCE_CONTINUITY','IMMUNE_SYSTEM','SURGICAL_CARE') then
+      jsonb_build_object('profile','continuity-v1','hard_quota_bytes',134217728,'working_set_bytes',33554432,'retention_days',2555,'classification_ceiling','confidential','write_enabled',true,'memory_state','ACTIVE_FAIL_CLOSED','semantic_determinism','strict-v1','model_dependency','none','model_version_required',false,'degraded_without_model',false,'brain_mesh_role',case when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key)='RESILIENCE_CONTINUITY' then 'checkpoint_replay_recovery' else null end)
+    when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('SECURITY_TRUST','GOVERNANCE_LEGAL') then
+      jsonb_build_object('profile','security-v1','hard_quota_bytes',67108864,'working_set_bytes',16777216,'retention_days',2555,'classification_ceiling','restricted','write_enabled',true,'memory_state','ACTIVE_FAIL_CLOSED','semantic_determinism','strict-v1','model_dependency','none','model_version_required',false,'degraded_without_model',false,'brain_mesh_role',case when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key)='SECURITY_TRUST' then 'policy_and_classification_guard' else null end)
     else
       jsonb_build_object(
         'profile', 'standard-v1',
@@ -117,12 +131,12 @@ as $$
         'classification_ceiling', 'confidential',
         'write_enabled', true,
         'memory_state', 'ACTIVE_FAIL_CLOSED',
-        'semantic_determinism', case when upper(p_family_key) in ('AUTOMATION_AGENTIC','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE') then 'bounded-semantic-v1' else 'strict-v1' end,
-        'model_dependency', case when upper(p_family_key) in ('AUTOMATION_AGENTIC','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE') then 'optional_replaceable' else 'none' end,
-        'model_version_required', upper(p_family_key) in ('AUTOMATION_AGENTIC','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE'),
-        'degraded_without_model', upper(p_family_key) in ('AUTOMATION_AGENTIC','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE'),
-        'brain_mesh_role', case upper(p_family_key)
-          when 'ROUTING_INTEROP' then 'governed_addressability'
+        'semantic_determinism', case when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('AUTOMATION_AGENTIC','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE') then 'bounded-semantic-v1' else 'strict-v1' end,
+        'model_dependency', case when penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('AUTOMATION_AGENTIC','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE') then 'optional_replaceable' else 'none' end,
+        'model_version_required', penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('AUTOMATION_AGENTIC','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE'),
+        'degraded_without_model', penta_runtime.penta_memory_canonical_family_key_v1(p_family_key) in ('AUTOMATION_AGENTIC','COMMUNICATIONS_SERVICE','MEDIA_CREATIVE','WORKFORCE_PEOPLE'),
+        'brain_mesh_role', case penta_runtime.penta_memory_canonical_family_key_v1(p_family_key)
+          when 'ROUTING_INTEROPERABILITY' then 'governed_addressability'
           when 'AUTOMATION_AGENTIC' then 'bounded_orchestration'
           when 'SYSTEM_ARCHITECTURE' then 'topology_and_identity'
           when 'BUILD_RELEASE' then 'independent_verification_and_release_evidence'
@@ -688,7 +702,7 @@ begin
     ('penta.brain','AUTOMATION_AGENTIC','bounded_orchestration',jsonb_build_object('contract','ct.penta.deterministic-memory.v1','write_scope','none')),
     ('penta.brain','SYSTEM_ARCHITECTURE','topology_and_identity',jsonb_build_object('contract','ct.penta.deterministic-memory.v1','write_scope','none')),
     ('penta.brain','BUILD_RELEASE','independent_verification_and_release_evidence',jsonb_build_object('contract','ct.penta.deterministic-memory.v1','write_scope','none'))
-  on conflict(subject_identity_key,family_key) do update set capability=excluded.capability,access_mode='READ_ONLY',cross_family_write=false,authority_expansion=false,current=true,metadata=excluded.metadata;
+  on conflict(subject_identity_key,family_key) do update set capability=excluded.capability,access_mode='READ_ONLY',cross_family_write=false,authority_expansion=false,current=true,metadata=excluded.metadata || jsonb_build_object('canonical_family_key',penta_runtime.penta_memory_canonical_family_key_v1(excluded.family_key));
 
   update penta_runtime.penta_memory_family_grants_v1
   set current=false
@@ -710,6 +724,7 @@ begin
   update integration_control.penta_family_runtime_v1 f
   set metadata=coalesce(f.metadata,'{}'::jsonb) || jsonb_build_object(
       'deterministic_memory_bound',true,
+      'canonical_family_key',penta_runtime.penta_memory_canonical_family_key_v1(f.family_key),
       'memory_contract','ct.penta.deterministic-memory.v1',
       'memory_mesh_role',case f.family_key
         when 'OBSERVABILITY_ORGANIC' then 'anchor_family'
@@ -1228,6 +1243,7 @@ grant execute on function penta_runtime.penta_deterministic_replay_record_v1(tex
 comment on table penta_runtime.penta_memory_namespaces_v1 is 'One literal durable memory allocation per current Penta identity. Quotas are logical persistent bytes, not a claim of dedicated physical RAM.';
 comment on table penta_runtime.penta_memory_records_v1 is 'Append-only, hash-chained Penta memory index and payload records; PentaContext remains the canonical evidence-backed semantic content store.';
 comment on table penta_runtime.penta_execution_replays_v1 is 'Append-only deterministic execution replay receipts. MISMATCH is preserved and fails consequential release closed.';
+comment on function penta_runtime.penta_memory_canonical_family_key_v1(text) is 'Maps authoritative ThriveBase provider family aliases to the canonical repository family identity without rewriting provider primary keys.';
 comment on function penta_runtime.penta_memory_reconcile_v1() is 'Idempotently assigns memory to every current Penta, verifies PentaBrain supporting families, and projects allocations into PentaCensus without creating authority.';
 comment on function penta_runtime.penta_memory_remember_v1(text,text,text,text,text,text,text,text,text[],jsonb,text,numeric,numeric,timestamptz,timestamptz) is 'Atomically scopes durable PentaContext content to a Penta memory namespace and adds a quota-counted memory index record.';
 
