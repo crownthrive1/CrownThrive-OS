@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 """Event-driven autonomous PentaPR convergence authority.
 
-v2.2 keeps the single provider-required Governed Merge Gate as the GitHub merge
-perimeter. Other workflows remain valuable evidence but do not independently
-veto merge unless their control is aggregated as applicable inside that required
-context. Explicit penta:hold, draft, mergeability and exact-head rules remain
-fail-closed.
+v2.3 keeps the single provider-required Governed Merge Gate as the GitHub merge
+perimeter while preserving the separate release topology for elevated-risk work.
+Other workflows remain valuable evidence but do not independently veto merge
+unless their control is aggregated as applicable inside that required context.
+
+Important authority boundary:
+- D0/D1 may use the bounded GitHub-native autonomous merge path after the exact
+  required gate passes and all ordinary mergeability/hold predicates pass.
+- D2 is never merged by PentaPR Autopilot. It may be moved from draft to ready
+  after the exact merge gate passes, then must continue through the independent
+  PentaSecurity -> CHLOM -> applicable CIE -> PentaCertifier -> PentaMerge/
+  PentaRelease topology.
+- D3 is human-reserved and is never autonomously merged.
+- Missing risk classification fails closed.
 """
 from __future__ import annotations
 
@@ -19,12 +28,36 @@ import penta_pr_lifecycle as lifecycle
 AUTOPILOT_SELF_CHECK = "pentapr autopilot"
 REQUIRED_MERGE_CONTEXT = "crownthrive governed merge gate"
 BAD_CONCLUSIONS = {"failure", "cancelled", "timed_out", "action_required", "stale", "startup_failure"}
+RISK_LABELS = (
+    ("D3", "penta:risk:d3"),
+    ("D2", "penta:risk:d2"),
+    ("D1", "penta:risk:d1"),
+    ("D0", "penta:risk:d0"),
+)
 
 
 def configure_self_check_exclusion() -> None:
     lifecycle.SELF_LIFECYCLE_CHECK_NAMES = frozenset(
         set(lifecycle.SELF_LIFECYCLE_CHECK_NAMES) | {AUTOPILOT_SELF_CHECK}
     )
+
+
+def classified_risk(labels: set[str]) -> str | None:
+    observed = [risk for risk, label in RISK_LABELS if label in labels]
+    if len(observed) != 1:
+        return None
+    return observed[0]
+
+
+def autonomous_merge_allowed(labels: set[str]) -> tuple[bool, str]:
+    risk = classified_risk(labels)
+    if risk is None:
+        return False, "risk_unclassified_or_ambiguous"
+    if risk == "D3":
+        return False, "d3_human_reserved"
+    if risk == "D2":
+        return False, "d2_independent_release_topology_required"
+    return True, f"{risk.lower()}_github_native_merge_eligible"
 
 
 def required_gate_state(gh: lifecycle.GH, sha: str) -> tuple[str, dict[str, Any] | None]:
@@ -115,6 +148,9 @@ def attempt_required_merge(gh: lifecycle.GH, number: int) -> tuple[bool, str]:
     labels = lifecycle.read_labels(gh, number)
     if "penta:hold" in labels:
         return False, "operator_hold"
+    allowed, risk_reason = autonomous_merge_allowed(labels)
+    if not allowed:
+        return False, risk_reason
     head_sha = ((pull.get("head") or {}).get("sha"))
     if not head_sha:
         return False, "head_sha_missing"
@@ -150,8 +186,6 @@ def attempt_required_merge(gh: lifecycle.GH, number: int) -> tuple[bool, str]:
 
 
 def drive_one(gh: lifecycle.GH, number: int) -> None:
-    # Keep lifecycle metadata/labels current, but do not let advisory workflow
-    # failures become an extra merge perimeter beyond the provider ruleset.
     lifecycle.pentapr(gh, number)
     pull = gh.get(f"/repos/{gh.repo}/pulls/{number}")
     if pull.get("state") != "open":
@@ -190,6 +224,23 @@ def drive_one(gh: lifecycle.GH, number: int) -> None:
         )
         return
 
+    allowed, risk_reason = autonomous_merge_allowed(labels)
+    if not allowed:
+        # Passing the GitHub merge perimeter is enough to make a D2 candidate
+        # reviewable, but never enough to manufacture release certification.
+        if pull.get("draft") and risk_reason == "d2_independent_release_topology_required":
+            changed, ready_reason = mark_ready_for_review(gh, pull)
+            print(
+                f"PentaAutopilot #{number} ready={changed} {ready_reason} terminal=DEFERRED "
+                f"reason={risk_reason} advisory_failed={advisory['failed']} advisory_pending={advisory['pending']}"
+            )
+            return
+        print(
+            f"PentaAutopilot #{number} terminal=DEFERRED reason={risk_reason} "
+            f"advisory_failed={advisory['failed']} advisory_pending={advisory['pending']}"
+        )
+        return
+
     merged, message = attempt_required_merge(gh, number)
     print(
         f"PentaAutopilot #{number} merged={merged} {message} "
@@ -201,8 +252,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY"))
     parser.add_argument("--number", type=int)
-    # Compatibility flag retained so old/manual callers do not crash. It no
-    # longer grants time-only closure authority.
     parser.add_argument("--allow-deadline-close", action="store_true")
     args = parser.parse_args()
     if not args.repo:
