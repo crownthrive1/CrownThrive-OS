@@ -12,7 +12,7 @@ on:
           - audit
           - apply
       max_delete:
-        description: Maximum safe generated branch refs to delete in one run
+        description: Maximum safe generated branch refs to retire in one run
         required: true
         default: '75'
         type: string
@@ -51,7 +51,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Prove deletion safety invariants
+      - name: Prove deletion and archival safety invariants
         run: |
           python -m py_compile scripts/pr_control_plane_janitor.py tests/test_pr_control_plane_janitor.py
           python -m unittest -v tests.test_pr_control_plane_janitor
@@ -70,7 +70,7 @@ jobs:
             mode="${INPUT_MODE:-audit}"
             max_delete="${INPUT_MAX_DELETE:-75}"
           else
-            # A merge of the janitor itself performs the first cleanup wave;
+            # A merge of the janitor itself performs a bounded cleanup wave;
             # the weekly schedule then keeps generated branch debt bounded.
             mode="apply"
             max_delete="75"
@@ -118,14 +118,23 @@ jobs:
           print(f"- Branches scanned: {d['branches_scanned']}")
           print(f"- Open-PR refs preserved: {d['open_pr_refs_preserved']}")
           print(f"- Eligible generated refs: {d['eligible']}")
+          print(f"- Direct-main eligible: {d['direct_main_eligible']}")
+          print(f"- Archive-required eligible: {d['archive_required_eligible']}")
           print(f"- Deletion attempts: {d['attempted']}")
+          print(f"- Unique tips anchored this run: {d['attempted_archive']}")
           print(f"- Deleted refs: {d['deleted']}")
           print(f"- Delete failures: {len(d['failures'])}")
+          archive = d.get('archive')
+          if archive:
+              print(f"- Archive branch: `{archive['archive_branch']}`")
+              print(f"- Archive anchor: `{archive['archive_anchor_sha']}`")
+              print(f"- Archive exact ref readback: {str(archive['exact_ref_readback']).lower()}")
+              print(f"- Archive source-tree mutation: {str(archive['source_tree_changed']).lower()}")
           print('- Unique unmerged work deleted: false')
           print('- Git/PR history rewritten: false')
           if d['deleted_refs']:
               print()
-              print('Deleted generated refs:')
+              print('Retired generated refs:')
               for name in d['deleted_refs'][:75]:
                   print(f'- `{name}`')
           PY
