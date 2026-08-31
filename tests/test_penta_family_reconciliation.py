@@ -16,10 +16,15 @@ SPEC.loader.exec_module(mod)
 
 EXPECTED = {
     'penta.bc': 'SYSTEM_ARCHITECTURE',
+    'penta.brainmemoryruntime': 'OBSERVABILITY_ORGANIC',
     'penta.clean': 'RESILIENCE_CONTINUITY',
     'penta.flush': 'RESILIENCE_CONTINUITY',
-    'penta.harvestor': 'INTELLIGENCE_RESEARCH',
+    'penta.harvestor': 'INTELLIGENCE_RESEARCH_IMPACT',
     'penta.hydrate': 'RESILIENCE_CONTINUITY',
+    'penta.memorycensus': 'KNOWLEDGE_SEMANTICS_DATA',
+    'penta.memoryconfig': 'SYSTEM_ARCHITECTURE',
+    'penta.memoryrollback': 'RESILIENCE_CONTINUITY',
+    'penta.memoryschema': 'KNOWLEDGE_SEMANTICS_DATA',
     'penta.notifs': 'COMMUNICATIONS_SERVICE',
     'penta.overseer': 'OBSERVABILITY_ORGANIC',
     'penta.prioritize': 'AUTOMATION_AGENTIC',
@@ -41,7 +46,7 @@ class PentaFamilyReconciliationTests(unittest.TestCase):
             self.assertEqual(family_key, mod.normalized_family(row.get('family_id') or row.get('family_slug')))
             self.assertFalse(row.get('execution_eligible_by_registry', False))
 
-    def test_manifest_resolves_all_nine_without_maturity_promotion(self):
+    def test_manifest_resolves_all_governed_assignments_without_maturity_promotion(self):
         manifest = mod.build_manifest(ROOT)
         rows = {row['machine_key']: row for row in manifest['assignments']}
         for machine_key, family_key in EXPECTED.items():
