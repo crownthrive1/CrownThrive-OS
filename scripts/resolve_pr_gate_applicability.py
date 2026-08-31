@@ -81,7 +81,6 @@ def _matches(path: str, rule: Mapping[str, Any]) -> bool:
         candidate = str(pattern).replace("\\", "/").lower()
         if fnmatch.fnmatchcase(normalized, candidate):
             return True
-        # Make a leading **/ optional so root-level files behave as expected.
         if candidate.startswith("**/") and fnmatch.fnmatchcase(normalized, candidate[3:]):
             return True
     return False
@@ -89,7 +88,7 @@ def _matches(path: str, rule: Mapping[str, Any]) -> bool:
 
 def infer_change_class(required: Sequence[str]) -> str:
     required_set = set(required)
-    if "workflow_policy" in required_set or "phase_control" in required_set:
+    if "workflow_policy" in required_set or "phase_control" in required_set or "phase3_state" in required_set:
         return "governance_control"
     if "security" in required_set:
         return "security_or_runtime"
@@ -108,6 +107,7 @@ def infer_risk(required: Sequence[str]) -> str:
     elevated = {
         "workflow_policy",
         "phase_control",
+        "phase3_state",
         "security",
         "namespace_api",
         "agent_governance",
@@ -164,7 +164,6 @@ def resolve(repo: Path, base: str, head: str, policy: Mapping[str, Any]) -> dict
     contract = resolve_paths(changed_paths(repo, base, head), policy)
     contract["base_sha"] = base
     contract["head_sha"] = head
-    # Re-hash after exact source identity is attached.
     contract.pop("contract_sha256", None)
     contract["contract_sha256"] = sha256_json(contract)
     return contract
@@ -185,13 +184,14 @@ def write_github_output(path: Path, contract: Mapping[str, Any], policy: Mapping
 
 def self_test(policy: Mapping[str, Any]) -> dict[str, Any]:
     vectors = [
-        ("docs_only", ["README.md"], {"documentation"}, {"security", "phase_control"}),
-        ("migration", ["supabase/migrations/20260831_example.sql"], {"security"}, {"documentation", "homepage"}),
-        ("homepage", ["scripts/render_homepage_projection.py"], {"homepage"}, {"collab_portal"}),
-        ("workflow", [".github/workflows/example.yml"], {"workflow_policy", "security"}, {"homepage"}),
-        ("penta_pr", ["scripts/penta_pr_lifecycle.py"], {"penta_control", "pm_routing"}, {"homepage"}),
-        ("collab_doc", ["docs/collab-portal-runbook.mdx"], {"documentation", "collab_portal"}, {"homepage"}),
-        ("asset", ["assets/logo.png"], set(), {"security", "documentation", "phase_control"}),
+        ("docs_only", ["README.md"], {"documentation"}, {"security", "phase_control", "phase3_state"}),
+        ("migration", ["supabase/migrations/20260831_example.sql"], {"security"}, {"documentation", "homepage", "phase3_state"}),
+        ("homepage", ["scripts/render_homepage_projection.py"], {"homepage"}, {"collab_portal", "phase3_state"}),
+        ("workflow", [".github/workflows/example.yml"], {"workflow_policy", "security"}, {"homepage", "phase3_state"}),
+        ("penta_pr", ["scripts/penta_pr_lifecycle.py"], {"penta_control", "pm_routing"}, {"homepage", "phase3_state"}),
+        ("collab_doc", ["docs/collab-portal-runbook.mdx"], {"documentation", "collab_portal"}, {"homepage", "phase3_state"}),
+        ("phase3_state", ["docs/phase3/CURRENT_STATE.md"], {"documentation", "phase3_state"}, {"homepage"}),
+        ("asset", ["assets/logo.png"], set(), {"security", "documentation", "phase_control", "phase3_state"}),
     ]
     results: list[dict[str, Any]] = []
     for name, paths, expected, forbidden in vectors:
