@@ -1,0 +1,240 @@
+---
+title: "Provider Activation Runbook"
+sidebarTitle: "Provider Activation"
+description: "Ordered, readback-driven activation sequence for GitHub, ThriveBase, Vercel, Verpex/cPanel, MySQL, Android builders, and Penta certification."
+icon: "list-check"
+keywords:
+  - "App Factory deployment"
+  - "provider activation"
+  - "cPanel deployment"
+  - "Vercel edge"
+  - "Android canary"
+---
+
+# Provider Activation Runbook
+
+This runbook is the only approved activation order for CrownThrive App Factory `1.0.0-rc.1` unless a governed successor supersedes it.
+
+A later provider must not be promoted merely because its dashboard reports success. Every material write requires provider readback, exact source or artifact identity, and institutional evidence.
+
+## Gate 0 — Confirm custody and authority
+
+Required starting evidence:
+
+- App Factory release candidate ZIP SHA-256: `aacf319dfec12ec7052da36f55ed8deab505d8a2dd6e6a958f820fa4f027813a`.
+- Full release candidate: 1,603 files, preserved in governed Drive custody.
+- Full release candidate tree: `5aa81ecdcc47bcf31c0a131a9b76512366a22499`.
+- Runtime-source derivative archive SHA-256: `f460073caa21642c40bf8396504a84527b1641fc4718c45d93ad010d1c1f6f94`.
+- Runtime-source derivative: 992 source files.
+- Runtime-source derivative tree: `e70472374ee73756f4397c996192911fec6408d4`.
+- App Factory repository: private and writable.
+- ThriveApps repository: private and writable.
+- No secret values in source or evidence.
+
+The runtime-source derivative excludes generated documentation, generated frontend build output, and local Gradle caches. The complete release candidate remains the preserved custody artifact.
+
+## Gate 1 — Canonical GitHub source
+
+Repository:
+
+`crownthrive1/CrownThrive-App-Factory`
+
+Required execution:
+
+1. Import the governed runtime-source derivative on a dedicated import branch.
+2. Verify archive SHA-256 before extraction.
+3. Verify all imported paths and source hashes against the runtime-source manifest.
+4. Verify the resulting Git tree equals `e70472374ee73756f4397c996192911fec6408d4` before adding provider-specific evidence changes.
+5. Update `crownthrive.deploy.json` only after source readback.
+6. Run all CI gates on the exact import commit.
+7. Open a governed pull request to `main`.
+8. Merge only after source identity and tests pass.
+9. Record the final GitHub commit and tree in PentaOS and ThriveBase.
+
+### Required CI
+
+- PHP syntax validation.
+- Composer dependency and platform validation.
+- PHPUnit.
+- Node dependency installation.
+- Vite production build.
+- JavaScript syntax and edge tests.
+- Go formatting and test execution using the required Go version.
+- Shell syntax validation.
+- Secret and forbidden-file scans.
+- Release-contract verification.
+- Archive and manifest identity checks.
+
+### Stop condition
+
+Do not connect cPanel or Vercel production deployment to an incomplete import branch or metadata-only repository.
+
+## Gate 2 — ThriveBase institutional ingest
+
+Apply:
+
+`institutional/thrivebase/20260831_app_factory_event_ingest_v1.sql`
+
+Deploy:
+
+`institutional/thrivebase/functions/app-factory-ingest`
+
+Required execution:
+
+1. Apply the migration through the governed database deployment path.
+2. Verify expected tables, indexes, constraints, policies, and function definitions.
+3. Bind `APP_FACTORY_INGEST_SHARED_SECRET` only in the ThriveBase function environment.
+4. Keep the ThriveBase service-role credential inside ThriveBase.
+5. Test first delivery.
+6. Test idempotent replay of the same event and payload.
+7. Test rejection when an event ID is replayed with a different payload digest.
+8. Preserve migration and function deployment receipts.
+
+### Stop condition
+
+Do not place a ThriveBase service-role key in Vercel, cPanel, GitHub, PentaDocs, or Drive evidence.
+
+## Gate 3 — Vercel edge project
+
+Root directory:
+
+`edge/`
+
+Required execution:
+
+1. Create a separate Vercel project for the App Factory edge plane.
+2. Bind the exact App Factory GitHub repository.
+3. Configure preview deployments before production aliases.
+4. Bind exact repository, workflow, and ref allowlists.
+5. Bind HMAC, GitHub dispatch, and ThriveBase relay credentials through Vercel environment variables.
+6. Deploy the edge project.
+7. Verify `/api/health`.
+8. Confirm that unauthorized repositories, workflows, branches, timestamps, and nonces are rejected.
+9. Confirm the governed Android workflow can be dispatched.
+10. Preserve project, deployment, commit, environment, and domain evidence.
+
+### Edge functions
+
+- health;
+- build dispatch;
+- ThriveBase relay;
+- bounded provider reconciliation.
+
+### Stop condition
+
+Do not treat Vercel as the Laravel database or stateful control-plane runtime.
+
+## Gate 4 — Dedicated Verpex/cPanel account
+
+Canonical hostname:
+
+`app.crownthrive.io`
+
+Recommended release root:
+
+`$HOME/apps/crownthrive-app-factory`
+
+Document root:
+
+`$HOME/apps/crownthrive-app-factory/current/public`
+
+Required execution:
+
+1. Create one dedicated cPanel account for the App Factory failure domain.
+2. Confirm authoritative DNS before changing records.
+3. Provision HTTPS for `app.crownthrive.io`.
+4. Confirm PHP 8.2 or later.
+5. Confirm required PHP extensions.
+6. Confirm SSH, Git, Composer, Node or an approved built-asset delivery path, rsync, gzip, cron, and `mysqldump`.
+7. Create the isolated MySQL database and user.
+8. Bind database credentials only in the protected shared `.env`.
+9. Configure cPanel Git access to the private repository.
+10. Deploy through `.cpanel.yml` and the atomic deployment scripts.
+
+### First-install execution
+
+1. Bind the one-time admin bootstrap secret through protected environment configuration.
+2. Execute the release deployment.
+3. Run migrations.
+4. Run `php artisan app-factory:bootstrap-admin`.
+5. Verify the canonical admin identity through provider readback.
+6. Confirm the one-time password is scrubbed.
+7. Run `php artisan app-factory:provision --force`.
+8. Install scheduler and bounded database-queue cron entries.
+9. Verify `/up` and signed Penta health.
+
+### Stop condition
+
+Do not install Java, the Android SDK, Gradle build workers, or persistent Android compilation services on shared cPanel.
+
+## Gate 5 — Frontend assets
+
+The canonical runtime-source derivative excludes `public/build/` because it is generated output.
+
+Before cPanel promotion:
+
+1. Run `npm ci` on the exact source commit.
+2. Run the production Vite build.
+3. Verify `public/build/manifest.json`.
+4. Bind the generated asset digest to the release receipt.
+5. Package source, Composer production dependencies, and generated frontend assets into the cPanel release unit.
+
+The cPanel preflight must continue to fail if required generated assets are absent.
+
+## Gate 6 — Signed Penta canary
+
+Use one controlled CrownThrive property as the first application canary.
+
+Required sequence:
+
+1. Submit signed Penta application upsert.
+2. Verify nonce, timestamp, client scope, tenant, and application identity.
+3. Create a debug Android build request.
+4. Verify Vercel dispatches the exact workflow and ref.
+5. Verify the GitHub runner claims the correct build.
+6. Verify the short-lived per-build credential and active keystore reference.
+7. Build the debug APK.
+8. Upload the artifact directly through the bounded callback.
+9. Independently verify SHA-256.
+10. Verify MySQL build state.
+11. Verify the durable outbox event.
+12. Verify the ThriveBase institutional receipt.
+13. Promote only the completed verified build.
+14. Confirm ThriveApps can read it only after publication.
+
+## Gate 7 — Recovery and rollback
+
+Before certification:
+
+1. Preserve the current application release.
+2. Deploy the candidate release.
+3. Verify database migration state.
+4. Verify public and signed health.
+5. Roll the application symlink back to the prior release.
+6. Verify health and key reads.
+7. Do not silently reverse irreversible database migrations.
+8. Reapply the current release.
+9. Verify state consistency and outbox delivery.
+10. Preserve rollback and reapply receipts.
+
+## Gate 8 — Production certification
+
+`PRODUCTION_CERTIFIED` requires evidence for the exact deployed state:
+
+- canonical GitHub commit and tree;
+- CI results for that commit;
+- Vercel project and deployment readback;
+- cPanel account, release, and HTTPS readback;
+- MySQL database and migration readback;
+- signed Penta health;
+- Android canary artifact and SHA-256;
+- ThriveBase event and deployment receipt;
+- ThriveApps published-only negative and positive tests;
+- rollback and reapply evidence;
+- independent PentaCertify review.
+
+Provider success alone is never sufficient.
+
+## Continue-on-repair doctrine
+
+Fail-closed is a protection condition, not an endpoint. Penta must diagnose the blocked dependency, repair the smallest safe component, perform readback, preserve evidence, and continue to the next dependency-ready gate without breaking verified production paths.
