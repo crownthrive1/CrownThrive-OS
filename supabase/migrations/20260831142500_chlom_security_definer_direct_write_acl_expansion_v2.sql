@@ -2,12 +2,11 @@
 -- Direct-callable SECURITY DEFINER write-surface hardening expansion v2.
 --
 -- Fresh independent PentaCertifier and ThriveBase catalog readback on 2026-08-31
--- established a broader 182-function role-EXECUTE least-privilege surface. Most
+-- established a broad SECURITY DEFINER role-EXECUTE least-privilege surface. Most
 -- private-schema functions are not directly callable by anon/authenticated because
 -- those roles lack schema USAGE. This bounded expansion does NOT claim universal
--- closure. It hardens four verified public-schema state-changing mirror callbacks
--- that are directly role-callable today and were outside the prior 22-function PR
--- #1962 cohort.
+-- closure. It hardens five verified public-schema state-changing callbacks that are
+-- directly role-callable today and were outside the prior 22-function PR #1962 cohort.
 --
 -- Authority boundary: ACL-only. No function body, credential, provider write,
 -- money movement, D3/sovereign state, rights/legal commitment, or authority
@@ -22,7 +21,8 @@ declare
     'public.thrivebase_sheet_mirror_record_failure_v1(uuid,uuid,text,text,jsonb)',
     'public.thrivebase_sheet_mirror_record_folder_v1(text,text,text,jsonb)',
     'public.thrivebase_sheet_mirror_record_progress_v1(uuid,uuid,text,text,integer,integer,bigint,boolean,text,text,jsonb)',
-    'public.thrivebase_sheet_mirror_record_provision_v1(uuid,uuid,integer,text,text,text,jsonb)'
+    'public.thrivebase_sheet_mirror_record_provision_v1(uuid,uuid,integer,text,text,text,jsonb)',
+    'public.penta_ads_scan_ingest_v1(bigint,text,integer,text,text,jsonb,text,jsonb)'
   ];
 begin
   foreach v_sig in array v_required loop
@@ -40,10 +40,12 @@ revoke execute on function public.thrivebase_sheet_mirror_record_failure_v1(uuid
 revoke execute on function public.thrivebase_sheet_mirror_record_folder_v1(text,text,text,jsonb) from public, anon, authenticated;
 revoke execute on function public.thrivebase_sheet_mirror_record_progress_v1(uuid,uuid,text,text,integer,integer,bigint,boolean,text,text,jsonb) from public, anon, authenticated;
 revoke execute on function public.thrivebase_sheet_mirror_record_provision_v1(uuid,uuid,integer,text,text,text,jsonb) from public, anon, authenticated;
+revoke execute on function public.penta_ads_scan_ingest_v1(bigint,text,integer,text,text,jsonb,text,jsonb) from public, anon, authenticated;
 
 grant execute on function public.thrivebase_sheet_mirror_record_failure_v1(uuid,uuid,text,text,jsonb) to service_role;
 grant execute on function public.thrivebase_sheet_mirror_record_folder_v1(text,text,text,jsonb) to service_role;
 grant execute on function public.thrivebase_sheet_mirror_record_progress_v1(uuid,uuid,text,text,integer,integer,bigint,boolean,text,text,jsonb) to service_role;
 grant execute on function public.thrivebase_sheet_mirror_record_provision_v1(uuid,uuid,integer,text,text,text,jsonb) to service_role;
+grant execute on function public.penta_ads_scan_ingest_v1(bigint,text,integer,text,text,jsonb,text,jsonb) to service_role;
 
 commit;
