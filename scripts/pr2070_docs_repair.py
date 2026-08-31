@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Deterministically place PR #2070 institutional pages into PentaDocs navigation.
+"""Deterministically place and normalize PR #2070 institutional pages in PentaDocs.
 
-This helper is temporary. It is executed only on the isolated generator branch and
-removed before the generated repair commit is published.
+This helper is temporary. It runs only on the isolated generator branch and is
+removed before the generated repair commit is published. It translates the
+package's earlier descriptive metadata vocabulary into the governed PentaDocs
+page-profile taxonomy without changing runtime/certification claims.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -38,6 +41,89 @@ PENTA_ROUTES = [
     "pentas/candidates/penta-ads-factory",
     "pentas/candidates/penta-ads-placement-os",
 ]
+
+# Exact supplied pages from PR #2070 whose original package metadata predates
+# the governed PentaDocs audience/page/content-state taxonomy. The normalized
+# states are documentation posture only and never promote runtime maturity.
+SUPPLIED_PROFILE_NORMALIZATION: dict[str, tuple[str, str, str]] = {
+    "institutional/penta-communications-personas-ads-institutionalization-2026-08-31.mdx": (
+        "executive", "reference", "current_with_holds"
+    ),
+    "knowledge/forked-reference-dependencies.mdx": (
+        "operator", "registry", "current"
+    ),
+    "runbooks/penta-mail-and-persona-operations.mdx": (
+        "operator", "runbook", "current_with_holds"
+    ),
+    "runbooks/penta-ads-release-recovery.mdx": (
+        "operator", "runbook", "current_with_holds"
+    ),
+    "standards/penta-persona-contract-standard.mdx": (
+        "operator", "standard", "current"
+    ),
+    "pentas/canonical/penta-mail.mdx": (
+        "operator", "reference", "current_with_holds"
+    ),
+    "pentas/canonical/penta-mailer.mdx": (
+        "operator", "reference", "current_with_holds"
+    ),
+    "pentas/canonical/penta-personas.mdx": (
+        "operator", "reference", "current_with_holds"
+    ),
+    "pentas/canonical/penta-persona-execution.mdx": (
+        "operator", "reference", "current_with_holds"
+    ),
+    "pentas/canonical/penta-persona-factory.mdx": (
+        "developer", "reference", "candidate"
+    ),
+    "pentas/canonical/penta-ads.mdx": (
+        "operator", "reference", "current_with_holds"
+    ),
+}
+
+FRONTMATTER_FIELD_RE = re.compile(
+    r"^(?P<key>primary_audience|page_type|content_state):\s*(?P<value>.*)$",
+    flags=re.MULTILINE,
+)
+
+
+def normalize_supplied_profiles() -> dict[str, dict[str, str]]:
+    changed: dict[str, dict[str, str]] = {}
+    for raw_path, (audience, page_type, content_state) in SUPPLIED_PROFILE_NORMALIZATION.items():
+        path = Path(raw_path)
+        if not path.is_file():
+            # Generated portal convergence may intentionally supersede/remove a
+            # hand-authored candidate page. Missing here is therefore not an error.
+            continue
+        text = path.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            raise SystemExit(f"{raw_path}: missing YAML frontmatter")
+        closing = text.find("\n---", 4)
+        if closing < 0:
+            raise SystemExit(f"{raw_path}: unterminated YAML frontmatter")
+        front = text[:closing]
+        body = text[closing:]
+        desired = {
+            "primary_audience": audience,
+            "page_type": page_type,
+            "content_state": content_state,
+        }
+        seen: set[str] = set()
+
+        def replace(match: re.Match[str]) -> str:
+            key = match.group("key")
+            seen.add(key)
+            return f'{key}: "{desired[key]}"'
+
+        new_front = FRONTMATTER_FIELD_RE.sub(replace, front)
+        missing = set(desired) - seen
+        if missing:
+            raise SystemExit(f"{raw_path}: missing governed profile fields {sorted(missing)}")
+        new_text = new_front + body
+        if new_text != text:
+            path.write_text(new_text, encoding="utf-8")
+            changed[raw_path] = desired
+    return changed
 
 
 def iter_string_routes(node: Any) -> Iterable[str]:
@@ -106,6 +192,7 @@ def ensure_penta_group(document: dict[str, Any], penta_tab: dict[str, Any]) -> d
 
 
 def main() -> None:
+    normalized = normalize_supplied_profiles()
     document = json.loads(DOCS.read_text(encoding="utf-8"))
     crownthrive_tab = find_tab(document, "CrownThrive OS")
     penta_tab = find_tab(document, "Pentas")
@@ -126,7 +213,7 @@ def main() -> None:
         raise SystemExit(f"navigation convergence failed: {bad}")
 
     DOCS.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(json.dumps({"status": "PASS", "routes": counts}, sort_keys=True))
+    print(json.dumps({"status": "PASS", "normalized_profiles": normalized, "routes": counts}, sort_keys=True))
 
 
 if __name__ == "__main__":
