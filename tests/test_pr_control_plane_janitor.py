@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import datetime as dt
 from pathlib import Path
 import sys
 import unittest
@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from pr_control_plane_janitor import (  # noqa: E402
     JanitorError,
     classify_branch,
+    create_archive_anchor,
     load_policy,
     paginate,
     pagination_request_paths,
@@ -36,43 +37,54 @@ class PRControlPlaneJanitorTests(unittest.TestCase):
         kwargs.update(overrides)
         return classify_branch(**kwargs)
 
-    def test_old_merged_generated_remediation_is_eligible(self) -> None:
+    def test_old_merged_generated_remediation_is_directly_eligible(self) -> None:
         row = self.classify("pentaself/remediation/deadbeef")
         self.assertTrue(row["eligible"])
+        self.assertFalse(row["archive_eligible"])
         self.assertEqual(row["reason"], "safe_generated_ref_already_preserved_on_main")
 
-    def test_open_pr_head_or_base_is_never_deleted(self) -> None:
-        name = "pentaself/remediation/deadbeef"
-        row = self.classify(name, active_pr_refs={name})
-        self.assertFalse(row["eligible"])
-        self.assertEqual(row["reason"], "open_pr_head_or_base")
-
-    def test_unmerged_unique_tip_is_never_deleted(self) -> None:
+    def test_old_unique_generated_tip_requires_archive(self) -> None:
         row = self.classify(
             "pentarelease/auto-3.99.0.0-123",
             merged_into_main=False,
         )
         self.assertFalse(row["eligible"])
-        self.assertEqual(row["reason"], "unique_tip_not_merged_into_main")
+        self.assertTrue(row["archive_eligible"])
+        self.assertEqual(row["reason"], "safe_archive_required_for_unique_generated_tip")
+
+    def test_open_pr_head_or_base_is_never_deleted_or_archived(self) -> None:
+        name = "pentaself/remediation/deadbeef"
+        row = self.classify(name, active_pr_refs={name}, merged_into_main=False)
+        self.assertFalse(row["eligible"])
+        self.assertFalse(row["archive_eligible"])
+        self.assertEqual(row["reason"], "open_pr_head_or_base")
 
     def test_protected_branch_is_never_deleted(self) -> None:
         row = self.classify("noop", protected=True)
         self.assertFalse(row["eligible"])
+        self.assertFalse(row["archive_eligible"])
         self.assertEqual(row["reason"], "protected_branch")
 
     def test_archive_namespace_is_preserved(self) -> None:
         row = self.classify("archive/pentaself/remediation/deadbeef")
         self.assertFalse(row["eligible"])
+        self.assertFalse(row["archive_eligible"])
         self.assertEqual(row["reason"], "preserve_pattern")
 
     def test_unmanaged_branch_is_not_swept(self) -> None:
-        row = self.classify("admin-mcp/important-human-work")
+        row = self.classify("admin-mcp/important-human-work", merged_into_main=False)
         self.assertFalse(row["eligible"])
+        self.assertFalse(row["archive_eligible"])
         self.assertEqual(row["reason"], "outside_managed_generated_namespaces")
 
-    def test_retention_window_is_enforced(self) -> None:
-        row = self.classify("pentaself/remediation/new", age_hours=2)
+    def test_retention_window_is_enforced_before_archive(self) -> None:
+        row = self.classify(
+            "pentaself/remediation/new",
+            age_hours=2,
+            merged_into_main=False,
+        )
         self.assertFalse(row["eligible"])
+        self.assertFalse(row["archive_eligible"])
         self.assertEqual(row["reason"], "retention_window_active")
 
     def test_noop_can_be_retired_without_age_delay_once_merged(self) -> None:
@@ -81,24 +93,28 @@ class PRControlPlaneJanitorTests(unittest.TestCase):
 
     def test_current_execution_branch_is_preserved(self) -> None:
         name = "pentaself/remediation/current"
-        row = self.classify(name, execution_branch=name)
+        row = self.classify(name, execution_branch=name, merged_into_main=False)
         self.assertFalse(row["eligible"])
+        self.assertFalse(row["archive_eligible"])
         self.assertEqual(row["reason"], "current_execution_branch")
 
-    def test_policy_declares_no_unique_work_deletion(self) -> None:
+    def test_policy_declares_archive_or_main_reachability_requirement(self) -> None:
         invariants = self.policy["invariants"]
-        self.assertTrue(invariants["delete_only_if_tip_is_ancestor_of_main"])
+        self.assertTrue(invariants["delete_only_if_tip_is_ancestor_of_main_or_verified_archive_anchor"])
+        self.assertTrue(invariants["archive_anchor_uses_protected_main_tree_only"])
+        self.assertTrue(invariants["archive_exact_ref_readback_required_before_unique_tip_delete"])
         self.assertTrue(invariants["delete_only_if_not_open_pr_head_or_base"])
-        self.assertTrue(invariants["closed_unmerged_unique_work_is_not_deleted"])
         self.assertTrue(invariants["preserve_commit_and_pr_history"])
+        self.assertTrue(invariants["closed_unmerged_unique_work_requires_archive_before_ref_retirement"])
 
     def test_pagination_uses_repository_relative_numeric_pages(self) -> None:
         calls: list[str] = []
 
-        def fake_api_request(*, repo_full_name, token, path, method="GET"):
+        def fake_api_request(*, repo_full_name, token, path, method="GET", payload=None):
             self.assertEqual(repo_full_name, "crownthrive1/CrownThrive-OS")
             self.assertEqual(token, "token")
             self.assertEqual(method, "GET")
+            self.assertIsNone(payload)
             calls.append(path)
             if path.endswith("page=1"):
                 return (
@@ -139,6 +155,93 @@ class PRControlPlaneJanitorTests(unittest.TestCase):
     def test_pagination_rejects_duplicate_page_parameter(self) -> None:
         with self.assertRaises(JanitorError):
             pagination_request_paths("/branches?page=1&page=2")
+
+    def test_archive_anchor_uses_main_tree_and_exact_tip_parents(self) -> None:
+        main_sha = "1" * 40
+        main_tree = "2" * 40
+        tip_a = "a" * 40
+        tip_b = "b" * 40
+        anchor_sha = "c" * 40
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_git(repo, *args, check=True):
+            if args == ("rev-parse", "refs/remotes/origin/main^{commit}"):
+                return main_sha
+            if args == ("rev-parse", "refs/remotes/origin/main^{tree}"):
+                return main_tree
+            self.fail(f"unexpected git call: {args}")
+
+        def fake_api_request(*, repo_full_name, token, path, method="GET", payload=None):
+            calls.append((path, method, payload))
+            if path == "/git/commits" and method == "POST":
+                self.assertEqual(payload["tree"], main_tree)
+                self.assertEqual(payload["parents"], [main_sha, tip_a, tip_b])
+                return ({
+                    "sha": anchor_sha,
+                    "tree": {"sha": main_tree},
+                    "parents": [{"sha": main_sha}, {"sha": tip_a}, {"sha": tip_b}],
+                }, {}, 201)
+            if path == "/git/refs" and method == "POST":
+                self.assertTrue(str(payload["ref"]).startswith("refs/heads/archive/generated-branches/"))
+                self.assertEqual(payload["sha"], anchor_sha)
+                return ({"ref": payload["ref"], "object": {"sha": anchor_sha}}, {}, 201)
+            if path.startswith("/git/ref/heads/archive/generated-branches/"):
+                return ({"object": {"sha": anchor_sha}}, {}, 200)
+            self.fail(f"unexpected API call: {method} {path}")
+
+        with (
+            patch("pr_control_plane_janitor.git", side_effect=fake_git),
+            patch("pr_control_plane_janitor.api_request", side_effect=fake_api_request),
+            patch.dict("os.environ", {"GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "2"}),
+        ):
+            result = create_archive_anchor(
+                repo=ROOT,
+                repo_full_name="crownthrive1/CrownThrive-OS",
+                token="token",
+                main_ref="refs/remotes/origin/main",
+                candidates=[{"tip_sha": tip_a}, {"tip_sha": tip_b}],
+                now=dt.datetime(2026, 8, 31, tzinfo=dt.timezone.utc),
+            )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["archive_anchor_sha"], anchor_sha)
+        self.assertEqual(result["archive_tree_sha"], main_tree)
+        self.assertEqual(result["archived_tip_shas"], [tip_a, tip_b])
+        self.assertTrue(result["exact_ref_readback"])
+        self.assertFalse(result["source_tree_changed"])
+        self.assertEqual(result["archive_branch"], "archive/generated-branches/20260831-123-2")
+        self.assertEqual(len(calls), 3)
+
+    def test_archive_anchor_holds_on_parent_readback_drift(self) -> None:
+        main_sha = "1" * 40
+        main_tree = "2" * 40
+        tip = "a" * 40
+
+        def fake_git(repo, *args, check=True):
+            return main_sha if args[-1].endswith("^{commit}") else main_tree
+
+        def fake_api_request(*, repo_full_name, token, path, method="GET", payload=None):
+            if path == "/git/commits":
+                return ({
+                    "sha": "c" * 40,
+                    "tree": {"sha": main_tree},
+                    "parents": [{"sha": main_sha}],
+                }, {}, 201)
+            self.fail("archive ref must never be created after parent drift")
+
+        with (
+            patch("pr_control_plane_janitor.git", side_effect=fake_git),
+            patch("pr_control_plane_janitor.api_request", side_effect=fake_api_request),
+        ):
+            with self.assertRaises(JanitorError):
+                create_archive_anchor(
+                    repo=ROOT,
+                    repo_full_name="crownthrive1/CrownThrive-OS",
+                    token="token",
+                    main_ref="refs/remotes/origin/main",
+                    candidates=[{"tip_sha": tip}],
+                    now=dt.datetime(2026, 8, 31, tzinfo=dt.timezone.utc),
+                )
 
 
 if __name__ == "__main__":
