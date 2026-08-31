@@ -36,12 +36,12 @@ jobs:
           set -euo pipefail
           java -version
           test -n "${ANDROID_HOME:-}"
-          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" || test -x "$ANDROID_HOME/tools/bin/sdkmanager"
+          command -v sdkmanager >/dev/null || test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" || test -x "$ANDROID_HOME/tools/bin/sdkmanager"
           curl --fail --silent --show-error --location --retry 5 --retry-all-errors \
             --max-time 30 \
             --output /tmp/app-factory-up.txt \
             "$APP_FACTORY_CANONICAL_URL/up"
-          test -s /tmp/app-factory-up.txt
+          test -f /tmp/app-factory-up.txt
           sha256sum /tmp/app-factory-up.txt
 
       - name: Install verified Gradle and Android SDK 35
@@ -59,8 +59,10 @@ jobs:
           printf '%s  %s\n' "$(tr -d '[:space:]' < "gradle-${GRADLE_VERSION}-bin.zip.sha256")" "gradle-${GRADLE_VERSION}-bin.zip" | sha256sum --check --strict
           unzip -q "gradle-${GRADLE_VERSION}-bin.zip"
           echo "$RUNNER_TEMP/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$ANDROID_HOME/tools/bin/sdkmanager"; fi
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ] && [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"; fi
+          if [ -z "$SDKMANAGER" ] && [ -x "$ANDROID_HOME/tools/bin/sdkmanager" ]; then SDKMANAGER="$ANDROID_HOME/tools/bin/sdkmanager"; fi
+          test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
@@ -89,7 +91,7 @@ jobs:
           EOF
           cat > canary/build.gradle.kts <<'EOF'
           plugins {
-              id("com.android.application") version "8.5.2" apply false
+              id("com.android.application") version "8.6.1" apply false
           }
           EOF
           cat > canary/app/build.gradle.kts <<'EOF'
