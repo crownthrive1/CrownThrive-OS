@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Evidence-preserving cleanup for generated GitHub branch namespaces.
 
-The janitor deletes a branch ref only when all of the following are true:
-- the branch matches an explicitly managed generated namespace;
-- it is not protected and is not covered by a preserve pattern;
-- it is not the head or base of any open pull request;
-- its tip is already an ancestor of protected main, so deleting the ref cannot
-  remove unique source work from repository history;
-- its namespace-specific retention window has elapsed.
+Generated refs are retired only when the underlying history is already durable:
+- merged tips may be deleted because they are reachable from protected main;
+- unique generated tips may be deleted only after an archive anchor is created
+  with the exact tip commits as parents and the archive ref is read back;
+- protected, preserved, active-PR, current-execution, unmanaged, and young refs
+  are never deleted.
 
-Closed-but-unmerged branches are intentionally retained because their tips may
-contain unique engineering work. Deleting a ref never rewrites commits or PR
-history. The default mode is audit; apply mode is bounded by --max-delete.
+Archive anchors use the protected-main tree and add history reachability only.
+They never merge archived source into main, never rewrite PR/commit history, and
+remain under the preserved ``archive/*`` namespace. Default mode is audit;
+apply mode is bounded by ``--max-delete``.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -31,8 +31,9 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_POLICY = ROOT / "config/pr_control_plane_janitor.json"
 API_VERSION = "2022-11-28"
-USER_AGENT = "CrownThrive-PR-Control-Plane-Janitor/1.0"
+USER_AGENT = "CrownThrive-PR-Control-Plane-Janitor/1.1"
 MAX_PAGINATION_PAGES = 100
+ARCHIVE_PARENT_CHUNK = 24
 
 
 class JanitorError(RuntimeError):
@@ -89,7 +90,6 @@ def matching_rule(name: str, policy: dict[str, Any]) -> dict[str, Any] | None:
     ]
     if not matches:
         return None
-    # Prefer the most specific rule if policy patterns overlap.
     return max(matches, key=lambda item: len(str(item.get("pattern", ""))))
 
 
@@ -110,6 +110,7 @@ def classify_branch(
     row: dict[str, Any] = {
         "name": name,
         "eligible": False,
+        "archive_eligible": False,
         "reason": "unclassified",
         "age_hours": round(age_hours, 2),
     }
@@ -131,16 +132,22 @@ def classify_branch(
     if name in active_pr_refs:
         row["reason"] = "open_pr_head_or_base"
         return row
-    if not merged_into_main:
-        row["reason"] = "unique_tip_not_merged_into_main"
-        return row
+
     minimum = float(rule.get("min_age_hours", 0))
     row["min_age_hours"] = minimum
     if age_hours < minimum:
         row["reason"] = "retention_window_active"
         return row
-    row["eligible"] = True
-    row["reason"] = "safe_generated_ref_already_preserved_on_main"
+
+    if merged_into_main:
+        row["eligible"] = True
+        row["reason"] = "safe_generated_ref_already_preserved_on_main"
+        return row
+
+    # A managed, aged, inactive unique tip is a cleanup candidate only after an
+    # archive anchor makes the exact commit graph durably reachable.
+    row["archive_eligible"] = True
+    row["reason"] = "safe_archive_required_for_unique_generated_tip"
     return row
 
 
@@ -150,16 +157,23 @@ def api_request(
     token: str,
     path: str,
     method: str = "GET",
+    payload: MappingLike | None = None,
 ) -> tuple[Any | None, dict[str, str], int]:
+    data = None
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "X-GitHub-Api-Version": API_VERSION,
+        "User-Agent": USER_AGENT,
+    }
+    if payload is not None:
+        data = json.dumps(dict(payload), separators=(",", ":")).encode("utf-8")
+        headers["Content-Type"] = "application/json"
     request = urllib.request.Request(
         f"https://api.github.com/repos/{repo_full_name}{path}",
         method=method,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": API_VERSION,
-            "User-Agent": USER_AGENT,
-        },
+        headers=headers,
+        data=data,
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
@@ -171,15 +185,12 @@ def api_request(
         raise JanitorError(f"GitHub API {method} {path} failed {exc.code}: {detail[:800]}") from exc
 
 
-def pagination_request_paths(path: str) -> tuple[str, list[tuple[str, str]], int, int]:
-    """Normalize a repository-relative list endpoint for deterministic paging.
+# Python 3.12-friendly structural alias without importing typing.Mapping twice.
+MappingLike = dict[str, Any]
 
-    GitHub may emit absolute Link targets using its numeric ``/repositories/{id}``
-    canonical form even when the request entered through ``/repos/{owner}/{repo}``.
-    Those provider-generated URLs are valid but are intentionally not trusted as
-    future request authority. We instead retain the caller's already-bounded
-    repository-relative endpoint and advance only the integer ``page`` parameter.
-    """
+
+def pagination_request_paths(path: str) -> tuple[str, list[tuple[str, str]], int, int]:
+    """Normalize a repository-relative list endpoint for deterministic paging."""
     parsed = urllib.parse.urlsplit(path)
     if parsed.scheme or parsed.netloc or not parsed.path.startswith("/") or parsed.path.startswith("//"):
         raise JanitorError("pagination path must remain repository-relative")
@@ -293,6 +304,105 @@ def tip_age_hours(repo: Path, ref: str, now_epoch: float) -> float:
     return max(0.0, (now_epoch - timestamp) / 3600.0)
 
 
+def chunks(values: list[dict[str, Any]], size: int = ARCHIVE_PARENT_CHUNK) -> Iterator[list[dict[str, Any]]]:
+    if size < 1:
+        raise JanitorError("archive parent chunk must be positive")
+    for offset in range(0, len(values), size):
+        yield values[offset : offset + size]
+
+
+def create_archive_anchor(
+    *,
+    repo: Path,
+    repo_full_name: str,
+    token: str,
+    main_ref: str,
+    candidates: list[dict[str, Any]],
+    now: dt.datetime,
+) -> dict[str, Any] | None:
+    """Create a preserved reachability anchor for unique generated tips.
+
+    Each anchor commit uses the exact protected-main tree. Candidate tip SHAs are
+    parents only; therefore source files are not merged or projected into main.
+    Chained anchor commits bound parent fan-out while retaining every candidate.
+    The final archive branch is created only after every commit response matches
+    the requested parent set, then read back exactly before deletion can begin.
+    """
+    if not candidates:
+        return None
+
+    main_sha = git(repo, "rev-parse", f"{main_ref}^{{commit}}")
+    main_tree = git(repo, "rev-parse", f"{main_ref}^{{tree}}")
+    current_parent = main_sha
+    anchor_commits: list[str] = []
+    anchored_tips: list[str] = []
+
+    for index, group in enumerate(chunks(candidates), 1):
+        tip_shas = [str(row.get("tip_sha") or "").strip() for row in group]
+        if any(len(sha) != 40 for sha in tip_shas):
+            raise JanitorError("archive candidate has malformed tip SHA")
+        requested_parents = [current_parent, *tip_shas]
+        body, _, status = api_request(
+            repo_full_name=repo_full_name,
+            token=token,
+            path="/git/commits",
+            method="POST",
+            payload={
+                "message": (
+                    f"archive(generated-branches): preserve batch {index} before ref retirement\n\n"
+                    "History-reachability anchor only. Tree is protected main; candidate tips are parents."
+                ),
+                "tree": main_tree,
+                "parents": requested_parents,
+            },
+        )
+        if status not in {200, 201} or not isinstance(body, dict):
+            raise JanitorError(f"archive commit creation returned unexpected status {status}")
+        created_sha = str(body.get("sha") or "").strip()
+        observed_parents = [str((item or {}).get("sha") or "") for item in body.get("parents", [])]
+        if len(created_sha) != 40 or observed_parents != requested_parents:
+            raise JanitorError("archive commit readback did not preserve exact requested parents")
+        if str((body.get("tree") or {}).get("sha") or "") != main_tree:
+            raise JanitorError("archive commit tree drifted from protected main")
+        anchor_commits.append(created_sha)
+        anchored_tips.extend(tip_shas)
+        current_parent = created_sha
+
+    run_id = str(os.environ.get("GITHUB_RUN_ID") or int(now.timestamp()))
+    attempt = str(os.environ.get("GITHUB_RUN_ATTEMPT") or "1")
+    archive_branch = f"archive/generated-branches/{now:%Y%m%d}-{run_id}-{attempt}"
+    body, _, status = api_request(
+        repo_full_name=repo_full_name,
+        token=token,
+        path="/git/refs",
+        method="POST",
+        payload={"ref": f"refs/heads/{archive_branch}", "sha": current_parent},
+    )
+    if status not in {200, 201} or not isinstance(body, dict):
+        raise JanitorError(f"archive ref creation returned unexpected status {status}")
+
+    encoded = urllib.parse.quote(archive_branch, safe="/")
+    readback, _, _ = api_request(
+        repo_full_name=repo_full_name,
+        token=token,
+        path=f"/git/ref/heads/{encoded}",
+    )
+    observed = str(((readback or {}).get("object") or {}).get("sha") or "")
+    if observed != current_parent:
+        raise JanitorError("archive ref exact readback mismatch")
+
+    return {
+        "archive_branch": archive_branch,
+        "archive_anchor_sha": current_parent,
+        "archive_tree_sha": main_tree,
+        "archive_commits": anchor_commits,
+        "archived_tip_shas": anchored_tips,
+        "archived_count": len(candidates),
+        "exact_ref_readback": True,
+        "source_tree_changed": False,
+    }
+
+
 def delete_branch(repo_full_name: str, token: str, name: str) -> None:
     encoded = urllib.parse.quote(name, safe="/")
     _, _, status = api_request(
@@ -345,6 +455,7 @@ def run(
             rows.append({
                 "name": name,
                 "eligible": False,
+                "archive_eligible": False,
                 "reason": "remote_ref_missing_from_checkout",
                 "protected": bool(branch.get("protected", False)),
             })
@@ -362,16 +473,44 @@ def run(
         row["tip_sha"] = str((branch.get("commit") or {}).get("sha") or "")
         rows.append(row)
 
-    eligible = sorted(
-        (row for row in rows if row.get("eligible")),
+    direct = [row for row in rows if row.get("eligible")]
+    archive_required = [row for row in rows if row.get("archive_eligible")]
+    deletion_candidates = sorted(
+        [*direct, *archive_required],
         key=lambda row: (-float(row.get("age_hours", 0)), str(row.get("name"))),
     )
-    attempted = eligible[:max_delete] if mode == "apply" else []
+    attempted = deletion_candidates[:max_delete] if mode == "apply" else []
+    attempted_archive = [row for row in attempted if row.get("archive_eligible")]
+    attempted_direct = [row for row in attempted if row.get("eligible")]
+
+    archive = None
     deleted: list[str] = []
     failures: list[dict[str, str]] = []
+    if mode == "apply" and attempted_archive:
+        # Archive all unique tips before deleting any ref in this wave. A HOLD
+        # here means zero deletions have happened in this run.
+        archive = create_archive_anchor(
+            repo=repo,
+            repo_full_name=repo_full_name,
+            token=token,
+            main_ref=main_ref,
+            candidates=attempted_archive,
+            now=now,
+        )
+        if archive is None or archive.get("exact_ref_readback") is not True:
+            raise JanitorError("unique-tip archive did not complete exact readback")
+        for row in attempted_archive:
+            row["archive_branch"] = archive["archive_branch"]
+            row["archive_anchor_sha"] = archive["archive_anchor_sha"]
+            row["archived_before_delete"] = True
+
     if mode == "apply":
         for row in attempted:
             name = str(row["name"])
+            if row.get("archive_eligible") and not row.get("archived_before_delete"):
+                failures.append({"name": name, "error": "archive_readback_missing"})
+                row["action"] = "delete_blocked_missing_archive"
+                continue
             try:
                 delete_branch(repo_full_name, token, name)
                 deleted.append(name)
@@ -379,7 +518,7 @@ def run(
             except JanitorError as exc:
                 row["action"] = "delete_failed"
                 failures.append({"name": name, "error": str(exc)})
-        for row in eligible[max_delete:]:
+        for row in deletion_candidates[max_delete:]:
             row["action"] = "eligible_over_run_cap"
 
     counts: dict[str, int] = {}
@@ -397,8 +536,13 @@ def run(
         "max_delete": max_delete,
         "branches_scanned": len(rows),
         "open_pr_refs_preserved": len(active_refs),
-        "eligible": len(eligible),
+        "eligible": len(deletion_candidates),
+        "direct_main_eligible": len(direct),
+        "archive_required_eligible": len(archive_required),
         "attempted": len(attempted),
+        "attempted_direct": len(attempted_direct),
+        "attempted_archive": len(attempted_archive),
+        "archive": archive,
         "deleted": len(deleted),
         "deleted_refs": deleted,
         "failures": failures,
@@ -406,6 +550,7 @@ def run(
         "rows": rows,
         "history_rewritten": False,
         "unique_unmerged_work_deleted": False,
+        "archived_history_remains_reachable": bool(archive) if attempted_archive else True,
         "authority_expansion": False,
     }
 
@@ -449,7 +594,8 @@ def main(argv: list[str] | None = None) -> int:
         key: result[key]
         for key in (
             "schema", "repository", "mode", "branches_scanned", "eligible",
-            "attempted", "deleted", "open_pr_refs_preserved", "reason_counts"
+            "direct_main_eligible", "archive_required_eligible", "attempted",
+            "attempted_archive", "deleted", "open_pr_refs_preserved", "reason_counts"
         )
     }, indent=2, sort_keys=True))
     if result["failures"]:
