@@ -33,6 +33,25 @@ A review-only handoff means: deliver the assignment's exact subject, exact artif
 
 Security decisions, CHLOM rights/authority decisions, applicable CIE decisions and independent PentaCertifier dispositions remain separate governed evidence objects and must be read back through their canonical runtimes.
 
+## Independent-certifier release-gate bridge
+
+Fresh production readback exposed a bootstrap gap after the review-only route itself reached `AWAITING_CERTIFICATION`: the existing `PentaCertify v3` task runtime did not consume Penta Assignment certification state, and the assignment fabric had no exact-subject binding contract for the upstream PentaSecurity, CHLOM-rights and applicable-CIE decisions that must precede PentaCertifier.
+
+The additive `ct.penta.assignment.certifier-preflight.v1` bridge closes only that orchestration gap. It does **not** create any of those authorities. The canonical evidence stays external to the bridge and can be bound only when all of the following agree with the current assignment subject:
+
+- the authority identity is exactly the canonical owner (`penta.security`, `chlom`, or `cie`);
+- the assignment exact Git head matches;
+- the exact assignment subject digest matches;
+- the evidence digest is valid;
+- the referenced DAIL event/hash reads back from canonical chronology;
+- predecessor/supersession lineage is preserved when a decision is replaced.
+
+`PentaSecurity` must produce `PASS`. `CHLOM_RIGHTS` must produce `PASS` or a governed `NOT_APPLICABLE`. `CIE` must produce `PASS` or a governed `NOT_APPLICABLE`. The bridge itself cannot manufacture `NOT_APPLICABLE`; it only records the exact external disposition supplied by that authority.
+
+The preflight additionally requires DAIL Evidence/Decision/Execution readback, PentaDocs and all three governed provider projections, current owner PASS results, exact-head PR linkage, D0-D2 scope, absence of reserved effects, and certifier-vs-owner separation. Only after all of those predicates pass may `penta_assignment_enqueue_independent_certifier_v1` place an `inspect` task into the **existing** `penta_certify_tasks_v3` queue. Queueing is not certification. The resulting task is source-bound, certification-only and explicitly carries `production_deploy=false` and `authority_created=false`.
+
+The gate-binding ledger is append-only. Historical gate evidence is never rewritten; a changed exact head or exact subject digest invalidates prior bindings for preflight purposes and requires new authoritative evidence.
+
 ## CHLOM + DAIL boundary
 
 Assignment routing is an interop/orchestration concern. CHLOM remains the canonical rights/authority/governance protocol. PentaCHLOM may translate and bind the review evidence, but it does not inherit CHLOM authority.
@@ -54,19 +73,29 @@ This contract specifically blocks:
 - metadata-based PM execution eligibility escalation;
 - provider-write, credential, money, D3 or authority-expansion leakage;
 - unknown reviewer names silently becoming executable routes;
-- treating a completed transport handoff as independent certification.
+- treating a completed transport handoff as independent certification;
+- relabeling an arbitrary actor as PentaSecurity/CHLOM/CIE;
+- reusing a gate receipt across a changed Git head or changed subject digest;
+- queuing PentaCertifier before upstream security/rights/cultural gates are satisfied;
+- converting source/readiness or self-certified evidence into release authority.
 
 Unknown/unregistered owner identities continue to fail closed under #1899.
 
 ## Acceptance
 
-The transactional test must prove that the four existing executable routes remain unchanged, all three reviewer routes are canonical review-only Census handoffs, OS20 escalation and metadata authority escalation are rejected, a synthetic assignment reaches all three review handoffs, and zero OS20 execution tasks are created. The transaction must roll back all canary state.
+The review-routing transactional test must prove that the four existing executable routes remain unchanged, all three reviewer routes are canonical review-only Census handoffs, OS20 escalation and metadata authority escalation are rejected, a synthetic assignment reaches all three review handoffs, and zero OS20 execution tasks are created. The transaction must roll back all canary state.
+
+The release-gate bridge transactional test must separately prove that current `AWAITING_CERTIFICATION` work remains HOLD without authentic PentaSecurity/CHLOM/CIE receipts, no PentaCertify task is queued on that HOLD, authority identity mismatch fails, exact-head mismatch fails, subject-digest mismatch fails, and all bridge functions remain service-role-only. It must not manufacture positive security/rights/CIE evidence merely to reach the certifier.
 
 ## Rollback
 
 Before production apply: close/supersede this candidate with #1899/current main unchanged.
 
-After governed apply: deactivate/remove only the three additive review-only registry rows and the review-only guard through a governed forward migration, then read back the original four-route registry. Historical assignment/DAIL evidence is never deleted or rewritten.
+After governed apply: deactivate/remove only the additive review-only registry rows, review-only guard, exact-subject gate-binding/preflight/enqueue bridge through a governed forward migration, then exact-readback the original four-route registry and assignment state. Append-only assignment/DAIL/gate evidence remains historical and is never deleted or rewritten.
+
+## Standards mapping
+
+This implementation supports, without claiming external certification: NIST CSF 2.0 governance/protective controls; NIST SP 800-53 Rev.5 separation-of-duties, least-privilege, audit and configuration-management controls; NIST SP 800-207 explicit authorization; NIST SSDF/SP 800-218 verified release gates; NIST SP 800-161r1 exact source/provenance controls; CISA Secure by Design/Secure by Default fail-closed behavior; OWASP ASVS/API least privilege; CIS Controls v8; and SLSA-style source/provenance binding. SOC 2 Type II and ISO/IEC 27001:2022 remain architecture targets, not certification claims.
 
 ## Release boundary
 
