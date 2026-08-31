@@ -19,6 +19,7 @@ Important authority boundary:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from typing import Any
@@ -58,6 +59,34 @@ def autonomous_merge_allowed(labels: set[str]) -> tuple[bool, str]:
     if risk == "D2":
         return False, "d2_independent_release_topology_required"
     return True, f"{risk.lower()}_github_native_merge_eligible"
+
+
+def self_test() -> dict[str, Any]:
+    vectors = [
+        ({"penta:risk:d0"}, True, "d0_github_native_merge_eligible"),
+        ({"penta:risk:d1"}, True, "d1_github_native_merge_eligible"),
+        ({"penta:risk:d2"}, False, "d2_independent_release_topology_required"),
+        ({"penta:risk:d3"}, False, "d3_human_reserved"),
+        (set(), False, "risk_unclassified_or_ambiguous"),
+        ({"penta:risk:d1", "penta:risk:d2"}, False, "risk_unclassified_or_ambiguous"),
+    ]
+    receipts: list[dict[str, Any]] = []
+    for labels, expected_allowed, expected_reason in vectors:
+        allowed, reason = autonomous_merge_allowed(labels)
+        if allowed != expected_allowed or reason != expected_reason:
+            raise RuntimeError(
+                f"autopilot self-test failed labels={sorted(labels)} allowed={allowed} reason={reason}"
+            )
+        receipts.append({"labels": sorted(labels), "allowed": allowed, "reason": reason})
+    return {
+        "schema": "ct.penta.pr-autopilot.release-topology-self-test.v1",
+        "state": "PASS",
+        "vectors": receipts,
+        "d2_requires_independent_release_topology": True,
+        "d3_human_reserved": True,
+        "unknown_risk_fail_closed": True,
+        "authority_created": False,
+    }
 
 
 def required_gate_state(gh: lifecycle.GH, sha: str) -> tuple[str, dict[str, Any] | None]:
@@ -226,8 +255,6 @@ def drive_one(gh: lifecycle.GH, number: int) -> None:
 
     allowed, risk_reason = autonomous_merge_allowed(labels)
     if not allowed:
-        # Passing the GitHub merge perimeter is enough to make a D2 candidate
-        # reviewable, but never enough to manufacture release certification.
         if pull.get("draft") and risk_reason == "d2_independent_release_topology_required":
             changed, ready_reason = mark_ready_for_review(gh, pull)
             print(
@@ -253,7 +280,11 @@ def main() -> int:
     parser.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY"))
     parser.add_argument("--number", type=int)
     parser.add_argument("--allow-deadline-close", action="store_true")
+    parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
+    if args.self_test:
+        print(json.dumps(self_test(), sort_keys=True))
+        return 0
     if not args.repo:
         raise SystemExit("repo_required")
 
