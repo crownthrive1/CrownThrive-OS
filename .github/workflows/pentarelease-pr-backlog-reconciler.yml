@@ -9,20 +9,23 @@ on:
       - "PentaRelease — Comprehensive Release Surface"
     types: [completed]
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '47 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: write
 
+# Release/workflow events are the primary path. The hourly sweep is only a
+# recovery net; a newer reconciliation supersedes an older in-flight sweep.
 concurrency:
   group: pentarelease-pr-backlog-reconciler
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   reconcile:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Retire provider-proven and source-converged PentaRelease PR shells
         env:
@@ -46,8 +49,6 @@ jobs:
 
           # Provider publication is not sufficient terminal evidence for a release
           # shell. Read the canonical managed-source projection from protected main.
-          # The state file and public latest-release page are committed by the
-          # comprehensive surface workflow in the same governed source projection.
           SOURCE_TAG=""
           if gh api "repos/$REPO/contents/.pentarelease/state/release-surface.json?ref=main" >/tmp/pentarelease-source-state-api.json 2>/dev/null; then
             jq -r '.content // empty' /tmp/pentarelease-source-state-api.json | tr -d '\n' | base64 --decode >/tmp/pentarelease-source-state.json 2>/dev/null || true
@@ -139,10 +140,8 @@ jobs:
               continue
             fi
 
-            # Critical continuity invariant: a published provider release cannot
-            # retire either its autonomous shell or its source-surface shell until
-            # protected main proves that same release (or a strictly newer one) is
-            # represented by the governed managed-source projection.
+            # Published provider state is not enough: protected main must prove the
+            # same release or a newer forward-only managed-source projection.
             if [ -z "$SOURCE_TAG" ] || ! source_covers_tag "$SOURCE_TAG" "$tag"; then
               echo "KEEP #$number: source projection not converged for $tag (main managed source=${SOURCE_TAG:-unreadable})."
               held_for_source_convergence=$((held_for_source_convergence + 1))
@@ -165,10 +164,10 @@ jobs:
             echo "- Generated PR shells retired: $retired"
             echo "- Held for source convergence: $held_for_source_convergence"
             echo "- Generated branches retained under least privilege: $retained_branches"
+            echo '- Recovery sweep cadence: hourly; release and upstream workflow events remain primary.'
             echo '- Safety invariant: provider publication/assets alone never authorize PR-shell retirement.'
             echo '- Safety invariant: protected-main managed source must represent the candidate release or a newer forward-only release before retirement.'
             echo '- Generated-PR identity is verified from the provider REST pull-request record.'
             echo '- Remote branch deletion remains advisory and is not granted to this workflow.'
-            echo '- Upstream workflow conclusion is advisory; provider evidence plus managed-source readback are terminal cleanup evidence.'
             echo '- Main-branch rules are not bypassed or weakened.'
           } >> "$GITHUB_STEP_SUMMARY"
