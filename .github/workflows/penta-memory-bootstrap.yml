@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   unpack-verify-commit:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -68,7 +69,27 @@ jobs:
         run: python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract -v
 
       - name: Generate deterministic memory census
-        run: python runtime/penta_deterministic_memory.py reconcile --write
+        shell: bash
+        run: |
+          set +e
+          python runtime/penta_deterministic_memory.py reconcile --write > .penta-memory-reconcile-error.txt 2>&1
+          status=$?
+          cat .penta-memory-reconcile-error.txt
+          if [ "$status" -eq 0 ]; then
+            rm -f .penta-memory-reconcile-error.txt
+          fi
+          exit "$status"
+
+      - name: Persist reconcile failure evidence
+        if: failure() && hashFiles('.penta-memory-reconcile-error.txt') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "CrownThrive Penta Runtime"
+          git config user.email "contact@crownthrive.com"
+          git add .penta-memory-reconcile-error.txt
+          git commit -m "diagnostic(penta): capture deterministic memory reconcile failure [diag]"
+          git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: Validate deterministic memory census
         run: python runtime/penta_deterministic_memory.py validate
