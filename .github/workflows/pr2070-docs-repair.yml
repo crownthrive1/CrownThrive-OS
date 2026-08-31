@@ -1,0 +1,52 @@
+name: PR 2070 deterministic PentaDocs repair
+
+on:
+  push:
+    branches:
+      - "admin-mcp/penta-portal-pr2070-repair-20260831"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact generator branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Generate canonical Penta portal projection
+        run: python scripts/penta_portal_docs.py --write
+      - name: Place institutional pages in governed navigation
+        run: python scripts/pr2070_docs_repair.py
+      - name: Finalize PentaDocs metadata and page profiles
+        run: python scripts/penta_portal_finalize.py --apply
+      - name: Generate operational and agent knowledge
+        run: python scripts/penta_operational_knowledge_entrypoint.py --apply
+      - name: Generate Pentagonal reference suite
+        run: python scripts/pentagonal_reference_suite.py --apply
+      - name: Validate deterministic corpus
+        run: |
+          python scripts/penta_portal_finalize.py --check
+          python scripts/penta_operational_knowledge_entrypoint.py --check
+          python scripts/pentagonal_reference_suite.py --check
+          python -m unittest tests.test_penta_portal_docs tests.test_penta_operational_knowledge tests.test_pentagonal_reference_suite
+          python scripts/validate_docs.py
+          python runtime/penta_families.py --portal-index > /tmp/penta-families.json
+          git diff --check
+      - name: Commit generated repair only
+        run: |
+          git rm -f scripts/pr2070_docs_repair.py .github/workflows/pr2070-docs-repair.yml
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          git config user.name "CrownThrive PentaDocs"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "docs(penta): deterministically converge PR 2070 portal"
+          git push origin HEAD:${GITHUB_REF_NAME}
