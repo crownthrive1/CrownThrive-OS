@@ -48,8 +48,9 @@ class PentaGapClosureAdvisoryStaleTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
+        retired_phase = "Phase " + "2.99"
         (root / "unexpected.mdx").write_text(
-            "This current record unexpectedly refers to Phase 2.99.",
+            f"This current record unexpectedly refers to {retired_phase}.",
             encoding="utf-8",
         )
         manifest_path = root / gap.REGISTRY
