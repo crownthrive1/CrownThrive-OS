@@ -8,7 +8,7 @@ on:
       - penta/evidence/pentadocs-pr1988-quality-apply.ready
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pentadocs-quality-apply-pr1988
@@ -41,18 +41,28 @@ jobs:
           python scripts/validate_docs.py
           git diff --check
 
-      - name: Commit governed migration output
+      - name: Package verified migration output
+        shell: bash
         run: |
-          git config user.name "CrownThrive PentaDocs"
-          git config user.email "contact@crownthrive.com"
-          git add \
+          set -euo pipefail
+          git diff --binary > /tmp/pentadocs-pr1988-quality-output.patch
+          tar -czf /tmp/pentadocs-pr1988-quality-output.tar.gz \
             changelog/crownthrive-app-factory-rc1-institutionalization-2026-08-30.mdx \
             pentas/app-factory-orchestration.mdx \
             platforms/app-factory \
             data/documentation/pentadocs-page-profiles.v1.json
-          if git diff --cached --quiet; then
-            echo "No deterministic PentaDocs changes required."
-            exit 0
-          fi
-          git commit -m "docs: conform App Factory pages to PentaDocs v2 governance"
-          git push origin HEAD:admin-mcp/app-factory-rc1-source-import-a044d93
+          sha256sum \
+            /tmp/pentadocs-pr1988-quality-output.patch \
+            /tmp/pentadocs-pr1988-quality-output.tar.gz \
+            > /tmp/pentadocs-pr1988-quality-output.sha256
+
+      - name: Upload verified migration artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pentadocs-pr1988-quality-output
+          path: |
+            /tmp/pentadocs-pr1988-quality-output.patch
+            /tmp/pentadocs-pr1988-quality-output.tar.gz
+            /tmp/pentadocs-pr1988-quality-output.sha256
+          if-no-files-found: error
+          retention-days: 7
