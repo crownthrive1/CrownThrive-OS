@@ -1,0 +1,59 @@
+name: App Factory Final Release — PentaDocs Quality
+
+on:
+  push:
+    branches:
+      - institutionalize/app-factory-final-release-20260831
+    paths:
+      - penta/evidence/app-factory-final-pentadocs-quality.ready
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app-factory-final-pentadocs-quality
+  cancel-in-progress: false
+
+jobs:
+  normalize-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: institutionalize/app-factory-final-release-20260831
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply deterministic PentaDocs standard
+        run: python scripts/pentadocs_quality.py --apply
+
+      - name: Verify complete documentation corpus
+        run: |
+          python scripts/penta_portal_finalize.py --check
+          python scripts/penta_operational_knowledge_entrypoint.py --check
+          python scripts/pentagonal_reference_suite.py --check
+          python scripts/validate_docs.py
+          git diff --check
+
+      - name: Remove one-shot execution files
+        run: |
+          rm -f .github/workflows/app-factory-final-pentadocs-quality.yml
+          rm -f penta/evidence/app-factory-final-pentadocs-quality.ready
+
+      - name: Commit verified normalized output
+        run: |
+          git config user.name "CrownThrive PentaDocs Automation"
+          git config user.email "contact@crownthrive.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No normalization changes required."
+          else
+            git commit -m "docs(app-factory): normalize final release readback"
+            git push origin HEAD:institutionalize/app-factory-final-release-20260831
+          fi
