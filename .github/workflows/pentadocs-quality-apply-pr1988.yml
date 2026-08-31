@@ -1,0 +1,58 @@
+name: PentaDocs Quality Apply — PR 1988
+
+on:
+  push:
+    branches:
+      - admin-mcp/app-factory-rc1-source-import-a044d93
+    paths:
+      - penta/evidence/pentadocs-pr1988-quality-apply.ready
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pentadocs-quality-apply-pr1988
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out documentation branch
+        uses: actions/checkout@v4
+        with:
+          ref: admin-mcp/app-factory-rc1-source-import-a044d93
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply deterministic PentaDocs quality standard
+        run: python scripts/pentadocs_quality.py --apply
+
+      - name: Verify full documentation corpus
+        run: |
+          python scripts/penta_portal_finalize.py --check
+          python scripts/penta_operational_knowledge_entrypoint.py --check
+          python scripts/pentagonal_reference_suite.py --check
+          python scripts/validate_docs.py
+          git diff --check
+
+      - name: Commit governed migration output
+        run: |
+          git config user.name "CrownThrive PentaDocs"
+          git config user.email "contact@crownthrive.com"
+          git add \
+            changelog/crownthrive-app-factory-rc1-institutionalization-2026-08-30.mdx \
+            pentas/app-factory-orchestration.mdx \
+            platforms/app-factory \
+            data/documentation/pentadocs-page-profiles.v1.json
+          if git diff --cached --quiet; then
+            echo "No deterministic PentaDocs changes required."
+            exit 0
+          fi
+          git commit -m "docs: conform App Factory pages to PentaDocs v2 governance"
+          git push origin HEAD:admin-mcp/app-factory-rc1-source-import-a044d93
