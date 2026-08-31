@@ -33,7 +33,10 @@ declare
     'pentatime.executor_paypal_live_receipt_reconcile_v4()',
     'pentatime.pentadispatch_v1(integer)',
     'pentatime.pentatick_v1(integer)',
-    'pentatime.request_wake_v1(text,text,text,text,text,jsonb,text,text,integer,boolean)'
+    'pentatime.request_wake_v1(text,text,text,text,text,jsonb,text,text,integer,boolean)',
+    'pentatime.dail_crossover_sync_v1(integer)',
+    'penta_treasury.enact_reconciliation_v1(uuid,bigint,text,bigint)',
+    'pentamocracy.ratify_v1(text,text,boolean,boolean,boolean,boolean,boolean,text,text,text)'
   ];
 begin
   foreach v_sig in array v_required loop
@@ -44,6 +47,10 @@ begin
 
     if not (select p.prosecdef from pg_proc p where p.oid = v_oid) then
       raise exception 'expected SECURITY DEFINER function lost security-definer posture: %', v_sig;
+    end if;
+
+    if has_function_privilege('public', v_oid, 'EXECUTE') then
+      raise exception 'PUBLIC still has EXECUTE on privileged RPC: %', v_sig;
     end if;
 
     if has_function_privilege('anon', v_oid, 'EXECUTE') then
@@ -87,7 +94,10 @@ declare
     'pentatime.executor_paypal_live_receipt_reconcile_v4()',
     'pentatime.pentadispatch_v1(integer)',
     'pentatime.pentatick_v1(integer)',
-    'pentatime.request_wake_v1(text,text,text,text,text,jsonb,text,text,integer,boolean)'
+    'pentatime.request_wake_v1(text,text,text,text,text,jsonb,text,text,integer,boolean)',
+    'pentatime.dail_crossover_sync_v1(integer)',
+    'penta_treasury.enact_reconciliation_v1(uuid,bigint,text,bigint)',
+    'pentamocracy.ratify_v1(text,text,boolean,boolean,boolean,boolean,boolean,text,text,text)'
   ];
 begin
   foreach v_sig in array v_required loop
