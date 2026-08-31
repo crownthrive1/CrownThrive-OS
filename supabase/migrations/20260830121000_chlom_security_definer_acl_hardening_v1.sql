@@ -2,8 +2,10 @@
 --
 -- Fresh ThriveBase security readback on 2026-08-30 found a bounded cohort of
 -- SECURITY DEFINER functions with EXECUTE inherited by anon/authenticated via
--- PUBLIC or explicit grants. Several functions also enforce service_role inside
--- the body, but the API surface itself must still be least-privilege / fail-closed.
+-- PUBLIC or explicit grants. Fresh 2026-08-31 readback expanded the verified
+-- exposed cohort from 19 to 22 after three additional privileged surfaces were
+-- discovered. Several functions also enforce service_role inside the body, but
+-- the API surface itself must still be least-privilege / fail-closed.
 -- This migration changes ACLs only. It does not change function bodies, create
 -- D3 authority, rotate credentials, move money, grant rights, or expand provider writes.
 
@@ -34,7 +36,10 @@ declare
     'pentatime.executor_paypal_live_receipt_reconcile_v4()',
     'pentatime.pentadispatch_v1(integer)',
     'pentatime.pentatick_v1(integer)',
-    'pentatime.request_wake_v1(text,text,text,text,text,jsonb,text,text,integer,boolean)'
+    'pentatime.request_wake_v1(text,text,text,text,text,jsonb,text,text,integer,boolean)',
+    'pentatime.dail_crossover_sync_v1(integer)',
+    'penta_treasury.enact_reconciliation_v1(uuid,bigint,text,bigint)',
+    'pentamocracy.ratify_v1(text,text,boolean,boolean,boolean,boolean,boolean,text,text,text)'
   ];
 begin
   foreach v_sig in array v_required loop
@@ -94,5 +99,16 @@ grant execute on function pentatime.executor_paypal_live_receipt_reconcile_v4() 
 grant execute on function pentatime.pentadispatch_v1(integer) to service_role;
 grant execute on function pentatime.pentatick_v1(integer) to service_role;
 grant execute on function pentatime.request_wake_v1(text,text,text,text,text,jsonb,text,text,integer,boolean) to service_role;
+
+-- Newly verified privileged authority/crossover surfaces discovered in the 2026-08-31
+-- exact catalog readback. All three are SECURITY DEFINER with pinned search_path, and
+-- all three currently inherit public/anon/authenticated EXECUTE. This remains ACL-only.
+revoke execute on function pentatime.dail_crossover_sync_v1(integer) from public, anon, authenticated;
+revoke execute on function penta_treasury.enact_reconciliation_v1(uuid,bigint,text,bigint) from public, anon, authenticated;
+revoke execute on function pentamocracy.ratify_v1(text,text,boolean,boolean,boolean,boolean,boolean,text,text,text) from public, anon, authenticated;
+
+grant execute on function pentatime.dail_crossover_sync_v1(integer) to service_role;
+grant execute on function penta_treasury.enact_reconciliation_v1(uuid,bigint,text,bigint) to service_role;
+grant execute on function pentamocracy.ratify_v1(text,text,boolean,boolean,boolean,boolean,boolean,text,text,text) to service_role;
 
 commit;
