@@ -1,0 +1,79 @@
+{
+  "schema": "ct.github.pr-control-plane-janitor/v1",
+  "version": "1.1.0",
+  "main_branch": "main",
+  "default_max_delete": 75,
+  "managed_patterns": [
+    {
+      "pattern": "noop*",
+      "min_age_hours": 0,
+      "reason": "explicit no-op/test branch namespace"
+    },
+    {
+      "pattern": "tmp-noop*",
+      "min_age_hours": 0,
+      "reason": "explicit temporary no-op namespace"
+    },
+    {
+      "pattern": "temp/*",
+      "min_age_hours": 24,
+      "reason": "temporary reconciliation namespace"
+    },
+    {
+      "pattern": "pentaself/remediation/*",
+      "min_age_hours": 24,
+      "reason": "generated PentaSELF remediation namespace"
+    },
+    {
+      "pattern": "pentarelease/auto-*",
+      "min_age_hours": 24,
+      "reason": "generated PentaRelease automatic release namespace"
+    },
+    {
+      "pattern": "pentarelease/surface-*",
+      "min_age_hours": 24,
+      "reason": "generated PentaRelease projection namespace"
+    },
+    {
+      "pattern": "pentarelease/intelligence-*",
+      "min_age_hours": 24,
+      "reason": "generated PentaRelease intelligence namespace"
+    },
+    {
+      "pattern": "factory/provider-job-*",
+      "min_age_hours": 24,
+      "reason": "generated provider-factory job namespace"
+    },
+    {
+      "pattern": "chlom/publication-*",
+      "min_age_hours": 24,
+      "reason": "generated CHLOM publication candidate namespace"
+    }
+  ],
+  "preserve_patterns": [
+    "main",
+    "main1",
+    "archive/*",
+    "production/*",
+    "release/*",
+    "security/*",
+    "governance/*",
+    "institutional/*",
+    "institutionalize/*",
+    "hotfix/*",
+    "audit/*",
+    "status/*"
+  ],
+  "invariants": {
+    "delete_only_if_tip_is_ancestor_of_main_or_verified_archive_anchor": true,
+    "archive_anchor_uses_protected_main_tree_only": true,
+    "archive_exact_ref_readback_required_before_unique_tip_delete": true,
+    "delete_only_if_not_protected": true,
+    "delete_only_if_not_open_pr_head_or_base": true,
+    "delete_only_managed_patterns": true,
+    "preserve_commit_and_pr_history": true,
+    "closed_unmerged_unique_work_requires_archive_before_ref_retirement": true,
+    "bounded_deletions_per_run": true,
+    "no_issue_per_branch": true
+  }
+}
