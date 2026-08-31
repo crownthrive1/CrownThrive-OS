@@ -71,8 +71,8 @@ class PRControlPlaneJanitorTests(unittest.TestCase):
         self.assertFalse(row["archive_eligible"])
         self.assertEqual(row["reason"], "preserve_pattern")
 
-    def test_unmanaged_branch_is_not_swept(self) -> None:
-        row = self.classify("admin-mcp/important-human-work", merged_into_main=False)
+    def test_unmanaged_human_branch_is_not_swept(self) -> None:
+        row = self.classify("fix/important-human-work", merged_into_main=False)
         self.assertFalse(row["eligible"])
         self.assertFalse(row["archive_eligible"])
         self.assertEqual(row["reason"], "outside_managed_generated_namespaces")
@@ -86,6 +86,49 @@ class PRControlPlaneJanitorTests(unittest.TestCase):
         self.assertFalse(row["eligible"])
         self.assertFalse(row["archive_eligible"])
         self.assertEqual(row["reason"], "retention_window_active")
+
+    def test_old_admin_mcp_unique_tip_requires_archive_after_seven_days(self) -> None:
+        row = self.classify(
+            "admin-mcp/old-editor-projection-deadbeef",
+            age_hours=200,
+            merged_into_main=False,
+        )
+        self.assertFalse(row["eligible"])
+        self.assertTrue(row["archive_eligible"])
+        self.assertEqual(row["min_age_hours"], 168.0)
+        self.assertEqual(row["reason"], "safe_archive_required_for_unique_generated_tip")
+
+    def test_recent_admin_mcp_branch_is_retained(self) -> None:
+        row = self.classify(
+            "admin-mcp/recent-editor-projection-deadbeef",
+            age_hours=72,
+            merged_into_main=False,
+        )
+        self.assertFalse(row["eligible"])
+        self.assertFalse(row["archive_eligible"])
+        self.assertEqual(row["reason"], "retention_window_active")
+
+    def test_old_mintlify_branch_uses_same_seven_day_boundary(self) -> None:
+        row = self.classify(
+            "mintlify/weekly-link-repair",
+            age_hours=200,
+            merged_into_main=False,
+        )
+        self.assertFalse(row["eligible"])
+        self.assertTrue(row["archive_eligible"])
+        self.assertEqual(row["min_age_hours"], 168.0)
+
+    def test_active_provider_branch_is_preserved_even_when_old(self) -> None:
+        name = "admin-mcp/active-editor-projection"
+        row = self.classify(
+            name,
+            age_hours=500,
+            merged_into_main=False,
+            active_pr_refs={name},
+        )
+        self.assertFalse(row["eligible"])
+        self.assertFalse(row["archive_eligible"])
+        self.assertEqual(row["reason"], "open_pr_head_or_base")
 
     def test_noop_can_be_retired_without_age_delay_once_merged(self) -> None:
         row = self.classify("noop-should-not-create", age_hours=0)
