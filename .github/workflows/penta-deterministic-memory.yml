@@ -15,6 +15,7 @@ on:
       - "scripts/penta_census.py"
       - "scripts/pentacensus_reconcile.py"
       - "tests/pentacensus/**"
+      - "tests/test_penta_census.py"
       - "tests/test_penta_deterministic_memory.py"
       - "tests/test_penta_family_reconciliation.py"
       - "tests/test_penta_provider_family_aliases.py"
@@ -39,6 +40,7 @@ on:
       - "scripts/penta_census.py"
       - "scripts/pentacensus_reconcile.py"
       - "tests/pentacensus/**"
+      - "tests/test_penta_census.py"
       - "tests/test_penta_deterministic_memory.py"
       - "tests/test_penta_family_reconciliation.py"
       - "tests/test_penta_provider_family_aliases.py"
@@ -74,15 +76,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m py_compile \
-            runtime/penta_deterministic_memory.py \
-            penta_census/*.py \
-            scripts/penta_census.py \
-            scripts/pentacensus_reconcile.py \
-            tests/test_penta_deterministic_memory.py \
-            tests/test_penta_family_reconciliation.py \
-            tests/test_penta_provider_family_aliases.py \
+          files=(
+            runtime/penta_deterministic_memory.py
+            scripts/penta_census.py
+            scripts/pentacensus_reconcile.py
+            tests/test_penta_deterministic_memory.py
+            tests/test_penta_family_reconciliation.py
+            tests/test_penta_provider_family_aliases.py
             tests/test_penta_sql_contract.py
+          )
+          if test -d penta_census; then
+            while IFS= read -r -d '' source; do
+              files+=("$source")
+            done < <(find penta_census -type f -name '*.py' -print0)
+          fi
+          python -m py_compile "${files[@]}"
 
       - name: Validate canonical PentaCensus
         shell: bash
@@ -92,7 +100,11 @@ jobs:
           python scripts/penta_census.py --root . --validate-structure
           python scripts/penta_census.py --root . --validate-contract
           python scripts/penta_census.py --root . --check
-          pytest -q tests/pentacensus
+          if test -d tests/pentacensus; then
+            pytest -q tests/pentacensus
+          else
+            python -m unittest tests.test_penta_census -v
+          fi
 
       - name: Validate deterministic memory projection
         shell: bash
