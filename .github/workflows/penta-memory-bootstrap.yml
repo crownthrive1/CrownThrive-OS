@@ -61,16 +61,23 @@ jobs:
           rm -rf .bootstrap
           rm -f .github/workflows/penta-memory-bootstrap.yml
 
-      - name: Compile, test, reconcile, and validate
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m py_compile runtime/penta_deterministic_memory.py tests/test_penta_deterministic_memory.py tests/test_penta_sql_contract.py
-          python -m unittest discover -s tests -p 'test_penta_*' -v
-          python runtime/penta_deterministic_memory.py reconcile --write
-          python runtime/penta_deterministic_memory.py validate
-          python -m unittest discover -s tests -p 'test_penta_*' -v
-          git diff --check
+      - name: Compile deterministic memory source
+        run: python -m py_compile runtime/penta_deterministic_memory.py tests/test_penta_deterministic_memory.py tests/test_penta_sql_contract.py
+
+      - name: Run focused deterministic memory tests before reconciliation
+        run: python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract -v
+
+      - name: Generate deterministic memory census
+        run: python runtime/penta_deterministic_memory.py reconcile --write
+
+      - name: Validate deterministic memory census
+        run: python runtime/penta_deterministic_memory.py validate
+
+      - name: Run focused deterministic memory tests after reconciliation
+        run: python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract -v
+
+      - name: Verify clean patch semantics
+        run: git diff --check
 
       - name: Commit verified branch source
         shell: bash
