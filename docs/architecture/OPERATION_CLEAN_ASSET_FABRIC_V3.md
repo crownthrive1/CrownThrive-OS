@@ -133,16 +133,20 @@ Protected identities remain protected. Missing identity fields are not permissio
 
 ## Service productization
 
-Existing confirmed reference points:
+Present-tense service pricing is governed by current runtime/service-catalog readback. As of the 2026-09-01 reconciliation, `developer_commerce.virality_service_catalog_v1` is authoritative for the active Virality service rows.
 
-- Operation C.L.E.A.N. catalog cohort: **$6,500 / 25 assets** (originated as 25-track service).
-- Virality Music Creative & Catalog Consultation: current operating baseline **$1,500 / 90 minutes**.
+Current confirmed reference points:
+
+- Operation C.L.E.A.N. Catalog Sprint (`virality.catalog_clean_sprint`): **$12,500+ / 25 tracks**, pricing mode `floor`, checkout mode `proposal_agreement`, state `qualified_only`.
+- Virality Music Creative & Catalog Consultation: **$1,500 / 90 minutes**.
 - Licensing Discovery Brief: **$350**, discovery/fit only; not a rights grant.
 
-Provisional new packages must remain non-public until economic/commerce approval:
+The earlier **$6,500 / 25 assets** value is retained as a **provisional mixed-asset CLEAN 25 package**, not the current governed Virality Catalog Sprint price. It must not be quoted as the active Catalog Sprint baseline unless a later runtime/service-catalog decision explicitly supersedes the current row.
+
+Provisional package concepts remain non-public until economic/commerce approval:
 
 - `CLEAN_DIAGNOSTIC`: $1,500, up to 25 assets.
-- `CLEAN_25`: $6,500, up to 25 assets.
+- `CLEAN_25`: $6,500, up to 25 mixed assets — provisional, not the current Virality Catalog Sprint.
 - `CLEAN_50`: $11,500, up to 50 assets.
 - `CLEAN_100`: $19,500, up to 100 assets.
 - `CLEAN_ESTATE`: from $45,000, 250+ or multi-platform estate.
