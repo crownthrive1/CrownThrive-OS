@@ -1,0 +1,83 @@
+name: Penta Deterministic Memory
+
+on:
+  push:
+    branches:
+      - main
+      - "admin-mcp/pentadocs-pentacensus-*"
+    paths:
+      - "config/penta_deterministic_memory.v1.json"
+      - "runtime/penta_deterministic_memory.py"
+      - "schemas/penta/deterministic-memory-census.schema.json"
+      - "tests/test_penta_deterministic_memory.py"
+      - "tests/test_penta_sql_contract.py"
+      - "supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql"
+      - "supabase/rollbacks/20260831094500_penta_deterministic_memory_v1.rollback.sql"
+      - "data/penta/os-v1.registry.json"
+      - "data/penta/namespace-census.v1.json"
+      - "penta/registry/penta-families.v1.json"
+      - ".github/workflows/penta-deterministic-memory.yml"
+  pull_request:
+    paths:
+      - "config/penta_deterministic_memory.v1.json"
+      - "runtime/penta_deterministic_memory.py"
+      - "schemas/penta/deterministic-memory-census.schema.json"
+      - "tests/test_penta_deterministic_memory.py"
+      - "tests/test_penta_sql_contract.py"
+      - "supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql"
+      - "supabase/rollbacks/20260831094500_penta_deterministic_memory_v1.rollback.sql"
+      - "data/penta/os-v1.registry.json"
+      - "data/penta/namespace-census.v1.json"
+      - "penta/registry/penta-families.v1.json"
+      - ".github/workflows/penta-deterministic-memory.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: penta-deterministic-memory-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deterministic-memory-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile deterministic kernel
+        run: python -m py_compile runtime/penta_deterministic_memory.py tests/test_penta_deterministic_memory.py tests/test_penta_sql_contract.py
+
+      - name: Run deterministic and SQL contract tests
+        run: python -m unittest discover -s tests -p "test_penta_*" -v
+
+      - name: Reconcile canonical repository census
+        run: python runtime/penta_deterministic_memory.py reconcile --write
+
+      - name: Validate generated census
+        run: python runtime/penta_deterministic_memory.py validate
+
+      - name: Require committed census on PR and main
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        run: git diff --exit-code -- data/penta/deterministic-memory-census.v1.json
+
+      - name: Commit deterministic census on governed implementation branch
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        shell: bash
+        run: |
+          if git diff --quiet -- data/penta/deterministic-memory-census.v1.json; then
+            echo "Deterministic memory census is already converged."
+            exit 0
+          fi
+          git config user.name "crownthrive-penta-census[bot]"
+          git config user.email "contact@crownthrive.com"
+          git add data/penta/deterministic-memory-census.v1.json
+          git commit -m "chore(penta-census): converge deterministic memory allocations"
+          git push
