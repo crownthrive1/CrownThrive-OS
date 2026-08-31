@@ -89,6 +89,7 @@ FRONTMATTER_FIELD_RE = re.compile(
 
 def normalize_supplied_profiles() -> dict[str, dict[str, str]]:
     changed: dict[str, dict[str, str]] = {}
+    governed_keys = {"primary_audience", "page_type", "content_state"}
     for raw_path, (audience, page_type, content_state) in SUPPLIED_PROFILE_NORMALIZATION.items():
         path = Path(raw_path)
         if not path.is_file():
@@ -108,17 +109,24 @@ def normalize_supplied_profiles() -> dict[str, dict[str, str]]:
             "page_type": page_type,
             "content_state": content_state,
         }
-        seen: set[str] = set()
+        present = {match.group("key") for match in FRONTMATTER_FIELD_RE.finditer(front)}
+        if not present:
+            # Canonical/generated Penta pages intentionally receive their governed
+            # profile from penta_portal_finalize.py after portal generation. Do
+            # not fight that deterministic owner by injecting package-era fields.
+            continue
+        if present != governed_keys:
+            missing = sorted(governed_keys - present)
+            unexpected = sorted(present - governed_keys)
+            raise SystemExit(
+                f"{raw_path}: partial governed profile; missing={missing} unexpected={unexpected}"
+            )
 
         def replace(match: re.Match[str]) -> str:
             key = match.group("key")
-            seen.add(key)
             return f'{key}: "{desired[key]}"'
 
         new_front = FRONTMATTER_FIELD_RE.sub(replace, front)
-        missing = set(desired) - seen
-        if missing:
-            raise SystemExit(f"{raw_path}: missing governed profile fields {sorted(missing)}")
         new_text = new_front + body
         if new_text != text:
             path.write_text(new_text, encoding="utf-8")
