@@ -11,6 +11,7 @@ import argparse
 import contextlib
 import datetime as dt
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from .core import (
     _blob_sha,
     _is_protected,
     collect_git_changes,
+    git_gate,
     load_policy,
 )
 
@@ -126,6 +128,52 @@ def project_workflow_receipt(
     return result
 
 
+def gate_with_workflow_projection(
+    repo: Path,
+    base: str,
+    head: str,
+    policy_path: Path,
+    *,
+    actor: str = "github-actions[bot]",
+) -> dict[str, Any]:
+    """Run the normal gate with a temporary exact-workflow projection installed.
+
+    The temporary receipt is removed in ``finally`` even when the underlying
+    gate rejects the candidate. This is a single reusable execution path for
+    every CI caller of the PentaSerialized CLI.
+    """
+    repo = repo.resolve()
+    policy_path = policy_path if policy_path.is_absolute() else repo / policy_path
+    policy = load_policy(policy_path)
+    receipt_glob = policy.get("receipt_glob", "penta/continuity/receipts/*.json")
+    receipt_dir = repo / Path(receipt_glob).parent
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    receipt_path = receipt_dir / (
+        f".ci-workflow-projection-{os.getpid()}-{head[:12]}.json"
+    )
+    try:
+        projection = project_workflow_receipt(
+            repo,
+            base,
+            head,
+            policy_path,
+            receipt_path,
+            actor=actor,
+            rollback_ref=base,
+            receipt_id=f"ct.penta.serialized.ci-workflow-projection.{head[:12]}",
+        )
+        result = git_gate(repo, base, head, policy_path)
+        result["workflow_projection"] = {
+            "generated": projection["generated"],
+            "eligible_changes": projection["eligible_changes"],
+            "ephemeral": True,
+        }
+        return result
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            receipt_path.unlink()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="penta-serialized-workflow-projection")
     parser.add_argument("--repo", default=".")
@@ -136,6 +184,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--actor", default="github-actions[bot]")
     parser.add_argument("--rollback-ref")
     parser.add_argument("--receipt-id")
+    return parser
+
+
+def build_gate_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="penta-serialized git-gate")
+    parser.add_argument("--repo", default=".")
+    parser.add_argument("--base", required=True)
+    parser.add_argument("--head", required=True)
+    parser.add_argument("--policy", required=True)
+    parser.add_argument("--actor", default="github-actions[bot]")
     return parser
 
 
@@ -154,6 +212,23 @@ def main(argv: list[str] | None = None) -> int:
         )
     except (IntegrityError, OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"PentaSerialized workflow projection HOLD: {exc}")
+        return 2
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
+def gate_main(argv: list[str] | None = None) -> int:
+    args = build_gate_parser().parse_args(argv)
+    try:
+        result = gate_with_workflow_projection(
+            Path(args.repo),
+            args.base,
+            args.head,
+            Path(args.policy),
+            actor=args.actor,
+        )
+    except (IntegrityError, OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"PentaSerialized HOLD: {exc}")
         return 2
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
