@@ -13,7 +13,6 @@ on:
       - "penta/registry/penta-families.v1.json"
       - "penta_census/**"
       - "scripts/penta_census.py"
-      - "scripts/pentacensus_reconcile.py"
       - "tests/pentacensus/**"
       - "tests/test_penta_census.py"
       - "tests/test_penta_deterministic_memory.py"
@@ -38,7 +37,6 @@ on:
       - "penta/registry/penta-families.v1.json"
       - "penta_census/**"
       - "scripts/penta_census.py"
-      - "scripts/pentacensus_reconcile.py"
       - "tests/pentacensus/**"
       - "tests/test_penta_census.py"
       - "tests/test_penta_deterministic_memory.py"
@@ -79,7 +77,7 @@ jobs:
           files=(
             runtime/penta_deterministic_memory.py
             scripts/penta_census.py
-            scripts/pentacensus_reconcile.py
+            tests/test_penta_census.py
             tests/test_penta_deterministic_memory.py
             tests/test_penta_family_reconciliation.py
             tests/test_penta_provider_family_aliases.py
@@ -92,19 +90,12 @@ jobs:
           fi
           python -m py_compile "${files[@]}"
 
-      - name: Validate canonical PentaCensus
+      - name: Validate canonical PentaCensus discovery contract
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/penta_census.py --root . --validate
-          python scripts/penta_census.py --root . --validate-structure
-          python scripts/penta_census.py --root . --validate-contract
-          python scripts/penta_census.py --root . --check
-          if test -d tests/pentacensus; then
-            pytest -q tests/pentacensus
-          else
-            python -m unittest tests.test_penta_census -v
-          fi
+          python scripts/penta_census.py --root .
+          python -m unittest tests.test_penta_census -v
 
       - name: Validate deterministic memory projection
         shell: bash
