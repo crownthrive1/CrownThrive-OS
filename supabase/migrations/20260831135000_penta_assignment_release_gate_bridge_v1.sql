@@ -66,6 +66,7 @@ declare
   v_role text:=coalesce((nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'role'),'');
   a integration_control.penta_assignment_contracts_v1%rowtype;
   v_expected_authority text;
+  v_authority_current boolean:=false;
   v_id uuid;
 begin
   if session_user not in ('postgres','supabase_admin') and v_role<>'service_role' then
@@ -83,14 +84,40 @@ begin
     raise exception 'release_gate_disposition_invalid';
   end if;
 
+  -- These identifiers are resolved from current authoritative runtime/census truth,
+  -- not invented aliases. PentaSecurity is registered in penta_system_registry;
+  -- CHLOM core is the current PentaCensus entity `chlom_core`; CIE's framework id
+  -- is `ct.framework.cultural-imprint-engine` in the maintained framework package.
   v_expected_authority:=case p_gate_kind
     when 'PENTASECURITY' then 'penta.security'
-    when 'CHLOM_RIGHTS' then 'chlom'
-    when 'CIE' then 'cie'
+    when 'CHLOM_RIGHTS' then 'chlom_core'
+    when 'CIE' then 'ct.framework.cultural-imprint-engine'
   end;
   if lower(coalesce(p_authority_system_key,''))<>v_expected_authority then
     raise exception 'release_gate_authority_mismatch';
   end if;
+
+  if p_gate_kind='PENTASECURITY' then
+    select exists(
+      select 1 from public.penta_system_registry s
+      where s.system_key='penta.security' and s.canonical_name='PentaSecurity'
+    ) into v_authority_current;
+  elsif p_gate_kind='CHLOM_RIGHTS' then
+    select exists(
+      select 1 from integration_control.penta_census_entities_v1 e
+      where e.current and e.entity_key='chlom_core' and e.canonical_name='CHLOM Metaprotocol Control Plane'
+    ) into v_authority_current;
+  elsif p_gate_kind='CIE' then
+    select exists(
+      select 1 from institutional_federation.framework_package_registry p
+      where p.package_id='ct.framework-package.cie'
+        and p.framework_id='ct.framework.cultural-imprint-engine'
+        and lower(p.package_state)='maintained'
+        and p.authority_ceiling='D2'
+        and p.d3_human_reserved
+    ) into v_authority_current;
+  end if;
+  if not v_authority_current then raise exception 'release_gate_authority_registry_not_current'; end if;
 
   if a.exact_head_sha !~ '^[0-9a-f]{40}$' or p_exact_head_sha<>a.exact_head_sha then
     raise exception 'release_gate_exact_head_mismatch';
@@ -168,29 +195,31 @@ begin
   select * into i from integration_control.penta_assignment_institutionalization_v1 where assignment_id=p_assignment_id;
 
   if a.state<>'AWAITING_CERTIFICATION' then v_missing:=v_missing||jsonb_build_array('STATE_AWAITING_CERTIFICATION'); end if;
-  if not a.independent_certification_required then v_missing:=v_missing||jsonb_build_array('INDEPENDENT_CERTIFICATION_REQUIRED'); end if;
+  if not coalesce(a.independent_certification_required,false) then v_missing:=v_missing||jsonb_build_array('INDEPENDENT_CERTIFICATION_REQUIRED'); end if;
   if a.risk_class not in ('D0','D1','D2') then v_missing:=v_missing||jsonb_build_array('D3_HUMAN_RESERVED'); end if;
-  if a.provider_write_allowed or a.money_movement_allowed or a.credential_change_allowed or a.authority_expansion then
+  if coalesce(a.provider_write_allowed,false) or coalesce(a.money_movement_allowed,false) or coalesce(a.credential_change_allowed,false) or coalesce(a.authority_expansion,false) then
     v_missing:=v_missing||jsonb_build_array('RESERVED_EFFECT');
   end if;
   if lower(coalesce(a.certifier_penta,'')) not in ('pentacertify','pentacertifier','penta.certify','ct.penta.certifier') then
     v_missing:=v_missing||jsonb_build_array('INDEPENDENT_CERTIFIER_IDENTITY');
   end if;
-  if a.owner_pentas ? a.certifier_penta then v_missing:=v_missing||jsonb_build_array('CERTIFIER_OWNER_COLLISION'); end if;
+  if exists(select 1 from jsonb_array_elements_text(coalesce(a.owner_pentas,'[]'::jsonb)) o where lower(o.value)=lower(coalesce(a.certifier_penta,''))) then
+    v_missing:=v_missing||jsonb_build_array('CERTIFIER_OWNER_COLLISION');
+  end if;
   if a.exact_head_sha !~ '^[0-9a-f]{40}$' then v_missing:=v_missing||jsonb_build_array('EXACT_HEAD'); end if;
   if a.exact_artifact_sha256 !~ '^[0-9a-f]{64}$' then v_missing:=v_missing||jsonb_build_array('EXACT_SUBJECT_DIGEST'); end if;
 
-  if i.assignment_id is null or not i.evidence_readback then v_missing:=v_missing||jsonb_build_array('DAIL_EVIDENCE'); end if;
-  if i.assignment_id is null or not i.decision_readback then v_missing:=v_missing||jsonb_build_array('DAIL_DECISION'); end if;
-  if i.assignment_id is null or not i.execution_readback then v_missing:=v_missing||jsonb_build_array('DAIL_EXECUTION'); end if;
+  if i.assignment_id is null or not coalesce(i.evidence_readback,false) then v_missing:=v_missing||jsonb_build_array('DAIL_EVIDENCE'); end if;
+  if i.assignment_id is null or not coalesce(i.decision_readback,false) then v_missing:=v_missing||jsonb_build_array('DAIL_DECISION'); end if;
+  if i.assignment_id is null or not coalesce(i.execution_readback,false) then v_missing:=v_missing||jsonb_build_array('DAIL_EXECUTION'); end if;
   if i.assignment_id is null or i.pentadocs_state<>'READBACK_PASS' then v_missing:=v_missing||jsonb_build_array('PENTADOCS'); end if;
-  if i.assignment_id is null or i.provider_projection_state<>'READBACK_PASS' or not i.drive_human_readback or not i.drive_hybrid_readback or not i.drive_machine_readback then
+  if i.assignment_id is null or i.provider_projection_state<>'READBACK_PASS' or not coalesce(i.drive_human_readback,false) or not coalesce(i.drive_hybrid_readback,false) or not coalesce(i.drive_machine_readback,false) then
     v_missing:=v_missing||jsonb_build_array('THREE_WAY_PROVIDER_PROJECTION');
   end if;
 
-  v_required:=jsonb_array_length(a.owner_pentas);
+  v_required:=jsonb_array_length(coalesce(a.owner_pentas,'[]'::jsonb));
   select count(*) into v_pass
-  from jsonb_array_elements_text(a.owner_pentas) owner_name
+  from jsonb_array_elements_text(coalesce(a.owner_pentas,'[]'::jsonb)) owner_name
   where (
     select r.result_state from integration_control.penta_assignment_owner_results_v1 r
     where r.assignment_id=a.assignment_id and lower(r.owner_penta)=lower(owner_name.value)
@@ -252,6 +281,10 @@ begin
   v_pre:=integration_control.penta_assignment_certifier_preflight_v1(p_assignment_id);
   if not coalesce((v_pre->>'ready')::boolean,false) then
     return jsonb_build_object('state','HOLD','reason','UPSTREAM_RELEASE_GATES_MISSING','preflight',v_pre,'authority_created',false);
+  end if;
+
+  if a.source_repo is null or a.source_pr_number is null then
+    return jsonb_build_object('state','HOLD','reason','EXACT_PROVIDER_SUBJECT_REQUIRED','preflight',v_pre,'authority_created',false);
   end if;
 
   v_snapshot:=jsonb_build_object(
