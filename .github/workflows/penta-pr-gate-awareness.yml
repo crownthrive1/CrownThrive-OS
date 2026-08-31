@@ -206,6 +206,29 @@ jobs:
         run: |
           set -euo pipefail
           cd pr-worktree
+
+          # A bounded Penta evidence-projection commit must be terminal for this
+          # reconciliation cycle. Re-certifying that projection would move the
+          # PR head forever and prevent exact-head provider checks from settling.
+          projection_message="chore(penta): self-certify PR #${NUMBER} evidence"
+          current_message="$(git log -1 --pretty=%s)"
+          mapfile -t current_paths < <(git diff-tree --no-commit-id --name-only -r HEAD)
+          if [[ "$current_message" == "$projection_message" && ${#current_paths[@]} -gt 0 ]]; then
+            projection_only=true
+            for path in "${current_paths[@]}"; do
+              case "$path" in
+                "penta/evidence/pr-self-cert/pr-${NUMBER}.json"|"penta/continuity/receipts/pr-${NUMBER}-self-certification.json") ;;
+                *) projection_only=false; break ;;
+              esac
+            done
+            if [[ "$projection_only" == true ]]; then
+              printf '{"changed":false,"reason":"current_head_is_bounded_evidence_projection"}\n' > "$RUNNER_TEMP/penta-pr-self-certification.json"
+              cat "$RUNNER_TEMP/penta-pr-self-certification.json"
+              echo 'changed=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
           git fetch --no-tags --no-recurse-submodules origin "$BASE_SHA" "$HEAD_SHA"
           python ../penta-control/scripts/penta_pr_gate_awareness.py prepare \
             --repo . \
