@@ -80,15 +80,16 @@ jobs:
           fi
           exit "$status"
 
-      - name: Persist reconcile failure evidence
+      - name: Persist materialized source and reconcile evidence
         if: failure() && hashFiles('.penta-memory-reconcile-error.txt') != ''
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "CrownThrive Penta Runtime"
           git config user.email "contact@crownthrive.com"
-          git add .penta-memory-reconcile-error.txt
-          git commit -m "diagnostic(penta): capture deterministic memory reconcile failure [diag]"
+          git add -A
+          git status --short
+          git commit -m "chore(penta): materialize governed memory source for reconciliation"
           git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: Validate deterministic memory census
