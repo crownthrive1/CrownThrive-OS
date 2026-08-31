@@ -1,0 +1,264 @@
+---
+title: "Architecture and Authority Model"
+sidebarTitle: "Architecture"
+description: "Cross-provider architecture, data authority, security boundaries, and system-of-record rules for App Factory."
+icon: "diagram-project"
+keywords:
+  - "App Factory architecture"
+  - "cPanel"
+  - "MySQL"
+  - "ThriveBase"
+  - "Vercel"
+  - "GitHub Actions"
+standard_version: "1.0.0"
+primary_audience: "executive"
+page_type: "reference"
+content_state: "unresolved"
+---
+
+{/* pentadocs:audience-orientation:v2 */}
+<Info>
+  **Audience:** executive and governance readers (`executive`).
+
+  **This page:** Architecture and Authority Model — Cross-provider architecture, data authority, security boundaries, and system-of-record rules for App Factory.
+
+  **Documentation state:** `unresolved` for page type `reference`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Unresolved reason:** no explicit page-level editorial acceptance state was declared in the migrated source.
+
+  **Evidence needed:** an accepted governing source or accountable-owner attestation.
+
+  **Review role:** PentaDocs governance.
+
+  **Review trigger:** next material edit or source reconciliation.
+
+  **Related guidance:** [Documentation source governance](/standards/documentation-source-of-truth-and-autonomous-governance) and [Institutional record standard](/standards/record-and-format-standard).
+</Info>
+{/* /pentadocs:audience-orientation:v2 */}
+
+## Architecture and Authority Model
+
+CrownThrive App Factory uses a bounded hybrid topology. Each provider has a narrow authority domain. No provider dashboard, database, or repository is treated as universal truth.
+
+## Production topology
+
+```text
+CrownThrive OS / Penta
+        │
+        ├── CHLOM authority and entitlements
+        ├── CIE brand and cultural policy
+        ├── PentaGreen economic activation
+        └── Vault secret references
+        │
+        ▼
+Vercel edge plane
+        │
+        ├── signed workflow dispatch
+        ├── signed ThriveBase relay
+        ├── health and reconciliation
+        └── stateless public adapters
+        │
+        ▼
+app.crownthrive.io
+Verpex / dedicated cPanel account
+Laravel App Factory control plane
+        │
+        ├── cPanel MySQL transactional authority
+        ├── scheduler and database queue
+        ├── protected private artifact staging
+        └── application and build APIs
+        │
+        ▼
+GitHub Actions ephemeral Android workers
+        │
+        ├── Java 17
+        ├── Android SDK 35
+        ├── scoped build claim
+        ├── APK or AAB compilation
+        └── SHA-256 artifact upload
+        │
+        ▼
+Verified build and release state
+        │
+        ├── ThriveBase institutional receipt
+        ├── Penta certification evidence
+        └── ThriveApps published-only projection
+```
+
+## Provider authority matrix
+
+| Surface | Owns | Does not own |
+| --- | --- | --- |
+| GitHub | Source history, commits, branches, CI, workflows, release source, source rollback | Runtime secrets, live database state, DNS, payments, certification |
+| Verpex/cPanel | Laravel runtime, bounded cron, queue workers, application filesystem, local private staging | Canonical source, institutional governance, Android build fleet |
+| cPanel MySQL | Users, tenants, app configuration, build requests, immediate state, vendor tables, operational transactions | CrownThrive institutional lineage, rights authority, source history |
+| Vercel | Stateless edge functions, workflow dispatch, relay, health and reconciliation adapters | Laravel stateful runtime, primary transactional database |
+| GitHub Actions | Ephemeral build execution for one claimed build | Persistent application state, long-term secret custody, institutional authority |
+| ThriveBase | Property identity, provider bindings, lifecycle evidence, deployment receipts, build lineage, certification and rollback receipts | Direct mutation of App Factory vendor tables, raw secret custody |
+| CHLOM | Rights, permissions, licenses, obligations, entitlements | Payment-provider execution, application operational tables |
+| CIE | Brand, cultural, audience, canon, imprint, presentation constraints | Database execution, source hosting, payment settlement |
+| PentaGreen | Economic activation, ECAC/HOLD/DENY disposition | Raw payment execution |
+| Stripe and payment providers | Checkout, payment, refund, dispute, settlement evidence | Rights, institutional certification, source authority |
+| Vault/provider environment | Secret values, signing keys, keystores, API credentials | Public evidence, source documentation |
+| ThriveApps | Published application discovery and governed access routing | App manufacturing, signing, unpublished inventory, internal evidence |
+
+## Database authority
+
+The live App Factory database is cPanel MySQL. It owns the state needed to operate the Laravel application in real time.
+
+Examples include:
+
+- users and authentication bindings;
+- tenants and memberships;
+- app definitions and settings;
+- build requests and immediate build status;
+- notifications and usage;
+- subscriptions and provider-facing transaction records;
+- plugin and vendor application tables;
+- queue jobs, failed jobs, nonces, and local outbox state.
+
+ThriveBase is the institutional system of record. It stores the governed CrownThrive projection of material events and evidence.
+
+Examples include:
+
+- canonical property IDs and UUID/DID mappings;
+- website-to-application mappings;
+- provider bindings and opaque Vault references;
+- source commit and tree identity;
+- release and artifact digests;
+- build lineage and publication state;
+- CHLOM, CIE, PentaGreen, Crown Credits, and payment evidence references;
+- health, drift, rollback, and certification receipts.
+
+### One writable owner per data domain
+
+App Factory MySQL commits operational state first. A durable outbox event projects the governed result into ThriveBase.
+
+```text
+MySQL transaction
+  ├── operational row mutation
+  └── durable outbox event
+          ↓
+Vercel relay or bounded worker
+          ↓
+ThriveBase idempotent ingest
+          ↓
+institutional receipt
+```
+
+ThriveBase does not directly edit App Factory tables. Penta commands App Factory through authenticated APIs. Drift is detected and repaired through typed reconciliation rather than silent cross-database writes.
+
+## Edge plane
+
+The Vercel project is rooted at `edge/` in the App Factory repository. Its functions are intentionally stateless.
+
+Primary duties:
+
+- expose `/api/health`;
+- validate signed Penta requests;
+- enforce exact GitHub repository, workflow, and ref allowlists;
+- dispatch Android builder workflows;
+- relay signed institutional events to ThriveBase;
+- provide bounded reconciliation and provider health probes.
+
+The ThriveBase service-role key remains inside the ThriveBase function environment. Vercel receives only a dedicated ingest credential for the narrow relay contract.
+
+## Android builder plane
+
+Android compilation uses ephemeral GitHub-hosted workers rather than a persistent VPS.
+
+```text
+Build request
+  ↓
+Penta-authorized App Factory state transition
+  ↓
+Vercel dispatch of exact workflow/ref
+  ↓
+GitHub runner claims one build
+  ↓
+short-lived per-build scope
+  ↓
+compile and sign within authorized scope
+  ↓
+upload artifact and SHA-256
+  ↓
+App Factory verifies ownership and digest
+  ↓
+outbox and ThriveBase evidence
+  ↓
+runner terminates
+```
+
+Controls include:
+
+- exact workflow and branch allowlists;
+- atomic build claim;
+- active keystore enforcement;
+- bounded retries;
+- stale-dispatch recovery;
+- build timeout greater than the workflow execution ceiling;
+- artifact extension validation;
+- SHA-256 requirement;
+- idempotent completion and failure callbacks;
+- no inbound persistent builder server.
+
+## Tenant and application identity
+
+The App Factory is multi-tenant. Infrastructure account count is not customer count.
+
+Each application record carries:
+
+- tenant scope;
+- canonical application ID;
+- package identifier;
+- source website origin;
+- CIE profile;
+- CHLOM authority reference;
+- signing identity reference;
+- active release channel;
+- version and artifact lineage;
+- health and rollback state.
+
+Tenant authority derives from verified hostname, authenticated membership, or signed client claims. Request bodies and query strings cannot independently establish tenant authority.
+
+## Secret custody
+
+Never store secret values in:
+
+- GitHub source;
+- Drive evidence documents;
+- PentaDocs;
+- issue bodies;
+- deployment logs;
+- ThriveBase public projections;
+- ThriveApps responses.
+
+Allowed records use opaque aliases such as `vault://...`, provider environment names, or credential binding IDs.
+
+## Failure-domain isolation
+
+`app.crownthrive.io` should use one dedicated reseller cPanel account. This is an isolation decision, not a requirement created by the subdomain itself.
+
+The dedicated account isolates:
+
+- Laravel runtime files;
+- MySQL credentials and database user;
+- scheduler and queue processes;
+- logs and protected artifacts;
+- provider deployment keys;
+- failure and recovery operations.
+
+Customer applications remain SaaS tenants inside the factory unless a separate contract or technical boundary requires dedicated hosting.
+
+## Recovery order
+
+1. Preserve or restore the last verified GitHub source commit.
+2. Restore the last verified cPanel application release.
+3. Restore MySQL from its own tested backup when required.
+4. Reconcile durable outbox events into ThriveBase.
+5. Rebind Vercel edge to the verified source and environment.
+6. Verify signed Penta health.
+7. Rebuild or revalidate application artifacts from preserved source and signing references.
+8. Reopen ThriveApps publication only after the published projection is current.
+
+ThriveBase is not treated as a substitute for MySQL backup. GitHub is not treated as a substitute for provider configuration evidence. Drive custody is not treated as an executable production runtime.

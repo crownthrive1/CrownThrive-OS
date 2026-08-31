@@ -1,0 +1,220 @@
+---
+title: "ThriveApps Published-Catalog Boundary"
+sidebarTitle: "ThriveApps Boundary"
+description: "The signed published-only contract separating App Factory manufacturing from ThriveApps discovery and access."
+icon: "store"
+keywords:
+  - "ThriveApps"
+  - "published catalog"
+  - "application marketplace"
+  - "App Factory API"
+standard_version: "1.0.0"
+primary_audience: "executive"
+page_type: "reference"
+content_state: "unresolved"
+---
+
+{/* pentadocs:audience-orientation:v2 */}
+<Info>
+  **Audience:** executive and governance readers (`executive`).
+
+  **This page:** ThriveApps Published-Catalog Boundary — The signed published-only contract separating App Factory manufacturing from ThriveApps discovery and access.
+
+  **Documentation state:** `unresolved` for page type `reference`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Unresolved reason:** no explicit page-level editorial acceptance state was declared in the migrated source.
+
+  **Evidence needed:** an accepted governing source or accountable-owner attestation.
+
+  **Review role:** PentaDocs governance.
+
+  **Review trigger:** next material edit or source reconciliation.
+
+  **Related guidance:** [Documentation source governance](/standards/documentation-source-of-truth-and-autonomous-governance) and [Institutional record standard](/standards/record-and-format-standard).
+</Info>
+{/* /pentadocs:audience-orientation:v2 */}
+
+## ThriveApps Published-Catalog Boundary
+
+ThriveApps is a separate application, repository, deployment unit, and authority scope. It is not an alternate administrative interface for CrownThrive App Factory.
+
+## Separation of responsibility
+
+```text
+CrownThrive App Factory
+  ├── application configuration
+  ├── package and signing references
+  ├── build orchestration
+  ├── artifact verification
+  ├── version and release state
+  ├── publication and unpublication
+  └── institutional evidence
+                ↓
+       signed published projection
+                ↓
+ThriveApps
+  ├── discovery
+  ├── category and search presentation
+  ├── application detail pages
+  ├── entitlement-aware access routing
+  └── published catalog experience
+```
+
+App Factory manufactures and governs applications. ThriveApps presents only the authorized public or member-facing projection of applications that have reached the `published` lifecycle state.
+
+## Canonical identity
+
+| Field | Value |
+| --- | --- |
+| Property ID | `ct.platform.thriveapps` |
+| Hostname | `thriveapps.crownthrive.com` |
+| Repository | `crownthrive1/ThriveApps` |
+| Repository ID | `1351931251` |
+| Visibility | Private |
+| Default branch | `main` |
+| Current head | `942129dfaf3973c7615d22c35976514b1dc5df09` |
+| Current tree | `43b3a7b38b8b17e278b6d4bac18d3f24e5969d0e` |
+| Current state | `CATALOG_APP_SCAFFOLD_REQUIRED` |
+| Read scope | `PUBLISHED_ONLY` |
+| Build issue | `#1` |
+
+## Mandatory signed scope
+
+ThriveApps receives a dedicated client identity and narrow scope:
+
+`thriveapps.published_catalog.read`
+
+The upstream query contract fixes:
+
+`lifecycle_state=published`
+
+The client cannot remove, broaden, or replace that filter.
+
+## Allowed projection
+
+A published application response may include only the fields approved by the public or member catalog contract, such as:
+
+- public application ID;
+- display name and short description;
+- CIE-approved imagery and presentation metadata;
+- category and audience labels;
+- current published version;
+- platform availability;
+- governed access or installation route;
+- CHLOM entitlement requirement reference;
+- public support and privacy routes;
+- public-safe release date and compatibility information.
+
+## Prohibited data
+
+ThriveApps must never receive:
+
+- draft or internal application definitions;
+- `catalog`, `building`, `failed`, `suspended`, `retired`, or unpublished records;
+- builder tokens or scoped build credentials;
+- keystore files, signing passwords, or private signing references;
+- internal artifact staging URLs;
+- source archives or private repository data;
+- provider secrets;
+- service-role credentials;
+- raw payment credentials;
+- customer-private records;
+- private Penta, CHLOM, CIE, or ThriveBase evidence;
+- internal security, health, or rollback details;
+- unapproved pricing or economic state.
+
+## Lifecycle behavior
+
+### Publish
+
+Publication requires:
+
+1. completed application configuration;
+2. completed build;
+3. verified artifact filename and byte length;
+4. independently verified SHA-256;
+5. authorized Penta promotion command;
+6. CHLOM and CIE approval state where applicable;
+7. institutional receipt.
+
+Only after those conditions resolve may the App Factory emit a published catalog projection.
+
+### Unpublish or suspend
+
+On unpublish, suspension, rights hold, security hold, or economic hold:
+
+1. App Factory changes the authoritative lifecycle state;
+2. the outbox emits the governed event;
+3. ThriveBase records the change;
+4. ThriveApps purges or invalidates cached catalog entries;
+5. the public or member access route is removed or replaced with the governed state response.
+
+ThriveApps may not continue displaying stale published inventory after the authoritative state changes.
+
+## Cache policy
+
+Published catalog caching is permitted only with:
+
+- bounded TTL;
+- state-aware cache keys;
+- purge on publication-state events;
+- no caching of signed private responses in public storage;
+- no persistence of prohibited internal fields;
+- observable cache version and source receipt.
+
+## Access and entitlements
+
+ThriveApps may route a user to an application, store listing, managed download, or web experience. It does not independently manufacture an entitlement.
+
+Entitlement authority remains with CHLOM and the applicable commerce rail. ThriveApps can display or route based on an approved entitlement result but cannot silently override it.
+
+## CIE presentation
+
+All public presentation is constrained by the application's CIE profile, including:
+
+- exact display brand;
+- cultural and audience context;
+- approved imagery and terminology;
+- canon and content-safety constraints;
+- accessibility requirements;
+- public claim class.
+
+A technically published artifact is not automatically approved for every audience or presentation context.
+
+## Negative test matrix
+
+Before production activation, tests must prove that ThriveApps cannot retrieve or render:
+
+| Prohibited state or class | Expected result |
+| --- | --- |
+| Draft | Denied or absent |
+| Internal | Denied or absent |
+| Catalog/pre-release | Denied or absent |
+| Building | Denied or absent |
+| Failed | Denied or absent |
+| Suspended | Purged and denied |
+| Retired | Removed or governed retired response |
+| Unpublished | Denied or absent |
+| Cross-tenant private record | Denied |
+| Builder credentials | Never serialized |
+| Signing material | Never serialized |
+| Private evidence | Never serialized |
+
+Positive tests must prove that a correctly published application renders only the permitted fields and routes.
+
+## Repository and deployment rule
+
+ThriveApps receives its own private GitHub repository and its own Vercel project. It does not share the Laravel App Factory cPanel runtime.
+
+This separation provides:
+
+- independent release cadence;
+- smaller public attack surface;
+- narrow API credentials;
+- clear rollback boundaries;
+- published-catalog performance optimization;
+- stronger prevention of administrative data leakage.
+
+## Current next gate
+
+The repository identity and contract exist. The next ThriveApps work begins after App Factory source import and catalog API verification, then proceeds through frontend scaffold, signed adapter, prohibited-state tests, Vercel preview, domain readback, rollback, and independent certification.

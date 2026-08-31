@@ -1,0 +1,299 @@
+---
+title: "Operations, Recovery, and Certification"
+sidebarTitle: "Operations & Certification"
+description: "Penta-operated application lifecycle, observability, repair doctrine, rollback, and production certification requirements."
+icon: "shield-check"
+keywords:
+  - "Penta operations"
+  - "App Factory certification"
+  - "rollback"
+  - "observability"
+  - "fail closed"
+standard_version: "1.0.0"
+primary_audience: "executive"
+page_type: "reference"
+content_state: "unresolved"
+---
+
+{/* pentadocs:audience-orientation:v2 */}
+<Info>
+  **Audience:** executive and governance readers (`executive`).
+
+  **This page:** Operations, Recovery, and Certification — Penta-operated application lifecycle, observability, repair doctrine, rollback, and production certification requirements.
+
+  **Documentation state:** `unresolved` for page type `reference`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Unresolved reason:** no explicit page-level editorial acceptance state was declared in the migrated source.
+
+  **Evidence needed:** an accepted governing source or accountable-owner attestation.
+
+  **Review role:** PentaDocs governance.
+
+  **Review trigger:** next material edit or source reconciliation.
+
+  **Related guidance:** [Documentation source governance](/standards/documentation-source-of-truth-and-autonomous-governance) and [Institutional record standard](/standards/record-and-format-standard).
+</Info>
+{/* /pentadocs:audience-orientation:v2 */}
+
+## Operations, Recovery, and Certification
+
+CrownThrive App Factory is operated through typed Penta commands, provider readback, durable events, and independent evidence. Autonomous operation is permitted only inside explicit authority and risk boundaries.
+
+## Operating objectives
+
+Penta operates the factory to:
+
+- discover and register eligible CrownThrive properties;
+- resolve CHLOM, CIE, Vault, provider, and economic authority;
+- create or update application definitions;
+- trigger and supervise Android builds;
+- verify artifacts and digests;
+- promote or withdraw releases;
+- reconcile MySQL and ThriveBase projections;
+- detect provider drift;
+- repair bounded recoverable faults;
+- preserve complete evidence and rollback state;
+- advance to the next dependency-ready item after successful readback.
+
+## Signed control API
+
+Penta control requests use:
+
+- HMAC-SHA256 signatures;
+- client identity;
+- timestamp validation;
+- bounded clock skew;
+- persisted nonce;
+- replay rejection;
+- method and path binding;
+- payload digest;
+- client-specific authorization scope.
+
+Primary operations include:
+
+- health readback;
+- app upsert;
+- build request;
+- build status readback;
+- release promotion;
+- publication withdrawal;
+- published catalog retrieval.
+
+A request that authenticates successfully is still evaluated for tenant, resource, state-machine, CHLOM, CIE, and economic authorization.
+
+## Application lifecycle
+
+A canonical application state model includes at least:
+
+```text
+draft
+  ↓
+configured
+  ↓
+build_requested
+  ↓
+building
+  ↓
+built_verified
+  ↓
+published
+  ↓
+suspended / unpublished / retired
+```
+
+Failed transitions are explicit. A failure does not silently return an object to a previous state.
+
+## Build lifecycle
+
+```text
+requested
+  ↓
+dispatch_pending
+  ↓
+dispatched
+  ↓
+claimed
+  ↓
+building
+  ↓
+uploading
+  ↓
+completed_verified
+```
+
+Alternative terminal states include `failed`, `timed_out`, `cancelled`, or `rejected`.
+
+Each transition records:
+
+- build ID;
+- application and tenant ID;
+- source commit and ref;
+- workflow run and worker identity;
+- platform and build type;
+- signing reference;
+- timestamps;
+- reason codes;
+- artifact identity when available;
+- retry count;
+- outbox and ThriveBase receipt references.
+
+## Fail-closed and continuation doctrine
+
+Fail-closed protects an authority or evidence boundary. It is not an acceptable final operating state by itself.
+
+When a gate fails, the assigned Penta must:
+
+1. identify the smallest failed dependency;
+2. distinguish code failure, configuration failure, provider unavailability, missing evidence, and authority denial;
+3. inspect provider state before retrying ambiguous writes;
+4. repair the smallest safe component;
+5. rerun the affected check;
+6. perform provider and public readback;
+7. preserve the new evidence;
+8. continue to the next dependency-ready item.
+
+Penta must not manufacture PASS states, conceal unresolved failures, or break a verified production path merely to clear a gate.
+
+## Retry policy
+
+Automatic retries are allowed only for bounded, idempotent operations.
+
+| Operation class | Retry behavior |
+| --- | --- |
+| Read-only provider query | Bounded exponential retry |
+| Idempotent dispatch with stable idempotency key | Bounded retry after readback |
+| Ambiguous provider write | Readback before any retry |
+| Database transaction failure | Native rollback, then bounded retry when safe |
+| Rights, security, or economic denial | No automatic bypass |
+| Artifact digest mismatch | Reject artifact; no promotion |
+| Source identity mismatch | Stop deployment and reconcile source |
+
+## Health and observability
+
+Required health surfaces include:
+
+- public Laravel `/up`;
+- signed App Factory Penta health;
+- MySQL connectivity and migration state;
+- queue age and failed-job state;
+- scheduler freshness;
+- outbox backlog and oldest pending event;
+- ThriveBase ingest freshness;
+- Vercel edge health;
+- GitHub workflow dispatch and runner status;
+- artifact storage capacity and retention;
+- published catalog projection freshness;
+- current release and rollback target.
+
+Health is recorded with timestamp, source, scope, and evidence class. A cached dashboard state cannot override fresh provider or public readback.
+
+## Bounded autonomous repair
+
+Penta may automatically repair:
+
+- stale idempotent dispatches;
+- bounded queue worker or scheduler configuration drift;
+- expired per-build scopes;
+- recoverable outbox delivery failures;
+- missing caches and rebuildable projections;
+- a failed release symlink switch when the prior release remains intact;
+- stale ThriveApps published-catalog cache after authoritative state change.
+
+Penta must escalate rather than autonomously bypass:
+
+- rights or licensing revocation;
+- active security compromise;
+- payment or settlement disputes requiring human authority;
+- destructive database recovery without verified backup;
+- signing-key compromise;
+- cross-tenant exposure;
+- unresolvable source or artifact identity conflict.
+
+## Artifact verification
+
+A build is not completed until App Factory verifies:
+
+- artifact is associated with the claimed build;
+- uploader owns the active build scope;
+- extension and content class are permitted;
+- byte length is within policy;
+- supplied SHA-256 equals independently calculated SHA-256;
+- signing reference is active and authorized;
+- build source and workflow identities match the request;
+- artifact storage readback succeeds.
+
+Publication requires the verified digest-bearing artifact.
+
+## Outbox and institutional evidence
+
+Every material transaction that must reach ThriveBase writes a durable outbox event in the same MySQL transaction as the operational change.
+
+Required event properties include:
+
+- stable event ID;
+- idempotency key;
+- aggregate type and ID;
+- event type and version;
+- tenant scope;
+- payload digest;
+- creation and delivery timestamps;
+- delivery attempt state;
+- provider and source references.
+
+ThriveBase rejects equivocation: the same event ID cannot be replayed with a different payload digest.
+
+## Backup and rollback
+
+### MySQL
+
+- perform a pre-migration `mysqldump`;
+- gzip and protect the backup;
+- preserve release and schema metadata;
+- test bounded restoration periodically;
+- never treat ThriveBase as the MySQL backup.
+
+### Application release
+
+The cPanel deployment uses release directories and a `current` symlink.
+
+Rollback changes the active application release to a previously verified release. It does not silently reverse database migrations.
+
+### Edge
+
+Vercel rollback restores the previous verified edge deployment and environment binding.
+
+### Android artifacts
+
+A published artifact remains addressable by its digest and release record. Rebuilding creates a new artifact record even when application version metadata is unchanged.
+
+## Certification evidence set
+
+Production certification requires:
+
+1. exact canonical GitHub commit and tree;
+2. successful CI for the exact commit;
+3. secret scan and forbidden-file scan;
+4. Vercel edge project and deployment readback;
+5. cPanel account, release, environment, cron, and HTTPS readback;
+6. MySQL database, migration, and backup readback;
+7. signed Penta health;
+8. Android canary build and SHA-256;
+9. durable outbox delivery and ThriveBase receipt;
+10. positive publication test;
+11. negative ThriveApps state and data-class tests;
+12. rollback and reapply proof;
+13. independent PentaCertify review.
+
+## Certification states
+
+| State | Meaning |
+| --- | --- |
+| `PLANNED` | Architecture or intent only |
+| `CANDIDATE_PREPARED` | Source/package exists but verification incomplete |
+| `DEPLOYMENT_CANDIDATE_VERIFIED` | Local candidate checks and custody complete |
+| `PROVIDER_ACTIVATION_IN_PROGRESS` | Providers are being configured and read back |
+| `CANARY_VERIFIED` | Controlled end-to-end canary passed |
+| `PRODUCTION_CERTIFIED` | Exact deployed state has complete independent evidence |
+| `SUSPENDED` | Certification withdrawn or production intentionally held |
+
+Current App Factory state is below `PRODUCTION_CERTIFIED` and must remain labeled accordingly until all required gates resolve.
