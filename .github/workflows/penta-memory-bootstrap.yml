@@ -1,4 +1,4 @@
-name: Penta Deterministic Memory Branch Bootstrap
+name: Penta Deterministic Memory Family Reconciliation
 
 on:
   push:
@@ -9,11 +9,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: penta-memory-bootstrap-${{ github.ref }}
+  group: penta-memory-family-reconciliation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  unpack-verify-commit:
+  reconcile-governed-families:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -28,92 +28,164 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify source ancestry and payload custody
+      - name: Apply exact governed family assignments
         shell: bash
         run: |
           set -euo pipefail
-          git merge-base --is-ancestor "89eb1e65131d6d5b3655c23da63646429451829d" HEAD
-          git merge-base --is-ancestor "885f9b8b0b0fbd48b46c6a67b97ea866ddf8ed24" HEAD
-          test "$(find .bootstrap -maxdepth 1 -type f -name 'payload.part*' | wc -l)" -eq 8
-          cat .bootstrap/payload.part* > /tmp/penta_memory_payload.b64
-          echo "6550b336036b12de9d3be41b6296df450afd8a2a6f9bf48601800e25106fe781  /tmp/penta_memory_payload.b64" | sha256sum -c -
-          base64 --decode /tmp/penta_memory_payload.b64 > /tmp/penta_memory_payload.tgz
-          echo "cdbed34972cde1ac1083d6e4c667188d61b5a45304623e90051ead34bcd6ade1  /tmp/penta_memory_payload.tgz" | sha256sum -c -
           python - <<'PY'
-          import pathlib
-          import tarfile
+          import json
+          from pathlib import Path
 
-          archive = pathlib.Path('/tmp/penta_memory_payload.tgz')
-          with tarfile.open(archive, 'r:gz') as tf:
-              members = tf.getmembers()
-              if not members:
-                  raise SystemExit('empty payload')
-              for member in members:
-                  path = pathlib.PurePosixPath(member.name)
-                  if path.is_absolute() or '..' in path.parts:
-                      raise SystemExit(f'unsafe archive member: {member.name}')
+          path = Path('data/penta/namespace-census.v1.json')
+          payload = json.loads(path.read_text(encoding='utf-8'))
+          mappings = {
+              'penta.bc': ('system-architecture', 'System Architecture'),
+              'penta.clean': ('resilience-continuity', 'Resilience Continuity'),
+              'penta.flush': ('resilience-continuity', 'Resilience Continuity'),
+              'penta.harvestor': ('intelligence-research', 'Intelligence Research'),
+              'penta.hydrate': ('resilience-continuity', 'Resilience Continuity'),
+              'penta.notifs': ('communications-service', 'Communications Service'),
+              'penta.overseer': ('observability-organic', 'Observability Organic'),
+              'penta.prioritize': ('automation-agentic', 'Automation Agentic'),
+              'penta.relay': ('routing-interoperability', 'Routing Interoperability'),
+          }
+          records = payload.get('records')
+          if not isinstance(records, list):
+              raise SystemExit('namespace census records must be a list')
+          for machine_key, (family_id, family_name) in mappings.items():
+              matches = [
+                  row for row in records
+                  if isinstance(row, dict) and row.get('canonical_machine_key') == machine_key
+              ]
+              if len(matches) != 1:
+                  raise SystemExit(f'{machine_key}: expected exactly one canonical census record, found {len(matches)}')
+              row = matches[0]
+              existing = row.get('family_id') or row.get('family_slug')
+              if existing and existing != family_id:
+                  raise SystemExit(f'{machine_key}: governed family collision {existing} vs {family_id}')
+              row['family_id'] = family_id
+              row['family_slug'] = family_id
+              row['family_name'] = family_name
+              row['assignment_state'] = 'registry_backed'
+
+          counts = payload.setdefault('counts', {})
+          counts['family_pending'] = sum(
+              1 for row in records
+              if isinstance(row, dict) and not (row.get('family_id') or row.get('family_slug'))
+          )
+          counts['families'] = len({
+              row.get('family_id') or row.get('family_slug')
+              for row in records
+              if isinstance(row, dict) and (row.get('family_id') or row.get('family_slug'))
+          })
+          path.write_text(
+              json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
           PY
 
-      - name: Expand governed source payload
+      - name: Add deterministic family reconciliation tests
         shell: bash
         run: |
           set -euo pipefail
-          tar -xzf /tmp/penta_memory_payload.tgz
-          rm -rf .bootstrap
-          rm -f .github/workflows/penta-memory-bootstrap.yml
+          cat > tests/test_penta_family_reconciliation.py <<'PY'
+          #!/usr/bin/env python3
+          from __future__ import annotations
 
-      - name: Compile deterministic memory source
-        run: python -m py_compile runtime/penta_deterministic_memory.py tests/test_penta_deterministic_memory.py tests/test_penta_sql_contract.py
+          import importlib.util
+          import json
+          import sys
+          import unittest
+          from pathlib import Path
 
-      - name: Run focused deterministic memory tests before reconciliation
-        run: python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract -v
+          ROOT = Path(__file__).resolve().parents[1]
+          MODULE_PATH = ROOT / 'runtime' / 'penta_deterministic_memory.py'
+          SPEC = importlib.util.spec_from_file_location('penta_deterministic_memory_reconcile', MODULE_PATH)
+          mod = importlib.util.module_from_spec(SPEC)
+          sys.modules[SPEC.name] = mod
+          SPEC.loader.exec_module(mod)
 
-      - name: Generate deterministic memory census
-        shell: bash
-        run: |
-          set +e
-          python runtime/penta_deterministic_memory.py reconcile --write > .penta-memory-reconcile-error.txt 2>&1
-          status=$?
-          cat .penta-memory-reconcile-error.txt
-          if [ "$status" -eq 0 ]; then
-            rm -f .penta-memory-reconcile-error.txt
-          fi
-          exit "$status"
+          EXPECTED = {
+              'penta.bc': 'SYSTEM_ARCHITECTURE',
+              'penta.clean': 'RESILIENCE_CONTINUITY',
+              'penta.flush': 'RESILIENCE_CONTINUITY',
+              'penta.harvestor': 'INTELLIGENCE_RESEARCH',
+              'penta.hydrate': 'RESILIENCE_CONTINUITY',
+              'penta.notifs': 'COMMUNICATIONS_SERVICE',
+              'penta.overseer': 'OBSERVABILITY_ORGANIC',
+              'penta.prioritize': 'AUTOMATION_AGENTIC',
+              'penta.relay': 'ROUTING_INTEROPERABILITY',
+          }
 
-      - name: Persist materialized source and reconcile evidence
-        if: failure() && hashFiles('.penta-memory-reconcile-error.txt') != ''
+
+          class PentaFamilyReconciliationTests(unittest.TestCase):
+              def test_exact_governed_census_assignments(self):
+                  census = json.loads((ROOT / mod.NAMESPACE_CENSUS_PATH).read_text(encoding='utf-8'))
+                  rows = {
+                      row['canonical_machine_key']: row
+                      for row in census['records']
+                      if isinstance(row, dict) and row.get('canonical_machine_key') in EXPECTED
+                  }
+                  self.assertEqual(set(EXPECTED), set(rows))
+                  for machine_key, family_key in EXPECTED.items():
+                      row = rows[machine_key]
+                      self.assertEqual(family_key, mod.normalized_family(row.get('family_id') or row.get('family_slug')))
+                      self.assertFalse(row.get('execution_eligible_by_registry', False))
+
+              def test_manifest_resolves_all_nine_without_maturity_promotion(self):
+                  manifest = mod.build_manifest(ROOT)
+                  rows = {row['machine_key']: row for row in manifest['assignments']}
+                  for machine_key, family_key in EXPECTED.items():
+                      self.assertIn(machine_key, rows)
+                      self.assertEqual(family_key, rows[machine_key]['family_key'])
+                      if rows[machine_key]['maturity'] not in mod.HOT_MATURITY:
+                          self.assertFalse(rows[machine_key]['write_enabled'])
+                          self.assertEqual('COLD_RESERVED', rows[machine_key]['activation_state'])
+
+              def test_census_has_no_unclassified_canonical_penta(self):
+                  census = json.loads((ROOT / mod.NAMESPACE_CENSUS_PATH).read_text(encoding='utf-8'))
+                  unresolved = sorted({
+                      row['canonical_machine_key']
+                      for row in census['records']
+                      if isinstance(row, dict)
+                      and isinstance(row.get('canonical_machine_key'), str)
+                      and row['canonical_machine_key'].startswith('penta.')
+                      and not (row.get('family_id') or row.get('family_slug'))
+                  })
+                  self.assertEqual([], unresolved)
+
+
+          if __name__ == '__main__':
+              unittest.main(verbosity=2)
+          PY
+
+      - name: Compile deterministic memory source and tests
+        run: python -m py_compile runtime/penta_deterministic_memory.py tests/test_penta_deterministic_memory.py tests/test_penta_sql_contract.py tests/test_penta_family_reconciliation.py
+
+      - name: Run focused tests before projection
+        run: python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract tests.test_penta_family_reconciliation -v
+
+      - name: Generate and validate deterministic memory census
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "CrownThrive Penta Runtime"
-          git config user.email "contact@crownthrive.com"
-          mkdir -p .penta-staging
-          if test -f .github/workflows/penta-deterministic-memory.yml; then
-            mv .github/workflows/penta-deterministic-memory.yml .penta-staging/penta-deterministic-memory.workflow.yml
-          fi
-          git checkout HEAD -- .github/workflows/penta-memory-bootstrap.yml
+          python runtime/penta_deterministic_memory.py reconcile --write
+          python runtime/penta_deterministic_memory.py validate
+          python runtime/penta_deterministic_memory.py reconcile --check
+          rm -f .penta-memory-reconcile-error.txt
+
+      - name: Run focused tests after projection
+        run: python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract tests.test_penta_family_reconciliation -v
+
+      - name: Persist governed reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
           find runtime tests -type d -name __pycache__ -prune -exec rm -rf '{}' +
-          git add -A
-          git status --short
-          git commit -m "chore(penta): materialize governed memory source for reconciliation"
-          git push origin HEAD:${GITHUB_REF_NAME}
-
-      - name: Validate deterministic memory census
-        run: python runtime/penta_deterministic_memory.py validate
-
-      - name: Run focused deterministic memory tests after reconciliation
-        run: python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract -v
-
-      - name: Verify clean patch semantics
-        run: git diff --check
-
-      - name: Commit verified branch source
-        shell: bash
-        run: |
-          set -euo pipefail
           git config user.name "CrownThrive Penta Runtime"
           git config user.email "contact@crownthrive.com"
           git add -A
+          git diff --cached --check
           git status --short
-          git commit -m "feat(penta): institutionalize deterministic memory fabric"
+          git commit -m "fix(penta): reconcile deterministic memory family census"
           git push origin HEAD:${GITHUB_REF_NAME}
