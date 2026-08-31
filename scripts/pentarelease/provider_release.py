@@ -3,9 +3,12 @@
 
 This adapter keeps provider availability separate from release truth:
 - canonical tag selection comes from fetched local Git tags;
-- the exact candidate must be independently verified through the provider API;
-- 403/429/5xx and network failures are retried within a bounded budget;
-- 404, mismatched tags, and draft releases fail closed;
+- the exact candidate must be independently verified through the GitHub provider;
+- authenticated GitHub REST is the hot read path;
+- rate-limited authenticated reads may fail over once to the unauthenticated public
+  GitHub REST endpoint for the same exact tag; that warm path is read-only;
+- 403/429/5xx and network failures remain bounded and ultimately fail closed;
+- authenticated 404, mismatched tags, and draft releases fail closed immediately;
 - the verified provider payload can be reused by release_surface.py without a
   second provider lookup that could disagree because of rate limits or API lag.
 """
@@ -26,12 +29,17 @@ from typing import Any, Callable, Iterable
 
 VERSION_TAG = re.compile(r"^v\d+(?:\.\d+){2,3}$")
 RETRYABLE_HTTP_STATUS = {403, 429, 500, 502, 503, 504}
+PUBLIC_READ_FAILOVER_STATUS = {403, 429}
 DEFAULT_ATTEMPTS = 12
 MAX_DELAY_SECONDS = 30
 
 
 class ProviderReleaseError(RuntimeError):
     """Fail-closed provider release resolution error."""
+
+
+class ProviderPublicReadUnavailable(ProviderReleaseError):
+    """Public GitHub provider read could not establish external release truth."""
 
 
 def _version_key(tag: str) -> tuple[tuple[int, int, int, int], int]:
@@ -94,6 +102,28 @@ def _read_error_body(exc: urllib.error.HTTPError) -> str:
         return ""
 
 
+def _provider_release_url(repository: str, tag: str) -> str:
+    if "/" not in repository:
+        raise ProviderReleaseError(f"invalid_repository:{repository}")
+    owner, name = repository.split("/", 1)
+    return (
+        "https://api.github.com/repos/"
+        f"{urllib.parse.quote(owner, safe='')}/{urllib.parse.quote(name, safe='')}"
+        f"/releases/tags/{urllib.parse.quote(tag, safe='')}"
+    )
+
+
+def _provider_headers(token: str | None = None) -> dict[str, str]:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "CrownThrive-PentaRelease",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
 def validate_provider_release(payload: dict[str, Any], expected_tag: str) -> dict[str, Any]:
     if payload.get("tag_name") != expected_tag:
         raise ProviderReleaseError(
@@ -102,6 +132,59 @@ def validate_provider_release(payload: dict[str, Any], expected_tag: str) -> dic
     if payload.get("draft") is not False:
         raise ProviderReleaseError(f"provider_release_not_published:{expected_tag}")
     return payload
+
+
+def _read_provider_once(
+    url: str,
+    tag: str,
+    headers: dict[str, str],
+    *,
+    timeout: int,
+    opener: Callable[..., Any],
+) -> dict[str, Any]:
+    request = urllib.request.Request(url, headers=headers, method="GET")
+    with opener(request, timeout=timeout) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ProviderReleaseError("provider_release_payload_not_object")
+    return validate_provider_release(payload, tag)
+
+
+def fetch_public_provider_release(
+    repository: str,
+    tag: str,
+    *,
+    timeout: int = 20,
+    opener: Callable[..., Any] = urllib.request.urlopen,
+) -> dict[str, Any]:
+    """Read exact public GitHub release truth without consuming installation quota.
+
+    This is a warm, read-only provider path. Transport/visibility failures are
+    intentionally distinct from semantic release failures so a tag mismatch or
+    draft response can never be downgraded into a retry or local fallback.
+    """
+    url = _provider_release_url(repository, tag)
+    try:
+        return _read_provider_once(
+            url,
+            tag,
+            _provider_headers(),
+            timeout=timeout,
+            opener=opener,
+        )
+    except urllib.error.HTTPError as exc:
+        body = _read_error_body(exc)
+        raise ProviderPublicReadUnavailable(
+            f"provider_public_http_{exc.code}:{body}"
+        ) from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise ProviderPublicReadUnavailable(
+            f"provider_public_network_error:{exc}"
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise ProviderPublicReadUnavailable(
+            f"provider_public_invalid_json:{exc}"
+        ) from exc
 
 
 def fetch_provider_release(
@@ -114,32 +197,39 @@ def fetch_provider_release(
     sleep_fn: Callable[[float], None] = time.sleep,
     opener: Callable[..., Any] = urllib.request.urlopen,
 ) -> dict[str, Any]:
-    if not token:
-        raise ProviderReleaseError("provider_token_missing")
-    if "/" not in repository:
-        raise ProviderReleaseError(f"invalid_repository:{repository}")
-    owner, name = repository.split("/", 1)
-    url = (
-        "https://api.github.com/repos/"
-        f"{urllib.parse.quote(owner, safe='')}/{urllib.parse.quote(name, safe='')}"
-        f"/releases/tags/{urllib.parse.quote(tag, safe='')}"
-    )
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "Authorization": f"Bearer {token}",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "CrownThrive-PentaRelease",
-    }
+    url = _provider_release_url(repository, tag)
 
-    last_error = "provider_read_failed"
-    for attempt in range(1, max(1, attempts) + 1):
-        request = urllib.request.Request(url, headers=headers, method="GET")
+    if not token:
         try:
-            with opener(request, timeout=timeout) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            if not isinstance(payload, dict):
-                raise ProviderReleaseError("provider_release_payload_not_object")
-            return validate_provider_release(payload, tag)
+            payload = fetch_public_provider_release(
+                repository,
+                tag,
+                timeout=timeout,
+                opener=opener,
+            )
+            print(
+                f"PentaRelease verified {tag} through public GitHub REST warm read "
+                "because no installation token was available.",
+                file=sys.stderr,
+            )
+            return payload
+        except ProviderPublicReadUnavailable as exc:
+            raise ProviderReleaseError(
+                f"provider_token_missing:public_read_unavailable:{exc}"
+            ) from exc
+
+    headers = _provider_headers(token)
+    last_error = "provider_read_failed"
+    public_failover_attempted = False
+    for attempt in range(1, max(1, attempts) + 1):
+        try:
+            return _read_provider_once(
+                url,
+                tag,
+                headers,
+                timeout=timeout,
+                opener=opener,
+            )
         except urllib.error.HTTPError as exc:
             body = _read_error_body(exc)
             last_error = f"provider_http_{exc.code}:{body}"
@@ -147,11 +237,33 @@ def fetch_provider_release(
                 raise ProviderReleaseError(f"provider_release_not_found:{tag}") from exc
             if exc.code not in RETRYABLE_HTTP_STATUS:
                 raise ProviderReleaseError(last_error) from exc
+
+            if (
+                exc.code in PUBLIC_READ_FAILOVER_STATUS
+                and not public_failover_attempted
+            ):
+                public_failover_attempted = True
+                try:
+                    payload = fetch_public_provider_release(
+                        repository,
+                        tag,
+                        timeout=timeout,
+                        opener=opener,
+                    )
+                    print(
+                        f"PentaRelease verified {tag} through public GitHub REST warm read "
+                        f"after authenticated provider HTTP {exc.code}.",
+                        file=sys.stderr,
+                    )
+                    return payload
+                except ProviderPublicReadUnavailable as public_exc:
+                    last_error = f"{last_error}:public_warm={public_exc}"
+
             if attempt >= attempts:
                 break
             delay = _retry_delay(exc.headers, attempt)
             print(
-                f"PentaRelease provider read unavailable for {tag} "
+                f"PentaRelease authenticated provider read unavailable for {tag} "
                 f"(HTTP {exc.code}, attempt {attempt}/{attempts}); retrying in {delay}s.",
                 file=sys.stderr,
             )
@@ -162,7 +274,7 @@ def fetch_provider_release(
                 break
             delay = min(MAX_DELAY_SECONDS, max(1, attempt * 5))
             print(
-                f"PentaRelease provider network read unavailable for {tag} "
+                f"PentaRelease authenticated provider network read unavailable for {tag} "
                 f"(attempt {attempt}/{attempts}); retrying in {delay}s.",
                 file=sys.stderr,
             )
