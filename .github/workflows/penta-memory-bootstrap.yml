@@ -1,4 +1,4 @@
-name: Penta Deterministic Memory Family Reconciliation
+name: Penta Deterministic Memory Provider Alias Reconciliation
 
 on:
   push:
@@ -9,11 +9,11 @@ permissions:
   contents: write
 
 concurrency:
-  group: penta-memory-family-reconciliation-${{ github.ref }}
+  group: penta-memory-provider-alias-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  reconcile-governed-families:
+  reconcile-provider-family-aliases:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Apply exact governed family assignments
+      - name: Reconcile canonical and live provider family keys
         shell: bash
         run: |
           set -euo pipefail
@@ -36,59 +36,74 @@ jobs:
           import json
           from pathlib import Path
 
-          path = Path('data/penta/namespace-census.v1.json')
-          payload = json.loads(path.read_text(encoding='utf-8'))
-          mappings = {
-              'penta.bc': ('system-architecture', 'System Architecture'),
-              'penta.clean': ('resilience-continuity', 'Resilience Continuity'),
-              'penta.flush': ('resilience-continuity', 'Resilience Continuity'),
-              'penta.harvestor': ('intelligence-research', 'Intelligence Research'),
-              'penta.hydrate': ('resilience-continuity', 'Resilience Continuity'),
-              'penta.notifs': ('communications-service', 'Communications Service'),
-              'penta.overseer': ('observability-organic', 'Observability Organic'),
-              'penta.prioritize': ('automation-agentic', 'Automation Agentic'),
-              'penta.relay': ('routing-interoperability', 'Routing Interoperability'),
+          config_path = Path('config/penta_deterministic_memory.v1.json')
+          config = json.loads(config_path.read_text(encoding='utf-8'))
+          mesh = config['brain_mesh']
+          support = mesh['support_families']
+          expected_legacy = {
+              'KNOWLEDGE_DATA': 'verified_context_read',
+              'ROUTING_INTEROP': 'governed_addressability',
           }
-          records = payload.get('records')
-          if not isinstance(records, list):
-              raise SystemExit('namespace census records must be a list')
-          for machine_key, (family_id, family_name) in mappings.items():
-              matches = [
-                  row for row in records
-                  if isinstance(row, dict) and row.get('canonical_machine_key') == machine_key
-              ]
-              if len(matches) != 1:
-                  raise SystemExit(f'{machine_key}: expected exactly one canonical census record, found {len(matches)}')
-              row = matches[0]
-              existing = row.get('family_id') or row.get('family_slug')
-              if existing and existing != family_id:
-                  raise SystemExit(f'{machine_key}: governed family collision {existing} vs {family_id}')
-              row['family_id'] = family_id
-              row['family_slug'] = family_id
-              row['family_name'] = family_name
-              row['assignment_state'] = 'registry_backed'
-
-          counts = payload.setdefault('counts', {})
-          counts['family_pending'] = sum(
-              1 for row in records
-              if isinstance(row, dict) and not (row.get('family_id') or row.get('family_slug'))
-          )
-          counts['families'] = len({
-              row.get('family_id') or row.get('family_slug')
-              for row in records
-              if isinstance(row, dict) and (row.get('family_id') or row.get('family_slug'))
-          })
-          path.write_text(
-              json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + '\n',
+          for key, role in expected_legacy.items():
+              if support.get(key) != role:
+                  raise SystemExit(f'unexpected legacy mesh mapping for {key}: {support.get(key)!r}')
+          support['KNOWLEDGE_SEMANTICS_DATA'] = support.pop('KNOWLEDGE_DATA')
+          support['ROUTING_INTEROPERABILITY'] = support.pop('ROUTING_INTEROP')
+          mesh['production_family_aliases'] = {
+              'KNOWLEDGE_SEMANTICS_DATA': 'KNOWLEDGE_DATA',
+              'ROUTING_INTEROPERABILITY': 'ROUTING_INTEROP',
+          }
+          config_path.write_text(
+              json.dumps(config, indent=2, sort_keys=True, ensure_ascii=False) + '\n',
               encoding='utf-8',
           )
+
+          sql_path = Path('supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql')
+          sql = sql_path.read_text(encoding='utf-8')
+          marker = 'create or replace function penta_runtime.penta_memory_profile_v1('
+          if sql.count(marker) != 1:
+              raise SystemExit('unexpected memory profile function count')
+          alias_function = '''create or replace function penta_runtime.penta_memory_canonical_family_key_v1(p_family_key text)\nreturns text\nlanguage sql\nimmutable\nstrict\nset search_path = pg_catalog\nas $$\n  select case upper(btrim(p_family_key))\n    when 'KNOWLEDGE_DATA' then 'KNOWLEDGE_SEMANTICS_DATA'\n    when 'ROUTING_INTEROP' then 'ROUTING_INTEROPERABILITY'\n    else upper(btrim(p_family_key))\n  end;\n$$;\n\n'''
+          sql = sql.replace(marker, alias_function + marker, 1)
+          start = sql.index(marker)
+          end = sql.index('create table if not exists penta_runtime.penta_memory_namespaces_v1', start)
+          profile = sql[start:end]
+          if profile.count("'KNOWLEDGE_DATA'") != 2 or profile.count("'ROUTING_INTEROP'") != 2:
+              raise SystemExit('unexpected provider-family literals in profile function')
+          profile = profile.replace('upper(p_family_key)', 'penta_runtime.penta_memory_canonical_family_key_v1(p_family_key)')
+          profile = profile.replace("'KNOWLEDGE_DATA'", "'KNOWLEDGE_SEMANTICS_DATA'")
+          profile = profile.replace("'ROUTING_INTEROP'", "'ROUTING_INTEROPERABILITY'")
+          sql = sql[:start] + profile + sql[end:]
+
+          upsert = "metadata=excluded.metadata;"
+          replacement = "metadata=excluded.metadata || jsonb_build_object('canonical_family_key',penta_runtime.penta_memory_canonical_family_key_v1(excluded.family_key));"
+          if sql.count(upsert) != 1:
+              raise SystemExit(f'unexpected family-grant upsert count: {sql.count(upsert)}')
+          sql = sql.replace(upsert, replacement, 1)
+
+          family_update_start = sql.index('update integration_control.penta_family_runtime_v1 f')
+          family_update_end = sql.index('update public.penta_runtime_activations a', family_update_start)
+          family_update = sql[family_update_start:family_update_end]
+          needle = "'deterministic_memory_bound',true,\n      'memory_contract'"
+          replacement = "'deterministic_memory_bound',true,\n      'canonical_family_key',penta_runtime.penta_memory_canonical_family_key_v1(f.family_key),\n      'memory_contract'"
+          if family_update.count(needle) != 1:
+              raise SystemExit('unexpected family runtime metadata block')
+          family_update = family_update.replace(needle, replacement, 1)
+          sql = sql[:family_update_start] + family_update + sql[family_update_end:]
+
+          comment_marker = "comment on function penta_runtime.penta_memory_reconcile_v1() is"
+          alias_comment = "comment on function penta_runtime.penta_memory_canonical_family_key_v1(text) is 'Maps authoritative ThriveBase provider family aliases to the canonical repository family identity without rewriting provider primary keys.';\n"
+          if sql.count(comment_marker) != 1:
+              raise SystemExit('unexpected reconcile comment marker')
+          sql = sql.replace(comment_marker, alias_comment + comment_marker, 1)
+          sql_path.write_text(sql, encoding='utf-8')
           PY
 
-      - name: Add deterministic family reconciliation tests
+      - name: Add provider alias contract tests
         shell: bash
         run: |
           set -euo pipefail
-          cat > tests/test_penta_family_reconciliation.py <<'PY'
+          cat > tests/test_penta_provider_family_aliases.py <<'PY'
           #!/usr/bin/env python3
           from __future__ import annotations
 
@@ -99,85 +114,79 @@ jobs:
           from pathlib import Path
 
           ROOT = Path(__file__).resolve().parents[1]
+          CONFIG = ROOT / 'config' / 'penta_deterministic_memory.v1.json'
+          SQL = ROOT / 'supabase' / 'migrations' / '20260831094500_penta_deterministic_memory_v1.sql'
           MODULE_PATH = ROOT / 'runtime' / 'penta_deterministic_memory.py'
-          SPEC = importlib.util.spec_from_file_location('penta_deterministic_memory_reconcile', MODULE_PATH)
+          SPEC = importlib.util.spec_from_file_location('penta_deterministic_memory_aliases', MODULE_PATH)
           mod = importlib.util.module_from_spec(SPEC)
           sys.modules[SPEC.name] = mod
           SPEC.loader.exec_module(mod)
 
-          EXPECTED = {
-              'penta.bc': 'SYSTEM_ARCHITECTURE',
-              'penta.clean': 'RESILIENCE_CONTINUITY',
-              'penta.flush': 'RESILIENCE_CONTINUITY',
-              'penta.harvestor': 'INTELLIGENCE_RESEARCH',
-              'penta.hydrate': 'RESILIENCE_CONTINUITY',
-              'penta.notifs': 'COMMUNICATIONS_SERVICE',
-              'penta.overseer': 'OBSERVABILITY_ORGANIC',
-              'penta.prioritize': 'AUTOMATION_AGENTIC',
-              'penta.relay': 'ROUTING_INTEROPERABILITY',
-          }
 
+          class PentaProviderFamilyAliasTests(unittest.TestCase):
+              @classmethod
+              def setUpClass(cls):
+                  cls.config = json.loads(CONFIG.read_text(encoding='utf-8'))
+                  cls.sql = SQL.read_text(encoding='utf-8')
+                  cls.lower = cls.sql.lower()
 
-          class PentaFamilyReconciliationTests(unittest.TestCase):
-              def test_exact_governed_census_assignments(self):
-                  census = json.loads((ROOT / mod.NAMESPACE_CENSUS_PATH).read_text(encoding='utf-8'))
-                  rows = {
-                      row['canonical_machine_key']: row
-                      for row in census['records']
-                      if isinstance(row, dict) and row.get('canonical_machine_key') in EXPECTED
+              def test_repository_mesh_uses_nine_canonical_families(self):
+                  expected = {
+                      'OBSERVABILITY_ORGANIC',
+                      'KNOWLEDGE_SEMANTICS_DATA',
+                      'SECURITY_TRUST',
+                      'ROUTING_INTEROPERABILITY',
+                      'RESILIENCE_CONTINUITY',
+                      'INTELLIGENCE_RESEARCH',
+                      'AUTOMATION_AGENTIC',
+                      'SYSTEM_ARCHITECTURE',
+                      'BUILD_RELEASE',
                   }
-                  self.assertEqual(set(EXPECTED), set(rows))
-                  for machine_key, family_key in EXPECTED.items():
-                      row = rows[machine_key]
-                      self.assertEqual(family_key, mod.normalized_family(row.get('family_id') or row.get('family_slug')))
-                      self.assertFalse(row.get('execution_eligible_by_registry', False))
+                  self.assertEqual(expected, set(self.config['brain_mesh']['support_families']))
 
-              def test_manifest_resolves_all_nine_without_maturity_promotion(self):
+              def test_live_provider_aliases_are_explicit_and_bounded(self):
+                  self.assertEqual(
+                      {
+                          'KNOWLEDGE_SEMANTICS_DATA': 'KNOWLEDGE_DATA',
+                          'ROUTING_INTEROPERABILITY': 'ROUTING_INTEROP',
+                      },
+                      self.config['brain_mesh']['production_family_aliases'],
+                  )
+                  self.assertIn("when 'knowledge_data' then 'knowledge_semantics_data'", self.lower)
+                  self.assertIn("when 'routing_interop' then 'routing_interoperability'", self.lower)
+
+              def test_manifest_assigns_canonical_brain_mesh_roles(self):
                   manifest = mod.build_manifest(ROOT)
-                  rows = {row['machine_key']: row for row in manifest['assignments']}
-                  for machine_key, family_key in EXPECTED.items():
-                      self.assertIn(machine_key, rows)
-                      self.assertEqual(family_key, rows[machine_key]['family_key'])
-                      if rows[machine_key]['maturity'] not in mod.HOT_MATURITY:
-                          self.assertFalse(rows[machine_key]['write_enabled'])
-                          self.assertEqual('COLD_RESERVED', rows[machine_key]['activation_state'])
+                  by_family = {}
+                  for row in manifest['assignments']:
+                      if row['brain_mesh_role']:
+                          by_family.setdefault(row['family_key'], set()).add(row['brain_mesh_role'])
+                  self.assertIn('verified_context_read', by_family['KNOWLEDGE_SEMANTICS_DATA'])
+                  self.assertIn('governed_addressability', by_family['ROUTING_INTEROPERABILITY'])
 
-              def test_census_has_no_unclassified_canonical_penta(self):
-                  census = json.loads((ROOT / mod.NAMESPACE_CENSUS_PATH).read_text(encoding='utf-8'))
-                  unresolved = sorted({
-                      row['canonical_machine_key']
-                      for row in census['records']
-                      if isinstance(row, dict)
-                      and isinstance(row.get('canonical_machine_key'), str)
-                      and row['canonical_machine_key'].startswith('penta.')
-                      and not (row.get('family_id') or row.get('family_slug'))
-                  })
-                  self.assertEqual([], unresolved)
+              def test_sql_keeps_authoritative_provider_keys_at_fk_boundaries(self):
+                  required = "('OBSERVABILITY_ORGANIC'),('KNOWLEDGE_DATA'),('SECURITY_TRUST'),('ROUTING_INTEROP')"
+                  self.assertIn(required, self.sql)
+                  self.assertIn("('penta.brain','KNOWLEDGE_DATA','verified_context_read'", self.sql)
+                  self.assertIn("('penta.brain','ROUTING_INTEROP','governed_addressability'", self.sql)
+                  self.assertIn("'canonical_family_key',penta_runtime.penta_memory_canonical_family_key_v1(excluded.family_key)", self.sql)
 
 
           if __name__ == '__main__':
               unittest.main(verbosity=2)
           PY
 
-      - name: Compile deterministic memory source and tests
-        run: python -m py_compile runtime/penta_deterministic_memory.py tests/test_penta_deterministic_memory.py tests/test_penta_sql_contract.py tests/test_penta_family_reconciliation.py
-
-      - name: Run focused tests before projection
-        run: python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract tests.test_penta_family_reconciliation -v
-
-      - name: Generate and validate deterministic memory census
+      - name: Compile and run deterministic memory certification suite
         shell: bash
         run: |
           set -euo pipefail
+          python -m py_compile runtime/penta_deterministic_memory.py tests/test_penta_deterministic_memory.py tests/test_penta_sql_contract.py tests/test_penta_family_reconciliation.py tests/test_penta_provider_family_aliases.py
           python runtime/penta_deterministic_memory.py reconcile --write
           python runtime/penta_deterministic_memory.py validate
           python runtime/penta_deterministic_memory.py reconcile --check
-          rm -f .penta-memory-reconcile-error.txt
+          python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract tests.test_penta_family_reconciliation tests.test_penta_provider_family_aliases -v
 
-      - name: Run focused tests after projection
-        run: python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract tests.test_penta_family_reconciliation -v
-
-      - name: Persist governed reconciliation
+      - name: Persist provider alias reconciliation
         shell: bash
         run: |
           set -euo pipefail
@@ -187,5 +196,5 @@ jobs:
           git add -A
           git diff --cached --check
           git status --short
-          git commit -m "fix(penta): reconcile deterministic memory family census"
+          git commit -m "fix(penta): bind canonical families to ThriveBase provider aliases"
           git push origin HEAD:${GITHUB_REF_NAME}
