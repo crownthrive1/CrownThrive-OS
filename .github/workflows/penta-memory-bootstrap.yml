@@ -1,4 +1,4 @@
-name: Penta Deterministic Memory Provider Alias Reconciliation
+name: Penta Deterministic Memory Release Candidate Certification
 
 on:
   push:
@@ -6,15 +6,14 @@ on:
       - admin-mcp/pentadocs-pentacensus-deterministic-memory
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: penta-memory-provider-alias-${{ github.ref }}
+  group: penta-memory-release-candidate-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  reconcile-provider-family-aliases:
-    if: github.actor != 'github-actions[bot]'
+  certify-release-candidate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -28,173 +27,99 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Reconcile canonical and live provider family keys
+      - name: Verify deterministic source and census
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          config_path = Path('config/penta_deterministic_memory.v1.json')
-          config = json.loads(config_path.read_text(encoding='utf-8'))
-          mesh = config['brain_mesh']
-          support = mesh['support_families']
-          expected_legacy = {
-              'KNOWLEDGE_DATA': 'verified_context_read',
-              'ROUTING_INTEROP': 'governed_addressability',
-          }
-          for key, role in expected_legacy.items():
-              if support.get(key) != role:
-                  raise SystemExit(f'unexpected legacy mesh mapping for {key}: {support.get(key)!r}')
-          support['KNOWLEDGE_SEMANTICS_DATA'] = support.pop('KNOWLEDGE_DATA')
-          support['ROUTING_INTEROPERABILITY'] = support.pop('ROUTING_INTEROP')
-          mesh['production_family_aliases'] = {
-              'KNOWLEDGE_SEMANTICS_DATA': 'KNOWLEDGE_DATA',
-              'ROUTING_INTEROPERABILITY': 'ROUTING_INTEROP',
-          }
-          config_path.write_text(
-              json.dumps(config, indent=2, sort_keys=True, ensure_ascii=False) + '\n',
-              encoding='utf-8',
-          )
-
-          sql_path = Path('supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql')
-          sql = sql_path.read_text(encoding='utf-8')
-          marker = 'create or replace function penta_runtime.penta_memory_profile_v1('
-          if sql.count(marker) != 1:
-              raise SystemExit('unexpected memory profile function count')
-          alias_function = '''create or replace function penta_runtime.penta_memory_canonical_family_key_v1(p_family_key text)\nreturns text\nlanguage sql\nimmutable\nstrict\nset search_path = pg_catalog\nas $$\n  select case upper(btrim(p_family_key))\n    when 'KNOWLEDGE_DATA' then 'KNOWLEDGE_SEMANTICS_DATA'\n    when 'ROUTING_INTEROP' then 'ROUTING_INTEROPERABILITY'\n    else upper(btrim(p_family_key))\n  end;\n$$;\n\n'''
-          sql = sql.replace(marker, alias_function + marker, 1)
-          start = sql.index(marker)
-          end = sql.index('create table if not exists penta_runtime.penta_memory_namespaces_v1', start)
-          profile = sql[start:end]
-          if profile.count("'KNOWLEDGE_DATA'") != 2 or profile.count("'ROUTING_INTEROP'") != 2:
-              raise SystemExit('unexpected provider-family literals in profile function')
-          profile = profile.replace('upper(p_family_key)', 'penta_runtime.penta_memory_canonical_family_key_v1(p_family_key)')
-          profile = profile.replace("'KNOWLEDGE_DATA'", "'KNOWLEDGE_SEMANTICS_DATA'")
-          profile = profile.replace("'ROUTING_INTEROP'", "'ROUTING_INTEROPERABILITY'")
-          sql = sql[:start] + profile + sql[end:]
-
-          upsert = "metadata=excluded.metadata;"
-          replacement = "metadata=excluded.metadata || jsonb_build_object('canonical_family_key',penta_runtime.penta_memory_canonical_family_key_v1(excluded.family_key));"
-          if sql.count(upsert) != 1:
-              raise SystemExit(f'unexpected family-grant upsert count: {sql.count(upsert)}')
-          sql = sql.replace(upsert, replacement, 1)
-
-          family_update_start = sql.index('update integration_control.penta_family_runtime_v1 f')
-          family_update_end = sql.index('update public.penta_runtime_activations a', family_update_start)
-          family_update = sql[family_update_start:family_update_end]
-          needle = "'deterministic_memory_bound',true,\n      'memory_contract'"
-          replacement = "'deterministic_memory_bound',true,\n      'canonical_family_key',penta_runtime.penta_memory_canonical_family_key_v1(f.family_key),\n      'memory_contract'"
-          if family_update.count(needle) != 1:
-              raise SystemExit('unexpected family runtime metadata block')
-          family_update = family_update.replace(needle, replacement, 1)
-          sql = sql[:family_update_start] + family_update + sql[family_update_end:]
-
-          comment_marker = "comment on function penta_runtime.penta_memory_reconcile_v1() is"
-          alias_comment = "comment on function penta_runtime.penta_memory_canonical_family_key_v1(text) is 'Maps authoritative ThriveBase provider family aliases to the canonical repository family identity without rewriting provider primary keys.';\n"
-          if sql.count(comment_marker) != 1:
-              raise SystemExit('unexpected reconcile comment marker')
-          sql = sql.replace(comment_marker, alias_comment + comment_marker, 1)
-          sql_path.write_text(sql, encoding='utf-8')
-          PY
-
-      - name: Add provider alias contract tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > tests/test_penta_provider_family_aliases.py <<'PY'
-          #!/usr/bin/env python3
-          from __future__ import annotations
-
-          import importlib.util
-          import json
-          import sys
-          import unittest
-          from pathlib import Path
-
-          ROOT = Path(__file__).resolve().parents[1]
-          CONFIG = ROOT / 'config' / 'penta_deterministic_memory.v1.json'
-          SQL = ROOT / 'supabase' / 'migrations' / '20260831094500_penta_deterministic_memory_v1.sql'
-          MODULE_PATH = ROOT / 'runtime' / 'penta_deterministic_memory.py'
-          SPEC = importlib.util.spec_from_file_location('penta_deterministic_memory_aliases', MODULE_PATH)
-          mod = importlib.util.module_from_spec(SPEC)
-          sys.modules[SPEC.name] = mod
-          SPEC.loader.exec_module(mod)
-
-
-          class PentaProviderFamilyAliasTests(unittest.TestCase):
-              @classmethod
-              def setUpClass(cls):
-                  cls.config = json.loads(CONFIG.read_text(encoding='utf-8'))
-                  cls.sql = SQL.read_text(encoding='utf-8')
-                  cls.lower = cls.sql.lower()
-
-              def test_repository_mesh_uses_nine_canonical_families(self):
-                  expected = {
-                      'OBSERVABILITY_ORGANIC',
-                      'KNOWLEDGE_SEMANTICS_DATA',
-                      'SECURITY_TRUST',
-                      'ROUTING_INTEROPERABILITY',
-                      'RESILIENCE_CONTINUITY',
-                      'INTELLIGENCE_RESEARCH',
-                      'AUTOMATION_AGENTIC',
-                      'SYSTEM_ARCHITECTURE',
-                      'BUILD_RELEASE',
-                  }
-                  self.assertEqual(expected, set(self.config['brain_mesh']['support_families']))
-
-              def test_live_provider_aliases_are_explicit_and_bounded(self):
-                  self.assertEqual(
-                      {
-                          'KNOWLEDGE_SEMANTICS_DATA': 'KNOWLEDGE_DATA',
-                          'ROUTING_INTEROPERABILITY': 'ROUTING_INTEROP',
-                      },
-                      self.config['brain_mesh']['production_family_aliases'],
-                  )
-                  self.assertIn("when 'knowledge_data' then 'knowledge_semantics_data'", self.lower)
-                  self.assertIn("when 'routing_interop' then 'routing_interoperability'", self.lower)
-
-              def test_manifest_assigns_canonical_brain_mesh_roles(self):
-                  manifest = mod.build_manifest(ROOT)
-                  by_family = {}
-                  for row in manifest['assignments']:
-                      if row['brain_mesh_role']:
-                          by_family.setdefault(row['family_key'], set()).add(row['brain_mesh_role'])
-                  self.assertIn('verified_context_read', by_family['KNOWLEDGE_SEMANTICS_DATA'])
-                  self.assertIn('governed_addressability', by_family['ROUTING_INTEROPERABILITY'])
-
-              def test_sql_keeps_authoritative_provider_keys_at_fk_boundaries(self):
-                  required = "('OBSERVABILITY_ORGANIC'),('KNOWLEDGE_DATA'),('SECURITY_TRUST'),('ROUTING_INTEROP')"
-                  self.assertIn(required, self.sql)
-                  self.assertIn("('penta.brain','KNOWLEDGE_DATA','verified_context_read'", self.sql)
-                  self.assertIn("('penta.brain','ROUTING_INTEROP','governed_addressability'", self.sql)
-                  self.assertIn("'canonical_family_key',penta_runtime.penta_memory_canonical_family_key_v1(excluded.family_key)", self.sql)
-
-
-          if __name__ == '__main__':
-              unittest.main(verbosity=2)
-          PY
-
-      - name: Compile and run deterministic memory certification suite
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m py_compile runtime/penta_deterministic_memory.py tests/test_penta_deterministic_memory.py tests/test_penta_sql_contract.py tests/test_penta_family_reconciliation.py tests/test_penta_provider_family_aliases.py
-          python runtime/penta_deterministic_memory.py reconcile --write
+          python -m py_compile \
+            runtime/penta_deterministic_memory.py \
+            tests/test_penta_deterministic_memory.py \
+            tests/test_penta_sql_contract.py \
+            tests/test_penta_family_reconciliation.py \
+            tests/test_penta_provider_family_aliases.py
           python runtime/penta_deterministic_memory.py validate
           python runtime/penta_deterministic_memory.py reconcile --check
-          python -m unittest tests.test_penta_deterministic_memory tests.test_penta_sql_contract tests.test_penta_family_reconciliation tests.test_penta_provider_family_aliases -v
+          git diff --check
 
-      - name: Persist provider alias reconciliation
+      - name: Run independent focused certification suite
         shell: bash
         run: |
           set -euo pipefail
-          find runtime tests -type d -name __pycache__ -prune -exec rm -rf '{}' +
-          git config user.name "CrownThrive Penta Runtime"
-          git config user.email "contact@crownthrive.com"
-          git add -A
-          git diff --cached --check
-          git status --short
-          git commit -m "fix(penta): bind canonical families to ThriveBase provider aliases"
-          git push origin HEAD:${GITHUB_REF_NAME}
+          mkdir -p evidence/release-package
+          python -m unittest \
+            tests.test_penta_deterministic_memory \
+            tests.test_penta_sql_contract \
+            tests.test_penta_family_reconciliation \
+            tests.test_penta_provider_family_aliases \
+            -v 2>&1 | tee evidence/release-package/test-report.txt
+
+      - name: Build hash-bound release evidence
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          cp config/penta_deterministic_memory.v1.json evidence/release-package/
+          cp data/penta/deterministic-memory-census.v1.json evidence/release-package/
+          cp schemas/penta/deterministic-memory-census.schema.json evidence/release-package/
+          cp supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql evidence/release-package/
+          cp supabase/rollbacks/20260831094500_penta_deterministic_memory_v1.rollback.sql evidence/release-package/
+          cp docs/phase3/PENTA_DETERMINISTIC_MEMORY_PRODUCTION_CONTRACT_v1.0.md evidence/release-package/
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path('.')
+          package = root / 'evidence' / 'release-package'
+          census = json.loads((root / 'data/penta/deterministic-memory-census.v1.json').read_text(encoding='utf-8'))
+          tracked = [
+              root / 'runtime/penta_deterministic_memory.py',
+              root / 'config/penta_deterministic_memory.v1.json',
+              root / 'data/penta/deterministic-memory-census.v1.json',
+              root / 'schemas/penta/deterministic-memory-census.schema.json',
+              root / 'supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql',
+              root / 'supabase/rollbacks/20260831094500_penta_deterministic_memory_v1.rollback.sql',
+              root / 'tests/test_penta_deterministic_memory.py',
+              root / 'tests/test_penta_sql_contract.py',
+              root / 'tests/test_penta_family_reconciliation.py',
+              root / 'tests/test_penta_provider_family_aliases.py',
+          ]
+          digests = {
+              path.as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in tracked
+          }
+          evidence = {
+              'schema': 'ct.penta.deterministic-memory.release-candidate-certificate.v1',
+              'decision': 'SOURCE_CERTIFIED_PENDING_PRODUCTION_READBACK',
+              'head_sha': os.environ['HEAD_SHA'],
+              'github_run_id': os.environ['RUN_ID'],
+              'github_run_attempt': int(os.environ['RUN_ATTEMPT']),
+              'manifest_sha256': census['manifest_sha256'],
+              'counts': census['counts'],
+              'canonicalization_profile': census['canonicalization_profile'],
+              'production_project_ref': census['production_database']['project_ref'],
+              'authority_expansion': False,
+              'independent_production_certification_required': True,
+              'source_sha256': dict(sorted(digests.items())),
+          }
+          payload = json.dumps(evidence, indent=2, sort_keys=True) + '\n'
+          (package / 'release-candidate-certificate.json').write_text(payload, encoding='utf-8')
+          (package / 'release-candidate-certificate.sha256').write_text(
+              hashlib.sha256(payload.encode('utf-8')).hexdigest() + '  release-candidate-certificate.json\n',
+              encoding='utf-8',
+          )
+          PY
+          (cd evidence/release-package && sha256sum * | sort > PACKAGE_SHA256SUMS)
+
+      - name: Upload exact release candidate package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: penta-deterministic-memory-${{ github.sha }}
+          path: evidence/release-package
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 9
