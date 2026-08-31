@@ -87,6 +87,12 @@ jobs:
           set -euo pipefail
           git config user.name "CrownThrive Penta Runtime"
           git config user.email "contact@crownthrive.com"
+          mkdir -p .penta-staging
+          if test -f .github/workflows/penta-deterministic-memory.yml; then
+            mv .github/workflows/penta-deterministic-memory.yml .penta-staging/penta-deterministic-memory.workflow.yml
+          fi
+          git checkout HEAD -- .github/workflows/penta-memory-bootstrap.yml
+          find runtime tests -type d -name __pycache__ -prune -exec rm -rf '{}' +
           git add -A
           git status --short
           git commit -m "chore(penta): materialize governed memory source for reconciliation"
