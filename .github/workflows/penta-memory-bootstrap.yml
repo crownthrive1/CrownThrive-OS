@@ -1,4 +1,4 @@
-name: Penta Deterministic Memory Release Candidate Certification
+name: PentaCensus Deterministic Memory Corpus Materialization
 
 on:
   push:
@@ -6,14 +6,15 @@ on:
       - admin-mcp/pentadocs-pentacensus-deterministic-memory
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: penta-memory-release-candidate-${{ github.ref }}
+  group: penta-memory-census-materialization-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  certify-release-candidate:
+  materialize-canonical-corpus:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -27,99 +28,58 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify deterministic source and census
+      - name: Validate PentaCensus implementation and policy
         shell: bash
         run: |
           set -euo pipefail
-          python -m py_compile \
-            runtime/penta_deterministic_memory.py \
-            tests/test_penta_deterministic_memory.py \
-            tests/test_penta_sql_contract.py \
-            tests/test_penta_family_reconciliation.py \
-            tests/test_penta_provider_family_aliases.py
+          python -m py_compile penta_census/*.py scripts/penta_census.py scripts/pentacensus_reconcile.py
+          python scripts/penta_census.py --root . --validate
+          python scripts/penta_census.py --root . --validate-structure
+          python scripts/penta_census.py --root . --validate-contract
+          pytest -q tests/pentacensus
+          python scripts/penta_census.py --root . --check
+
+      - name: Materialize exact reconciled corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/penta_census.py --root . --write --emit-evidence --evidence-dir evidence/audits/penta-census
+          git diff --check
+          python scripts/penta_census.py --root . --validate
+          python scripts/penta_census.py --root . --validate-structure
+          python scripts/penta_census.py --root . --validate-contract
+          python scripts/penta_census.py --root . --check
+
+      - name: Revalidate deterministic memory projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python runtime/penta_deterministic_memory.py reconcile --write
           python runtime/penta_deterministic_memory.py validate
           python runtime/penta_deterministic_memory.py reconcile --check
-          git diff --check
-
-      - name: Run independent focused certification suite
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p evidence/release-package
           python -m unittest \
             tests.test_penta_deterministic_memory \
             tests.test_penta_sql_contract \
             tests.test_penta_family_reconciliation \
             tests.test_penta_provider_family_aliases \
-            -v 2>&1 | tee evidence/release-package/test-report.txt
+            -v
 
-      - name: Build hash-bound release evidence
+      - name: Commit generator-owned corpus
         shell: bash
-        env:
-          HEAD_SHA: ${{ github.sha }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           set -euo pipefail
-          cp config/penta_deterministic_memory.v1.json evidence/release-package/
-          cp data/penta/deterministic-memory-census.v1.json evidence/release-package/
-          cp schemas/penta/deterministic-memory-census.schema.json evidence/release-package/
-          cp supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql evidence/release-package/
-          cp supabase/rollbacks/20260831094500_penta_deterministic_memory_v1.rollback.sql evidence/release-package/
-          cp docs/phase3/PENTA_DETERMINISTIC_MEMORY_PRODUCTION_CONTRACT_v1.0.md evidence/release-package/
-          python - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-
-          root = Path('.')
-          package = root / 'evidence' / 'release-package'
-          census = json.loads((root / 'data/penta/deterministic-memory-census.v1.json').read_text(encoding='utf-8'))
-          tracked = [
-              root / 'runtime/penta_deterministic_memory.py',
-              root / 'config/penta_deterministic_memory.v1.json',
-              root / 'data/penta/deterministic-memory-census.v1.json',
-              root / 'schemas/penta/deterministic-memory-census.schema.json',
-              root / 'supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql',
-              root / 'supabase/rollbacks/20260831094500_penta_deterministic_memory_v1.rollback.sql',
-              root / 'tests/test_penta_deterministic_memory.py',
-              root / 'tests/test_penta_sql_contract.py',
-              root / 'tests/test_penta_family_reconciliation.py',
-              root / 'tests/test_penta_provider_family_aliases.py',
-          ]
-          digests = {
-              path.as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-              for path in tracked
-          }
-          evidence = {
-              'schema': 'ct.penta.deterministic-memory.release-candidate-certificate.v1',
-              'decision': 'SOURCE_CERTIFIED_PENDING_PRODUCTION_READBACK',
-              'head_sha': os.environ['HEAD_SHA'],
-              'github_run_id': os.environ['RUN_ID'],
-              'github_run_attempt': int(os.environ['RUN_ATTEMPT']),
-              'manifest_sha256': census['manifest_sha256'],
-              'counts': census['counts'],
-              'canonicalization_profile': census['canonicalization_profile'],
-              'production_project_ref': census['production_database']['project_ref'],
-              'authority_expansion': False,
-              'independent_production_certification_required': True,
-              'source_sha256': dict(sorted(digests.items())),
-          }
-          payload = json.dumps(evidence, indent=2, sort_keys=True) + '\n'
-          (package / 'release-candidate-certificate.json').write_text(payload, encoding='utf-8')
-          (package / 'release-candidate-certificate.sha256').write_text(
-              hashlib.sha256(payload.encode('utf-8')).hexdigest() + '  release-candidate-certificate.json\n',
-              encoding='utf-8',
-          )
-          PY
-          (cd evidence/release-package && sha256sum * | sort > PACKAGE_SHA256SUMS)
-
-      - name: Upload exact release candidate package
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: penta-deterministic-memory-${{ github.sha }}
-          path: evidence/release-package
-          if-no-files-found: error
-          retention-days: 30
-          compression-level: 9
+          find penta_census runtime tests -type d -name __pycache__ -prune -exec rm -rf '{}' +
+          git config user.name "CrownThrive PentaCensus"
+          git config user.email "contact@crownthrive.com"
+          git add data/penta/namespace-census.v1.json data/penta/deterministic-memory-census.v1.json
+          if test -d evidence/audits/penta-census; then
+            git add -f evidence/audits/penta-census
+          fi
+          git diff --cached --check
+          git status --short
+          if git diff --cached --quiet; then
+            echo "Canonical corpus already converged."
+            exit 0
+          fi
+          git commit -m "fix(pentacensus): materialize deterministic memory control-plane identities"
+          git push origin HEAD:${GITHUB_REF_NAME}
