@@ -11,6 +11,7 @@ declare
   v_route jsonb;
   v_count integer;
   v_os20 integer;
+  v_mobilization integer;
   v_rejected boolean:=false;
 begin
   -- Existing executable owner routes from PR #1899 must remain present.
@@ -76,7 +77,7 @@ begin
     'crownthrive1/CrownThrive-OS',
     null,
     null,
-    jsonb_build_array('review-only CENSUS handoffs only','no OS20 execution'),
+    jsonb_build_array('review-only CENSUS handoffs only','generic production mobilizer excluded','no OS20 execution'),
     false,
     'P2',
     jsonb_build_object('canary',true,'authority_created',false)
@@ -85,7 +86,7 @@ begin
   if v_assignment_id is null then raise exception 'canary assignment creation failed: %',v_assignment; end if;
 
   v_route:=integration_control.penta_assignment_route_v2(v_assignment_id);
-  if (v_route->>'holds')::integer<>0 then raise exception 'registered review routes unexpectedly held: %',v_route; end if;
+  if (v_route->>'holds')::integer<>0 then raise exception 'registered review routes unexpectedly held at admission: %',v_route; end if;
 
   select count(*) into v_count
   from integration_control.penta_assignment_dispatches_v1 d
@@ -97,17 +98,39 @@ begin
     and r.metadata->>'route_mode'='review_only';
   if v_count<>3 then raise exception 'review handoff dispatch readback failed'; end if;
 
+  -- Review handoffs are acknowledged into the review lane, not left queued for the
+  -- generic production mobilizer. They remain non-terminal pending real review receipt.
   select count(*) into v_count
   from integration_control.penta_census_handoffs_v1 h
   where h.handoff_key like 'assignment:'||v_assignment_id::text||':%'
     and h.target_ref in ('penta.security','penta.time','penta.democracy')
-    and h.state='queued';
-  if v_count<>3 then raise exception 'review handoff queue readback failed'; end if;
+    and h.state='acknowledged'
+    and coalesce((h.payload->>'review_only')::boolean,false)
+    and h.payload->>'review_transport_state'='queued'
+    and h.payload->>'hold_code'='HOLD_ASSIGNMENT_REVIEW_TRANSPORT_PENDING'
+    and coalesce((h.payload->>'pm_execution_eligible')::boolean,false)=false
+    and coalesce((h.payload->>'authority_expansion')::boolean,false)=false;
+  if v_count<>3 then raise exception 'review lane admission/readback failed'; end if;
 
   select count(*) into v_os20
   from penta_os20.execution_tasks
   where task_key like 'assignment:'||v_assignment_id::text||':%';
   if v_os20<>0 then raise exception 'review-only routing created OS20 execution tasks: %',v_os20; end if;
+
+  -- The generic production mobilizer only scans queued handoffs. Review-only rows must
+  -- therefore have zero production-mobilization records before a legitimate reviewer
+  -- transport/receipt exists.
+  select count(*) into v_mobilization
+  from integration_control.penta_production_mobilization_v1
+  where handoff_key like 'assignment:'||v_assignment_id::text||':%';
+  if v_mobilization<>0 then raise exception 'review-only handoff entered production mobilizer: %',v_mobilization; end if;
+
+  -- Unknown reviewer labels still fail closed through #1899; this candidate does not
+  -- turn arbitrary display names into routes.
+  if exists(
+    select 1 from integration_control.penta_assignment_owner_routes_v1
+    where lower(owner_penta)=lower('PentaUnknownReviewer') and active
+  ) then raise exception 'unknown reviewer route unexpectedly exists'; end if;
 end
 $$;
 
