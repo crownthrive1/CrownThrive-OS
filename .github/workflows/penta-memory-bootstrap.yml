@@ -18,20 +18,21 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out exact branch head
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
-      - name: Verify source parent and payload custody
+      - name: Verify source ancestry and payload custody
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "89eb1e65131d6d5b3655c23da63646429451829d"
+          git merge-base --is-ancestor "89eb1e65131d6d5b3655c23da63646429451829d" HEAD
+          git merge-base --is-ancestor "885f9b8b0b0fbd48b46c6a67b97ea866ddf8ed24" HEAD
           test "$(find .bootstrap -maxdepth 1 -type f -name 'payload.part*' | wc -l)" -eq 8
           cat .bootstrap/payload.part* > /tmp/penta_memory_payload.b64
           echo "6550b336036b12de9d3be41b6296df450afd8a2a6f9bf48601800e25106fe781  /tmp/penta_memory_payload.b64" | sha256sum -c -
