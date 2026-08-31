@@ -1,0 +1,244 @@
+name: CrownThrive App Factory — Public Android Release Canary
+
+on:
+  push:
+    branches:
+      - app-factory/android-public-canary-20260831
+    paths:
+      - .github/workflows/app-factory-android-public-canary.yml
+      - penta/evidence/app-factory/android-public-canary.ready
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-factory-android-public-canary-1.0.0-rc.1
+  cancel-in-progress: false
+
+jobs:
+  android-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      APP_FACTORY_RELEASE_ID: 1.0.0-rc.1
+      APP_FACTORY_SOURCE_SHA: ef060e73d079c1b06304382763efdcb32b22ef1b
+      APP_FACTORY_SOURCE_ZIP_SHA256: aacf319dfec12ec7052da36f55ed8deab505d8a2dd6e6a958f820fa4f027813a
+      APP_FACTORY_CANONICAL_URL: https://app.crownthrive.io
+      GRADLE_VERSION: "8.7"
+    steps:
+      - name: Check out governed OS ref
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Verify runner and live App Factory
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -version
+          test -n "${ANDROID_HOME:-}"
+          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" || test -x "$ANDROID_HOME/tools/bin/sdkmanager"
+          curl --fail --silent --show-error --location --retry 5 --retry-all-errors \
+            --max-time 30 \
+            --output /tmp/app-factory-up.txt \
+            "$APP_FACTORY_CANONICAL_URL/up"
+          test -s /tmp/app-factory-up.txt
+          sha256sum /tmp/app-factory-up.txt
+
+      - name: Install verified Gradle and Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/gradle"
+          cd "$RUNNER_TEMP/gradle"
+          curl --fail --silent --show-error --location --retry 5 --retry-all-errors \
+            --output "gradle-${GRADLE_VERSION}-bin.zip" \
+            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+          curl --fail --silent --show-error --location --retry 5 --retry-all-errors \
+            --output "gradle-${GRADLE_VERSION}-bin.zip.sha256" \
+            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip.sha256"
+          printf '%s  %s\n' "$(tr -d '[:space:]' < "gradle-${GRADLE_VERSION}-bin.zip.sha256")" "gradle-${GRADLE_VERSION}-bin.zip" | sha256sum --check --strict
+          unzip -q "gradle-${GRADLE_VERSION}-bin.zip"
+          echo "$RUNNER_TEMP/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$ANDROID_HOME/tools/bin/sdkmanager"; fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Generate source-bound Android WebView canary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p canary/app/src/main/java/io/crownthrive/appfactory/canary
+          cat > canary/settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "CrownThriveAppFactoryCanary"
+          include(":app")
+          EOF
+          cat > canary/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+          }
+          EOF
+          cat > canary/app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+          }
+
+          android {
+              namespace = "io.crownthrive.appfactory.canary"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "io.crownthrive.appfactory.canary"
+                  minSdk = 23
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "1.0.0-rc.1-canary"
+              }
+
+              buildTypes {
+                  getByName("release") {
+                      isMinifyEnabled = false
+                  }
+              }
+          }
+          EOF
+          cat > canary/app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:allowBackup="false"
+                  android:label="CrownThrive App Factory Canary"
+                  android:usesCleartextTraffic="false"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <meta-data
+                      android:name="ct.app_factory.source_sha"
+                      android:value="ef060e73d079c1b06304382763efdcb32b22ef1b" />
+                  <meta-data
+                      android:name="ct.app_factory.release_id"
+                      android:value="1.0.0-rc.1" />
+              </application>
+          </manifest>
+          EOF
+          cat > canary/app/src/main/java/io/crownthrive/appfactory/canary/MainActivity.java <<'EOF'
+          package io.crownthrive.appfactory.canary;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public final class MainActivity extends Activity {
+              private WebView webView;
+
+              @Override
+              protected void onCreate(Bundle state) {
+                  super.onCreate(state);
+                  webView = new WebView(this);
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setAllowFileAccess(false);
+                  settings.setAllowContentAccess(false);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.loadUrl("https://app.crownthrive.io");
+                  setContentView(webView);
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+          }
+          EOF
+          find canary -type f -print0 | sort -z | xargs -0 sha256sum | tee /tmp/canary-source.sha256
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd canary
+          gradle --no-daemon --stacktrace :app:assembleDebug
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp "$APK" "$GITHUB_WORKSPACE/out/crownthrive-app-factory-1.0.0-rc.1-canary.apk"
+          sha256sum "$GITHUB_WORKSPACE/out/crownthrive-app-factory-1.0.0-rc.1-canary.apk" | tee "$GITHUB_WORKSPACE/out/crownthrive-app-factory-1.0.0-rc.1-canary.apk.sha256"
+
+      - name: Create deterministic canary receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          apk = Path("out/crownthrive-app-factory-1.0.0-rc.1-canary.apk")
+          digest = hashlib.sha256(apk.read_bytes()).hexdigest()
+          source_manifest = Path("/tmp/canary-source.sha256").read_text(encoding="utf-8")
+          receipt = {
+              "schema": "ct.app-factory.android-public-canary.v1",
+              "property_id": "ct.platform.app-factory",
+              "release_id": os.environ["APP_FACTORY_RELEASE_ID"],
+              "canonical_url": os.environ["APP_FACTORY_CANONICAL_URL"],
+              "app_factory_source_commit": os.environ["APP_FACTORY_SOURCE_SHA"],
+              "app_factory_source_zip_sha256": os.environ["APP_FACTORY_SOURCE_ZIP_SHA256"],
+              "builder_repository": os.environ["GITHUB_REPOSITORY"],
+              "builder_commit": os.environ["GITHUB_SHA"],
+              "workflow": os.environ["GITHUB_WORKFLOW"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "runner_os": os.environ["RUNNER_OS"],
+              "artifact": {
+                  "filename": apk.name,
+                  "bytes": apk.stat().st_size,
+                  "sha256": digest,
+              },
+              "canary_scope": "live_https_webview_delivery_plane",
+              "generated_source_manifest_sha256": hashlib.sha256(source_manifest.encode()).hexdigest(),
+              "secret_values_included": False,
+              "production_certification_effect": "EVIDENCE_ONLY_UNTIL_THRIVEBASE_GATE",
+          }
+          Path("out/android-public-canary-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload APK and SHA-256 evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: crownthrive-app-factory-1.0.0-rc.1-android-canary
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
