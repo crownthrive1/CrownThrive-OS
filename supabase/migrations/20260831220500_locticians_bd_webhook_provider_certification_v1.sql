@@ -40,7 +40,7 @@ set search_path to 'pg_catalog','integration_control'
 as $function$
   select integration_control.locticians_bd_select_warm_credential_v3(p_failure_class)
 $function$;
-revoke all on function public.locticians_bd_select_warm_credential_v3(text) from public;
+revoke all on function public.locticians_bd_select_warm_credential_v3(text) from public, anon, authenticated;
 grant execute on function public.locticians_bd_select_warm_credential_v3(text) to service_role;
 
 create or replace function integration_control.locticians_bd_webhook_dispatch_tick_v1(p_limit integer default 100)
@@ -126,11 +126,13 @@ begin
   return jsonb_build_object('contract','ct.locticians.bd.webhook.target-dispatch.v1','completed',v_completed,'failed',v_failed,'signals_written',v_signals,'suppressions_applied',v_suppressed,'authority_expansion',false,'provider_write',false,'observed_at',clock_timestamp());
 end
 $function$;
+revoke all on function integration_control.locticians_bd_webhook_dispatch_tick_v1(integer) from public, anon, authenticated;
+grant execute on function integration_control.locticians_bd_webhook_dispatch_tick_v1(integer) to service_role;
 
 create or replace function public.locticians_bd_webhook_dispatch_tick_v1(p_limit integer default 100)
 returns jsonb language sql security definer set search_path to 'pg_catalog','integration_control'
 as $function$ select integration_control.locticians_bd_webhook_dispatch_tick_v1(p_limit) $function$;
-revoke all on function public.locticians_bd_webhook_dispatch_tick_v1(integer) from public;
+revoke all on function public.locticians_bd_webhook_dispatch_tick_v1(integer) from public, anon, authenticated;
 grant execute on function public.locticians_bd_webhook_dispatch_tick_v1(integer) to service_role;
 
 select cron.unschedule(jobid) from cron.job where jobname='ct-locticians-bd-webhook-target-dispatch-v1';
