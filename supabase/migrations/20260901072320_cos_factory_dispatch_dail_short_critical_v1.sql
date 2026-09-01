@@ -32,8 +32,6 @@ DECLARE
   v_police jsonb;
   v_wire jsonb;
 BEGIN
-  -- Compute/reconcile expensive local work first. PentaWire is intentionally last because
-  -- penta_wire_scan_v1() performs the canonical DAIL append near its return boundary.
   BEGIN
     v_police:=integration_control.penta_police_reconcile_v1();
   EXCEPTION WHEN OTHERS THEN
@@ -70,8 +68,6 @@ BEGIN
     v_exact:=jsonb_build_object('state','isolated_exact_evidence_error','error_class',sqlstate,'factory_tick_preserved',true);
   END;
 
-  -- Final evidence/reconciliation step. penta_wire_scan_v1() appends DAIL at the end of
-  -- its own work, leaving only bounded local event/write + return work in this transaction.
   BEGIN
     v_wire:=integration_control.penta_wire_tick_v1();
   EXCEPTION WHEN OTHERS THEN
@@ -108,7 +104,6 @@ DECLARE
   v_tick jsonb;
   v_dispatch jsonb;
 BEGIN
-  -- Provider/network dispatch happens before any factory-side DAIL append can occur.
   v_dispatch:=public.ct_factory_dispatch_worker(8);
   v_tick:=public.ct_factory_tick();
   RETURN jsonb_build_object('tick',v_tick,'dispatch',v_dispatch,'at',now());
