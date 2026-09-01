@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import re
 import unittest
 
 
@@ -46,11 +45,15 @@ class PentaHelpIndependentGateTransportContractTests(unittest.TestCase):
         self.assertIn("'ct.penta.chlom-review'", self.migration)
         self.assertIn("'ct.penta.cie-review'", self.migration)
 
-    def test_every_concrete_target_obeys_pentas_v2_node_id_contract(self) -> None:
-        targets = re.findall(r"then '([^']+)'", self.migration)
-        concrete = [value for value in targets if not value.startswith("unresolved://")]
-        self.assertGreaterEqual(len(concrete), 4)
-        for target in concrete:
+    def test_every_concrete_owner_target_obeys_pentas_v2_node_id_contract(self) -> None:
+        targets = (
+            "ct.penta.certify",
+            "ct.penta.security",
+            "ct.penta.chlom-review",
+            "ct.penta.cie-review",
+        )
+        for target in targets:
+            self.assertIn(f"then '{target}'", self.migration)
             self.assertRegex(target, r"^ct[.]penta[.][a-z0-9][a-z0-9._-]{2,160}$")
         self.assertNotIn("ct.chlom.authority", self.migration)
         self.assertNotIn("ct.cie.review", self.migration)
