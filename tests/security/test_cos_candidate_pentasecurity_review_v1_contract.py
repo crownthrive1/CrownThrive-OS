@@ -1,8 +1,8 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-MIGRATION = ROOT / "supabase/migrations/20260901232800_cos_candidate_pentasecurity_exact_review_v1.sql"
-ROLLBACK = ROOT / "supabase/rollback/20260901232800_cos_candidate_pentasecurity_exact_review_v1_rollback.sql"
+MIGRATION = ROOT / "supabase/migrations/20260901233134_cos_candidate_pentasecurity_exact_review_v1.sql"
+ROLLBACK = ROOT / "supabase/rollback/20260901233134_cos_candidate_pentasecurity_exact_review_v1_rollback.sql"
 
 
 def text(path: Path) -> str:
