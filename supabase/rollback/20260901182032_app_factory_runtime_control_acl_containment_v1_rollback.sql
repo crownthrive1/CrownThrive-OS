@@ -1,6 +1,6 @@
--- Guarded rollback for App Factory runtime-control provider dispatcher ACL containment v1.
--- WARNING: restores incident-observed end-user EXECUTE only under explicit governed recovery
--- and refuses changed provider executor bytes.
+-- Fail-closed recovery contract for App Factory runtime-control provider dispatcher ACL containment v1.
+-- The incident-observed end-user ACL is a known security defect and is never restored.
+-- Recovery is exact-definition-bound and reasserts service-role-only execution.
 
 DO $preflight$
 DECLARE
@@ -30,13 +30,13 @@ END
 $preflight$;
 
 REVOKE ALL ON FUNCTION public.app_factory_android_closeout_dispatch(text) FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_android_closeout_dispatch(text) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.app_factory_android_closeout_dispatch(text) TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_dcv_control_dispatch(text) FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_dcv_control_dispatch(text) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.app_factory_dcv_control_dispatch(text) TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_root_route_dispatch() FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_root_route_dispatch() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.app_factory_root_route_dispatch() TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_runtime_evidence_dispatch(text) FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_runtime_evidence_dispatch(text) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.app_factory_runtime_evidence_dispatch(text) TO service_role;
 
 DO $readback$
 DECLARE
@@ -49,14 +49,14 @@ BEGIN
     'public.app_factory_runtime_evidence_dispatch(text)'
   ]
   LOOP
-    IF NOT has_function_privilege('anon',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_RUNTIME_CONTROL_RPC_ANON_EXECUTE_NOT_RESTORED:%',v_sig;
+    IF has_function_privilege('anon',v_sig,'EXECUTE') THEN
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_RUNTIME_CONTROL_RPC_ANON_EXECUTE_PRESENT:%',v_sig;
     END IF;
-    IF NOT has_function_privilege('authenticated',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_RUNTIME_CONTROL_RPC_AUTH_EXECUTE_NOT_RESTORED:%',v_sig;
+    IF has_function_privilege('authenticated',v_sig,'EXECUTE') THEN
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_RUNTIME_CONTROL_RPC_AUTHENTICATED_EXECUTE_PRESENT:%',v_sig;
     END IF;
     IF NOT has_function_privilege('service_role',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_RUNTIME_CONTROL_RPC_SERVICE_EXECUTE_NOT_RESTORED:%',v_sig;
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_RUNTIME_CONTROL_RPC_SERVICE_EXECUTE_MISSING:%',v_sig;
     END IF;
   END LOOP;
 END
