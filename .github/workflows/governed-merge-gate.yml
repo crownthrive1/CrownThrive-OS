@@ -67,6 +67,9 @@ jobs:
           python -m py_compile scripts/resolve_pm_notification_recipients.py
           python -m py_compile scripts/security_self_heal_plan.py
           python -m py_compile scripts/run_function_tests.py
+          python -m py_compile runtime/penta_survival.py
+          python -m py_compile scripts/validate_penta_survival.py
+          python -m py_compile tests/test_penta_survival.py
 
       - name: Validate GitHub Actions runtime and supply-chain policy
         run: python scripts/validate_github_actions_runtime_policy.py
@@ -89,6 +92,15 @@ jobs:
             tests/test_penta_institutional_controls.py \
             tests/test_penta_institutional_controls_family.py \
             tests/test_penta_self_build.py
+
+      - name: Run deterministic Penta survival tests
+        run: python -m unittest tests.test_penta_survival -v
+
+      - name: Audit complete Penta survival coverage
+        run: |
+          mkdir -p artifacts
+          python scripts/validate_penta_survival.py --root . audit \
+            --output artifacts/penta-survival-governed-audit.json
 
       - name: Resolve exact governed diff range
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
@@ -147,6 +159,13 @@ jobs:
           python scripts/governed_current_pr_preflight_v2.py \
             --git-base "$CT_GIT_BASE_SHA" \
             --git-head "$CT_GIT_HEAD_SHA"
+
+      - name: Enforce deterministic Penta survival ratchet
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        run: |
+          python scripts/validate_penta_survival.py --root . ratchet \
+            --base-ref "$CT_GIT_MERGE_BASE_SHA" \
+            --output artifacts/penta-survival-governed-ratchet.json
 
       - name: Validate institutional documentation
         run: python scripts/validate_docs.py
