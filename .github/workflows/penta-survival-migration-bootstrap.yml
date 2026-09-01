@@ -1,0 +1,142 @@
+name: Materialize PENTA Survival Migration Wave
+
+on:
+  push:
+    branches:
+      - governance/penta-survival-contract-v1-20260831
+    paths:
+      - ".penta-migration-bootstrap/**"
+      - ".github/workflows/penta-survival-migration-bootstrap.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: penta-survival-migration-bootstrap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact governed branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Materialize verified migration source and stage protected workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          from hashlib import sha256
+          import io
+          from pathlib import Path, PurePosixPath
+          import shutil
+          import tarfile
+
+          root = Path.cwd().resolve()
+          parts = sorted((root / '.penta-migration-bootstrap').glob('payload.part*'))
+          if len(parts) != 6:
+              raise SystemExit(f'unexpected migration payload part count: {len(parts)}')
+          encoded = b''.join(path.read_bytes() for path in parts)
+          if sha256(encoded).hexdigest() != 'ac8142d0155dc1c8d1b700df465c28631768e84238701cdefe0d28de9f22332d':
+              raise SystemExit('migration payload encoded SHA mismatch')
+          archive = base64.b85decode(encoded)
+          if sha256(archive).hexdigest() != 'b779b7256ecc546e48e278535e9d5a1eb699fd6a7d4e7f59c0b408a87f13f838':
+              raise SystemExit('migration archive SHA mismatch')
+
+          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as package:
+              members = package.getmembers()
+              if len(members) != 8:
+                  raise SystemExit(f'unexpected migration package member count: {len(members)}')
+              for member in members:
+                  pure = PurePosixPath(member.name)
+                  if not member.isfile() or pure.is_absolute() or '..' in pure.parts:
+                      raise SystemExit(f'unsafe migration package member: {member.name}')
+                  destination = (root / pure.as_posix()).resolve()
+                  if destination != root and root not in destination.parents:
+                      raise SystemExit(f'migration package member escapes repository: {member.name}')
+                  payload = package.extractfile(member)
+                  if payload is None:
+                      raise SystemExit(f'unreadable migration package member: {member.name}')
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(payload.read())
+
+          workflow = root / '.github/workflows/penta-survival-migration.yml'
+          if not workflow.is_file():
+              raise SystemExit('materialized migration workflow is missing')
+          staged = root / '.penta-workflow-staging/penta-survival-migration.yml'
+          staged.parent.mkdir(parents=True, exist_ok=True)
+          shutil.copy2(workflow, staged)
+          workflow.unlink()
+          shutil.rmtree(root / '.penta-migration-bootstrap')
+          PY
+
+      - name: Compile and test complete migration software
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            runtime/penta_survival.py \
+            runtime/penta_survival_migration.py \
+            scripts/validate_penta_survival.py \
+            scripts/migrate_penta_survival_wave.py \
+            scripts/promote_verified_penta_survival.py
+          python -m unittest -v tests.test_penta_survival tests.test_penta_survival_migration
+
+      - name: Generate and verify one migration contract per registered Penta
+        id: generate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          SOURCE_COMMIT="$(git rev-parse HEAD)"
+          AS_OF="$(git show -s --format=%cI "$SOURCE_COMMIT")"
+          python scripts/migrate_penta_survival_wave.py --root . generate \
+            --source-commit "$SOURCE_COMMIT" \
+            --as-of "$AS_OF" \
+            --output artifacts/penta-survival-migration-generation.json
+          python scripts/migrate_penta_survival_wave.py --root . verify \
+            --output artifacts/penta-survival-migration-verification.json
+          test "$(jq -r '.member_count' artifacts/penta-survival-migration-generation.json)" -gt 0
+          test "$(jq -r '.member_count' artifacts/penta-survival-migration-generation.json)" = "$(jq -r '.contract_count' artifacts/penta-survival-migration-generation.json)"
+          test "$(jq -r '.member_count' artifacts/penta-survival-migration-generation.json)" = "$(jq -r '.evidence_bundle_count' artifacts/penta-survival-migration-generation.json)"
+          test "$(jq -r '.member_count' artifacts/penta-survival-migration-generation.json)" = "$(jq -r '.certification_queue_count' artifacts/penta-survival-migration-generation.json)"
+          test "$(jq -r '.production_promoted_count' artifacts/penta-survival-migration-generation.json)" = "0"
+          test "$(jq -r '.provider_write_count' artifacts/penta-survival-migration-generation.json)" = "0"
+          test "$(jq -r '.disposition' artifacts/penta-survival-migration-verification.json)" = "PASS_MIGRATION_INTEGRITY_SURVIVAL_HOLD"
+          echo "source_commit=$SOURCE_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Stage deterministic source and migration baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f -name '*.pyc' -delete
+          git config user.name 'PentaSurvival'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git status --short
+          git commit -m "governance: record Penta survival migration baseline ${{ steps.generate.outputs.source_commit }}"
+          git push origin HEAD:governance/penta-survival-contract-v1-20260831
+
+      - name: Preserve bootstrap migration receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-survival-migration-bootstrap-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/penta-survival-migration-*.json
+          if-no-files-found: error
+          retention-days: 90
