@@ -44,7 +44,7 @@ VALUES (
     'v_pre:=integration_control.penta_change_precert_status_v1',
     'grant execute on function integration_control.penta_change_issue_certification_v2(uuid,text,text,text,text,timestamptz,jsonb) to anon',
     'grant execute on function integration_control.penta_change_issue_certification_v2(uuid,text,text,text,text,timestamptz,jsonb) to authenticated',
-    'authority_expansion'':true'
+    '''authority_expansion'',true'
   ]::text[],
   200000,
   'active',
