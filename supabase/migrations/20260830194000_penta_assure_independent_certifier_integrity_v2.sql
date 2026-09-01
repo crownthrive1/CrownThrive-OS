@@ -5,7 +5,7 @@
 -- write scope, rotate credentials, move money, or create CHLOM rights. It only prevents
 -- a certification from being marked certified when independent certifier identity is
 -- absent or conflicts with the originator/builder/producer identities supplied by the
--- governed caller.
+-- governed service-role caller. The entrypoint is explicitly service-role only.
 
 create or replace function public.penta_assure_certify_v1(
   p_subject_ref text,
@@ -67,10 +67,8 @@ begin
     else
       v_builders := p_metadata->'builder_ids';
       if exists (
-        select 1
-        from jsonb_array_elements(v_builders) e
-        where jsonb_typeof(e) <> 'string'
-           or nullif(btrim(e #>> '{}'), '') is null
+        select 1 from jsonb_array_elements(v_builders) e
+        where jsonb_typeof(e) <> 'string' or nullif(btrim(e #>> '{}'), '') is null
       ) then
         v_identity_shape_valid := false;
         v_reason := 'invalid_builder_identity_shape';
@@ -85,10 +83,8 @@ begin
     else
       v_producers := p_metadata->'producer_ids';
       if exists (
-        select 1
-        from jsonb_array_elements(v_producers) e
-        where jsonb_typeof(e) <> 'string'
-           or nullif(btrim(e #>> '{}'), '') is null
+        select 1 from jsonb_array_elements(v_producers) e
+        where jsonb_typeof(e) <> 'string' or nullif(btrim(e #>> '{}'), '') is null
       ) then
         v_identity_shape_valid := false;
         v_reason := 'invalid_producer_identity_shape';
@@ -101,14 +97,12 @@ begin
   elsif lower(v_certifier) = lower(v_originator) then
     v_reason := 'self_certification_detected';
   elsif v_identity_shape_valid and exists (
-    select 1
-    from jsonb_array_elements_text(v_builders) b(value)
+    select 1 from jsonb_array_elements_text(v_builders) b(value)
     where lower(btrim(value)) = lower(v_certifier)
   ) then
     v_reason := 'certifier_is_builder';
   elsif v_identity_shape_valid and exists (
-    select 1
-    from jsonb_array_elements_text(v_producers) p(value)
+    select 1 from jsonb_array_elements_text(v_producers) p(value)
     where lower(btrim(value)) = lower(v_certifier)
   ) then
     v_reason := 'certifier_is_producer';
@@ -134,8 +128,7 @@ begin
   insert into public.penta_assure_certifications(
     certification_id, subject_ref, standard_ref, risk_class, evidence_refs,
     independence_state, checks, disposition, certified_at, expires_at, metadata
-  )
-  values(
+  ) values (
     v_id, p_subject_ref, p_standard_ref, p_risk_class,
     coalesce(p_evidence_refs,'[]'::jsonb), v_ind,
     coalesce(p_checks,'[]'::jsonb), v_disp,
@@ -162,5 +155,10 @@ begin
 end
 $function$;
 
+revoke all on function public.penta_assure_certify_v1(text,text,text,jsonb,jsonb,timestamptz,jsonb)
+  from public, anon, authenticated;
+grant execute on function public.penta_assure_certify_v1(text,text,text,jsonb,jsonb,timestamptz,jsonb)
+  to service_role;
+
 comment on function public.penta_assure_certify_v1(text,text,text,jsonb,jsonb,timestamptz,jsonb)
-is 'PentaAssure v1 certification entrypoint with fail-closed independent-certifier identity enforcement. D3 remains human-reserved; this function does not create authority.';
+is 'PentaAssure certification entrypoint with fail-closed independent-certifier identity enforcement. Service-role only. D3 remains human-reserved; this function does not create authority.';
