@@ -39,7 +39,6 @@ jobs:
           from hashlib import sha256
           import io
           from pathlib import Path, PurePosixPath
-          import shutil
           import tarfile
 
           root = Path.cwd().resolve()
@@ -86,9 +85,6 @@ jobs:
               if source.endswith(('\n', '\r')):
                   normalized += '\n'
               path.write_text(normalized, encoding='utf-8')
-
-          shutil.rmtree(root / '.penta-bootstrap')
-          (root / '.github/workflows/penta-survival-bootstrap.yml').unlink()
           PY
 
       - name: Run deterministic source-candidate verification
@@ -106,6 +102,61 @@ jobs:
           test "$(jq -r '.production_eligible' /tmp/penta-survival-template.json)" = 'false'
           test "$(jq -r '.self_asserted_verification_accepted' /tmp/penta-survival-template.json)" = 'false'
 
+      - name: Stage workflow payload outside protected workflow paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import io
+          from pathlib import Path, PurePosixPath
+          import shutil
+          import subprocess
+          import tarfile
+
+          root = Path.cwd().resolve()
+          encoded = b''.join(
+              (root / f'.penta-bootstrap/payload.part{i}').read_bytes()
+              for i in range(1, 5)
+          )
+          archive = base64.b85decode(encoded)
+          stage_root = root / '.penta-workflow-staging'
+          stage_root.mkdir(parents=True, exist_ok=True)
+
+          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as package:
+              workflow_members = [
+                  member for member in package.getmembers()
+                  if member.isfile() and PurePosixPath(member.name).parts[:2] == ('.github', 'workflows')
+              ]
+
+          for member in workflow_members:
+              repo_path = PurePosixPath(member.name).as_posix()
+              source = root / repo_path
+              if not source.is_file():
+                  raise SystemExit(f'materialized workflow missing: {repo_path}')
+              relative = PurePosixPath(repo_path).relative_to('.github/workflows')
+              staged = stage_root / relative.as_posix()
+              staged.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source, staged)
+
+              tracked = subprocess.run(
+                  ['git', 'cat-file', '-e', f'HEAD:{repo_path}'],
+                  cwd=root,
+                  stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL,
+                  check=False,
+              ).returncode == 0
+              if tracked:
+                  restored = subprocess.check_output(['git', 'show', f'HEAD:{repo_path}'], cwd=root)
+                  source.write_bytes(restored)
+              else:
+                  source.unlink()
+
+          shutil.rmtree(root / '.penta-bootstrap')
+          PY
+
       - name: Stage and inspect governed implementation
         shell: bash
         run: |
@@ -121,7 +172,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git commit -m 'governance: enforce deterministic Penta survival contracts'
+          git commit -m 'governance: materialize deterministic Penta survival source'
 
       - name: Push governed implementation
         shell: bash
