@@ -26,13 +26,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 2
           persist-credentials: false
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.12"
 
       - name: Resolve exact governed diff range
         shell: bash
@@ -44,6 +39,13 @@ jobs:
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
+          # The sovereign-governance contract preserves a shallow checkout perimeter, but the
+          # applicability resolver requires the complete ancestry before computing merge-base.
+          # Expand history here instead of relying on a shallow merge-base or caller assertions.
+          if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+            git fetch --no-tags --prune --unshallow origin
+          fi
+          test "$(git rev-parse --is-shallow-repository)" = "false"
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             base="$PR_BASE_SHA"
             head="$PR_HEAD_SHA"
