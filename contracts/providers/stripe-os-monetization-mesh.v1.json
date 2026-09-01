@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "ct.provider.stripe.os-monetization-mesh.v1",
+  "version": "1.0.0",
+  "provider": "stripe",
+  "economic_authority": "ct.pentagreen.core.v1",
+  "mesh_binding": "ct.binding.pentagreen-stripe-mesh.v3",
+  "maturity": "production",
+  "authority_ceiling": "D3",
+  "d3_human_reserved_for": [
+    "refunds",
+    "transfers_and_payouts",
+    "bank_or_external_account_changes",
+    "dispute_disposition",
+    "material_money_routing_changes",
+    "final_legal_or_rights_commitments"
+  ],
+  "no_self_approval": true,
+  "stripe_is_replaceable_execution_provider": true,
+  "canonical_identity_rules": {
+    "sku_authority": "PentaSKU",
+    "price_authority": "PentaPrice",
+    "catalog_authority": "PentaCatalog",
+    "checkout_authority": "PentaCheckout",
+    "ledger_authority": "PentaLedger",
+    "provider_ids_are_aliases": true
+  },
+  "account_routes": [
+    {
+      "role": "COMMERCE_PRIMARY",
+      "priority": 10,
+      "state": "provider_live_verified",
+      "purpose": "first-party CrownThrive commerce, Checkout, Billing and invoices"
+    },
+    {
+      "role": "SECONDARY_COMMERCE_EXPANSION",
+      "priority": 20,
+      "state": "provider_live_verified_direct",
+      "purpose": "platform, Connect and expansion workloads"
+    }
+  ],
+  "credential_policy": {
+    "source": "integration_control.stripe_live_secret_lanes_v1",
+    "roles": ["HOT", "WARM", "COLD", "EMERGENCY"],
+    "same_material_alias_is_not_independent": true,
+    "emergency_auto_promotion": false,
+    "raw_secret_projection": false,
+    "auto_rotate": false,
+    "auto_delete": false,
+    "silent_replace": false
+  },
+  "adapters": [
+    "ct.adapter.stripe.mcp.v1",
+    "ct.adapter.stripe.runtime.v1",
+    "ct.adapter.stripe.webhook.v3",
+    "ct.adapter.stripe.catalog-mirror.v2"
+  ],
+  "capability_registry": "integration_control.stripe_os_capabilities_v1",
+  "factory_request": "integration_control.pentagreen_stripe_prepare_monetization_v1",
+  "factory_autowire": "integration_control.pentagreen_stripe_autowire_v1",
+  "single_clock_status": "integration_control.pentagreen_stripe_clock_status_v1",
+  "provider_mirrors": {
+    "products": "integration_control.stripe_catalog_products_v2",
+    "prices": "integration_control.stripe_catalog_prices_v2",
+    "payment_links": "integration_control.stripe_payment_link_inventory_v4",
+    "webhook_lanes": "integration_control.stripe_webhook_lanes_v3",
+    "webhook_endpoints": "integration_control.stripe_webhook_endpoints_v3",
+    "catalog_bridge": "integration_control.pentagreen_stripe_catalog_bridge_v1"
+  },
+  "factory_outputs": [
+    "product_price",
+    "payment_link",
+    "checkout",
+    "subscription",
+    "invoice",
+    "webhook_binding",
+    "connect_plan",
+    "catalog_sync"
+  ],
+  "factory_preconditions": [
+    "existing PentaGreen rights state reconciled",
+    "existing PentaGreen fulfillment state reconciled",
+    "existing PentaGreen quality state reconciled",
+    "existing route/custody/docs states reconciled",
+    "direct checkout desired",
+    "no existing Stripe product or price binding as applicable"
+  ],
+  "execution_controls": [
+    "idempotency",
+    "read_after_write",
+    "rollback_or_compensation",
+    "signed_webhook_fulfillment",
+    "provider_event_deduplication",
+    "no_entitlement_from_browser_redirect",
+    "provider_account_role_selection",
+    "PentaRoute and PentaWire reuse",
+    "CHLOM/DAIL terminal evidence",
+    "no duplicate PentaGreen scheduler"
+  ],
+  "clone_policy": {
+    "allowed": "CrownThrive-owned adapters, contracts, mirrors, workers, SDK wrappers, webhook routers, tests, skills and provider-neutral interfaces",
+    "forbidden": "copying or representing Stripe proprietary backend/services as CrownThrive-owned source"
+  },
+  "institutional_refs": {
+    "thrivebase": "integration_control.stripe_os_mesh_status_v1()",
+    "pentadocs": "/commerce/stripe-os-monetization-fabric",
+    "partner_registry": "integration_control.crownthrive_partner_registry_v1",
+    "github_repo": "crownthrive1/CrownThrive-OS"
+  },
+  "authority_created": false
+}
