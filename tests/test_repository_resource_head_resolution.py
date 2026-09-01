@@ -36,10 +36,38 @@ class RepositoryResourceHeadResolutionTests(unittest.TestCase):
         self.assertEqual(self.registry["self_reference_policy"]["mode"], "DYNAMIC_DEFAULT_BRANCH_HEAD")
         self.assertTrue(self.registry["self_reference_policy"]["static_exact_head_is_observation_only"])
 
-    def test_merge_burst_moved_heads_are_reconciled(self):
-        self.assertEqual(self.by_repo["crownthrive1/PRIVATE-PentaOS"]["exact_head"], "eda12cf5b2585146f2a8e982fb6a754c9c3bd13a")
-        self.assertEqual(self.by_repo["crownthrive1/PRIVATE-PentaInteroperation"]["exact_head"], "000629a25b851f4e6facd6ccb213a93817813975")
-        self.assertEqual(self.by_repo["crownthrive1/PentaAds-Placement-OS"]["exact_head"], "e80c78582ce9c41a458f190cdb2d8b99cdb6d950")
+    def test_merge_burst_history_is_preserved_without_freezing_current_heads(self):
+        incident = {
+            item["repository"]: item
+            for item in self.policy["merge_burst_head_reconciliation"]
+        }
+        expected_history = {
+            "crownthrive1/PRIVATE-PentaOS": (
+                "1d21fa1127bbfb8d1bd44f0233be9ace00fc9f66",
+                "eda12cf5b2585146f2a8e982fb6a754c9c3bd13a",
+                "linear_merge_stack_preserved",
+            ),
+            "crownthrive1/PRIVATE-PentaInteroperation": (
+                "2f1a09332792f204c945d75ad4f4472dccf134fe",
+                "000629a25b851f4e6facd6ccb213a93817813975",
+                "production_cutover_merge_preserved",
+            ),
+            "crownthrive1/PentaAds-Placement-OS": (
+                "e80c78582ce9c41a458f190cdb2d8b99cdb6d950",
+                "e80c78582ce9c41a458f190cdb2d8b99cdb6d950",
+                "already_current",
+            ),
+        }
+        for repository, (snapshot, readback, resolution) in expected_history.items():
+            self.assertIn(repository, incident)
+            self.assertEqual(incident[repository]["registry_snapshot_head"], snapshot)
+            self.assertEqual(incident[repository]["incident_readback_head"], readback)
+            self.assertEqual(incident[repository]["resolution"], resolution)
+
+            current = self.by_repo[repository]["exact_head"]
+            self.assertIsInstance(current, str)
+            self.assertEqual(len(current), 40)
+            int(current, 16)
 
     def test_reference_forks_remain_non_authoritative(self):
         reference = [item for item in self.registry["resources"] if item["resource_class"] == "REFERENCE_FORK"]
