@@ -57,6 +57,18 @@ begin
     );
   end if;
 
+  -- Scoped v3 manifests must explicitly declare that the global migration
+  -- ledger is observation-only. Missing, true, string, numeric, or other values
+  -- fail closed so a v3 candidate can never silently regress to global pinning.
+  if p_manifest#>'{runtime,global_ledger_pinned}' is distinct from 'false'::jsonb then
+    return jsonb_build_object(
+      'ok', false,
+      'decision', 'HOLD_GLOBAL_LEDGER_PIN_UNSUPPORTED',
+      'observed_value', p_manifest#>'{runtime,global_ledger_pinned}',
+      'required_value', false
+    );
+  end if;
+
   if coalesce(p_manifest#>>'{runtime,migration_statement_digest_contract}','') <> 'ct.cos.required-migration-statements-sha256.v1.jsonb-text' then
     return jsonb_build_object(
       'ok', false,
@@ -171,12 +183,9 @@ begin
     'required_migration_count', v_required_count,
     'required_function_count', v_function_count,
     'required_migration_set_sha256', v_computed_set_sha,
-    'global_ledger_pinned', coalesce((p_manifest#>>'{runtime,global_ledger_pinned}')::boolean, false),
+    'global_ledger_pinned', false,
     'authority_created', false
   );
-exception
-  when invalid_text_representation then
-    return jsonb_build_object('ok', false, 'decision', 'HOLD_MANIFEST_BOOLEAN_INVALID');
 end;
 $function$;
 
