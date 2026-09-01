@@ -1,8 +1,6 @@
--- Guarded rollback for App Factory direct GitHub-write RPC least-privilege hardening v1.
---
--- WARNING: this rollback restores the incident-observed anon/authenticated EXECUTE
--- state. It is intended only for explicit governed recovery. It refuses to run if
--- any protected function body has changed since the incident readback.
+-- Fail-closed recovery contract for App Factory direct GitHub-write RPC least-privilege hardening v1.
+-- The incident-observed end-user ACL is a known security defect and is never restored.
+-- Recovery is exact-definition-bound and reasserts service-role-only execution.
 
 DO $preflight$
 DECLARE
@@ -33,23 +31,16 @@ $preflight$;
 
 REVOKE ALL ON FUNCTION public.app_factory_github_create_new_file(text,text,text,text,text)
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_github_create_new_file(text,text,text,text,text)
-  TO anon, authenticated, service_role;
-
+GRANT EXECUTE ON FUNCTION public.app_factory_github_create_new_file(text,text,text,text,text) TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_merge_receipt_pr(text,text,boolean)
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_merge_receipt_pr(text,text,boolean)
-  TO anon, authenticated, service_role;
-
+GRANT EXECUTE ON FUNCTION public.app_factory_merge_receipt_pr(text,text,boolean) TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_public_android_canary_apply_known_repairs()
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_public_android_canary_apply_known_repairs()
-  TO anon, authenticated, service_role;
-
+GRANT EXECUTE ON FUNCTION public.app_factory_public_android_canary_apply_known_repairs() TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_publish_final_release_receipts()
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_publish_final_release_receipts()
-  TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.app_factory_publish_final_release_receipts() TO service_role;
 
 DO $readback$
 DECLARE
@@ -62,14 +53,14 @@ BEGIN
     'public.app_factory_publish_final_release_receipts()'
   ]
   LOOP
-    IF NOT has_function_privilege('anon',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_GITHUB_WRITE_RPC_ANON_EXECUTE_NOT_RESTORED:%',v_sig;
+    IF has_function_privilege('anon',v_sig,'EXECUTE') THEN
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_GITHUB_WRITE_RPC_ANON_EXECUTE_PRESENT:%',v_sig;
     END IF;
-    IF NOT has_function_privilege('authenticated',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_GITHUB_WRITE_RPC_AUTH_EXECUTE_NOT_RESTORED:%',v_sig;
+    IF has_function_privilege('authenticated',v_sig,'EXECUTE') THEN
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_GITHUB_WRITE_RPC_AUTHENTICATED_EXECUTE_PRESENT:%',v_sig;
     END IF;
     IF NOT has_function_privilege('service_role',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_GITHUB_WRITE_RPC_SERVICE_EXECUTE_NOT_RESTORED:%',v_sig;
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_GITHUB_WRITE_RPC_SERVICE_EXECUTE_MISSING:%',v_sig;
     END IF;
   END LOOP;
 END
