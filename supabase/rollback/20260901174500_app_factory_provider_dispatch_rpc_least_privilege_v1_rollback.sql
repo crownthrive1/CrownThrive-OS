@@ -1,6 +1,6 @@
--- Guarded rollback for App Factory provider-control dispatch RPC hardening v1.
--- WARNING: restores the incident-observed end-user EXECUTE state only under explicit
--- governed recovery and refuses to run if any protected function body has changed.
+-- Fail-closed recovery contract for App Factory provider-control dispatch RPC hardening v1.
+-- The incident-observed end-user ACL is a known security defect and is never restored.
+-- Recovery is exact-definition-bound and reasserts service-role-only execution.
 
 DO $preflight$
 DECLARE
@@ -31,23 +31,16 @@ $preflight$;
 
 REVOKE ALL ON FUNCTION public.app_factory_operational_cleanup_dispatch(text)
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_operational_cleanup_dispatch(text)
-  TO anon, authenticated, service_role;
-
+GRANT EXECUTE ON FUNCTION public.app_factory_operational_cleanup_dispatch(text) TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_ssl_control_dispatch(text)
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_ssl_control_dispatch(text)
-  TO anon, authenticated, service_role;
-
+GRANT EXECUTE ON FUNCTION public.app_factory_ssl_control_dispatch(text) TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_docroot_control_dispatch(text)
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_docroot_control_dispatch(text)
-  TO anon, authenticated, service_role;
-
+GRANT EXECUTE ON FUNCTION public.app_factory_docroot_control_dispatch(text) TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_storage_repair_dispatch(text)
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_storage_repair_dispatch(text)
-  TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.app_factory_storage_repair_dispatch(text) TO service_role;
 
 DO $readback$
 DECLARE
@@ -60,14 +53,14 @@ BEGIN
     'public.app_factory_storage_repair_dispatch(text)'
   ]
   LOOP
-    IF NOT has_function_privilege('anon',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_PROVIDER_DISPATCH_RPC_ANON_EXECUTE_NOT_RESTORED:%',v_sig;
+    IF has_function_privilege('anon',v_sig,'EXECUTE') THEN
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_PROVIDER_DISPATCH_RPC_ANON_EXECUTE_PRESENT:%',v_sig;
     END IF;
-    IF NOT has_function_privilege('authenticated',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_PROVIDER_DISPATCH_RPC_AUTH_EXECUTE_NOT_RESTORED:%',v_sig;
+    IF has_function_privilege('authenticated',v_sig,'EXECUTE') THEN
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_PROVIDER_DISPATCH_RPC_AUTHENTICATED_EXECUTE_PRESENT:%',v_sig;
     END IF;
     IF NOT has_function_privilege('service_role',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_PROVIDER_DISPATCH_RPC_SERVICE_EXECUTE_NOT_RESTORED:%',v_sig;
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_PROVIDER_DISPATCH_RPC_SERVICE_EXECUTE_MISSING:%',v_sig;
     END IF;
   END LOOP;
 END
