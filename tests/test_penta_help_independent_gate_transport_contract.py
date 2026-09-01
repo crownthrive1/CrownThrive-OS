@@ -9,6 +9,8 @@ MIGRATION = ROOT / "supabase/migrations/20260901111500_penta_help_independent_ga
 ROLLBACK = ROOT / "supabase/rollback/20260901111500_penta_help_independent_gate_transport_v1_rollback.sql"
 CERTIFIER_ISOLATION = ROOT / "supabase/migrations/20260901125500_penta_help_independent_gate_certifier_transport_isolation_v1.sql"
 CERTIFIER_ISOLATION_ROLLBACK = ROOT / "supabase/rollback/20260901125500_penta_help_independent_gate_certifier_transport_isolation_v1_rollback.sql"
+ASSIGNMENT_ISOLATION = ROOT / "supabase/migrations/20260901143000_penta_assignment_transport_result_isolation_v1.sql"
+ASSIGNMENT_ISOLATION_ROLLBACK = ROOT / "supabase/rollback/20260901143000_penta_assignment_transport_result_isolation_v1_rollback.sql"
 
 
 class PentaHelpIndependentGateTransportContractTests(unittest.TestCase):
@@ -18,6 +20,8 @@ class PentaHelpIndependentGateTransportContractTests(unittest.TestCase):
         cls.rollback = ROLLBACK.read_text(encoding="utf-8")
         cls.certifier_isolation = CERTIFIER_ISOLATION.read_text(encoding="utf-8")
         cls.certifier_isolation_rollback = CERTIFIER_ISOLATION_ROLLBACK.read_text(encoding="utf-8")
+        cls.assignment_isolation = ASSIGNMENT_ISOLATION.read_text(encoding="utf-8")
+        cls.assignment_isolation_rollback = ASSIGNMENT_ISOLATION_ROLLBACK.read_text(encoding="utf-8")
 
     def test_transport_is_bound_to_independent_gate_requests(self) -> None:
         self.assertIn("q.blocker_class='independent_gate'", self.migration)
@@ -127,6 +131,41 @@ class PentaHelpIndependentGateTransportContractTests(unittest.TestCase):
         self.assertIn("node_id='ct.penta.certify-review'", self.certifier_isolation_rollback)
         self.assertIn("then ''ct.penta.certify''", self.certifier_isolation_rollback)
         self.assertNotIn("delete from penta_help.requests_v1", self.certifier_isolation_rollback.lower())
+
+    def test_assignment_handoff_completion_cannot_synthesize_owner_pass(self) -> None:
+        self.assertIn("HOLD_ASSIGNMENT_OWNER_SEMANTIC_RESULT_MISSING", self.assignment_isolation)
+        self.assertIn("transport_completion_is_not_owner_pass", self.assignment_isolation)
+        self.assertIn("penta_assignment_owner_results_v1", self.assignment_isolation)
+        self.assertIn("r.result_state='PASS'", self.assignment_isolation)
+        self.assertIn("r.exact_head_sha is not distinct from a.exact_head_sha", self.assignment_isolation)
+        census_block = self.assignment_isolation.split("if d.dispatch_kind='CENSUS_HANDOFF' then", 1)[1].split("elsif d.dispatch_kind='OS20_TASK' then", 1)[0]
+        self.assertNotIn("penta_assignment_record_owner_result_v1", census_block)
+        self.assertNotIn("'PASS'", census_block)
+
+    def test_assignment_transport_isolation_preserves_no_authority_expansion(self) -> None:
+        forbidden = (
+            "PASS_CERTIFIED",
+            "LICENSE_GRANTED",
+            "provider_write=true",
+            "credential_change=true",
+            "money_movement=true",
+            "rights_grant=true",
+            "vote_effect=true",
+            "quorum_effect=true",
+            "d3_execution=true",
+        )
+        for token in forbidden:
+            self.assertNotIn(token, self.assignment_isolation)
+        self.assertIn("'authority_created',false", self.assignment_isolation)
+        self.assertIn("'authority_expansion',false", self.assignment_isolation)
+        self.assertIn("to service_role", self.assignment_isolation)
+
+    def test_assignment_transport_isolation_rollback_restores_predecessor_semantics_explicitly(self) -> None:
+        self.assertIn("Restores the immediately preceding reconciliation behavior", self.assignment_isolation_rollback)
+        self.assertIn("verified_census_handoff", self.assignment_isolation_rollback)
+        self.assertIn("penta_assignment_record_owner_result_v1", self.assignment_isolation_rollback)
+        self.assertIn("'PASS'", self.assignment_isolation_rollback)
+        self.assertNotIn("drop table", self.assignment_isolation_rollback.lower())
 
 
 if __name__ == "__main__":
