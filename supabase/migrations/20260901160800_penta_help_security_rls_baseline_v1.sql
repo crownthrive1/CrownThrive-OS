@@ -149,7 +149,7 @@ select jsonb_build_object(
                      else 'HOLD_RLS_BASELINE_DRIFT' end,
   'force_rls_intentionally_deferred',true,
   'authority_created',false,
-  'observed_at',clock_timestamp()
+  'observed_at',now()
 )
 from summary s cross join roles r;
 $function$;
