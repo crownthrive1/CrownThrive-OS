@@ -8,6 +8,7 @@ do $test$
 declare
   v_founder text := 'ct.test.founder.chlom-c2';
   v_agent text := 'ct.test.agent.chlom-c2';
+  v_authorization uuid;
   v_active uuid := extensions.gen_random_uuid();
   v_expired uuid := extensions.gen_random_uuid();
   v_missing uuid := extensions.gen_random_uuid();
@@ -25,7 +26,7 @@ begin
     'founder',v_founder,'archive_reverse_verify',
     jsonb_build_object('test_only',true,'work_package','CHLOM-C2-0001'),
     'active',true,clock_timestamp()+interval '15 minutes'
-  );
+  ) returning authorization_id into v_authorization;
 
   insert into chlom_runtime.agent_authority_leases_v1(
     lease_id,principal_kind,principal_id,capability,resource_type,resource_id,
@@ -39,12 +40,13 @@ begin
   );
 
   v_result := chlom_runtime.revoke_agent_authority_lease_v1(
-    v_active,'founder',v_founder,'TEST_REVOKE','active'
+    v_active,'founder',v_founder,v_authorization,'TEST_REVOKE','active'
   );
 
   if v_result->>'state' <> 'revoked'
      or not coalesce((v_result->>'mutation_applied')::boolean,false)
      or coalesce((v_result->>'authority_created')::boolean,true)
+     or v_result->>'authority_ref' <> v_authorization::text
      or v_result->>'dail_event_id' is null then
     raise exception 'TEST_FAIL_REVOKE_RESULT:%',v_result;
   end if;
@@ -57,7 +59,7 @@ begin
   end if;
 
   v_second := chlom_runtime.revoke_agent_authority_lease_v1(
-    v_active,'founder',v_founder,'TEST_REPLAY','active'
+    v_active,'founder',v_founder,v_authorization,'TEST_REPLAY','active'
   );
   if v_second->>'state' <> 'already_terminal'
      or coalesce((v_second->>'mutation_applied')::boolean,true)
@@ -77,7 +79,7 @@ begin
   );
 
   v_expired_result := chlom_runtime.revoke_agent_authority_lease_v1(
-    v_expired,'founder',v_founder,'TEST_EXPIRED','active'
+    v_expired,'founder',v_founder,v_authorization,'TEST_EXPIRED','active'
   );
   if v_expired_result->>'state' <> 'expired_before_revoke'
      or not coalesce((v_expired_result->>'mutation_applied')::boolean,false)
@@ -93,7 +95,7 @@ begin
   end if;
 
   v_missing_result := chlom_runtime.revoke_agent_authority_lease_v1(
-    v_missing,'founder',v_founder,'TEST_MISSING','active'
+    v_missing,'founder',v_founder,v_authorization,'TEST_MISSING','active'
   );
   if v_missing_result->>'state' <> 'lease_not_found'
      or coalesce((v_missing_result->>'mutation_applied')::boolean,true) then
@@ -102,7 +104,7 @@ begin
 
   begin
     perform chlom_runtime.revoke_agent_authority_lease_v1(
-      v_missing,'agent',v_agent,'TEST_BAD_ACTOR','active'
+      v_missing,'agent',v_agent,v_authorization,'TEST_BAD_ACTOR','active'
     );
   exception when others then
     v_raised := position('founder_revoker_required' in sqlerrm)>0;
@@ -111,14 +113,26 @@ begin
     raise exception 'TEST_FAIL_NON_FOUNDER_GUARD';
   end if;
 
+  v_raised := false;
+  begin
+    perform chlom_runtime.revoke_agent_authority_lease_v1(
+      v_missing,'founder',v_founder,extensions.gen_random_uuid(),'TEST_BAD_AUTH','active'
+    );
+  exception when others then
+    v_raised := position('exact_active_founder_authority_required' in sqlerrm)>0;
+  end;
+  if not v_raised then
+    raise exception 'TEST_FAIL_EXACT_AUTHORITY_BINDING';
+  end if;
+
   if has_function_privilege(
        'anon',
-       'chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,text,text)',
+       'chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,uuid,text,text)',
        'EXECUTE'
      )
      or has_function_privilege(
        'authenticated',
-       'chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,text,text)',
+       'chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,uuid,text,text)',
        'EXECUTE'
      ) then
     raise exception 'TEST_FAIL_PUBLIC_EXECUTE_GRANT';
@@ -132,6 +146,7 @@ begin
   select count(*) into v_receipts
     from chlom_runtime.authority_lease_revocation_receipts_v1
    where revoker_id=v_founder
+     and authority_ref=v_authorization
      and reason_code in ('TEST_REVOKE','TEST_REPLAY','TEST_EXPIRED','TEST_MISSING');
   if v_receipts <> 4 then
     raise exception 'TEST_FAIL_RECEIPT_COUNT:%',v_receipts;
