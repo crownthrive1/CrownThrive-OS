@@ -35,13 +35,18 @@ def test_migration_does_not_change_merge_function_body_or_expand_authority():
     assert "to public" not in sql
 
 
-def test_rollback_is_definition_bound_and_restores_only_observed_role_acl():
+def test_recovery_is_definition_bound_and_never_reopens_known_vulnerable_acl():
     sql = _normalized(ROLLBACK)
     assert SIGNATURE in sql
     assert INCIDENT_DEFINITION_SHA in sql
+    assert "fail-closed recovery" in sql
     assert "rollback_refuses_changed_app_factory_merge_rpc" in sql
-    assert "to anon, authenticated, service_role" in sql
+    assert "to service_role" in sql
+    assert "to anon" not in sql
+    assert "to authenticated" not in sql
     assert "to public" not in sql
+    assert "anon_execute_present" in sql
+    assert "authenticated_execute_present" in sql
 
 
 def test_incident_contract_documents_provider_write_and_no_authority_expansion():
