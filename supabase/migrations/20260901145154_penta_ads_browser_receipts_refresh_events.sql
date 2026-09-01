@@ -1,0 +1,2 @@
+alter table integration_control.penta_ads_browser_receipts_v1 drop constraint if exists penta_ads_browser_receipts_v1_event_check;
+alter table integration_control.penta_ads_browser_receipts_v1 add constraint penta_ads_browser_receipts_v1_event_check check (event = any (array['runtime-ready'::text,'placement-selected'::text,'placement-ready'::text,'placement-held'::text,'placement-refresh'::text,'placement-refresh-skipped'::text,'placement-resize'::text]));
