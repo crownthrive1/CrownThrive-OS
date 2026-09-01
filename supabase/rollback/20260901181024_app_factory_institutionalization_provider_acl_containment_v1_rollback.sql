@@ -1,6 +1,6 @@
--- Guarded rollback for App Factory institutionalization provider-dispatch ACL containment v1.
--- WARNING: restores the incident-observed end-user EXECUTE state only under explicit
--- governed recovery and refuses to run if any protected function body has changed.
+-- Fail-closed recovery contract for App Factory institutionalization provider-dispatch ACL containment v1.
+-- The incident-observed end-user ACL is a known security defect and is never restored.
+-- Recovery is exact-definition-bound and reasserts service-role-only execution.
 
 DO $preflight$
 DECLARE
@@ -21,8 +21,7 @@ BEGIN
     IF v_oid IS NULL THEN
       RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_INSTITUTIONALIZATION_RPC_NOT_FOUND:%',v_sig;
     END IF;
-    SELECT encode(extensions.digest(convert_to(pg_get_functiondef(v_oid),'UTF8'),'sha256'),'hex')
-      INTO v_actual_sha;
+    SELECT encode(extensions.digest(convert_to(pg_get_functiondef(v_oid),'UTF8'),'sha256'),'hex') INTO v_actual_sha;
     IF v_actual_sha <> v_expected_sha THEN
       RAISE EXCEPTION 'ROLLBACK_REFUSES_CHANGED_APP_FACTORY_INSTITUTIONALIZATION_RPC:%:%',v_sig,v_actual_sha;
     END IF;
@@ -32,23 +31,16 @@ $preflight$;
 
 REVOKE ALL ON FUNCTION public.app_factory_institutionalize_recertification_dispatch()
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_institutionalize_recertification_dispatch()
-  TO anon, authenticated, service_role;
-
+GRANT EXECUTE ON FUNCTION public.app_factory_institutionalize_recertification_dispatch() TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_institutionalize_release_dispatch()
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_institutionalize_release_dispatch()
-  TO anon, authenticated, service_role;
-
+GRANT EXECUTE ON FUNCTION public.app_factory_institutionalize_release_dispatch() TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_merge_institutionalization_dispatch()
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_merge_institutionalization_dispatch()
-  TO anon, authenticated, service_role;
-
+GRANT EXECUTE ON FUNCTION public.app_factory_merge_institutionalization_dispatch() TO service_role;
 REVOKE ALL ON FUNCTION public.app_factory_merge_recertification_dispatch()
   FROM PUBLIC, anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.app_factory_merge_recertification_dispatch()
-  TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.app_factory_merge_recertification_dispatch() TO service_role;
 
 DO $readback$
 DECLARE
@@ -61,14 +53,14 @@ BEGIN
     'public.app_factory_merge_recertification_dispatch()'
   ]
   LOOP
-    IF NOT has_function_privilege('anon',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_INSTITUTIONALIZATION_RPC_ANON_EXECUTE_NOT_RESTORED:%',v_sig;
+    IF has_function_privilege('anon',v_sig,'EXECUTE') THEN
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_INSTITUTIONALIZATION_RPC_ANON_EXECUTE_PRESENT:%',v_sig;
     END IF;
-    IF NOT has_function_privilege('authenticated',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_INSTITUTIONALIZATION_RPC_AUTH_EXECUTE_NOT_RESTORED:%',v_sig;
+    IF has_function_privilege('authenticated',v_sig,'EXECUTE') THEN
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_INSTITUTIONALIZATION_RPC_AUTHENTICATED_EXECUTE_PRESENT:%',v_sig;
     END IF;
     IF NOT has_function_privilege('service_role',v_sig,'EXECUTE') THEN
-      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_INSTITUTIONALIZATION_RPC_SERVICE_EXECUTE_NOT_RESTORED:%',v_sig;
+      RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_INSTITUTIONALIZATION_RPC_SERVICE_EXECUTE_MISSING:%',v_sig;
     END IF;
   END LOOP;
 END
