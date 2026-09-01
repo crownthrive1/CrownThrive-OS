@@ -9,6 +9,8 @@ MIGRATION = ROOT / "supabase/migrations/20260901033000_penta_helper_bounded_retr
 ROLLBACK = ROOT / "supabase/rollback/20260901033000_penta_helper_bounded_retry_enforcement_v1_rollback.sql"
 BRIDGE = ROOT / "supabase/migrations/20260901034500_penta_pr_terminal_provider_schema_bridge_v1.sql"
 BRIDGE_ROLLBACK = ROOT / "supabase/rollback/20260901034500_penta_pr_terminal_provider_schema_bridge_v1_rollback.sql"
+INDEPENDENT_GATE_LIFECYCLE = ROOT / "supabase/migrations/20260901090500_penta_help_independent_gate_lifecycle_hardening_v1.sql"
+INDEPENDENT_GATE_LIFECYCLE_ROLLBACK = ROOT / "supabase/rollback/20260901090500_penta_help_independent_gate_lifecycle_hardening_v1_rollback.sql"
 
 
 class PentaHelperBoundedRetryContractTests(unittest.TestCase):
@@ -55,6 +57,50 @@ class PentaHelperBoundedRetryContractTests(unittest.TestCase):
             "when p_success then 'triaged' when r.attempt_count>=r.max_attempts then 'waiting_external'",
             self.rollback,
         )
+
+
+class PentaHelpIndependentGateLifecycleTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.migration = INDEPENDENT_GATE_LIFECYCLE.read_text(encoding="utf-8")
+        cls.rollback = INDEPENDENT_GATE_LIFECYCLE_ROLLBACK.read_text(encoding="utf-8")
+
+    def test_independent_gate_ttl_does_not_terminally_expire_request(self) -> None:
+        self.assertIn("blocker_class='independent_gate'", self.migration)
+        self.assertIn("set state='waiting_external'", self.migration)
+        self.assertIn("blocker_class is distinct from 'independent_gate'", self.migration)
+
+    def test_independent_gate_never_enters_automatic_helper_pick(self) -> None:
+        self.assertIn("and blocker_class is distinct from 'independent_gate'", self.migration)
+        self.assertIn("and attempt_count<max_attempts", self.migration)
+
+    def test_liaison_expiry_is_after_ttyl_for_independent_gate(self) -> None:
+        self.assertIn("v_ttyl_at + interval '1 hour'", self.migration)
+        self.assertIn("greatest(\n        r.expires_at,\n        v_ttyl_at + interval '1 hour')", self.migration)
+        self.assertIn("'ttyl_at',v_ttyl_at,'expires_at',v_thread_expires", self.migration)
+
+    def test_expired_unresolved_liaison_can_be_rerouted_without_reopening_resolved(self) -> None:
+        self.assertIn("l.state not in ('resolved','expired')", self.migration)
+        self.assertIn("when penta_help.liaison_threads_v1.state='resolved' then 'resolved'", self.migration)
+        self.assertIn("else 'routed'", self.migration)
+        self.assertIn("else null", self.migration)
+
+    def test_independent_gate_repair_does_not_create_authority_or_pass(self) -> None:
+        forbidden = (
+            "PASS_CERTIFIED",
+            "LICENSE_GRANTED",
+            "provider_write=true",
+            "vote_effect=true",
+            "quorum_effect=true",
+        )
+        for token in forbidden:
+            self.assertNotIn(token, self.migration)
+        self.assertIn("remain fail-closed", self.migration)
+
+    def test_rollback_restores_prior_expiry_and_liaison_shape(self) -> None:
+        self.assertIn("now()+make_interval(secs=>r.ttyl_seconds),r.expires_at", self.rollback)
+        self.assertIn("set state='expired',updated_at=now()", self.rollback)
+        self.assertNotIn("independent_gate_window_v1", self.rollback)
 
 
 class PentaPRTerminalProviderSchemaBridgeTests(unittest.TestCase):
