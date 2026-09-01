@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Event-driven autonomous PentaPR convergence authority.
 
-This wrapper preserves the existing PentaPR/PentaMerge/PentaCloser contracts while
-closing the execution gap between classification and terminal action. It never
-removes HOLDs, promotes drafts, bypasses failed/pending checks, manufactures
-provider evidence, or expands D3 authority.
+v2.1 removes time-only terminal closure. PentaPR may restack, merge when the
+governed gate is current and green, or request PentaCloser only for an explicit
+CLOSE disposition such as a deterministic supersession/represented-zero-delta.
+A PR is never closed merely because a wall-clock deadline expired.
 """
-
 from __future__ import annotations
 
 import argparse
@@ -15,7 +14,6 @@ import sys
 from typing import Any
 
 import penta_pr_lifecycle as lifecycle
-
 
 AUTOPILOT_SELF_CHECK = "pentapr autopilot"
 
@@ -47,7 +45,7 @@ def attempt_restack(gh: lifecycle.GH, number: int) -> tuple[bool, str]:
     return True, str(result.get("message") or "update_branch_requested")
 
 
-def drive_one(gh: lifecycle.GH, number: int, *, allow_deadline_close: bool) -> None:
+def drive_one(gh: lifecycle.GH, number: int) -> None:
     lifecycle.pentapr(gh, number)
     pull = gh.get(f"/repos/{gh.repo}/pulls/{number}")
     if pull.get("state") != "open":
@@ -68,8 +66,15 @@ def drive_one(gh: lifecycle.GH, number: int, *, allow_deadline_close: bool) -> N
         print(f"PentaAutopilot #{number} merged={merged} {message}")
         return
 
-    if allow_deadline_close:
+    if disposition == "CLOSE":
+        # PentaCloser remains the terminal authority. Crucially, it is invoked
+        # only for an evidence-based CLOSE classification, never because a
+        # generic deadline elapsed.
         lifecycle.pentacloser(gh, number)
+        print(
+            f"PentaAutopilot #{number} close_candidate=true "
+            f"reason={reason or 'unknown'}"
+        )
         return
 
     print(
@@ -82,6 +87,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY"))
     parser.add_argument("--number", type=int)
+    # Compatibility flag retained so old/manual callers do not crash. It no
+    # longer grants time-only closure authority.
     parser.add_argument("--allow-deadline-close", action="store_true")
     args = parser.parse_args()
     if not args.repo:
@@ -93,11 +100,7 @@ def main() -> int:
 
     pulls = lifecycle.open_pull_requests(gh, args.number)
     for pull in pulls:
-        drive_one(
-            gh,
-            int(pull["number"]),
-            allow_deadline_close=args.allow_deadline_close,
-        )
+        drive_one(gh, int(pull["number"]))
     return 0
 
 

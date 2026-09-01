@@ -2,7 +2,7 @@ name: Penta PR Gate Awareness
 
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize, edited, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
   workflow_dispatch:
     inputs:
       number:
@@ -10,152 +10,71 @@ on:
         required: true
         type: string
 
+# v2 is deliberately observation/projection-only. PentaPM owns Development
+# metadata. This workflow must not create Issues, edit PR bodies, or push
+# evidence commits into candidate branches.
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  actions: write
+  contents: read
+  pull-requests: read
+  issues: read
   checks: read
   statuses: read
+  actions: read
 
 concurrency:
-  group: penta-pr-gate-awareness-${{ github.repository }}-${{ github.event.pull_request.number || inputs.number || github.run_id }}
-  cancel-in-progress: false
+  group: penta-pr-gate-awareness-${{ github.repository }}-${{ github.event.pull_request.number || inputs.number }}
+  cancel-in-progress: true
 
 jobs:
   gate-awareness:
-    name: Penta originator self-certification
+    name: Penta originator readiness projection
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - name: Resolve bounded provider credential
-        shell: bash
-        env:
-          DEDICATED_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
-          BUILTIN_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          if [[ -n "$DEDICATED_TOKEN" ]]; then
-            echo "PENTA_GATE_TOKEN=$DEDICATED_TOKEN" >> "$GITHUB_ENV"
-            echo "Using the dedicated bounded Penta PR provider credential."
-          else
-            echo "PENTA_GATE_TOKEN=$BUILTIN_TOKEN" >> "$GITHUB_ENV"
-            echo "Dedicated credential unavailable; using the repository-scoped workflow token."
-          fi
-
       - name: Resolve exact same-repository PR target
         id: target
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
           EVENT_NUMBER: ${{ github.event.pull_request.number }}
           INPUT_NUMBER: ${{ inputs.number }}
-          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
-          import os
-          import urllib.request
+          import json, os, urllib.request
 
-          repo = os.environ['REPOSITORY']
-          number = (os.environ.get('EVENT_NUMBER') or os.environ.get('INPUT_NUMBER') or '').strip()
+          repo = os.environ["REPOSITORY"]
+          number = (os.environ.get("EVENT_NUMBER") or os.environ.get("INPUT_NUMBER") or "").strip()
           if not number.isdigit():
-              raise SystemExit('pull_request_number_required')
-          token = os.environ['PENTA_GATE_TOKEN']
-          headers = {
-              'Accept': 'application/vnd.github+json',
-              'Authorization': f'Bearer {token}',
-              'X-GitHub-Api-Version': '2022-11-28',
-              'User-Agent': 'CrownThrive-Penta-Gate-Awareness',
-          }
-          req = urllib.request.Request(f'https://api.github.com/repos/{repo}/pulls/{number}', headers=headers)
-          with urllib.request.urlopen(req, timeout=30) as response:
+              raise SystemExit("pull_request_number_required")
+          request = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/pulls/{number}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "CrownThrive-Penta-Gate-Awareness/2.0",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
               pull = json.load(response)
-          if pull.get('state') != 'open':
-              raise SystemExit('pull_request_not_open')
-          head_repo = ((pull.get('head') or {}).get('repo') or {}).get('full_name')
-          if head_repo != repo:
-              raise SystemExit('external_fork_provider_mutation_fail_closed')
-          head = (pull.get('head') or {}).get('sha') or ''
-          base = (pull.get('base') or {}).get('sha') or ''
-          head_ref = (pull.get('head') or {}).get('ref') or ''
-          originator = ((pull.get('user') or {}).get('login') or 'unknown-originator').strip()
+          if pull.get("state") != "open":
+              raise SystemExit("pull_request_not_open")
+          if (((pull.get("head") or {}).get("repo") or {}).get("full_name")) != repo:
+              raise SystemExit("external_fork_projection_fail_closed")
+          head = (pull.get("head") or {}).get("sha") or ""
+          base = (pull.get("base") or {}).get("sha") or ""
+          head_ref = (pull.get("head") or {}).get("ref") or ""
+          originator = ((pull.get("user") or {}).get("login") or "unknown-originator").strip()
           if len(head) != 40 or len(base) != 40 or not head_ref:
-              raise SystemExit('exact_pr_identity_unresolved')
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
-              fh.write(f'number={int(number)}\n')
-              fh.write(f'head_sha={head}\n')
-              fh.write(f'base_sha={base}\n')
-              fh.write(f'head_ref={head_ref}\n')
-              fh.write(f'originator={originator}\n')
-          print(json.dumps({'number': int(number), 'base_sha': base, 'head_sha': head, 'head_ref': head_ref, 'originator': originator}, sort_keys=True))
-          PY
-
-      - name: Heal missing PentaDevelopment linkage
-        id: development
-        shell: bash
-        env:
-          REPOSITORY: ${{ github.repository }}
-          NUMBER: ${{ steps.target.outputs.number }}
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          import os
-          import re
-          import time
-          import urllib.error
-          import urllib.request
-
-          repo = os.environ['REPOSITORY']
-          number = int(os.environ['NUMBER'])
-          token = os.environ['PENTA_GATE_TOKEN']
-          headers = {
-              'Accept': 'application/vnd.github+json',
-              'Authorization': f'Bearer {token}',
-              'Content-Type': 'application/json',
-              'X-GitHub-Api-Version': '2022-11-28',
-              'User-Agent': 'CrownThrive-Penta-Gate-Awareness',
-          }
-
-          def request(method, path, body=None):
-              data = None if body is None else json.dumps(body).encode()
-              for attempt in range(5):
-                  req = urllib.request.Request(f'https://api.github.com/repos/{repo}{path}', headers=headers, data=data, method=method)
-                  try:
-                      with urllib.request.urlopen(req, timeout=30) as response:
-                          raw = response.read()
-                          return json.loads(raw or b'null')
-                  except urllib.error.HTTPError as exc:
-                      if exc.code in {403, 429} and attempt < 4:
-                          time.sleep(min(2 ** attempt, 8))
-                          continue
-                      raise
-
-          pull = request('GET', f'/pulls/{number}')
-          body = pull.get('body') or ''
-          match = re.search(r'(?mi)^\s*(refs|closes|fixes)\s+#(\d+)\b', body)
-          if match:
-              issue = int(match.group(2))
-              state = 'existing'
-          else:
-              issue_payload = request('POST', '/issues', {
-                  'title': f'[PentaDevelopment] PR #{number}: {pull.get("title") or "governed change"}',
-                  'body': (
-                      f'Relationship: PR-scoped Development unit\nDevelopment PR: #{number}\n\n'
-                      'Automatically created by Penta PR Gate Awareness because every PR must carry an explicit Development linkage. '
-                      'This issue is metadata/evidence routing only and grants no D3 authority.'
-                  ),
-              })
-              issue = int(issue_payload['number'])
-              patched = body.rstrip() + f'\n\nRefs #{issue}\n'
-              request('PATCH', f'/pulls/{number}', {'body': patched})
-              state = 'created_and_bound'
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
-              fh.write(f'issue={issue}\n')
-              fh.write(f'state={state}\n')
-          print(json.dumps({'state': state, 'development_issue': issue}, sort_keys=True))
+              raise SystemExit("exact_pr_identity_unresolved")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"number={int(number)}\n")
+              fh.write(f"head_sha={head}\n")
+              fh.write(f"base_sha={base}\n")
+              fh.write(f"head_ref={head_ref}\n")
+              fh.write(f"originator={originator}\n")
           PY
 
       - name: Check out canonical Penta control plane
@@ -166,13 +85,12 @@ jobs:
           persist-credentials: false
           path: penta-control
 
-      - name: Check out exact PR branch with provider write scope
+      - name: Check out exact candidate head read-only
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository }}
-          ref: ${{ steps.target.outputs.head_ref }}
-          token: ${{ env.PENTA_GATE_TOKEN }}
-          persist-credentials: true
+          ref: ${{ steps.target.outputs.head_sha }}
+          persist-credentials: false
           fetch-depth: 0
           path: pr-worktree
 
@@ -181,21 +99,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify exact head has not moved
-        shell: bash
-        env:
-          EXPECTED_HEAD: ${{ steps.target.outputs.head_sha }}
-        run: |
-          set -euo pipefail
-          cd pr-worktree
-          observed="$(git rev-parse HEAD)"
-          if [[ "$observed" != "$EXPECTED_HEAD" ]]; then
-            echo "PR head moved during reconciliation; the next synchronize event will regenerate evidence."
-            exit 75
-          fi
-
-      - name: Write exact-head self-certification and continuity blobs
-        id: self_cert
+      - name: Generate exact-head originator-readiness packet without source mutation
         shell: bash
         env:
           REPOSITORY: ${{ github.repository }}
@@ -206,29 +110,11 @@ jobs:
         run: |
           set -euo pipefail
           cd pr-worktree
-
-          # A bounded Penta evidence-projection commit must be terminal for this
-          # reconciliation cycle. Re-certifying that projection would move the
-          # PR head forever and prevent exact-head provider checks from settling.
-          projection_message="chore(penta): self-certify PR #${NUMBER} evidence"
-          current_message="$(git log -1 --pretty=%s)"
-          mapfile -t current_paths < <(git diff-tree --no-commit-id --name-only -r HEAD)
-          if [[ "$current_message" == "$projection_message" && ${#current_paths[@]} -gt 0 ]]; then
-            projection_only=true
-            for path in "${current_paths[@]}"; do
-              case "$path" in
-                "penta/evidence/pr-self-cert/pr-${NUMBER}.json"|"penta/continuity/receipts/pr-${NUMBER}-self-certification.json") ;;
-                *) projection_only=false; break ;;
-              esac
-            done
-            if [[ "$projection_only" == true ]]; then
-              printf '{"changed":false,"reason":"current_head_is_bounded_evidence_projection"}\n' > "$RUNNER_TEMP/penta-pr-self-certification.json"
-              cat "$RUNNER_TEMP/penta-pr-self-certification.json"
-              echo 'changed=false' >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
+          observed="$(git rev-parse HEAD)"
+          if [[ "$observed" != "$HEAD_SHA" ]]; then
+            echo "::error::PR head moved during readiness projection"
+            exit 75
           fi
-
           git fetch --no-tags --no-recurse-submodules origin "$BASE_SHA" "$HEAD_SHA"
           python ../penta-control/scripts/penta_pr_gate_awareness.py prepare \
             --repo . \
@@ -237,43 +123,32 @@ jobs:
             --head "$HEAD_SHA" \
             --pr-number "$NUMBER" \
             --originator "$ORIGINATOR" \
-            > "$RUNNER_TEMP/penta-pr-self-certification.json"
-          cat "$RUNNER_TEMP/penta-pr-self-certification.json"
-          if [[ -n "$(git status --porcelain -- penta/evidence/pr-self-cert penta/continuity/receipts)" ]]; then
-            echo 'changed=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'changed=false' >> "$GITHUB_OUTPUT"
-          fi
+            > "$RUNNER_TEMP/penta-pr-originator-readiness.json"
+          cat "$RUNNER_TEMP/penta-pr-originator-readiness.json"
 
-      - name: Commit and push evidence projection
-        if: steps.self_cert.outputs.changed == 'true'
-        shell: bash
-        env:
-          NUMBER: ${{ steps.target.outputs.number }}
-          HEAD_REF: ${{ steps.target.outputs.head_ref }}
-        run: |
-          set -euo pipefail
-          cd pr-worktree
-          git config user.name 'CrownThrive Penta Gate Awareness'
-          git config user.email 'contact@crownthrive.com'
-          git add \
-            "penta/evidence/pr-self-cert/pr-${NUMBER}.json" \
-            "penta/continuity/receipts/pr-${NUMBER}-self-certification.json"
-          git commit -m "chore(penta): self-certify PR #${NUMBER} evidence"
-          git push origin "HEAD:${HEAD_REF}"
+      - name: Upload immutable workflow evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-pr-originator-readiness-${{ steps.target.outputs.number }}-${{ steps.target.outputs.head_sha }}
+          path: |
+            ${{ runner.temp }}/penta-pr-originator-readiness.json
+            pr-worktree/penta/evidence/pr-self-cert/pr-${{ steps.target.outputs.number }}.json
+            pr-worktree/penta/continuity/receipts/pr-${{ steps.target.outputs.number }}-self-certification.json
+          if-no-files-found: warn
+          retention-days: 90
 
-      - name: Project gate-aware state
+      - name: Project ownership boundary
         if: always()
         shell: bash
         run: |
           {
-            echo '## Penta PR Gate Awareness'
+            echo '## Penta PR Gate Awareness v2'
             echo
             echo "- PR: #${{ steps.target.outputs.number }}"
-            echo "- Input head: \`${{ steps.target.outputs.head_sha }}\`"
-            echo "- Development linkage: ${{ steps.development.outputs.state }} (#${{ steps.development.outputs.issue }})"
-            echo "- Evidence projection written: ${{ steps.self_cert.outputs.changed }}"
-            echo '- Originator self-certification: required'
-            echo '- Required provider gates: remain authoritative and cannot be bypassed by the self-certification packet'
-            echo '- DAIL: final institutional certification still requires governed DAIL binding/readback'
+            echo "- Exact head: \`${{ steps.target.outputs.head_sha }}\`"
+            echo '- Development metadata owner: **PentaPM only**'
+            echo '- Candidate branch mutation: **disabled**'
+            echo '- Issue creation: **disabled**'
+            echo '- PR body mutation: **disabled**'
+            echo '- Originator readiness: workflow artifact only; zero independent certification authority'
           } >> "$GITHUB_STEP_SUMMARY"
