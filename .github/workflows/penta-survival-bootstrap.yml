@@ -58,6 +58,7 @@ jobs:
           if actual_archive_sha != expected_archive_sha:
               raise SystemExit(f'archive SHA mismatch: {actual_archive_sha}')
 
+          written_paths: list[Path] = []
           with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as package:
               members = package.getmembers()
               if len(members) != 16:
@@ -74,13 +75,17 @@ jobs:
                       raise SystemExit(f'unreadable package member: {member.name}')
                   destination.parent.mkdir(parents=True, exist_ok=True)
                   destination.write_bytes(payload.read())
+                  written_paths.append(destination)
 
-          documentation = root / 'docs/phase3/PENTA_SURVIVAL_CONTRACT.md'
-          source = documentation.read_text(encoding='utf-8')
-          normalized = '\n'.join(line.rstrip() for line in source.splitlines())
-          if source.endswith('\n'):
-              normalized += '\n'
-          documentation.write_text(normalized, encoding='utf-8')
+          text_suffixes = {'.md', '.py', '.json', '.yaml', '.yml', '.sh', '.txt'}
+          for path in written_paths:
+              if path.suffix.lower() not in text_suffixes:
+                  continue
+              source = path.read_text(encoding='utf-8')
+              normalized = '\n'.join(line.rstrip(' \t') for line in source.splitlines())
+              if source.endswith('\n'):
+                  normalized += '\n'
+              path.write_text(normalized, encoding='utf-8')
 
           shutil.rmtree(root / '.penta-bootstrap')
           (root / '.github/workflows/penta-survival-bootstrap.yml').unlink()
