@@ -5,7 +5,7 @@
 
 create table if not exists chlom_runtime.authority_lease_revocation_receipts_v1 (
   receipt_id uuid primary key default extensions.gen_random_uuid(),
-  lease_id uuid null,
+  lease_id uuid not null,
   outcome text not null check (outcome in (
     'revoked',
     'already_terminal',
@@ -23,6 +23,7 @@ create table if not exists chlom_runtime.authority_lease_revocation_receipts_v1 
   resource_id text null,
   revoker_kind text not null check (revoker_kind = 'founder'),
   revoker_id text not null,
+  authority_ref uuid not null,
   reason_code text not null,
   mutation_applied boolean not null default false,
   authority_created boolean not null default false check (authority_created = false),
@@ -45,6 +46,7 @@ create or replace function chlom_runtime.revoke_agent_authority_lease_v1(
   p_lease_id uuid,
   p_revoker_kind text,
   p_revoker_id text,
+  p_authorization_id uuid,
   p_reason_code text,
   p_expected_state text default 'active'
 )
@@ -81,6 +83,9 @@ begin
   if p_revoker_id is null or length(trim(p_revoker_id)) < 2 then
     raise exception 'revoker_id_required';
   end if;
+  if p_authorization_id is null then
+    raise exception 'authorization_id_required';
+  end if;
   if p_reason_code is null or p_reason_code !~ '^[A-Z0-9_:-]{4,96}$' then
     raise exception 'invalid_reason_code';
   end if;
@@ -91,14 +96,15 @@ begin
   select exists(
     select 1
       from chlom_runtime.archive_reverse_authorizations
-     where principal_kind='founder'
+     where authorization_id=p_authorization_id
+       and principal_kind='founder'
        and principal_id=p_revoker_id
        and founder_granted=true
        and state='active'
        and (expires_at is null or expires_at>clock_timestamp())
   ) into v_founder_ok;
   if not v_founder_ok then
-    raise exception 'active_founder_authority_required';
+    raise exception 'exact_active_founder_authority_required';
   end if;
 
   perform pg_advisory_xact_lock(hashtextextended('chlom.authority.lease|' || p_lease_id::text, 0));
@@ -111,7 +117,7 @@ begin
 
   v_correlation_id := 'ctcorr:chlom-c2:lease-revoke:' || encode(
     extensions.digest(
-      concat_ws('|', p_lease_id::text, p_revoker_id, p_reason_code, coalesce(v_state,'missing')),
+      concat_ws('|', p_lease_id::text, p_revoker_id, p_authorization_id::text, p_reason_code, coalesce(v_state,'missing')),
       'sha256'
     ),
     'hex'
@@ -151,6 +157,7 @@ begin
         'resource_type',v_resource_type,
         'resource_id',v_resource_id,
         'reason_code',p_reason_code,
+        'authority_ref',p_authorization_id,
         'authority_created',false
       ),
       p_revoker_id,
@@ -159,7 +166,7 @@ begin
       '1.0.0',
       v_correlation_id,
       null,
-      'Founder-authorized exact-lease revocation; no delegated authority created',
+      'archive_reverse_authorizations:' || p_authorization_id::text,
       null,
       'restricted'
     ) into v_event;
@@ -167,12 +174,11 @@ begin
 
   insert into chlom_runtime.authority_lease_revocation_receipts_v1(
     lease_id,outcome,expected_state,observed_state,principal_kind,principal_id,
-    capability,resource_type,resource_id,revoker_kind,revoker_id,reason_code,
+    capability,resource_type,resource_id,revoker_kind,revoker_id,authority_ref,reason_code,
     mutation_applied,dail_event_id,correlation_id,metadata
   ) values (
-    case when v_outcome='lease_not_found' then null else p_lease_id end,
-    v_outcome,p_expected_state,v_state,v_principal_kind,v_principal_id,
-    v_capability,v_resource_type,v_resource_id,p_revoker_kind,p_revoker_id,p_reason_code,
+    p_lease_id,v_outcome,p_expected_state,v_state,v_principal_kind,v_principal_id,
+    v_capability,v_resource_type,v_resource_id,p_revoker_kind,p_revoker_id,p_authorization_id,p_reason_code,
     v_mutation,case when v_event is null then null else v_event->>'event_id' end,v_correlation_id,
     jsonb_build_object(
       'authority_created',false,
@@ -187,6 +193,7 @@ begin
     'lease_id',p_lease_id,
     'receipt_id',v_receipt_id,
     'observed_state',v_state,
+    'authority_ref',p_authorization_id,
     'mutation_applied',v_mutation,
     'authority_created',false,
     'dail_event_id',case when v_event is null then null else v_event->>'event_id' end,
@@ -195,10 +202,10 @@ begin
 end
 $function$;
 
-revoke all on function chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,text,text) from public, anon, authenticated;
-grant execute on function chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,text,text) to postgres, service_role;
+revoke all on function chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,uuid,text,text) from public, anon, authenticated;
+grant execute on function chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,uuid,text,text) to postgres, service_role;
 
 comment on table chlom_runtime.authority_lease_revocation_receipts_v1 is
-  'CHLOM C2 non-secret receipts for exact authority-lease revocation outcomes; no authority is created by this surface.';
-comment on function chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,text,text) is
-  'CHLOM C2 founder-authorized exact-lease revocation with advisory serialization, fail-closed role checks, DAIL lineage on successful revocation, and non-secret receipts.';
+  'CHLOM C2 non-secret receipts for exact authority-lease revocation outcomes; exact founder authority is bound and no authority is created by this surface.';
+comment on function chlom_runtime.revoke_agent_authority_lease_v1(uuid,text,text,uuid,text,text) is
+  'CHLOM C2 exact-authority-bound lease revocation with advisory serialization, fail-closed role checks, DAIL lineage on successful revocation, and non-secret receipts.';
