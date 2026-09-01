@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import unittest
 
 
@@ -42,8 +43,17 @@ class PentaHelpIndependentGateTransportContractTests(unittest.TestCase):
         self.assertIn("HOLD_TARGET_NODE_UNREGISTERED", self.migration)
         self.assertIn("HOLD_TARGET_NODE_UNHEALTHY", self.migration)
         self.assertIn("'ct.penta.security'", self.migration)
-        self.assertIn("'ct.chlom.authority'", self.migration)
-        self.assertIn("'ct.cie.review'", self.migration)
+        self.assertIn("'ct.penta.chlom-review'", self.migration)
+        self.assertIn("'ct.penta.cie-review'", self.migration)
+
+    def test_every_concrete_target_obeys_pentas_v2_node_id_contract(self) -> None:
+        targets = re.findall(r"then '([^']+)'", self.migration)
+        concrete = [value for value in targets if not value.startswith("unresolved://")]
+        self.assertGreaterEqual(len(concrete), 4)
+        for target in concrete:
+            self.assertRegex(target, r"^ct[.]penta[.][a-z0-9][a-z0-9._-]{2,160}$")
+        self.assertNotIn("ct.chlom.authority", self.migration)
+        self.assertNotIn("ct.cie.review", self.migration)
 
     def test_current_pentacertifier_node_is_supported_without_inheriting_authority(self) -> None:
         self.assertIn("'ct.penta.certify'", self.migration)
