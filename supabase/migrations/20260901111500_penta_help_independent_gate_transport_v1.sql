@@ -9,6 +9,9 @@
 -- credentials, money, votes/quorum, D3, or authority. A target node keeps its own independent
 -- decision/certification rules. Missing target nodes remain explicit HOLDs rather than being
 -- silently treated as success.
+--
+-- Penta v2 node IDs MUST satisfy ^ct[.]penta[.]. CHLOM/CIE review nodes are therefore bounded
+-- transport/execution identities under the Penta namespace, not sovereign CHLOM/CIE identities.
 
 create table if not exists penta_help.independent_gate_dispatches_v1 (
   dispatch_id uuid primary key default gen_random_uuid(),
@@ -99,8 +102,8 @@ begin
     v_target:=case
       when v_owner in ('penta.certify','pentacertify','penta certifier','pentacertifier') then 'ct.penta.certify'
       when v_owner in ('penta.security','pentasecurity') then 'ct.penta.security'
-      when v_owner in ('chlom','chlom_core','chlom core') then 'ct.chlom.authority'
-      when v_owner in ('cie','ct.framework.cultural-imprint-engine','cultural imprint engine') then 'ct.cie.review'
+      when v_owner in ('chlom','chlom_core','chlom core') then 'ct.penta.chlom-review'
+      when v_owner in ('cie','ct.framework.cultural-imprint-engine','cultural imprint engine') then 'ct.penta.cie-review'
       else 'unresolved://independent-gate-target'
     end;
 
