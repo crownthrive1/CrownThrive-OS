@@ -77,13 +77,13 @@ jobs:
                   destination.write_bytes(payload.read())
                   written_paths.append(destination)
 
-          text_suffixes = {'.md', '.py', '.json', '.yaml', '.yml', '.sh', '.txt'}
           for path in written_paths:
-              if path.suffix.lower() not in text_suffixes:
+              try:
+                  source = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
                   continue
-              source = path.read_text(encoding='utf-8')
               normalized = '\n'.join(line.rstrip(' \t') for line in source.splitlines())
-              if source.endswith('\n'):
+              if source.endswith(('\n', '\r')):
                   normalized += '\n'
               path.write_text(normalized, encoding='utf-8')
 
@@ -106,14 +106,25 @@ jobs:
           test "$(jq -r '.production_eligible' /tmp/penta-survival-template.json)" = 'false'
           test "$(jq -r '.self_asserted_verification_accepted' /tmp/penta-survival-template.json)" = 'false'
 
-      - name: Commit governed implementation and remove bootstrap scaffolding
+      - name: Stage and inspect governed implementation
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'PentaSurvival'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git diff --cached --check
           git status --short
+          git diff --cached --name-status
+          git diff --cached --check
+
+      - name: Commit governed implementation
+        shell: bash
+        run: |
+          set -euo pipefail
           git commit -m 'governance: enforce deterministic Penta survival contracts'
+
+      - name: Push governed implementation
+        shell: bash
+        run: |
+          set -euo pipefail
           git push origin HEAD:governance/penta-survival-contract-v1-20260831
