@@ -1,7 +1,6 @@
--- Guarded rollback for App Factory production-merge RPC least-privilege hardening v1.
--- Restores the exact pre-containment role ACL only if the provider-writing function bytes are
--- still the incident-observed definition. This rollback intentionally re-opens the prior
--- anon/authenticated execution state and therefore must be used only for controlled recovery.
+-- Fail-closed recovery contract for App Factory production-merge RPC least-privilege hardening v1.
+-- The incident-observed end-user ACL is a known security defect and is never restored.
+-- Recovery is definition-bound and reasserts the safe service-role-only execution boundary.
 
 DO $preflight$
 DECLARE
@@ -22,18 +21,18 @@ $preflight$;
 REVOKE ALL ON FUNCTION public.app_factory_merge_production_pr(text,text,boolean)
   FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.app_factory_merge_production_pr(text,text,boolean)
-  TO anon, authenticated, service_role;
+  TO service_role;
 
 DO $readback$
 BEGIN
-  IF NOT has_function_privilege('anon','public.app_factory_merge_production_pr(text,text,boolean)','EXECUTE') THEN
-    RAISE EXCEPTION 'ROLLBACK_ANON_EXECUTE_NOT_RESTORED';
+  IF has_function_privilege('anon','public.app_factory_merge_production_pr(text,text,boolean)','EXECUTE') THEN
+    RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_MERGE_RPC_ANON_EXECUTE_PRESENT';
   END IF;
-  IF NOT has_function_privilege('authenticated','public.app_factory_merge_production_pr(text,text,boolean)','EXECUTE') THEN
-    RAISE EXCEPTION 'ROLLBACK_AUTHENTICATED_EXECUTE_NOT_RESTORED';
+  IF has_function_privilege('authenticated','public.app_factory_merge_production_pr(text,text,boolean)','EXECUTE') THEN
+    RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_MERGE_RPC_AUTHENTICATED_EXECUTE_PRESENT';
   END IF;
   IF NOT has_function_privilege('service_role','public.app_factory_merge_production_pr(text,text,boolean)','EXECUTE') THEN
-    RAISE EXCEPTION 'ROLLBACK_SERVICE_ROLE_EXECUTE_NOT_RESTORED';
+    RAISE EXCEPTION 'ROLLBACK_APP_FACTORY_MERGE_RPC_SERVICE_ROLE_EXECUTE_MISSING';
   END IF;
 END
 $readback$;
