@@ -1,0 +1,107 @@
+name: Materialize Penta Survival Contract
+
+on:
+  push:
+    branches:
+      - governance/penta-survival-contract-v1-20260831
+
+permissions:
+  contents: write
+
+concurrency:
+  group: penta-survival-bootstrap-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact governed branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Materialize and verify source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          from hashlib import sha256
+          import io
+          from pathlib import Path, PurePosixPath
+          import shutil
+          import tarfile
+
+          root = Path.cwd().resolve()
+          parts = [root / f'.penta-bootstrap/payload.part{i}' for i in range(1, 5)]
+          for part in parts:
+              if not part.is_file():
+                  raise SystemExit(f'missing bootstrap payload: {part}')
+          encoded = b''.join(part.read_bytes() for part in parts)
+          expected_encoded_sha = 'ab127b3a5bf47659645b0761fd4bd30ddb45f134548b319204b50a94b72bd44c'
+          actual_encoded_sha = sha256(encoded).hexdigest()
+          if actual_encoded_sha != expected_encoded_sha:
+              raise SystemExit(f'bootstrap payload SHA mismatch: {actual_encoded_sha}')
+          archive = base64.b85decode(encoded)
+          expected_archive_sha = '3ca29085b19b5f8e27272a0925020f281cbebab3c1890b600b67ef1f6d19627c'
+          actual_archive_sha = sha256(archive).hexdigest()
+          if actual_archive_sha != expected_archive_sha:
+              raise SystemExit(f'archive SHA mismatch: {actual_archive_sha}')
+
+          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as package:
+              members = package.getmembers()
+              if len(members) != 16:
+                  raise SystemExit(f'unexpected package member count: {len(members)}')
+              for member in members:
+                  pure = PurePosixPath(member.name)
+                  if not member.isfile() or pure.is_absolute() or '..' in pure.parts:
+                      raise SystemExit(f'unsafe package member: {member.name}')
+                  destination = (root / pure.as_posix()).resolve()
+                  if destination != root and root not in destination.parents:
+                      raise SystemExit(f'package member escapes repository: {member.name}')
+                  payload = package.extractfile(member)
+                  if payload is None:
+                      raise SystemExit(f'unreadable package member: {member.name}')
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(payload.read())
+
+          shutil.rmtree(root / '.penta-bootstrap')
+          (root / '.github/workflows/penta-survival-bootstrap.yml').unlink()
+          PY
+
+      - name: Run deterministic source-candidate verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile runtime/penta_survival.py scripts/validate_penta_survival.py
+          python3 -m unittest tests.test_penta_survival -v
+          python3 scripts/validate_penta_survival.py audit --root . --output /tmp/penta-survival-coverage.json
+          python3 scripts/validate_penta_survival.py validate-contract \
+            data/penta/survival-contract.template.v1.json \
+            --root . \
+            --output /tmp/penta-survival-template.json
+          test "$(jq -r '.disposition' /tmp/penta-survival-template.json)" = 'DECLARED'
+          test "$(jq -r '.production_eligible' /tmp/penta-survival-template.json)" = 'false'
+          test "$(jq -r '.self_asserted_verification_accepted' /tmp/penta-survival-template.json)" = 'false'
+
+      - name: Commit governed implementation and remove bootstrap scaffolding
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'PentaSurvival'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git status --short
+          git commit -m 'governance: enforce deterministic Penta survival contracts'
+          git push origin HEAD:governance/penta-survival-contract-v1-20260831
