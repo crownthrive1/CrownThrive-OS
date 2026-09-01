@@ -1,0 +1,143 @@
+name: PENTA Deterministic Survival Contract
+
+on:
+  pull_request:
+    paths:
+      - "data/penta/**"
+      - "schemas/penta/**"
+      - "runtime/penta_survival.py"
+      - "scripts/validate_penta_survival.py"
+      - "tests/test_penta_survival.py"
+      - "tests/survival/**"
+      - "penta/survival/evidence/**"
+      - "docs/phase3/PENTA_SURVIVAL_CONTRACT.md"
+      - ".github/workflows/penta-survival-contract.yml"
+      - ".github/workflows/penta-survival-release-gate.yml"
+      - ".github/workflows/governed-merge-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/penta/**"
+      - "schemas/penta/**"
+      - "runtime/penta_survival.py"
+      - "scripts/validate_penta_survival.py"
+      - "tests/test_penta_survival.py"
+      - "tests/survival/**"
+      - "penta/survival/evidence/**"
+      - "docs/phase3/PENTA_SURVIVAL_CONTRACT.md"
+      - ".github/workflows/penta-survival-contract.yml"
+      - ".github/workflows/penta-survival-release-gate.yml"
+      - ".github/workflows/governed-merge-gate.yml"
+  workflow_dispatch:
+    inputs:
+      enforce_full_production_check:
+        description: "Fail unless every certified/production Penta has verified exact-release survival proof"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-survival-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Validate contracts, proofs and adoption ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate machine-readable artifacts
+        run: |
+          python -m json.tool data/penta/survival-policy.v1.json >/dev/null
+          python -m json.tool data/penta/survival-contracts.registry.json >/dev/null
+          python -m json.tool data/penta/survival-contract.template.v1.json >/dev/null
+          python -m json.tool data/penta/survival-proof.template.v1.json >/dev/null
+          python -m json.tool schemas/penta/penta-survival-contract-v1.schema.json >/dev/null
+          python -m json.tool schemas/penta/penta-survival-proof-v1.schema.json >/dev/null
+          python -m json.tool tests/survival/model-off-survival-test-plan.v1.json >/dev/null
+
+      - name: Compile dependency-free survival gate
+        run: |
+          python -m py_compile runtime/penta_survival.py
+          python -m py_compile scripts/validate_penta_survival.py
+          python -m py_compile tests/test_penta_survival.py
+
+      - name: Run deterministic survival test suite
+        run: python -m unittest -v tests.test_penta_survival
+
+      - name: Validate canonical declaration template
+        run: |
+          mkdir -p artifacts
+          python scripts/validate_penta_survival.py --root . validate-contract \
+            data/penta/survival-contract.template.v1.json \
+            --output artifacts/penta-survival-template-validation.json
+
+      - name: Emit complete family survival census
+        run: |
+          python scripts/validate_penta_survival.py --root . audit \
+            --output artifacts/penta-survival-audit.json
+
+      - name: Enforce pull-request survival ratchet
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+          python scripts/validate_penta_survival.py --root . ratchet \
+            --base-ref "origin/${BASE_BRANCH}" \
+            --output artifacts/penta-survival-ratchet.json
+
+      - name: Enforce complete production closure on demand
+        if: github.event_name == 'workflow_dispatch' && inputs.enforce_full_production_check
+        run: |
+          python scripts/validate_penta_survival.py --root . check \
+            --output artifacts/penta-survival-production-check.json
+
+      - name: Publish survival receipt summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          rows = ["## PENTA deterministic survival", ""]
+          for path in sorted(Path("artifacts").glob("penta-survival-*.json")):
+              data = json.loads(path.read_text(encoding="utf-8"))
+              rows.append(f"### `{path.name}`")
+              rows.append("")
+              rows.append(f"- disposition: `{data.get('disposition', 'UNKNOWN')}`")
+              if "family_member_count" in data:
+                  rows.append(f"- registered Pentas: `{data['family_member_count']}`")
+                  rows.append(f"- verified contracts: `{data.get('verified_contract_count', 0)}`")
+                  rows.append(f"- production blockers: `{data.get('production_blocker_count', 0)}`")
+                  rows.append(f"- declaration debt: `{data.get('declaration_debt_count', 0)}`")
+              if "blocker_count" in data:
+                  rows.append(f"- ratchet blockers: `{data['blocker_count']}`")
+              rows.append(f"- receipt SHA-256: `{data.get('receipt_sha256', 'n/a')}`")
+              rows.append("")
+          summary.write_text("\n".join(rows) + "\n", encoding="utf-8")
+          PY
+
+      - name: Preserve survival receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-survival-receipts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/penta-survival-*.json
+          if-no-files-found: error
+          retention-days: 30

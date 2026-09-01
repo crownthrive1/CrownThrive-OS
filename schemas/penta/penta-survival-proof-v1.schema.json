@@ -1,0 +1,316 @@
+{
+  "$defs": {
+    "case": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "pass"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "not_applicable_reason"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not_applicable"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "not_applicable_reason"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "assertion_count": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "case_id": {
+          "enum": [
+            "identity.restart-stability",
+            "state.durable-rehydrate",
+            "determinism.replay",
+            "queue.redelivery-idempotency",
+            "lease.owner-loss-fencing",
+            "penta-dnd.ttl-conflict-survival",
+            "penta-queue.work-state-survival",
+            "penta-pm.ownership-survival",
+            "dail.history-continuity",
+            "chlom.authority-continuity",
+            "penta-certifier.exact-subject",
+            "penta-self.case-survival",
+            "cos.phase-cursor-survival",
+            "model.unavailable-degraded-mode",
+            "model.replacement-compatibility",
+            "crash.commit-receipt-boundaries",
+            "recovery.backup-restore-isolation"
+          ]
+        },
+        "not_applicable_reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "passed_assertion_count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "receipt_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "not_applicable"
+          ]
+        }
+      },
+      "required": [
+        "case_id",
+        "status",
+        "observed_at",
+        "receipt_ref",
+        "receipt_sha256",
+        "assertion_count",
+        "passed_assertion_count"
+      ],
+      "type": "object"
+    },
+    "gitSha": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "nonEmpty": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "semver": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "subject": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "build_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "compiled_behavior_hash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "doctrine_version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "function_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runtime_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "source_commit": {
+          "$ref": "#/$defs/gitSha"
+        }
+      },
+      "required": [
+        "source_commit",
+        "artifact_sha256",
+        "doctrine_version",
+        "compiled_behavior_hash",
+        "function_set_sha256",
+        "runtime_version",
+        "build_id"
+      ],
+      "type": "object"
+    },
+    "summary": {
+      "additionalProperties": false,
+      "properties": {
+        "all_applicable_cases_pass": {
+          "const": true
+        },
+        "authority_manufactured": {
+          "const": false
+        },
+        "case_count": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "fail_count": {
+          "const": 0
+        },
+        "not_applicable_count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pass_count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "production_promoted": {
+          "const": false
+        },
+        "provider_write_performed": {
+          "const": false
+        }
+      },
+      "required": [
+        "case_count",
+        "pass_count",
+        "not_applicable_count",
+        "fail_count",
+        "all_applicable_cases_pass",
+        "authority_manufactured",
+        "production_promoted",
+        "provider_write_performed"
+      ],
+      "type": "object"
+    },
+    "verifier": {
+      "additionalProperties": false,
+      "properties": {
+        "identity_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "independent": {
+          "const": true
+        },
+        "provider_readback_ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "receipt_chain_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "verification_method": {
+          "enum": [
+            "governed_ci_oidc",
+            "penta_certifier",
+            "accountable_human_dual_control"
+          ]
+        },
+        "verification_run_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "verifier_id": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      },
+      "required": [
+        "verifier_id",
+        "independent",
+        "identity_ref",
+        "verification_method",
+        "verification_run_ref",
+        "receipt_chain_ref"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://crownthrive.com/schemas/penta/penta-survival-proof-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Immutable exact-subject execution evidence independently verified after the candidate source commit is fixed.",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/case"
+      },
+      "maxItems": 17,
+      "minItems": 17,
+      "type": "array"
+    },
+    "executed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "penta_id": {
+      "pattern": "^penta\\.[a-z0-9][a-z0-9.-]*$",
+      "type": "string"
+    },
+    "proof_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "proof_version": {
+      "$ref": "#/$defs/semver"
+    },
+    "schema": {
+      "const": "ct.penta.survival-proof-bundle.v1"
+    },
+    "subject": {
+      "$ref": "#/$defs/subject"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "test_plan_ref": {
+      "const": "tests/survival/model-off-survival-test-plan.v1.json"
+    },
+    "test_plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "verified_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "verifier": {
+      "$ref": "#/$defs/verifier"
+    }
+  },
+  "required": [
+    "schema",
+    "proof_version",
+    "proof_id",
+    "penta_id",
+    "subject",
+    "test_plan_ref",
+    "test_plan_sha256",
+    "executed_at",
+    "verified_at",
+    "expires_at",
+    "verifier",
+    "cases",
+    "summary"
+  ],
+  "title": "PENTA_SURVIVAL_PROOF_BUNDLE v1",
+  "type": "object"
+}

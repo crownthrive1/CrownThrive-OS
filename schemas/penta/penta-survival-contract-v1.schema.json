@@ -1,0 +1,1219 @@
+{
+  "$defs": {
+    "attestation": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "declared_by": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "evidence_bundle_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "declared",
+            "verified",
+            "hold",
+            "failed",
+            "expired"
+          ]
+        },
+        "verified_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "verified_by": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "verifier_independent": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status",
+        "declared_by",
+        "declared_at",
+        "verifier_independent",
+        "evidence_bundle_sha256"
+      ],
+      "type": "object"
+    },
+    "authority": {
+      "additionalProperties": false,
+      "properties": {
+        "append_only_audit_required": {
+          "const": true
+        },
+        "candidate_certified_production_sha_equal": {
+          "const": true
+        },
+        "chlom_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "dail_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "deterministic_boundary_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "exact_candidate_sha_required": {
+          "const": true
+        },
+        "fail_closed": {
+          "const": true
+        },
+        "model_can_authorize": {
+          "const": false
+        },
+        "model_can_mutate_authoritative_state": {
+          "const": false
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "provider_write_requires_certified_binding": {
+          "const": true
+        },
+        "provider_write_requires_readback": {
+          "const": true
+        },
+        "receipt_chain_required": {
+          "const": true
+        }
+      },
+      "required": [
+        "deterministic_boundary_ref",
+        "chlom_ref",
+        "dail_ref",
+        "model_can_authorize",
+        "model_can_mutate_authoritative_state",
+        "fail_closed",
+        "exact_candidate_sha_required",
+        "candidate_certified_production_sha_equal",
+        "provider_write_requires_certified_binding",
+        "provider_write_requires_readback",
+        "append_only_audit_required",
+        "receipt_chain_required",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "degraded": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_operations": {
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "authority_enforcement_preserved": {
+          "const": true
+        },
+        "forbidden_operations": {
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "health_state": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "mode": {
+          "enum": [
+            "full_deterministic_service",
+            "deterministic_core_only",
+            "read_only",
+            "queue_and_hold",
+            "fail_closed"
+          ]
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "queue_and_lease_safety_preserved": {
+          "const": true
+        },
+        "state_integrity_preserved": {
+          "const": true
+        }
+      },
+      "required": [
+        "mode",
+        "allowed_operations",
+        "forbidden_operations",
+        "state_integrity_preserved",
+        "authority_enforcement_preserved",
+        "queue_and_lease_safety_preserved",
+        "health_state",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "deterministicFunction": {
+      "additionalProperties": false,
+      "properties": {
+        "deterministic_boundary": {
+          "const": true
+        },
+        "implementation_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "input_schema_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "output_schema_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "replay_on_stored_inputs": {
+          "const": true
+        },
+        "replay_vectors_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "replay_vectors_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "side_effect_mode": {
+          "enum": [
+            "pure",
+            "effect_planned",
+            "effect_adapter"
+          ]
+        },
+        "side_effects_isolated": {
+          "const": true
+        },
+        "version": {
+          "$ref": "#/$defs/semver"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "implementation_sha256",
+        "input_schema_ref",
+        "output_schema_ref",
+        "replay_vectors_ref",
+        "replay_vectors_sha256",
+        "replay_on_stored_inputs",
+        "side_effects_isolated",
+        "deterministic_boundary",
+        "side_effect_mode",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "deterministicFunctions": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "declared"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "functions": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "not_applicable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "functions": {
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "not_applicable_reason"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "compiled_behavior_hash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "function_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "functions": {
+          "items": {
+            "$ref": "#/$defs/deterministicFunction"
+          },
+          "type": "array"
+        },
+        "mode": {
+          "enum": [
+            "declared",
+            "not_applicable"
+          ]
+        },
+        "not_applicable_reason": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        }
+      },
+      "required": [
+        "mode",
+        "functions",
+        "compiled_behavior_hash",
+        "function_set_sha256",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "bundle_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "content_addressed": {
+          "const": true
+        },
+        "evidence_as_of": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "immutable": {
+          "const": true
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model_off_test_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "negative_test_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "receipt_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "release_bound": {
+          "const": true
+        },
+        "restart_test_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "stress_test_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "subject": {
+          "$ref": "#/$defs/evidenceSubject"
+        }
+      },
+      "required": [
+        "bundle_id",
+        "bundle_ref",
+        "immutable",
+        "content_addressed",
+        "release_bound",
+        "evidence_as_of",
+        "expires_at",
+        "subject",
+        "receipt_refs",
+        "negative_test_refs",
+        "stress_test_refs",
+        "restart_test_refs",
+        "model_off_test_ref",
+        "manifest_sha256"
+      ],
+      "type": "object"
+    },
+    "evidenceSubject": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "build_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "compiled_behavior_hash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "doctrine_version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "function_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "runtime_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "source_commit": {
+          "$ref": "#/$defs/gitSha"
+        }
+      },
+      "required": [
+        "source_commit",
+        "artifact_sha256",
+        "doctrine_version",
+        "compiled_behavior_hash",
+        "runtime_version",
+        "build_id",
+        "function_set_sha256"
+      ],
+      "type": "object"
+    },
+    "gitSha": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "health": {
+      "additionalProperties": false,
+      "properties": {
+        "authority_state_exposed": {
+          "const": true
+        },
+        "degraded_state_exposed": {
+          "const": true
+        },
+        "dependency_state_exposed": {
+          "const": true
+        },
+        "lease_state_exposed": {
+          "const": true
+        },
+        "liveness": {
+          "$ref": "#/$defs/probe"
+        },
+        "model_state_separate": {
+          "const": true
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "queue_state_exposed": {
+          "const": true
+        },
+        "readiness": {
+          "$ref": "#/$defs/probe"
+        },
+        "survival": {
+          "$ref": "#/$defs/probe"
+        }
+      },
+      "required": [
+        "liveness",
+        "readiness",
+        "survival",
+        "dependency_state_exposed",
+        "authority_state_exposed",
+        "queue_state_exposed",
+        "lease_state_exposed",
+        "model_state_separate",
+        "degraded_state_exposed",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "leaseBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_source_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "conflict_test_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "fencing_token": {
+          "const": true
+        },
+        "lease_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "renewal_seconds": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "stale_owner_rejected": {
+          "const": true
+        },
+        "ttl_seconds": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lease_id",
+        "ttl_seconds",
+        "renewal_seconds",
+        "fencing_token",
+        "stale_owner_rejected",
+        "clock_source_ref",
+        "conflict_test_ref",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "leases": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "uses_leases": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bindings": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "uses_leases": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bindings": {
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "not_applicable_reason"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "bindings": {
+          "items": {
+            "$ref": "#/$defs/leaseBinding"
+          },
+          "type": "array"
+        },
+        "not_applicable_reason": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "uses_leases": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "uses_leases",
+        "bindings",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "modelDependency": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "optional",
+                  "proposal_required"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "model_adapter_ref"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "deterministic_authority_independent": {
+          "const": true
+        },
+        "direct_provider_execution": {
+          "const": false
+        },
+        "direct_tool_execution": {
+          "const": false
+        },
+        "durable_state_independent": {
+          "const": true
+        },
+        "mode": {
+          "enum": [
+            "none",
+            "optional",
+            "proposal_required"
+          ]
+        },
+        "model_adapter_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "model_output_untrusted": {
+          "const": true
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "purpose": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "queue_and_lease_safety_independent": {
+          "const": true
+        }
+      },
+      "required": [
+        "mode",
+        "purpose",
+        "deterministic_authority_independent",
+        "durable_state_independent",
+        "queue_and_lease_safety_independent",
+        "model_output_untrusted",
+        "direct_tool_execution",
+        "direct_provider_execution",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "nonEmpty": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "pentaId": {
+      "pattern": "^penta\\.[a-z0-9][a-z0-9.-]*$",
+      "type": "string"
+    },
+    "persistentIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "identity_registry_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "model_independent": {
+          "const": true
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "provider_independent": {
+          "const": true
+        },
+        "stable_id": {
+          "$ref": "#/$defs/pentaId"
+        },
+        "survives_node_replacement": {
+          "const": true
+        },
+        "survives_process_restart": {
+          "const": true
+        }
+      },
+      "required": [
+        "stable_id",
+        "identity_registry_ref",
+        "survives_process_restart",
+        "survives_node_replacement",
+        "provider_independent",
+        "model_independent",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "persistentState": {
+      "additionalProperties": false,
+      "properties": {
+        "authoritative_store_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "backup_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "checkpoint_strategy_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "externalized": {
+          "const": true
+        },
+        "in_memory_authoritative": {
+          "const": false
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "restore_test_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "rpo_seconds": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rto_seconds": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state_schema_version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "survives_restart": {
+          "const": true
+        }
+      },
+      "required": [
+        "externalized",
+        "in_memory_authoritative",
+        "survives_restart",
+        "authoritative_store_ref",
+        "state_schema_version",
+        "checkpoint_strategy_ref",
+        "backup_ref",
+        "restore_test_ref",
+        "rpo_seconds",
+        "rto_seconds",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "probe": {
+      "additionalProperties": false,
+      "properties": {
+        "failure_semantics": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "probe_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "success_semantics": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "timeout_seconds": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "probe_ref",
+        "timeout_seconds",
+        "success_semantics",
+        "failure_semantics"
+      ],
+      "type": "object"
+    },
+    "queueBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "dead_letter_queue_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "delivery_semantics": {
+          "enum": [
+            "at_least_once_idempotent",
+            "exactly_once_effect",
+            "transactional_outbox"
+          ]
+        },
+        "durable": {
+          "const": true
+        },
+        "idempotency_key_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "idempotent_consumer": {
+          "const": true
+        },
+        "ordering": {
+          "enum": [
+            "none",
+            "partition",
+            "global"
+          ]
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "queue_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "retry_policy_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "stable_job_ids": {
+          "const": true
+        }
+      },
+      "required": [
+        "queue_id",
+        "durable",
+        "stable_job_ids",
+        "idempotent_consumer",
+        "idempotency_key_ref",
+        "retry_policy_ref",
+        "dead_letter_queue_ref",
+        "delivery_semantics",
+        "ordering",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "queues": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "uses_queues": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bindings": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "uses_queues": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bindings": {
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "not_applicable_reason"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "bindings": {
+          "items": {
+            "$ref": "#/$defs/queueBinding"
+          },
+          "type": "array"
+        },
+        "not_applicable_reason": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "uses_queues": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "uses_queues",
+        "bindings",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "recovery": {
+      "additionalProperties": false,
+      "properties": {
+        "backup_restore_test_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "dependency_rebuild_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "isolation_recovery_test_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "recovery_point_objective_seconds": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_time_objective_seconds": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_without_model": {
+          "const": true
+        },
+        "strategy_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      },
+      "required": [
+        "strategy_ref",
+        "recovery_point_objective_seconds",
+        "recovery_time_objective_seconds",
+        "backup_restore_test_ref",
+        "isolation_recovery_test_ref",
+        "dependency_rebuild_ref",
+        "recovery_without_model",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "refs": {
+      "items": {
+        "$ref": "#/$defs/nonEmpty"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "releaseBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "binding_mode": {
+          "const": "external_exact_subject_proof"
+        },
+        "build_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "compiled_behavior_hash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "doctrine_version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "exact_source_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "runtime_version": {
+          "$ref": "#/$defs/semver"
+        },
+        "source_commit": {
+          "$ref": "#/$defs/gitSha"
+        }
+      },
+      "required": [
+        "binding_mode",
+        "exact_source_ref",
+        "source_commit",
+        "artifact_sha256",
+        "doctrine_version",
+        "compiled_behavior_hash",
+        "runtime_version",
+        "build_id"
+      ],
+      "type": "object"
+    },
+    "replaceableModel": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "applicable": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "adapter_contract_ref",
+              "compatibility_test_ref",
+              "proof_refs"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "applicable": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "not_applicable_reason"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "adapter_contract_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "applicable": {
+          "type": "boolean"
+        },
+        "compatibility_test_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "not_applicable_reason": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "replaceable": {
+          "const": true
+        },
+        "replacement_preserves_authority": {
+          "const": true
+        },
+        "replacement_preserves_identity": {
+          "const": true
+        },
+        "replacement_preserves_replay": {
+          "const": true
+        },
+        "replacement_preserves_state": {
+          "const": true
+        }
+      },
+      "required": [
+        "applicable",
+        "replaceable",
+        "replacement_preserves_identity",
+        "replacement_preserves_state",
+        "replacement_preserves_authority",
+        "replacement_preserves_replay"
+      ],
+      "type": "object"
+    },
+    "restart": {
+      "additionalProperties": false,
+      "properties": {
+        "authority_rechecked": {
+          "const": true
+        },
+        "chaos_test_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "duplicate_effects_prevented": {
+          "const": true
+        },
+        "identity_preserved": {
+          "const": true
+        },
+        "in_flight_work_reconciled": {
+          "const": true
+        },
+        "proof_refs": {
+          "$ref": "#/$defs/refs"
+        },
+        "restart_matrix_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "stable_job_ids_preserved": {
+          "const": true
+        },
+        "stale_leases_fenced": {
+          "const": true
+        },
+        "state_reloaded_from_authoritative_store": {
+          "const": true
+        },
+        "tested_cases": {
+          "items": {
+            "enum": [
+              "graceful_restart",
+              "crash_before_commit",
+              "crash_after_commit_before_receipt",
+              "queue_redelivery",
+              "lease_owner_loss",
+              "model_unavailable",
+              "model_replaced",
+              "backup_restore",
+              "node_replacement",
+              "dependency_rebuild"
+            ]
+          },
+          "minItems": 7,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "identity_preserved",
+        "state_reloaded_from_authoritative_store",
+        "in_flight_work_reconciled",
+        "stable_job_ids_preserved",
+        "duplicate_effects_prevented",
+        "stale_leases_fenced",
+        "authority_rechecked",
+        "tested_cases",
+        "restart_matrix_ref",
+        "chaos_test_ref",
+        "proof_refs"
+      ],
+      "type": "object"
+    },
+    "semver": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "$id": "https://crownthrive.com/schemas/penta/penta-survival-contract-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Exact-release deterministic survival declaration and proof contract for a CrownThrive Penta Family member.",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "attestation": {
+      "$ref": "#/$defs/attestation"
+    },
+    "authority_enforcement": {
+      "$ref": "#/$defs/authority"
+    },
+    "canonical_name": {
+      "$ref": "#/$defs/nonEmpty"
+    },
+    "contract_id": {
+      "pattern": "^ct\\.penta\\.survival\\.[a-z0-9][a-z0-9.-]*\\.v[0-9]+$",
+      "type": "string"
+    },
+    "contract_version": {
+      "$ref": "#/$defs/semver"
+    },
+    "degraded_without_model": {
+      "$ref": "#/$defs/degraded"
+    },
+    "deterministic_functions": {
+      "$ref": "#/$defs/deterministicFunctions"
+    },
+    "environment": {
+      "const": "production"
+    },
+    "evidence": {
+      "$ref": "#/$defs/evidence"
+    },
+    "health_check": {
+      "$ref": "#/$defs/health"
+    },
+    "leases": {
+      "$ref": "#/$defs/leases"
+    },
+    "maturity": {
+      "enum": [
+        "specified",
+        "implemented",
+        "certified",
+        "production",
+        "hold",
+        "retired"
+      ]
+    },
+    "model_dependency": {
+      "$ref": "#/$defs/modelDependency"
+    },
+    "penta_id": {
+      "$ref": "#/$defs/pentaId"
+    },
+    "persistent_identity": {
+      "$ref": "#/$defs/persistentIdentity"
+    },
+    "persistent_state": {
+      "$ref": "#/$defs/persistentState"
+    },
+    "queues": {
+      "$ref": "#/$defs/queues"
+    },
+    "recovery": {
+      "$ref": "#/$defs/recovery"
+    },
+    "release_binding": {
+      "$ref": "#/$defs/releaseBinding"
+    },
+    "replaceable_model": {
+      "$ref": "#/$defs/replaceableModel"
+    },
+    "restart_behavior": {
+      "$ref": "#/$defs/restart"
+    },
+    "schema": {
+      "const": "ct.penta.survival-contract.v1"
+    }
+  },
+  "required": [
+    "schema",
+    "contract_version",
+    "contract_id",
+    "penta_id",
+    "canonical_name",
+    "environment",
+    "maturity",
+    "release_binding",
+    "persistent_identity",
+    "persistent_state",
+    "deterministic_functions",
+    "queues",
+    "leases",
+    "recovery",
+    "evidence",
+    "authority_enforcement",
+    "health_check",
+    "model_dependency",
+    "degraded_without_model",
+    "replaceable_model",
+    "restart_behavior",
+    "attestation"
+  ],
+  "title": "PENTA_SURVIVAL_CONTRACT v1",
+  "type": "object"
+}

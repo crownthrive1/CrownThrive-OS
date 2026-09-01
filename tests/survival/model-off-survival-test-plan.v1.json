@@ -1,0 +1,349 @@
+{
+  "candidate_metadata_split": "The tested candidate source/artifact is immutable before proof generation. Proof metadata may be committed or stored later, but must bind back to the unchanged candidate subject.",
+  "cases": [
+    {
+      "assertions": [
+        "penta_id and stable institutional identity are unchanged",
+        "provider, host, process and model identifiers do not replace institutional identity",
+        "identity proof resolves to the declared registry record"
+      ],
+      "case_id": "identity.restart-stability",
+      "fault": "terminate the process and start the exact artifact on a new process identity",
+      "required_evidence": [
+        "before/after identity receipt",
+        "identity registry readback",
+        "exact artifact digest"
+      ],
+      "targets": [
+        "persistent_identity",
+        "restart_behavior"
+      ]
+    },
+    {
+      "assertions": [
+        "authoritative state is recovered without model inference",
+        "schema and checkpoint versions match the contract",
+        "RPO and RTO remain within declared limits"
+      ],
+      "case_id": "state.durable-rehydrate",
+      "fault": "clear all process memory and restart from the declared authoritative store",
+      "required_evidence": [
+        "checkpoint receipt",
+        "restore transcript",
+        "state digest comparison",
+        "RPO/RTO measurement"
+      ],
+      "targets": [
+        "persistent_state",
+        "recovery"
+      ]
+    },
+    {
+      "assertions": [
+        "each deterministic function returns the recorded output digest",
+        "side effects are isolated behind the deterministic execution boundary",
+        "compiled behavior hash and function-set hash match the contract"
+      ],
+      "case_id": "determinism.replay",
+      "fault": "replay stored inputs with the model disabled",
+      "required_evidence": [
+        "replay vectors",
+        "input/output digests",
+        "function version and implementation SHA-256"
+      ],
+      "targets": [
+        "deterministic_functions"
+      ]
+    },
+    {
+      "assertions": [
+        "the same idempotency key is reused",
+        "no duplicate authoritative effect or receipt is created",
+        "retry and dead-letter behavior match declared policy"
+      ],
+      "case_id": "queue.redelivery-idempotency",
+      "fault": "crash after dequeue and redeliver the same stable job ID",
+      "required_evidence": [
+        "queue attempt graph",
+        "idempotency ledger readback",
+        "effect and receipt counts"
+      ],
+      "targets": [
+        "queues",
+        "restart_behavior"
+      ]
+    },
+    {
+      "assertions": [
+        "the new owner receives a higher fencing token",
+        "the stale owner is denied after expiry",
+        "conflicting ownership cannot produce duplicate effects"
+      ],
+      "case_id": "lease.owner-loss-fencing",
+      "fault": "stop lease renewal, allow TTL expiry and start a replacement owner",
+      "required_evidence": [
+        "lease timeline",
+        "fencing-token sequence",
+        "stale-owner denial receipt"
+      ],
+      "targets": [
+        "leases",
+        "restart_behavior"
+      ]
+    },
+    {
+      "assertions": [
+        "PentaDND preserves active leases, TTLs and conflict precedence",
+        "expired restrictions release only through deterministic clock and policy logic",
+        "model absence cannot bypass, extend or invent a restriction"
+      ],
+      "case_id": "penta-dnd.ttl-conflict-survival",
+      "fault": "remove model access during overlapping do-not-disturb leases and TTL expiry",
+      "required_evidence": [
+        "DND lease ledger",
+        "PentaTime observations",
+        "conflict-resolution receipt"
+      ],
+      "targets": [
+        "PentaDND",
+        "leases",
+        "authority_enforcement"
+      ]
+    },
+    {
+      "assertions": [
+        "queued, leased, completed, failed and dead-letter states survive",
+        "stable work IDs and ownership history remain queryable",
+        "no work is silently dropped or duplicated"
+      ],
+      "case_id": "penta-queue.work-state-survival",
+      "fault": "restart all workers with the model unavailable",
+      "required_evidence": [
+        "before/after queue census",
+        "work-state digest",
+        "ownership history"
+      ],
+      "targets": [
+        "PentaQueue",
+        "queues",
+        "persistent_state"
+      ]
+    },
+    {
+      "assertions": [
+        "assignment and accountable-owner records persist",
+        "orphaned work is deterministically reconciled",
+        "model output cannot reassign accountable ownership"
+      ],
+      "case_id": "penta-pm.ownership-survival",
+      "fault": "restart the project/work owner runtime during active assignments",
+      "required_evidence": [
+        "assignment ledger before/after",
+        "orphan reconciliation receipt",
+        "authority trace"
+      ],
+      "targets": [
+        "PentaPM",
+        "persistent_state",
+        "leases"
+      ]
+    },
+    {
+      "assertions": [
+        "append-only evidence history remains complete and ordered",
+        "receipt hashes and subject bindings remain valid",
+        "rejected actions are not rewritten as successful"
+      ],
+      "case_id": "dail.history-continuity",
+      "fault": "restart the Penta after accepted and rejected actions exist",
+      "required_evidence": [
+        "DAIL chain verification",
+        "receipt hash comparison",
+        "history sequence readback"
+      ],
+      "targets": [
+        "DAIL",
+        "evidence"
+      ]
+    },
+    {
+      "assertions": [
+        "authority is re-resolved from CHLOM and accountable-owner records",
+        "missing, expired or mismatched authority fails closed",
+        "model availability does not alter the authority result"
+      ],
+      "case_id": "chlom.authority-continuity",
+      "fault": "disable the model and restart before a consequential mutation",
+      "required_evidence": [
+        "authority query receipt",
+        "negative authorization test",
+        "before/after disposition comparison"
+      ],
+      "targets": [
+        "CHLOM",
+        "authority_enforcement"
+      ]
+    },
+    {
+      "assertions": [
+        "certificate subject must match the exact source and artifact",
+        "candidate SHA, certified SHA and production SHA must remain equal",
+        "mismatched or stale certificate causes HOLD_FAIL_CLOSED"
+      ],
+      "case_id": "penta-certifier.exact-subject",
+      "fault": "replace source or artifact after certification and attempt release",
+      "required_evidence": [
+        "certificate subject",
+        "candidate/certified/production SHA comparison",
+        "negative mismatch receipt"
+      ],
+      "targets": [
+        "PentaCertifier",
+        "evidence",
+        "release_binding"
+      ]
+    },
+    {
+      "assertions": [
+        "case identity and state persist",
+        "stored inputs replay to the same deterministic disposition",
+        "model replacement cannot rewrite prior case outcomes"
+      ],
+      "case_id": "penta-self.case-survival",
+      "fault": "restart between case intake, deterministic evaluation and evidence preservation",
+      "required_evidence": [
+        "case state timeline",
+        "replay receipt",
+        "model-replacement comparison"
+      ],
+      "targets": [
+        "PentaSELF",
+        "deterministic_functions",
+        "persistent_state"
+      ]
+    },
+    {
+      "assertions": [
+        "the exact phase cursor and completed dependency set persist",
+        "the next run resumes from durable state rather than chat memory",
+        "already completed effects are not repeated"
+      ],
+      "case_id": "cos.phase-cursor-survival",
+      "fault": "restart during a multi-phase convergence run",
+      "required_evidence": [
+        "phase cursor before/after",
+        "dependency completion ledger",
+        "duplicate-effect check"
+      ],
+      "targets": [
+        "COS",
+        "persistent_state",
+        "restart_behavior"
+      ]
+    },
+    {
+      "assertions": [
+        "the declared degraded mode is entered",
+        "identity, state, authority, queue and lease safety remain intact",
+        "allowed and forbidden operations match the contract",
+        "health distinguishes model degradation from deterministic-core failure"
+      ],
+      "case_id": "model.unavailable-degraded-mode",
+      "fault": "deny all model requests",
+      "required_evidence": [
+        "degraded-state receipt",
+        "health readback",
+        "allowed/forbidden operation tests"
+      ],
+      "targets": [
+        "model_dependency",
+        "degraded_without_model",
+        "health_check"
+      ]
+    },
+    {
+      "assertions": [
+        "persistent identity and state are unchanged",
+        "authority results and deterministic replay results are unchanged",
+        "provider/model identity does not become Penta identity",
+        "incompatible model output is rejected or held"
+      ],
+      "case_id": "model.replacement-compatibility",
+      "fault": "replace the model/provider through the declared adapter contract",
+      "required_evidence": [
+        "adapter compatibility suite",
+        "before/after replay digest",
+        "authority comparison"
+      ],
+      "targets": [
+        "replaceable_model",
+        "deterministic_functions"
+      ]
+    },
+    {
+      "assertions": [
+        "each boundary converges to one authoritative outcome",
+        "outbox, execution, receipt and audit remain reconcilable",
+        "no boundary creates a duplicate effect or missing terminal evidence"
+      ],
+      "case_id": "crash.commit-receipt-boundaries",
+      "fault": "inject crashes before commit, after commit before outbox, after outbox before execution, and after execution before receipt",
+      "required_evidence": [
+        "fault-injection matrix",
+        "database/outbox/execution/receipt/audit counts",
+        "reconciliation receipt"
+      ],
+      "targets": [
+        "queues",
+        "evidence",
+        "restart_behavior"
+      ]
+    },
+    {
+      "assertions": [
+        "the restored state digest matches the declared recovery point",
+        "the Penta can perform deterministic health and replay checks in isolation",
+        "no provider write or production promotion occurs during recovery proof"
+      ],
+      "case_id": "recovery.backup-restore-isolation",
+      "fault": "restore into an isolated environment with the model disabled",
+      "required_evidence": [
+        "backup manifest",
+        "restore digest",
+        "isolated health/replay receipt"
+      ],
+      "targets": [
+        "recovery",
+        "persistent_state"
+      ]
+    }
+  ],
+  "completion_rule": "A production Penta passes only when every applicable case has immutable exact-subject evidence, the contract validates, the evidence is unexpired, and an independent verifier attests the bundle. Missing or failed cases remain HOLD_FAIL_CLOSED.",
+  "contract_schema_ref": "schemas/penta/penta-survival-contract-v1.schema.json",
+  "effective_date": "2026-08-31",
+  "execution_rule": "Every case must run against the exact source commit, artifact SHA-256, doctrine version and compiled behavior hash declared by the subject PENTA_SURVIVAL_CONTRACT. A plan is not evidence until immutable receipts are attached.",
+  "global_invariants": [
+    "persistent identity remains the same across process and node replacement",
+    "authoritative state rehydrates from durable external storage",
+    "candidate SHA equals certified SHA equals production SHA",
+    "model output is never an authority source",
+    "no duplicate authoritative effects or receipts are created",
+    "stale lease holders are fenced",
+    "queue job IDs and idempotency keys remain stable",
+    "CHLOM authority and DAIL history remain intact",
+    "health reports model loss separately from deterministic-core failure"
+  ],
+  "global_preconditions": [
+    "The exact candidate artifact and source commit are pinned.",
+    "The model adapter is disabled or disconnected without disabling the deterministic runtime.",
+    "Authoritative state, queues, lease stores, CHLOM authority records, DAIL evidence and health telemetry are available through their declared recovery paths.",
+    "No test may manufacture provider readback, certification, authority, receipts or production state."
+  ],
+  "owner": "CrownThrive LLC",
+  "plan_id": "ct.penta.survival.model-off-test-plan.v1",
+  "policy_ref": "data/penta/survival-policy.v1.json",
+  "proof_directory": "penta/survival/evidence",
+  "proof_schema_ref": "schemas/penta/penta-survival-proof-v1.schema.json",
+  "purpose": "Prove that each Penta's deterministic authority and continuity survive model removal, process restart, node replacement, redelivery, lease loss and exact-release recovery.",
+  "version": "1.0.0"
+}

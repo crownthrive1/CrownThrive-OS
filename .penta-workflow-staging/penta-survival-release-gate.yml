@@ -1,0 +1,164 @@
+name: PENTA Survival Exact Release Gate
+
+on:
+  workflow_call:
+    inputs:
+      penta_id:
+        description: "Canonical penta.* machine key"
+        required: true
+        type: string
+      source_commit:
+        description: "Exact 40-character source commit bound by the survival contract"
+        required: true
+        type: string
+      artifact_sha256:
+        description: "Exact artifact SHA-256 bound by the survival contract"
+        required: true
+        type: string
+      doctrine_version:
+        description: "Optional exact doctrine version"
+        required: false
+        type: string
+      compiled_behavior_hash:
+        description: "Optional exact compiled behavior SHA-256"
+        required: false
+        type: string
+    outputs:
+      disposition:
+        description: "PASS or HOLD_FAIL_CLOSED"
+        value: ${{ jobs.gate.outputs.disposition }}
+      receipt_sha256:
+        description: "Deterministic release-gate receipt digest"
+        value: ${{ jobs.gate.outputs.receipt_sha256 }}
+  workflow_dispatch:
+    inputs:
+      penta_id:
+        description: "Canonical penta.* machine key"
+        required: true
+        type: string
+      source_commit:
+        description: "Exact 40-character source commit bound by the survival contract"
+        required: true
+        type: string
+      artifact_sha256:
+        description: "Exact artifact SHA-256 bound by the survival contract"
+        required: true
+        type: string
+      doctrine_version:
+        description: "Optional exact doctrine version"
+        required: false
+        type: string
+      compiled_behavior_hash:
+        description: "Optional exact compiled behavior SHA-256"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-survival-release-${{ inputs.penta_id }}-${{ inputs.source_commit }}-${{ inputs.artifact_sha256 }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Gate exact production subject
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      disposition: ${{ steps.receipt.outputs.disposition }}
+      receipt_sha256: ${{ steps.receipt.outputs.receipt_sha256 }}
+    steps:
+      - name: Checkout control-plane declaration and proof
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Confirm immutable candidate exists without checking it out
+        env:
+          EXPECTED_SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          set -euo pipefail
+          git cat-file -e "${EXPECTED_SOURCE_COMMIT}^{commit}"
+          git merge-base --is-ancestor "${EXPECTED_SOURCE_COMMIT}" HEAD || {
+            echo "Candidate source commit must be an ancestor of the control-plane proof commit." >&2
+            exit 1
+          }
+          test "$(git rev-parse HEAD)" != "${EXPECTED_SOURCE_COMMIT}" || {
+            echo "Proof metadata must be generated outside the immutable candidate commit." >&2
+            exit 1
+          }
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile exact release gate
+        run: |
+          python -m py_compile runtime/penta_survival.py
+          python -m py_compile scripts/validate_penta_survival.py
+
+      - name: Evaluate exact survival subject
+        id: gate
+        env:
+          PENTA_ID: ${{ inputs.penta_id }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          ARTIFACT_SHA256: ${{ inputs.artifact_sha256 }}
+          DOCTRINE_VERSION: ${{ inputs.doctrine_version }}
+          COMPILED_BEHAVIOR_HASH: ${{ inputs.compiled_behavior_hash }}
+        run: |
+          mkdir -p artifacts
+          args=(
+            --root .
+            release
+            --penta-id "${PENTA_ID}"
+            --source-commit "${SOURCE_COMMIT}"
+            --artifact-sha256 "${ARTIFACT_SHA256}"
+            --output artifacts/penta-survival-release-gate.json
+          )
+          if [[ -n "${DOCTRINE_VERSION}" ]]; then
+            args+=(--doctrine-version "${DOCTRINE_VERSION}")
+          fi
+          if [[ -n "${COMPILED_BEHAVIOR_HASH}" ]]; then
+            args+=(--compiled-behavior-hash "${COMPILED_BEHAVIOR_HASH}")
+          fi
+          python scripts/validate_penta_survival.py "${args[@]}"
+
+      - name: Export deterministic receipt
+        id: receipt
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("artifacts/penta-survival-release-gate.json")
+          if not path.exists():
+              raise SystemExit("release-gate receipt was not produced")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              output.write(f"disposition={data['disposition']}\n")
+              output.write(f"receipt_sha256={data['receipt_sha256']}\n")
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
+              summary.write("## PENTA exact survival release gate\n\n")
+              summary.write(f"- Penta: `{data.get('penta_id')}`\n")
+              summary.write(f"- candidate source: `{data.get('source_commit')}`\n")
+              summary.write(f"- control-plane metadata commit: `{data.get('control_plane_commit')}`\n")
+              summary.write(f"- metadata split preserved: `{data.get('metadata_split_preserved')}`\n")
+              summary.write(f"- artifact: `{data.get('artifact_sha256')}`\n")
+              summary.write(f"- disposition: `{data.get('disposition')}`\n")
+              summary.write(f"- receipt SHA-256: `{data.get('receipt_sha256')}`\n")
+              summary.write("- provider write performed: `false`\n")
+              summary.write("- production promoted: `false`\n")
+          PY
+
+      - name: Preserve exact release-gate receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-survival-release-${{ inputs.penta_id }}-${{ github.run_id }}
+          path: artifacts/penta-survival-release-gate.json
+          if-no-files-found: error
+          retention-days: 90

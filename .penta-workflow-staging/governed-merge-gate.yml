@@ -1,0 +1,263 @@
+name: Governed Merge Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "phase4/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: governed-merge-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  governed-merge-gate:
+    name: CrownThrive governed merge gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Install pinned COS V1 validation dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements/cos-v1-validation.txt
+
+      - name: Verify governed validator syntax
+        run: |
+          python -m py_compile scripts/validate_docs.py
+          python -m py_compile scripts/validate_phase3_institutional_gate.py
+          python -m py_compile scripts/validate_gate_registry_v4.py
+          python -m py_compile scripts/run_phase4_preparation_audit.py
+          python -m py_compile scripts/validate_homepage_control_plane.py
+          python -m py_compile scripts/render_homepage_projection.py
+          python -m py_compile scripts/validate_collab_portal_adapter.py
+          python -m py_compile scripts/validate_holdings_82_domain_seed.py
+          python -m py_compile scripts/validate_phase_2_7_74_registry_seed.py
+          python -m py_compile scripts/validate_s103_74_canonical_crosswalk.py
+          python -m py_compile scripts/validate_s103_s100_engine_domain_edges.py
+          python -m py_compile scripts/validate_repository_governance_enforcement_state.py
+          python -m py_compile scripts/validate_phase_namespace_and_api_control.py
+          python -m py_compile scripts/validate_agent_sovereign_governance.py
+          python -m py_compile scripts/validate_security_governance.py
+          python -m py_compile scripts/validate_github_actions_runtime_policy.py
+          python -m py_compile scripts/penta_gap_closure.py
+          python -m py_compile scripts/governed_merge_decision.py
+          python -m py_compile scripts/governed_current_pr_preflight.py
+          python -m py_compile scripts/governed_current_pr_preflight_v2.py
+          python -m py_compile scripts/resolve_pm_notification_recipients.py
+          python -m py_compile scripts/security_self_heal_plan.py
+          python -m py_compile scripts/run_function_tests.py
+          python -m py_compile runtime/penta_survival.py
+          python -m py_compile scripts/validate_penta_survival.py
+          python -m py_compile tests/test_penta_survival.py
+
+      - name: Validate GitHub Actions runtime and supply-chain policy
+        run: python scripts/validate_github_actions_runtime_policy.py
+
+      - name: Validate Phase 4 V4 gate contract
+        run: python scripts/validate_gate_registry_v4.py
+
+      - name: Validate evidence-data classifier negative vectors
+        run: python scripts/governed_current_pr_preflight_v2.py --self-test
+
+      - name: Run complete local Phase 4 preparation audit
+        run: python scripts/run_phase4_preparation_audit.py
+
+      - name: Run function-style Penta control tests
+        run: |
+          python scripts/run_function_tests.py \
+            tests/test_governed_evidence_data_classification.py \
+            tests/test_penta_compliance_license.py \
+            tests/test_penta_family.py \
+            tests/test_penta_institutional_controls.py \
+            tests/test_penta_institutional_controls_family.py \
+            tests/test_penta_self_build.py
+
+      - name: Run deterministic Penta survival tests
+        run: python -m unittest tests.test_penta_survival -v
+
+      - name: Audit complete Penta survival coverage
+        run: |
+          mkdir -p artifacts
+          python scripts/validate_penta_survival.py --root . audit \
+            --output artifacts/penta-survival-governed-audit.json
+
+      - name: Resolve exact governed diff range
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base="$PR_BASE_SHA"
+            head="$PR_HEAD_SHA"
+            git fetch --no-tags --no-recurse-submodules --depth=256 origin "$base"
+            git fetch --no-tags --no-recurse-submodules --depth=256 origin "$head"
+          else
+            head="$PUSH_HEAD_SHA"
+            git fetch --no-tags --no-recurse-submodules --depth=256 origin main
+            git fetch --no-tags --no-recurse-submodules --depth=256 origin "$head"
+            base="$(git merge-base origin/main "$head" || true)"
+            if [[ -z "$base" ]]; then
+              git fetch --no-tags --no-recurse-submodules --unshallow origin || \
+                git fetch --no-tags --no-recurse-submodules origin
+              base="$(git merge-base origin/main "$head")"
+            fi
+          fi
+          git cat-file -e "${base}^{commit}"
+          git cat-file -e "${head}^{commit}"
+          if ! git merge-base "$base" "$head" >/dev/null; then
+            git fetch --no-tags --no-recurse-submodules --unshallow origin || \
+              git fetch --no-tags --no-recurse-submodules origin
+          fi
+          merge_base="$(git merge-base "$base" "$head")"
+          test -n "$merge_base"
+          echo "CT_GIT_BASE_SHA=$base" >> "$GITHUB_ENV"
+          echo "CT_GIT_HEAD_SHA=$head" >> "$GITHUB_ENV"
+          echo "CT_GIT_MERGE_BASE_SHA=$merge_base" >> "$GITHUB_ENV"
+
+      - name: Enforce PentaSerialized continuity in required merge perimeter
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        run: |
+          python -m penta.runtime.serialized git-gate \
+            --repo . \
+            --base "$CT_GIT_BASE_SHA" \
+            --head "$CT_GIT_HEAD_SHA" \
+            --policy penta/registry/serialized-suite.json
+
+      - name: Bind governed changed files to trusted Git diff
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        run: |
+          python scripts/governed_merge_decision.py \
+            --verify-git-diff \
+            --git-base "$CT_GIT_BASE_SHA" \
+            --git-head "$CT_GIT_HEAD_SHA"
+          python scripts/governed_current_pr_preflight_v2.py \
+            --git-base "$CT_GIT_BASE_SHA" \
+            --git-head "$CT_GIT_HEAD_SHA"
+
+      - name: Enforce deterministic Penta survival ratchet
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        run: |
+          python scripts/validate_penta_survival.py --root . ratchet \
+            --base-ref "$CT_GIT_MERGE_BASE_SHA" \
+            --output artifacts/penta-survival-governed-ratchet.json
+
+      - name: Validate institutional documentation
+        run: python scripts/validate_docs.py
+
+      - name: Validate Phase 3 institutional gate
+        run: python scripts/validate_phase3_institutional_gate.py
+
+      - name: Validate exact retired-phase alias dispositions
+        run: python scripts/penta_gap_closure.py . --json
+
+      - name: Validate homepage control-plane projection
+        run: |
+          python scripts/render_homepage_projection.py --check
+          python scripts/validate_homepage_control_plane.py
+
+      - name: Validate Collab Portal adapter contract
+        run: python scripts/validate_collab_portal_adapter.py
+
+      - name: Validate Holdings 82-domain seed
+        run: python scripts/validate_holdings_82_domain_seed.py
+
+      - name: Validate Phase 2.7 74-registry seed
+        run: python scripts/validate_phase_2_7_74_registry_seed.py
+
+      - name: Validate S103 canonical crosswalk
+        run: python scripts/validate_s103_74_canonical_crosswalk.py
+
+      - name: Validate S103/S100 engine-domain edges
+        run: python scripts/validate_s103_s100_engine_domain_edges.py
+
+      - name: Validate ten-phase namespace and API/MCP control plane
+        run: python scripts/validate_phase_namespace_and_api_control.py
+
+      - name: Validate agent-sovereign governance
+        run: python scripts/validate_agent_sovereign_governance.py
+
+      - name: Validate deterministic security governance
+        run: python scripts/validate_security_governance.py
+
+      - name: Validate sovereign merge decision invariants
+        run: python scripts/governed_merge_decision.py --self-test
+
+      - name: Validate PM routing invariants
+        run: python scripts/resolve_pm_notification_recipients.py --self-test
+
+      - name: Validate security self-healing invariants
+        run: python scripts/security_self_heal_plan.py --self-test
+
+      - name: Validate repository enforcement target
+        run: python scripts/validate_repository_governance_enforcement_state.py
+
+      - name: Prevent conflicting advanced CodeQL setup
+        shell: bash
+        run: |
+          if grep -R -nE '^[[:space:]]*uses:[[:space:]]*github/codeql-action/' .github/workflows; then
+            echo "Advanced CodeQL workflow detected while GitHub default setup is the registered provider mode."
+            exit 1
+          fi
+          echo "Provider-managed CodeQL default setup remains the registered mode."
+          echo "This check does not synthesize provider CodeQL findings."
+
+      - name: Detect dependency-manifest changes
+        id: dependency_scope
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))
+        shell: bash
+        run: |
+          set -euo pipefail
+          dependency_pattern='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|deno\.lock|requirements([^/]*)\.txt|Pipfile|Pipfile\.lock|poetry\.lock|pyproject\.toml|uv\.lock|Gemfile|Gemfile\.lock|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|composer\.json|composer\.lock|pom\.xml|build\.gradle|build\.gradle\.kts|gradle\.lockfile|packages\.lock\.json|paket\.dependencies|paket\.lock|mix\.exs|mix\.lock|Package\.swift|Package\.resolved)$'
+          if git diff --name-only "$CT_GIT_BASE_SHA" "$CT_GIT_HEAD_SHA" | grep -Eq "$dependency_pattern"; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            echo "Dependency manifest changes detected; provider dependency review is required."
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "No dependency manifest changes detected; provider dependency review is not applicable."
+          fi
+
+      - name: Review dependency changes
+        if: (github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))) && steps.dependency_scope.outputs.required == 'true'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          base-ref: ${{ env.CT_GIT_BASE_SHA }}
+          head-ref: ${{ env.CT_GIT_HEAD_SHA }}
+
+      - name: Record dependency-review no-op
+        if: (github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/phase4/'))) && steps.dependency_scope.outputs.required != 'true'
+        run: echo "Dependency review not applicable because the governed diff contains no dependency manifests."
+
+      - name: Check whitespace and conflict markers
+        run: |
+          git diff --check
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>)' -- . ':!THIRD_PARTY_NOTICES.md'; then
+            echo "Unresolved merge-conflict markers detected."
+            exit 1
+          fi
