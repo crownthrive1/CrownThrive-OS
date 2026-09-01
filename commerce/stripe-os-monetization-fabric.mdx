@@ -1,7 +1,7 @@
 ---
 title: "Stripe OS Monetization Fabric"
 sidebarTitle: "Stripe OS Fabric"
-description: "CrownThrive's PentaGreen-bound Stripe execution fabric: accounts, catalog, pricing, Checkout, Billing, Connect, webhooks, HOT/WARM/COLD custody, PentaFactory monetization, provider adapters, reconciliation, and safe autonomy."
+description: "Current Stripe execution, mirror, capability-adoption, factory-readiness, webhook, credential-custody, and monetization holds under PentaGreen."
 icon: "credit-card"
 keywords:
   - "Stripe"
@@ -17,201 +17,213 @@ keywords:
 standard_version: "1.0.0"
 primary_audience: "operator"
 page_type: "reference"
-content_state: "current"
+content_state: "current_with_holds"
 ---
 
+{/* pentadocs:audience-orientation:v2 */}
 <Note>
-  **Canonical economic authority:** [PentaGreen](/commerce/pentagreen). **Provider:** Stripe. Stripe executes bounded provider operations; it does not replace CrownThrive SKU, price, rights, entitlement, settlement, or ledger authority.
+  **Audience:** operators and administrators (`operator`).
+
+  **This page:** Stripe OS Monetization Fabric — Current Stripe execution, mirror, capability-adoption, factory-readiness, webhook, credential-custody, and monetization holds under PentaGreen.
+
+  **Documentation state:** `current_with_holds` for page type `reference`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Related guidance:** [Operating principles](/start-here/operating-principles) and [Permissions and approvals](/automation/permissions-and-approval-gates).
+</Note>
+{/* /pentadocs:audience-orientation:v2 */}
+
+<Note>
+  **Canonical economic authority:** [PentaGreen](/commerce/pentagreen). **External infrastructure provider:** Stripe. Stripe executes bounded provider operations; it does not replace CrownThrive SKU, price, rights, entitlement, settlement, or ledger authority. Public surfaces must not promote Stripe as a strategic partner without a governing relationship record that supports that claim.
 </Note>
 
 ## Current production posture
 
-CrownThrive operates Stripe as a reusable commerce execution fabric rather than a collection of site-specific integrations.
+The Stripe runtime contract has been repaired and narrowed to typed operations, but the PentaGreen Stripe factory is intentionally paused. Current readback is:
 
-Current institutional readback binds:
+- mesh state: `RUNTIME_REPAIRED_FACTORY_PAUSED_GOVERNED_GATES`;
+- canonical adapter: `ct.adapter.stripe.v1`, component version `2.0.0`;
+- factory clock: inactive, with no live cron row;
+- factory-ready profiles: **0 of 1,042**;
+- product types enabled for sale: **0 of 17**;
+- legally ready tax profiles: **0**;
+- payout rail: `HOLD_DEFAULT_BANK_ERRORED`;
+- capability-adoption rows: **30**, including **16** with the literal `d3_gated` autonomy state; the capability policy marks **22 of 30** as D3/human-gated;
+- provider-write families: Product, Price, Payment Link, and Webhook only.
 
-- two verified live CrownThrive Stripe account routes;
-- `456` mirrored Stripe Product records;
-- `478` mirrored Stripe Price records;
-- `48` mirrored Payment Links;
-- `4` active Stripe webhook lanes;
-- `15` provider endpoint records;
-- `18` provider capability families;
-- `13` capability families eligible for PentaFactory/PentaGreen monetization writes;
-- one HOT/WARM/COLD/EMERGENCY credential-custody policy with no raw-secret projection;
-- exact live runtime credential verification for both declared Stripe account roles before provider writes;
-- `integration_control.stripe_os_provider_request_v1` as the concrete CrownThrive runtime adapter;
-- `integration_control.pentagreen_stripe_commerce_binder_tick_v1` as the existing PentaGreen Commerce Binder executor;
-- exactly one canonical PentaGreen commerce clock; the legacy ThriveEvergreen alias is superseded and non-restorable.
+The typed adapter being available is not a monetization-ready claim. Founder/D3 authority does not replace product sale state, legal-tax evidence, rights, fulfillment, entitlement, signed webhook, or provider-readback evidence.
 
-The controlling mesh is `ct.binding.pentagreen-stripe-mesh.v3`. The historical `ct.binding.thriveevergreen-stripe-live.v2` remains preserved as lineage and is not rewritten into current truth.
+The controlling mesh is `ct.binding.pentagreen-stripe-mesh.v3`. The historical `ct.binding.thriveevergreen-stripe-live.v2` remains lineage, not current authority.
+
+## Provider readback and mirror state
+
+Observed provider state and CrownThrive mirrors remain distinct:
+
+| Surface | Stripe provider readback | CrownThrive mirror | Current gap |
+| --- | ---: | ---: | --- |
+| Products | 459 total / 434 active | 456 | 131 active products lack a default Price; 8 active products have no list Price; 48 active duplicate-name groups |
+| Prices | 484 total / 465 active | 478 | 384 active Prices lack a lookup key; 107 mirror Prices lack account scope; 7 active Prices belong to inactive Products |
+| Payment Links | 48 total / 33 active | 48 | 15 inactive; duplicate configurations remain; 14 allow promotion codes while zero promotion codes exist |
+| Webhook endpoints | 16 enabled | 15 endpoint records | Wildcard canary failure, redundant coverage, missing metadata/description, and API-version fragmentation |
+
+Additional provider evidence includes:
+
+- 216 active Products without metadata;
+- 420 active Products without a product tax code;
+- 257 recurring Prices, all licensed rather than metered;
+- zero metered or meter-linked Prices;
+- four Connect accounts observed through Accounts v2, three accessible and one inaccessible;
+- one active tax registration, scoped to Virginia;
+- one primary account read back with 22 active payment capabilities.
+
+Account-level `charges_enabled` or `payouts_enabled` flags do not certify the payout rail. The default payout bank reports an errored state, so transfers/payouts remain held pending controlled repair and canary evidence.
 
 ## Architecture
 
 ```mermaid
-flowchart LR
-  F[PentaFactory / Sites / Products] --> G[PentaGreen]
-  G --> S[PentaSKU + PentaPrice + PentaCatalog]
-  S --> Q[Stripe monetization request]
-  Q --> B[PentaGreen Commerce Binder]
-  B --> R[PentaBridge / PentaRoute]
-  R --> A[Stripe MCP or server API adapter]
-  A --> P[Stripe provider]
-  P --> W[Signed webhooks / provider readback]
-  W --> H[PentaHook + PentaWire]
-  H --> C[PentaReceipt + PentaReconcile]
-  C --> L[PentaLedger / Entitlements]
+flowchart TD
+  F["PentaFactory / Sites"] --> G["PentaGreen intent"]
+  G --> Q["Readiness gate + request"]
+  Q --> A["ct.adapter.stripe.v1"]
+  A --> P["Typed Stripe operation"]
+  P --> R["Provider readback / signed event"]
+  R --> E["Receipt + entitlement + ledger"]
 ```
 
-## Account routing
+PentaRoute selects an account and transport; PentaBridge normalizes provider semantics; PentaWire carries signed events; PentaReceipt/PentaReconcile preserve evidence; PentaGreen owns the economic decision.
 
-| Route | Purpose | Provider state |
+## Canonical adapter and variants
+
+| Adapter identity | Purpose | Current state |
 | --- | --- | --- |
-| `COMMERCE_PRIMARY` | First-party CrownThrive commerce, Checkout, Billing, subscriptions, invoices and general product monetization | Live verified; charges and payouts enabled |
-| `SECONDARY_COMMERCE_EXPANSION` | Platform, Connect and expansion workloads; independent direct-provider route | Live verified; charges and payouts enabled |
+| `ct.adapter.stripe.v1` | Canonical provider adapter, version `2.0.0` | Active with holds |
+| `ct.adapter.stripe.mcp.v1` | Operator discovery and governed MCP work | Active operator surface; not application runtime |
+| `ct.adapter.stripe.runtime.v1` | Product, Price, and Payment Link operations | Typed route ready; factory paused |
+| `ct.adapter.stripe.webhook.v3` | Signed webhook reconciliation | Degraded topology; factory paused |
+| `ct.adapter.stripe.catalog-mirror.v2` | Provider mirrors | Active with reconciliation lag |
 
-Account identifiers, tokens and credential material remain in governed ThriveBase/Drive custody and are not projected into public documentation.
+The variants are transports under the canonical adapter and do not create independent authority.
 
-## Credential survival routes
+Stripe's official MCP endpoint is `https://mcp.stripe.com`. MCP authentication uses OAuth or a restricted key outside source. MCP must not bypass PentaGreen, the capability registry, D3 gates, product readiness, or the server-runtime contract.
 
-Provider API credentials use a deterministic custody ladder:
+## Typed executable boundary
+
+| Family | CrownThrive route | Provider-write state |
+| --- | --- | --- |
+| Product | `integration_control.stripe_os_provider_operation_v2` | Typed; factory paused |
+| Price | `integration_control.stripe_os_provider_operation_v2` | Typed; factory paused |
+| Payment Link | `integration_control.stripe_os_provider_operation_v2` | Typed; factory paused |
+| Webhook | `integration_control.stripe_webhook_provider_reconcile_v3` | Typed reconciliation; degraded and paused |
+
+The low-level request function is private to the typed adapter. It is not a general service-role tunnel for arbitrary Stripe URLs, paths, query parameters, or bodies. The server route pins `Stripe-Version: 2026-07-29.dahlia` and appends sanitized evidence to `integration_control.stripe_os_provider_operation_receipts_v2`.
+
+Checkout Sessions, customers, subscriptions, invoices, quotes, Connect mutations, application fees, coupons, promotion codes, billing meters, standalone PaymentIntents, Terminal, Identity, Financial Connections, Issuing, Treasury, and Radar do not have a certified generic factory executor. They remain read-only, planning-only, D3-gated, or `HOLD_SPECIALIZED_EXECUTOR_REQUIRED`.
+
+Tax mutation is `held_legal_tax_gate`. Transfers, payouts, refunds, disputes, external-account changes, and other material money effects remain separately D3/human gated.
+
+## Capability adoption
+
+`integration_control.stripe_os_capability_adoption_v2` records provider availability, CrownThrive adoption, autonomy, write route, hold reason, and observed evidence independently.
+
+| Adoption group | Current state |
+| --- | --- |
+| Products, Prices, Payment Links | Typed adapter ready; factory paused for zero governed candidates |
+| Webhooks | Typed reconcile route; provider topology degraded and signed canary required |
+| Account, reporting, portal, data exports | Read or configuration evidence only; no inherited write authority |
+| Checkout, customers, subscriptions, invoices, quotes | Observed/available; specialized executor required |
+| Tax | Configured only for the verified registration scope; legal/product gates hold writes |
+| Connect and money effects | Partial readback or provider availability; D3 and specialized controls required |
+| Promotions, meters, Terminal, Identity, financial products, Radar | Not normalized, not configured, not adopted, or D3 gated |
+
+Thirty adoption rows exist. Sixteen use the literal `d3_gated` autonomy state, while the capability policy marks 22 of 30 as requiring a D3/human gate. Some of those 22 use a more specific legal-tax or specialized-executor hold label. Provider availability never creates CrownThrive authority.
+
+## Account and credential routes
+
+Runtime code uses account roles, not provider account IDs:
+
+| Route | Intended scope | Evidence boundary |
+| --- | --- | --- |
+| `COMMERCE_PRIMARY` | First-party CrownThrive commerce | Audited account/capability readback; payout rail still held |
+| `SECONDARY_COMMERCE_EXPANSION` | Platform/Connect/expansion work | Must be independently verified for the exact operation; no inherited certification |
+
+Credentials follow:
 
 ```text
 HOT -> WARM -> COLD -> EMERGENCY
 ```
 
-- **HOT** is the current provider-verified authority route.
-- **WARM** is the canonical independent standby. A same-material recovery alias does not count as an independent credential.
-- **COLD** is a separately verified platform standby.
-- **EMERGENCY** never auto-promotes before same-account provider verification.
-- Internal worker secrets are explicitly excluded from provider API authority.
+- HOT is the current provider-verified route.
+- WARM and COLD must be independently verified before failover.
+- Same-material recovery aliases are not independent credentials.
+- EMERGENCY never auto-promotes without same-account provider verification.
+- Internal worker secrets do not become Stripe authority.
 
-Canonical machine source: `integration_control.stripe_live_secret_lanes_v1`.
+No route may expose raw credentials, silently replace founder-controlled material, or store MCP/API authorization in repository source, Drive prose, public docs, analytics, or client bundles.
 
-No route may expose raw credentials, silently replace a credential, or auto-delete/auto-rotate founder-controlled material.
+## PentaFactory contract
 
-## Provider capabilities exposed to CrownThrive OS
-
-| Family | CrownThrive owner | Factory monetization | Additional human/D3 gate |
-| --- | --- | --- | --- |
-| Products | PentaCatalog / PentaFactory | Yes | No |
-| Prices | PentaPrice / PentaFactory | Yes | No |
-| Payment Links | PentaCheckout / PentaFactory | Yes | No |
-| Checkout Sessions | PentaCheckout | Yes | No |
-| Customers | PentaCatalog / CRM | Yes | No |
-| Subscriptions / Billing | PentaInvoice | Yes | No |
-| Invoices | PentaInvoice | Yes | No |
-| Quotes | PentaPrice / PentaMarketer | Yes | No |
-| Tax bindings | PentaPolicy / tax lane | Yes | No |
-| Webhook bindings | PentaBridge / PentaHook | Yes | No, subject to endpoint topology/capacity |
-| Connect onboarding/capabilities | PentaMarket / PentaBridge | Planning and bounded onboarding | Yes for consequential platform/money-routing effects |
-| Application-fee bindings | PentaMarket / PentaLedger | Bounded configuration | Yes for consequential fee/routing effects |
-| Transfers / payouts | PentaPayout | No autonomous factory execution | Yes |
-| Refunds | PentaCompensate | No autonomous factory execution | Yes |
-| Disputes | PentaHold / risk lane | No autonomous factory execution | Yes |
-| Reporting / reconciliation | PentaLedger / analytics | Read/reconcile | No |
-
-## PentaFactory plug-and-play contract
-
-Factories and sites must not create ad hoc Stripe integrations. They submit one idempotent request to:
+Factories and sites submit one idempotent request to:
 
 `integration_control.pentagreen_stripe_prepare_monetization_v1(...)`
 
-Supported outputs include:
+The accepted request/output pairs are:
 
-- Stripe Product \+ Price binding;
-- Payment Link;
-- Checkout binding;
-- subscription plan;
-- invoice offer;
-- webhook binding;
-- Connect plan;
-- repricing through a new provider Price object;
-- catalog synchronization.
+- `PRODUCT_PRICE` -> `product_price`;
+- `PAYMENT_LINK` -> `payment_link`;
+- `WEBHOOK_BINDING` -> `webhook_binding`;
+- `CATALOG_SYNC` -> `catalog_sync`, for mirror/reconciliation work.
 
-The request reuses the existing PentaGreen work queue and the existing `Commerce Binder` role. Duplicate requests reuse the same idempotency identity rather than creating parallel work.
+All other output types remain held for a specialized executor. In particular, Checkout, subscription, invoice, quote, and Connect plans are not accepted as generic provider execution merely because Stripe supports those products.
 
-Reserved effects such as refunds, payouts, bank-account changes, transfers of funds, final rights grants or dispute disposition do not enter this generic factory path.
+## Product eligibility
 
-## Product and price identity
+A product is not factory-ready until exact readback proves:
 
-PentaSKU remains the exclusive CrownThrive SKU authority. A Stripe Product ID, Price ID, Payment Link ID, Checkout Session ID or connected-account ID is a **provider alias**, not the CrownThrive institutional identity.
+- its product type is enabled for sale;
+- its tax profile has a provider-verified Stripe code;
+- its legal taxability state is ready, verified, approved, certified, `taxable_verified`, or `not_taxable_verified`;
+- `tax_behavior` is exactly `inclusive` or `exclusive`;
+- rights, fulfillment, quality, route, custody, and documentation states are ready;
+- `stripe_entitlement_handler_ref` exists;
+- `stripe_webhook_binding_key` exists;
+- the exact handler/event matrix is bound;
+- a signed provider webhook canary passes.
 
-Provider mirrors are reused directly:
+The current 1,042 profiles do not satisfy that full conjunction. The clock stays paused until at least one profile does.
 
-- `integration_control.stripe_catalog_products_v2`
-- `integration_control.stripe_catalog_prices_v2`
-- `integration_control.stripe_payment_link_inventory_v4`
-- `integration_control.pentagreen_stripe_catalog_bridge_v1`
+## One-product canary before re-enable
 
-Do not create a second Stripe catalog database for a site or factory.
+1. Select exactly one profile while the commerce clock remains paused.
+2. Read back every sale, legal-tax, tax-behavior, rights, fulfillment, quality, route, custody, docs, entitlement, and webhook gate.
+3. Reconcile existing Product, Price, Payment Link, endpoint, and account-scope aliases.
+4. Submit one supported idempotent request.
+5. Execute one bounded Commerce Binder item through the typed route.
+6. Read the Stripe object back and prove that no duplicate provider object, request, or queue row was created.
+7. Deliver a signed test or natural event through the exact webhook handler and prove entitlement/ledger reconciliation.
+8. Append and read back the terminal receipt/DAIL evidence.
+9. Obtain the required human authorization, enable exactly one desired job, and verify exactly one live job.
+10. Pause on any drift, duplicate, failed canary, missing entitlement, tax/legal change, or money-movement crossover.
 
-## Webhooks and fulfillment
-
-Stripe webhooks remain the provider event source of truth for fulfillment-sensitive state.
-
-Current lanes include CrownThrive platform surfaces such as ticketing, ministry/digital-product commerce, local commerce and API-marketplace routing. Every lane must preserve:
-
-- raw-body signature verification where required;
-- idempotent event identity;
-- bounded retries;
-- provider endpoint readback;
-- stable route identity;
-- PentaWire transport;
-- PentaReceipt/PentaReconcile institutionalization;
-- no entitlement from a browser redirect alone.
-
-See [Payment and Fulfillment](/commerce/payment-and-fulfillment).
-
-## Adapter and MCP topology
-
-CrownThrive maintains provider-neutral adapters rather than cloning Stripe's proprietary backend.
-
-| Adapter | Purpose |
-| --- | --- |
-| `ct.adapter.stripe.mcp.v1` | Operator/API discovery and governed Stripe MCP execution |
-| `ct.adapter.stripe.runtime.v1` | Server-side REST execution with idempotency and read-after-write |
-| `ct.adapter.stripe.webhook.v3` | Signed event ingress and provider-event routing |
-| `ct.adapter.stripe.catalog-mirror.v2` | Products, prices and Payment Link provider mirrors |
-
-PentaRoute selects the provider route, PentaWire carries events, PentaBridge normalizes provider semantics, PentaGreen owns economic decisions, and PentaCredentials owns custody.
-
-## Monetization autonomy
-
-Founder monetization authority enables CrownThrive to autonomously prepare and execute bounded provider configuration required to sell already-governed products and services: catalog objects, prices, checkout bindings, subscription/invoice configuration, webhook bindings and related provider readback.
-
-That authority does **not** mean every possible Stripe mutation is interchangeable. Money movement, refunds, bank changes, final legal/rights commitments, dispute disposition and other consequential reserved effects retain their specialized controls and no-self-approval boundaries.
+A rollback-only database canary proves runtime contract mechanics. It does not make a product sale-ready and does not authorize scheduler activation.
 
 ## Learning and optimization
 
-The Stripe fabric may learn from reconciled provider evidence to improve:
-
-- conversion routing;
-- payment-method eligibility;
-- recurring versus one-time pricing recommendations;
-- PentaPrice price-band proposals;
-- invoice versus Checkout selection;
-- marketplace versus first-party route selection;
-- webhook coverage;
-- recovery and failed-payment workflows;
-- catalog deduplication;
-- PentaGreen economic forecasts.
-
-Learning may propose or execute only within the capability's recorded authority class. It cannot turn provider capability into new CrownThrive authority.
+The fabric may use reconciled evidence to recommend conversion routing, payment-method eligibility, recurring versus one-time structures, price bands, catalog deduplication, webhook coverage, recovery, and failed-payment workflows. Learning can act only inside an already-authorized capability. It cannot create tax, legal, rights, credential, privacy, money-movement, or D3 authority.
 
 ## Institutional references
 
 - Mesh: `integration_control.pentagreen_stripe_mesh_v3`
+- Runtime readiness: `integration_control.stripe_os_runtime_readiness_v2()`
 - Accounts: `integration_control.stripe_os_accounts_v1`
 - Capabilities: `integration_control.stripe_os_capabilities_v1`
+- Adoption: `integration_control.stripe_os_capability_adoption_v2`
 - Adapters: `integration_control.stripe_os_adapter_registry_v1`
 - Credential routes: `integration_control.stripe_live_secret_lanes_v1`
 - Requests: `integration_control.pentagreen_stripe_monetization_requests_v1`
-- Partner registry: `integration_control.crownthrive_partner_registry_v1`
-- Status: `integration_control.stripe_os_mesh_status_v1()`
+- Provider receipts: `integration_control.stripe_os_provider_operation_receipts_v2`
+- Partner relationship: `integration_control.crownthrive_partner_registry_v1`
 
 <Warning>
-  Never embed Stripe secret keys, Connect access tokens, webhook signing secrets, customer payment data, bank details or unrestricted service credentials in source, docs, analytics, client bundles, Drive prose or public metadata. Store references and fingerprints only.
+  Never embed Stripe secret keys, Connect access tokens, webhook signing secrets, customer payment data, bank details, unrestricted service credentials, or MCP authorization in source, docs, analytics, client bundles, Drive prose, or public metadata. Store governed references and fingerprints only.
 </Warning>
 
 ## Related
