@@ -68,8 +68,10 @@ VALUES (
     'v_reason := ''certifier_is_producer'';',
     'v_reason := ''d3_human_reserved'';',
     '''independence_contract_version'', ''2.0.0''',
-    'revoke all on function public.penta_assure_certify_v1(text,text,text,jsonb,jsonb,timestamptz,jsonb) from public, anon, authenticated;',
-    'grant execute on function public.penta_assure_certify_v1(text,text,text,jsonb,jsonb,timestamptz,jsonb) to service_role;'
+    'revoke all on function public.penta_assure_certify_v1',
+    'from public, anon, authenticated;',
+    'grant execute on function public.penta_assure_certify_v1',
+    'to service_role;'
   ]::text[],
   ARRAY[
     'grant execute on function public.penta_assure_certify_v1(text,text,text,jsonb,jsonb,timestamptz,jsonb) to anon',
@@ -101,7 +103,7 @@ BEGIN
       OR
       (policy_key='ct.penta.security.policy.penta-assure-independent-certifier-integrity-v2.v1'
        AND source_path='supabase/migrations/20260830194000_penta_assure_independent_certifier_integrity_v2.sql'
-       AND cardinality(required_literals)=10 AND cardinality(forbidden_literals)=5)
+       AND cardinality(required_literals)=12 AND cardinality(forbidden_literals)=5)
     );
 
   IF v_count <> 2 THEN
