@@ -1,0 +1,111 @@
+{
+  "schema": "crownthrive.penta.overlay/v1",
+  "registry_id": "ct.penta.overlay.v1",
+  "canonical_name": "PentaOverlay",
+  "version": "1.0.0",
+  "lifecycle_state": "ACTIVE",
+  "effective_scope": "canonical_main_only",
+  "axis": "continuity",
+  "primary_family": "build-release",
+  "machine_category": "source_convergence",
+  "mission": "Continuously reconcile CrownThrive repository resources against the canonical repository-resource registry while preserving default-branch semantics, CrownThrive overlay provenance, third-party authorship boundaries, exact-head readback, and fail-closed authority controls.",
+  "runtime": "penta/runtime/overlay.py",
+  "workflow": ".github/workflows/penta-overlay.yml",
+  "contract_schema": "penta/contracts/penta-overlay-v1.schema.json",
+  "documentation": "PENTA-OVERLAY.md",
+  "canonical_registry": ".crownthrive/resources/repository-resources.v1.json",
+  "trigger_modes": [
+    "scheduled_every_4_hours",
+    "workflow_dispatch",
+    "pull_request_validation"
+  ],
+  "resource_class_contracts": {
+    "REFERENCE_FORK": {
+      "policy": "PURE_REFERENCE_FAST_FORWARD",
+      "mutation_preconditions": [
+        "zero CrownThrive-only commits",
+        "fork head is an ancestor of upstream head",
+        "actual default branches resolved from GitHub",
+        "provider write capability is already authorized"
+      ],
+      "mutation": "fast-forward only; force=false",
+      "readback": "fork default-branch head must exactly equal the intended upstream head"
+    },
+    "MANAGED_OVERLAY_FORK": {
+      "policy": "CROWNTHRIVE_OVERLAY_GOVERNED_MERGE",
+      "direct_fast_forward_forbidden": true,
+      "preferred_execution": "dispatch an existing repository-local upstream-follow workflow",
+      "fallback_execution": "prepare one governed upstream-convergence branch/PR that merges upstream into preserved CrownThrive history",
+      "duplicate_pr_or_workflow_forbidden": true,
+      "merge_requires": ["repository-local tests", "governed checks", "exact-head readback"]
+    },
+    "FIRST_PARTY_SOURCE": {
+      "policy": "FIRST_PARTY_TRACK_DEFAULT",
+      "mutation": "none",
+      "readback": "resolve actual default branch and exact live head"
+    }
+  },
+  "authority": {
+    "may": [
+      "read registered repository metadata and exact heads",
+      "compare registered fork and upstream history",
+      "fast-forward an eligible REFERENCE_FORK without force when provider authority already exists",
+      "dispatch a registered managed-overlay upstream workflow",
+      "prepare one collision-safe managed-overlay convergence PR when no repository-local workflow exists",
+      "prepare one collision-safe CrownThrive-OS registry-update PR",
+      "emit exact-head reconciliation receipts"
+    ],
+    "may_not": [
+      "reset",
+      "rebase",
+      "force push",
+      "overwrite CrownThrive-only commits",
+      "rename main or master cosmetically",
+      "promote third-party content to CrownThrive-authored IP",
+      "treat crownthrive1/Supabase or crownthrive1/thivebase-supabase- as canonical ThriveBase state authority",
+      "expose secrets",
+      "manufacture PASS",
+      "create provider-write, credential, money, rights, certification, vote/quorum, or D3 authority"
+    ]
+  },
+  "dependencies": {
+    "PentaVergence": "reconciliation and stale-state convergence semantics",
+    "PentaFederation": "multi-repository federation boundary",
+    "PentaRoute": "GitHub read/write routing primitives",
+    "PentaActions": "bounded provider action execution",
+    "PentaPR": "collision-safe registry and managed-overlay PR lifecycle",
+    "PentaMerge": "merge readiness only after applicable gates",
+    "PentaRelease": "post-merge release/readback integration",
+    "PentaSerialized": "preserve lineage and reject blind protected overwrites",
+    "PentaResults": "hash-bound reconciliation results",
+    "PentaSecurity": "credential and provider-write boundary",
+    "PentaSELF": "bounded recovery on transient execution failure"
+  },
+  "provider_capability_gates": {
+    "multi_repository_read": {
+      "required_binding": "PENTAOVERLAY_GITHUB_TOKEN or successor scoped GitHub App installation token",
+      "missing_binding_state": "HOLD_PROVIDER_READ"
+    },
+    "reference_fork_write": {
+      "required_binding": "provider-authorized multi-repository contents write",
+      "missing_binding_state": "HOLD_PROVIDER_WRITE"
+    },
+    "managed_overlay_dispatch": {
+      "required_binding": "provider-authorized Actions dispatch on the target repository",
+      "missing_binding_state": "HOLD_PROVIDER_WRITE"
+    }
+  },
+  "notification_policy": {
+    "notify_only_for": [
+      "meaningful upstream sync",
+      "managed-overlay divergence or convergence PR",
+      "new or removed resource",
+      "security or provenance issue",
+      "sync failure requiring action",
+      "material registry change"
+    ],
+    "unchanged_current_state": "NO_NOTIFICATION"
+  },
+  "production_invariant": "Workflow success means the PentaOverlay engine executed. It is not itself proof that every provider mutation passed. Provider-dependent capability remains HOLD unless the exact provider action and resulting head are read back.",
+  "failure_mode": "HOLD"
+}
