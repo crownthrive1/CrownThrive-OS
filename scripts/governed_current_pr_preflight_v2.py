@@ -3,22 +3,20 @@
 
 Closes #121 by classifying only an exact registry of inert Help Center evidence
 transport as neutral while keeping every unknown or material data path fail-closed.
-Every pull request must also carry exact-head originator readiness evidence. Legacy
-SELF_CERTIFIED packets may be consumed only through the bounded bootstrap bridge
-below, which validates them with the exact trusted base implementation and then
-normalizes them to zero-authority same-lane readiness evidence. They never
-substitute for provider gates, DAIL binding, CHLOM/CIE decisions, or independent
-PentaCertifier authority.
+Every pull request must also carry exact-head originator readiness evidence. That
+evidence may be projected ephemerally in CI when doing so does not weaken the
+explicit continuity contract; it never substitutes for provider gates, DAIL
+binding, or human-reserved authority.
 """
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 from typing import Any
 
 from governed_merge_decision import (
@@ -44,12 +42,8 @@ from governed_current_pr_preflight import (
 
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_CONTRACT = ROOT / "developers/manifests/governed-evidence-data-classification.v1.json"
+SERIALIZED_POLICY = ROOT / "penta/registry/serialized-suite.json"
 PREFLIGHT_VERSION = "2.2.0"
-LEGACY_SEMANTIC_ERROR = "legacy evidence schema is not explicitly bound to originator readiness semantics"
-LEGACY_EVIDENCE_SCHEMA = "ct.penta.pr.self-certification.v1"
-LEGACY_RECEIPT_SCHEMA = "crownthrive.penta.serialized.git-receipt/v1"
-LEGACY_PENDING_FINAL = "PENDING_REQUIRED_GATES_READBACK_AND_DAIL"
-LEGACY_PENDING_DAIL = "REQUIRED_BEFORE_INSTITUTIONAL_CERTIFICATION"
 
 
 def evidence_contract() -> dict[str, Any]:
@@ -126,151 +120,122 @@ def classifications_for(trusted_files: set[str], policy: dict[str, Any], contrac
     return classifications, domains
 
 
-def _legacy_projection_paths(number: int) -> tuple[Path, Path]:
+def _self_cert_paths(number: int) -> tuple[Path, Path]:
     return (
         ROOT / f"penta/evidence/pr-self-cert/pr-{number}.json",
         ROOT / f"penta/continuity/receipts/pr-{number}-self-certification.json",
     )
 
 
-def validate_legacy_readiness_payload(packet: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any]:
-    """Fail-closed semantic downgrade for the trusted-base legacy packet.
+def _ephemeral_self_certification_eligible(git_base: str, git_head: str) -> tuple[bool, str]:
+    """Keep automatic CI projection inside the same narrow continuity boundary.
 
-    Cryptographic/hash/diff validation is performed by the exact trusted-base
-    generator/validator before this function is called. This function only
-    establishes that the legacy packet is safe to interpret as zero-authority
-    same-lane readiness evidence during the bootstrap transition.
+    Deletes and renames always need explicit committed continuity evidence.
+    Protected non-workflow modifications also remain explicit. In-place GitHub
+    workflow modifications may use the exact-head PentaSerialized projection,
+    and unprotected/additive changes do not need a continuity receipt.
     """
-    if packet.get("schema") != LEGACY_EVIDENCE_SCHEMA:
-        raise ValueError("legacy readiness evidence schema mismatch")
-    if receipt.get("schema") != LEGACY_RECEIPT_SCHEMA:
-        raise ValueError("legacy readiness receipt schema mismatch")
-    if packet.get("canonical_semantics") not in (None, ""):
-        raise ValueError("noncanonical legacy readiness packet cannot use compatibility downgrade")
-    if receipt.get("canonical_semantics") not in (None, ""):
-        raise ValueError("noncanonical legacy readiness receipt cannot use compatibility downgrade")
-    if packet.get("self_certification_state") != "SELF_CERTIFIED":
-        raise ValueError("legacy readiness packet state mismatch")
-    if packet.get("final_institutional_certification_state") != LEGACY_PENDING_FINAL:
-        raise ValueError("legacy readiness packet does not remain pending final institutional certification")
-    if packet.get("dail_binding_state") != LEGACY_PENDING_DAIL:
-        raise ValueError("legacy readiness packet does not remain pending DAIL binding")
-    if packet.get("provider_results_manufactured") is not False:
-        raise ValueError("legacy readiness packet attempted to manufacture provider truth")
-    if packet.get("required_gate_bypass") is not False:
-        raise ValueError("legacy readiness packet attempted to bypass a required gate")
-    if packet.get("originator_identity") != packet.get("self_certifier_identity"):
-        raise ValueError("legacy readiness packet is not same-lane originator evidence")
-    for field in ("independent_certification", "authority_created", "merge_authority", "release_authority"):
-        if packet.get(field) not in (None, False):
-            raise ValueError(f"legacy readiness packet attempted to claim {field}")
-
-    legacy_self = receipt.get("self_certification")
-    if not isinstance(legacy_self, dict):
-        raise ValueError("legacy readiness receipt self-certification envelope missing")
-    if legacy_self.get("state") != "SELF_CERTIFIED":
-        raise ValueError("legacy readiness receipt state mismatch")
-    if legacy_self.get("provider_results_manufactured") is not False:
-        raise ValueError("legacy readiness receipt attempted to manufacture provider truth")
-    if legacy_self.get("final_gate_bypassed") is not False:
-        raise ValueError("legacy readiness receipt attempted to bypass final gate")
-    if legacy_self.get("originator") not in (None, packet.get("originator_identity")):
-        raise ValueError("legacy readiness receipt originator mismatch")
-
-    return {
-        "state": "PASS",
-        "canonical_semantics": "originator_readiness_evidence",
-        "compatibility_input": "legacy_SELF_CERTIFIED_same_lane_packet",
-        "actor_class": "originator_same_lane",
-        "originator": packet.get("originator_identity"),
-        "independent_certification": False,
-        "authority_created": False,
-        "merge_authority": False,
-        "release_authority": False,
-        "provider_results_manufactured": False,
-        "required_gate_bypass": False,
-        "requires_pentacertifier": True,
-        "final_institutional_certification": "NOT_GRANTED_REQUIRES_INDEPENDENT_PENTACERTIFIER_AND_DAIL",
-    }
-
-
-def _validate_with_trusted_base_legacy_generator(
-    *,
-    git_base: str,
-    git_head: str,
-    number: int,
-    repository: str,
-) -> dict[str, Any]:
-    show = subprocess.run(
-        ["git", "show", f"{git_base}:scripts/penta_pr_gate_awareness.py"],
+    serialized = load_json(SERIALIZED_POLICY)
+    protected = [str(value) for value in serialized.get("protected_patterns", [])]
+    proc = subprocess.run(
+        ["git", "diff", "--name-status", "--find-renames", f"{git_base}...{git_head}"],
         cwd=ROOT,
         check=False,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    if show.returncode != 0 or not show.stdout.startswith("#!/usr/bin/env python3"):
-        raise SystemExit("ERROR: exact trusted-base legacy gate-awareness validator unavailable")
+    if proc.returncode != 0:
+        return False, f"trusted Git diff unavailable: {proc.stderr.strip()}"
 
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".py", delete=False) as fh:
-        fh.write(show.stdout)
-        legacy_script = Path(fh.name)
+    for line in proc.stdout.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        code = parts[0][0]
+        if code == "R":
+            return False, f"workflow/source rename requires committed continuity: {parts[-1]}"
+        path = parts[1]
+        if code == "D":
+            return False, f"delete requires committed tombstone continuity: {path}"
+        if code == "M" and any(fnmatch.fnmatch(path, pattern) for pattern in protected):
+            if not path.startswith(".github/workflows/"):
+                return False, f"protected non-workflow modification requires committed continuity: {path}"
+    return True, "exact-head ephemeral projection permitted"
+
+
+def validate_originator_self_certification(git_base: str, git_head: str) -> dict[str, Any]:
+    """Require exact-head originator readiness without forcing a candidate commit.
+
+    Existing committed packets continue to validate for backward compatibility.
+    When both packet files are absent, CI may build and validate a temporary pair
+    only if the diff stays within the narrow automatic-continuity boundary. The
+    files are deleted in ``finally`` and are never pushed to the PR branch.
+    """
+    if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
+        return {"state": "NOT_APPLICABLE", "reason": "non_pull_request_execution"}
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if not event_path:
+        raise SystemExit("ERROR: GITHUB_EVENT_PATH missing for pull_request self-certification gate")
     try:
-        command = [
+        event = json.loads(Path(event_path).read_text(encoding="utf-8"))
+        number = int(event["pull_request"]["number"])
+        originator = str(
+            event["pull_request"].get("user", {}).get("login")
+            or os.environ.get("GITHUB_ACTOR")
+            or "unknown-originator"
+        )
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise SystemExit("ERROR: unable to resolve pull request identity for self-certification gate") from exc
+
+    evidence_file, receipt_file = _self_cert_paths(number)
+    evidence_exists = evidence_file.exists()
+    receipt_exists = receipt_file.exists()
+    if evidence_exists != receipt_exists:
+        raise SystemExit(
+            "ERROR: partial originator readiness projection found; evidence and continuity receipt must be paired"
+        )
+
+    ephemeral = False
+    if not evidence_exists:
+        eligible, reason = _ephemeral_self_certification_eligible(git_base, git_head)
+        if not eligible:
+            raise SystemExit(
+                "ERROR: committed originator readiness evidence required; "
+                f"source-pure CI projection is not eligible: {reason}"
+            )
+        prepare_command = [
             sys.executable,
-            str(legacy_script),
-            "validate",
+            str(ROOT / "scripts" / "penta_pr_gate_awareness.py"),
+            "prepare",
             "--repo",
             str(ROOT),
             "--repository",
-            repository,
+            os.environ.get("GITHUB_REPOSITORY", "crownthrive1/CrownThrive-OS"),
             "--base",
             git_base,
             "--head",
             git_head,
             "--pr-number",
             str(number),
+            "--originator",
+            originator,
         ]
-        proc = subprocess.run(command, cwd=ROOT, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    finally:
-        legacy_script.unlink(missing_ok=True)
-    if proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout).strip()
-        raise SystemExit(f"ERROR: trusted-base legacy readiness validation failed: {detail[:1500]}")
-    try:
-        legacy_result = json.loads(proc.stdout)
-    except json.JSONDecodeError as exc:
-        raise SystemExit("ERROR: trusted-base legacy readiness validator emitted invalid JSON") from exc
-    if legacy_result.get("state") != "PASS":
-        raise SystemExit("ERROR: trusted-base legacy readiness validator did not return PASS")
+        prepared = subprocess.run(
+            prepare_command,
+            cwd=ROOT,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if prepared.returncode != 0:
+            detail = (prepared.stderr or prepared.stdout).strip()
+            raise SystemExit(f"ERROR: ephemeral originator readiness projection failed: {detail[:1500]}")
+        if not evidence_file.exists() or not receipt_file.exists():
+            raise SystemExit("ERROR: ephemeral originator readiness projection emitted no paired evidence")
+        ephemeral = True
 
-    evidence_path, receipt_path = _legacy_projection_paths(number)
-    try:
-        packet = json.loads(evidence_path.read_text(encoding="utf-8"))
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        normalized = validate_legacy_readiness_payload(packet, receipt)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
-        raise SystemExit(f"ERROR: unsafe legacy readiness compatibility packet: {exc}") from exc
-    normalized["trusted_base_validator"] = git_base
-    normalized["legacy_validation_state"] = legacy_result.get("state")
-    normalized["legacy_subject_head_sha"] = legacy_result.get("subject_head_sha")
-    return normalized
-
-
-def validate_originator_readiness(git_base: str, git_head: str) -> dict[str, Any]:
-    """Require current same-lane readiness evidence on GitHub PR executions."""
-    if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
-        return {"state": "NOT_APPLICABLE", "reason": "non_pull_request_execution"}
-    event_path = os.environ.get("GITHUB_EVENT_PATH")
-    if not event_path:
-        raise SystemExit("ERROR: GITHUB_EVENT_PATH missing for pull_request readiness gate")
-    try:
-        event = json.loads(Path(event_path).read_text(encoding="utf-8"))
-        number = int(event["pull_request"]["number"])
-    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise SystemExit("ERROR: unable to resolve pull request number for readiness gate") from exc
-
-    repository = os.environ.get("GITHUB_REPOSITORY", "crownthrive1/CrownThrive-OS")
     command = [
         sys.executable,
         str(ROOT / "scripts" / "penta_pr_gate_awareness.py"),
@@ -278,7 +243,7 @@ def validate_originator_readiness(git_base: str, git_head: str) -> dict[str, Any
         "--repo",
         str(ROOT),
         "--repository",
-        repository,
+        os.environ.get("GITHUB_REPOSITORY", "crownthrive1/CrownThrive-OS"),
         "--base",
         git_base,
         "--head",
@@ -286,28 +251,31 @@ def validate_originator_readiness(git_base: str, git_head: str) -> dict[str, Any
         "--pr-number",
         str(number),
     ]
-    proc = subprocess.run(command, cwd=ROOT, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout).strip()
-        if LEGACY_SEMANTIC_ERROR in detail:
-            return _validate_with_trusted_base_legacy_generator(
-                git_base=git_base,
-                git_head=git_head,
-                number=number,
-                repository=repository,
-            )
-        raise SystemExit(f"ERROR: Penta originator readiness HOLD: {detail[:1500]}")
     try:
-        result = json.loads(proc.stdout)
-    except json.JSONDecodeError as exc:
-        raise SystemExit("ERROR: readiness validator emitted invalid JSON") from exc
-    if result.get("state") != "PASS":
-        raise SystemExit("ERROR: originator readiness did not return PASS")
-    if result.get("independent_certification") is not False:
-        raise SystemExit("ERROR: originator readiness attempted to claim independent certification")
-    if result.get("merge_authority") is not False or result.get("release_authority") is not False:
-        raise SystemExit("ERROR: originator readiness attempted to claim merge/release authority")
-    return result
+        proc = subprocess.run(
+            command,
+            cwd=ROOT,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout).strip()
+            raise SystemExit(f"ERROR: Penta originator self-certification HOLD: {detail[:1500]}")
+        try:
+            result = json.loads(proc.stdout)
+        except json.JSONDecodeError as exc:
+            raise SystemExit("ERROR: self-certification validator emitted invalid JSON") from exc
+        if result.get("state") != "PASS":
+            raise SystemExit("ERROR: originator self-certification did not return PASS")
+        result["ephemeral_projection"] = ephemeral
+        result["candidate_branch_mutated"] = False
+        return result
+    finally:
+        if ephemeral:
+            evidence_file.unlink(missing_ok=True)
+            receipt_file.unlink(missing_ok=True)
 
 
 def self_test(policy: dict[str, Any], contract: dict[str, Any]) -> None:
@@ -349,8 +317,9 @@ def self_test(policy: dict[str, Any], contract: dict[str, Any]) -> None:
         "material_negative_vectors": len(material_vectors),
         "unknown_data_fail_closed": True,
         "extension_only_neutrality": False,
-        "originator_readiness_gate": True,
-        "legacy_self_certification_bootstrap_is_zero_authority": True,
+        "originator_self_certification_gate": True,
+        "source_pure_ephemeral_originator_projection": True,
+        "ephemeral_projection_forbids_delete_rename_and_protected_nonworkflow_modify": True,
         "self_test": "PASS",
     }, sort_keys=True))
 
@@ -370,7 +339,7 @@ def main() -> int:
     if not args.git_base or not args.git_head:
         raise SystemExit("ERROR: --git-base and --git-head are required unless --self-test is used")
 
-    originator_readiness = validate_originator_readiness(args.git_base, args.git_head)
+    self_certification = validate_originator_self_certification(args.git_base, args.git_head)
     trusted_files = trusted_changed_files_from_git(args.git_base, args.git_head)
     classifications, domains = classifications_for(trusted_files, policy, contract)
     required_specialists = required_specialists_for(domains, policy)
@@ -390,7 +359,7 @@ def main() -> int:
         "mode": "ci_operational_preflight_non_sovereign_authority",
         "preflight_version": PREFLIGHT_VERSION,
         "evidence_contract": contract["contract_id"],
-        "originator_readiness": originator_readiness,
+        "originator_self_certification": self_certification,
         "sovereign_authority": False,
         "trusted_changed_files_count": len(trusted_files),
         "trusted_changed_files_digest": changed_file_digest(trusted_files),

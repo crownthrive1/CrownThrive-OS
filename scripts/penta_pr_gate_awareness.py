@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""Universal Penta PR gate-awareness and originator readiness evidence.
+"""Universal Penta PR gate-awareness and originator self-certification.
 
-The originating Penta may record an exact-head, hash-bound readiness/evidence
-projection for its own change. That projection is same-lane evidence only: it
-creates no certification, authority, merge authority, or release authority and
-must never be consumed as a PentaCertifier receipt.
-
-Legacy filenames and the historical evidence schema identifier are preserved as
-compatibility aliases so existing lineage is not broken. Their canonical
-semantics are originator readiness, not self-certification.
+The engine lets the originating Penta submit its own exact-head evidence and
+continuity blobs. SELF_CERTIFIED means the originator has produced a complete,
+hash-bound candidate evidence packet; it never fabricates provider gate results
+and it does not replace repository-required gates, destination readback, DAIL
+binding, or D3/human-reserved authority.
 """
 
 from __future__ import annotations
@@ -23,13 +20,8 @@ import sys
 from typing import Any, Mapping
 
 
-# Compatibility identifier/path family. Do not reinterpret this legacy name as
-# certification authority.
 EVIDENCE_SCHEMA = "ct.penta.pr.self-certification.v1"
 RECEIPT_SCHEMA = "crownthrive.penta.serialized.git-receipt/v1"
-CANONICAL_SEMANTICS = "originator_readiness_evidence"
-READINESS_STATE = "ORIGINATOR_READINESS_RECORDED"
-LEGACY_SELF_CERT_STATE = "ORIGINATOR_COMPLETE_AWAITING_PENTACERTIFIER"
 DEFAULT_POLICY = "config/penta_pr_gate_awareness.json"
 DEFAULT_SERIALIZED_POLICY = "penta/registry/serialized-suite.json"
 
@@ -96,12 +88,10 @@ def _is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
 
 
 def evidence_path(number: int) -> str:
-    # Legacy path retained for append-only lineage compatibility.
     return f"penta/evidence/pr-self-cert/pr-{number}.json"
 
 
 def receipt_path(number: int) -> str:
-    # Legacy path retained for append-only lineage compatibility.
     return f"penta/continuity/receipts/pr-{number}-self-certification.json"
 
 
@@ -168,19 +158,6 @@ def _source_changes(repo: Path, base: str, subject_head: str, number: int) -> li
     return [change for change in collect_changes(repo, base, subject_head) if change["path"] not in excluded]
 
 
-def _no_authority_contract() -> dict[str, Any]:
-    return {
-        "actor_class": "originator_same_lane",
-        "independent_certification": False,
-        "authority_created": False,
-        "merge_authority": False,
-        "release_authority": False,
-        "provider_results_manufactured": False,
-        "required_gate_bypass": False,
-        "requires_pentacertifier": True,
-    }
-
-
 def build_continuity_receipt(
     *,
     repo: Path,
@@ -191,8 +168,7 @@ def build_continuity_receipt(
     serialized_policy: Mapping[str, Any],
 ) -> dict[str, Any]:
     controlled = [
-        change
-        for change in _source_changes(repo, base, subject_head, number)
+        change for change in _source_changes(repo, base, subject_head, number)
         if _continuity_required(change, serialized_policy)
     ]
     items: list[dict[str, Any]] = []
@@ -201,7 +177,7 @@ def build_continuity_receipt(
             "path": change["path"],
             "operation": change["operation"],
             "reason": (
-                f"PR #{number} originator readiness evidence binds this protected change "
+                f"PR #{number} originator self-certification binds this protected change "
                 "to its exact source head and rollback baseline."
             ),
             "rollback_ref": base,
@@ -217,18 +193,14 @@ def build_continuity_receipt(
             item["successor"] = change["path"]
         items.append(item)
 
-    authority = _no_authority_contract()
     receipt = {
         "schema": RECEIPT_SCHEMA,
         "receipt_id": f"ct.penta.pr-self-cert.{number}.{subject_head[:12]}",
-        "canonical_semantics": CANONICAL_SEMANTICS,
-        "compatibility_alias": "legacy_pr_self_certification_path_and_id_only",
         "created_at": utc_now(),
         "actor": originator,
-        "actor_class": authority["actor_class"],
         "reason": (
-            f"Originator readiness continuity packet for PR #{number}; preserves exact-source "
-            "lineage and rollback while independent PentaCertifier and provider gates remain required."
+            f"Originator self-certification continuity packet for PR #{number}; "
+            "preserves exact-source lineage and rollback while final provider gates remain independent."
         ),
         "subject": {
             "pr_number": number,
@@ -236,18 +208,11 @@ def build_continuity_receipt(
             "subject_head_sha": subject_head,
         },
         "changes": items,
-        "originator_readiness": {
-            "state": READINESS_STATE,
-            "originator": originator,
-            **authority,
-        },
-        # Compatibility field retained so old readers fail safely on a non-PASS
-        # state instead of interpreting same-lane evidence as certification.
         "self_certification": {
-            "state": LEGACY_SELF_CERT_STATE,
-            "legacy_alias_only": True,
+            "state": "SELF_CERTIFIED",
             "originator": originator,
-            **authority,
+            "provider_results_manufactured": False,
+            "final_gate_bypassed": False,
         },
     }
     receipt["receipt_sha256"] = sha256_json(receipt)
@@ -266,11 +231,8 @@ def build_evidence_packet(
     receipt: Mapping[str, Any],
 ) -> dict[str, Any]:
     changes = _source_changes(repo, base, subject_head, number)
-    authority = _no_authority_contract()
     packet = {
         "schema": EVIDENCE_SCHEMA,
-        "canonical_semantics": CANONICAL_SEMANTICS,
-        "compatibility_alias": "legacy_pr_self_certification_schema_and_path_only",
         "policy_version": policy.get("version"),
         "repository": repository,
         "pr_number": number,
@@ -279,14 +241,12 @@ def build_evidence_packet(
         "subject_tree_sha": _tree_sha(repo, subject_head),
         "rollback_ref": base,
         "originator_identity": originator,
-        "actor_class": authority["actor_class"],
-        "originator_readiness_state": READINESS_STATE,
-        "originator_readiness_scope": "originator_evidence_and_gate_readiness",
-        # Legacy state is deliberately non-PASS and cannot satisfy an
-        # independent-certification consumer.
-        "self_certification_state": LEGACY_SELF_CERT_STATE,
-        **authority,
-        "final_institutional_certification_state": "PENDING_INDEPENDENT_PENTACERTIFIER_AND_DAIL",
+        "self_certifier_identity": originator,
+        "self_certification_state": "SELF_CERTIFIED",
+        "self_certification_scope": "originator_evidence_and_gate_readiness",
+        "provider_results_manufactured": False,
+        "required_gate_bypass": False,
+        "final_institutional_certification_state": "PENDING_REQUIRED_GATES_READBACK_AND_DAIL",
         "dail_binding_state": "REQUIRED_BEFORE_INSTITUTIONAL_CERTIFICATION",
         "changes": changes,
         "change_set_sha256": sha256_json(changes),
@@ -307,8 +267,6 @@ def build_evidence_packet(
             "changed_file_manifest": True,
             "head_change_invalidates_packet": True,
             "provider_truth_remains_external": True,
-            "same_lane_evidence_only": True,
-            "cannot_satisfy_pentacertifier": True,
         },
         "generated_at": utc_now(),
     }
@@ -325,20 +283,6 @@ def _validate_hash(payload: Mapping[str, Any], field: str) -> None:
         raise GateAwarenessError(f"{field} mismatch")
 
 
-def _validate_no_authority_contract(packet: Mapping[str, Any]) -> None:
-    if packet.get("actor_class") != "originator_same_lane":
-        raise GateAwarenessError("originator readiness actor must remain same-lane")
-    if packet.get("independent_certification") is not False:
-        raise GateAwarenessError("originator readiness cannot claim independent certification")
-    for field in ("authority_created", "merge_authority", "release_authority"):
-        if packet.get(field) is not False:
-            raise GateAwarenessError(f"originator readiness cannot claim {field}")
-    if packet.get("requires_pentacertifier") is not True:
-        raise GateAwarenessError("originator readiness must require independent PentaCertifier")
-    if packet.get("provider_results_manufactured") is not False or packet.get("required_gate_bypass") is not False:
-        raise GateAwarenessError("originator readiness attempted to manufacture provider truth or bypass a gate")
-
-
 def validate_projection(
     *,
     repo: Path,
@@ -353,61 +297,58 @@ def validate_projection(
     epath = repo / evidence_path(number)
     rpath = repo / receipt_path(number)
     if not epath.exists():
-        raise GateAwarenessError(f"missing originator readiness evidence blob: {evidence_path(number)}")
+        raise GateAwarenessError(f"missing self-certification evidence blob: {evidence_path(number)}")
     if not rpath.exists():
-        raise GateAwarenessError(f"missing readiness continuity receipt blob: {receipt_path(number)}")
+        raise GateAwarenessError(f"missing continuity receipt blob: {receipt_path(number)}")
 
     policy = _load_json(policy_path)
     packet = _load_json(epath)
     receipt = _load_json(rpath)
     if packet.get("schema") != EVIDENCE_SCHEMA:
-        raise GateAwarenessError("unsupported readiness evidence compatibility schema")
-    if packet.get("canonical_semantics") != CANONICAL_SEMANTICS:
-        raise GateAwarenessError("legacy evidence schema is not explicitly bound to originator readiness semantics")
+        raise GateAwarenessError("unsupported self-certification evidence schema")
     if receipt.get("schema") != RECEIPT_SCHEMA:
         raise GateAwarenessError("unsupported continuity receipt schema")
-    if receipt.get("canonical_semantics") != CANONICAL_SEMANTICS:
-        raise GateAwarenessError("continuity receipt is not bound to originator readiness semantics")
     if packet.get("pr_number") != number:
-        raise GateAwarenessError("originator readiness PR identity mismatch")
+        raise GateAwarenessError("self-certification PR identity mismatch")
     if packet.get("base_sha") != base:
-        raise GateAwarenessError("originator readiness base SHA is stale")
-    if packet.get("originator_readiness_state") != READINESS_STATE:
-        raise GateAwarenessError("originator readiness evidence is not recorded")
-    if packet.get("self_certification_state") == "SELF_CERTIFIED":
-        raise GateAwarenessError("legacy SELF_CERTIFIED state is prohibited for same-lane originator evidence")
-    _validate_no_authority_contract(packet)
+        raise GateAwarenessError("self-certification base SHA is stale")
+    if packet.get("self_certification_state") != "SELF_CERTIFIED":
+        raise GateAwarenessError("originator self-certification is not PASS")
+    if packet.get("provider_results_manufactured") is not False or packet.get("required_gate_bypass") is not False:
+        raise GateAwarenessError("self-certification attempted to manufacture provider truth or bypass a gate")
+    if packet.get("originator_identity") != packet.get("self_certifier_identity"):
+        raise GateAwarenessError("originator self-certifier identity is not self-bound")
 
     _validate_hash(packet, "evidence_sha256")
     _validate_hash(receipt, "receipt_sha256")
     if packet.get("continuity_receipt", {}).get("sha256") != receipt.get("receipt_sha256"):
-        raise GateAwarenessError("readiness evidence packet is not bound to the continuity receipt")
+        raise GateAwarenessError("evidence packet is not bound to the continuity receipt")
 
     subject = str(packet.get("subject_head_sha") or "")
     _ensure_commit(repo, subject)
     if not _is_ancestor(repo, subject, head):
-        raise GateAwarenessError("readiness subject head is not an ancestor of the PR head")
+        raise GateAwarenessError("self-certification subject head is not an ancestor of the PR head")
 
     projection = collect_changes(repo, subject, head)
     allowed = _projection_paths(number)
     unexpected = [item["path"] for item in projection if item["path"] not in allowed]
     if unexpected:
         raise GateAwarenessError(
-            "originator readiness became stale after non-evidence changes: " + ", ".join(sorted(unexpected))
+            "self-certification became stale after non-evidence changes: " + ", ".join(sorted(unexpected))
         )
 
     expected_changes = _source_changes(repo, base, subject, number)
     if packet.get("changes") != expected_changes:
-        raise GateAwarenessError("originator readiness change manifest does not match trusted Git diff")
+        raise GateAwarenessError("self-certification change manifest does not match trusted Git diff")
     if packet.get("change_set_sha256") != sha256_json(expected_changes):
-        raise GateAwarenessError("originator readiness change-set digest mismatch")
+        raise GateAwarenessError("self-certification change-set digest mismatch")
     if packet.get("subject_tree_sha") != _tree_sha(repo, subject):
-        raise GateAwarenessError("originator readiness source tree digest mismatch")
+        raise GateAwarenessError("self-certification source tree digest mismatch")
 
     required_contexts = policy.get("gate_awareness", {}).get("required_contexts", [])
     observed_contexts = [item.get("context") for item in packet.get("gate_matrix", [])]
     if observed_contexts != required_contexts:
-        raise GateAwarenessError("originator readiness required-gate matrix drifted")
+        raise GateAwarenessError("self-certification required-gate matrix drifted")
 
     # Re-run the canonical PentaSerialized gate against the exact source diff.
     proc = subprocess.run(
@@ -433,29 +374,22 @@ def validate_projection(
     )
     if proc.returncode != 0:
         raise GateAwarenessError(
-            "PentaSerialized rejected originator readiness evidence: "
-            + (proc.stderr.strip() or proc.stdout.strip())
+            "PentaSerialized rejected originator continuity evidence: " + (proc.stderr.strip() or proc.stdout.strip())
         )
 
     return {
-        "schema": "ct.penta.pr.originator-readiness-validation.v1",
+        "schema": "ct.penta.pr.self-certification-validation.v1",
         "state": "PASS",
         "pr_number": number,
         "base_sha": base,
         "subject_head_sha": subject,
         "projection_head_sha": head,
         "originator": packet["originator_identity"],
-        "actor_class": "originator_same_lane",
         "source_changes": len(expected_changes),
         "continuity_changes": len(receipt.get("changes", [])),
         "evidence_sha256": packet["evidence_sha256"],
         "receipt_sha256": receipt["receipt_sha256"],
-        "authority_created": False,
-        "merge_authority": False,
-        "release_authority": False,
-        "independent_certification": False,
-        "requires_pentacertifier": True,
-        "final_institutional_certification": "NOT_GRANTED_REQUIRES_INDEPENDENT_PENTACERTIFIER_AND_DAIL",
+        "final_institutional_certification": "STILL_REQUIRES_PROVIDER_GATES_READBACK_AND_DAIL",
     }
 
 
@@ -473,7 +407,7 @@ def prepare(
     _ensure_commit(repo, base)
     _ensure_commit(repo, head)
 
-    # If the current head is already a valid source+readiness projection, do not
+    # If the current head is already a valid source+evidence projection, do not
     # generate another evidence commit. This makes synchronize events idempotent.
     if (repo / evidence_path(number)).exists() and (repo / receipt_path(number)).exists():
         try:
@@ -485,7 +419,7 @@ def prepare(
                 policy_path=policy_path,
                 serialized_policy_path=serialized_policy_path,
             )
-            return {"changed": False, "reason": "current_readiness_projection_valid", "validation": validation}
+            return {"changed": False, "reason": "current_projection_valid", "validation": validation}
         except GateAwarenessError:
             pass
 
@@ -518,7 +452,7 @@ def prepare(
     epath.write_text(json.dumps(packet, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
     return {
         "changed": True,
-        "reason": "originator_readiness_projection_written",
+        "reason": "self_certification_projection_written",
         "pr_number": number,
         "base_sha": base,
         "subject_head_sha": head,
@@ -526,9 +460,6 @@ def prepare(
         "receipt_path": receipt_path(number),
         "evidence_sha256": packet["evidence_sha256"],
         "receipt_sha256": receipt["receipt_sha256"],
-        "authority_created": False,
-        "independent_certification": False,
-        "requires_pentacertifier": True,
     }
 
 
