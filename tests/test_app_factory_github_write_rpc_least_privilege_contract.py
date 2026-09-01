@@ -50,11 +50,16 @@ def test_preflight_is_exact_definition_bound_and_fail_closed_on_drift():
         assert expected_sha in sql
 
 
-def test_rollback_is_definition_bound_and_restores_only_observed_roles():
+def test_recovery_refuses_definition_drift_and_never_reopens_end_user_execute():
     sql = _normalized(ROLLBACK)
+    assert "fail-closed recovery" in sql
     assert "rollback_refuses_changed_app_factory_github_write_rpc" in sql
-    assert "to anon, authenticated, service_role" in sql
+    assert "to service_role" in sql
+    assert "to anon" not in sql
+    assert "to authenticated" not in sql
     assert "to public" not in sql
+    assert "anon_execute_present" in sql
+    assert "authenticated_execute_present" in sql
     for signature, expected_sha in TARGETS.items():
         assert signature in sql
         assert expected_sha in sql
