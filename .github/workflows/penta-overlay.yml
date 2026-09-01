@@ -1,0 +1,196 @@
+name: PentaOverlay Repository Resource Reconciliation
+
+on:
+  pull_request:
+    paths:
+      - 'penta/runtime/overlay.py'
+      - 'penta/registry/penta-overlay.v1.json'
+      - 'penta/contracts/penta-overlay-v1.schema.json'
+      - 'data/penta/systems.overlay.v1.json'
+      - 'tests/test_penta_overlay.py'
+      - 'PENTA-OVERLAY.md'
+      - 'penta/retirements/repository-resource-manual-reconciliation.v1.json'
+      - '.github/workflows/penta-overlay.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'penta/runtime/overlay.py'
+      - 'penta/registry/penta-overlay.v1.json'
+      - 'penta/contracts/penta-overlay-v1.schema.json'
+      - 'data/penta/systems.overlay.v1.json'
+      - 'tests/test_penta_overlay.py'
+      - 'PENTA-OVERLAY.md'
+      - 'penta/retirements/repository-resource-manual-reconciliation.v1.json'
+      - '.github/workflows/penta-overlay.yml'
+  schedule:
+    - cron: '17 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: penta-overlay-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-tests:
+    name: PentaOverlay contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Compile PentaOverlay
+        run: python -m py_compile penta/runtime/overlay.py tests/test_penta_overlay.py
+
+      - name: Run PentaOverlay unit tests
+        run: python -m unittest -v tests.test_penta_overlay
+
+      - name: Run deterministic safety vectors
+        run: python -m penta.runtime.overlay self-test
+
+      - name: Validate PentaOverlay JSON contracts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in (
+              'penta/registry/penta-overlay.v1.json',
+              'penta/contracts/penta-overlay-v1.schema.json',
+              'data/penta/systems.overlay.v1.json',
+              'penta/retirements/repository-resource-manual-reconciliation.v1.json',
+          ):
+              json.loads(Path(path).read_text(encoding='utf-8'))
+          print('PentaOverlay JSON contracts parse successfully.')
+          PY
+
+  reconcile:
+    name: PentaOverlay scheduled reconciliation
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: contract-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PENTAOVERLAY_GITHUB_TOKEN: ${{ secrets.PENTAOVERLAY_GITHUB_TOKEN }}
+    steps:
+      - name: Check out canonical OS main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Reconcile registered repository resources
+        id: reconcile
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="${RUNNER_TEMP}/repository-resources.v1.json"
+          receipt="${RUNNER_TEMP}/penta-overlay-receipt.json"
+          python -m penta.runtime.overlay reconcile \
+            --registry .crownthrive/resources/repository-resources.v1.json \
+            --registry-out "$candidate" \
+            --receipt-out "$receipt" \
+            --apply-reference-sync \
+            --dispatch-managed-overlay \
+            --prepare-managed-overlay \
+            --token-env PENTAOVERLAY_GITHUB_TOKEN
+          echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
+          echo "receipt=$receipt" >> "$GITHUB_OUTPUT"
+          python - <<'PY' "$receipt" >> "$GITHUB_OUTPUT"
+          import json, sys
+          d = json.load(open(sys.argv[1], encoding='utf-8'))
+          print(f"state={d['state']}")
+          print(f"material_registry_change={'true' if d['material_registry_change'] else 'false'}")
+          print(f"meaningful_events={len(d['meaningful_events'])}")
+          PY
+
+      - name: Preserve reconciliation receipt
+        if: always() && steps.reconcile.outputs.receipt != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-overlay-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.reconcile.outputs.receipt }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Prepare one governed registry PR when material state changed
+        if: steps.reconcile.outputs.state == 'PASS_OBSERVED' && steps.reconcile.outputs.material_registry_change == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE: ${{ steps.reconcile.outputs.candidate }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          live_main="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.commit.sha')"
+          if [[ "$live_main" != "$GITHUB_SHA" ]]; then
+            echo "PentaOverlay registry projection HOLD_STALE_BASE: checkout=$GITHUB_SHA live_main=$live_main" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,headRefName --jq '.[] | select(.headRefName | startswith("pentaoverlay/repository-resources-auto-")) | .number' | head -n 1)"
+          if [[ -n "$existing" ]]; then
+            echo "PentaOverlay did not create a duplicate registry PR; existing PR #${existing} remains the single governed candidate." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          branch="pentaoverlay/repository-resources-auto-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/heads/${branch}" \
+            -f sha="$GITHUB_SHA" >/dev/null
+          blob_sha="$(gh api "repos/${GITHUB_REPOSITORY}/contents/.crownthrive/resources/repository-resources.v1.json?ref=${branch}" --jq '.sha')"
+          encoded="$(base64 -w 0 "$CANDIDATE")"
+          gh api --method PUT "repos/${GITHUB_REPOSITORY}/contents/.crownthrive/resources/repository-resources.v1.json" \
+            -f message='PentaOverlay: reconcile repository resource registry' \
+            -f content="$encoded" \
+            -f sha="$blob_sha" \
+            -f branch="$branch" >/dev/null
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$branch" \
+            --title 'PentaOverlay: reconcile repository resources' \
+            --body 'Automated governed repository-resource reconciliation from PentaOverlay. REFERENCE_FORK changes are limited to proven non-force fast-forwards with exact readback. MANAGED_OVERLAY_FORK changes preserve CrownThrive commits and provenance. Third-party content remains third-party provenance. Supabase remains reference-only and is not canonical ThriveBase state authority. No provider-write, credential, money, rights, certification, vote/quorum, or D3 authority is created by registry projection. Merge only after applicable CrownThrive gates pass.' >/dev/null
+          echo "PentaOverlay opened one governed registry candidate on branch ${branch}." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish semantic status
+        if: always()
+        env:
+          RECEIPT: ${{ steps.reconcile.outputs.receipt }}
+        shell: bash
+        run: |
+          echo '## PentaOverlay repository reconciliation' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Workflow success means the engine executed; it is not synthetic provider PASS.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Force-push, reset and rebase are forbidden.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Managed overlays preserve CrownThrive commits and use repository-local upstream-follow automation first.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Supabase is reference-only, not canonical ThriveBase state authority.' >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "${RECEIPT:-}" && -s "$RECEIPT" ]]; then
+            python - <<'PY' "$RECEIPT" >> "$GITHUB_STEP_SUMMARY"
+          import json, sys
+          d = json.load(open(sys.argv[1], encoding='utf-8'))
+          print(f"- Semantic state: **{d['state']}**")
+          print(f"- Provider authenticated: **{d['provider_authenticated']}**")
+          print(f"- Material registry change: **{d['material_registry_change']}**")
+          print(f"- Meaningful events: **{len(d['meaningful_events'])}**")
+          print(f"- Errors/HOLD evidence: **{len(d['errors'])}**")
+          PY
+          else
+            echo '- Semantic state: **HOLD — no receipt emitted**' >> "$GITHUB_STEP_SUMMARY"
+          fi

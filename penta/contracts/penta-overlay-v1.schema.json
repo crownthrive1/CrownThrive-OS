@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/contracts/penta-overlay-v1.schema.json",
+  "title": "CrownThrive PentaOverlay Receipt v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "contract",
+    "observed_at",
+    "state",
+    "provider_authenticated",
+    "material_registry_change",
+    "events",
+    "meaningful_events",
+    "errors",
+    "authority_created",
+    "third_party_authorship_promoted",
+    "force_push_used",
+    "reset_used",
+    "rebase_used"
+  ],
+  "properties": {
+    "schema": {"const": "ct.penta.overlay.receipt.v1"},
+    "contract": {"const": "ct.penta.overlay.v1"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "state": {
+      "enum": ["PASS_OBSERVED", "HOLD", "HOLD_SYNC_AVAILABLE"]
+    },
+    "provider_authenticated": {"type": "boolean"},
+    "material_registry_change": {"type": "boolean"},
+    "changed_repositories": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[^/]+/[^/]+$"},
+      "uniqueItems": true
+    },
+    "events": {"type": "array", "items": {"type": "object"}},
+    "meaningful_events": {"type": "array", "items": {"type": "object"}},
+    "errors": {"type": "array", "items": {"type": "object"}},
+    "authority_created": {"const": false},
+    "third_party_authorship_promoted": {"const": false},
+    "force_push_used": {"const": false},
+    "reset_used": {"const": false},
+    "rebase_used": {"const": false}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"state": {"const": "PASS_OBSERVED"}}},
+      "then": {"properties": {"errors": {"maxItems": 0}}}
+    }
+  ],
+  "additionalProperties": true,
+  "description": "PASS_OBSERVED certifies the observation/reconciliation engine completed without a recorded HOLD. It never creates provider, rights, money, credential, certification, vote/quorum, or D3 authority and is not a substitute for exact provider mutation readback."
+}
