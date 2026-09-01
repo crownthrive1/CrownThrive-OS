@@ -14,12 +14,18 @@
 DO $preflight$
 DECLARE
   v_oid oid := to_regprocedure('public.app_factory_merge_production_pr(text,text,boolean)');
+  v_definition_sha256 text;
 BEGIN
   IF v_oid IS NULL THEN
     RAISE EXCEPTION 'APP_FACTORY_MERGE_RPC_NOT_FOUND';
   END IF;
   IF NOT (SELECT p.prosecdef FROM pg_proc p WHERE p.oid=v_oid) THEN
     RAISE EXCEPTION 'APP_FACTORY_MERGE_RPC_SECURITY_DEFINER_EXPECTED';
+  END IF;
+  SELECT encode(extensions.digest(convert_to(pg_get_functiondef(v_oid),'UTF8'),'sha256'),'hex')
+    INTO v_definition_sha256;
+  IF v_definition_sha256 <> '29af46e774a7fd6fadec29f063928bc96950a6a4021d185f07dbf69ceb02f394' THEN
+    RAISE EXCEPTION 'APP_FACTORY_MERGE_RPC_DEFINITION_DRIFT:%',v_definition_sha256;
   END IF;
 END
 $preflight$;
