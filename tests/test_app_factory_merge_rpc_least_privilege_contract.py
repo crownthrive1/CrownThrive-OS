@@ -14,6 +14,8 @@ def _normalized(path: Path) -> str:
 def test_migration_targets_only_exact_merge_rpc_and_removes_end_user_execute():
     sql = _normalized(MIGRATION)
     assert SIGNATURE in sql
+    assert INCIDENT_DEFINITION_SHA in sql
+    assert "app_factory_merge_rpc_definition_drift" in sql
     assert f"revoke all on function {SIGNATURE}" in sql
     assert "from public, anon, authenticated" in sql
     assert f"grant execute on function {SIGNATURE}" in sql
