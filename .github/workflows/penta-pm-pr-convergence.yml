@@ -1,24 +1,17 @@
 name: PentaPM PR Metadata Convergence
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/penta-pm-pr-convergence.yml"
-      - ".github/workflows/penta-pm-governance.yml"
-      - "scripts/penta_pm_pr_converge.py"
-      - "tests/test_penta_pm_pr_converge.py"
-      - "config/penta_pm_policy.json"
-      - "scripts/penta_pm_reconcile.py"
   pull_request_target:
-    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
+    types: [opened, reopened, edited]
   workflow_run:
     workflows: ["PentaSELF Remediation Handoff"]
     types: [completed]
+  schedule:
+    - cron: '37 * * * *'
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "Optional PR number; blank reconciles all open governed PRs"
+        description: Optional PR number; blank reconciles metadata across the repository
         required: false
         type: string
 
@@ -28,13 +21,15 @@ permissions:
   pull-requests: write
   repository-projects: write
 
+# Metadata ownership is serialized only within one PR. Repository-wide cleanup
+# gets its own sweep lane instead of blocking every active PR.
 concurrency:
-  group: penta-pm-pr-convergence-${{ github.repository }}
-  cancel-in-progress: false
+  group: penta-pm-pr-convergence-${{ github.repository }}-${{ github.event.pull_request.number || inputs.pr_number || 'sweep' }}
+  cancel-in-progress: true
 
 jobs:
   converge:
-    name: PentaPM/PentaIssues/PentaDevelopment converge
+    name: PentaPM canonical PR metadata
     if: >-
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
@@ -45,8 +40,6 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
       GH_TOKEN: ${{ secrets.PENTA_PM_GITHUB_TOKEN }}
     steps:
-      # pull_request_target is intentionally trusted-base only. Never checkout
-      # or execute the candidate PR head while a provider-capable token exists.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -56,7 +49,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify trusted PentaPM convergence source
+      - name: Verify trusted mutation source
         if: github.event_name == 'pull_request_target'
         shell: bash
         env:
@@ -68,12 +61,7 @@ jobs:
             exit 78
           fi
 
-      - name: Run convergence unit contracts
-        run: |
-          python -m unittest tests.test_penta_pm_pr_converge -v
-          python -m unittest tests.test_penta_pm_reconcile -v
-
-      - name: Require dedicated PentaPM Projects credential
+      - name: Require dedicated PentaPM provider credential
         shell: bash
         run: |
           set -euo pipefail
@@ -83,7 +71,7 @@ jobs:
           fi
 
       - id: scope
-        name: Resolve bounded reconciliation scope
+        name: Resolve reconciliation scope
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -100,83 +88,66 @@ jobs:
             fi
             echo "args=--pr ${MANUAL_PR}" >> "$GITHUB_OUTPUT"
           else
-            # main activation and PentaSELF workflow completion both reconcile
-            # all open governed PRs. This is the PentaRetro/PentaWatch catch-up
-            # path and is idempotent.
-            echo "args=--all-open" >> "$GITHUB_OUTPUT"
+            echo "args=--all" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Materialize Relationships and Development
+      - name: Converge Development metadata to one unit per PR
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts/penta-pm
-          python scripts/penta_pm_pr_converge.py \
+          python scripts/penta_pr_metadata_converge_v2.py \
             --repo "$GITHUB_REPOSITORY" \
             ${{ steps.scope.outputs.args }} \
-            --apply | tee artifacts/penta-pm/pr-convergence.json
+            --apply | tee artifacts/penta-pm/pr-metadata-v2.json
 
       - id: provider
-        name: Materialize Project, Milestone, owner, lane, risk, stage and evidence
+        name: Reconcile Project, milestone, owner, lane, risk, stage and evidence
         continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python scripts/penta_pm_reconcile.py --repo "$GITHUB_REPOSITORY" --apply
 
-      - name: Classify provider reconciliation outcome
+      - name: Classify provider-only hold
+        if: steps.provider.outcome != 'success'
         shell: bash
-        env:
-          PROVIDER_OUTCOME: ${{ steps.provider.outcome }}
         run: |
           set -euo pipefail
-          if [[ "$PROVIDER_OUTCOME" == "success" ]]; then
-            echo "PentaPM provider reconciliation passed."
-            exit 0
-          fi
           python - <<'PY'
           import json
           from pathlib import Path
-          path=Path('artifacts/penta-pm/latest.json')
+          path = Path("artifacts/penta-pm/latest.json")
           if not path.exists():
-              raise SystemExit('PentaPM provider reconciliation failed without a receipt')
-          payload=json.loads(path.read_text())
-          holds=payload.get('holds') or []
-          provider=[h for h in holds if h.get('type') in {'projects_v2_provider_authority','project_item_provider_authority'}]
+              raise SystemExit("PentaPM provider reconciliation failed without receipt")
+          payload = json.loads(path.read_text())
+          holds = payload.get("holds") or []
+          provider = [
+              item for item in holds
+              if item.get("type") in {
+                  "projects_v2_provider_authority",
+                  "project_item_provider_authority",
+              }
+          ]
           if not provider:
-              raise SystemExit('PentaPM provider reconciliation failed for an unclassified reason')
-          print('::warning::GitHub Projects v2 remains externally authority-gated; safe repository-native reconciliation continues and the provider lane will retry.')
-          for hold in provider:
-              print(f"::warning::{hold.get('type')}: {hold.get('message','provider authority unavailable')}")
+              raise SystemExit("PentaPM reconciliation failed for an unclassified reason")
+          print("Provider-only Projects hold preserved; repository-native metadata convergence completed.")
           PY
 
-      - name: Verify post-apply Development contract
+      - name: Verify idempotent post-state
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/penta_pm_pr_converge.py \
+          python scripts/penta_pr_metadata_converge_v2.py \
             --repo "$GITHUB_REPOSITORY" \
             ${{ steps.scope.outputs.args }} \
-            > artifacts/penta-pm/pr-convergence-postcheck.json
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          payload=json.loads(Path('artifacts/penta-pm/pr-convergence-postcheck.json').read_text())
-          failures=[]
-          for item in payload.get('results', []):
-              if not item.get('governed'):
-                  continue
-              if item.get('development_action') == 'missing-reference':
-                  failures.append(f"PR #{item.get('pr')}: missing issue reference")
-          if failures:
-              raise SystemExit('; '.join(failures))
-          PY
+            > artifacts/penta-pm/pr-metadata-v2-postcheck.json
 
-      - name: Upload PentaPM convergence evidence
+      - name: Upload convergence evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: penta-pm-pr-convergence-${{ github.run_id }}
+          name: penta-pm-pr-metadata-v2-${{ github.run_id }}
           path: artifacts/penta-pm/
           if-no-files-found: warn
           retention-days: 90

@@ -7,6 +7,7 @@ on:
       - 'penta/registry/serialized-suite.json'
       - 'penta/continuity/receipts/**'
       - 'tests/test_penta_serialized.py'
+      - 'tests/test_penta_workflow_continuity_projection.py'
       - 'PENTA-SERIALIZED.md'
       - 'PENTA-FAMILY-REGISTRY.md'
       - 'docs/versioning/**'
@@ -21,6 +22,7 @@ on:
       - 'penta/registry/serialized-suite.json'
       - 'penta/continuity/receipts/**'
       - 'tests/test_penta_serialized.py'
+      - 'tests/test_penta_workflow_continuity_projection.py'
       - 'PENTA-SERIALIZED.md'
       - 'PENTA-FAMILY-REGISTRY.md'
       - 'docs/versioning/**'
@@ -35,9 +37,11 @@ on:
 permissions:
   contents: read
 
+# Exact-head work supersedes stale work for the same PR/ref. Continuity protects
+# the current candidate instead of spending runner time certifying obsolete heads.
 concurrency:
-  group: penta-serialized-${{ github.ref }}
-  cancel-in-progress: false
+  group: penta-serialized-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   serialized-assurance:
@@ -56,10 +60,17 @@ jobs:
           python-version: '3.12'
 
       - name: Compile PentaSerialized
-        run: python -m compileall -q penta/runtime/serialized tests/test_penta_serialized.py
+        run: |
+          python -m compileall -q \
+            penta/runtime/serialized \
+            tests/test_penta_serialized.py \
+            tests/test_penta_workflow_continuity_projection.py
 
       - name: Run PentaSerialized tests
-        run: python -m unittest -v tests.test_penta_serialized
+        run: |
+          python -m unittest -v \
+            tests.test_penta_serialized \
+            tests.test_penta_workflow_continuity_projection
 
       - name: Exercise serialized mutation and recovery path
         shell: bash
@@ -78,7 +89,8 @@ jobs:
           python -m penta.runtime.serialized snapshot "$store" --actor ci --reason 'smoke recovery baseline' > "${RUNNER_TEMP}/snapshot.json"
           python -m penta.runtime.serialized doctor "$store" > "${RUNNER_TEMP}/doctor.json"
 
-      - name: Gate Git continuity receipts
+      - name: Resolve exact continuity range
+        id: exact_range
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -89,19 +101,85 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "pull_request" ]; then
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
             base="$PR_BASE"
             head="$PR_HEAD"
           else
             base="$PUSH_BASE"
             head="$PUSH_HEAD"
           fi
+          git cat-file -e "${base}^{commit}"
+          git cat-file -e "${head}^{commit}"
+          echo "CT_GIT_BASE_SHA=$base" >> "$GITHUB_ENV"
+          echo "CT_GIT_HEAD_SHA=$head" >> "$GITHUB_ENV"
+          echo "checkout_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Project exact-head workflow continuity evidence
+        id: workflow_projection
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="${RUNNER_TEMP}/penta-serialized-ci"
+          artifact_path="${artifact_dir}/continuity-receipt.json"
+          mkdir -p "$artifact_dir"
+          python -m penta.runtime.serialized.workflow_projection \
+            --repo . \
+            --base "$CT_GIT_BASE_SHA" \
+            --head "$CT_GIT_HEAD_SHA" \
+            --policy penta/registry/serialized-suite.json \
+            --output "$artifact_path" \
+            --actor 'github-actions[bot]' \
+            --receipt-id "ct.penta.serialized.ci-workflow-projection.${{ github.run_id }}.${{ github.run_attempt }}"
+          if [[ -s "$artifact_path" ]]; then
+            echo 'generated=true' >> "$GITHUB_OUTPUT"
+            echo "artifact_path=$artifact_path" >> "$GITHUB_OUTPUT"
+          else
+            echo 'generated=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Gate Git continuity receipts
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The canonical CLI installs the same narrowly scoped exact-head
+          # workflow projection transiently, runs the normal fail-closed gate,
+          # and removes it in finally. Candidate source is never rewritten.
           python -m penta.runtime.serialized git-gate \
             --repo . \
-            --base "$base" \
-            --head "$head" \
+            --base "$CT_GIT_BASE_SHA" \
+            --head "$CT_GIT_HEAD_SHA" \
             --policy penta/registry/serialized-suite.json \
             > "${RUNNER_TEMP}/git-gate.json"
+
+      - name: Upload exact-head continuity projection
+        if: always() && steps.workflow_projection.outputs.generated == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: penta-serialized-workflow-continuity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.workflow_projection.outputs.artifact_path }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Prove source purity
+        if: always() && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'))
+        env:
+          CHECKOUT_SHA: ${{ steps.exact_range.outputs.checkout_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # compileall/unittest legitimately produce bytecode. Remove only those
+          # deterministic test byproducts before evaluating source-tree purity.
+          find penta/runtime/serialized tests -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete 2>/dev/null || true
+          find penta/runtime/serialized tests -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+          test "$(git rev-parse HEAD)" = "$CHECKOUT_SHA"
+          dirty="$(git status --porcelain --untracked-files=all)"
+          if [[ -n "$dirty" ]]; then
+            echo "::error::Continuity assurance mutated the checked-out source tree"
+            printf '%s\n' "$dirty"
+            exit 79
+          fi
 
       - name: Publish PentaStatus summary
         if: always()
@@ -112,8 +190,10 @@ jobs:
           echo '- Control plane: PentaSerialized v1.0.0' >> "$GITHUB_STEP_SUMMARY"
           echo '- Hard delete API: disabled/absent' >> "$GITHUB_STEP_SUMMARY"
           echo '- Mutation model: expected-revision + append-only hash chain + tombstones' >> "$GITHUB_STEP_SUMMARY"
-          echo '- Git gate: deletions, renames, and protected modifications require continuity receipts' >> "$GITHUB_STEP_SUMMARY"
-          if [ -s "${RUNNER_TEMP}/verify.json" ]; then
+          echo '- Git gate: one reusable exact-head CLI path across required merge/continuity callers' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Modified workflow continuity: exact-head ephemeral projection allowed; evidence artifact retained, candidate branch never rewritten' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Workflow deletes/renames and non-workflow protected modifications: explicit committed receipt still required' >> "$GITHUB_STEP_SUMMARY"
+          if [[ -s "${RUNNER_TEMP}/verify.json" ]]; then
             python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json, os
           from pathlib import Path
@@ -125,15 +205,18 @@ jobs:
           print(f"- Last event hash: `{d['last_event_hash']}`")
           PY
           fi
-          if [ -s "${RUNNER_TEMP}/git-gate.json" ]; then
+          if [[ -s "${RUNNER_TEMP}/git-gate.json" ]]; then
             python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json, os
           from pathlib import Path
           p = Path(os.environ['RUNNER_TEMP']) / 'git-gate.json'
           d = json.loads(p.read_text())
+          projection = d.get('workflow_projection', {})
           print(f"- Git continuity gate: {d['status']}")
           print(f"- Continuity-controlled changes: {d['continuity_checked']}")
+          print(f"- Ephemeral workflow projection: {projection.get('generated', False)}")
+          print(f"- Projected workflow modifications: {projection.get('eligible_changes', 0)}")
           PY
           else
-            echo '- Git continuity gate: **HOLD/FAIL — no nonempty gate receipt emitted; inspect the gate step**' >> "$GITHUB_STEP_SUMMARY"
+            echo '- Git continuity gate: **HOLD/FAIL — no nonempty gate result emitted; inspect the gate step**' >> "$GITHUB_STEP_SUMMARY"
           fi

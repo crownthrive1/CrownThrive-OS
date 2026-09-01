@@ -9,6 +9,10 @@ current repository evidence makes the action reversible and unambiguous:
   the PR is current with main, mergeable, non-draft and contains no HOLD marker;
 * otherwise emit repair/restack/preserve dispositions.
 
+GitHub provider throttling is evidence unavailability, not repository failure.
+A provider rate limit therefore produces an OBSERVE_RATE_LIMIT disposition and
+never authorizes merge/close mutation. Missing evidence is never treated as PASS.
+
 It never force-pushes, deletes branches, manufactures reviews, bypasses a gate,
 or treats missing evidence as PASS.
 """
@@ -19,10 +23,11 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Any
 
 API = "https://api.github.com"
@@ -40,10 +45,64 @@ HOLD_MARKERS = (
 PASS_CONCLUSIONS = {"success", "neutral", "skipped"}
 
 
+class GitHubRateLimit(RuntimeError):
+    """GitHub provider quota prevented an authoritative read."""
+
+    def __init__(self, method: str, path: str, status: int, detail: str, reset_epoch: int | None = None) -> None:
+        self.method = method
+        self.path = path
+        self.status = status
+        self.detail = detail
+        self.reset_epoch = reset_epoch
+        reset_text = f"; reset_epoch={reset_epoch}" if reset_epoch is not None else ""
+        super().__init__(f"GitHub {method} {path} -> {status}: provider rate limit{reset_text}")
+
+    def evidence(self) -> dict[str, Any]:
+        now = int(time.time())
+        retry_after = max(0, self.reset_epoch - now) if self.reset_epoch is not None else None
+        return {
+            "provider": "github",
+            "state": "RATE_LIMITED",
+            "http_status": self.status,
+            "method": self.method,
+            "path": self.path,
+            "reset_epoch": self.reset_epoch,
+            "retry_after_seconds": retry_after,
+            "authority_effect": "none",
+            "mutation_allowed": False,
+        }
+
+
 class GitHub:
     def __init__(self, repo: str, token: str) -> None:
         self.repo = repo
         self.token = token
+        self._compare_cache: dict[tuple[str, str], dict[str, Any]] = {}
+        self._checks_cache: dict[str, list[dict[str, Any]]] = {}
+        self._pr_cache: dict[int, dict[str, Any]] = {}
+
+    @staticmethod
+    def _reset_epoch(headers: Any) -> int | None:
+        try:
+            value = headers.get("X-RateLimit-Reset") if headers is not None else None
+            return int(value) if value else None
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _is_rate_limit(exc: urllib.error.HTTPError, detail: str) -> bool:
+        lower = detail.lower()
+        headers = exc.headers
+        remaining = headers.get("X-RateLimit-Remaining") if headers is not None else None
+        retry_after = headers.get("Retry-After") if headers is not None else None
+        return (
+            exc.code == 429
+            or remaining == "0"
+            or retry_after is not None
+            or "rate limit exceeded" in lower
+            or "secondary rate limit" in lower
+            or "abuse detection mechanism" in lower
+        )
 
     def request(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
         url = f"{API}{path}"
@@ -60,19 +119,31 @@ class GitHub:
                 return json.loads(raw) if raw else None
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")
+            if self._is_rate_limit(exc, detail):
+                raise GitHubRateLimit(method, path, exc.code, detail[:800], self._reset_epoch(exc.headers)) from exc
             raise RuntimeError(f"GitHub {method} {path} -> {exc.code}: {detail[:800]}") from exc
 
     def open_prs(self) -> list[dict[str, Any]]:
         return self.request("GET", f"/repos/{self.repo}/pulls?state=open&per_page=100&sort=updated&direction=asc")
 
     def compare(self, base: str, head: str) -> dict[str, Any]:
-        base_q = urllib.parse.quote(base, safe="")
-        head_q = urllib.parse.quote(head, safe="")
-        return self.request("GET", f"/repos/{self.repo}/compare/{base_q}...{head_q}")
+        cache_key = (base, head)
+        if cache_key not in self._compare_cache:
+            base_q = urllib.parse.quote(base, safe="")
+            head_q = urllib.parse.quote(head, safe="")
+            self._compare_cache[cache_key] = self.request("GET", f"/repos/{self.repo}/compare/{base_q}...{head_q}")
+        return self._compare_cache[cache_key]
 
     def checks(self, sha: str) -> list[dict[str, Any]]:
-        payload = self.request("GET", f"/repos/{self.repo}/commits/{sha}/check-runs?per_page=100")
-        return payload.get("check_runs", []) if isinstance(payload, dict) else []
+        if sha not in self._checks_cache:
+            payload = self.request("GET", f"/repos/{self.repo}/commits/{sha}/check-runs?per_page=100")
+            self._checks_cache[sha] = payload.get("check_runs", []) if isinstance(payload, dict) else []
+        return self._checks_cache[sha]
+
+    def pr_detail(self, number: int) -> dict[str, Any]:
+        if number not in self._pr_cache:
+            self._pr_cache[number] = self.request("GET", f"/repos/{self.repo}/pulls/{number}")
+        return self._pr_cache[number]
 
     def close_pr(self, number: int) -> None:
         self.request("PATCH", f"/repos/{self.repo}/pulls/{number}", {"state": "closed"})
@@ -94,11 +165,23 @@ class Decision:
     reasons: list[str]
     mutation: str | None = None
     mutation_result: str | None = None
+    provider_evidence: dict[str, Any] | None = None
 
 
 def is_hold(pr: dict[str, Any]) -> bool:
     text = f"{pr.get('title', '')}\n{pr.get('body') or ''}".lower()
     return bool(pr.get("draft")) or any(marker in text for marker in HOLD_MARKERS)
+
+
+def rate_limited_decision(number: int, title: str, head_sha: str, exc: GitHubRateLimit) -> Decision:
+    return Decision(
+        number,
+        title,
+        head_sha,
+        "OBSERVE_RATE_LIMIT",
+        ["GitHub provider rate limit prevented authoritative readback; no mutation authorized"],
+        provider_evidence=exc.evidence(),
+    )
 
 
 def classify(gh: GitHub, pr: dict[str, Any]) -> Decision:
@@ -109,14 +192,22 @@ def classify(gh: GitHub, pr: dict[str, Any]) -> Decision:
     if is_hold(pr):
         return Decision(number, title, head_sha, "PRESERVE_HOLD", ["draft or explicit governance/HOLD marker"])
 
-    cmp = gh.compare(pr["base"]["sha"], head_sha)
+    try:
+        cmp = gh.compare(pr["base"]["sha"], head_sha)
+    except GitHubRateLimit as exc:
+        return rate_limited_decision(number, title, head_sha, exc)
+
     ahead = int(cmp.get("ahead_by", 0))
     behind = int(cmp.get("behind_by", 0))
 
     if ahead == 0:
         return Decision(number, title, head_sha, "CLOSE_REPRESENTED", ["head has zero unique commits relative to base/main"])
 
-    checks = gh.checks(head_sha)
+    try:
+        checks = gh.checks(head_sha)
+    except GitHubRateLimit as exc:
+        return rate_limited_decision(number, title, head_sha, exc)
+
     completed = [c for c in checks if c.get("status") == "completed"]
     failed = [c for c in completed if str(c.get("conclusion") or "").lower() not in PASS_CONCLUSIONS]
     governed = [c for c in completed if "governed merge gate" in str(c.get("name") or "").lower()]
@@ -130,7 +221,10 @@ def classify(gh: GitHub, pr: dict[str, Any]) -> Decision:
     mergeable = pr.get("mergeable")
     # List-pulls may omit mergeability; fetch exact PR if needed.
     if mergeable is None:
-        detail = gh.request("GET", f"/repos/{gh.repo}/pulls/{number}")
+        try:
+            detail = gh.pr_detail(number)
+        except GitHubRateLimit as exc:
+            return rate_limited_decision(number, title, head_sha, exc)
         mergeable = detail.get("mergeable")
 
     governed_pass = any(str(c.get("conclusion") or "").lower() in PASS_CONCLUSIONS for c in governed)
@@ -153,9 +247,21 @@ def reconcile(repo: str, token: str, apply: bool, max_mutations: int) -> dict[st
     gh = GitHub(repo, token)
     decisions: list[Decision] = []
     mutations = 0
+    worker_state = "COMPLETE"
+    provider_evidence: dict[str, Any] | None = None
 
-    for pr in gh.open_prs():
+    try:
+        prs = gh.open_prs()
+    except GitHubRateLimit as exc:
+        worker_state = "OBSERVE_RATE_LIMIT"
+        provider_evidence = exc.evidence()
+        prs = []
+
+    for pr in prs:
         d = classify(gh, pr)
+        if d.disposition == "OBSERVE_RATE_LIMIT":
+            worker_state = "OBSERVE_RATE_LIMIT"
+            provider_evidence = provider_evidence or d.provider_evidence
         if apply and mutations < max_mutations:
             if d.disposition == "CLOSE_REPRESENTED":
                 gh.close_pr(d.number)
@@ -173,12 +279,16 @@ def reconcile(repo: str, token: str, apply: bool, max_mutations: int) -> dict[st
     summary: dict[str, int] = {}
     for d in decisions:
         summary[d.disposition] = summary.get(d.disposition, 0) + 1
+    if worker_state == "OBSERVE_RATE_LIMIT":
+        summary["OBSERVE_RATE_LIMIT"] = max(1, summary.get("OBSERVE_RATE_LIMIT", 0))
     return {
-        "contract": "ct.penta.vergence.repository-report.v1",
+        "contract": "ct.penta.vergence.repository-report.v2",
         "repository": repo,
         "apply": apply,
+        "worker_state": worker_state,
         "mutations": mutations,
         "summary": summary,
+        "provider_evidence": provider_evidence,
         "decisions": [asdict(d) for d in decisions],
     }
 
@@ -199,7 +309,7 @@ def main() -> int:
     with open(args.output, "w", encoding="utf-8") as fh:
         json.dump(report, fh, indent=2, sort_keys=True)
         fh.write("\n")
-    print(json.dumps({"repository": report["repository"], "summary": report["summary"], "mutations": report["mutations"]}, sort_keys=True))
+    print(json.dumps({"repository": report["repository"], "worker_state": report["worker_state"], "summary": report["summary"], "mutations": report["mutations"]}, sort_keys=True))
     return 0
 
 
