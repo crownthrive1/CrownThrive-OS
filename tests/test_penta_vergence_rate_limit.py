@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import sys
 import unittest
 from unittest import mock
 
@@ -7,6 +8,7 @@ from unittest import mock
 MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "penta_vergence_reconciler.py"
 SPEC = importlib.util.spec_from_file_location("penta_vergence_reconciler", MODULE_PATH)
 module = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = module
 assert SPEC.loader is not None
 SPEC.loader.exec_module(module)
 
