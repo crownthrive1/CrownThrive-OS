@@ -19,7 +19,7 @@ class COSV1CommandCenterReconciliationTests(unittest.TestCase):
         manifest = load_manifest()
         self.assertEqual(
             manifest["source_heads"]["crownthrive_os_main"],
-            "76beee6678813fa5e7fe004e4f2e61a41ee781cb",
+            "90472fdce24d05a5f722b4029af4b466b43c3d4a",
         )
         site = manifest["command_center"]
         self.assertEqual(site["site_source_sha"], "d94e1dc01348091ae479cd200b3fe2bb86958968")
