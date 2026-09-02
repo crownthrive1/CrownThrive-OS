@@ -77,7 +77,9 @@ cross join lateral jsonb_populate_record(null::penta_pr.lifecycle, a.row_snapsho
 where a.archive_batch = '20260901210200_penta_pr_repo_identity_citext_v2'
   and not exists (select 1 from penta_pr.lifecycle l where l.id = a.alias_row_id);
 
--- Restore the pre-migration read models and their TEXT comparison semantics.
+-- Restore the pre-migration read models and their TEXT comparison semantics. CREATE
+-- VIEW restores the same owner-only NULL ACL that existed before the forward migration;
+-- no explicit REVOKE is issued because that would materialize a different relacl.
 create view penta_pr.current_zero_delta_candidates_v3 as
 select
   l.repo,
@@ -120,14 +122,12 @@ join penta_pr.lifecycle l
  and l.head_sha = v.head_sha
 where l.terminal_state is null;
 
-revoke all on table penta_pr.current_zero_delta_candidates_v3 from public, anon, authenticated;
-revoke all on table penta_runtime.current_vergence_repairs_v3 from public, anon, authenticated;
-
 -- Exact rollback postcondition: repository identity column is TEXT; custody remains
--- append-only and both reviewed read models are restored with the prior TEXT contract.
+-- append-only and both reviewed read models are restored with the prior TEXT/ACL contract.
 do $verify$
 declare
   v_repo_view_type text;
+  v_bad_view_contract integer;
 begin
   if format_type(
        (select atttypid from pg_attribute
@@ -151,6 +151,19 @@ begin
 
   if v_repo_view_type <> 'text' then
     raise exception 'rollback_refuses_zero_delta_repo_contract_changed:%', v_repo_view_type;
+  end if;
+
+  select count(*) into v_bad_view_contract
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where (n.nspname, c.relname) in (
+      ('penta_pr', 'current_zero_delta_candidates_v3'),
+      ('penta_runtime', 'current_vergence_repairs_v3')
+    )
+    and (pg_get_userbyid(c.relowner) <> 'postgres' or c.relacl is not null or c.reloptions is not null);
+
+  if v_bad_view_contract <> 0 then
+    raise exception 'rollback_refuses_repo_view_security_contract_not_preserved:%', v_bad_view_contract;
   end if;
 end
 $verify$;
