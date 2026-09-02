@@ -25,11 +25,11 @@ Required fabrics are registered: PentaCredentials, PentaFlex, PentaMCP, PentaWir
 
 Allowed reads are `health.read`, `domains.read`, `target_domain.read`, `disk_usage.read`, and `site_profile.read`. Provider writes are disabled.
 
-## Route contract
+## Route contract and current readback
 
-- **Hot:** live authenticated provider reads and exact `thrivepush.io` certification. State: blocked until exact Vault binding and provider readback pass.
-- **Warm:** standby reconciliation, failover, and separately authorized mutations. It references the same Vault-held credential and does not create another plaintext copy.
-- **Cold:** sealed recovery and explicit rebind. It does not claim an independently issued provider credential.
+- **Hot:** blocked. Provider state is `bound_ready`, credential-reference state is `unverified`, and the exact Vault binding plus provider readback must pass before promotion.
+- **Warm:** blocked. Provider state is `bound_ready`, credential-reference state is `missing`, and the primary Vault binding plus warm-reference reconciliation must pass. Warm refers to the same Vault-held credential and never creates a plaintext duplicate.
+- **Cold:** sealed. Provider state is `bound_ready`, credential-reference state is `reconcile_required`, and the reconciliation trigger currently records `reconcile_trigger_failed:42883`. Cold does not claim an independently issued provider credential.
 
 ## MCP projection
 
@@ -60,6 +60,8 @@ Response digest: `898b102ab88aaa130251874ca21b87d4b964c51a12186851808908629e7708
 | cPanel authentication | NOT EXERCISED |
 | Exact `thrivepush.io` provider visibility | NOT EXERCISED |
 | Hot-route activation | WITHHELD |
+| Warm-route readiness | BLOCKED — primary reference missing |
+| Cold recovery readiness | SEALED — reconciliation repair required |
 | Production MCP exposure | WITHHELD |
 
 No raw or encoded credential is present in this repository, Drive, API contracts, MCP schemas, logs, or evidence. The fixed production credential has no scheduled or automatic rotation. Replacement requires explicit founder authority, confirmed compromise, or provider invalidation.
