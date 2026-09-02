@@ -1,0 +1,111 @@
+{
+  "registry_id": "ct.os.integration.cpanel-thrivepush-io.v1",
+  "version": "1.0.2",
+  "recorded_at": "2026-09-02",
+  "environment": "production",
+  "system_of_record": {
+    "runtime": "ThriveBase",
+    "implementation_repository": "crownthrive1/ThrivePush",
+    "os_projection_repository": "crownthrive1/CrownThrive-OS"
+  },
+  "service": {
+    "service_id": "cpanel_thrivepush_io",
+    "brand": "ThrivePush",
+    "provider": "cPanel",
+    "api_family": "UAPI",
+    "account_identity": "crownthrive",
+    "target_domain": "thrivepush.io",
+    "provider_token_label": "Penta_ThrivePush_IO",
+    "credential_id": "ct.credential.cpanel.thrivepush-io.penta-api",
+    "vault_reference": "cpanel.penta_thrivepush_io.api_token",
+    "recovery_reference": "cpanel.penta_thrivepush_io.api_token.recovery"
+  },
+  "custody": {
+    "founder_supplied": true,
+    "custody_mode": "append_only",
+    "provider_scope": "unrestricted",
+    "runtime_scope": "least_privilege_operation_brokered",
+    "auto_rotate_allowed": false,
+    "auto_delete_allowed": false,
+    "silent_replace_allowed": false,
+    "raw_secret_export": false,
+    "rotation_policy": "founder_directed_no_scheduled_rotation_except_confirmed_compromise_or_provider_invalidation"
+  },
+  "fabrics": ["PentaCredentials", "PentaFlex", "PentaMCP", "PentaWire", "PentaCertify"],
+  "routes": {
+    "hot": {
+      "state": "blocked",
+      "provider_state": "bound_ready",
+      "credential_reference_state": "unverified",
+      "last_error_code": "credential_reference_missing_or_unverified",
+      "purpose": "live authenticated provider reads and exact thrivepush.io certification",
+      "activation_gate": "exact_vault_bind_and_provider_readback_pass"
+    },
+    "warm": {
+      "state": "blocked",
+      "provider_state": "bound_ready",
+      "credential_reference_state": "missing",
+      "last_error_code": "warm_reference_missing",
+      "purpose": "reconciliation, failover, and separately authorized mutation execution",
+      "activation_gate": "primary_vault_binding_and_warm_reference_reconciliation",
+      "credential_semantics": "same_vault_reference_no_plaintext_duplicate"
+    },
+    "cold": {
+      "state": "sealed",
+      "provider_state": "bound_ready",
+      "credential_reference_state": "reconcile_required",
+      "last_error_code": "cold_route_rehydration_required",
+      "reconciliation_dispatch": "repaired_and_exercised",
+      "purpose": "recovery and explicit rebind",
+      "credential_semantics": "no_independent_provider_credential_claimed"
+    }
+  },
+  "runtime_components": {
+    "adapter": {
+      "slug": "cpanel-thrivepush-io-api-control",
+      "deployment_id": "34951cd3-fe2f-4b59-94bd-fa5450fded35",
+      "version": 1,
+      "state": "ACTIVE",
+      "verify_jwt": true,
+      "source_sha256": "8243f80ed990dcf7e741de90810ba990af14323282d0cbcbb4e5c46a1adfd500"
+    },
+    "penta_wire_facade": {
+      "slug": "penta-wire-secure-cpanel-thrivepush-io",
+      "deployment_id": "7d15b12a-001f-4b2e-98ba-3f979f63613b",
+      "version": 1,
+      "state": "ACTIVE",
+      "verify_jwt": false,
+      "custom_auth": "constant_time_internal_secret",
+      "source_sha256": "a0db3676653857a7e5bb5000e4ab876b2c29cf43324dcc30935619d5a6f75dab"
+    },
+    "secure_dispatch": "integration_control.cpanel_thrivepush_io_secure_canary_dispatch_v1",
+    "credential_reconcile_overload": "integration_control.penta_credentials_reconcile_trigger_v1(text)"
+  },
+  "api_operations": ["health.read", "domains.read", "target_domain.read", "disk_usage.read", "site_profile.read"],
+  "mcp_tools": [
+    "cpanel_thrivepush_io_health",
+    "cpanel_thrivepush_io_domains",
+    "cpanel_thrivepush_io_target_domain",
+    "cpanel_thrivepush_io_disk_usage",
+    "cpanel_thrivepush_io_site_profile"
+  ],
+  "authority": {
+    "provider_writes_enabled": false,
+    "write_gate": true,
+    "provider_unrestricted_does_not_bypass_chlom": true,
+    "founder": "Kavonte Jones Sr."
+  },
+  "certification": {
+    "registry": "PASS",
+    "edge_deployment": "PASS",
+    "route_reconciliation_dispatch": "PASS",
+    "secure_facade_health": "PASS_FAIL_CLOSED",
+    "secure_facade_http_status": 200,
+    "secure_facade_response_sha256": "898b102ab88aaa130251874ca21b87d4b964c51a12186851808908629e770848",
+    "vault_binding": "BLOCKED_SECURE_INGRESS_REQUIRED",
+    "provider_authentication": "NOT_EXERCISED",
+    "target_domain_visibility": "NOT_EXERCISED",
+    "production_mcp_exposure": "WITHHELD_PENDING_PROVIDER_CERTIFICATION",
+    "credential_exposed": false
+  }
+}
