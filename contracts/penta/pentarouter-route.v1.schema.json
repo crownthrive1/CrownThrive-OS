@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/contracts/penta/pentarouter-route.v1.schema.json",
+  "title": "CrownThrive PentaRouter Route Request and Receipt Contract",
+  "type": "object",
+  "required": ["subject_id", "operation", "risk_class", "effect", "source_sha"],
+  "properties": {
+    "subject_id": {"type": "string", "minLength": 1},
+    "operation": {"type": "string", "minLength": 1},
+    "risk_class": {"enum": ["D0", "D1", "D2", "D3"]},
+    "effect": {"enum": ["read", "write", "rights", "money", "publish", "reconcile", "archive"]},
+    "requested_lane": {"enum": ["auto", "hot", "warm", "cold"], "default": "auto"},
+    "source_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+    "principal_id": {"type": ["string", "null"]},
+    "idempotency_key": {"type": ["string", "null"]},
+    "human_authority_ref": {"type": ["string", "null"]},
+    "dail_state": {"enum": ["PASS", "HOLD", "DENY", null]},
+    "chlom_state": {"enum": ["PASS", "HOLD", "DENY", null]},
+    "wallet_state": {"enum": ["AVAILABLE", "UNAVAILABLE", "HOLD", null]},
+    "payload": {"type": "object"},
+    "payload_fingerprint": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"effect": {"not": {"const": "read"}}}},
+      "then": {"required": ["principal_id", "idempotency_key", "dail_state", "chlom_state"]}
+    },
+    {
+      "if": {"properties": {"risk_class": {"const": "D3"}, "effect": {"not": {"const": "read"}}}},
+      "then": {"required": ["human_authority_ref"]}
+    },
+    {
+      "if": {"properties": {"effect": {"const": "money"}}},
+      "then": {"required": ["wallet_state"]}
+    }
+  ],
+  "additionalProperties": true,
+  "x-crownthrive-invariants": {
+    "provider_execution_performed_by_router": false,
+    "secret_values_allowed": false,
+    "automatic_authority_manufacture": false,
+    "provider_readback_required_after_side_effect": true,
+    "hot_lane_side_effects_allowed": false
+  }
+}
