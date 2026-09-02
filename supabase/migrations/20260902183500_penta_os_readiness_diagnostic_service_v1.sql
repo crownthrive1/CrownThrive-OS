@@ -38,7 +38,7 @@ begin
       description,
       service_family,
       commercial_class,
-      default_band,
+      default_band_key,
       authority_ceiling,
       requires_payment_before_execution,
       charge_on_success_only,
@@ -76,7 +76,7 @@ begin
       )
     );
   else
-    if v_existing.default_band <> 'penta.deep.v1'
+    if v_existing.default_band_key <> 'penta.deep.v1'
        or v_existing.authority_ceiling <> 'D1'
        or v_existing.commercial_class <> 'paid_service'
        or not v_existing.requires_payment_before_execution
