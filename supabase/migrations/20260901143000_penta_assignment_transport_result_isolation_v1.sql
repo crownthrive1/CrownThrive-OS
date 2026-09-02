@@ -1,14 +1,13 @@
 -- PentaAssignment transport/result isolation v1.
 --
--- Root cause: penta_assignment_reconcile_owner_dispatches_v1() historically converted a
--- completed PentaCensus handoff plus any packet receipt into an owner PASS. A generic packet
--- can be completed after transport acceptance (for example accepted_for_institutional_processing)
--- without the target owner producing a semantic review/certification disposition. Transport
--- completion must never manufacture owner PASS, certification, rights, authority, or release.
+-- Root cause: penta_assignment_reconcile_owner_dispatches_v1() historically converted
+-- completed transport/execution evidence into semantic owner PASS. A completed Census handoff
+-- or OS20 execution task proves delivery/execution only; neither proves that the assigned owner
+-- reached an independent semantic review/certification disposition for this exact head.
 --
 -- This repair keeps owner-result authority with the assigned owner. Explicit current-head
--- penta_assignment_owner_results_v1 PASS remains authoritative. CENSUS_HANDOFF transport
--- completion without that result becomes a precise HOLD instead of synthesized PASS.
+-- penta_assignment_owner_results_v1 PASS remains authoritative. CENSUS_HANDOFF and OS20_TASK
+-- completion without that result become precise HOLDs instead of synthesized PASS.
 
 create or replace function integration_control.penta_assignment_reconcile_owner_dispatches_v1(
   p_assignment_id uuid
@@ -24,8 +23,7 @@ declare
   d record;
   h record;
   t record;
-  v_result jsonb;
-  v_pass integer:=0;
+  v_progress integer:=0;
   v_hold integer:=0;
 begin
   if session_user not in ('postgres','supabase_admin') and v_role<>'service_role' then
@@ -54,8 +52,15 @@ begin
         and r.exact_head_sha is not distinct from a.exact_head_sha
     ) then
       update integration_control.penta_assignment_dispatches_v1
-      set state='COMPLETED',completed_at=coalesce(completed_at,now()),updated_at=now()
+      set state='COMPLETED',
+          completed_at=coalesce(completed_at,now()),
+          evidence=evidence||jsonb_build_object(
+            'completion_basis','explicit_current_head_owner_result',
+            'semantic_owner_result_required',true,
+            'authority_created',false),
+          updated_at=now()
       where dispatch_id=d.dispatch_id;
+      v_progress:=v_progress+1;
       continue;
     end if;
 
@@ -65,9 +70,7 @@ begin
       where handoff_key=d.external_ref;
 
       if found and h.state='completed' and coalesce((h.payload->>'receipt_count')::integer,0)>0 then
-        -- Completed/routed/delivered packet receipts prove transport only. They do not prove
-        -- that PentaSecurity, CHLOM, CIE, PentaCertify or another owner reached a semantic
-        -- disposition for this exact assignment/head.
+        -- Completed/routed/delivered packet receipts prove transport only.
         update integration_control.penta_assignment_dispatches_v1
         set state='HOLD',
             evidence=evidence||jsonb_build_object(
@@ -78,6 +81,7 @@ begin
               'receipt_count',coalesce((h.payload->>'receipt_count')::integer,0),
               'required_owner_result','integration_control.penta_assignment_owner_results_v1 current-head PASS',
               'transport_completion_is_not_owner_pass',true,
+              'semantic_owner_result_required',true,
               'authority_created',false),
             updated_at=now()
         where dispatch_id=d.dispatch_id;
@@ -90,6 +94,7 @@ begin
                 then 'HOLD_ASSIGNMENT_DISPATCH_FAILED_READBACK'
                 else 'HOLD_ASSIGNMENT_OWNER_ROUTE_UNREGISTERED' end,
               'handoff_state',h.state,
+              'semantic_owner_result_required',true,
               'authority_created',false),
             updated_at=now()
         where dispatch_id=d.dispatch_id;
@@ -102,23 +107,30 @@ begin
       where id=d.external_ref::uuid;
 
       if found and t.status='completed' and t.completed_at is not null then
-        v_result:=integration_control.penta_assignment_record_owner_result_v1(
-          a.assignment_id,d.owner_penta,'PASS',a.exact_artifact_ref,
-          a.exact_artifact_sha256,a.exact_head_sha,
-          jsonb_build_object(
-            'execution_mode','verified_os20_task',
-            'task_id',t.id,
-            'task_key',t.task_key,
-            'operation_key',t.operation_key,
-            'completed_at',t.completed_at,
-            'authority_created',false));
-        v_pass:=v_pass+1;
+        -- OS20 completion proves bounded execution only. It cannot create an owner PASS.
+        update integration_control.penta_assignment_dispatches_v1
+        set state='HOLD',
+            evidence=evidence||jsonb_build_object(
+              'hold_code','HOLD_ASSIGNMENT_OWNER_SEMANTIC_RESULT_MISSING',
+              'execution_mode','verified_os20_task',
+              'task_id',t.id,
+              'task_key',t.task_key,
+              'operation_key',t.operation_key,
+              'completed_at',t.completed_at,
+              'required_owner_result','integration_control.penta_assignment_owner_results_v1 current-head PASS',
+              'execution_completion_is_not_owner_pass',true,
+              'semantic_owner_result_required',true,
+              'authority_created',false),
+            updated_at=now()
+        where dispatch_id=d.dispatch_id;
+        v_hold:=v_hold+1;
       elsif found and t.status='needs_help' then
         update integration_control.penta_assignment_dispatches_v1
         set state='HOLD',
             evidence=evidence||jsonb_build_object(
               'hold_code','HOLD_ASSIGNMENT_OS20_TASK_NEEDS_HELP',
               'task_id',t.id,
+              'semantic_owner_result_required',true,
               'authority_created',false),
             updated_at=now()
         where dispatch_id=d.dispatch_id;
@@ -130,11 +142,14 @@ begin
   return jsonb_build_object(
     'assignment_id',a.assignment_id,
     'state',case when v_hold>0 then 'SUCCESS_HOLD'
-                 when v_pass>0 then 'SUCCESS_PROGRESS'
+                 when v_progress>0 then 'SUCCESS_PROGRESS'
                  else 'SUCCESS_NO_CHANGE' end,
-    'new_pass_results',v_pass,
+    'new_pass_results',0,
+    'completed_from_existing_owner_results',v_progress,
     'holds',v_hold,
     'transport_completion_is_not_owner_pass',true,
+    'execution_completion_is_not_owner_pass',true,
+    'semantic_owner_result_required',true,
     'authority_expansion',false,
     'observed_at',clock_timestamp());
 end
@@ -146,4 +161,4 @@ grant execute on function integration_control.penta_assignment_reconcile_owner_d
   to service_role;
 
 comment on function integration_control.penta_assignment_reconcile_owner_dispatches_v1(uuid) is
-'Reconciles assignment owner execution without converting transport completion into owner PASS. CENSUS_HANDOFF completion requires an explicit exact-head owner result.';
+'Reconciles assignment owner execution without converting transport or OS20 execution completion into owner PASS. CENSUS_HANDOFF and OS20_TASK completion require an explicit exact-head owner result.';
