@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/contracts/penta/pentarouter-survival.v1.schema.json",
+  "contract_id": "ct.contract.pentarouter-survival.v1",
+  "title": "CrownThrive PentaRouter Survival Contract",
+  "version": "1.0.0",
+  "state": "SOURCE_READY",
+  "production_invariant": "A Penta is not production-capable merely because it is registered, can call a model, or can initiate a workflow. Persistent identity, persistent state, deterministic functions, queues, leases, recovery, evidence, authority enforcement, health behavior, model degradation, model replacement, and restart behavior must be declared, exercised, bound to an immutable exact subject, and independently verified.",
+  "required_capabilities": {
+    "persistent_identity": {"required": true, "evidence": "immutable node_id and exact source SHA"},
+    "persistent_state": {"required": true, "evidence": "source-bound state and durable receipt projection"},
+    "deterministic_functions": {"required": true, "evidence": "repeatable request and decision fingerprints"},
+    "queues": {"required": true, "evidence": "warm durable queue and cold replay queue declarations"},
+    "leases": {"required": true, "evidence": "lease owner, expiry, retry budget, and dead-letter disposition"},
+    "recovery": {"required": true, "evidence": "hot-to-warm, warm-to-cold, and cold-to-HOLD tests"},
+    "evidence": {"required": true, "evidence": "append-only PentaAudit/PentaProof receipt"},
+    "authority_enforcement": {"required": true, "evidence": "DAIL, CHLOM, human-reserved D3, and provider boundary tests"},
+    "health_behavior": {"required": true, "evidence": "health state, circuit breaker, capacity, and diagnostics"},
+    "model_degradation": {"required": true, "evidence": "model-independent deterministic routing remains available"},
+    "model_replacement": {"required": true, "evidence": "provider/model replacement cannot change contract identity or authority"},
+    "restart_behavior": {"required": true, "evidence": "idempotency, queue recovery, lease recovery, and receipt replay tests"}
+  },
+  "degradation_modes": [
+    {
+      "mode": "primary_router_unavailable",
+      "allowed_transition": "same_lane_secondary_then_hot_to_warm",
+      "authority_change": false
+    },
+    {
+      "mode": "warm_queue_or_provider_unavailable",
+      "allowed_transition": "cold_reconciliation_queue_or_HOLD",
+      "authority_change": false
+    },
+    {
+      "mode": "evidence_or_readback_unavailable",
+      "allowed_transition": "HOLD_FAIL_CLOSED",
+      "authority_change": false
+    },
+    {
+      "mode": "model_unavailable_or_replaced",
+      "allowed_transition": "deterministic_runtime_only_or_HOLD",
+      "authority_change": false
+    }
+  ],
+  "shutdown_thresholds": [
+    "exact subject cannot be preserved",
+    "idempotency cannot be preserved",
+    "authority state is missing or contradictory",
+    "all eligible router nodes are unavailable",
+    "cold evidence ledger is unavailable for a side effect",
+    "provider readback cannot be obtained after a claimed side effect",
+    "secret-bearing input is detected"
+  ],
+  "recovery_acceptance_criteria": [
+    "same immutable subject and source SHA",
+    "same or superseding generation without stale rollback",
+    "idempotency key reconciled",
+    "leases expired or safely transferred",
+    "queue and dead-letter state reconciled",
+    "circuit breaker health observed",
+    "provider state read back where side effects occurred",
+    "independent certification receipt bound to exact subject"
+  ],
+  "production_gate": {
+    "source_tests": "required",
+    "exact-head_CI": "required",
+    "independent_certification": "required",
+    "provider_readback": "required_when_provider_effects_are_claimed",
+    "D3_human_ratification": "required_for_D3_side_effects",
+    "blanket_maturity_promotion": false
+  }
+}

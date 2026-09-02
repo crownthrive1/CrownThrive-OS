@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0.0",
+  "system_id": "ct.os.pentarouter.v1",
+  "canonical_name": "CrownThrive OS PentaRouter Redundancy Fabric",
+  "version": "1.0.0",
+  "state": "SOURCE_READY",
+  "production_activation": "HOLD_PENDING_MERGE_CI_INDEPENDENT_CERTIFICATION_AND_PROVIDER_READBACK",
+  "route_contract_ref": "contracts/penta/pentarouter-route.v1.schema.json",
+  "node_contract_ref": "contracts/penta/pentarouter-node.v1.schema.json",
+  "survival_contract_ref": "contracts/penta/pentarouter-survival.v1.schema.json",
+  "commercialization_bridge_ref": "commercialization/routing/mesh-routing.v1.json",
+  "ownership": {
+    "source_owner": "CrownThrive, LLC",
+    "governance": "CHLOM",
+    "economic_activation_authority": "ThriveEvergreen/ECAC",
+    "commercial_packaging_lane": "PentaGreen",
+    "contact": "contact@crownthrive.com"
+  },
+  "planes": [
+    {
+      "plane_id": "ct.plane.control",
+      "purpose": "Policy, routing, leases, circuit breakers, and deterministic coordination",
+      "authority": "CHLOM-bound"
+    },
+    {
+      "plane_id": "ct.plane.identity-authority",
+      "purpose": "CrownThrive ID, role, DAIL, delegation, and human-reserved authority resolution",
+      "authority": "No authority manufacture"
+    },
+    {
+      "plane_id": "ct.plane.data",
+      "purpose": "Operational state, queues, projections, caches, and source-bound records",
+      "authority": "ThriveBase source precedence"
+    },
+    {
+      "plane_id": "ct.plane.evidence",
+      "purpose": "PentaAudit/PentaProof receipts, hashes, provenance, certification, and readback",
+      "authority": "Append-only evidence"
+    },
+    {
+      "plane_id": "ct.plane.economic",
+      "purpose": "Offers, pricing, rights, entitlements, settlement intent, and recovery",
+      "authority": "ThriveEvergreen/ECAC and CHLOM"
+    },
+    {
+      "plane_id": "ct.plane.delivery",
+      "purpose": "Provider-neutral dispatch, publication, communications, and fulfillment handoffs",
+      "authority": "Provider authority remains external"
+    },
+    {
+      "plane_id": "ct.plane.recovery",
+      "purpose": "Durable replay, reconciliation, rollback/compensation, archives, and restart",
+      "authority": "Fail-closed survival contract"
+    }
+  ],
+  "fabrics": [
+    {
+      "fabric_id": "ct.fabric.chlom-authority",
+      "planes": ["ct.plane.control", "ct.plane.identity-authority", "ct.plane.evidence"]
+    },
+    {
+      "fabric_id": "ct.fabric.runtime-continuity",
+      "planes": ["ct.plane.control", "ct.plane.data", "ct.plane.recovery"]
+    },
+    {
+      "fabric_id": "ct.fabric.evidence-assurance",
+      "planes": ["ct.plane.evidence", "ct.plane.recovery"]
+    },
+    {
+      "fabric_id": "ct.fabric.commercialization",
+      "planes": ["ct.plane.economic", "ct.plane.delivery", "ct.plane.evidence"]
+    },
+    {
+      "fabric_id": "ct.fabric.communications",
+      "planes": ["ct.plane.identity-authority", "ct.plane.delivery", "ct.plane.evidence"]
+    },
+    {
+      "fabric_id": "ct.fabric.source-projection",
+      "planes": ["ct.plane.data", "ct.plane.evidence", "ct.plane.delivery"]
+    }
+  ],
+  "bridges": [
+    {
+      "bridge_id": "ct.bridge.thrivebase-runtime",
+      "from": "ct.plane.data",
+      "to": "ThriveBase",
+      "mode": "runtime_metadata_and_receipts",
+      "provider_write_state": "NOT_ASSERTED"
+    },
+    {
+      "bridge_id": "ct.bridge.github-source",
+      "from": "ct.plane.control",
+      "to": "crownthrive1/CrownThrive-OS",
+      "mode": "canonical_source",
+      "provider_write_state": "PR_ONLY"
+    },
+    {
+      "bridge_id": "ct.bridge.drive-ledger",
+      "from": "ct.plane.evidence",
+      "to": "Google Drive governed ledgers",
+      "mode": "additive_projection",
+      "provider_write_state": "REQUIRES_READBACK"
+    },
+    {
+      "bridge_id": "ct.bridge.pentadocs",
+      "from": "ct.plane.evidence",
+      "to": "PentaDocs/Mintlify",
+      "mode": "documentation_projection",
+      "provider_write_state": "NOT_ASSERTED"
+    },
+    {
+      "bridge_id": "ct.bridge.mcp",
+      "from": "ct.plane.delivery",
+      "to": "CrownThrive and CHLOM MCP servers",
+      "mode": "secret_free_dispatch_envelope",
+      "provider_write_state": "AUTHORITY_GATED"
+    },
+    {
+      "bridge_id": "ct.bridge.provider",
+      "from": "ct.plane.delivery",
+      "to": "authorized external providers",
+      "mode": "adapter_and_provider_readback",
+      "provider_write_state": "FAIL_CLOSED"
+    },
+    {
+      "bridge_id": "ct.bridge.pentagreen",
+      "from": "ct.plane.economic",
+      "to": "PentaGreen stable-product pipeline",
+      "mode": "commercial_candidate_handoff",
+      "provider_write_state": "STABLE_PRODUCTS_ONLY"
+    }
+  ],
+  "meshes": [
+    {
+      "mesh_id": "ct.mesh.execution",
+      "node_refs": ["ct.node.pentarouter.primary", "ct.node.pentarouter.secondary", "ct.node.pentarouter.recovery"]
+    },
+    {
+      "mesh_id": "ct.mesh.data",
+      "node_refs": ["ct.node.queue.warm", "ct.node.ledger.cold"]
+    },
+    {
+      "mesh_id": "ct.mesh.evidence",
+      "node_refs": ["ct.node.observer.evidence", "ct.node.ledger.cold"]
+    },
+    {
+      "mesh_id": "ct.mesh.commercialization",
+      "bridge_ref": "commercialization/routing/mesh-routing.v1.json",
+      "node_refs": ["ct.node.pentarouter.primary", "ct.node.queue.warm", "ct.node.ledger.cold"]
+    },
+    {
+      "mesh_id": "ct.mesh.communications",
+      "node_refs": ["ct.node.pentarouter.secondary", "ct.node.queue.warm", "ct.node.observer.evidence"]
+    },
+    {
+      "mesh_id": "ct.mesh.recovery",
+      "node_refs": ["ct.node.pentarouter.recovery", "ct.node.ledger.cold", "ct.node.observer.evidence"]
+    }
+  ],
+  "route_standard": {
+    "standard_id": "ct.standard.hot-warm-cold.v1",
+    "default_requested_lane": "auto",
+    "operation_routes": [
+      {"operation_prefix": "system.", "lane": "hot"},
+      {"operation_prefix": "commercial.catalog.", "lane": "hot"},
+      {"operation_prefix": "commercial.offer.", "lane": "hot"},
+      {"operation_prefix": "commercial.health", "lane": "hot"},
+      {"operation_prefix": "commercial.license.quote.", "lane": "warm"},
+      {"operation_prefix": "commercial.license.accept", "lane": "warm"},
+      {"operation_prefix": "commercial.wallet.intent.", "lane": "warm"},
+      {"operation_prefix": "commercial.entitlement.issue", "lane": "warm"},
+      {"operation_prefix": "commercial.package.", "lane": "warm"},
+      {"operation_prefix": "commercial.publication.", "lane": "warm"},
+      {"operation_prefix": "commercial.settlement.", "lane": "cold"},
+      {"operation_prefix": "commercial.refund.", "lane": "cold"},
+      {"operation_prefix": "commercial.reversal.", "lane": "cold"},
+      {"operation_prefix": "commercial.provenance.", "lane": "cold"},
+      {"operation_prefix": "commercial.sbom.", "lane": "cold"},
+      {"operation_prefix": "commercial.evidence.", "lane": "cold"},
+      {"operation_prefix": "recovery.", "lane": "cold"}
+    ],
+    "lanes": {
+      "hot": {
+        "purpose": "Low-latency reads, health, routing, and non-mutating resolution",
+        "max_risk": "D1",
+        "allowed_effects": ["read"],
+        "target_p95_seconds": 2,
+        "max_attempts": 2,
+        "durability": "ephemeral_plus_receipt",
+        "fallback": "warm",
+        "required_controls": [
+          "request fingerprint",
+          "bounded cache",
+          "public-safe response filtering",
+          "closed circuit breaker",
+          "no provider mutation"
+        ]
+      },
+      "warm": {
+        "purpose": "Buffered writes and governed asynchronous work with idempotency and readback",
+        "max_risk": "D3",
+        "allowed_effects": ["read", "write", "rights", "money", "publish"],
+        "target_p95_seconds": 300,
+        "max_attempts": 5,
+        "durability": "durable_queue_and_receipt",
+        "fallback": "cold",
+        "required_controls": [
+          "authenticated principal",
+          "idempotency key",
+          "DAIL PASS",
+          "CHLOM PASS",
+          "exact source binding",
+          "lease and retry budget",
+          "authoritative provider readback",
+          "rollback or compensation"
+        ]
+      },
+      "cold": {
+        "purpose": "Durable reconciliation, replay, archive, recovery, and independent evidence",
+        "max_risk": "D3",
+        "allowed_effects": ["read", "write", "rights", "money", "publish", "reconcile", "archive"],
+        "target_p95_seconds": 86400,
+        "max_attempts": 12,
+        "durability": "append_only_ledger_and_replay_queue",
+        "fallback": "hold",
+        "required_controls": [
+          "append-only evidence",
+          "immutable exact subject",
+          "independent verification",
+          "retention and archive policy",
+          "operator-visible diagnostics",
+          "authoritative provider readback",
+          "recovery acceptance criteria"
+        ]
+      }
+    }
+  },
+  "redundancy": {
+    "selection": "healthy_then_priority_then_capacity_then_node_id",
+    "hot_to_warm": true,
+    "warm_to_cold": true,
+    "cold_to_hold": true,
+    "automatic_upward_escalation": false,
+    "automatic_side_effect_authority": false,
+    "automatic_money_movement_fallback": false,
+    "preserve_idempotency_across_failover": true,
+    "preserve_exact_subject_across_failover": true,
+    "provider_readback_required_after_side_effect": true
+  },
+  "nodes": [
+    {
+      "node_id": "ct.node.pentarouter.primary",
+      "node_type": "pentarouter",
+      "dispatch_role": "router",
+      "enabled": true,
+      "priority": 10,
+      "lanes": ["hot", "warm", "cold"],
+      "capabilities": ["*"],
+      "risk_ceiling": "D3",
+      "health_default": {"state": "healthy", "breaker": "closed", "capacity": 100}
+    },
+    {
+      "node_id": "ct.node.pentarouter.secondary",
+      "node_type": "pentarouter",
+      "dispatch_role": "router",
+      "enabled": true,
+      "priority": 20,
+      "lanes": ["hot", "warm"],
+      "capabilities": ["*"],
+      "risk_ceiling": "D3",
+      "health_default": {"state": "healthy", "breaker": "closed", "capacity": 80}
+    },
+    {
+      "node_id": "ct.node.pentarouter.recovery",
+      "node_type": "pentarouter",
+      "dispatch_role": "router",
+      "enabled": true,
+      "priority": 30,
+      "lanes": ["warm", "cold"],
+      "capabilities": ["*"],
+      "risk_ceiling": "D3",
+      "health_default": {"state": "healthy", "breaker": "closed", "capacity": 50}
+    },
+    {
+      "node_id": "ct.node.queue.warm",
+      "node_type": "durable_queue",
+      "dispatch_role": "support",
+      "enabled": true,
+      "lanes": ["warm"],
+      "capabilities": ["lease", "retry", "dead_letter"],
+      "risk_ceiling": "D3",
+      "health_default": {"state": "healthy", "breaker": "closed", "capacity": 1000}
+    },
+    {
+      "node_id": "ct.node.ledger.cold",
+      "node_type": "append_only_ledger",
+      "dispatch_role": "support",
+      "enabled": true,
+      "lanes": ["cold"],
+      "capabilities": ["receipt", "replay", "archive", "reconciliation"],
+      "risk_ceiling": "D3",
+      "health_default": {"state": "healthy", "breaker": "closed", "capacity": 10000}
+    },
+    {
+      "node_id": "ct.node.observer.evidence",
+      "node_type": "independent_observer",
+      "dispatch_role": "support",
+      "enabled": true,
+      "lanes": ["hot", "warm", "cold"],
+      "capabilities": ["health", "evidence", "certification"],
+      "risk_ceiling": "D3",
+      "health_default": {"state": "healthy", "breaker": "closed", "capacity": 500}
+    }
+  ],
+  "propagation": {
+    "github": "SOURCE_READY",
+    "google_drive_master_ledger": "REQUIRES_PROVIDER_READBACK",
+    "thrivebase_runtime_registry": "QUEUED_AFTER_MERGE",
+    "pentadocs_projection": "QUEUED_AFTER_MERGE",
+    "provider_runtime": "NOT_ASSERTED"
+  }
+}
