@@ -57,6 +57,8 @@ begin
     limit v_limit
     for update of x skip locked
   loop
+    -- PentaContext fallback is a context/evidence handoff, not an executable
+    -- production packet route. Require its actual queue/readback before closing.
     if h.target_ref='penta.context' then
       select q.job_id,q.context_id,q.status,q.fingerprint_sha256,q.completed_at
       into v_context
