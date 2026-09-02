@@ -1,0 +1,75 @@
+name: PentaGreen Drive Custody Transfer fa07e0d6
+
+on:
+  push:
+    branches:
+      - pentagreen-transfer-fa07e0d6
+    paths:
+      - .github/workflows/pentagreen-drive-custody-fa07e0d6.yml
+
+permissions:
+  contents: read
+
+jobs:
+  transfer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download and verify exact private asset packages
+        env:
+          EXPORT_TOKEN: 92448fb245fbd4485d9d9b29a16fd6a1239c01042449043d88618aa9645f74f0
+        run: |
+          set -euo pipefail
+          mkdir -p export
+          curl --fail --silent --show-error --max-time 180 \
+            "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/pentagreen-asset-export-v1?token=${EXPORT_TOKEN}" \
+            -o /tmp/pentagreen-export.json
+          python3 - <<'PY'
+          import base64, hashlib, json, pathlib
+          payload = json.loads(pathlib.Path('/tmp/pentagreen-export.json').read_text())
+          if payload.get('state') != 'PASS':
+              raise SystemExit(f"export failed: {payload.get('state')} {payload.get('reason')}")
+          root = pathlib.Path('export')
+          manifest = []
+          for source in payload.get('files', []):
+              item = dict(source)
+              encoded = item.pop('base64')
+              data = base64.b64decode(encoded, validate=True)
+              expected_size = int(item['byte_size'])
+              expected_sha = item['sha256']
+              actual_sha = hashlib.sha256(data).hexdigest()
+              if len(data) != expected_size or actual_sha != expected_sha:
+                  raise SystemExit(f"integrity mismatch: {item['file_name']}")
+              file_name = pathlib.Path(item['file_name']).name
+              (root / file_name).write_bytes(data)
+              manifest.append({
+                  **item,
+                  'artifact_file_name': file_name,
+                  'verified_byte_size': len(data),
+                  'verified_sha256': actual_sha,
+                  'integrity_state': 'pass',
+              })
+          manifest_payload = {
+              'state': 'PASS',
+              'contract': 'ct.pentagreen.github-artifact-custody-transfer.v1',
+              'file_count': len(manifest),
+              'source_manifest_sha256': payload.get('manifest_sha256'),
+              'files': manifest,
+              'secret_values_included': False,
+          }
+          (root / 'PENTAGREEN_CUSTODY_MANIFEST.json').write_text(
+              json.dumps(manifest_payload, indent=2, sort_keys=True)
+          )
+          if len(manifest) != 11:
+              raise SystemExit(f"expected 11 files, received {len(manifest)}")
+          PY
+          rm -f /tmp/pentagreen-export.json
+
+      - name: Upload short-lived exact custody artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pentagreen-drive-custody-${{ github.run_id }}
+          path: export/
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
