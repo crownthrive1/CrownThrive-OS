@@ -99,6 +99,17 @@ class DiagnosticTests(unittest.TestCase):
         self.assertNotIn("hidden", rendered)
         self.assertEqual(redacted["provider"]["api_key"], "[REDACTED]")
 
+    def test_service_migration_uses_current_price_band_column(self) -> None:
+        migration = (
+            ROOT
+            / "supabase"
+            / "migrations"
+            / "20260902183500_penta_os_readiness_diagnostic_service_v1.sql"
+        ).read_text(encoding="utf-8")
+        self.assertIn("default_band_key", migration)
+        self.assertNotIn("v_existing.default_band <>", migration)
+        self.assertIn("penta.deep.v1", migration)
+
     def test_cli_writes_json_and_markdown(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
