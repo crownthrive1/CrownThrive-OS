@@ -131,8 +131,10 @@ alter table penta_pr.lifecycle
   using btrim(repo)::extensions.citext;
 
 -- Recreate current read models with the same columns and least-privilege contract.
--- The zero-delta view deliberately casts repo back to TEXT so its public row type does
--- not change merely because the lifecycle storage identity becomes CITEXT.
+-- The zero-delta view deliberately casts repo back to TEXT so its external row type does
+-- not change merely because the lifecycle storage identity becomes CITEXT. CREATE VIEW
+-- naturally restores the prior owner-only NULL ACL; explicit REVOKE would materialize a
+-- different relacl and make guarded rollback reject its own forward state.
 create view penta_pr.current_zero_delta_candidates_v3 as
 select
   l.repo::text as repo,
@@ -175,15 +177,13 @@ join penta_pr.lifecycle l
  and l.head_sha = v.head_sha
 where l.terminal_state is null;
 
-revoke all on table penta_pr.current_zero_delta_candidates_v3 from public, anon, authenticated;
-revoke all on table penta_runtime.current_vergence_repairs_v3 from public, anon, authenticated;
-
 -- Exact postcondition: one row per case-insensitive repository/PR identity, both
--- dependent views remain present with their pre-migration TEXT-facing contract.
+-- dependent views remain present with their pre-migration TEXT-facing/ACL contract.
 do $verify$
 declare
   v_dupes integer;
   v_repo_view_type text;
+  v_bad_view_contract integer;
 begin
   select count(*) into v_dupes
   from (
@@ -219,6 +219,19 @@ begin
 
   if v_repo_view_type <> 'text' then
     raise exception 'penta_pr_zero_delta_repo_contract_changed:%', v_repo_view_type;
+  end if;
+
+  select count(*) into v_bad_view_contract
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where (n.nspname, c.relname) in (
+      ('penta_pr', 'current_zero_delta_candidates_v3'),
+      ('penta_runtime', 'current_vergence_repairs_v3')
+    )
+    and (pg_get_userbyid(c.relowner) <> 'postgres' or c.relacl is not null or c.reloptions is not null);
+
+  if v_bad_view_contract <> 0 then
+    raise exception 'penta_pr_repo_view_security_contract_not_preserved:%', v_bad_view_contract;
   end if;
 end
 $verify$;
