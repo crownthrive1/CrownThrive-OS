@@ -1,9 +1,9 @@
 -- PentaPR lifecycle v2 repository identity normalization.
 -- Root cause: provider-truth writers store lower(repo) while GitHub reconciliation
 -- stores the provider's canonical casing. The text UNIQUE(repo, pr_number) therefore
--- permits two active rows for one GitHub PR and can leave the fresh provider row
--- unclassified. This migration contracts identity ambiguity without granting any
--- provider, D3, money, rights, credential, or vote authority.
+-- permits multiple lifecycle rows for one GitHub PR and can let stale/terminal aliases
+-- outrank current provider truth. This migration contracts identity ambiguity without
+-- granting provider, D3, money, rights, credential, or vote authority.
 
 begin;
 
@@ -81,18 +81,80 @@ create table if not exists penta_pr.lifecycle_identity_alias_archive_v2 (
 alter table penta_pr.lifecycle_identity_alias_archive_v2 enable row level security;
 revoke all on table penta_pr.lifecycle_identity_alias_archive_v2 from public, anon, authenticated;
 
--- Preserve every case-alias row before deduplication. Survivor selection prefers an
--- already-classified row, then the lower-case spelling, then freshest provider truth.
+-- Snapshot duplicate-group current truth before any row can be removed. This is used both
+-- to fail closed on ambiguous active heads and to prove that deduplication did not terminalize
+-- or rewind an active lifecycle row.
+create temporary table penta_pr_identity_preflight_v2 on commit drop as
+select
+  lower(btrim(l.repo)) as canonical_repo,
+  l.pr_number,
+  count(*) as row_count,
+  count(*) filter (where l.terminal_state is null) as active_rows,
+  count(distinct l.head_sha) filter (
+    where l.terminal_state is null and l.head_sha is not null
+  ) as active_head_count,
+  min(l.head_sha) filter (
+    where l.terminal_state is null and l.head_sha is not null
+  ) as active_head_sha,
+  count(distinct nullif(coalesce(l.metadata,'{}'::jsonb)->>'classification','')) filter (
+    where l.terminal_state is null
+  ) as active_classification_count,
+  count(distinct nullif(coalesce(l.metadata,'{}'::jsonb)->>'disposition','')) filter (
+    where l.terminal_state is null
+  ) as active_disposition_count,
+  max(l.provider_updated_at) filter (where l.terminal_state is null) as latest_active_provider_updated_at,
+  max(l.last_observed_at) filter (where l.terminal_state is null) as latest_active_observed_at
+from penta_pr.lifecycle l
+group by lower(btrim(l.repo)), l.pr_number
+having count(*) > 1;
+
+do $identity_conflict_preflight$
+declare
+  v_active_head_conflicts integer;
+  v_active_classification_conflicts integer;
+  v_active_disposition_conflicts integer;
+begin
+  select count(*) into v_active_head_conflicts
+  from penta_pr_identity_preflight_v2
+  where active_rows > 1 and active_head_count > 1;
+
+  if v_active_head_conflicts <> 0 then
+    raise exception 'penta_pr_active_alias_head_conflict:%', v_active_head_conflicts;
+  end if;
+
+  select count(*) into v_active_classification_conflicts
+  from penta_pr_identity_preflight_v2
+  where active_rows > 1 and active_classification_count > 1;
+
+  if v_active_classification_conflicts <> 0 then
+    raise exception 'penta_pr_active_alias_classification_conflict:%', v_active_classification_conflicts;
+  end if;
+
+  select count(*) into v_active_disposition_conflicts
+  from penta_pr_identity_preflight_v2
+  where active_rows > 1 and active_disposition_count > 1;
+
+  if v_active_disposition_conflicts <> 0 then
+    raise exception 'penta_pr_active_alias_disposition_conflict:%', v_active_disposition_conflicts;
+  end if;
+end
+$identity_conflict_preflight$;
+
+-- Preserve every case-alias row before deduplication. Current active truth always outranks
+-- terminal history. Within the same lifecycle class, freshest provider/readback truth outranks
+-- spelling/classification preferences. This prevents an active canonical alias from collapsing
+-- to a CLOSED/terminal row merely because the terminal row is lower-case or classified.
 with ranked as (
   select
     l.*,
     row_number() over (
       partition by lower(btrim(l.repo)), l.pr_number
       order by
-        ((coalesce(l.metadata, '{}'::jsonb) ->> 'classification') is not null) desc,
-        (l.repo = lower(btrim(l.repo))) desc,
+        (l.terminal_state is null) desc,
         l.provider_updated_at desc nulls last,
         l.last_observed_at desc nulls last,
+        ((coalesce(l.metadata, '{}'::jsonb) ->> 'classification') is not null) desc,
+        (l.repo = lower(btrim(l.repo))) desc,
         l.first_seen_at asc,
         l.id asc
     ) as identity_rank
@@ -117,6 +179,69 @@ using penta_pr.lifecycle_identity_alias_archive_v2 a
 where a.archive_batch = '20260901210200_penta_pr_repo_identity_citext_v2'
   and a.alias_row_id = l.id;
 
+-- Prove that no duplicate group containing active provider truth collapsed to terminal or
+-- changed its uniquely known active head/freshness before changing the storage type.
+do $survivor_verify$
+declare
+  v_terminalized_active integer;
+  v_active_head_rewound integer;
+  v_active_provider_rewound integer;
+  v_active_observation_rewound integer;
+begin
+  select count(*) into v_terminalized_active
+  from penta_pr_identity_preflight_v2 p
+  join penta_pr.lifecycle l
+    on lower(btrim(l.repo)) = p.canonical_repo
+   and l.pr_number = p.pr_number
+  where p.active_rows > 0
+    and l.terminal_state is not null;
+
+  if v_terminalized_active <> 0 then
+    raise exception 'penta_pr_active_alias_terminalized:%', v_terminalized_active;
+  end if;
+
+  select count(*) into v_active_head_rewound
+  from penta_pr_identity_preflight_v2 p
+  join penta_pr.lifecycle l
+    on lower(btrim(l.repo)) = p.canonical_repo
+   and l.pr_number = p.pr_number
+  where p.active_rows > 0
+    and p.active_head_count = 1
+    and l.head_sha is distinct from p.active_head_sha;
+
+  if v_active_head_rewound <> 0 then
+    raise exception 'penta_pr_active_alias_head_changed:%', v_active_head_rewound;
+  end if;
+
+  select count(*) into v_active_provider_rewound
+  from penta_pr_identity_preflight_v2 p
+  join penta_pr.lifecycle l
+    on lower(btrim(l.repo)) = p.canonical_repo
+   and l.pr_number = p.pr_number
+  where p.active_rows > 0
+    and p.latest_active_provider_updated_at is not null
+    and l.provider_updated_at is distinct from p.latest_active_provider_updated_at;
+
+  if v_active_provider_rewound <> 0 then
+    raise exception 'penta_pr_active_alias_provider_freshness_changed:%', v_active_provider_rewound;
+  end if;
+
+  select count(*) into v_active_observation_rewound
+  from penta_pr_identity_preflight_v2 p
+  join penta_pr.lifecycle l
+    on lower(btrim(l.repo)) = p.canonical_repo
+   and l.pr_number = p.pr_number
+  where p.active_rows > 0
+    and p.latest_active_provider_updated_at is null
+    and p.latest_active_observed_at is not null
+    and l.last_observed_at is distinct from p.latest_active_observed_at;
+
+  if v_active_observation_rewound <> 0 then
+    raise exception 'penta_pr_active_alias_observation_freshness_changed:%', v_active_observation_rewound;
+  end if;
+end
+$survivor_verify$;
+
 -- Preserve the two current direct read-model dependencies before the type conversion.
 -- Their definitions are recreated immediately after ALTER TYPE. No downstream views
 -- currently depend on either surface; any future dependency causes DROP VIEW to fail
@@ -125,16 +250,11 @@ drop view penta_pr.current_zero_delta_candidates_v3;
 drop view penta_runtime.current_vergence_repairs_v3;
 
 -- Make repository identity comparisons and UNIQUE(repo, pr_number) case-insensitive.
--- This fixes both reconciliation lookup and all future writers at the storage boundary.
 alter table penta_pr.lifecycle
   alter column repo type extensions.citext
   using btrim(repo)::extensions.citext;
 
 -- Recreate current read models with the same columns and least-privilege contract.
--- The zero-delta view deliberately casts repo back to TEXT so its external row type does
--- not change merely because the lifecycle storage identity becomes CITEXT. CREATE VIEW
--- naturally restores the prior owner-only NULL ACL; explicit REVOKE would materialize a
--- different relacl and make guarded rollback reject its own forward state.
 create view penta_pr.current_zero_delta_candidates_v3 as
 select
   l.repo::text as repo,
