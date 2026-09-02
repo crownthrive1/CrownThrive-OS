@@ -1,11 +1,17 @@
 # PentaRouter OS Planes, Fabrics, Bridges, Meshes, and Redundancy Standard V1
 
-**System:** `ct.os.pentarouter.v1`  
-**Owner:** CrownThrive, LLC  
-**Governance:** CHLOM  
-**Commercial packaging:** PentaGreen  
-**Economic activation:** ThriveEvergreen / ECAC  
-**Source state:** `SOURCE_READY`  
+**System:** `ct.os.pentarouter.v1`
+
+**Owner:** CrownThrive, LLC
+
+**Governance:** CHLOM
+
+**Commercial packaging:** PentaGreen
+
+**Economic activation:** ThriveEvergreen / ECAC
+
+**Source state:** `SOURCE_READY`
+
 **Production activation:** `HOLD_PENDING_MERGE_CI_INDEPENDENT_CERTIFICATION_AND_PROVIDER_READBACK`
 
 ## 1. Institutional whole
