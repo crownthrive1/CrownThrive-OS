@@ -37,7 +37,7 @@ const MCP_ERROR = Object.freeze({
 const CONTROL_PLANE_CANONICAL_ORIGIN = 'https://crown-thrive-os.vercel.app';
 const CONTROL_PLANE_CANONICAL_HOST = 'crown-thrive-os.vercel.app';
 const CONTROL_PLANE_DEPLOYMENT_HOST =
-  /^crown-thrive-os-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.vercel\.app$/;
+  /^(?:crown-thrive-os-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|crownthrive-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?-crownthrive-os)\.vercel\.app$/;
 const SERVER_INFO = Object.freeze({
   name: 'crownthrive-vercel-fabric',
   title: 'CrownThrive Vercel + CHLOM Fabric',
