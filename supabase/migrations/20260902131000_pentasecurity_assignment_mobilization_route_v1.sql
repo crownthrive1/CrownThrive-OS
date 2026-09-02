@@ -264,7 +264,7 @@ $function$;
 comment on function integration_control.penta_census_mobilize_safe_handoffs_v1(integer) is
 'PentaCensus D0-D2 mobilizer. v1 repair adds canonical penta.security -> ct.penta.security resolution without expanding authority.';
 
-do $$
+do $do$
 begin
   if not exists (
     select 1 from pentas.nodes_v2
@@ -278,10 +278,10 @@ begin
   end if;
 
   if position(
-    $$when 'penta.security' then 'ct.penta.security'$$
+    $needle$when 'penta.security' then 'ct.penta.security'$needle$
     in pg_get_functiondef('integration_control.penta_census_mobilize_safe_handoffs_v1(integer)'::regprocedure)
   ) = 0 then
     raise exception 'PENTASECURITY_MOBILIZER_ROUTE_READBACK_FAILED';
   end if;
 end
-$$;
+$do$;
