@@ -35,11 +35,32 @@ def test_migration_preserves_alias_history_before_removal_and_creates_no_externa
     assert "provider mutation" not in sql
 
 
-def test_preflight_refuses_unreviewed_fk_topology_change():
+def test_preflight_refuses_unreviewed_fk_and_repo_view_dependency_topology_changes():
     sql = _normalized(MIGRATION)
     assert "contype = 'f'" in sql
     assert "penta_pr_lifecycle_fk_topology_changed" in sql
     assert "penta_pr_lifecycle_missing" in sql
+    assert "penta_pr.current_zero_delta_candidates_v3" in sql
+    assert "penta_runtime.current_vergence_repairs_v3" in sql
+    assert "penta_pr_repo_view_dependency_topology_changed" in sql
+    assert "penta_pr_repo_view_security_contract_changed" in sql
+
+
+def test_forward_conversion_preserves_current_repo_dependent_views_and_text_facing_contract():
+    sql = _normalized(MIGRATION)
+    alter_pos = sql.index("alter table penta_pr.lifecycle alter column repo type extensions.citext")
+    zero_drop = sql.index("drop view penta_pr.current_zero_delta_candidates_v3")
+    vergence_drop = sql.index("drop view penta_runtime.current_vergence_repairs_v3")
+    zero_create = sql.index("create view penta_pr.current_zero_delta_candidates_v3 as")
+    vergence_create = sql.index("create view penta_runtime.current_vergence_repairs_v3 as")
+    assert zero_drop < alter_pos
+    assert vergence_drop < alter_pos
+    assert alter_pos < zero_create
+    assert alter_pos < vergence_create
+    assert "l.repo::text as repo" in sql
+    assert "l.repo = v.repository_full_name::extensions.citext" in sql
+    assert "penta_pr_zero_delta_repo_contract_changed" in sql
+    assert "penta_pr_repo_view_security_contract_not_preserved" in sql
 
 
 def test_rollback_restores_text_semantics_and_exact_archived_rows_without_dropping_custody():
@@ -51,3 +72,19 @@ def test_rollback_restores_text_semantics_and_exact_archived_rows_without_droppi
     assert "rollback_refuses_missing_penta_pr_identity_custody" in sql
     assert "drop table penta_pr.lifecycle_identity_alias_archive_v2" not in sql
     assert "grant execute" not in sql
+
+
+def test_rollback_preserves_views_and_restores_original_text_join_semantics():
+    sql = _normalized(ROLLBACK)
+    alter_pos = sql.index("alter table penta_pr.lifecycle alter column repo type text")
+    zero_drop = sql.index("drop view penta_pr.current_zero_delta_candidates_v3")
+    vergence_drop = sql.index("drop view penta_runtime.current_vergence_repairs_v3")
+    zero_create = sql.index("create view penta_pr.current_zero_delta_candidates_v3 as")
+    vergence_create = sql.index("create view penta_runtime.current_vergence_repairs_v3 as")
+    assert zero_drop < alter_pos
+    assert vergence_drop < alter_pos
+    assert alter_pos < zero_create
+    assert alter_pos < vergence_create
+    assert "on l.repo = v.repository_full_name and l.pr_number = v.pr_number" in sql
+    assert "rollback_refuses_repo_view_dependency_topology_changed" in sql
+    assert "rollback_refuses_repo_view_security_contract_not_preserved" in sql
