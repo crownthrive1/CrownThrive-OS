@@ -184,16 +184,16 @@ def plan_task(task: Mapping[str, Any], registry: Mapping[str, Any]) -> Dict[str,
 
 
 def cmd_list(registry: Mapping[str, Any]) -> int:
-    rows = [
-        {
-            "skill_id": item["skill_id"],
-            "slug": item["slug"],
-            "name": item["name"],
-            "state": item["lifecycle_state"],
-            "max_authority": item["max_authority"],
-        }
-        for item in registry["skills"]
-    ]
+    rows = []
+    for item in registry["skills"]:
+        skill = find_skill(registry, item["skill_id"])
+        rows.append({
+            "skill_id": skill["skill_id"],
+            "slug": skill["slug"],
+            "name": skill["name"],
+            "state": skill["lifecycle_state"],
+            "max_authority": skill["max_authority"],
+        })
     print(json.dumps(rows, indent=2, ensure_ascii=False))
     return 0
 
