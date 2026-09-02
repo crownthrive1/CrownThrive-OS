@@ -1,0 +1,115 @@
+name: CrownThrive Skills Factory Hourly
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'software-factory-v5/**'
+      - 'command-center/factory/**'
+      - 'api/factory/status.js'
+      - 'automation/skills-production-factory.mdx'
+      - 'skills/crownthrive-skills-production-factory/**'
+      - '.github/workflows/skills-factory-hourly.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crownthrive-skills-factory-hourly
+  cancel-in-progress: false
+
+jobs:
+  produce-and-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validate stable factory source
+        working-directory: software-factory-v5
+        run: |
+          npm run validate
+          npm test
+
+      - name: Hydrate last published runtime state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE_BRANCH: automation/skills-factory-state
+        run: |
+          set -euo pipefail
+          STATE_DIR="$(mktemp -d)"
+          AUTH_REPO="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          rm -rf "$GITHUB_WORKSPACE/software-factory-v5/generated"
+          mkdir -p "$GITHUB_WORKSPACE/software-factory-v5/generated"
+          if git ls-remote --exit-code --heads "$AUTH_REPO" "$STATE_BRANCH" >/dev/null 2>&1; then
+            git clone --depth 1 --branch "$STATE_BRANCH" "$AUTH_REPO" "$STATE_DIR"
+            if [ -d "$STATE_DIR/software-factory-v5/generated" ]; then
+              cp -R "$STATE_DIR/software-factory-v5/generated/." "$GITHUB_WORKSPACE/software-factory-v5/generated/"
+              echo "CT_FACTORY_STATE_SOURCE=STATE_BRANCH" >> "$GITHUB_ENV"
+            else
+              echo "CT_FACTORY_STATE_SOURCE=STATE_BRANCH_EMPTY" >> "$GITHUB_ENV"
+            fi
+          else
+            echo "CT_FACTORY_STATE_SOURCE=CLEAN_FIRST_RUN" >> "$GITHUB_ENV"
+          fi
+
+      - name: Produce current hourly batch
+        working-directory: software-factory-v5
+        run: npm run tick
+
+      - name: Process PentaGreen handoff queue
+        working-directory: software-factory-v5
+        env:
+          PENTAGREEN_BINDINGS_JSON: ${{ secrets.PENTAGREEN_SKILLS_BINDINGS_JSON }}
+        run: npm run pentagreen
+
+      - name: Publish append-only runtime state branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE_BRANCH: automation/skills-factory-state
+        run: |
+          set -euo pipefail
+          STATE_DIR="$(mktemp -d)"
+          AUTH_REPO="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$AUTH_REPO" "$STATE_BRANCH" >/dev/null 2>&1; then
+            git clone --depth 1 --branch "$STATE_BRANCH" "$AUTH_REPO" "$STATE_DIR"
+          else
+            git clone --depth 1 "$AUTH_REPO" "$STATE_DIR"
+            cd "$STATE_DIR"
+            git switch --orphan "$STATE_BRANCH"
+            git rm -rf . >/dev/null 2>&1 || true
+            cd "$GITHUB_WORKSPACE"
+          fi
+          mkdir -p "$STATE_DIR/software-factory-v5"
+          rm -rf "$STATE_DIR/software-factory-v5/generated"
+          cp -R "$GITHUB_WORKSPACE/software-factory-v5/generated" "$STATE_DIR/software-factory-v5/generated"
+          cd "$STATE_DIR"
+          git config user.name "CrownThrive Skills Factory"
+          git config user.email "contact@crownthrive.com"
+          git add -f software-factory-v5/generated
+          if git diff --cached --quiet; then
+            echo "No state change; idempotency preserved."
+            exit 0
+          fi
+          git commit -m "chore(factory): publish hourly skills and PentaGreen state"
+          git push origin "HEAD:${STATE_BRANCH}"
+
+      - name: Publish run summary
+        working-directory: software-factory-v5
+        run: |
+          node -e "const s=require('./generated/current-status.json'); console.log('## CrownThrive Skills Factory', '\n', '- Tick:', s.tick_id, '\n', '- Produced:', s.current_batch.produced, '\n', '- ECAC:', s.current_batch.commercial_ecac, '\n', '- HOLD:', s.current_batch.commercial_hold, '\n', '- Continuity:', s.continuity_source);" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crownthrive-skills-factory-${{ github.run_id }}
+          path: software-factory-v5/generated
+          retention-days: 7
