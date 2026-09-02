@@ -29,6 +29,8 @@ declare
 begin
   v_limit:=greatest(1,least(coalesce(p_limit,2),2));
 
+  -- Recover only stale leases. The request is then subject to the same bounded-attempt guard
+  -- as every other candidate below.
   update penta_help.requests_v1
      set state='triaged',lease_owner=null,lease_expires_at=null,next_action_at=now(),updated_at=now()
    where state='executing' and lease_expires_at<now();
@@ -52,6 +54,9 @@ begin
      set state='expired',updated_at=now()
    where state not in ('resolved','retired','expired') and expires_at<=now() and risk_class<>'D3';
 
+  -- Exhausted autonomous work is terminal for this bounded attempt budget. Preserve the row,
+  -- clear any lease, and move it to the already-governed external/liaison path. A later explicit
+  -- governed rearm may create a new budget; this function never silently resets attempts.
   with exhausted as (
     update penta_help.requests_v1
        set state='waiting_external',lease_owner=null,lease_expires_at=null,updated_at=now()
@@ -163,6 +168,8 @@ begin
   insert into penta_help.receipts_v1(request_id,actor_system_key,action,attempt_no,success,evidence,evidence_sha256)
   values(r.request_id,'penta.helper',r.resolution_mode,r.attempt_count,p_success,coalesce(p_result,'{}'::jsonb),v_sha);
 
+  -- Resolution wins. Otherwise an exhausted budget always leaves the automatic retry pool,
+  -- including a technically successful attempt whose semantic result remains unresolved.
   v_state:=coalesce(
     nullif(p_state,''),
     case
@@ -172,6 +179,7 @@ begin
     end
   );
 
+  -- Callers cannot use p_state to silently rearm exhausted unresolved work.
   if v_state in ('raised','triaged','waiting_evidence')
      and r.attempt_count>=r.max_attempts
      and not (p_success and coalesce((p_result->>'resolved')::boolean,false)) then
