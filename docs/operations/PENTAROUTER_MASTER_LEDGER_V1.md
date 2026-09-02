@@ -1,8 +1,11 @@
 # PentaRouter V1 Master Ledger
 
-**Ledger ID:** `ct.ledger.pentarouter.v1`  
-**Effective date:** 2026-09-02  
-**Canonical source:** `crownthrive1/CrownThrive-OS`  
+**Ledger ID:** `ct.ledger.pentarouter.v1`
+
+**Effective date:** 2026-09-02
+
+**Canonical source:** `crownthrive1/CrownThrive-OS`
+
 **System ID:** `ct.os.pentarouter.v1`
 
 ## Asset register
