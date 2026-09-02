@@ -1,0 +1,63 @@
+name: Collision Read Transport Governance
+
+on:
+  pull_request:
+    paths:
+      - "scripts/governed_collision_agent_v2.py"
+      - "scripts/governed_collision_agent_v2_trusted.py"
+      - "scripts/governed_collision_agent_v2_trusted_main.py"
+      - "tests/test_collision_agent_v2.py"
+      - "tests/test_collision_snapshot_retry_contract.py"
+      - "tests/test_collision_trusted_observer.py"
+      - "tests/test_collision_trusted_main_observer.py"
+      - ".github/workflows/collision-governance-trusted-v2.yml"
+      - ".github/workflows/collision-read-transport-governance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/governed_collision_agent_v2.py"
+      - "scripts/governed_collision_agent_v2_trusted.py"
+      - "scripts/governed_collision_agent_v2_trusted_main.py"
+      - "tests/test_collision_agent_v2.py"
+      - "tests/test_collision_snapshot_retry_contract.py"
+      - "tests/test_collision_trusted_observer.py"
+      - "tests/test_collision_trusted_main_observer.py"
+      - ".github/workflows/collision-governance-trusted-v2.yml"
+      - ".github/workflows/collision-read-transport-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate shared trusted GitHub read transport
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile collision observers
+        run: |
+          python -m py_compile \
+            scripts/governed_collision_agent_v2.py \
+            scripts/governed_collision_agent_v2_trusted.py \
+            scripts/governed_collision_agent_v2_trusted_main.py
+      - name: Run collision transport tests
+        run: |
+          python -m unittest \
+            tests.test_collision_agent_v2 \
+            tests.test_collision_snapshot_retry_contract \
+            tests.test_collision_trusted_observer \
+            tests.test_collision_trusted_main_observer \
+            -v
+      - name: Check diff hygiene
+        run: |
+          git diff --check HEAD^ HEAD
