@@ -22,6 +22,7 @@ Required fabrics are registered: PentaCredentials, PentaFlex, PentaMCP, PentaWir
 | `cpanel-thrivepush-io-api-control` | ACTIVE, version 1 | JWT-protected; resolves the dedicated Vault reference only |
 | `penta-wire-secure-cpanel-thrivepush-io` | ACTIVE, version 1 | Constant-time internal authentication; five-operation read allowlist |
 | `integration_control.cpanel_thrivepush_io_secure_canary_dispatch_v1` | Deployed | Service-role-only network canary dispatcher |
+| `integration_control.penta_credentials_reconcile_trigger_v1(text)` | Deployed and exercised | Service-role-controlled interface reconciliation overload; returns no secret values and creates no provider authority |
 
 Allowed reads are `health.read`, `domains.read`, `target_domain.read`, `disk_usage.read`, and `site_profile.read`. Provider writes are disabled.
 
@@ -29,7 +30,7 @@ Allowed reads are `health.read`, `domains.read`, `target_domain.read`, `disk_usa
 
 - **Hot:** blocked. Provider state is `bound_ready`, credential-reference state is `unverified`, and the exact Vault binding plus provider readback must pass before promotion.
 - **Warm:** blocked. Provider state is `bound_ready`, credential-reference state is `missing`, and the primary Vault binding plus warm-reference reconciliation must pass. Warm refers to the same Vault-held credential and never creates a plaintext duplicate.
-- **Cold:** sealed. Provider state is `bound_ready`, credential-reference state is `reconcile_required`, and the reconciliation trigger currently records `reconcile_trigger_failed:42883`. Cold does not claim an independently issued provider credential.
+- **Cold:** sealed. Provider state is `bound_ready`, credential-reference state is `reconcile_required`, and its current controlled state is `cold_route_rehydration_required`. The previously missing one-argument reconciliation routine was added and successfully exercised. Cold does not claim an independently issued provider credential.
 
 ## MCP projection
 
@@ -55,13 +56,14 @@ Response digest: `898b102ab88aaa130251874ca21b87d4b964c51a12186851808908629e7708
 |---|---|
 | Service, custody, continuity, variable, API, MCP, and route registries | PASS |
 | Edge deployment | PASS |
+| Route reconciliation dispatcher | PASS — missing overload repaired and exercised |
 | Secure façade health and fail-closed behavior | PASS |
 | Exact production credential stored in Vault | BLOCKED — protected secret ingress required |
 | cPanel authentication | NOT EXERCISED |
 | Exact `thrivepush.io` provider visibility | NOT EXERCISED |
 | Hot-route activation | WITHHELD |
 | Warm-route readiness | BLOCKED — primary reference missing |
-| Cold recovery readiness | SEALED — reconciliation repair required |
+| Cold recovery readiness | SEALED — credential rehydration required |
 | Production MCP exposure | WITHHELD |
 
 No raw or encoded credential is present in this repository, Drive, API contracts, MCP schemas, logs, or evidence. The fixed production credential has no scheduled or automatic rotation. Replacement requires explicit founder authority, confirmed compromise, or provider invalidation.
