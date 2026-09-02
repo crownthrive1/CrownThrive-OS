@@ -196,7 +196,34 @@ jobs:
           jq -e '.cie_score.score | type == "number"' dist/pentarelease-surface/PENTARELEASE_RELEASE_RECORD.json >/dev/null
           jq -e '.release_intelligence.costs.methodology | type == "object"' dist/pentarelease-surface/PENTARELEASE_RELEASE_RECORD.json >/dev/null
 
+      - name: Resolve current release-intelligence candidate
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA=$(git rev-parse HEAD)
+          SAFE_TAG=$(printf '%s' "$TAG" | tr '/' '-')
+          TITLE="PentaRelease release intelligence $TAG"
+          PREFIX="pentarelease/intelligence-${SAFE_TAG}-${BASE_SHA:0:12}-"
+          CANDIDATE=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --base main --limit 100 \
+            --json number,title,headRefName,headRefOid,baseRefOid,url \
+            | jq -c --arg title "$TITLE" --arg base "$BASE_SHA" --arg prefix "$PREFIX" \
+              '[.[] | select(.title == $title and .baseRefOid == $base and (.headRefName | startswith($prefix)))] | sort_by(.number) | first // empty')
+          if [ -n "$CANDIDATE" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$(jq -r '.number' <<<"$CANDIDATE")" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$(jq -r '.headRefOid' <<<"$CANDIDATE")" >> "$GITHUB_OUTPUT"
+            echo "url=$(jq -r '.url' <<<"$CANDIDATE")" >> "$GITHUB_OUTPUT"
+            echo "Reusing current exact-base release-intelligence candidate $(jq -r '.url' <<<"$CANDIDATE")."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish rich release record and assets
+        if: steps.candidate.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
@@ -217,6 +244,7 @@ jobs:
 
       - name: Commit synchronized README and PentaDocs surfaces
         id: commit
+        if: steps.candidate.outputs.exists != 'true'
         env:
           TAG: ${{ steps.release.outputs.tag }}
         shell: bash
@@ -307,6 +335,7 @@ jobs:
             --comment "Merged synchronization PR #${PR_NUM}; terminal merge confirmed before production readback."
 
       - name: Production readback
+        if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
