@@ -23,6 +23,38 @@ def test_migration_contracts_case_insensitive_repo_identity_at_storage_boundary(
     assert "penta_pr_case_identity_duplicate_remaining" in sql
 
 
+def test_active_truth_outranks_terminal_alias_and_provider_freshness_outranks_spelling():
+    sql = _normalized(MIGRATION)
+    ranking = sql.split("row_number() over", 1)[1].split("as identity_rank", 1)[0]
+    assert "(l.terminal_state is null) desc" in ranking
+    assert "l.provider_updated_at desc nulls last" in ranking
+    assert ranking.index("(l.terminal_state is null) desc") < ranking.index("l.provider_updated_at desc nulls last")
+    assert ranking.index("l.provider_updated_at desc nulls last") < ranking.index("(l.repo = lower(btrim(l.repo))) desc")
+
+
+def test_conflicting_active_heads_and_semantics_fail_closed_before_delete():
+    sql = _normalized(MIGRATION)
+    assert "penta_pr_identity_preflight_v2" in sql
+    assert "active_head_count" in sql
+    assert "penta_pr_active_alias_head_conflict" in sql
+    assert "penta_pr_active_alias_classification_conflict" in sql
+    assert "penta_pr_active_alias_disposition_conflict" in sql
+    preflight_pos = sql.index("penta_pr_active_alias_head_conflict")
+    delete_pos = sql.index("delete from penta_pr.lifecycle")
+    assert preflight_pos < delete_pos
+
+
+def test_survivor_verification_prevents_active_terminalization_head_or_freshness_rewind():
+    sql = _normalized(MIGRATION)
+    assert "penta_pr_active_alias_terminalized" in sql
+    assert "penta_pr_active_alias_head_changed" in sql
+    assert "penta_pr_active_alias_provider_freshness_changed" in sql
+    assert "penta_pr_active_alias_observation_freshness_changed" in sql
+    survivor_verify_pos = sql.index("penta_pr_active_alias_terminalized")
+    alter_pos = sql.index("alter table penta_pr.lifecycle alter column repo type extensions.citext")
+    assert survivor_verify_pos < alter_pos
+
+
 def test_migration_preserves_alias_history_before_removal_and_creates_no_external_authority():
     sql = _normalized(MIGRATION)
     archive_pos = sql.index("insert into penta_pr.lifecycle_identity_alias_archive_v2")
