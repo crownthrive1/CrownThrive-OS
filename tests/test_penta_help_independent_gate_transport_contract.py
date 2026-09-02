@@ -12,7 +12,7 @@ class PentaAssignmentTransportResultIsolationTests(unittest.TestCase):
         cls.migration = MIGRATION.read_text(encoding="utf-8")
         cls.rollback = ROLLBACK.read_text(encoding="utf-8")
 
-    def test_transport_completion_cannot_synthesize_owner_pass(self) -> None:
+    def test_census_transport_completion_cannot_synthesize_owner_pass(self) -> None:
         self.assertIn("HOLD_ASSIGNMENT_OWNER_SEMANTIC_RESULT_MISSING", self.migration)
         self.assertIn("transport_completion_is_not_owner_pass", self.migration)
         self.assertIn("penta_assignment_owner_results_v1", self.migration)
@@ -21,6 +21,21 @@ class PentaAssignmentTransportResultIsolationTests(unittest.TestCase):
         census_block = self.migration.split("if d.dispatch_kind='CENSUS_HANDOFF' then", 1)[1].split("elsif d.dispatch_kind='OS20_TASK' then", 1)[0]
         self.assertNotIn("penta_assignment_record_owner_result_v1", census_block)
         self.assertNotIn("'PASS'", census_block)
+
+    def test_completed_os20_task_without_owner_result_is_hold_not_pass(self) -> None:
+        os20_block = self.migration.split("elsif d.dispatch_kind='OS20_TASK' then", 1)[1].split("end if;\n  end loop;", 1)[0]
+        self.assertIn("t.status='completed'", os20_block)
+        self.assertIn("HOLD_ASSIGNMENT_OWNER_SEMANTIC_RESULT_MISSING", os20_block)
+        self.assertIn("execution_completion_is_not_owner_pass", os20_block)
+        self.assertIn("semantic_owner_result_required", os20_block)
+        self.assertNotIn("penta_assignment_record_owner_result_v1", os20_block)
+        self.assertNotIn("'PASS'", os20_block)
+
+    def test_reconciler_reports_zero_new_pass_results(self) -> None:
+        self.assertIn("'new_pass_results',0", self.migration)
+        self.assertIn("'completed_from_existing_owner_results',v_progress", self.migration)
+        self.assertIn("'execution_completion_is_not_owner_pass',true", self.migration)
+        self.assertIn("'semantic_owner_result_required',true", self.migration)
 
     def test_forward_path_preserves_no_authority_expansion(self) -> None:
         forbidden = (
