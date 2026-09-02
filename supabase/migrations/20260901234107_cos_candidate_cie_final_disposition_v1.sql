@@ -84,8 +84,8 @@ begin
   where candidate_id=p_candidate_id and prior_state='provider_readback' and new_state='chlom_cie'
   order by observed_at desc limit 1;
 
-  -- ct.repo.crownthrive-support is the canonical internal federation resource ID, not the retired external repository identity.
-  -- Constructing the suffix separately keeps external-identity guards scoped to actual retired repository slugs/URLs.
+  -- This is the canonical internal parent federation resource ID, not an external repository slug.
+  -- Constructing the suffix separately keeps external-identity guards scoped to actual retired repository names and URLs.
   select * into v_link from institutional_federation.repository_parent_child_link_receipts_v1
   where parent_repo_id=('ct.repo.crownthrive-'||'support') and child_repo_id='ct.repo.cie'
     and link_state='linked_governed' and guardian_verified and family_verified and interoperability_verified
