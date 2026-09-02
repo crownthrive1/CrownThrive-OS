@@ -1,0 +1,44 @@
+name: PentaRouter Runtime Governance
+
+on:
+  pull_request:
+    paths:
+      - "runtime/pentarouter/**"
+      - "scripts/pentarouter_runtime.py"
+      - "contracts/penta/pentarouter-*.json"
+      - "commercialization/routing/mesh-routing.v1.json"
+      - "commercialization/pentagreen/**"
+      - "skills/pentarouter-*/**"
+      - "skills/pentagreen-stable-product-handoff/**"
+      - "tests/test_pentarouter_runtime.py"
+      - ".github/workflows/pentarouter-runtime-governance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "runtime/pentarouter/**"
+      - "scripts/pentarouter_runtime.py"
+      - "contracts/penta/pentarouter-*.json"
+      - "commercialization/routing/mesh-routing.v1.json"
+      - "commercialization/pentagreen/**"
+      - "tests/test_pentarouter_runtime.py"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile runtime
+        run: python -m py_compile scripts/pentarouter_runtime.py
+      - name: Validate topology
+        run: python scripts/pentarouter_runtime.py validate --manifest runtime/pentarouter/pentarouter-system.v1.json
+      - name: Run embedded failover tests
+        run: python scripts/pentarouter_runtime.py self-test --manifest runtime/pentarouter/pentarouter-system.v1.json
+      - name: Run unit tests
+        run: python -m unittest tests.test_pentarouter_runtime -v
