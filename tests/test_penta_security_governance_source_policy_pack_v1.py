@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 MIGRATION = Path('supabase/migrations/20260901191000_penta_security_governance_source_policy_pack_v1.sql')
@@ -7,6 +8,12 @@ POLICY_2020 = 'ct.penta.security.policy.institutional-pre-release-certification-
 SOURCE_2020 = 'supabase/migrations/20260831074800_penta_institutional_pre_release_certification_v2.sql'
 POLICY_1894 = 'ct.penta.security.policy.penta-assure-independent-certifier-integrity-v2.v1'
 SOURCE_1894 = 'supabase/migrations/20260830194000_penta_assure_independent_certifier_integrity_v2.sql'
+
+SQL_OBJECT = re.compile(
+    r"\b(?:create|alter|drop)\s+(?:or\s+replace\s+)?(?:table|function|view|sequence|policy|trigger)\s+"
+    r"(?:if\s+(?:not\s+)?exists\s+)?([A-Za-z_][A-Za-z0-9_.]*)",
+    re.IGNORECASE,
+)
 
 
 def _text(path: Path) -> str:
@@ -59,6 +66,11 @@ def test_policy_pack_forbids_end_user_certification_and_explicit_authority_expan
     assert "to authenticated" in sql
     assert "to public" in sql
     assert "'authority_expansion',true" in sql or "'authority_expansion', true" in sql
+
+
+def test_policy_data_literals_do_not_claim_target_runtime_objects_in_collision_scanner():
+    sql = _text(MIGRATION)
+    assert SQL_OBJECT.findall(sql) == []
 
 
 def test_rollback_preserves_history_and_retires_both_policies_fail_closed():
