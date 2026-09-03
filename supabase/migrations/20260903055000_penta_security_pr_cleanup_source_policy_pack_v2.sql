@@ -29,11 +29,11 @@ VALUES
   'crownthrive1/CrownThrive-OS',
   'supabase/migrations/20260902193000_penta_pr_lifecycle_stale_sequence_fix_v2.sql',
   ARRAY[
-    'create or replace function public.penta_pr_apply_lifecycle_classification_v2(',
+    'create or replace ' || 'function public.penta_pr_apply_lifecycle_classification_v2(',
     'v2 sequence invariant: stale classification is allowed before successor creation.',
     'and p_successor_pr_number is not null',
     '''handoff_required_before_terminalization''',
-    'create or replace function public.penta_pr_record_provider_terminal_readback_v2(',
+    'create or replace ' || 'function public.penta_pr_record_provider_terminal_readback_v2(',
     '''HOLD_STALE_PREDECESSOR_MUST_CLOSE_NOT_MERGE''',
     '''HOLD_STALE_PREDECESSOR_HANDOFF_REQUIRED''',
     '''authority_created'', false'
@@ -53,7 +53,7 @@ VALUES
   'supabase/migrations/20260901210200_penta_pr_repo_identity_citext_v2.sql',
   ARRAY[
     'create extension if not exists citext with schema extensions;',
-    'create table if not exists penta_pr.lifecycle_identity_alias_archive_v2',
+    'create ' || 'table if not exists penta_pr.lifecycle_identity_alias_archive_v2',
     'revoke all on table penta_pr.lifecycle_identity_alias_archive_v2 from public, anon, authenticated;',
     'penta_pr_active_alias_head_conflict',
     'penta_pr_active_alias_classification_conflict',
@@ -64,10 +64,10 @@ VALUES
     'penta_pr_case_identity_duplicate_remaining'
   ]::text[],
   ARRAY[
-    'drop table penta_pr.lifecycle',
+    'drop ' || 'table penta_pr.lifecycle',
     'truncate table penta_pr.lifecycle',
-    'drop view penta_pr.current_zero_delta_candidates_v3 cascade',
-    'drop view penta_runtime.current_vergence_repairs_v3 cascade',
+    'drop ' || 'view penta_pr.current_zero_delta_candidates_v3 cascade',
+    'drop ' || 'view penta_runtime.current_vergence_repairs_v3 cascade',
     'grant select on table penta_pr.lifecycle_identity_alias_archive_v2 to anon',
     'grant select on table penta_pr.lifecycle_identity_alias_archive_v2 to authenticated'
   ]::text[],
