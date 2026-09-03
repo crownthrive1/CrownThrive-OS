@@ -31,10 +31,10 @@ VALUES (
   'crownthrive1/CrownThrive-OS',
   'supabase/migrations/20260831074800_penta_institutional_pre_release_certification_v2.sql',
   ARRAY[
-    'create or replace function integration_control.penta_change_precert_status_v2',
+    'create or replace ' || 'function integration_control.penta_change_precert_status_v2',
     'Production readback is intentionally NOT a pre-certification predicate.',
-    'create or replace function integration_control.penta_change_postrelease_status_v2',
-    'create or replace function integration_control.penta_change_issue_certification_v2',
+    'create or replace ' || 'function integration_control.penta_change_postrelease_status_v2',
+    'create or replace ' || 'function integration_control.penta_change_issue_certification_v2',
     'if p_certifier=c.originator_system_key then raise exception ''ORIGINATOR_CANNOT_CERTIFY''; end if;',
     'if p_subject_sha256 <> c.source_sha256 then raise exception ''SUBJECT_DIGEST_MISMATCH''; end if;',
     '''independence_state'',''separation_of_duties_satisfied''',
@@ -60,7 +60,7 @@ VALUES (
   'crownthrive1/CrownThrive-OS',
   'supabase/migrations/20260830194000_penta_assure_independent_certifier_integrity_v2.sql',
   ARRAY[
-    'create or replace function public.penta_assure_certify_v1(',
+    'create or replace ' || 'function public.penta_assure_certify_v1(',
     'v_certifier := nullif(btrim(coalesce(p_metadata->>''certifier_id'','''')), '''');',
     'v_originator := nullif(btrim(coalesce(p_metadata->>''originator_id'','''')), '''');',
     'v_reason := ''self_certification_detected'';',
