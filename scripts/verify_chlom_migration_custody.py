@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Fail-closed source verifier for the CHLOM Git/Supabase replay custody repair."""
+"""Fail-closed source verifier for the bounded CHLOM replay custody repair."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import re
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +15,7 @@ BASELINE = MIGRATIONS / "20260821231328_remote_applied_lineage.sql"
 ASSERTION = MIGRATIONS / "20260823203546_execution_builder_capability_contract_identity_v1.sql"
 LEGACY_ASSERTION = MIGRATIONS / "20260823202950_execution_builder_capability_contract_identity_v1.sql"
 CANONICAL_RE = re.compile(r"^(\d{14})_.+\.sql$")
+TARGET_VERSIONS = {"20260821231328", "20260823202950", "20260823203546"}
 
 EXPECTED_SHA256 = {
     BASELINE: "d380b37f211cccab9af5f98381e34d125372c7783f8d90afec1d1d7bea04e85b",
@@ -54,30 +54,55 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def fail(errors: list[str]) -> None:
-    print(json.dumps({"status": "HOLD", "errors": errors}, indent=2, sort_keys=True))
+def fail(errors: list[str], observations: list[str]) -> None:
+    print(
+        json.dumps(
+            {"status": "HOLD", "errors": errors, "repository_observations": observations},
+            indent=2,
+            sort_keys=True,
+        )
+    )
     raise SystemExit(1)
 
 
 def main() -> None:
     errors: list[str] = []
-    active_by_version: dict[str, Path] = {}
+    observations: list[str] = []
+    files_by_version: dict[str, list[Path]] = {}
+    canonical_count = 0
 
     for path in sorted(MIGRATIONS.glob("*.sql")):
         match = CANONICAL_RE.match(path.name)
         if not match:
-            errors.append(f"noncanonical migration filename: {path.name}")
+            observations.append(f"preexisting noncanonical migration filename: {path.name}")
             continue
+        canonical_count += 1
         version = match.group(1)
-        if version in active_by_version:
-            errors.append(
-                f"duplicate migration version {version}: "
-                f"{active_by_version[version].name}, {path.name}"
-            )
-        active_by_version[version] = path
+        files_by_version.setdefault(version, []).append(path)
 
-    if LEGACY_ASSERTION.exists():
-        errors.append(f"non-provider assertion timestamp remains active: {LEGACY_ASSERTION.name}")
+    for version, paths in sorted(files_by_version.items()):
+        if len(paths) <= 1:
+            continue
+        message = f"duplicate migration version {version}: " + ", ".join(path.name for path in paths)
+        if version in TARGET_VERSIONS:
+            errors.append(message)
+        else:
+            observations.append(f"preexisting {message}")
+
+    expected_paths = {
+        "20260821231328": BASELINE,
+        "20260823203546": ASSERTION,
+    }
+    for version, expected_path in expected_paths.items():
+        paths = files_by_version.get(version, [])
+        if paths != [expected_path]:
+            errors.append(
+                f"CHLOM custody version {version} must resolve only to "
+                f"{expected_path.name}; found={[path.name for path in paths]}"
+            )
+
+    if files_by_version.get("20260823202950") or LEGACY_ASSERTION.exists():
+        errors.append("non-provider CHLOM assertion timestamp 20260823202950 remains active")
 
     for path, expected in EXPECTED_SHA256.items():
         if not path.exists():
@@ -122,16 +147,19 @@ def main() -> None:
             errors.append("receipt has invalid dependent_penta_advance state")
 
     if errors:
-        fail(errors)
+        fail(errors, observations)
 
     result = {
         "status": "PASS",
-        "active_migration_count": len(active_by_version),
+        "scope": "CHLOM_REPLAY_CUSTODY",
+        "canonical_migration_file_count": canonical_count,
+        "distinct_canonical_versions": len(files_by_version),
         "baseline_version": "20260821231328",
         "assertion_version": "20260823203546",
         "legacy_assertion_active": False,
         "production_history_mutated": False,
         "secret_bodies_published": False,
+        "repository_observations": observations,
     }
     print(json.dumps(result, indent=2, sort_keys=True))
 
@@ -140,4 +168,4 @@ if __name__ == "__main__":
     try:
         main()
     except (OSError, ValueError, json.JSONDecodeError) as exc:
-        fail([f"verifier exception: {exc}"])
+        fail([f"verifier exception: {exc}"], [])
