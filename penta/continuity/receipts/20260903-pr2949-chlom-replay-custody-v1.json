@@ -1,0 +1,38 @@
+{
+  "schema": "crownthrive.penta.serialized.git-receipt/v1",
+  "receipt_id": "ct.penta.serialized.pr2949.chlom-replay-custody.20260903.v1",
+  "created_at": "2026-09-03T20:00:00Z",
+  "actor": "CrownThrive Penta Activation continuity clock",
+  "reason": "Preserve explicit Git continuity for the CHLOM replay-custody timestamp correction on PR #2949 without rewriting production migration history.",
+  "changes": [
+    {
+      "path": "supabase/migrations/20260823203546_remote_applied_lineage.sql",
+      "operation": "delete",
+      "previous_blob_sha": "8c32554e6064ca0d23905bd86371b36fe5321fd8",
+      "reason": "Retire the no-op remote-applied lineage marker at timestamp 20260823203546 because that timestamp is now occupied by the replayable Execution Builder capability-contract identity assertion required by the current CHLOM custody repair.",
+      "rollback_ref": "0598340489f36cc7542ac86e7decd777c68108c6",
+      "tombstone": true
+    },
+    {
+      "path": "supabase/migrations/20260823203546_execution_builder_capability_contract_identity_v1.sql",
+      "old_path": "supabase/migrations/20260823202950_execution_builder_capability_contract_identity_v1.sql",
+      "operation": "rename",
+      "previous_blob_sha": "79e49475b0c8b0d865c1ecb21f1ac8972cb629b1",
+      "new_blob_sha": "79e49475b0c8b0d865c1ecb21f1ac8972cb629b1",
+      "reason": "Move the unchanged fail-closed Execution Builder capability-contract identity assertion from 20260823202950 to the production-applied 20260823203546 lineage timestamp so clean replay records the governed applied version and no longer records the non-production timestamp.",
+      "rollback_ref": "0598340489f36cc7542ac86e7decd777c68108c6",
+      "successor": "supabase/migrations/20260823203546_execution_builder_capability_contract_identity_v1.sql"
+    }
+  ],
+  "continuity": {
+    "silent_replacement": false,
+    "silent_delete": false,
+    "tombstones": ["supabase/migrations/20260823203546_remote_applied_lineage.sql"],
+    "successors": ["supabase/migrations/20260823203546_execution_builder_capability_contract_identity_v1.sql"],
+    "production_migration_history_changed": false,
+    "rollback_preserved": true
+  },
+  "exclusions": [
+    "No protected-main direct write, production migration execution, credential mutation, money movement, rights grant, certification grant, vote/quorum effect, or D3 authority is created by this receipt."
+  ]
+}
