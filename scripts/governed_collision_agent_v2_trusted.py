@@ -11,7 +11,10 @@ GitHub Actions installation tokens can be temporarily unavailable even while the
 same public repository resources remain readable through GitHub's public GET
 surface. Authenticated reads are attempted first. A 403/429 may degrade to a
 bounded public read only when that exact provider resource succeeds publicly.
-No writes use this transport and both transports remain fail-closed.
+Semantic file bodies switch to immutable raw.githubusercontent.com reads after
+that degradation so the collision observer does not exhaust the unauthenticated
+GitHub REST request budget merely by reading exact-head source bytes. No writes
+use this transport and all transports remain bounded and fail-closed.
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ import governed_collision_agent_v2 as agent
 MAX_HTTP_ATTEMPTS = 5
 MAX_RATE_LIMIT_SLEEP_SECONDS = 30
 MAX_PUBLIC_FALLBACK_REQUESTS = 50
+MAX_PUBLIC_RAW_REQUESTS = agent.MAX_SEMANTIC_INSPECTIONS
 
 
 def _header(headers: Mapping[str, str] | Any, name: str) -> str:
@@ -139,6 +143,7 @@ class TrustedCandidateClient(agent.GitHubClient):
         self.candidate = candidate
         self.authenticated_requests = 0
         self.public_fallback_requests = 0
+        self.public_raw_requests = 0
         self.public_read_mode = False
         self.last_transport = "none"
 
@@ -146,8 +151,10 @@ class TrustedCandidateClient(agent.GitHubClient):
         return {
             "authenticated_requests": self.authenticated_requests,
             "public_fallback_requests": self.public_fallback_requests,
+            "public_raw_requests": self.public_raw_requests,
             "public_read_mode": self.public_read_mode,
             "public_request_budget": MAX_PUBLIC_FALLBACK_REQUESTS,
+            "public_raw_request_budget": MAX_PUBLIC_RAW_REQUESTS,
             "last_transport": self.last_transport,
         }
 
@@ -278,12 +285,91 @@ class TrustedCandidateClient(agent.GitHubClient):
                 ) from public_error
 
             # The exact provider resource was independently readable without the
-            # installation token. Remaining reads stay on that bounded public
+            # installation token. Remaining REST reads stay on that bounded public
             # surface to avoid repeated pressure on a degraded auth transport.
             self.public_read_mode = True
             return result
         except (urllib.error.URLError, TimeoutError) as exc:
             raise agent.GitHubReadError(f"github_read_failed:{url}:{exc}") from exc
+
+    def _public_raw_content(self, path: str, ref: str) -> str:
+        if len(ref) != 40 or any(ch not in "0123456789abcdefABCDEF" for ch in ref):
+            raise agent.GitHubReadError("trusted_public_raw_exact_sha_required")
+        if self.public_raw_requests >= MAX_PUBLIC_RAW_REQUESTS:
+            raise agent.GitHubReadError(
+                f"public_raw_request_budget_exceeded:{MAX_PUBLIC_RAW_REQUESTS}"
+            )
+        self.public_raw_requests += 1
+        encoded_ref = urllib.parse.quote(ref, safe="")
+        encoded_path = urllib.parse.quote(path, safe="/")
+        url = f"https://raw.githubusercontent.com/{self.repository}/{encoded_ref}/{encoded_path}"
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "crownthrive-collision-agent-v2-trusted"},
+        )
+        last_error: Exception | None = None
+        for attempt in range(MAX_HTTP_ATTEMPTS):
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    raw = response.read(agent.MAX_INSPECT_BYTES + 1)
+                    if len(raw) > agent.MAX_INSPECT_BYTES:
+                        raise agent.GitHubReadError(
+                            f"semantic_file_too_large:{path}:{len(raw)}"
+                        )
+                    try:
+                        content = raw.decode("utf-8")
+                    except UnicodeDecodeError as exc:
+                        raise agent.GitHubReadError(
+                            f"semantic_file_not_utf8:{path}"
+                        ) from exc
+                    self.last_transport = "public-raw"
+                    return content
+            except urllib.error.HTTPError as exc:
+                last_error = exc
+                try:
+                    body = exc.read().decode("utf-8", errors="replace")
+                except OSError:
+                    body = ""
+                retryable = exc.code in {429, 502, 503, 504} or _rate_limited(
+                    exc.code, exc.headers or {}, body
+                )
+                if not retryable or attempt >= MAX_HTTP_ATTEMPTS - 1:
+                    raise agent.GitHubReadError(
+                        f"github_public_raw_read_failed:{url}:HTTP {exc.code}:{_body_excerpt(body)}"
+                    ) from exc
+                time.sleep(_retry_delay_headers(exc.headers or {}, attempt))
+            except (urllib.error.URLError, TimeoutError) as exc:
+                last_error = exc
+                if attempt >= MAX_HTTP_ATTEMPTS - 1:
+                    raise agent.GitHubReadError(
+                        f"github_public_raw_read_failed:{url}:{exc}"
+                    ) from exc
+                time.sleep(min(MAX_RATE_LIMIT_SLEEP_SECONDS, 2**attempt))
+        raise agent.GitHubReadError(
+            f"github_public_raw_retry_exhausted:{url}:{last_error}"
+        )
+
+    def content(self, path: str, ref: str) -> str:
+        key = (ref, path)
+        if key in self._content_cache:
+            return self._content_cache[key]
+        self._semantic_inspections += 1
+        if self._semantic_inspections > agent.MAX_SEMANTIC_INSPECTIONS:
+            raise agent.GitHubReadError(
+                f"semantic_inspection_bound_exceeded:{agent.MAX_SEMANTIC_INSPECTIONS}"
+            )
+
+        if self.public_read_mode or not self.token:
+            content = self._public_raw_content(path, ref)
+            self._content_cache[key] = content
+            return content
+
+        # Authenticated mode keeps the canonical Contents API behavior. If that
+        # request itself triggers provider degradation, _request() performs one
+        # exact-resource public fallback and flips public_read_mode; subsequent
+        # semantic reads then use immutable raw content rather than consuming the
+        # remaining unauthenticated REST budget.
+        return super().content(path, ref)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
