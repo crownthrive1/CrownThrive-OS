@@ -196,7 +196,54 @@ jobs:
           jq -e '.cie_score.score | type == "number"' dist/pentarelease-surface/PENTARELEASE_RELEASE_RECORD.json >/dev/null
           jq -e '.release_intelligence.costs.methodology | type == "object"' dist/pentarelease-surface/PENTARELEASE_RELEASE_RECORD.json >/dev/null
 
+      - name: Resolve current release-intelligence subject
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA=$(git rev-parse HEAD)
+          SAFE_TAG=$(printf '%s' "$TAG" | tr '/' '-')
+          TITLE="PentaRelease release intelligence $TAG"
+          TRACKED=(
+            .pentarelease/state/release-surface.json
+            data/documentation/pentadocs-page-profiles.v1.json
+            docs.json
+            README.md ABOUT_ME.md LICENSE CODE_OF_CONDUCT.md PARTNERS.md FAQ.md CHANGELOG.md
+            pentarelease/latest.mdx pentarelease/faq.mdx pentarelease/changelog.mdx
+            pentarelease/costs.mdx pentarelease/cie.mdx pentarelease/data.mdx pentarelease/evidence.mdx
+          )
+          CONTENT_SHA=$(git diff --no-ext-diff --binary -- "${TRACKED[@]}" | sha256sum | awk '{print $1}')
+          BRANCH="pentarelease/intelligence-${SAFE_TAG}-${BASE_SHA:0:12}-${CONTENT_SHA:0:12}"
+          CANDIDATE=$(gh pr list --repo "$GITHUB_REPOSITORY" --state all --base main --limit 300 \
+            --json number,title,state,mergedAt,headRefName,headRefOid,baseRefOid,url \
+            | jq -c --arg title "$TITLE" --arg base "$BASE_SHA" --arg branch "$BRANCH" \
+              '[.[] | select(.title == $title and .baseRefOid == $base and .headRefName == $branch)] | sort_by(.number) | last // empty')
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "content_sha=$CONTENT_SHA" >> "$GITHUB_OUTPUT"
+          if [ -n "$CANDIDATE" ]; then
+            PR_NUM=$(jq -r '.number' <<<"$CANDIDATE")
+            PR_STATE=$(jq -r '.state' <<<"$CANDIDATE")
+            MERGED_AT=$(jq -r '.mergedAt // empty' <<<"$CANDIDATE")
+            if [ "$PR_STATE" = "CLOSED" ] && [ -z "$MERGED_AT" ]; then
+              gh pr reopen "$PR_NUM" --repo "$GITHUB_REPOSITORY"
+              PR_STATE="OPEN"
+            fi
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$(jq -r '.headRefOid' <<<"$CANDIDATE")" >> "$GITHUB_OUTPUT"
+            echo "url=$(jq -r '.url' <<<"$CANDIDATE")" >> "$GITHUB_OUTPUT"
+            echo "state=$PR_STATE" >> "$GITHUB_OUTPUT"
+            echo "merged=$([ -n "$MERGED_AT" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+            echo "Reusing deterministic exact-base/exact-content release-intelligence subject $(jq -r '.url' <<<"$CANDIDATE")."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish rich release record and assets
+        if: steps.candidate.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
@@ -217,16 +264,16 @@ jobs:
 
       - name: Commit synchronized README and PentaDocs surfaces
         id: commit
+        if: steps.candidate.outputs.exists != 'true'
         env:
           TAG: ${{ steps.release.outputs.tag }}
+          BRANCH: ${{ steps.candidate.outputs.branch }}
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'PentaRelease'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           BASE_SHA=$(git rev-parse HEAD)
-          SAFE_TAG=$(printf '%s' "$TAG" | tr '/' '-')
-          BRANCH="pentarelease/intelligence-${SAFE_TAG}-${BASE_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git checkout -b "$BRANCH"
           git add \
             .pentarelease/state/release-surface.json \
@@ -266,7 +313,7 @@ jobs:
 
           PR_URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
             --title "PentaRelease release intelligence $TAG" \
-            --body "Canonical convergence of GitHub Release, README, repository release surfaces, PentaDocs, calculated economic methodology, CIE scorecard and provider readback for $TAG. Generated from exact governed evidence; no authority is manufactured.\n\nRefs #${ISSUE_NUM}" )
+            --body "Canonical convergence of GitHub Release, README, repository release surfaces, PentaDocs, calculated economic methodology, CIE scorecard and provider readback for $TAG. Generated from exact governed evidence; no authority is manufactured. Refs #${ISSUE_NUM}")
           PR_NUM="${PR_URL##*/}"
 
           PASS=false
@@ -307,6 +354,7 @@ jobs:
             --comment "Merged synchronization PR #${PR_NUM}; terminal merge confirmed before production readback."
 
       - name: Production readback
+        if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
