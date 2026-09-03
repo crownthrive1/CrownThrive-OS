@@ -9,8 +9,9 @@ it can represent historical PR ancestry rather than the current branch head.
 
 GitHub Actions installation tokens can be temporarily unavailable even while the
 same public repository resources remain readable through GitHub's public GET
-surface. Authenticated reads are attempted first. A 403/429 may degrade to a
-bounded public read only when that exact provider resource succeeds publicly.
+surface. Every exact provider read prefers the authenticated transport. A
+403/429 may degrade that exact read to a bounded public GET, but later reads
+retry authenticated transport rather than entering a sticky public-only mode.
 No writes use this transport and both transports remain fail-closed.
 """
 
@@ -139,6 +140,8 @@ class TrustedCandidateClient(agent.GitHubClient):
         self.candidate = candidate
         self.authenticated_requests = 0
         self.public_fallback_requests = 0
+        # Evidence flag: at least one exact read used the public fallback. It is
+        # deliberately not a transport-mode latch.
         self.public_read_mode = False
         self.last_transport = "none"
 
@@ -227,6 +230,11 @@ class TrustedCandidateClient(agent.GitHubClient):
                 return self._request_once(url, token=token, transport=transport)
             except ProviderHTTPError as exc:
                 last_error = exc
+                # Authenticated 403/429 is the exact handoff signal for the
+                # bounded public GET fallback. Do not spend five authenticated
+                # retries before exercising that fail-closed alternate read.
+                if transport == "authenticated" and exc.status in {403, 429}:
+                    raise
                 retryable = exc.status in {429, 502, 503, 504} or _rate_limited(
                     exc.status,
                     exc.headers,
@@ -246,7 +254,7 @@ class TrustedCandidateClient(agent.GitHubClient):
         if not url.startswith(self.base + "/"):
             raise agent.GitHubReadError("trusted_public_fallback_repo_scope_required")
 
-        if self.public_read_mode or not self.token:
+        if not self.token:
             try:
                 return self._request_transport(
                     url,
@@ -277,9 +285,9 @@ class TrustedCandidateClient(agent.GitHubClient):
                     f"github_read_failed:{url}:authenticated={auth_error};public={public_error}"
                 ) from public_error
 
-            # The exact provider resource was independently readable without the
-            # installation token. Remaining reads stay on that bounded public
-            # surface to avoid repeated pressure on a degraded auth transport.
+            # Record that public degradation occurred, but do not latch future
+            # requests into public-only mode. The next exact read retries the
+            # authenticated provider surface and can recover immediately.
             self.public_read_mode = True
             return result
         except (urllib.error.URLError, TimeoutError) as exc:
