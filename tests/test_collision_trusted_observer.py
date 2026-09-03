@@ -123,7 +123,7 @@ class CollisionTrustedObserverTests(unittest.TestCase):
             trusted.MAX_RATE_LIMIT_SLEEP_SECONDS,
         )
 
-    def test_authenticated_403_can_degrade_to_exact_public_provider_read(self) -> None:
+    def test_authenticated_403_degrades_one_read_then_auth_recovers(self) -> None:
         client = trusted.TrustedCandidateClient(
             "crownthrive1/CrownThrive-OS",
             "test-token",
@@ -145,9 +145,30 @@ class CollisionTrustedObserverTests(unittest.TestCase):
 
         evidence = client.transport_evidence()
         self.assertTrue(evidence["public_read_mode"])
-        self.assertEqual(evidence["authenticated_requests"], 1)
-        self.assertEqual(evidence["public_fallback_requests"], 2)
-        self.assertEqual(evidence["last_transport"], "public-fallback")
+        self.assertEqual(evidence["authenticated_requests"], 2)
+        self.assertEqual(evidence["public_fallback_requests"], 1)
+        self.assertEqual(evidence["last_transport"], "authenticated")
+
+    def test_authenticated_rate_limit_hands_off_without_five_auth_retries(self) -> None:
+        client = trusted.TrustedCandidateClient(
+            "crownthrive1/CrownThrive-OS",
+            "test-token",
+            event_base_sha="a" * 40,
+            candidate=1474,
+        )
+        payload = {"object": {"type": "commit", "sha": "b" * 40}}
+        with patch.object(
+            trusted.urllib.request,
+            "urlopen",
+            side_effect=[
+                http_error(403, "API rate limit exceeded", remaining="0"),
+                FakeResponse(payload),
+            ],
+        ), patch.object(trusted.time, "sleep", return_value=None):
+            self.assertEqual(client.main_sha("main"), "b" * 40)
+
+        self.assertEqual(client.authenticated_requests, 1)
+        self.assertEqual(client.public_fallback_requests, 1)
 
     def test_public_fallback_failure_remains_fail_closed(self) -> None:
         client = trusted.TrustedCandidateClient(
@@ -178,11 +199,10 @@ class CollisionTrustedObserverTests(unittest.TestCase):
     def test_public_fallback_request_budget_is_hard_bounded(self) -> None:
         client = trusted.TrustedCandidateClient(
             "crownthrive1/CrownThrive-OS",
-            "test-token",
+            None,
             event_base_sha="a" * 40,
             candidate=1474,
         )
-        client.public_read_mode = True
         client.public_fallback_requests = trusted.MAX_PUBLIC_FALLBACK_REQUESTS
         with self.assertRaises(trusted.agent.GitHubReadError) as ctx:
             client.main_sha("main")
