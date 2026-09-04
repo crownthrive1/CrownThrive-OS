@@ -6,7 +6,10 @@ on:
       - 'repair/chlom-agent-runtime-custody-v6-*'
     paths:
       - 'supabase/migration_lineage/provider_custody/envelopes_v6/**'
-      - 'scripts/assemble_chlom_provider_custody_v6.sh'
+      - 'supabase/migration_lineage/provider_custody/foundation_v7/**'
+      - 'supabase/migration_lineage/chlom_replay_dependency_custody_v7.json'
+      - 'scripts/assemble_chlom_foundation_custody_v7.sh'
+      - 'scripts/verify_chlom_replay_dependency_custody_v7.py'
       - '.github/workflows/materialize-chlom-provider-custody-v6.yml'
   workflow_dispatch:
 
@@ -19,7 +22,7 @@ concurrency:
 
 jobs:
   materialize:
-    name: Verify and assemble exact provider bodies
+    name: Verify and assemble exact provider foundation and agent runtime
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -32,11 +35,13 @@ jobs:
       - name: Confirm OpenPGP transport support
         run: gpg --version
 
-      - name: Verify envelopes and assemble provider migration custody
-        run: bash scripts/assemble_chlom_provider_custody_v6.sh
+      - name: Verify carrier and assemble provider replay foundation
+        run: bash scripts/assemble_chlom_foundation_custody_v7.sh
 
-      - name: Verify exact source identities and safety boundary
-        run: python3 scripts/verify_chlom_agent_runtime_custody.py
+      - name: Verify foundation and agent-runtime source custody
+        run: |
+          python3 scripts/verify_chlom_replay_dependency_custody_v7.py
+          python3 scripts/verify_chlom_agent_runtime_custody.py
 
       - name: Reject whitespace and patch corruption
         run: git diff --check
@@ -44,13 +49,13 @@ jobs:
       - name: Commit exact provider custody without force
         run: |
           if git diff --quiet --exit-code; then
-            echo 'Exact provider custody is already materialized.'
+            echo 'Exact provider foundation custody is already materialized.'
             exit 0
           fi
           git config user.name 'crownthrive-custody[bot]'
           git config user.email 'crownthrive-custody[bot]@users.noreply.github.com'
           git add \
             supabase/migrations \
-            supabase/migration_lineage/chlom_agent_runtime_custody_v6.json
-          git commit -m 'fix(supabase): materialize exact CHLOM agent runtime custody'
+            supabase/migration_lineage/chlom_replay_dependency_custody_v7.json
+          git commit -m 'fix(supabase): materialize exact CHLOM replay foundation custody'
           git push origin "HEAD:${GITHUB_REF_NAME}"
