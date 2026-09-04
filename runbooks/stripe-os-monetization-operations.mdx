@@ -1,0 +1,251 @@
+---
+title: "Stripe OS Monetization Operations"
+sidebarTitle: "Stripe Operations"
+description: "Operate, canary, recover, reconcile, and safely extend the governed Stripe monetization fabric while its product factory remains paused."
+icon: "screwdriver-wrench"
+keywords:
+  - "Stripe"
+  - "operations"
+  - "webhooks"
+  - "reconciliation"
+  - "PentaGreen"
+standard_version: "1.0.0"
+primary_audience: "operator"
+page_type: "runbook"
+content_state: "current_with_holds"
+---
+
+{/* pentadocs:audience-orientation:v2 */}
+<Note>
+  **Audience:** operators and administrators (`operator`).
+
+  **This page:** Stripe OS Monetization Operations — Operate, canary, recover, reconcile, and safely extend the governed Stripe monetization fabric while its product factory remains paused.
+
+  **Documentation state:** `current_with_holds` for page type `runbook`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Related guidance:** [Operating principles](/start-here/operating-principles) and [Permissions and approvals](/automation/permissions-and-approval-gates).
+</Note>
+{/* /pentadocs:audience-orientation:v2 */}
+
+Operational runbook for `ct.binding.pentagreen-stripe-mesh.v3` and canonical adapter `ct.adapter.stripe.v1` version `2.0.0`.
+
+## Current safe baseline
+
+Do not expect `ACTIVE_MONETIZATION_READY`. The correct current baseline is a repaired runtime with the factory paused:
+
+- `integration_control.stripe_os_runtime_readiness_v2()` reports `RUNTIME_REPAIRED_FACTORY_PAUSED_GOVERNED_GATES`;
+- `factory_clock_active=false`;
+- the live Stripe commerce cron count is zero;
+- factory-ready profiles are zero of 1,042;
+- provider adapter API roles show no public, anonymous, authenticated, or broad service-role access to the low-level request or typed operation functions;
+- the typed server route supports only Product, Price, and Payment Link operations;
+- Webhook mutation uses the separate typed reconciliation route;
+- the payout rail is `HOLD_DEFAULT_BANK_ERRORED`;
+- money movement remains separately gated;
+- no raw credential material is projected.
+
+The capability-adoption registry contains 30 rows. Sixteen have the literal autonomy state `d3_gated`. The capability policy marks 22 of 30 as requiring a D3/human gate; some of those use `held_specialized_executor` or `held_legal_tax_gate` rather than the literal D3 adoption label.
+
+## Current institutional inventory
+
+Use provider readback and mirrors as separate evidence:
+
+| Surface | Provider | Mirror | Relevant hold |
+| --- | ---: | ---: | --- |
+| Products | 459 total / 434 active | 456 | 131 active without default Price; 8 active without list Price; 48 duplicate active-name groups |
+| Prices | 484 total / 465 active | 478 | 384 active without lookup key; 107 mirror rows lack account scope; 7 active on inactive Products |
+| Payment Links | 48 total / 33 active | 48 | 15 inactive; duplicate configurations; 14 promotion-enabled with zero promotion codes |
+| Webhook endpoints | 16 enabled | 15 endpoint records | Failed wildcard canary, redundant coverage, and API-version fragmentation |
+
+Other observed evidence:
+
+- 216 active Products have no metadata;
+- 420 active Products have no product tax code;
+- 257 recurring Prices are licensed; zero are metered or meter-linked;
+- four Connect Accounts v2 were observed, three accessible and one inaccessible;
+- one active tax registration is scoped to Virginia;
+- the primary account has 22 active payment capabilities;
+- account payout enablement is true, but the default payout bank is errored.
+
+Treat counts as time-bounded evidence. Refresh provider and mirror readback before a canary, repair, or release claim.
+
+## Supported request classes
+
+Only submit these exact request/output pairs through `integration_control.pentagreen_stripe_prepare_monetization_v1`:
+
+| Request | Output | Execution |
+| --- | --- | --- |
+| `PRODUCT_PRICE` | `product_price` | Product/Price typed provider route |
+| `PAYMENT_LINK` | `payment_link` | Payment Link typed provider route |
+| `WEBHOOK_BINDING` | `webhook_binding` | Typed webhook reconciliation route |
+| `CATALOG_SYNC` | `catalog_sync` | Mirror/read reconciliation |
+
+Checkout, customer, subscription, invoice, quote, and Connect requests must stay `HOLD_SPECIALIZED_EXECUTOR_REQUIRED` until their specialized contracts are certified. Do not use the private low-level request function to work around that hold.
+
+## Product readiness preflight
+
+For one candidate, read back every gate before queueing work:
+
+1. canonical PentaSKU/offer/product identity exists;
+2. product type is `enabled_for_sale=true`;
+3. PentaPrice amount, currency, cadence, and evidence are current;
+4. tax profile has a provider-verified Stripe code;
+5. legal taxability is ready, verified, approved, certified, `taxable_verified`, or `not_taxable_verified`;
+6. `tax_behavior` is exactly `inclusive` or `exclusive`;
+7. rights state is ready;
+8. fulfillment state is ready;
+9. quality state is ready;
+10. route state is ready;
+11. custody state is ready;
+12. documentation state is ready;
+13. `stripe_entitlement_handler_ref` exists;
+14. `stripe_webhook_binding_key` exists;
+15. the exact handler/event matrix is bound;
+16. the lane's signed provider webhook canary passes.
+
+If any readback is absent or stale, stop. Founder/D3 monetization authority is not a substitute for product, legal, tax, rights, fulfillment, entitlement, or webhook truth.
+
+## One-product production canary
+
+Keep the recurring clock paused throughout the canary.
+
+1. Select exactly one profile that passes the full preflight.
+2. Reconcile current Product, Price, Payment Link, webhook, and provider-account aliases before creation.
+3. Confirm the exact supported operation and canonical account role.
+4. Submit one idempotent request bound to that product and requested effect.
+5. Invoke the Commerce Binder with a one-item limit.
+6. Verify the typed route used the pinned API version, exact request identity, bounded payload, and intended account.
+7. Read the provider object back.
+8. Verify no duplicate Product, Price, Payment Link, request, work item, or queue row exists.
+9. Reconcile the provider alias and account scope into the mirror.
+10. Send a signed test event or observe a natural signed event through the exact handler/event matrix.
+11. Verify idempotent entitlement and PentaLedger/PentaReceipt/PentaReconcile state.
+12. Append and read back the terminal DAIL/evidence receipt.
+13. Confirm the payout/money-movement lane was not entered.
+
+Any failed check ends the canary in HOLD. Use forward compensation; do not erase economic history.
+
+## Re-enable sequence
+
+The recurring factory can be considered for activation only after the one-product canary closes cleanly.
+
+1. Refresh `integration_control.stripe_os_runtime_readiness_v2()`.
+2. Prove at least one profile remains ready under the full gate conjunction.
+3. Prove the provider and mirrors have no canary-created duplicates or unresolved account-scope drift.
+4. Prove the exact webhook canary and entitlement route remain healthy.
+5. Prove the low-level and typed provider functions retain the intended private ACLs.
+6. Prove payout state remains isolated at `HOLD_DEFAULT_BANK_ERRORED`.
+7. Record the required human/D3 scheduler-activation authorization.
+8. Enable exactly one desired commerce job.
+9. Verify exactly one live cron row and no legacy Stripe-specific scheduler.
+10. Observe the first bounded cycle and read back its receipt.
+
+Pause immediately if work duplicates, the ready-candidate count returns to zero, a legal/tax/rights/product gate drifts, a signed webhook canary fails, entitlement does not reconcile, provider/mirror state diverges, or the cycle crosses into a reserved effect.
+
+A rollback-only database canary is necessary contract evidence but does not authorize this sequence on its own.
+
+## Product and Price execution
+
+1. Preserve CrownThrive SKU/price identity; provider IDs remain aliases.
+2. Reconcile before create.
+3. Bind idempotency to the executing request.
+4. Use a successor Stripe Price when amount or recurring semantics change.
+5. Read the provider object back.
+6. Reconcile exact provider-account scope.
+7. Rebind or deactivate dependent Payment Links under the product contract.
+8. Preserve prior Prices and effective periods as history.
+
+Never rewrite transaction history to make a successor Price look like the original provider object.
+
+## Payment Link execution
+
+1. Confirm the Price and product alias are current.
+2. Confirm signed-event entitlement behavior before link activation.
+3. Create or update through the typed Payment Link operation only.
+4. Read the link back and reconcile active/inactive state.
+5. Test the exact webhook/entitlement route.
+6. Do not assume promotion-code readiness because a link permits promotion codes.
+
+Deactivate a wrong link as a compensating action; preserve its provider alias and receipt.
+
+## Held specialized lanes
+
+### Checkout
+
+Provider Checkout Sessions are observed, but a generic typed Checkout executor and entitlement path are not certified. Planning can prefer hosted Checkout and dynamic payment methods, but execution stays held until the exact order, webhook, entitlement, idempotency, and compensation contract exists.
+
+### Subscriptions and invoices
+
+Recurring Prices and provider objects exist, but the factory cannot launch or mutate subscriptions/invoices generically. A specialized executor must preserve cadence, lifecycle events, dunning/recovery, customer/contract identity, and provider readback.
+
+### Connect
+
+Accounts v2 readback is partial: three of four observed accounts are accessible. Do not infer or mutate direct, destination, separate-charge/transfer, application-fee, liability, refund, dispute, or payout architecture through the generic factory. PentaMarket/PentaGreen must bind the exact economic model, and consequential effects remain D3/human gated.
+
+### Tax
+
+Automatic-tax mutation is held. All current product types are disabled for sale and all tax profiles require jurisdiction review. Only the verified registration scope may be represented, and no automated tax state may be inferred for other jurisdictions or product types.
+
+### Payouts and money movement
+
+The default payout bank reports `errored`. Do not certify the payout rail healthy, initiate an autonomous payout/transfer, or change an external account. Repair requires the specialized custody, financial, D3, provider-readback, controlled-canary, and reconciliation lane.
+
+## Webhook recovery
+
+When a Stripe route is degraded:
+
+1. Read `integration_control.stripe_webhook_status_v3()`.
+2. Read the latest provider receipts.
+3. Verify the stable lane, handler/event matrix, signing-secret alias, and raw-body signature behavior.
+4. Read the provider endpoint URL, enabled state, API version, metadata, and description.
+5. Prefer governed repair/reuse over endpoint churn.
+6. Never create or delete endpoints merely to escape a transient hold or capacity constraint.
+7. Read provider state after mutation.
+8. Require a signed canary and idempotent duplicate-delivery proof.
+9. Reconcile PentaSELF/PentaReceipt/PentaReconcile only from current evidence.
+
+The existing wildcard canary failure prevents a provider-wide healthy-webhook claim.
+
+## Credential failure
+
+Read `integration_control.stripe_live_secret_lanes_v1`.
+
+- HOT healthy -> remain HOT.
+- HOT unavailable -> verify WARM independently before use.
+- WARM unavailable -> verify COLD independently.
+- EMERGENCY remains blocked until same-account provider verification.
+- Same-material aliases do not create redundancy.
+- Never wildcard-select a Stripe-looking secret.
+- Never write a secret into source, docs, logs, receipts, Drive prose, analytics, or a client bundle.
+
+No automatic key deletion or rotation follows a provider failure.
+
+## Evidence package
+
+A closeout package binds:
+
+- canonical CrownThrive SKU/offer/work identity;
+- product readiness readback;
+- exact account and credential **roles**, without raw material;
+- capability/adoption state;
+- request identity and idempotency key reference;
+- typed route and pinned provider API version;
+- provider object aliases and provider readback;
+- mirror reconciliation and account scope;
+- signed webhook receipt and entitlement evidence when relevant;
+- PentaGreen/PentaLedger result;
+- Git source/PR/readback when code changed;
+- PentaDocs and Drive custody references when topology changed;
+- CHLOM/DAIL terminal event;
+- compensation/rollback state.
+
+## Rollback and compensation
+
+Use append-only or forward compensation where destructive rollback would erase economic evidence:
+
+- deactivate a wrong Price rather than rewrite transaction history;
+- deactivate a Payment Link rather than delete ledger evidence;
+- restore a prior webhook binding using exact provider readback;
+- mark an adapter generation superseded rather than delete custody records;
+- preserve every historical Stripe ID as an alias/evidence record;
+- pause the scheduler before repairing queue, eligibility, webhook, entitlement, or provider-mirror drift.

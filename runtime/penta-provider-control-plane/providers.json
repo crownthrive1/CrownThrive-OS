@@ -115,14 +115,44 @@
       },
       "adapter": {
         "adapter_id": "ct.adapter.stripe.v1",
-        "version": "1.1.0",
+        "version": "2.0.0",
+        "transport_variants": [
+          {
+            "adapter_id": "ct.adapter.stripe.mcp.v1",
+            "role": "operator_transport",
+            "authority": "inherits_ct.adapter.stripe.v1"
+          },
+          {
+            "adapter_id": "ct.adapter.stripe.runtime.v1",
+            "role": "typed_runtime_transport",
+            "authority": "inherits_ct.adapter.stripe.v1"
+          },
+          {
+            "adapter_id": "ct.adapter.stripe.webhook.v3",
+            "role": "signed_event_transport",
+            "authority": "inherits_ct.adapter.stripe.v1"
+          },
+          {
+            "adapter_id": "ct.adapter.stripe.catalog-mirror.v2",
+            "role": "provider_readback_transport",
+            "authority": "inherits_ct.adapter.stripe.v1"
+          }
+        ],
         "operations": [
           {"operation": "balance_read", "side_effect": false, "authority_class": "D0", "requires_readback": true},
           {"operation": "product_write", "side_effect": true, "authority_class": "D2", "requires_readback": true},
-          {"operation": "price_write", "side_effect": true, "authority_class": "D2", "requires_readback": true}
+          {"operation": "price_write", "side_effect": true, "authority_class": "D2", "requires_readback": true},
+          {"operation": "payment_link_write", "side_effect": true, "authority_class": "D2", "requires_readback": true},
+          {"operation": "webhook_reconcile", "side_effect": true, "authority_class": "D2", "requires_readback": true}
         ]
       },
-      "evidence_hints": ["developers/certification/stripe-crown-credits-chlom-thriveevergreen-production-2026-08-23.mdx", "https://docs.stripe.com/api/balance/balance_retrieve"]
+      "evidence_hints": [
+        "contracts/providers/stripe-os-monetization-mesh.v1.json",
+        "supabase/migrations/20260901024551_stripe_runtime_typed_adapter_hardening_v2.sql",
+        "supabase/migrations/20260901025133_stripe_pentagreen_runtime_contract_repair_v1.sql",
+        "https://docs.stripe.com/api/balance/balance_retrieve",
+        "https://docs.stripe.com/mcp"
+      ]
     },
     {
       "provider_id": "resend",

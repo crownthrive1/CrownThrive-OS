@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "ct.provider.stripe.os-monetization-mesh.v1",
+  "version": "2.0.0",
+  "provider": "stripe",
+  "provider_role": "replaceable_external_financial_infrastructure",
+  "economic_authority": "ct.pentagreen.core.v1",
+  "mesh_binding": "ct.binding.pentagreen-stripe-mesh.v3",
+  "maturity": "production_runtime_repaired_factory_paused",
+  "runtime_state": {
+    "mesh_state": "RUNTIME_REPAIRED_FACTORY_PAUSED_GOVERNED_GATES",
+    "factory_clock_active": false,
+    "factory_ready_candidates": 0,
+    "product_profiles_observed": 1042,
+    "product_types_enabled_for_sale": 0,
+    "legal_tax_profiles_ready": 0,
+    "automatic_restart_allowed": false
+  },
+  "authority_ceiling": "D3",
+  "d3_human_reserved_for": [
+    "refunds",
+    "transfers_and_payouts",
+    "bank_or_external_account_changes",
+    "dispute_disposition",
+    "material_money_routing_changes",
+    "final_legal_or_rights_commitments"
+  ],
+  "no_self_approval": true,
+  "stripe_is_replaceable_execution_provider": true,
+  "canonical_identity_rules": {
+    "sku_authority": "PentaSKU",
+    "price_authority": "PentaPrice",
+    "catalog_authority": "PentaCatalog",
+    "checkout_authority": "PentaCheckout",
+    "ledger_authority": "PentaLedger",
+    "provider_ids_are_aliases": true
+  },
+  "account_routes": [
+    {
+      "role": "COMMERCE_PRIMARY",
+      "priority": 10,
+      "state": "provider_live_verified_with_payout_hold",
+      "purpose": "first-party catalog, payment-link and provider-readback execution"
+    },
+    {
+      "role": "SECONDARY_COMMERCE_EXPANSION",
+      "priority": 20,
+      "state": "provider_live_verified_direct_specialized_writes_held",
+      "purpose": "expansion readback; Connect and money-routing mutations require separately certified executors"
+    }
+  ],
+  "credential_policy": {
+    "source": "integration_control.stripe_live_secret_lanes_v1",
+    "roles": ["HOT", "WARM", "COLD", "EMERGENCY"],
+    "same_material_alias_is_not_independent": true,
+    "emergency_auto_promotion": false,
+    "raw_secret_projection": false,
+    "auto_rotate": false,
+    "auto_delete": false,
+    "silent_replace": false
+  },
+  "adapter": {
+    "canonical_adapter_id": "ct.adapter.stripe.v1",
+    "version": "2.0.0",
+    "typed_runtime": "integration_control.stripe_os_provider_operation_v2",
+    "provider_receipts": "integration_control.stripe_os_provider_operation_receipts_v2",
+    "stripe_api_version": "2026-07-29.dahlia",
+    "operator_mcp": {
+      "url": "https://mcp.stripe.com",
+      "credential_projection": false
+    },
+    "transport_variants": [
+      {
+        "adapter_id": "ct.adapter.stripe.mcp.v1",
+        "role": "operator_transport",
+        "authority": "inherits_ct.adapter.stripe.v1",
+        "independent_authority": false
+      },
+      {
+        "adapter_id": "ct.adapter.stripe.runtime.v1",
+        "role": "typed_runtime_transport",
+        "authority": "inherits_ct.adapter.stripe.v1",
+        "independent_authority": false
+      },
+      {
+        "adapter_id": "ct.adapter.stripe.webhook.v3",
+        "role": "signed_event_transport",
+        "authority": "inherits_ct.adapter.stripe.v1",
+        "independent_authority": false
+      },
+      {
+        "adapter_id": "ct.adapter.stripe.catalog-mirror.v2",
+        "role": "provider_readback_transport",
+        "authority": "inherits_ct.adapter.stripe.v1",
+        "independent_authority": false
+      }
+    ]
+  },
+  "capability_registry": "integration_control.stripe_os_capabilities_v1",
+  "capability_adoption_registry": "integration_control.stripe_os_capability_adoption_v2",
+  "factory_request": "integration_control.pentagreen_stripe_prepare_monetization_v1",
+  "factory_autowire": "integration_control.pentagreen_stripe_autowire_v1",
+  "factory_binder": "integration_control.pentagreen_stripe_commerce_binder_tick_v1",
+  "factory_readiness": "integration_control.stripe_os_runtime_readiness_v2",
+  "single_clock_status": "integration_control.pentagreen_stripe_clock_status_v1",
+  "provider_mirrors": {
+    "products": "integration_control.stripe_catalog_products_v2",
+    "prices": "integration_control.stripe_catalog_prices_v2",
+    "payment_links": "integration_control.stripe_payment_link_inventory_v4",
+    "webhook_lanes": "integration_control.stripe_webhook_lanes_v3",
+    "webhook_endpoints": "integration_control.stripe_webhook_endpoints_v3",
+    "catalog_bridge": "integration_control.pentagreen_stripe_catalog_bridge_v1"
+  },
+  "factory_outputs": [
+    "product_price",
+    "payment_link",
+    "webhook_binding",
+    "catalog_sync"
+  ],
+  "executable_provider_operations": [
+    "product.create",
+    "product.retrieve",
+    "price.create",
+    "price.retrieve",
+    "payment_link.create",
+    "payment_link.retrieve",
+    "webhook.reconcile",
+    "catalog.sync"
+  ],
+  "planned_held_outputs": [
+    {"output": "checkout", "state": "HOLD_SPECIALIZED_EXECUTOR_REQUIRED"},
+    {"output": "subscription", "state": "HOLD_SPECIALIZED_EXECUTOR_REQUIRED"},
+    {"output": "invoice", "state": "HOLD_SPECIALIZED_EXECUTOR_REQUIRED"},
+    {"output": "customer", "state": "HOLD_SPECIALIZED_EXECUTOR_REQUIRED"},
+    {"output": "quote", "state": "HOLD_SPECIALIZED_EXECUTOR_REQUIRED"},
+    {"output": "connect_plan", "state": "HOLD_D3_AND_TYPED_EXECUTOR_REQUIRED"},
+    {"output": "application_fee", "state": "HOLD_D3_AND_CHARGE_MODEL_APPROVAL_REQUIRED"},
+    {"output": "coupon_or_promotion", "state": "HOLD_D3_AND_NORMALIZATION_REQUIRED"},
+    {"output": "billing_meter", "state": "HOLD_SPECIALIZED_EXECUTOR_REQUIRED"},
+    {"output": "tax_registration_or_taxability_change", "state": "HOLD_LEGAL_TAX_GATE"},
+    {"output": "refund", "state": "HOLD_D3_MONEY_EFFECT"},
+    {"output": "transfer", "state": "HOLD_D3_MONEY_MOVEMENT"},
+    {"output": "payout", "state": "HOLD_DEFAULT_BANK_ERRORED"}
+  ],
+  "factory_preconditions": [
+    "product_type_enabled_for_sale",
+    "provider_tax_code_verified",
+    "legal_taxability_state_ready_or_verified",
+    "tax_behavior_inclusive_or_exclusive",
+    "entitlement_handler_ref_bound",
+    "entitlement_binding_state_ready",
+    "webhook_binding_key_bound",
+    "signed_webhook_canary_current_with_required_event_matrix",
+    "rights_state_ready",
+    "fulfillment_state_ready",
+    "quality_state_ready",
+    "route_state_ready",
+    "custody_state_ready",
+    "docs_state_ready",
+    "direct_checkout_desired",
+    "no_conflicting_provider_binding"
+  ],
+  "execution_controls": [
+    "typed_exact_route_allowlist",
+    "private_provider_adapter_acl",
+    "pinned_stripe_api_version",
+    "idempotency",
+    "read_after_write",
+    "rollback_or_compensation",
+    "signed_webhook_fulfillment",
+    "provider_event_deduplication",
+    "no_entitlement_from_browser_redirect",
+    "provider_account_role_selection",
+    "PentaRoute and PentaWire reuse",
+    "CHLOM/DAIL terminal evidence",
+    "no duplicate PentaGreen scheduler"
+  ],
+  "payout_rail": {
+    "state": "HOLD_DEFAULT_BANK_ERRORED",
+    "account_payout_flag_is_not_health_evidence": true,
+    "controlled_canary_required": true,
+    "automatic_money_movement_allowed": false
+  },
+  "clone_policy": {
+    "allowed": "CrownThrive-owned adapters, contracts, mirrors, workers, SDK wrappers, webhook routers, tests, skills and provider-neutral interfaces",
+    "forbidden": "copying or representing Stripe proprietary backend/services as CrownThrive-owned source"
+  },
+  "institutional_refs": {
+    "thrivebase": "integration_control.stripe_os_runtime_readiness_v2()",
+    "pentadocs": "/commerce/stripe-os-monetization-fabric",
+    "partner_registry": "integration_control.crownthrive_partner_registry_v1",
+    "github_repo": "crownthrive1/CrownThrive-OS"
+  },
+  "authority_created": false
+}
