@@ -28,16 +28,20 @@ CHLOM now has a deployed, authenticated production gateway over its live ThriveB
 
 | Capability | State | Evidence |
 |---|---|---|
-| Production gateway | **ACTIVE** | Supabase Edge Function `chlom-control-plane-v1`, version `1` |
-| Gateway contract | **ACTIVE** | `ct.chlom.authenticated-control-plane-gateway.v1` |
-| Gateway source/deployment digest | **BOUND** | `2031fc9cbcf59d7e500730e8d96a91a9fa7e3d448541da6c8aeabfcddf325ed2` |
-| Immutable source custody | **MERGED** | `crownthrive1/chlom-protocol` PR `#48`, commit `9f54c718672d1fd65326bfa8a359200d3cff1996` |
-| JWT enforcement | **ACTIVE** | Provider route has `verify_jwt=true`; unauthenticated probe returned HTTP `401` |
+| Production gateway | **ACTIVE** | Supabase Edge Function `chlom-control-plane-v1`, provider version `4` |
+| Gateway contract | **ACTIVE** | `ct.chlom.authenticated-control-plane-gateway.v1`, gateway version `1.1.0` |
+| Dispatcher contract | **ACTIVE** | `ct.chlom.authenticated-control-plane-dispatch.v3` |
+| Gateway deployment digest | **BOUND** | `b1426595021a29106b7f10e344527a390af1f1ed36becb645ed5c1dcddaad540` |
+| Deployment-manifest digest | **BOUND** | `07f55628b2c66dda701c758c55273cdad85272348a744160ba275f5fb26df432` |
+| JWT enforcement | **ACTIVE** | Provider route has `verify_jwt=true`; unauthenticated provider probe returned HTTP `401` |
+| Origin enforcement | **ACTIVE** | CrownThrive preflight returned HTTP `204`; unapproved origin returned HTTP `403` |
 | Founder operator record | **ACTIVE** | `ct.subject.founder.kavonte-jones-sr`, authority class `D3`, version `1` |
 | Scope and authority enforcement | **ACTIVE** | Action-specific scope and D0–D3 threshold checks |
-| Mutation idempotency | **ACTIVE** | Required idempotency key, advisory transaction lock, append-only replay receipt |
-| Append-only dispatch evidence | **ACTIVE** | Dispatch and idempotency receipt tables force append-only behavior |
-| DAIL verification | **PASS** | `PASS_GLOBAL_COMPACT_CHAIN`, sequence lag `0`, verified through `2310790` |
+| Read path | **ACTIVE** | Authenticated status and capabilities; no mutation idempotency key required; limit `120/minute` |
+| Mutation idempotency | **ACTIVE** | Valid key required; advisory lock, payload-conflict detection, stable replay result; limit `30/minute` |
+| Append-only dispatch evidence | **ACTIVE** | Domain event and dispatch receipt persisted; replay produced no duplicate mutation |
+| DAIL verification | **PASS** | `PASS_GLOBAL_COMPACT_CHAIN`, sequence lag `0`, verified through `2323298` |
+| GitHub source custody | **MERGED** | PR `#49`; merge commit `c30d07f63ffadb3c6e18639abc51a60ff9ca165b` |
 | External money movement | **DISABLED** | No dispatcher action; recorded count `0` |
 | Production token mint confirmation | **DISABLED** | No dispatcher action; confirmed count `0` |
 | Public validator activation | **DISABLED** | No dispatcher action |
@@ -131,39 +135,40 @@ The same operator, action, and idempotency key with the same canonical payload r
 
 ## Persisted production canary
 
-The gateway release was bound through a real internal mutation, not only a status request.
+The gateway v1.1.0 release was bound through a real authenticated database-context mutation and a second replay call, not only a status request. The test explicitly remains classified as a database-authenticated canary rather than an external browser-issued founder-session canary.
 
 | Field | Value |
 |---|---|
-| Canonical asset | `ct.asset.canary.chlom-control-plane-gateway-v1.20260904` |
-| Binding ID | `0d5b88d5-0087-4b88-b94c-8956bbf2fd8e` |
-| Binding record SHA-256 | `72cce8161603683e0193ade492f5dbacc2a33ad19e878572330800bf945fdf55` |
-| Asset DAIL event | `a9cb095e-d130-4082-b989-4c51c9b55e49` |
-| Asset DAIL event hash | `093d6fddadc8b9419fb3b273920b27b44f6079a13fa37e25e0ecc69e7fdb1957` |
-| Dispatch request ID | `10cd18dc-91ca-4c3d-9ae2-7c08ccac8908` |
-| Dispatch receipt ID | `914008c3-72d0-4b87-8579-34939f18f2dd` |
-| Idempotency receipt ID | `0b78e916-091d-47c2-8a42-cbb6b73be1d5` |
-| Dispatch result SHA-256 | `e6cbcf90f400da42a2155341633e2f17d5f09a9a72c1a504eb71076c2924854b` |
-| Receipt DAIL event | `0b14ddf8-2e52-40dd-bde3-bc84c809fc19` |
-| Receipt DAIL event hash | `fb587768a6ed6fe9e79cabae3199f943ab06fe6782ad40530608a1298044f411` |
+| Canonical asset | `ct.asset.chlom-control-plane.gateway-v1-1-0.20260904.01` |
+| Binding ID | `a20e8ac0-4a7c-4651-8906-9577216a3cdf` |
+| Binding record SHA-256 | `02f2385b3fcfd15ed69f72c0653874faa36b283d312da104640e1a42e827bc29` |
+| Asset DAIL event | `a8eb4005-d3b1-4572-a7c8-5d90b5e20cce` |
+| Asset DAIL sequence | `2323191` |
+| Asset DAIL event hash | `ffac4b323dd7a187d585fe2a63be3044baa0f9f39f3ecdee7698e5a199a1354c` |
+| Dispatch request ID | `81b8ac87-9ce5-4943-9f77-2852af406c32` |
+| Dispatch receipt ID | `fdc799fa-0c8a-4d8c-a803-fe9cd25588d0` |
+| Receipt DAIL event | `4d05d21a-b5ae-4e79-bd03-1826c2704622` |
+| Receipt DAIL sequence | `2323192` |
+| Receipt DAIL event hash | `20db482cf41126080746d8b3eb66ce1cef159f41d103ea438e95fecdee37845c` |
+| Idempotency response SHA-256 | `da00654e853d76800f11fa6cd9afe3d0a308f039f29aab727fcc86ff56946f53` |
 | First execution | `idempotent_replay=false` |
 | Second execution | `idempotent_replay=true` |
-| Duplicate bindings created | `0` |
+| Duplicate domain mutations created | `0` |
 
-The durable readback after this canary showed one active API operator version, one dispatch receipt, one idempotency receipt, and one matching gateway-canary binding.
+The deployment itself was then recorded as gateway deployment version `2`, manifest SHA-256 `07f55628b2c66dda701c758c55273cdad85272348a744160ba275f5fb26df432`, DAIL event `165c80b0-eb08-43e1-a17a-e5f157e4af6e`, sequence `2323281`.
 
 ## DAIL assurance
 
-After the gateway mutation and receipt were appended, bounded catch-up completed and the assurance projection returned:
+After the gateway mutation, replay proof, deployment-version record, and provider-boundary tests were completed, bounded catch-up returned:
 
 ```json
 {
   "ok": true,
   "integrity_state": "PASS_GLOBAL_COMPACT_CHAIN",
   "sequence_span_lag": 0,
-  "verified_through_sequence_id": 2310790,
-  "current_head_sequence_id": 2310790,
-  "v4_segment_count": 136,
+  "verified_through_sequence_id": 2323298,
+  "current_head_sequence_id": 2323298,
+  "v4_segment_count": 437,
   "base_checkpoint_id": "dfb2018c-7dba-4200-b8af-16951efd4cc8"
 }
 ```
@@ -178,13 +183,13 @@ The previous CHLOM runtime blocker associated with pull request `#47` is obsolet
 23245967e661e7dd1e6ea57a37c9160d6f8c8063
 ```
 
-The authenticated production gateway release was reviewed and merged through CHLOM protocol pull request `#48` at commit:
+The initial authenticated gateway baseline was merged through CHLOM protocol pull request `#48`. The current production cutover—dispatcher v3, gateway v1.1.0, operations runbook, and exact deployment receipt—was reviewed in pull request `#49` and merged to `main` at:
 
 ```text
-9f54c718672d1fd65326bfa8a359200d3cff1996
+c30d07f63ffadb3c6e18639abc51a60ff9ca165b
 ```
 
-That immutable source tree contains the deployed edge source, operator and append-only receipt registries, authenticated capability projection, allowlisted dispatcher, confirmed-identity founder enrollment, mutation idempotency layer, production evidence manifest, and fail-closed CI verifier. Runtime and network claims remain governed by their own reproducible-build and provider-readback gates.
+The active Vercel commit check passed before merge. The immutable source tree now contains the deployed Edge Function source, read-safe idempotent dispatcher migration, operator and receipt registries, provider-boundary evidence, authenticated mutation/replay canary, deployment registry receipt, and DAIL assurance record. Runtime and network claims remain governed by their own reproducible-build and provider-readback gates.
 
 ## Production candidate
 
