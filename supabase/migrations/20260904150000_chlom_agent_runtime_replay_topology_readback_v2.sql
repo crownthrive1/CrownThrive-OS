@@ -33,6 +33,15 @@ declare
 begin
   with expected(version,name) as (
     values
+      ('20260819020805','integration_control_plane_v1'),
+      ('20260819164517','credential_continuity_registry_v1'),
+      ('20260820182344','chlom_identity_foundation'),
+      ('20260821021521','chlom_modular_metaprotocol_control_plane_v1'),
+      ('20260821021702','chlom_runtime_rpc_surface_v1'),
+      ('20260821021745','chlom_dedicated_mcp_server_scope_v1'),
+      ('20260821021758','chlom_public_identity_admin_rpc_v1'),
+      ('20260821022105','chlom_runtime_deployment_evidence_v1'),
+      ('20260821022237','chlom_google_drive_recovery_capsule_verified_v1'),
       ('20260821022535','chlom_fluid_module_agent_oracle_registry_v1'),
       ('20260821030452','chlom_construction_work_queue_v1'),
       ('20260821050436','agent_capability_master_suite_v1'),
@@ -59,7 +68,18 @@ begin
 
   with expected(schema_name,object_name,relkind) as (
     values
+      ('integration_control','services','r'::"char"),
+      ('integration_control','mcp_tools','r'::"char"),
+      ('integration_control','credential_continuity_registry','r'::"char"),
+      ('integration_control','runtime_variable_registry','r'::"char"),
+      ('chlom_identity','subjects','r'::"char"),
+      ('chlom_identity','key_registry','r'::"char"),
+      ('chlom_identity','public_identity_records','r'::"char"),
+      ('chlom_identity','fingerprints','r'::"char"),
       ('chlom_secrets','trade_secret_assets','r'::"char"),
+      ('chlom_runtime','modules','r'::"char"),
+      ('chlom_runtime','module_capabilities','r'::"char"),
+      ('chlom_runtime','platform_bindings','r'::"char"),
       ('chlom_runtime','vaulted_capability_registry','r'::"char"),
       ('chlom_runtime','capability_contracts','v'::"char"),
       ('chlom_runtime','agent_templates','r'::"char"),
@@ -85,12 +105,23 @@ begin
   left join observed o using(schema_name,object_name)
   where o.object_name is null or o.relkind<>e.relkind;
   if v_problem is not null then
-    raise exception 'HOLD_AGENT_RUNTIME_RELATION_TOPOLOGY_DRIFT: %', v_problem;
+    raise exception 'HOLD_REPLAY_RELATION_TOPOLOGY_DRIFT: %', v_problem;
   end if;
 
   with expected(schema_name,table_name,pk_column) as (
     values
+      ('integration_control','services','service_id'),
+      ('integration_control','mcp_tools','tool_name'),
+      ('integration_control','credential_continuity_registry','credential_id'),
+      ('integration_control','runtime_variable_registry','variable_key'),
+      ('chlom_identity','subjects','subject_id'),
+      ('chlom_identity','key_registry','key_id'),
+      ('chlom_identity','public_identity_records','public_id'),
+      ('chlom_identity','fingerprints','fingerprint_id'),
       ('chlom_secrets','trade_secret_assets','asset_id'),
+      ('chlom_runtime','modules','module_id'),
+      ('chlom_runtime','module_capabilities','capability_id'),
+      ('chlom_runtime','platform_bindings','binding_id'),
       ('chlom_runtime','vaulted_capability_registry','capability_id'),
       ('chlom_runtime','agent_templates','agent_id'),
       ('chlom_runtime','agent_health','agent_id'),
@@ -118,12 +149,23 @@ begin
    and o.definition ilike '%(' || e.pk_column || ')%'
   where o.table_name is null;
   if v_problem is not null then
-    raise exception 'HOLD_AGENT_RUNTIME_PRIMARY_KEY_DRIFT: %', v_problem;
+    raise exception 'HOLD_REPLAY_PRIMARY_KEY_DRIFT: %', v_problem;
   end if;
 
   with expected(schema_name,table_name) as (
     values
+      ('integration_control','services'),
+      ('integration_control','mcp_tools'),
+      ('integration_control','credential_continuity_registry'),
+      ('integration_control','runtime_variable_registry'),
+      ('chlom_identity','subjects'),
+      ('chlom_identity','key_registry'),
+      ('chlom_identity','public_identity_records'),
+      ('chlom_identity','fingerprints'),
       ('chlom_secrets','trade_secret_assets'),
+      ('chlom_runtime','modules'),
+      ('chlom_runtime','module_capabilities'),
+      ('chlom_runtime','platform_bindings'),
       ('chlom_runtime','vaulted_capability_registry'),
       ('chlom_runtime','agent_templates'),
       ('chlom_runtime','agent_health'),
@@ -140,9 +182,40 @@ begin
   from expected e
   join pg_namespace n on n.nspname=e.schema_name
   join pg_class c on c.relnamespace=n.oid and c.relname=e.table_name
-  where not c.relrowsecurity or not c.relforcerowsecurity;
+  where not c.relrowsecurity;
   if v_problem is not null then
-    raise exception 'HOLD_AGENT_RUNTIME_FORCED_RLS_MISSING: %', v_problem;
+    raise exception 'HOLD_REPLAY_RLS_MISSING: %', v_problem;
+  end if;
+
+  with expected(schema_name,table_name) as (
+    values
+      ('chlom_identity','subjects'),
+      ('chlom_identity','key_registry'),
+      ('chlom_identity','public_identity_records'),
+      ('chlom_identity','fingerprints'),
+      ('chlom_secrets','trade_secret_assets'),
+      ('chlom_runtime','modules'),
+      ('chlom_runtime','module_capabilities'),
+      ('chlom_runtime','platform_bindings'),
+      ('chlom_runtime','vaulted_capability_registry'),
+      ('chlom_runtime','agent_templates'),
+      ('chlom_runtime','agent_health'),
+      ('chlom_runtime','agent_suite_registry'),
+      ('chlom_runtime','agent_skill_packages'),
+      ('chlom_runtime','construction_work_queue'),
+      ('chlom_runtime','dail_events'),
+      ('institutional_federation','continuity_compiler_runs'),
+      ('institutional_federation','capability_execution_queue')
+  )
+  select string_agg(e.schema_name || '.' || e.table_name, ', '
+                    order by e.schema_name,e.table_name)
+  into v_problem
+  from expected e
+  join pg_namespace n on n.nspname=e.schema_name
+  join pg_class c on c.relnamespace=n.oid and c.relname=e.table_name
+  where not c.relforcerowsecurity;
+  if v_problem is not null then
+    raise exception 'HOLD_REPLAY_FORCE_RLS_MISSING: %', v_problem;
   end if;
 
   select count(*) into v_count
@@ -205,6 +278,9 @@ select
     select jsonb_agg(jsonb_build_object('version',version,'name',name) order by version)
     from supabase_migrations.schema_migrations
     where version in (
+      '20260819020805','20260819164517','20260820182344',
+      '20260821021521','20260821021702','20260821021745',
+      '20260821021758','20260821022105','20260821022237',
       '20260821022535','20260821030452','20260821050436',
       '20260822193302','20260823203546','20260823203649'
     )
@@ -220,7 +296,18 @@ select
       ) order by n.nspname,c.relname)
       from pg_class c join pg_namespace n on n.oid=c.relnamespace
       where (n.nspname,c.relname) in (
+        ('integration_control','services'),
+        ('integration_control','mcp_tools'),
+        ('integration_control','credential_continuity_registry'),
+        ('integration_control','runtime_variable_registry'),
+        ('chlom_identity','subjects'),
+        ('chlom_identity','key_registry'),
+        ('chlom_identity','public_identity_records'),
+        ('chlom_identity','fingerprints'),
         ('chlom_secrets','trade_secret_assets'),
+        ('chlom_runtime','modules'),
+        ('chlom_runtime','module_capabilities'),
+        ('chlom_runtime','platform_bindings'),
         ('chlom_runtime','vaulted_capability_registry'),
         ('chlom_runtime','capability_contracts'),
         ('chlom_runtime','agent_templates'),
@@ -245,7 +332,18 @@ select
       join pg_namespace n on n.oid=t.relnamespace
       where k.contype='p'
         and (n.nspname,t.relname) in (
+          ('integration_control','services'),
+          ('integration_control','mcp_tools'),
+          ('integration_control','credential_continuity_registry'),
+          ('integration_control','runtime_variable_registry'),
+          ('chlom_identity','subjects'),
+          ('chlom_identity','key_registry'),
+          ('chlom_identity','public_identity_records'),
+          ('chlom_identity','fingerprints'),
           ('chlom_secrets','trade_secret_assets'),
+          ('chlom_runtime','modules'),
+          ('chlom_runtime','module_capabilities'),
+          ('chlom_runtime','platform_bindings'),
           ('chlom_runtime','vaulted_capability_registry'),
           ('chlom_runtime','agent_templates'),
           ('chlom_runtime','agent_health'),
@@ -279,6 +377,23 @@ select
       select count(*)
       from supabase_migrations.schema_migrations
       where version in ('20260823202950','20260823203100')
+    ),
+    'foundation_provider_identity_count', (
+      select count(*)
+      from supabase_migrations.schema_migrations
+      where version in (
+        '20260819020805','20260819164517','20260820182344',
+        '20260821021521','20260821021702','20260821021745',
+        '20260821021758','20260821022105','20260821022237'
+      )
+    ),
+    'agent_runtime_provider_identity_count', (
+      select count(*)
+      from supabase_migrations.schema_migrations
+      where version in (
+        '20260821022535','20260821030452','20260821050436',
+        '20260822193302','20260823203546','20260823203649'
+      )
     ),
     'capability_contract_view_definition',
       pg_get_viewdef('chlom_runtime.capability_contracts'::regclass,true)
