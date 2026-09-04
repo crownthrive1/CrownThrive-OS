@@ -1,0 +1,68 @@
+name: PentaDocs Deterministic Apply
+
+on:
+  push:
+    branches:
+      - admin-mcp/chlom-production-realization-7cf3bc7
+    paths:
+      - .github/workflows/pentadocs-deterministic-apply.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pentadocs-deterministic-apply-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: regenerate governed page and profile manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          ref: admin-mcp/chlom-production-realization-7cf3bc7
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply deterministic PentaDocs migration
+        run: python scripts/pentadocs_quality.py --apply | tee /tmp/pentadocs-apply-receipt.jsonl
+
+      - name: Limit generated write set
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git diff --name-only)
+          printf '%s\n' "${changed[@]}"
+          for path in "${changed[@]}"; do
+            case "$path" in
+              chlom/production-system-status-and-activation.mdx|data/documentation/pentadocs-page-profiles.v1.json)
+                ;;
+              *)
+                echo "Unexpected deterministic write outside governed page/profile pair: $path" >&2
+                exit 1
+                ;;
+            esac
+          done
+          test "${#changed[@]}" -eq 2
+
+      - name: Validate regenerated repository
+        run: python scripts/pentadocs_quality.py --check
+
+      - name: Commit deterministic repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "CrownThrive PentaDocs Bot"
+          git config user.email "contact@crownthrive.com"
+          git add chlom/production-system-status-and-activation.mdx data/documentation/pentadocs-page-profiles.v1.json
+          git diff --cached --check
+          git commit -m "docs(chlom): regenerate governed PentaDocs profile"
+          git push origin HEAD:admin-mcp/chlom-production-realization-7cf3bc7
