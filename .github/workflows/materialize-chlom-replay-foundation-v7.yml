@@ -1,0 +1,59 @@
+name: Materialize CHLOM Replay Foundation v7
+
+on:
+  push:
+    branches:
+      - 'repair/chlom-agent-runtime-custody-v6-*'
+    paths:
+      - 'supabase/migration_lineage/provider_custody/foundation_v7/**'
+      - 'supabase/migration_lineage/chlom_replay_dependency_custody_v7.json'
+      - 'scripts/assemble_chlom_foundation_custody_v7.sh'
+      - '.github/workflows/materialize-chlom-replay-foundation-v7.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-chlom-replay-foundation-v7-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Verify and materialize provider replay foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact repair head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Confirm OpenPGP transport support
+        run: gpg --version
+
+      - name: Materialize exact provider foundation bodies
+        run: bash scripts/assemble_chlom_foundation_custody_v7.sh
+
+      - name: Verify foundation and agent-runtime custody
+        run: |
+          python3 scripts/verify_chlom_replay_dependency_custody_v7.py
+          python3 scripts/verify_chlom_agent_runtime_custody.py
+
+      - name: Reject whitespace and patch corruption
+        run: git diff --check
+
+      - name: Commit exact provider foundation without force
+        run: |
+          if git diff --quiet --exit-code; then
+            echo 'Exact provider replay foundation is already materialized.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-custody[bot]'
+          git config user.email 'crownthrive-custody[bot]@users.noreply.github.com'
+          git add \
+            supabase/migrations \
+            supabase/migration_lineage/chlom_replay_dependency_custody_v7.json
+          git commit -m 'fix(supabase): materialize exact CHLOM replay foundation custody'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
