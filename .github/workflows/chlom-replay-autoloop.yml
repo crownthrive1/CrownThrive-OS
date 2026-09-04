@@ -1,0 +1,151 @@
+name: CHLOM Replay Autoloop
+
+on:
+  push:
+    branches:
+      - 'validation/chlom-replay-*'
+    paths:
+      - '.github/workflows/chlom-replay-autoloop.yml'
+      - 'supabase/migration_lineage/replay_diagnostics/**validation_request*.json'
+      - 'supabase/migration_lineage/replay_diagnostics/20260904_v12_fresh_preview_request.json'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: chlom-replay-autoloop-global
+  cancel-in-progress: false
+
+jobs:
+  advance:
+    name: Repair one exact custody gap or certify terminal replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PARENT_PROJECT_REF: tzajnzshmtzjenqulehq
+      REPAIR_BRANCH: repair/chlom-framework-package-custody-v8-20260904
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out exact validation head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Load autoloop from canonical repair line
+        run: |
+          git fetch origin "${REPAIR_BRANCH}:refs/remotes/origin/${REPAIR_BRANCH}"
+          git show "origin/${REPAIR_BRANCH}:scripts/chlom_replay_autoloop.py" > /tmp/chlom_replay_autoloop.py
+          python3 -m py_compile /tmp/chlom_replay_autoloop.py
+
+      - name: Resolve preview, repair one exact gap, or certify PASS
+        id: loop
+        run: |
+          set +e
+          python3 /tmp/chlom_replay_autoloop.py
+          rc=$?
+          set -e
+          test -f /tmp/chlom_replay_autoloop_result.json || {
+            echo '{"state":"HOLD","reason":"AUTLOOP_RESULT_NOT_WRITTEN","production_mutated":false,"dependent_penta_wave":"HOLD"}' > /tmp/chlom_replay_autoloop_result.json
+            rc=1
+          }
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          data=json.loads(Path('/tmp/chlom_replay_autoloop_result.json').read_text())
+          state=str(data.get('state','HOLD'))
+          with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as fh:
+              fh.write(f'state={state}\n')
+              fh.write(f"next_branch={data.get('validation_branch','')}\n")
+              fh.write(f"next_pr={data.get('validation_pr_number','')}\n")
+          print(json.dumps(data,indent=2,sort_keys=True))
+          PY
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+
+      - name: Persist branch-local replay evidence
+        if: always()
+        env:
+          SOURCE_HEAD: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json,re,os
+          from pathlib import Path
+          source=Path('/tmp/chlom_replay_autoloop_result.json')
+          data=json.loads(source.read_text())
+          slug=re.sub(r'[^A-Za-z0-9._-]+','_',os.environ.get('GITHUB_REF_NAME','validation'))
+          target=Path('supabase/migration_lineage/replay_diagnostics/autoloop')/f'{slug}_result.json'
+          target.parent.mkdir(parents=True,exist_ok=True)
+          target.write_text(json.dumps(data,indent=2,sort_keys=True)+'\n')
+          if data.get('state')=='PASS':
+              auth={
+                  'schema':'crownthrive.penta.dependent-wave-authorization/v1',
+                  'authorization_id':'ct.penta.wave.chlom-replay.20260904.terminal',
+                  'state':'AUTHORIZED',
+                  'authority_basis':'DATA_LESS_PREVIEW_MIGRATIONS_PASSED_AND_INDEPENDENT_TOPOLOGY_PASS',
+                  'validated_source_head_sha':data.get('validated_source_head_sha'),
+                  'preview_project_ref':data.get('preview_project_ref'),
+                  'preview_branch_id':data.get('preview_branch_id'),
+                  'migration_state':'MIGRATIONS_PASSED',
+                  'migration_head':(data.get('topology_readback') or {}).get('migration_head'),
+                  'stable_products_only':True,
+                  'production_mutated':False,
+                  'production_deployment_authorized':False,
+                  'commercial_activation_authorized':False,
+                  'next_state':'DEPENDENT_PENTA_VALIDATION',
+                  'authorized_at_utc':data.get('certified_at_utc'),
+              }
+              Path('supabase/migration_lineage/penta_wave_authorization_terminal.json').write_text(json.dumps(auth,indent=2,sort_keys=True)+'\n')
+              wave={
+                  'schema':'crownthrive.penta.dependent-wave-state/v1',
+                  'wave_id':'ct.penta.wave.chlom-replay-dependent.20260904.terminal',
+                  'state':'ADVANCED_TO_DEPENDENT_VALIDATION',
+                  'authorization_id':auth['authorization_id'],
+                  'validated_source_head_sha':auth['validated_source_head_sha'],
+                  'preview_project_ref':auth['preview_project_ref'],
+                  'preview_branch_id':auth['preview_branch_id'],
+                  'migration_state':'MIGRATIONS_PASSED',
+                  'migration_head':auth['migration_head'],
+                  'stable_products_only':True,
+                  'production_mutated':False,
+                  'production_deployment_authorized':False,
+                  'commercial_activation_authorized':False,
+                  'next_gate':'DEPENDENT_PENTA_REBASE_TEST_AND_INDEPENDENT_ACCEPTANCE',
+                  'advanced_at_utc':data.get('certified_at_utc'),
+              }
+              Path('supabase/migration_lineage/dependent_penta_wave_terminal.json').write_text(json.dumps(wave,indent=2,sort_keys=True)+'\n')
+          PY
+          git config user.name 'crownthrive-replay-autoloop[bot]'
+          git config user.email 'crownthrive-replay-autoloop[bot]@users.noreply.github.com'
+          git add supabase/migration_lineage
+          if git diff --cached --quiet; then
+            echo 'No new branch-local replay evidence.'
+          else
+            git commit -m 'test(supabase): persist CHLOM replay autoloop outcome'
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      - name: Enforce fail-closed outcome
+        if: always()
+        env:
+          STATE: ${{ steps.loop.outputs.state }}
+          LOOP_EXIT_CODE: ${{ steps.loop.outputs.exit_code }}
+        run: |
+          case "$STATE" in
+            PASS)
+              echo 'PASS_CHLOM_REPLAY_AND_DEPENDENT_PENTA_VALIDATION_ADVANCE'
+              ;;
+            EXACT_PROVIDER_CUSTODY_RESTORED_NEXT_PREVIEW_DISPATCHED)
+              echo 'PASS_ONE_GAP_REPAIRED_NEXT_DATA_LESS_PREVIEW_DISPATCHED'
+              ;;
+            *)
+              echo "HOLD_CHLOM_REPLAY_AUTLOOP: state=$STATE exit=$LOOP_EXIT_CODE" >&2
+              exit 1
+              ;;
+          esac
