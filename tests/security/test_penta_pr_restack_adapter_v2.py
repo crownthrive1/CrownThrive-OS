@@ -52,6 +52,10 @@ def test_no_secret_material_is_serialized_to_evidence():
 
 def test_structural_replay_bridge_precedes_provider_proven_preflight_without_credentials():
     assert "20260823202950_execution_builder_capability_contract_identity_v1.sql" in BRIDGE
+    assert "create schema if not exists chlom_runtime" in BRIDGE.lower()
+    assert "create schema if not exists chlom_secrets" in BRIDGE.lower()
+    assert "revoke all on schema chlom_runtime from public, anon, authenticated" in BRIDGE.lower()
+    assert "grant usage on schema chlom_runtime to service_role" in BRIDGE.lower()
     assert "chlom_secrets.trade_secret_assets" in BRIDGE
     assert "chlom_runtime.vaulted_capability_registry" in BRIDGE
     assert "create or replace view chlom_runtime.capability_contracts" in BRIDGE
@@ -69,6 +73,8 @@ def test_structural_replay_bridge_preserves_client_deny_and_service_role_boundar
     assert "grant select, insert, update on chlom_secrets.trade_secret_assets to service_role" in BRIDGE.lower()
     assert "grant select, insert, update on chlom_runtime.vaulted_capability_registry to service_role" in BRIDGE.lower()
     assert "body_exposure_allowed boolean not null default false" in BRIDGE.lower()
+    assert "to_regnamespace('chlom_runtime')" in BRIDGE
+    assert "to_regnamespace('chlom_secrets')" in BRIDGE
 
 
 def test_late_bridge_is_provenance_only_tombstone():
