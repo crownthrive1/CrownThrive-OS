@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   crawl:
@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
@@ -26,7 +28,7 @@ jobs:
         run: python -m py_compile scripts/estate_crawl_audit.py scripts/estate_crawl_exception_retry.py
       - name: Crawl bounded public surfaces and fingerprint observations
         run: python scripts/estate_crawl_audit.py
-      - name: Retry relative-sitemap exceptions
+      - name: Retry relative-sitemap exceptions and build ingest manifest
         run: python scripts/estate_crawl_exception_retry.py
       - name: Upload governed crawl evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -35,3 +37,15 @@ jobs:
           path: artifacts/estate-crawl-20260904/
           if-no-files-found: error
           retention-days: 30
+      - name: Commit governed evidence to audit branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name 'CrownThrive Evidence Bot'
+          git config user.email 'evidence-bot@users.noreply.github.com'
+          git add artifacts/estate-crawl-20260904/
+          if git diff --cached --quiet; then
+            echo 'No evidence changes to commit.'
+          else
+            git commit -m 'evidence: publish corrected estate crawl manifest [HOLD_DAIL_UNBOUND]'
+            git push origin HEAD:${{ github.head_ref }}
+          fi
