@@ -1,0 +1,64 @@
+name: Materialize COS 1.8 Clean Constitutional Kernel
+on:
+  push:
+    branches:
+      - "governance/cos-1.8-ratification-execution-20260904"
+    paths:
+      - ".cos18-bootstrap/payload.tar.gz.b64"
+      - ".github/workflows/_cos18_clean_materialize.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cos18-clean-materialize
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "governance/cos-1.8-ratification-execution-20260904"
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Decode and verify clean payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cos18"
+          base64 --decode .cos18-bootstrap/payload.tar.gz.b64 > "$RUNNER_TEMP/cos18/payload.tar.gz"
+          echo "858b86107e34f663feda2ea03d39b0bcf677ddf3762367a26d25e1d8adfce8fb  $RUNNER_TEMP/cos18/payload.tar.gz" | sha256sum --check -
+          mkdir -p "$RUNNER_TEMP/cos18/extracted"
+          tar -xzf "$RUNNER_TEMP/cos18/payload.tar.gz" -C "$RUNNER_TEMP/cos18/extracted"
+          test -f "$RUNNER_TEMP/cos18/extracted/.crownthrive/releases/cos-1.8.0-rc.1.kernel.json"
+          test -f "$RUNNER_TEMP/cos18/extracted/.crownthrive/releases/cos-1.8.0-rc.1.manifest.json"
+          test -f "$RUNNER_TEMP/cos18/extracted/supabase/migrations/20260904000100_cos_1_8_constitutional_kernel.sql"
+      - name: Independently validate extracted candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/cos18/extracted"
+          PYTHONDONTWRITEBYTECODE=1 python -m compileall -q scripts/cos18 tests/cos18
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests/cos18 -p "test_*.py" -v
+          PYTHONDONTWRITEBYTECODE=1 python scripts/cos18/validate_cos18_kernel.py --root .
+      - name: Materialize one immutable behavior commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -a "$RUNNER_TEMP/cos18/extracted/" ./
+          rm -rf .cos18-bootstrap
+          rm -f .github/workflows/_cos18_clean_materialize.yml
+          git diff --check
+          git config user.name "PentaGovernance Materializer"
+          git config user.email "penta-governance@crownthrive.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No materialization changes."
+            exit 0
+          fi
+          git commit -m "feat(cos): materialize COS 1.8 constitutional kernel"
+          git push origin "HEAD:governance/cos-1.8-ratification-execution-20260904"
