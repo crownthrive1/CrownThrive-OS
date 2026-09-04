@@ -1,0 +1,34 @@
+name: CrownThrive governed estate crawl audit
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/estate_crawl_audit.py'
+      - 'evidence/estate-crawl/crawl-targets-20260904.json'
+      - 'evidence/estate-crawl/crawl-targets-20260904.tsv'
+      - '.github/workflows/estate-crawl-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile crawler
+        run: python -m py_compile scripts/estate_crawl_audit.py
+      - name: Crawl bounded public surfaces and fingerprint observations
+        run: python scripts/estate_crawl_audit.py
+      - name: Upload governed crawl evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: crownthrive-estate-crawl-20260904
+          path: artifacts/estate-crawl-20260904/
+          if-no-files-found: error
+          retention-days: 30
