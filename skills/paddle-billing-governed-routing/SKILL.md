@@ -13,7 +13,7 @@ This wrapper does not replace Paddle's ten implementation skills. It makes their
 
 ## Required routing
 
-Load the exact upstream skill before implementation:
+First call the CrownThrive OS MCP tool `crownthrive_paddle_route` with the bounded operation and requested environment. Treat its `required_skill`, `mcp_server`, and route state as the canonical execution route for the task. Then load the exact upstream skill before implementation:
 
 | Work | Required skill |
 | --- | --- |
@@ -49,16 +49,18 @@ Use `paddle-docs` whenever current provider semantics, field shapes, events, per
 
 ## Execution sequence
 
-1. Resolve the matching Paddle skill.
-2. Read current Paddle semantics through `paddle-docs` when material.
-3. Resolve the requested environment; choose sandbox unless live was explicitly authorized.
-4. Resolve identity, credential binding, exact-operation authority, data class, side effects, and rollback.
-5. Use the named Paddle MCP. Prefer its current `search` contract before `execute`.
-6. Perform the smallest bounded operation.
-7. Read back the affected provider object or state.
-8. Reconcile webhook, database, CHLOM, entitlement, and PentaGreen state only within separately granted authority.
-9. Record a sanitized evidence receipt.
-10. State unresolved provider, settlement, entitlement, rights, tax, legal, or production gates without promoting them.
+1. Call `crownthrive_paddle_route` on the CrownThrive OS MCP for the bounded operation.
+2. Load the exact `required_skill` returned by that route.
+3. Read current Paddle semantics through `paddle-docs` when material.
+4. Resolve the requested environment; choose sandbox unless live was explicitly authorized.
+5. Run `crownthrive_paddle_preflight` and resolve every returned blocker that is within current authority.
+6. Resolve identity, credential binding, exact-operation authority, data class, side effects, and rollback.
+7. Use the named Paddle MCP. Prefer its current `search` contract before `execute`.
+8. Perform the smallest bounded operation.
+9. Read back the affected provider object or state.
+10. Reconcile webhook, database, CHLOM, entitlement, and PentaGreen state only within separately granted authority.
+11. Record a sanitized evidence receipt.
+12. State unresolved provider, settlement, entitlement, rights, tax, legal, or production gates without promoting them.
 
 ## Completion boundary
 
