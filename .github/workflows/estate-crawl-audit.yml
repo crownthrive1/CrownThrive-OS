@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/estate_crawl_audit.py'
+      - 'scripts/estate_crawl_exception_retry.py'
       - 'evidence/estate-crawl/crawl-targets-20260904.json'
       - 'evidence/estate-crawl/crawl-targets-20260904.tsv'
       - '.github/workflows/estate-crawl-audit.yml'
@@ -21,10 +22,12 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-      - name: Compile crawler
-        run: python -m py_compile scripts/estate_crawl_audit.py
+      - name: Compile crawlers
+        run: python -m py_compile scripts/estate_crawl_audit.py scripts/estate_crawl_exception_retry.py
       - name: Crawl bounded public surfaces and fingerprint observations
         run: python scripts/estate_crawl_audit.py
+      - name: Retry relative-sitemap exceptions
+        run: python scripts/estate_crawl_exception_retry.py
       - name: Upload governed crawl evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
