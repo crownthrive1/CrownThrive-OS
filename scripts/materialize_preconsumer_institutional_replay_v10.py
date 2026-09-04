@@ -2,11 +2,13 @@
 """Materialize the pre-consumer institutional replay supplement at 20260820003352.
 
 The migration is composed deterministically from:
-1. the already-reviewed institutional replay baseline SQL body; and
+1. a separately custodied, reviewed institutional replay compatibility baseline; and
 2. the exact provider-applied `preserve_future_credential_pending_state` body.
 
-The provider component remains byte-for-byte intact. Production already records this
-version as applied, so this operation changes Git custody and preview replay only.
+The original migration at 20260820192640 remains untouched and is not repurposed.
+The provider component remains byte-for-byte intact. Production already records the
+target provider version as applied, so this operation changes Git custody and preview
+replay only.
 """
 
 from __future__ import annotations
@@ -20,7 +22,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "supabase" / "migrations"
-BASELINE = MIGRATIONS / "20260820192640_institutional_master_registry_20260820_v1.sql"
+BASELINE = (
+    ROOT
+    / "supabase"
+    / "migration_lineage"
+    / "replay_baselines"
+    / "institutional_federation_replay_baseline_v1.sql"
+)
 PROVIDER = (
     ROOT
     / "supabase"
@@ -45,6 +53,7 @@ BASELINE_GIT_BLOB = "7457b9e80944fee8db85b06903aff9fbbac75417"
 PROVIDER_BYTES = 2803
 PROVIDER_SHA256 = "d774bd53a6114267fc6bbc1270b773acdc8050ea041be0341be605fe5a4d0c3b"
 PROVIDER_GIT_BLOB = "44457542bfcc2e8826f37b9b8da59c6c531f7d16"
+ORIGINAL_20260820192640_GIT_BLOB = "f80fd7d0271d03f6c2b36448d82bf000dc24fc35"
 
 HEADER = b"""-- CrownThrive pre-consumer institutional replay supplement v1.
 -- Source version: 20260820003352 / preserve_future_credential_pending_state.
@@ -110,7 +119,7 @@ def main() -> None:
     baseline = BASELINE.read_bytes()
     provider = PROVIDER.read_bytes()
     verify_component(
-        "institutional replay baseline",
+        "institutional replay compatibility baseline",
         baseline,
         BASELINE_BYTES,
         BASELINE_SHA256,
@@ -124,18 +133,22 @@ def main() -> None:
         PROVIDER_GIT_BLOB,
     )
 
+    original = MIGRATIONS / "20260820192640_institutional_master_registry_20260820_v1.sql"
+    if not original.is_file():
+        hold("original 20260820192640 migration is missing")
+    if git_blob_sha(original.read_bytes()) != ORIGINAL_20260820192640_GIT_BLOB:
+        hold("original 20260820192640 migration identity changed")
+
     start = baseline.find(b"begin;")
     if start < 0:
-        hold("institutional replay baseline transaction body not found")
+        hold("institutional replay compatibility transaction body not found")
     baseline_sql = baseline[start:]
     if not baseline_sql.rstrip().endswith(b"commit;"):
-        hold("institutional replay baseline does not terminate with commit")
+        hold("institutional replay compatibility baseline does not terminate with commit")
 
     combined = HEADER + baseline_sql + SEPARATOR + provider
-    if not combined.endswith(provider):
-        hold("provider body is not an exact suffix of generated migration")
     if combined[-len(provider) :] != provider:
-        hold("provider suffix diverged during assembly")
+        hold("provider body is not preserved as an exact suffix")
 
     TARGET.write_bytes(combined)
     if MARKER.exists():
@@ -151,6 +164,13 @@ def main() -> None:
             "source_state": "PRECONSUMER_SUPPLEMENT_MATERIALIZED_REPLAY_PENDING",
             "canonical_path": str(TARGET.relative_to(ROOT)),
             "retired_marker": str(MARKER.relative_to(ROOT)),
+            "historical_identity_separation": {
+                "original_migration_path": str(original.relative_to(ROOT)),
+                "original_migration_git_blob_sha": ORIGINAL_20260820192640_GIT_BLOB,
+                "original_migration_repurposed": False,
+                "compatibility_baseline_path": str(BASELINE.relative_to(ROOT)),
+                "compatibility_baseline_git_blob_sha": BASELINE_GIT_BLOB,
+            },
             "institutional_prefix": {
                 "source_path": str(BASELINE.relative_to(ROOT)),
                 "source_bytes": len(baseline),
@@ -192,6 +212,7 @@ def main() -> None:
                 "combined_bytes": len(combined),
                 "combined_sha256": sha256(combined),
                 "provider_body_exact": True,
+                "original_20260820192640_unchanged": True,
                 "production_mutated": False,
                 "dependent_penta_wave": receipt["dependent_penta_wave"],
             },
