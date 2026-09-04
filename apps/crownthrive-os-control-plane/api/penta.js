@@ -130,38 +130,37 @@ function evidenceSinkState(oidcToken, selfTest = null) {
     verified &&
     selfTest?.persistence?.authentication === EXPECTED_OIDC_RECEIPT_AUTHENTICATION,
   );
+  const oidcBound = config.oidc_token_present;
+  const serviceRoleConfigured = config.service_role_configuration_valid;
+
+  const configurationBoundary = {
+    bound: oidcBound ? false : serviceRoleConfigured,
+    primary_route: oidcBound ? 'VERCEL_OIDC' : 'SERVICE_ROLE_FALLBACK',
+    service_role_fallback_available: serviceRoleConfigured,
+  };
+  if (!oidcBound && !serviceRoleConfigured) configurationBoundary.primary_route = 'UNBOUND';
 
   let mode = 'UNBOUND';
   if (verified) {
     mode = oidcVerified
       ? 'VERCEL_OIDC_EXACT_READBACK'
       : 'SERVICE_ROLE_EXACT_READBACK';
-  } else if (config.oidc_token_present) {
+  } else if (oidcBound) {
     mode = config.oidc_ingest_configuration_valid
       ? 'VERCEL_OIDC_PRESENT_UNVERIFIED'
       : 'VERCEL_OIDC_INGEST_CONFIGURATION_HOLD';
   } else if (config.service_role_present) {
-    mode = config.service_role_configuration_valid
+    mode = serviceRoleConfigured
       ? 'SERVICE_ROLE_CONFIGURED'
       : 'SERVICE_ROLE_CONFIGURATION_HOLD';
   }
 
-  const bound = verified || (
-    !config.oidc_token_present &&
-    config.service_role_configuration_valid
-  );
-
   return {
     provider: 'supabase',
-    bound,
+    ...configurationBoundary,
+    bound: verified ? true : configurationBoundary.bound,
     verified,
     mode,
-    primary_route: config.oidc_token_present
-      ? 'VERCEL_OIDC'
-      : config.service_role_configuration_valid
-        ? 'SERVICE_ROLE_FALLBACK'
-        : 'UNBOUND',
-    service_role_fallback_available: config.service_role_configuration_valid,
     ...config,
     oidc_token_verified: oidcVerified,
     verification_boundary: verified
@@ -254,10 +253,7 @@ async function persistWithServiceRole(penta, supabaseUrl, serviceRoleKey) {
     body: JSON.stringify(evidenceRow(penta)),
   });
   if (!result.ok) {
-    throw new EvidenceSinkError(
-      `Supabase Penta sink rejected delivery (${result.status})`,
-      result.status,
-    );
+    throw new EvidenceSinkError(`Supabase Penta sink rejected delivery (${result.status})`, result.status);
   }
   const readback = await fetch(
     `${canonicalOrigin}/rest/v1/pentafabric_events?penta_id=eq.${encodeURIComponent(penta.id)}&select=penta_id,trace_id,integrity_digest,build_sha,event,received_at&limit=1`,
@@ -271,12 +267,7 @@ async function persistWithServiceRole(penta, supabaseUrl, serviceRoleKey) {
       },
     },
   );
-  if (!readback.ok) {
-    throw new EvidenceSinkError(
-      `Supabase Penta readback failed (${readback.status})`,
-      readback.status,
-    );
-  }
+  if (!readback.ok) throw new EvidenceSinkError(`Supabase Penta readback failed (${readback.status})`, readback.status);
   const rows = await readback.json();
   const stored = Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
   const exact =
@@ -312,17 +303,10 @@ async function persistWithVercelOidc(penta, oidcToken) {
   const raw = await result.text();
   let receipt = null;
   if (raw) {
-    try {
-      receipt = JSON.parse(raw);
-    } catch {
-      receipt = null;
-    }
+    try { receipt = JSON.parse(raw); } catch { receipt = null; }
   }
   if (!result.ok) {
-    throw new EvidenceSinkError(
-      `Supabase OIDC Penta sink rejected delivery (${result.status})`,
-      result.status,
-    );
+    throw new EvidenceSinkError(`Supabase OIDC Penta sink rejected delivery (${result.status})`, result.status);
   }
   if (
     receipt?.status !== 'PERSISTED_READBACK_VERIFIED' ||
@@ -336,10 +320,7 @@ async function persistWithVercelOidc(penta, oidcToken) {
     receipt?.signing_build_sha !== penta.integrity.build_sha ||
     receipt?.exact_readback !== true
   ) {
-    throw new EvidenceSinkError(
-      'Supabase OIDC Penta sink did not return exact readback evidence',
-      result.status,
-    );
+    throw new EvidenceSinkError('Supabase OIDC Penta sink did not return exact readback evidence', result.status);
   }
   return {
     status: 'PERSISTED_READBACK_VERIFIED',
@@ -362,7 +343,9 @@ async function persistWithVercelOidc(penta, oidcToken) {
 async function persistPenta(penta, oidcToken) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (oidcToken) return persistWithVercelOidc(penta, oidcToken);
+  if (oidcToken) {
+    return persistWithVercelOidc(penta, oidcToken);
+  }
   if (supabaseUrl && serviceRoleKey) return persistWithServiceRole(penta, supabaseUrl, serviceRoleKey);
   return {
     status: 'SKIPPED_UNBOUND',
@@ -387,13 +370,8 @@ async function runSelfTest(state, oidcToken) {
   });
   verifyPenta(probe, { requireSignature: true });
   const persistence = await persistPenta(probe, oidcToken);
-  if (
-    persistence.status !== 'PERSISTED_READBACK_VERIFIED' ||
-    persistence.exact_readback !== true
-  ) {
-    throw new EvidenceSinkError(
-      'PentaFabric provider self-test did not produce exact persisted readback',
-    );
+  if (persistence.status !== 'PERSISTED_READBACK_VERIFIED' || persistence.exact_readback !== true) {
+    throw new EvidenceSinkError('PentaFabric provider self-test did not produce exact persisted readback');
   }
   return {
     status: 'PASS',
@@ -412,20 +390,11 @@ async function runSelfTest(state, oidcToken) {
 function classifySelfTestFailure(error) {
   const message = String(error?.message || '');
   if (/signing secret is not bound/i.test(message)) {
-    return {
-      reason: 'HMAC_BINDING_UNAVAILABLE',
-      detail: 'PentaFabric signing secret is not bound',
-    };
+    return { reason: 'HMAC_BINDING_UNAVAILABLE', detail: 'PentaFabric signing secret is not bound' };
   }
-  if (/canonical CrownThrive edge function|ingest URL/i.test(message)) {
-    return { reason: 'OIDC_INGEST_CONFIGURATION_HOLD' };
-  }
-  if (/canonical CrownThrive project|origin/i.test(message)) {
-    return { reason: 'SERVICE_ROLE_CONFIGURATION_HOLD' };
-  }
-  if (/exact readback|persisted readback/i.test(message)) {
-    return { reason: 'PROVIDER_READBACK_NOT_VERIFIED' };
-  }
+  if (/canonical CrownThrive edge function|ingest URL/i.test(message)) return { reason: 'OIDC_INGEST_CONFIGURATION_HOLD' };
+  if (/canonical CrownThrive project|origin/i.test(message)) return { reason: 'SERVICE_ROLE_CONFIGURATION_HOLD' };
+  if (/exact readback|persisted readback/i.test(message)) return { reason: 'PROVIDER_READBACK_NOT_VERIFIED' };
   return { reason: 'SELF_TEST_FAILED' };
 }
 
@@ -435,7 +404,6 @@ export default async function handler(request, response) {
 
   if (request.method === 'GET') {
     const selfTestRequested = requestQueryParam(request, 'selftest') === '1';
-
     if (!selfTestRequested) {
       const selfTest = { status: 'NOT_REQUESTED' };
       return send(response, 200, {
@@ -483,11 +451,7 @@ export default async function handler(request, response) {
         fabric: state,
         evidence_sink: evidenceSinkState(oidcToken),
         write_authorization: writeAuthorizationState(oidcToken),
-        self_test: {
-          status: 'FAIL',
-          reason: failure.reason,
-          provider_readback_verified: false,
-        },
+        self_test: { status: 'FAIL', reason: failure.reason, provider_readback_verified: false },
         provider_readback_claimed: false,
         pass_manufactured: false,
       });
@@ -515,9 +479,7 @@ export default async function handler(request, response) {
 
   try {
     const rawLength = Number(request.headers['content-length'] || 0);
-    if (rawLength > MAX_BODY_BYTES) {
-      return send(response, 413, { status: 'REJECTED', error: 'penta_payload_too_large' });
-    }
+    if (rawLength > MAX_BODY_BYTES) return send(response, 413, { status: 'REJECTED', error: 'penta_payload_too_large' });
     const body = request.body && typeof request.body === 'object' ? request.body : {};
     const externallySupplied = Object.hasOwn(body, 'penta');
     const penta = externallySupplied
