@@ -1,0 +1,44 @@
+ation_state text not null default 'draft' check (publication_state in ('draft','source_verified','approved','active','blocked','retired')),
+  alt_text_required boolean not null default true,
+  auto_sync_allowed boolean not null default false,
+  last_synced_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table integration_control.site_interaction_checks (
+  check_id text primary key,
+  surface_id text not null references integration_control.website_surfaces(surface_id) on delete cascade,
+  interaction_key text not null,
+  interaction_type text not null,
+  check_url text not null,
+  purpose text not null,
+  data_class text not null default 'public',
+  expect_http_min integer not null default 200,
+  expect_http_max integer not null default 299,
+  expect_form boolean not null default false,
+  expect_mailto boolean not null default false,
+  expect_tel boolean not null default false,
+  expect_text text,
+  consent_required boolean not null default false,
+  check_frequency_minutes integer not null default 1440 check (check_frequency_minutes >= 60),
+  auto_repair_class text not null default 'none' check (auto_repair_class in ('none','D0','D1','D2','D3')),
+  enabled boolean not null default true,
+  last_result text not null default 'unknown' check (last_result in ('unknown','pass','fail','blocked')),
+  last_checked_at timestamptz,
+  evidence_ref text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(surface_id, interaction_key)
+);
+
+create table integration_control.site_interaction_check_results (
+  result_id bigint generated always as identity primary key,
+  check_id text not null references integration_control.site_interaction_checks(check_id) on delete cascade,
+  checked_at timestamptz not null default now(),
+  http_status integer,
+  latency_ms integer,
+  content_type text,
+  response_sha256 text,

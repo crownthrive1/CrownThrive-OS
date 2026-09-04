@@ -1,0 +1,61 @@
+', now()
+  )
+  from integration_control.website_surfaces s;
+$$;
+
+create or replace function integration_control.website_asset_routes(p_surface_id text default null)
+returns jsonb
+language sql
+security definer
+set search_path = pg_catalog, integration_control
+as $$
+  select jsonb_build_object(
+    'surface_id', p_surface_id,
+    'routes', coalesce(jsonb_agg(to_jsonb(r) order by r.route_id) filter (where r.route_id is not null), '[]'::jsonb),
+    'retrieved_at', now()
+  )
+  from integration_control.creative_asset_routes r
+  where p_surface_id is null or r.surface_id = p_surface_id;
+$$;
+
+create or replace function integration_control.website_update_queue_list(p_surface_id text default null)
+returns jsonb
+language sql
+security definer
+set search_path = pg_catalog, integration_control
+as $$
+  select jsonb_build_object(
+    'surface_id', p_surface_id,
+    'updates', coalesce(jsonb_agg(to_jsonb(q) order by q.created_at desc) filter (where q.update_id is not null), '[]'::jsonb),
+    'retrieved_at', now()
+  )
+  from integration_control.site_update_queue q
+  where p_surface_id is null or q.surface_id = p_surface_id;
+$$;
+
+create or replace function integration_control.run_site_interaction_check(p_check_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, integration_control, public, extensions
+as $$
+declare
+  v_check integration_control.site_interaction_checks%rowtype;
+  v_response extensions.http_response;
+  v_started timestamptz := clock_timestamp();
+  v_latency integer;
+  v_body text;
+  v_hash text;
+  v_has_form boolean;
+  v_has_mailto boolean;
+  v_has_tel boolean;
+  v_text_match boolean;
+  v_ok boolean;
+  v_result_id bigint;
+begin
+  select * into v_check from integration_control.site_interaction_checks where check_id=p_check_id and enabled=true;
+  if not found then
+    return jsonb_build_object('check_id',p_check_id,'state','not_found_or_disabled');
+  end if;
+  if v_check.check_url !~ '^https://[A-Za-z0-9.-]+(?::[0-9]+)?(?:/|$)' then
+    update integration_control.site_interaction_check

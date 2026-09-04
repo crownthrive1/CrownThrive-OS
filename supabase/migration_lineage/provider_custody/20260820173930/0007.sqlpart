@@ -1,0 +1,51 @@
+ath = pg_catalog, integration_control
+as $$
+declare
+  r record;
+  v_results jsonb := '[]'::jsonb;
+  v_count integer := 0;
+begin
+  for r in
+    select check_id from integration_control.site_interaction_checks
+    where enabled=true and (last_checked_at is null or last_checked_at <= now() - make_interval(mins=>check_frequency_minutes))
+    order by coalesce(last_checked_at,'epoch'::timestamptz), check_id
+    limit greatest(1,least(coalesce(p_limit,25),100))
+  loop
+    v_results := v_results || jsonb_build_array(integration_control.run_site_interaction_check(r.check_id));
+    v_count := v_count + 1;
+  end loop;
+  return jsonb_build_object('checks_run',v_count,'results',v_results,'run_at',now());
+end;
+$$;
+
+create or replace function integration_control.plan_site_surface_updates(p_surface_id text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, integration_control
+as $$
+declare
+  r record;
+  v_created integer := 0;
+begin
+  for r in
+    select c.*, res.result_id, res.failure_class
+    from integration_control.site_interaction_checks c
+    join lateral (
+      select x.* from integration_control.site_interaction_check_results x where x.check_id=c.check_id order by x.checked_at desc limit 1
+    ) res on true
+    where res.success=false
+      and c.auto_repair_class <> 'none'
+      and (p_surface_id is null or c.surface_id=p_surface_id)
+      and not exists (
+        select 1 from integration_control.site_update_queue q
+        where q.surface_id=c.surface_id and q.trigger_key=c.check_id and q.state in ('planned','approved','executing')
+      )
+  loop
+    insert into integration_control.site_update_queue(surface_id,trigger_key,operation_key,risk_class,requested_change,autonomous_eligible,requires_human_approval,source_result_id,metadata)
+    values(
+      r.surface_id,
+      r.check_id,
+      'site.interaction.remediation.plan',
+      r.auto_repair_class,
+      jsonb_build_object('interaction_key',r.interaction_key,'interaction_type',r.interaction_type,'failure_class',r.failure_c

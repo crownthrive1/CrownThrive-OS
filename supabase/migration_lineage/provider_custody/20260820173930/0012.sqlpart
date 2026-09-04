@@ -1,0 +1,8 @@
+.list','website_surface_control','update_queue.list','D0',true,false,'{"type":"object","properties":{"surface_id":{"type":["string","null"]}},"additionalProperties":false}'::jsonb,'{"type":"object"}'::jsonb,'Lists website remediation/update plans and their approval state.'),
+('sites.update.plan','website_surface_control','update.plan','D1',true,false,'{"type":"object","properties":{"surface_id":{"type":["string","null"]}},"additionalProperties":false}'::jsonb,'{"type":"object"}'::jsonb,'Creates internal remediation plans from failed site interaction checks. Does not mutate external websites.'),
+('sites.update.apply','website_surface_control','update.apply','D2',false,true,'{"type":"object","properties":{"update_id":{"type":"string"}},"required":["update_id"],"additionalProperties":false}'::jsonb,'{"type":"object"}'::jsonb,'Reserved external website mutation path. Disabled until the Sites/provider write adapter, rollback and read-after-write certification pass.')
+on conflict(tool_name) do update set service_id=excluded.service_id,operation_key=excluded.operation_key,risk_class=excluded.risk_class,enabled=excluded.enabled,requires_human_approval=excluded.requires_human_approval,input_schema=excluded.input_schema,output_schema=excluded.output_schema,notes=excluded.notes,updated_at=now();
+
+select cron.unschedule(jobid) from cron.job where jobname in ('crownthrive_site_interaction_checks_daily','crownthrive_site_update_planner_daily');
+select cron.schedule('crownthrive_site_interaction_checks_daily','12 5 * * *','select integration_control.run_due_site_interaction_checks(25);');
+select cron.schedule('crownthrive_site_update_planner_daily','17 5 * * *','select integration_control.plan_site_surface_updates(null);');

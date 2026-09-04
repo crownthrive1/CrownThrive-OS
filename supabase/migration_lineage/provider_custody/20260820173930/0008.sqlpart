@@ -1,0 +1,28 @@
+lass,'check_url',r.check_url),
+      r.auto_repair_class in ('D0','D1'),
+      r.auto_repair_class in ('D2','D3'),
+      r.result_id,
+      jsonb_build_object('external_mutation_allowed',false,'reason','Sites/provider write adapter not certified; queue is planning evidence only')
+    );
+    v_created := v_created + 1;
+  end loop;
+  return jsonb_build_object('surface_id',p_surface_id,'planned_updates_created',v_created,'external_mutation_allowed',false,'planned_at',now());
+end;
+$$;
+
+revoke all on function integration_control.website_surface_list() from public, anon, authenticated;
+revoke all on function integration_control.website_asset_routes(text) from public, anon, authenticated;
+revoke all on function integration_control.website_update_queue_list(text) from public, anon, authenticated;
+revoke all on function integration_control.run_site_interaction_check(text) from public, anon, authenticated;
+revoke all on function integration_control.run_due_site_interaction_checks(integer) from public, anon, authenticated;
+revoke all on function integration_control.plan_site_surface_updates(text) from public, anon, authenticated;
+grant execute on function integration_control.website_surface_list() to service_role;
+grant execute on function integration_control.website_asset_routes(text) to service_role;
+grant execute on function integration_control.website_update_queue_list(text) to service_role;
+grant execute on function integration_control.run_site_interaction_check(text) to service_role;
+grant execute on function integration_control.run_due_site_interaction_checks(integer) to service_role;
+grant execute on function integration_control.plan_site_surface_updates(text) to service_role;
+
+insert into integration_control.website_surfaces(surface_id,platform_id,display_name,provider_system,provider_project_ref,provider_version_ref,environment,canonical_url,contact_url,design_authority_ref,creative_production_ref,source_evidence_ref,provider_connection_state,update_mode,auto_update_enabled,metadata)
+values
+('ct.surface.crownthriv

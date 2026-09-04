@@ -1,0 +1,29 @@
+s set last_result='blocked',last_checked_at=now(),updated_at=now() where check_id=p_check_id;
+    return jsonb_build_object('check_id',p_check_id,'state','blocked_invalid_url');
+  end if;
+
+  v_response := extensions.http((row(
+    'GET',
+    v_check.check_url,
+    array[extensions.http_header('Accept','text/html,application/xhtml+xml'), extensions.http_header('User-Agent','CrownThrive-Surface-Control/1.0')],
+    null,
+    null
+  ))::extensions.http_request);
+  v_latency := greatest(0, round(extract(epoch from (clock_timestamp()-v_started))*1000)::integer);
+  v_body := lower(coalesce(v_response.content,''));
+  v_hash := encode(extensions.digest(coalesce(v_response.content,''),'sha256'),'hex');
+  v_has_form := position('<form' in v_body) > 0;
+  v_has_mailto := position('mailto:' in v_body) > 0;
+  v_has_tel := position('tel:' in v_body) > 0;
+  v_text_match := case when v_check.expect_text is null then true else position(lower(v_check.expect_text) in v_body) > 0 end;
+  v_ok := v_response.status between v_check.expect_http_min and v_check.expect_http_max
+          and (not v_check.expect_form or v_has_form)
+          and (not v_check.expect_mailto or v_has_mailto)
+          and (not v_check.expect_tel or v_has_tel)
+          and v_text_match;
+
+  insert into integration_control.site_interaction_check_results(
+    check_id,http_status,latency_ms,content_type,response_sha256,response_bytes,has_form,has_mailto,has_tel,text_match,success,failure_class,evidence
+  ) values (
+    p_check_id,v_response.status,v_latency,v_response.content_type,v_hash,octet_length(coalesce(v_response.content,'')),v_has_form,v_has_mailto,v_has_tel,v_text_match,v_ok,
+    case when v_ok then null when v_response.status not between v_check.expect_http_min and v_check.expect_http_max then 'http_status' when v_check.expect_form and not v_has_form then 'form_missing' when v_check.expect_mailto and not v_has_mailto then 'mailto_missing' when v_check.expect_tel and not v_has_tel then 'tel_missing' when not v_text_match then 'expected_text_missing' else '

@@ -1,0 +1,10 @@
+t handoff presence','public',false,false,false,'Get In Touch',false,1440,'D1',jsonb_build_object('claim_drift_watch',true)),
+('ct.check.kjv.contact-route','ct.surface.kjv-visualized.production','contact.route.primary','contact_route','https://kjvsermontoolkit.crownthrive.com/contact','public KJV contact route availability','public',false,false,false,null,false,1440,'D1',jsonb_build_object('source_route_verified_in_release_register',true,'form_expectation_unverified',true))
+on conflict(check_id) do update set check_url=excluded.check_url,purpose=excluded.purpose,data_class=excluded.data_class,expect_form=excluded.expect_form,expect_mailto=excluded.expect_mailto,expect_tel=excluded.expect_tel,expect_text=excluded.expect_text,check_frequency_minutes=excluded.check_frequency_minutes,auto_repair_class=excluded.auto_repair_class,metadata=integration_control.site_interaction_checks.metadata||excluded.metadata,updated_at=now();
+
+insert into integration_control.mcp_tools(tool_name,service_id,operation_key,risk_class,enabled,requires_human_approval,input_schema,output_schema,notes)
+values
+('sites.surface.list','website_surface_control','surface.list','D0',true,false,'{"type":"object","additionalProperties":false}'::jsonb,'{"type":"object"}'::jsonb,'Lists governed website surfaces and current provider/design/automation state.'),
+('sites.interaction.check','website_surface_control','interaction.check','D0',true,false,'{"type":"object","properties":{"check_id":{"type":"string","minLength":1,"maxLength":200}},"required":["check_id"],"additionalProperties":false}'::jsonb,'{"type":"object"}'::jsonb,'Runs a read-only public website/contact interaction expectation check. Never submits live contact forms.'),
+('sites.asset_routes.list','website_surface_control','asset_routes.list','D0',true,false,'{"type":"object","properties":{"surface_id":{"type":["string","null"]}},"additionalProperties":false}'::jsonb,'{"type":"object"}'::jsonb,'Lists governed Figma/Canva/other creative asset routes into website surfaces.'),
+('sites.update_queue

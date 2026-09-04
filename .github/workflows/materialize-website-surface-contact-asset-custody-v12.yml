@@ -1,0 +1,79 @@
+name: Materialize Website Surface Contact Asset Custody v12
+
+on:
+  push:
+    branches:
+      - 'repair/chlom-framework-package-custody-v8-20260904'
+    paths:
+      - 'supabase/migration_lineage/provider_custody/20260820173930/**'
+      - 'scripts/materialize_website_surface_contact_asset_custody_v12.py'
+      - '.github/workflows/materialize-website-surface-contact-asset-custody-v12.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-website-surface-contact-asset-v12-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Assemble and verify exact provider body
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check out exact repair head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Materialize exact provider migration
+        run: python3 scripts/materialize_website_surface_contact_asset_custody_v12.py
+
+      - name: Reject patch and whitespace corruption
+        run: git diff --check
+
+      - name: Reverify complete provider object identity
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          path = Path('supabase/migrations/20260820173930_add_website_surface_contact_asset_control.sql')
+          raw = path.read_bytes()
+          expected = (
+              26314,
+              '686f55cb167de9b0e2a78f913c542bc033843a9dc5272f107a23a95727771086',
+              '9caa8428f4f295aee689f3eb69974635be97b6dc',
+          )
+          actual = (
+              len(raw),
+              hashlib.sha256(raw).hexdigest(),
+              hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest(),
+          )
+          if actual != expected:
+              raise SystemExit(f'HOLD_COMPLETE_PROVIDER_OBJECT_MISMATCH: {actual}')
+          matches = sorted(
+              p.name for p in Path('supabase/migrations').glob('20260820173930_*.sql')
+          )
+          if matches != ['20260820173930_add_website_surface_contact_asset_control.sql']:
+              raise SystemExit(f'HOLD_PROVIDER_VERSION_NOT_UNIQUE: {matches}')
+          print('PASS_WEBSITE_SURFACE_PROVIDER_OBJECT')
+          PY
+
+      - name: Commit exact source custody without force
+        run: |
+          if git diff --quiet --exit-code; then
+            echo 'Exact provider custody is already materialized.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-custody[bot]'
+          git config user.email 'crownthrive-custody[bot]@users.noreply.github.com'
+          git add -A \
+            supabase/migrations/20260820173930_add_website_surface_contact_asset_control.sql \
+            supabase/migrations/20260820173930_remote_applied_lineage.sql \
+            supabase/migration_lineage/replay_diagnostics/20260904_website_surface_contact_asset_control_custody_v12.json
+          git commit -m 'fix(supabase): materialize website surface asset custody'
+          git push origin "HEAD:${GITHUB_REF_NAME}"

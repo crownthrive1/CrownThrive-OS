@@ -1,0 +1,26 @@
+expectation_failed' end,
+    jsonb_build_object('url',v_check.check_url,'interaction_type',v_check.interaction_type,'data_class',v_check.data_class,'consent_required',v_check.consent_required)
+  ) returning result_id into v_result_id;
+
+  update integration_control.site_interaction_checks set last_result=case when v_ok then 'pass' else 'fail' end,last_checked_at=now(),evidence_ref='site_interaction_result:'||v_result_id,updated_at=now() where check_id=p_check_id;
+  update integration_control.website_surfaces s set
+    last_checked_at=now(),
+    health_state=case when v_ok then 'healthy' else 'degraded' end,
+    updated_at=now()
+  where s.surface_id=v_check.surface_id;
+
+  perform public.integration_record_request('website_surface_control','interaction.check','GET',v_check.interaction_key,v_response.status,v_ok,'supabase_surface_probe',v_latency,v_hash,case when v_ok then 'site interaction expectation passed' else 'site interaction expectation failed' end);
+
+  return jsonb_build_object('check_id',p_check_id,'surface_id',v_check.surface_id,'result_id',v_result_id,'success',v_ok,'http_status',v_response.status,'latency_ms',v_latency,'has_form',v_has_form,'has_mailto',v_has_mailto,'has_tel',v_has_tel,'text_match',v_text_match,'response_sha256',v_hash,'checked_at',now());
+exception when others then
+  insert into integration_control.site_interaction_check_results(check_id,success,failure_class,evidence) values (p_check_id,false,SQLSTATE,jsonb_build_object('exception_class',SQLSTATE)) returning result_id into v_result_id;
+  update integration_control.site_interaction_checks set last_result='blocked',last_checked_at=now(),evidence_ref='site_interaction_result:'||v_result_id,updated_at=now() where check_id=p_check_id;
+  return jsonb_build_object('check_id',p_check_id,'result_id',v_result_id,'success',false,'error_class',SQLSTATE,'checked_at',now());
+end;
+$$;
+
+create or replace function integration_control.run_due_site_interaction_checks(p_limit integer default 25)
+returns jsonb
+language plpgsql
+security definer
+set search_p
