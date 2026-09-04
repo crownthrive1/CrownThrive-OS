@@ -18,9 +18,26 @@ function send(response, status, payload, head = false) {
 }
 
 function canonicalSupabaseOrigin(value) {
-  return value === CANONICAL_SUPABASE_ORIGIN || value === `${CANONICAL_SUPABASE_ORIGIN}/`
-    ? CANONICAL_SUPABASE_ORIGIN
-    : null;
+  const raw = String(value || '');
+  const exact = raw === CANONICAL_SUPABASE_ORIGIN || raw === `${CANONICAL_SUPABASE_ORIGIN}/`;
+  if (!exact) return null;
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.origin !== CANONICAL_SUPABASE_ORIGIN ||
+    parsed.username ||
+    parsed.password ||
+    parsed.port ||
+    parsed.pathname !== '/' ||
+    parsed.search ||
+    parsed.hash
+  ) return null;
+  return CANONICAL_SUPABASE_ORIGIN;
 }
 
 function countBy(rows, key) {
@@ -39,11 +56,39 @@ function windowHours(request) {
   if (raw === '1h') return 1;
   if (raw === '7d') return 168;
   const parsed = Number(raw);
-  return Number.isFinite(parsed) ? Math.min(Math.max(Math.trunc(parsed), 1), 168) : DEFAULT_WINDOW_HOURS;
+  return Number.isFinite(parsed)
+    ? Math.min(Math.max(Math.trunc(parsed), 1), 168)
+    : DEFAULT_WINDOW_HOURS;
+}
+
+function bindingState() {
+  const suppliedUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!suppliedUrl || !serviceRoleKey) {
+    return {
+      state: 'UNBOUND',
+      origin: null,
+      serviceRoleKey: null,
+    };
+  }
+  const origin = canonicalSupabaseOrigin(suppliedUrl);
+  if (!origin) {
+    return {
+      state: 'CONFIGURATION_HOLD',
+      origin: null,
+      serviceRoleKey: null,
+    };
+  }
+  return {
+    state: 'BOUND',
+    origin,
+    serviceRoleKey,
+  };
 }
 
 async function rpc(origin, key, functionName, body) {
-  const result = await fetch(`${origin}/rest/v1/rpc/${functionName}`, {
+  const target = new URL(`/rest/v1/rpc/${functionName}`, origin);
+  const result = await fetch(target, {
     method: 'POST',
     redirect: 'error',
     cache: 'no-store',
@@ -56,35 +101,27 @@ async function rpc(origin, key, functionName, body) {
     body: JSON.stringify(body),
   });
   if (!result.ok) {
-    const detail = await result.text();
-    const error = new Error(`${functionName} readback failed (${result.status})`);
-    error.detail = detail.slice(0, 240);
+    const error = new Error(`${functionName}_readback_failed`);
+    error.code = 'UPSTREAM_READBACK_FAILED';
     throw error;
   }
   return result.json();
 }
 
-async function readUnified(request) {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    const error = new Error('SUPABASE_SERVICE_ROLE_BINDING_REQUIRED');
-    error.code = 'UNBOUND';
-    throw error;
-  }
-  const origin = canonicalSupabaseOrigin(supabaseUrl);
-  if (!origin) throw new Error('SUPABASE_ORIGIN_NOT_CANONICAL');
-
-  const live = await rpc(origin, serviceRoleKey, 'crownthrive_os_live_readback_v1', {
+async function readUnified(request, binding) {
+  const live = await rpc(binding.origin, binding.serviceRoleKey, 'crownthrive_os_live_readback_v1', {
     p_window_hours: windowHours(request),
     p_limit: DEFAULT_LIMIT,
   });
 
-  let interventionHistory = null;
+  let interventionHistory;
   try {
-    interventionHistory = await rpc(origin, serviceRoleKey, 'crownthrive_os_intervention_history_v1', {
-      p_limit: INTERVENTION_LIMIT,
-    });
+    interventionHistory = await rpc(
+      binding.origin,
+      binding.serviceRoleKey,
+      'crownthrive_os_intervention_history_v1',
+      { p_limit: INTERVENTION_LIMIT },
+    );
   } catch {
     interventionHistory = {
       status: 'PARTIAL',
@@ -95,6 +132,70 @@ async function readUnified(request) {
   }
 
   return { live, interventionHistory };
+}
+
+function unboundPayload(request, binding) {
+  return {
+    schema: 'ct.penta.os.operations.v2',
+    service: 'crownthrive-os-control-plane',
+    status: 'PARTIAL',
+    window_hours: windowHours(request),
+    window_start: null,
+    source: {
+      provider: 'supabase',
+      state: binding.state,
+      mode: 'SERVER_ONLY_UNIFIED_RPC',
+      secret_material_exposed: false,
+    },
+    activity: {
+      total_events: 0,
+      persisted_pentas: 0,
+      penta_super_runs: 0,
+      wake_requests: 0,
+      remediation_events: 0,
+      intervention_events: 0,
+      distribution_scope: 'unobserved_until_server_binding',
+      active_protocols: 0,
+      active_routes: 0,
+      active_lanes: 0,
+      protocols: [],
+      routes: [],
+      lanes: [],
+      recent: [],
+    },
+    stats: {},
+    providers: [],
+    routes: [],
+    operations: [],
+    interventions: [],
+    intervention_history: {
+      status: binding.state,
+      count: 0,
+      complete_to_limit: false,
+      limit: INTERVENTION_LIMIT,
+    },
+    dail: [],
+    instrumentation: {
+      unified_live_readback: binding.state,
+      vercel_provider_readback: 'UNBOUND',
+      pentafabric_event_ledger: 'UNBOUND',
+      penta_runtime: 'UNBOUND',
+      pentatime: 'UNBOUND',
+      remediation: 'UNBOUND',
+      dail: 'UNBOUND',
+      communications_evidence: 'UNBOUND',
+      pentamocracy: 'UNBOUND',
+      intervention_ledger: 'UNBOUND',
+      provider_registry: 'UNBOUND',
+      route_registry: 'UNBOUND',
+      polling_mode: 'NEAR_REAL_TIME',
+      unobserved_activity_claimed: false,
+    },
+    generated_at: null,
+    observed_at: new Date().toISOString(),
+    public_safe: true,
+    pass_manufactured: false,
+  };
 }
 
 export default async function handler(request, response) {
@@ -109,8 +210,34 @@ export default async function handler(request, response) {
     });
   }
 
+  const binding = bindingState();
+  if (binding.state === 'UNBOUND') {
+    return send(response, 200, unboundPayload(request, binding), head);
+  }
+  if (binding.state !== 'BOUND') {
+    return send(response, 503, {
+      schema: 'ct.penta.os.operations.v2',
+      service: 'crownthrive-os-control-plane',
+      status: 'DEGRADED',
+      error: 'operations_readback_failed',
+      source: {
+        provider: 'supabase',
+        state: 'CONFIGURATION_HOLD',
+        mode: 'SERVER_ONLY_UNIFIED_RPC',
+        secret_material_exposed: false,
+      },
+      instrumentation: {
+        unified_live_readback: 'CONFIGURATION_HOLD',
+        vercel_provider_readback: 'UNBOUND',
+        unobserved_activity_claimed: false,
+      },
+      observed_at: new Date().toISOString(),
+      pass_manufactured: false,
+    }, head);
+  }
+
   try {
-    const { live, interventionHistory } = await readUnified(request);
+    const { live, interventionHistory } = await readUnified(request, binding);
     const ledger = Array.isArray(live?.ledger) ? live.ledger : [];
     const providers = Array.isArray(live?.providers) ? live.providers : [];
     const routes = Array.isArray(live?.routes) ? live.routes : [];
@@ -183,6 +310,8 @@ export default async function handler(request, response) {
       },
       dail,
       instrumentation: {
+        unified_live_readback: 'BOUND',
+        vercel_provider_readback: 'SEPARATE_PROVIDER_ENDPOINT',
         pentafabric_event_ledger: 'BOUND',
         penta_runtime: 'BOUND',
         pentatime: 'BOUND',
@@ -202,15 +331,21 @@ export default async function handler(request, response) {
       pass_manufactured: false,
     };
     return send(response, 200, payload, head);
-  } catch (error) {
+  } catch {
     return send(response, 503, {
       schema: 'ct.penta.os.operations.v2',
       service: 'crownthrive-os-control-plane',
       status: 'DEGRADED',
-      error: error?.code || 'operations_readback_failed',
-      detail: String(error?.message || error).slice(0, 240),
+      error: 'operations_readback_failed',
+      source: {
+        provider: 'supabase',
+        state: 'BOUND',
+        mode: 'SERVER_ONLY_UNIFIED_RPC',
+        secret_material_exposed: false,
+      },
       instrumentation: {
         unified_live_readback: 'READBACK_FAILED',
+        vercel_provider_readback: 'UNOBSERVED',
         unobserved_activity_claimed: false,
       },
       observed_at: new Date().toISOString(),
