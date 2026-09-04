@@ -73,16 +73,15 @@ class FullRepositoryEstateCensusTests(unittest.TestCase):
         ):
             self.assertEqual(self.by_repo[repository]["source_contract_ci"], "PASS")
 
-    def test_pentaself_is_truthful_tooling_hold_not_fake_merge(self):
+    def test_pentaself_terminalized_source_custody_is_bound_without_authority(self):
         item = self.by_repo["crownthrive1/PentaSELF"]
-        self.assertEqual(item["exact_head"], "7bf1017de4208ce85f92d5007a95232c1202b885")
-        self.assertEqual(item["governance_candidate_head"], "d0c4cc01b45307bf2bbac5c28887fc424b4aa036")
+        self.assertEqual(item["exact_head"], "f13f1d8bc5bcf54f63f6ea34a9e66f9ce0162142")
+        self.assertEqual(item["governance_candidate_head"], "de090e92fabe61ce9dc0823e02320c5aef3ae031")
         self.assertEqual(item["source_contract_ci"], "PASS")
-        self.assertEqual(item["merge_state"], "OPEN_TOOLING_SAFETY_HOLD")
-        self.assertEqual(item["state"], "ACTIVE_GOVERNANCE_PR_TOOLING_HOLD")
-        hold = self.registry_set["holds"][0]
-        self.assertEqual(hold["repository"], "crownthrive1/PentaSELF")
-        self.assertFalse(hold["mutation_authority_from_hold"])
+        self.assertEqual(item["merge_state"], "MERGED_READBACK")
+        self.assertEqual(item["state"], "ACTIVE")
+        self.assertFalse(item["runtime_authority_moved"])
+        self.assertFalse(any(hold.get("repository") == "crownthrive1/PentaSELF" for hold in self.registry_set["holds"]))
 
     def test_empty_placeholders_are_inventory_only(self):
         self.assertFalse(self.census["authority"]["empty_placeholder_grants_authority"])
