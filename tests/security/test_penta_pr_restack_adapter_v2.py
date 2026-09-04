@@ -3,7 +3,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SQL = (ROOT / "supabase/migrations/20260904134400_penta_pr_restack_execution_adapter_v2.sql").read_text()
 EDGE = (ROOT / "supabase/functions/penta-pr-restack-provider/index.ts").read_text()
-BRIDGE = (ROOT / "supabase/migrations/20260823203545_chlom_vault_capability_structural_replay_bridge_v1.sql").read_text()
+BRIDGE = (ROOT / "supabase/migrations/20260823202949_chlom_vault_capability_structural_replay_bridge_v1.sql").read_text()
+TOMBSTONE = (ROOT / "supabase/migrations/20260823203545_chlom_vault_capability_structural_replay_bridge_v1.sql").read_text()
 
 
 def test_assignment_gate_is_exact_and_d2_bounded():
@@ -49,8 +50,8 @@ def test_no_secret_material_is_serialized_to_evidence():
     assert "raw_secret" not in SQL.lower()
 
 
-def test_structural_replay_bridge_restores_exact_dependency_without_credentials():
-    assert "20260823203546_execution_builder_capability_contract_identity_v1.sql" in BRIDGE
+def test_structural_replay_bridge_precedes_provider_proven_preflight_without_credentials():
+    assert "20260823202950_execution_builder_capability_contract_identity_v1.sql" in BRIDGE
     assert "chlom_secrets.trade_secret_assets" in BRIDGE
     assert "chlom_runtime.vaulted_capability_registry" in BRIDGE
     assert "create or replace view chlom_runtime.capability_contracts" in BRIDGE
@@ -68,3 +69,11 @@ def test_structural_replay_bridge_preserves_client_deny_and_service_role_boundar
     assert "grant select, insert, update on chlom_secrets.trade_secret_assets to service_role" in BRIDGE.lower()
     assert "grant select, insert, update on chlom_runtime.vaulted_capability_registry to service_role" in BRIDGE.lower()
     assert "body_exposure_allowed boolean not null default false" in BRIDGE.lower()
+
+
+def test_late_bridge_is_provenance_only_tombstone():
+    assert "PROVENANCE-ONLY TOMBSTONE" in TOMBSTONE
+    assert "20260823202949_chlom_vault_capability_structural_replay_bridge_v1.sql" in TOMBSTONE
+    assert "create table" not in TOMBSTONE.lower()
+    assert "create or replace view" not in TOMBSTONE.lower()
+    assert "vault.create_secret" not in TOMBSTONE
