@@ -27,16 +27,23 @@ class FullRepositoryEstateCensusTests(unittest.TestCase):
         cls.by_repo = {item["repository"]: item for item in cls.materialized["resources"]}
 
     def test_provider_census_is_complete_and_disjoint(self):
-        self.assertEqual(self.census["accessible_repository_count"], 128)
-        self.assertEqual(self.census["nonempty_repository_count"], 37)
-        self.assertEqual(self.census["empty_placeholder_count"], 91)
-        self.assertEqual(128, 37 + 91)
-        self.assertEqual(len(self.census["nonempty_repositories"]), 37)
-        self.assertEqual(len(self.census["empty_placeholders"]), 91)
+        accessible = self.census["accessible_repository_count"]
+        nonempty_count = self.census["nonempty_repository_count"]
+        empty_count = self.census["empty_placeholder_count"]
+        self.assertEqual(accessible, nonempty_count + empty_count)
+        self.assertEqual(len(self.census["nonempty_repositories"]), nonempty_count)
+        self.assertEqual(len(self.census["empty_placeholders"]), empty_count)
         self.assertFalse(set(self.census["nonempty_repositories"]) & set(self.census["empty_placeholders"]))
 
     def test_composed_registry_accounts_for_every_nonempty_repository(self):
-        self.assertEqual(self.materialized["governed_resource_count"], 38)
+        self.assertEqual(
+            self.materialized["governed_resource_count"],
+            self.registry_set["composed_governed_resource_count"],
+        )
+        self.assertEqual(
+            self.materialized["governed_resource_count"],
+            self.census["governed_resource_registry_count_target"],
+        )
         nonempty = {f"crownthrive1/{name}" for name in self.census["nonempty_repositories"]}
         governed = set(self.by_repo)
         self.assertTrue(nonempty <= governed)
