@@ -24,7 +24,7 @@ jobs:
           ref: "governance/cos-1.8-pentagovernance-ratification-20260904"
           fetch-depth: 0
           persist-credentials: true
-      - name: Capture deterministic payload diagnostic
+      - name: Capture encoded-payload canonicalization diagnostic
         shell: bash
         run: |
           python - <<'PY'
@@ -47,63 +47,80 @@ jobs:
           }
           expected_archive = 'e0fb8547ce9c40eeb3706228943afd2a2cedc6d2c64ff233173ad106b635fe7e'
           record: dict[str, object] = {
-              'schema': 'ct.cos18.payload-diagnostic.v1',
+              'schema': 'ct.cos18.payload-diagnostic.v2',
               'expected_archive_sha256': expected_archive,
               'parts': {},
-              'members': [],
-              'status': 'DIAGNOSTIC_FAILED',
+              'decode_attempts': {},
+              'status': 'DIAGNOSTIC_COMPLETE',
           }
-          try:
-              joined = bytearray()
-              for name, expected in expected_parts.items():
-                  path = root / name
-                  data = path.read_bytes()
-                  actual = hashlib.sha256(data).hexdigest()
-                  record['parts'][name] = {
-                      'bytes': len(data),
-                      'expected_sha256': expected,
-                      'actual_sha256': actual,
-                      'matches': actual == expected,
-                  }
-                  if actual != expected:
-                      raise ValueError(f'part digest mismatch: {name}')
-                  joined.extend(data)
+          raw_joined = bytearray()
+          compact_joined = bytearray()
+          for name, expected in expected_parts.items():
+              path = root / name
+              data = path.read_bytes()
+              stripped = data.rstrip(b'\r\n')
+              compact = b''.join(data.split())
+              actual = hashlib.sha256(data).hexdigest()
+              stripped_sha = hashlib.sha256(stripped).hexdigest()
+              compact_sha = hashlib.sha256(compact).hexdigest()
+              record['parts'][name] = {
+                  'raw_bytes': len(data),
+                  'compact_bytes': len(compact),
+                  'expected_sha256': expected,
+                  'raw_sha256': actual,
+                  'rstrip_newline_sha256': stripped_sha,
+                  'whitespace_free_sha256': compact_sha,
+                  'expected_matches': [
+                      mode for mode, digest in {
+                          'raw': actual,
+                          'rstrip_newline': stripped_sha,
+                          'whitespace_free': compact_sha,
+                      }.items() if digest == expected
+                  ],
+              }
+              raw_joined.extend(data)
+              compact_joined.extend(compact)
 
-              record['joined_base64_bytes'] = len(joined)
-              archive = base64.b64decode(bytes(joined), validate=True)
-              archive_sha = hashlib.sha256(archive).hexdigest()
-              record['archive_bytes'] = len(archive)
-              record['actual_archive_sha256'] = archive_sha
-              record['archive_matches'] = archive_sha == expected_archive
-              if archive_sha != expected_archive:
-                  raise ValueError('archive digest mismatch')
-
-              with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as tf:
-                  members = tf.getmembers()
-                  names: list[str] = []
-                  unsafe: list[str] = []
-                  for member in members:
-                      name = member.name
-                      names.append(name)
-                      path = pathlib.PurePosixPath(name)
-                      if path.is_absolute() or '..' in path.parts:
-                          unsafe.append(name)
-                  record['members'] = sorted(names)
-                  record['member_count'] = len(names)
-                  record['unsafe_members'] = unsafe
-                  record['manifest_candidates'] = sorted(
-                      name for name in names if name.endswith('governance/pentagovernance/ratification/PATCH_MANIFEST.json')
-                  )
-                  record['compact_candidates'] = sorted(
-                      name for name in names if name.endswith('governance/pentagovernance/contracts/PENTAGOVERNANCE_CONSTITUENCY_COMPACT_v1.md')
-                  )
-                  if unsafe:
-                      raise ValueError('unsafe archive members present')
-              record['status'] = 'PASS_DIAGNOSTIC'
-          except Exception as exc:  # diagnostic must survive the failing condition
-              record['error_type'] = type(exc).__name__
-              record['error'] = str(exc)
-              record['traceback'] = traceback.format_exc()
+          attempts = {
+              'raw_permissive': bytes(raw_joined),
+              'whitespace_free': bytes(compact_joined),
+          }
+          for label, encoded in attempts.items():
+              attempt: dict[str, object] = {
+                  'encoded_bytes': len(encoded),
+                  'encoded_sha256': hashlib.sha256(encoded).hexdigest(),
+              }
+              try:
+                  archive = base64.b64decode(encoded, validate=(label == 'whitespace_free'))
+                  archive_sha = hashlib.sha256(archive).hexdigest()
+                  attempt['archive_bytes'] = len(archive)
+                  attempt['archive_sha256'] = archive_sha
+                  attempt['expected_archive_match'] = archive_sha == expected_archive
+                  with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as tf:
+                      members = tf.getmembers()
+                      names = [member.name for member in members]
+                      unsafe = [
+                          name for name in names
+                          if pathlib.PurePosixPath(name).is_absolute()
+                          or '..' in pathlib.PurePosixPath(name).parts
+                      ]
+                      attempt['tar_valid'] = True
+                      attempt['member_count'] = len(names)
+                      attempt['members'] = sorted(names)
+                      attempt['unsafe_members'] = unsafe
+                      attempt['manifest_candidates'] = sorted(
+                          name for name in names
+                          if name.endswith('governance/pentagovernance/ratification/PATCH_MANIFEST.json')
+                      )
+                      attempt['compact_candidates'] = sorted(
+                          name for name in names
+                          if name.endswith('governance/pentagovernance/contracts/PENTAGOVERNANCE_CONSTITUENCY_COMPACT_v1.md')
+                      )
+              except Exception as exc:
+                  attempt['error_type'] = type(exc).__name__
+                  attempt['error'] = str(exc)
+                  attempt['traceback'] = traceback.format_exc()
+              record['decode_attempts'][label] = attempt
 
           output = root / 'archive-diagnostic.json'
           output.write_text(json.dumps(record, indent=2, sort_keys=True) + '\n', encoding='utf-8')
@@ -121,5 +138,5 @@ jobs:
             echo "Diagnostic is unchanged."
             exit 0
           fi
-          git commit -m "chore(cos): record deterministic COS 1.8 payload diagnostic"
+          git commit -m "chore(cos): record COS 1.8 payload canonicalization diagnostic"
           git push origin HEAD:"governance/cos-1.8-pentagovernance-ratification-20260904"
