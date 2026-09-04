@@ -12,11 +12,9 @@ import {
 } from '../lib/vercel-oidc.js';
 
 const MAX_BODY_BYTES = 262144;
-const SUPABASE_PROJECT_ORIGIN =
-  'https://tzajnzshmtzjenqulehq.supabase.co';
+const SUPABASE_PROJECT_ORIGIN = 'https://tzajnzshmtzjenqulehq.supabase.co';
 const PENTAFABRIC_INGEST_PATH = '/functions/v1/pentafabric-ingest';
-const DEFAULT_PENTAFABRIC_INGEST_URL =
-  `${SUPABASE_PROJECT_ORIGIN}${PENTAFABRIC_INGEST_PATH}`;
+const DEFAULT_PENTAFABRIC_INGEST_URL = `${SUPABASE_PROJECT_ORIGIN}${PENTAFABRIC_INGEST_PATH}`;
 const EXPECTED_OIDC_RECEIPT_AUTHENTICATION = 'VERCEL_OIDC_RS256';
 const EXPECTED_OIDC_WORKLOAD = Object.freeze({
   owner_id: 'team_v4xkGtBZSrZXnJtLEJhra5nd',
@@ -32,33 +30,31 @@ class EvidenceSinkError extends Error {
   }
 }
 
+function send(response, status, payload) {
+  response.setHeader('Cache-Control', 'no-store, max-age=0');
+  response.setHeader('Content-Type', 'application/json; charset=utf-8');
+  response.setHeader('X-PentaFabric-Version', '1.0.1');
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('X-Frame-Options', 'DENY');
+  response.setHeader('Referrer-Policy', 'no-referrer');
+  return response.status(status).json(payload);
+}
+
 function canonicalSupabaseOrigin(value) {
   const raw = String(value || '');
   let parsed;
   try {
     parsed = new URL(raw);
   } catch {
-    throw new EvidenceSinkError(
-      'Supabase Penta sink origin is invalid',
-    );
+    throw new EvidenceSinkError('Supabase Penta sink origin is invalid');
   }
-  const exact =
-    raw === SUPABASE_PROJECT_ORIGIN ||
-    raw === `${SUPABASE_PROJECT_ORIGIN}/`;
+  const exact = raw === SUPABASE_PROJECT_ORIGIN || raw === `${SUPABASE_PROJECT_ORIGIN}/`;
   if (
-    !exact ||
-    parsed.protocol !== 'https:' ||
-    parsed.origin !== SUPABASE_PROJECT_ORIGIN ||
-    parsed.username ||
-    parsed.password ||
-    parsed.port ||
-    parsed.pathname !== '/' ||
-    parsed.search ||
-    parsed.hash
+    !exact || parsed.protocol !== 'https:' || parsed.origin !== SUPABASE_PROJECT_ORIGIN ||
+    parsed.username || parsed.password || parsed.port || parsed.pathname !== '/' ||
+    parsed.search || parsed.hash
   ) {
-    throw new EvidenceSinkError(
-      'Supabase Penta sink origin is not the canonical CrownThrive project',
-    );
+    throw new EvidenceSinkError('Supabase Penta sink origin is not the canonical CrownThrive project');
   }
   return SUPABASE_PROJECT_ORIGIN;
 }
@@ -69,36 +65,16 @@ function canonicalPentafabricIngestUrl(value) {
   try {
     parsed = new URL(raw);
   } catch {
-    throw new EvidenceSinkError(
-      'PentaFabric OIDC ingest URL is invalid',
-    );
+    throw new EvidenceSinkError('PentaFabric OIDC ingest URL is invalid');
   }
   if (
-    raw !== DEFAULT_PENTAFABRIC_INGEST_URL ||
-    parsed.protocol !== 'https:' ||
-    parsed.origin !== SUPABASE_PROJECT_ORIGIN ||
-    parsed.username ||
-    parsed.password ||
-    parsed.port ||
-    parsed.pathname !== PENTAFABRIC_INGEST_PATH ||
-    parsed.search ||
-    parsed.hash
+    raw !== DEFAULT_PENTAFABRIC_INGEST_URL || parsed.protocol !== 'https:' ||
+    parsed.origin !== SUPABASE_PROJECT_ORIGIN || parsed.username || parsed.password ||
+    parsed.port || parsed.pathname !== PENTAFABRIC_INGEST_PATH || parsed.search || parsed.hash
   ) {
-    throw new EvidenceSinkError(
-      'PentaFabric OIDC ingest URL is not the canonical CrownThrive edge function',
-    );
+    throw new EvidenceSinkError('PentaFabric OIDC ingest URL is not the canonical CrownThrive edge function');
   }
   return DEFAULT_PENTAFABRIC_INGEST_URL;
-}
-
-function send(response, status, payload) {
-  response.setHeader('Cache-Control', 'no-store, max-age=0');
-  response.setHeader('Content-Type', 'application/json; charset=utf-8');
-  response.setHeader('X-PentaFabric-Version', '1.0.0');
-  response.setHeader('X-Content-Type-Options', 'nosniff');
-  response.setHeader('X-Frame-Options', 'DENY');
-  response.setHeader('Referrer-Policy', 'no-referrer');
-  return response.status(status).json(payload);
 }
 
 function evidenceRow(penta) {
@@ -119,84 +95,88 @@ function evidenceRow(penta) {
   };
 }
 
-function evidenceSinkState(oidcToken) {
-  const supabaseUrl =
-    process.env.SUPABASE_URL ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRolePresent = Boolean(
-    supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY,
-  );
-  const oidcBound = Boolean(oidcToken);
+function sinkConfiguration(oidcToken) {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRolePresent = Boolean(supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY);
   let serviceRoleConfigured = false;
   let oidcIngestConfigured = false;
   try {
-    serviceRoleConfigured = Boolean(
-      serviceRolePresent && canonicalSupabaseOrigin(supabaseUrl),
-    );
+    serviceRoleConfigured = Boolean(serviceRolePresent && canonicalSupabaseOrigin(supabaseUrl));
   } catch {
     serviceRoleConfigured = false;
   }
   try {
-    oidcIngestConfigured = Boolean(canonicalPentafabricIngestUrl(
-      process.env.PENTAFABRIC_INGEST_URL,
-    ));
+    oidcIngestConfigured = Boolean(canonicalPentafabricIngestUrl(process.env.PENTAFABRIC_INGEST_URL));
   } catch {
     oidcIngestConfigured = false;
   }
   return {
-    provider: 'supabase',
-    bound: oidcBound ? false : serviceRoleConfigured,
-    mode: oidcBound
-      ? oidcIngestConfigured
-        ? 'VERCEL_OIDC_PRESENT_UNVERIFIED'
-        : 'VERCEL_OIDC_INGEST_CONFIGURATION_HOLD'
-      : serviceRoleConfigured
-        ? 'SERVICE_ROLE'
-        : serviceRolePresent
-          ? 'SERVICE_ROLE_CONFIGURATION_HOLD'
-          : 'UNBOUND',
-    primary_route: oidcBound ? 'VERCEL_OIDC' : 'SERVICE_ROLE_FALLBACK',
+    oidc_token_present: Boolean(oidcToken),
+    oidc_ingest_configuration_valid: oidcIngestConfigured,
     service_role_present: serviceRolePresent,
     service_role_configuration_valid: serviceRoleConfigured,
-    service_role_fallback_available: serviceRoleConfigured,
-    oidc_token_present: oidcBound,
-    oidc_token_verified: false,
-    oidc_ingest_configuration_valid: oidcIngestConfigured,
-    oidc_verification_boundary:
-      'verified_by_supabase_only_on_successful_delivery',
+    configured: Boolean((oidcToken && oidcIngestConfigured) || serviceRoleConfigured),
+  };
+}
+
+function evidenceSinkState(oidcToken, selfTest = null) {
+  const config = sinkConfiguration(oidcToken);
+  const verified = Boolean(
+    selfTest?.status === 'PASS' &&
+    selfTest?.provider_readback_verified === true &&
+    selfTest?.persistence?.status === 'PERSISTED_READBACK_VERIFIED',
+  );
+  const mode = verified
+    ? selfTest.persistence.authentication === EXPECTED_OIDC_RECEIPT_AUTHENTICATION
+      ? 'VERCEL_OIDC_EXACT_READBACK'
+      : 'SERVICE_ROLE_EXACT_READBACK'
+    : config.oidc_token_present && config.oidc_ingest_configuration_valid
+      ? 'VERCEL_OIDC_CONFIGURED'
+      : config.service_role_configuration_valid
+        ? 'SERVICE_ROLE_CONFIGURED'
+        : 'UNBOUND';
+  return {
+    provider: 'supabase',
+    bound: verified || config.configured,
+    verified,
+    mode,
+    primary_route: config.oidc_token_present ? 'VERCEL_OIDC' : 'SERVICE_ROLE_FALLBACK',
+    ...config,
+    oidc_token_verified: verified && selfTest?.persistence?.authentication === EXPECTED_OIDC_RECEIPT_AUTHENTICATION,
+    verification_boundary: verified ? 'EXACT_PROVIDER_READBACK' : 'CONFIGURATION_ONLY',
     table: 'pentafabric_events',
     edge_ingest: 'pentafabric-ingest',
   };
 }
 
-function writeAuthorizationState() {
+function writeAuthorizationState(oidcToken, selfTest = null) {
   const writeToken = process.env.PENTAFABRIC_WRITE_TOKEN || '';
   const writeTokenReady = Buffer.byteLength(writeToken, 'utf8') >= 32;
-  if (writeTokenReady) {
-    return {
-      required: true,
-      bound: true,
-      mode: 'PENTAFABRIC_WRITE_TOKEN',
-    };
-  }
-  if (writeToken) {
-    return {
-      required: true,
-      bound: false,
-      mode: 'PENTAFABRIC_WRITE_TOKEN_CONFIGURATION_HOLD',
-    };
-  }
-  if (process.env.VERCEL_OIDC_TOKEN) {
-    return {
-      required: true,
-      bound: true,
-      mode: 'VERCEL_OIDC_TOKEN_EXACT',
-    };
-  }
+  const workloadVerified = Boolean(
+    selfTest?.status === 'PASS' &&
+    selfTest?.provider_readback_verified === true,
+  );
   return {
     required: true,
-    bound: false,
-    mode: 'UNBOUND',
+    bound: workloadVerified || writeTokenReady,
+    mode: workloadVerified
+      ? 'WORKLOAD_IDENTITY_EXACT_READBACK'
+      : oidcToken
+        ? 'WORKLOAD_IDENTITY_CONFIGURED'
+        : writeTokenReady
+          ? 'DIRECT_WRITE_TOKEN_BOUND'
+          : 'SECURE_DEFAULT_DENY',
+    workload_identity: {
+      present: Boolean(oidcToken),
+      verified: workloadVerified,
+      state: workloadVerified ? 'VERIFIED' : oidcToken ? 'CONFIGURED' : 'UNAVAILABLE',
+    },
+    direct_external_write: {
+      required_for_runtime: false,
+      token_bound: writeTokenReady,
+      state: writeTokenReady ? 'TOKEN_BOUND' : 'FAIL_CLOSED',
+      posture: writeTokenReady ? 'EXPLICIT_CREDENTIAL' : 'SECURE_DEFAULT_DENY',
+    },
   };
 }
 
@@ -218,79 +198,36 @@ function constantTimeEqual(left, right) {
 function authorizeWrite(request) {
   const presented = bearerToken(request);
   const configuredValue = process.env.PENTAFABRIC_WRITE_TOKEN || '';
-  const configuredToken =
-    Buffer.byteLength(configuredValue, 'utf8') >= 32
-      ? configuredValue
-      : null;
-  const workloadToken = process.env.VERCEL_OIDC_TOKEN || null;
-
+  const configuredToken = Buffer.byteLength(configuredValue, 'utf8') >= 32 ? configuredValue : null;
+  if (!configuredToken) {
+    return {
+      authorized: false,
+      status: configuredValue ? 503 : 503,
+      error: configuredValue ? 'write_authorization_binding_invalid' : 'direct_external_write_fail_closed',
+    };
+  }
   if (!presented) {
-    if (configuredValue && !configuredToken && !workloadToken) {
-      return {
-        authorized: false,
-        status: 503,
-        error: 'write_authorization_binding_invalid',
-      };
-    }
-    return {
-      authorized: false,
-      status: configuredToken || workloadToken ? 401 : 503,
-      error:
-        configuredToken || workloadToken
-          ? 'write_authorization_required'
-          : 'write_authorization_binding_required',
-    };
+    return { authorized: false, status: 401, error: 'write_authorization_required' };
   }
-
-  if (configuredToken && constantTimeEqual(presented, configuredToken)) {
-    return {
-      authorized: true,
-      method: 'PENTAFABRIC_WRITE_TOKEN',
-    };
+  if (constantTimeEqual(presented, configuredToken)) {
+    return { authorized: true, method: 'PENTAFABRIC_WRITE_TOKEN' };
   }
-
-  if (workloadToken && constantTimeEqual(presented, workloadToken)) {
-    return {
-      authorized: true,
-      method: 'VERCEL_OIDC_TOKEN_EXACT',
-    };
-  }
-
-  if (configuredValue && !configuredToken && !workloadToken) {
-    return {
-      authorized: false,
-      status: 503,
-      error: 'write_authorization_binding_invalid',
-    };
-  }
-
-  return {
-    authorized: false,
-    status: 403,
-    error: 'write_authorization_rejected',
-  };
+  return { authorized: false, status: 403, error: 'write_authorization_rejected' };
 }
 
-async function persistWithServiceRole(
-  penta,
-  supabaseUrl,
-  serviceRoleKey,
-) {
+async function persistWithServiceRole(penta, supabaseUrl, serviceRoleKey) {
   const canonicalOrigin = canonicalSupabaseOrigin(supabaseUrl);
-  const result = await fetch(
-    `${canonicalOrigin}/rest/v1/pentafabric_events?on_conflict=penta_id`,
-    {
-      method: 'POST',
-      redirect: 'error',
-      headers: {
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=ignore-duplicates,return=minimal',
-      },
-      body: JSON.stringify(evidenceRow(penta)),
+  const result = await fetch(`${canonicalOrigin}/rest/v1/pentafabric_events?on_conflict=penta_id`, {
+    method: 'POST',
+    redirect: 'error',
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=ignore-duplicates,return=minimal',
     },
-  );
+    body: JSON.stringify(evidenceRow(penta)),
+  });
   if (!result.ok) {
     const detail = await result.text();
     throw new EvidenceSinkError(
@@ -299,9 +236,7 @@ async function persistWithServiceRole(
     );
   }
   const readback = await fetch(
-    `${canonicalOrigin}/rest/v1/pentafabric_events` +
-      `?penta_id=eq.${encodeURIComponent(penta.id)}` +
-      '&select=penta_id,trace_id,integrity_digest,build_sha,event&limit=1',
+    `${canonicalOrigin}/rest/v1/pentafabric_events?penta_id=eq.${encodeURIComponent(penta.id)}&select=penta_id,trace_id,integrity_digest,build_sha,event,received_at&limit=1`,
     {
       method: 'GET',
       redirect: 'error',
@@ -312,12 +247,7 @@ async function persistWithServiceRole(
       },
     },
   );
-  if (!readback.ok) {
-    throw new EvidenceSinkError(
-      `Supabase Penta readback failed (${readback.status})`,
-      readback.status,
-    );
-  }
+  if (!readback.ok) throw new EvidenceSinkError(`Supabase Penta readback failed (${readback.status})`, readback.status);
   const rows = await readback.json();
   const stored = Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
   const exact =
@@ -326,9 +256,7 @@ async function persistWithServiceRole(
     stored?.integrity_digest === penta.integrity.digest &&
     stored?.build_sha === penta.integrity.build_sha &&
     canonicalPentaJson(stored?.event) === canonicalPentaJson(penta);
-  if (!exact) {
-    throw new EvidenceSinkError('Supabase Penta exact readback mismatch');
-  }
+  if (!exact) throw new EvidenceSinkError('Supabase Penta exact readback mismatch');
   return {
     status: 'PERSISTED_READBACK_VERIFIED',
     sink: 'supabase',
@@ -336,13 +264,13 @@ async function persistWithServiceRole(
     idempotent_key: penta.id,
     signing_build_sha: penta.integrity.build_sha,
     exact_readback: true,
+    persisted_at: stored?.received_at || null,
+    verified_at: new Date().toISOString(),
   };
 }
 
 async function persistWithVercelOidc(penta, oidcToken) {
-  const ingestUrl = canonicalPentafabricIngestUrl(
-    process.env.PENTAFABRIC_INGEST_URL,
-  );
+  const ingestUrl = canonicalPentafabricIngestUrl(process.env.PENTAFABRIC_INGEST_URL);
   const result = await fetch(ingestUrl, {
     method: 'POST',
     redirect: 'error',
@@ -355,18 +283,10 @@ async function persistWithVercelOidc(penta, oidcToken) {
   const raw = await result.text();
   let receipt = null;
   if (raw) {
-    try {
-      receipt = JSON.parse(raw);
-    } catch {
-      receipt = { raw: raw.slice(0, 240) };
-    }
+    try { receipt = JSON.parse(raw); } catch { receipt = { raw: raw.slice(0, 240) }; }
   }
   if (!result.ok) {
-    const detail =
-      receipt?.detail ||
-      receipt?.error ||
-      raw ||
-      'unknown edge rejection';
+    const detail = receipt?.detail || receipt?.error || raw || 'unknown edge rejection';
     throw new EvidenceSinkError(
       `Supabase OIDC Penta sink rejected delivery (${result.status}): ${String(detail).slice(0, 240)}`,
       result.status,
@@ -384,10 +304,7 @@ async function persistWithVercelOidc(penta, oidcToken) {
     receipt?.signing_build_sha !== penta.integrity.build_sha ||
     receipt?.exact_readback !== true
   ) {
-    throw new EvidenceSinkError(
-      'Supabase OIDC Penta sink did not return exact readback evidence',
-      result.status,
-    );
+    throw new EvidenceSinkError('Supabase OIDC Penta sink did not return exact readback evidence', result.status);
   }
   return {
     status: 'PERSISTED_READBACK_VERIFIED',
@@ -401,39 +318,25 @@ async function persistWithVercelOidc(penta, oidcToken) {
     idempotent_key: penta.id,
     signing_build_sha: penta.integrity.build_sha,
     exact_readback: true,
+    persisted_at: receipt.persisted_at || null,
+    verified_at: receipt.verified_at || new Date().toISOString(),
     receipt,
   };
 }
 
 async function persistPenta(penta, oidcToken) {
-  const supabaseUrl =
-    process.env.SUPABASE_URL ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  // Prefer the custom workload-identity verifier whenever Vercel supplies an
-  // OIDC token. The service-role route is a fail-closed fallback for runtimes
-  // where workload identity is genuinely unavailable.
-  if (oidcToken) {
-    return persistWithVercelOidc(penta, oidcToken);
-  }
-
-  if (supabaseUrl && serviceRoleKey) {
-    return persistWithServiceRole(
-      penta,
-      supabaseUrl,
-      serviceRoleKey,
-    );
-  }
-
+  if (oidcToken) return persistWithVercelOidc(penta, oidcToken);
+  if (supabaseUrl && serviceRoleKey) return persistWithServiceRole(penta, supabaseUrl, serviceRoleKey);
   return {
     status: 'SKIPPED_UNBOUND',
     sink: 'supabase',
-    required_binding:
-      'SUPABASE_SERVICE_ROLE_KEY_OR_VERCEL_OIDC_CONTEXT',
+    required_binding: 'SUPABASE_SERVICE_ROLE_KEY_OR_VERCEL_OIDC_CONTEXT',
   };
 }
 
-function runSelfTest(state) {
+async function runSelfTest(state, oidcToken) {
   const probe = emitPenta({
     protocol: 'PentaFabricSelfTest',
     payload: { probe: true, build_sha: state.build_sha },
@@ -443,12 +346,15 @@ function runSelfTest(state) {
     corridor: 'runtime-assurance',
     lane: 'hot',
     ttl_seconds: 60,
-    chlom_intent_id:
-      'chlom-intent-pentafabric-self-test-v1',
+    chlom_intent_id: 'chlom-intent-pentafabric-self-test-v1',
     chlom_policy_refs: ['ct.chlom.pentafabric.v1'],
     rights_scope: 'runtime-assurance-only',
   });
   verifyPenta(probe, { requireSignature: true });
+  const persistence = await persistPenta(probe, oidcToken);
+  if (persistence.status !== 'PERSISTED_READBACK_VERIFIED' || persistence.exact_readback !== true) {
+    throw new EvidenceSinkError('PentaFabric provider self-test did not produce exact persisted readback');
+  }
   return {
     status: 'PASS',
     penta_id: probe.id,
@@ -457,6 +363,9 @@ function runSelfTest(state) {
     chlom_binding: probe.mesh.chlom.binding,
     event_contract: probe.mesh.contract,
     fabric_schema: probe.mesh.fabric.schema,
+    provider_readback_verified: true,
+    persistence,
+    verified_at: persistence.verified_at || new Date().toISOString(),
   };
 }
 
@@ -465,77 +374,74 @@ export default async function handler(request, response) {
   const oidcToken = resolveVercelOidcToken(request);
 
   if (request.method === 'GET') {
+    const selfTestRequested = requestQueryParam(request, 'selftest') === '1';
     try {
-      const selfTestRequested =
-        requestQueryParam(request, 'selftest') === '1';
+      const selfTest = selfTestRequested
+        ? await runSelfTest(state, oidcToken)
+        : { status: 'NOT_REQUESTED' };
+      const sink = evidenceSinkState(oidcToken, selfTest);
+      const writeAuthorization = writeAuthorizationState(oidcToken, selfTest);
+      if (!sink.bound) throw new EvidenceSinkError('PentaFabric evidence sink is not configured');
       return send(response, 200, {
-        schema: 'ct.penta.vercel.fabric.20260827.v1',
+        schema: 'ct.penta.vercel.fabric.20260903.v2',
         service: 'crownthrive-os-control-plane',
         status: 'OPERATIONAL',
         fabric: state,
         accepts: 'crownthrive.penta.event.v1',
         emits: 'crownthrive.penta.event.v1',
         chlom_governed: true,
-        evidence_sink: evidenceSinkState(oidcToken),
-        write_authorization: writeAuthorizationState(),
-        self_test: selfTestRequested
-          ? runSelfTest(state)
-          : { status: 'NOT_REQUESTED' },
+        evidence_sink: sink,
+        write_authorization: writeAuthorization,
+        self_test: selfTest,
         observed_at: new Date().toISOString(),
+        pass_manufactured: false,
       });
     } catch (error) {
       return send(response, 503, {
-        schema: 'ct.penta.vercel.fabric.20260827.v1',
+        schema: 'ct.penta.vercel.fabric.20260903.v2',
         status: 'DEGRADED',
         error: 'pentafabric_self_test_failure',
-        detail: String(error?.message || error),
+        detail: String(error?.message || error).slice(0, 240),
         fabric: state,
+        evidence_sink: evidenceSinkState(oidcToken),
+        write_authorization: writeAuthorizationState(oidcToken),
+        self_test: { status: selfTestRequested ? 'FAIL' : 'NOT_REQUESTED' },
+        pass_manufactured: false,
       });
     }
   }
 
   if (request.method !== 'POST') {
     response.setHeader('Allow', 'GET, POST');
-    return send(response, 405, {
-      status: 'REJECTED',
-      error: 'method_not_allowed',
-    });
+    return send(response, 405, { status: 'REJECTED', error: 'method_not_allowed' });
   }
 
   const authorization = authorizeWrite(request);
   if (!authorization.authorized) {
-    response.setHeader(
-      'WWW-Authenticate',
-      'Bearer realm="CrownThrive PentaFabric"',
-    );
+    response.setHeader('WWW-Authenticate', 'Bearer realm="CrownThrive PentaFabric"');
     return send(response, authorization.status, {
       schema: 'ct.penta.error.v1',
       status: 'WRITE_GATED',
       error: authorization.error,
       service: 'crownthrive-os-control-plane',
+      security_posture: 'FAIL_CLOSED',
+      runtime_provider_path_affected: false,
       pass_manufactured: false,
     });
   }
 
   try {
-    const rawLength = Number(
-      request.headers['content-length'] || 0,
-    );
+    const rawLength = Number(request.headers['content-length'] || 0);
     if (rawLength > MAX_BODY_BYTES) {
-      return send(response, 413, {
-        status: 'REJECTED',
-        error: 'penta_payload_too_large',
-      });
+      return send(response, 413, { status: 'REJECTED', error: 'penta_payload_too_large' });
     }
-    const body =
-      request.body && typeof request.body === 'object'
-        ? request.body
-        : {};
+    const body = request.body && typeof request.body === 'object' ? request.body : {};
     const externallySupplied = Object.hasOwn(body, 'penta');
     const penta = externallySupplied
       ? verifyPenta(body.penta, { requireSignature: true })
       : emitPenta(body);
     verifyPenta(penta, { requireSignature: true });
+
     let persistence;
     try {
       persistence = await persistPenta(penta, oidcToken);
@@ -550,10 +456,7 @@ export default async function handler(request, response) {
         persistence: {
           status: 'FAILED',
           sink: 'supabase',
-          upstream_status:
-            error instanceof EvidenceSinkError
-              ? error.providerStatus
-              : null,
+          upstream_status: error instanceof EvidenceSinkError ? error.providerStatus : null,
         },
         pass_manufactured: false,
       });
@@ -571,7 +474,7 @@ export default async function handler(request, response) {
       });
     }
     const receipt = {
-      schema: 'ct.penta.receipt.20260827.v1',
+      schema: 'ct.penta.receipt.20260903.v2',
       status: 'DELIVERED',
       penta_id: penta.id,
       trace_id: penta.trace.trace_id,
@@ -582,14 +485,11 @@ export default async function handler(request, response) {
       chlom_binding: penta.mesh.chlom.binding,
       assurance: penta.integrity.algorithm,
       write_authorization: authorization.method,
-      transport_assurance:
-        persistence.authentication || 'UNBOUND',
+      transport_assurance: persistence.authentication || 'UNBOUND',
       persistence,
       signing_build_sha: penta.integrity.build_sha,
-      persisting_build_sha:
-        process.env.VERCEL_GIT_COMMIT_SHA || null,
-      deployment_id:
-        process.env.VERCEL_DEPLOYMENT_ID || null,
+      persisting_build_sha: process.env.VERCEL_GIT_COMMIT_SHA || null,
+      deployment_id: process.env.VERCEL_DEPLOYMENT_ID || null,
       delivered_at: new Date().toISOString(),
     };
     return send(response, 202, { penta, receipt });
@@ -597,7 +497,7 @@ export default async function handler(request, response) {
     return send(response, 400, {
       status: 'REJECTED',
       error: 'pentafabric_contract_failure',
-      detail: String(error?.message || error),
+      detail: String(error?.message || error).slice(0, 240),
       fabric: state,
     });
   }
