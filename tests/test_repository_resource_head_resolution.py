@@ -18,9 +18,9 @@ class RepositoryResourceHeadResolutionTests(unittest.TestCase):
     def test_registry_is_complete_and_unique(self):
         self.assertEqual(self.registry["contract"], "ct.repository-resource-registry.v1")
         self.assertEqual(self.registry["version"], "1.1.0")
-        self.assertEqual(self.registry["repository_count"], 31)
-        self.assertEqual(len(self.registry["resources"]), 31)
-        self.assertEqual(len(self.by_repo), 31)
+        self.assertEqual(self.registry["repository_count"], 32)
+        self.assertEqual(len(self.registry["resources"]), 32)
+        self.assertEqual(len(self.by_repo), 32)
 
     def test_static_heads_are_observations_not_reset_authority(self):
         self.assertIn("observed snapshot", self.registry["exact_head_semantics"])

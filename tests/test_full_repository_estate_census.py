@@ -28,15 +28,15 @@ class FullRepositoryEstateCensusTests(unittest.TestCase):
 
     def test_provider_census_is_complete_and_disjoint(self):
         self.assertEqual(self.census["accessible_repository_count"], 128)
-        self.assertEqual(self.census["nonempty_repository_count"], 36)
-        self.assertEqual(self.census["empty_placeholder_count"], 92)
-        self.assertEqual(128, 36 + 92)
-        self.assertEqual(len(self.census["nonempty_repositories"]), 36)
-        self.assertEqual(len(self.census["empty_placeholders"]), 92)
+        self.assertEqual(self.census["nonempty_repository_count"], 37)
+        self.assertEqual(self.census["empty_placeholder_count"], 91)
+        self.assertEqual(128, 37 + 91)
+        self.assertEqual(len(self.census["nonempty_repositories"]), 37)
+        self.assertEqual(len(self.census["empty_placeholders"]), 91)
         self.assertFalse(set(self.census["nonempty_repositories"]) & set(self.census["empty_placeholders"]))
 
     def test_composed_registry_accounts_for_every_nonempty_repository(self):
-        self.assertEqual(self.materialized["governed_resource_count"], 37)
+        self.assertEqual(self.materialized["governed_resource_count"], 38)
         nonempty = {f"crownthrive1/{name}" for name in self.census["nonempty_repositories"]}
         governed = set(self.by_repo)
         self.assertTrue(nonempty <= governed)
