@@ -1,0 +1,66 @@
+name: Materialize CHLOM Provider Custody v6
+
+on:
+  push:
+    branches:
+      - 'repair/chlom-agent-runtime-custody-v6-*'
+    paths:
+      - 'supabase/migration_lineage/provider_custody/envelopes_v6/**'
+      - 'supabase/migration_lineage/provider_custody/foundation_v7/**'
+      - 'supabase/migration_lineage/chlom_replay_dependency_custody_v7.json'
+      - 'scripts/assemble_chlom_foundation_custody_v7.sh'
+      - 'scripts/verify_chlom_replay_dependency_custody_v7.py'
+      - 'scripts/inventory_remote_migration_markers.py'
+      - '.github/workflows/materialize-chlom-provider-custody-v6.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-chlom-provider-custody-v6-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Verify custody and inventory bounded replay markers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact repair head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Confirm OpenPGP transport support
+        run: gpg --version
+
+      - name: Verify carrier and assemble provider replay foundation
+        run: bash scripts/assemble_chlom_foundation_custody_v7.sh
+
+      - name: Verify foundation and agent-runtime source custody
+        run: |
+          python3 scripts/verify_chlom_replay_dependency_custody_v7.py
+          python3 scripts/verify_chlom_agent_runtime_custody.py
+
+      - name: Inventory active no-op lineage markers in bounded interval
+        run: python3 scripts/inventory_remote_migration_markers.py
+
+      - name: Reject whitespace and patch corruption
+        run: git diff --check
+
+      - name: Commit custody and marker inventory without force
+        run: |
+          if git diff --quiet --exit-code; then
+            echo 'Exact custody and marker inventory are already current.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-custody[bot]'
+          git config user.email 'crownthrive-custody[bot]@users.noreply.github.com'
+          git add \
+            supabase/migrations \
+            supabase/migration_lineage/chlom_replay_dependency_custody_v7.json \
+            supabase/migration_lineage/active_remote_marker_inventory_v8.json
+          git commit -m 'audit(supabase): inventory bounded replay lineage markers'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
