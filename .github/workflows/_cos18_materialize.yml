@@ -40,6 +40,30 @@ jobs:
           base64 --decode /tmp/cos18-patch.b64 > /tmp/cos18-patch.tar.gz
           echo "e0fb8547ce9c40eeb3706228943afd2a2cedc6d2c64ff233173ad106b635fe7e  /tmp/cos18-patch.tar.gz" | sha256sum --check --strict
           tar -xzf /tmp/cos18-patch.tar.gz -C .
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+
+          target = Path("governance/pentagovernance/contracts/PENTAGOVERNANCE_CONSTITUENCY_COMPACT_v1.md")
+          normalized = "\n".join(line.rstrip() for line in target.read_text(encoding="utf-8").splitlines()).rstrip() + "\n"
+          target.write_text(normalized, encoding="utf-8")
+
+          manifest_path = Path("governance/pentagovernance/ratification/PATCH_MANIFEST.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          found = False
+          for entry in manifest.get("files", []):
+              path = Path(entry["path"])
+              if path.as_posix() == target.as_posix():
+                  data = path.read_bytes()
+                  entry["size_bytes"] = len(data)
+                  entry["sha256"] = hashlib.sha256(data).hexdigest()
+                  found = True
+                  break
+          if not found:
+              raise SystemExit("compact markdown missing from patch manifest")
+          manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
           rm -rf .cos18-bootstrap
           rm -f .github/workflows/_cos18_materialize.yml
       - name: Validate materialized candidate
