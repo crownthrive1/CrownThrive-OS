@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import time
 from collections import Counter
@@ -22,8 +23,8 @@ TARGETS = {
     "crownaffiliates.com": "https://crownaffiliates.com/",
     "thezazabar.xyz": "https://thezazabar.xyz/",
 }
-SOURCE_COMMIT_SHA = "448af1db19f50b2ba918609f9d24ba260a9c9860"
-PROVIDER_RUN_REF = "github-actions:${GITHUB_RUN_ID}"
+SOURCE_COMMIT_SHA = os.getenv("GITHUB_SHA", "local-unversioned")
+PROVIDER_RUN_REF = f"github-actions:{os.getenv('GITHUB_RUN_ID', 'local')}"
 
 
 class TitleParser(HTMLParser):
@@ -130,30 +131,18 @@ def compact_ingest(result: dict) -> dict:
     identity_seed = f"{result['target_id']}|{result['url']}".encode()
     error = result.get("error") or ""
     return {
-        "target_id": result["target_id"],
-        "source_system": result["source"],
-        "requested_url": result["url"],
-        "final_url": result.get("final_url"),
-        "subject_identity_ref": "ct.website.subject." + digest(identity_seed),
-        "http_status": result.get("root_status"),
-        "availability_state": result["state"],
-        "page_title": result.get("root_title") or None,
-        "page_count": result.get("page_count") or 0,
-        "robots_status": result.get("robots_status"),
-        "sitemap_count": result.get("sitemap_count") or 0,
+        "target_id": result["target_id"], "source_system": result["source"], "requested_url": result["url"],
+        "final_url": result.get("final_url"), "subject_identity_ref": "ct.website.subject." + digest(identity_seed),
+        "http_status": result.get("root_status"), "availability_state": result["state"],
+        "page_title": result.get("root_title") or None, "page_count": result.get("page_count") or 0,
+        "robots_status": result.get("robots_status"), "sitemap_count": result.get("sitemap_count") or 0,
         "binary_sha256": result.get("root_binary_sha256") or digest(b""),
         "content_fingerprint": result.get("root_content_fingerprint") or digest(b""),
         "observation_fingerprint": result["observation_fingerprint"],
-        "error_class": error.split(":", 1)[0] if error else None,
-        "checked_at": result["checked_at"],
-        "metadata": {
-            "target_domain": result.get("domain"),
-            "source_commit_sha": SOURCE_COMMIT_SHA,
-            "provider_run_ref": PROVIDER_RUN_REF,
-            "public_only": True,
-            "mailbox_sources_excluded": True,
-            "retry_corrected": result.get("domain") in TARGETS,
-        },
+        "error_class": error.split(":", 1)[0] if error else None, "checked_at": result["checked_at"],
+        "metadata": {"target_domain": result.get("domain"), "source_commit_sha": SOURCE_COMMIT_SHA,
+                     "provider_run_ref": PROVIDER_RUN_REF, "public_only": True, "mailbox_sources_excluded": True,
+                     "retry_corrected": result.get("domain") in TARGETS},
     }
 
 
@@ -162,21 +151,20 @@ def main():
     retry_payload = {"schema": "ct.website-crawl-exception-retry.v1", "target_count": len(retry_results),
                      "results": retry_results, "dail_state": "HOLD_DAIL_UNBOUND"}
     (OUT / "estate-exception-retry.json").write_text(json.dumps(retry_payload, indent=2), encoding="utf-8")
-
     base = json.loads((OUT / "estate-crawl.json").read_text(encoding="utf-8"))
     by_domain = {result["domain"]: result for result in base["results"]}
     for retry in retry_results:
         current = by_domain[retry["domain"]]
-        current.update({
-            "checked_at": retry["checked_at"], "root_status": retry["status"], "final_url": retry["final_url"],
-            "state": retry["state"], "root_title": retry["title"], "root_binary_sha256": retry["binary_sha256"],
-            "root_content_fingerprint": retry["content_fingerprint"],
-            "observation_fingerprint": retry["observation_fingerprint"], "robots_status": retry["robots_status"],
-            "sitemap_count": sum(1 for item in retry["sitemaps"] if item.get("status") and 200 <= item["status"] < 400),
-            "error": retry["error"], "fingerprint_state": retry["fingerprint_state"],
-            "entitlement_state": retry["entitlement_state"], "dail_state": retry["dail_state"],
-            "pages": [], "discovery": {"retry_sitemaps": retry["sitemaps"]},
-        })
+        current.update({"checked_at": retry["checked_at"], "root_status": retry["status"], "final_url": retry["final_url"],
+                        "state": retry["state"], "root_title": retry["title"],
+                        "root_binary_sha256": retry["binary_sha256"],
+                        "root_content_fingerprint": retry["content_fingerprint"],
+                        "observation_fingerprint": retry["observation_fingerprint"],
+                        "robots_status": retry["robots_status"],
+                        "sitemap_count": sum(1 for item in retry["sitemaps"] if item.get("status") and 200 <= item["status"] < 400),
+                        "error": retry["error"], "fingerprint_state": retry["fingerprint_state"],
+                        "entitlement_state": retry["entitlement_state"], "dail_state": retry["dail_state"],
+                        "pages": [], "discovery": {"retry_sitemaps": retry["sitemaps"]}})
     results = sorted(by_domain.values(), key=lambda item: item["domain"])
     counts = Counter(item["state"] for item in results)
     summary = dict(base["summary"])
@@ -188,13 +176,11 @@ def main():
     (OUT / "estate-summary-corrected.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     ingest = [compact_ingest(item) for item in results]
     (OUT / "estate-ingest.json").write_text(json.dumps(ingest, separators=(",", ":")), encoding="utf-8")
-    manifest = {
-        "schema": "ct.website-crawl-ingest-manifest.v1", "target_count": len(ingest),
-        "source_commit_sha": SOURCE_COMMIT_SHA, "provider_run_ref": PROVIDER_RUN_REF,
-        "corrected_crawl_sha256": digest((OUT / "estate-crawl-corrected.json").read_bytes()),
-        "ingest_sha256": digest((OUT / "estate-ingest.json").read_bytes()),
-        "state_counts": dict(counts), "dail_state": "HOLD_DAIL_UNBOUND",
-    }
+    manifest = {"schema": "ct.website-crawl-ingest-manifest.v1", "target_count": len(ingest),
+                "source_commit_sha": SOURCE_COMMIT_SHA, "provider_run_ref": PROVIDER_RUN_REF,
+                "corrected_crawl_sha256": digest((OUT / "estate-crawl-corrected.json").read_bytes()),
+                "ingest_sha256": digest((OUT / "estate-ingest.json").read_bytes()),
+                "state_counts": dict(counts), "dail_state": "HOLD_DAIL_UNBOUND"}
     (OUT / "estate-ingest-manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(json.dumps(manifest, indent=2))
 
