@@ -126,24 +126,52 @@ function evidenceSinkState(oidcToken, selfTest = null) {
     selfTest?.provider_readback_verified === true &&
     selfTest?.persistence?.status === 'PERSISTED_READBACK_VERIFIED',
   );
-  const mode = verified
-    ? selfTest.persistence.authentication === EXPECTED_OIDC_RECEIPT_AUTHENTICATION
+  const oidcVerified = Boolean(
+    verified &&
+    selfTest?.persistence?.authentication === EXPECTED_OIDC_RECEIPT_AUTHENTICATION,
+  );
+
+  let mode = 'UNBOUND';
+  if (verified) {
+    mode = oidcVerified
       ? 'VERCEL_OIDC_EXACT_READBACK'
-      : 'SERVICE_ROLE_EXACT_READBACK'
-    : config.oidc_token_present && config.oidc_ingest_configuration_valid
-      ? 'VERCEL_OIDC_CONFIGURED'
-      : config.service_role_configuration_valid
-        ? 'SERVICE_ROLE_CONFIGURED'
-        : 'UNBOUND';
+      : 'SERVICE_ROLE_EXACT_READBACK';
+  } else if (config.oidc_token_present) {
+    mode = config.oidc_ingest_configuration_valid
+      ? 'VERCEL_OIDC_PRESENT_UNVERIFIED'
+      : 'VERCEL_OIDC_INGEST_CONFIGURATION_HOLD';
+  } else if (config.service_role_present) {
+    mode = config.service_role_configuration_valid
+      ? 'SERVICE_ROLE_CONFIGURED'
+      : 'SERVICE_ROLE_CONFIGURATION_HOLD';
+  }
+
+  // Workload identity is presence-only until the edge provider returns an exact
+  // persisted readback. If OIDC is present it is the primary route, so the
+  // service-role fallback does not manufacture a bound/verified OIDC state.
+  const bound = verified || (
+    !config.oidc_token_present &&
+    config.service_role_configuration_valid
+  );
+
   return {
     provider: 'supabase',
-    bound: verified || config.configured,
+    bound,
     verified,
     mode,
-    primary_route: config.oidc_token_present ? 'VERCEL_OIDC' : 'SERVICE_ROLE_FALLBACK',
+    primary_route: config.oidc_token_present
+      ? 'VERCEL_OIDC'
+      : config.service_role_configuration_valid
+        ? 'SERVICE_ROLE_FALLBACK'
+        : 'UNBOUND',
+    service_role_fallback_available: config.service_role_configuration_valid,
     ...config,
-    oidc_token_verified: verified && selfTest?.persistence?.authentication === EXPECTED_OIDC_RECEIPT_AUTHENTICATION,
-    verification_boundary: verified ? 'EXACT_PROVIDER_READBACK' : 'CONFIGURATION_ONLY',
+    oidc_token_verified: oidcVerified,
+    verification_boundary: verified
+      ? 'EXACT_PROVIDER_READBACK'
+      : config.configured
+        ? 'CONFIGURATION_ONLY'
+        : 'UNBOUND',
     table: 'pentafabric_events',
     edge_ingest: 'pentafabric-ingest',
   };
@@ -162,14 +190,14 @@ function writeAuthorizationState(oidcToken, selfTest = null) {
     mode: workloadVerified
       ? 'WORKLOAD_IDENTITY_EXACT_READBACK'
       : oidcToken
-        ? 'WORKLOAD_IDENTITY_CONFIGURED'
+        ? 'WORKLOAD_IDENTITY_PRESENT_UNVERIFIED'
         : writeTokenReady
           ? 'DIRECT_WRITE_TOKEN_BOUND'
           : 'SECURE_DEFAULT_DENY',
     workload_identity: {
       present: Boolean(oidcToken),
       verified: workloadVerified,
-      state: workloadVerified ? 'VERIFIED' : oidcToken ? 'CONFIGURED' : 'UNAVAILABLE',
+      state: workloadVerified ? 'VERIFIED' : oidcToken ? 'PRESENT_UNVERIFIED' : 'UNAVAILABLE',
     },
     direct_external_write: {
       required_for_runtime: false,
@@ -202,7 +230,7 @@ function authorizeWrite(request) {
   if (!configuredToken) {
     return {
       authorized: false,
-      status: configuredValue ? 503 : 503,
+      status: 503,
       error: configuredValue ? 'write_authorization_binding_invalid' : 'direct_external_write_fail_closed',
     };
   }
@@ -229,9 +257,8 @@ async function persistWithServiceRole(penta, supabaseUrl, serviceRoleKey) {
     body: JSON.stringify(evidenceRow(penta)),
   });
   if (!result.ok) {
-    const detail = await result.text();
     throw new EvidenceSinkError(
-      `Supabase Penta sink rejected delivery (${result.status}): ${detail.slice(0, 240)}`,
+      `Supabase Penta sink rejected delivery (${result.status})`,
       result.status,
     );
   }
@@ -247,7 +274,12 @@ async function persistWithServiceRole(penta, supabaseUrl, serviceRoleKey) {
       },
     },
   );
-  if (!readback.ok) throw new EvidenceSinkError(`Supabase Penta readback failed (${readback.status})`, readback.status);
+  if (!readback.ok) {
+    throw new EvidenceSinkError(
+      `Supabase Penta readback failed (${readback.status})`,
+      readback.status,
+    );
+  }
   const rows = await readback.json();
   const stored = Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
   const exact =
@@ -283,12 +315,15 @@ async function persistWithVercelOidc(penta, oidcToken) {
   const raw = await result.text();
   let receipt = null;
   if (raw) {
-    try { receipt = JSON.parse(raw); } catch { receipt = { raw: raw.slice(0, 240) }; }
+    try {
+      receipt = JSON.parse(raw);
+    } catch {
+      receipt = null;
+    }
   }
   if (!result.ok) {
-    const detail = receipt?.detail || receipt?.error || raw || 'unknown edge rejection';
     throw new EvidenceSinkError(
-      `Supabase OIDC Penta sink rejected delivery (${result.status}): ${String(detail).slice(0, 240)}`,
+      `Supabase OIDC Penta sink rejected delivery (${result.status})`,
       result.status,
     );
   }
@@ -304,7 +339,10 @@ async function persistWithVercelOidc(penta, oidcToken) {
     receipt?.signing_build_sha !== penta.integrity.build_sha ||
     receipt?.exact_readback !== true
   ) {
-    throw new EvidenceSinkError('Supabase OIDC Penta sink did not return exact readback evidence', result.status);
+    throw new EvidenceSinkError(
+      'Supabase OIDC Penta sink did not return exact readback evidence',
+      result.status,
+    );
   }
   return {
     status: 'PERSISTED_READBACK_VERIFIED',
@@ -352,8 +390,13 @@ async function runSelfTest(state, oidcToken) {
   });
   verifyPenta(probe, { requireSignature: true });
   const persistence = await persistPenta(probe, oidcToken);
-  if (persistence.status !== 'PERSISTED_READBACK_VERIFIED' || persistence.exact_readback !== true) {
-    throw new EvidenceSinkError('PentaFabric provider self-test did not produce exact persisted readback');
+  if (
+    persistence.status !== 'PERSISTED_READBACK_VERIFIED' ||
+    persistence.exact_readback !== true
+  ) {
+    throw new EvidenceSinkError(
+      'PentaFabric provider self-test did not produce exact persisted readback',
+    );
   }
   return {
     status: 'PASS',
@@ -375,13 +418,9 @@ export default async function handler(request, response) {
 
   if (request.method === 'GET') {
     const selfTestRequested = requestQueryParam(request, 'selftest') === '1';
-    try {
-      const selfTest = selfTestRequested
-        ? await runSelfTest(state, oidcToken)
-        : { status: 'NOT_REQUESTED' };
-      const sink = evidenceSinkState(oidcToken, selfTest);
-      const writeAuthorization = writeAuthorizationState(oidcToken, selfTest);
-      if (!sink.bound) throw new EvidenceSinkError('PentaFabric evidence sink is not configured');
+
+    if (!selfTestRequested) {
+      const selfTest = { status: 'NOT_REQUESTED' };
       return send(response, 200, {
         schema: 'ct.penta.vercel.fabric.20260903.v2',
         service: 'crownthrive-os-control-plane',
@@ -390,22 +429,42 @@ export default async function handler(request, response) {
         accepts: 'crownthrive.penta.event.v1',
         emits: 'crownthrive.penta.event.v1',
         chlom_governed: true,
-        evidence_sink: sink,
-        write_authorization: writeAuthorization,
+        evidence_sink: evidenceSinkState(oidcToken, selfTest),
+        write_authorization: writeAuthorizationState(oidcToken, selfTest),
         self_test: selfTest,
+        provider_readback_claimed: false,
         observed_at: new Date().toISOString(),
         pass_manufactured: false,
       });
-    } catch (error) {
+    }
+
+    try {
+      const selfTest = await runSelfTest(state, oidcToken);
+      return send(response, 200, {
+        schema: 'ct.penta.vercel.fabric.20260903.v2',
+        service: 'crownthrive-os-control-plane',
+        status: 'OPERATIONAL',
+        fabric: state,
+        accepts: 'crownthrive.penta.event.v1',
+        emits: 'crownthrive.penta.event.v1',
+        chlom_governed: true,
+        evidence_sink: evidenceSinkState(oidcToken, selfTest),
+        write_authorization: writeAuthorizationState(oidcToken, selfTest),
+        self_test: selfTest,
+        provider_readback_claimed: true,
+        observed_at: new Date().toISOString(),
+        pass_manufactured: false,
+      });
+    } catch {
       return send(response, 503, {
         schema: 'ct.penta.vercel.fabric.20260903.v2',
         status: 'DEGRADED',
         error: 'pentafabric_self_test_failure',
-        detail: String(error?.message || error).slice(0, 240),
         fabric: state,
         evidence_sink: evidenceSinkState(oidcToken),
         write_authorization: writeAuthorizationState(oidcToken),
-        self_test: { status: selfTestRequested ? 'FAIL' : 'NOT_REQUESTED' },
+        self_test: { status: 'FAIL', provider_readback_verified: false },
+        provider_readback_claimed: false,
         pass_manufactured: false,
       });
     }
