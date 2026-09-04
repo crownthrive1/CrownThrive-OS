@@ -1,0 +1,56 @@
+name: Materialize CHLOM Provider Custody v6
+
+on:
+  push:
+    branches:
+      - 'repair/chlom-agent-runtime-custody-v6-*'
+    paths:
+      - 'scripts/materialize_chlom_provider_custody.py'
+      - '.github/workflows/materialize-chlom-provider-custody-v6.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-chlom-provider-custody-v6-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Recover, verify, and commit exact provider bodies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_MANAGEMENT_TOKEN: ${{ secrets.SUPABASE_MANAGEMENT_TOKEN }}
+      SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+    steps:
+      - name: Check out exact repair head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Materialize provider-applied migration custody
+        run: python3 scripts/materialize_chlom_provider_custody.py
+
+      - name: Verify exact source identities and safety boundary
+        run: python3 scripts/verify_chlom_agent_runtime_custody.py
+
+      - name: Reject whitespace and patch corruption
+        run: git diff --check
+
+      - name: Commit materialized provider custody without force
+        run: |
+          if git diff --quiet --exit-code; then
+            echo 'Exact provider custody is already materialized.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-custody[bot]'
+          git config user.email 'crownthrive-custody[bot]@users.noreply.github.com'
+          git add \
+            supabase/migrations \
+            supabase/migration_lineage/chlom_agent_runtime_custody_v6.json
+          git commit -m 'fix(supabase): materialize exact CHLOM agent runtime custody'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
