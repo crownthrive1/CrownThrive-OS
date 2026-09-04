@@ -16,9 +16,26 @@ The upstream plugin supplies ten Paddle Billing skills plus three MCP servers:
 
 Paddle Classic is excluded.
 
+## CrownThrive OS MCP control surface
+
+`api/mcp.js` supplies the previously missing `/api/mcp` handler referenced by the root `.mcp.json`. It is dependency-free, stateless, and serves both MCP eras:
+
+- modern `2026-07-28` through `server/discover`, per-request metadata, `Mcp-Method`/`Mcp-Name` validation, cache hints, and no protocol session;
+- legacy `2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05` through `initialize` compatibility.
+
+Every request is independently protected by `CROWNTHRIVE_CONTROL_TOKEN`. Missing or invalid control-token binding fails closed before MCP dispatch.
+
+The OS MCP exposes three read-only orchestration tools:
+
+- `crownthrive_paddle_route` selects the exact Paddle skill and direct upstream MCP lane;
+- `crownthrive_paddle_preflight` reports local credential and authority blockers without contacting Paddle;
+- `crownthrive_paddle_integration_status` returns public-safe source and gate state without exposing secret values.
+
+It also exposes three resources and one governed-operation prompt. The OS endpoint does not proxy or execute Paddle mutations. Provider operations continue through the pinned direct `paddle-docs`, `paddle-sandbox`, or `paddle-live` server after routing, skill loading, authorization, and preflight.
+
 ## Runtime policy
 
-All Paddle work must first load `skills/paddle-billing-governed-routing/SKILL.md`, then load the matching upstream `paddle-*` implementation skill.
+All Paddle work must first call `crownthrive_paddle_route`, load `skills/paddle-billing-governed-routing/SKILL.md`, and then load the matching upstream `paddle-*` implementation skill. This sequence makes the upstream Paddle skills operationally mandatory rather than merely installed.
 
 `paddle-sandbox` is the default execution lane. Its bearer token is resolved only from `PADDLE_SANDBOX_API_KEY` in a protected runtime or operator keychain.
 
@@ -27,15 +44,19 @@ All Paddle work must first load `skills/paddle-billing-governed-routing/SKILL.md
 ## Activation sequence
 
 1. Accept and merge the exact source candidate after CI and required review.
-2. Import or sync the CrownThrive OS marketplace from the repository.
-3. Make the Paddle plugin available to the intended Codex role.
-4. Bind a least-privilege Paddle sandbox key to `PADDLE_SANDBOX_API_KEY` outside Git.
-5. Authenticate `paddle-docs` when prompted.
-6. Run a documentation lookup through `paddle-docs`.
-7. Run the governed sandbox test sequence through `paddle-sandbox`; preserve sanitized readback.
-8. Authorize `paddle-live` with OAuth only for an eligible operator. Keep the connection read-only unless a separately authorized live write is required.
-9. Reconcile any provider side effect into PentaGreen, CHLOM, entitlement, webhook, and DAIL surfaces only within their own authority.
-10. Advance production state only after security review and independent verification.
+2. Confirm the Vercel deployment contains the new `/api/mcp` function.
+3. Bind `CROWNTHRIVE_CONTROL_TOKEN` to both the eligible MCP client and the protected Vercel runtime; never write it to Git.
+4. Perform an authenticated `/api/mcp` handler readback and modern `server/discover` canary.
+5. Import or sync the CrownThrive OS marketplace from the repository.
+6. Make the Paddle plugin available to the intended Codex role.
+7. Bind a least-privilege Paddle sandbox key to `PADDLE_SANDBOX_API_KEY` outside Git.
+8. Call `crownthrive_paddle_route` and `crownthrive_paddle_preflight` for the bounded task.
+9. Load the exact returned upstream `paddle-*` skill.
+10. Authenticate `paddle-docs` when prompted and resolve current provider semantics.
+11. Run the governed sandbox test sequence through `paddle-sandbox`; preserve sanitized provider readback.
+12. Authorize `paddle-live` with OAuth only for an eligible operator. Keep the connection read-only unless a separately authorized live write is required.
+13. Reconcile any provider side effect into PentaGreen, CHLOM, entitlement, webhook, and DAIL surfaces only within their own authority.
+14. Advance production state only after security review and independent verification.
 
 ## Validation
 
@@ -44,9 +65,11 @@ Run:
 ```bash
 python3 scripts/validate_paddle_integration.py
 python3 -m unittest tests.test_paddle_integration
+node --experimental-default-type=module --check api/mcp.js
+node --experimental-default-type=module --test tests/test_mcp_handler.mjs
 ```
 
-The validator proves the checked source contract only. It does not contact Paddle, authenticate an account, perform a transaction, or certify production.
+The deterministic local MCP suite exercises authentication, modern discovery, legacy initialization, tool listing, exact catalog-skill routing, live fail-closed behavior, header mismatch rejection, unsupported-version negotiation, and credential redaction. It does not contact Paddle or prove a provider account connection.
 
 ## Failure and rollback
 
@@ -59,4 +82,4 @@ On authentication, permission, schema, idempotency, webhook, reconciliation, or 
 5. Rerun the original control and broader regression checks.
 6. Keep production state at `HOLD` until evidence is complete.
 
-To remove the integration, disable or remove the plugin, remove the three root MCP entries, revoke live OAuth, and rotate or revoke the sandbox key. Preserve source and provider history.
+To remove the integration, disable or remove the plugin, remove the three direct Paddle MCP entries, remove the Paddle orchestration tools from `/api/mcp`, revoke live OAuth, and rotate or revoke the sandbox key. Preserve source and provider history.
