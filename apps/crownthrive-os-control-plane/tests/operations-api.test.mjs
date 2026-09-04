@@ -44,7 +44,7 @@ function mockResponse() {
 }
 
 function request() {
-  return { method: 'GET', url: '/api/operations', headers: {} };
+  return { method: 'GET', url: '/api/operations', headers: {}, query: {} };
 }
 
 function boundEnv(url, publicFallback = false) {
@@ -55,12 +55,66 @@ function boundEnv(url, publicFallback = false) {
   };
 }
 
-function jsonResponse(rows, contentRange = '0-0/1') {
+function responseJson(payload) {
   return {
     ok: true,
     status: 200,
-    headers: { get: (name) => name.toLowerCase() === 'content-range' ? contentRange : null },
-    json: async () => rows,
+    json: async () => payload,
+  };
+}
+
+function livePayload() {
+  return {
+    schema: 'ct.crownthrive.os.live-readback.v1',
+    status: 'OPERATIONAL',
+    window_hours: 24,
+    window_start: '2026-09-03T00:00:00.000Z',
+    generated_at: '2026-09-04T00:00:00.000Z',
+    stats: {
+      penta_events_window: 1,
+      penta_super_runs_window: 2,
+      wake_requests_window: 3,
+      remediation_window: 4,
+      interventions_window: 5,
+      registered_providers: 20,
+      active_providers: 19,
+      registered_routes: 1,
+      active_routes: 1,
+      dail_systems: 5,
+      dail_active_systems: 5,
+      operation_count: 32,
+    },
+    ledger: [{
+      occurred_at: '2026-09-04T00:00:00.000Z',
+      source: 'PentaRuntime',
+      protocol: 'PentaSuperRun',
+      route: 'runtime-key',
+      lane: 'runtime',
+      penta: null,
+      trace: 'trace-1',
+      state: 'SUCCEEDED',
+      evidence: 'abcdef1234567890',
+      authority: 'D2',
+      visibility: 'internal',
+    }],
+    providers: [{ provider_key: 'vercel', state: 'production_verified', route_count: 1 }],
+    routes: [{ route_key: 'ct.penta.pm.route.vercel.v1', provider_key: 'vercel', state: 'production_verified' }],
+    operations: [{ operation_key: 'penta_tick', last_state: 'SUCCEEDED', run_count: 10 }],
+    interventions: [{ id: 'window-intervention', stage: 'READBACK', state: 'OPERATIONAL' }],
+    dail: [{ system_key: 'ct.dail.machine.v1', state: 'active', sequence_id: '123' }],
+  };
+}
+
+function interventionPayload() {
+  return {
+    schema: 'ct.crownthrive.os.intervention-history.v1',
+    status: 'OPERATIONAL',
+    count: 2,
+    generated_at: '2026-09-04T00:00:00.000Z',
+    rows: [
+      { id: 'intervention-1', stage: 'READBACK', state: 'VERIFIED', authority_class: 'D2' },
+      { id: 'intervention-2', stage: 'PLAN', state: 'QUEUED', authority_class: 'D3' },
+    ],
   };
 }
 
@@ -82,6 +136,7 @@ test('unbound operations state does not claim provider readback', async () => {
     assert.equal(response.payload.status, 'PARTIAL');
     assert.equal(response.payload.source.state, 'UNBOUND');
     assert.equal(response.payload.instrumentation.vercel_provider_readback, 'UNBOUND');
+    assert.equal(response.payload.instrumentation.unobserved_activity_claimed, false);
     assert.equal(fetches, 0);
   } finally {
     global.fetch = originalFetch;
@@ -124,52 +179,45 @@ test('hostile Supabase URL variants fail before any credentialed fetch', async (
   }
 });
 
-test('canonical origins build the exact request and expose only signing_build_sha', async () => {
+test('canonical origins invoke only the exact unified readback RPCs and expose public-safe data', async () => {
   const originalFetch = global.fetch;
   try {
     for (const [url, publicFallback] of [
       [SUPABASE_ORIGIN, false],
       [`${SUPABASE_ORIGIN}/`, true],
     ]) {
-      let fetches = 0;
+      const requests = [];
       global.fetch = async (target, options) => {
-        fetches += 1;
+        requests.push({ target, options });
         assert.equal(target.origin, SUPABASE_ORIGIN);
-        assert.equal(target.pathname, '/rest/v1/pentafabric_events');
-        assert.equal(
-          target.searchParams.get('select'),
-          'penta_id,trace_id,protocol,lane,route,chlom_binding,build_sha,received_at',
-        );
-        assert.equal(target.searchParams.get('limit'), '250');
-        assert.match(target.searchParams.get('received_at'), /^gte\./);
-        assert.equal(target.searchParams.get('order'), 'received_at.desc');
-        assert.equal(options.method, 'GET');
+        assert.equal(options.method, 'POST');
         assert.equal(options.redirect, 'error');
         assert.equal(options.cache, 'no-store');
         assert.equal(options.headers.apikey, SERVICE_ROLE_KEY);
         assert.equal(options.headers.Authorization, `Bearer ${SERVICE_ROLE_KEY}`);
-        assert.equal(options.headers.Prefer, 'count=exact');
-        assert.equal(options.headers.Range, '0-249');
-        assert.equal(options.headers['Range-Unit'], 'items');
-        return jsonResponse([{
-          penta_id: 'penta-1',
-          trace_id: 'trace-1',
-          protocol: 'Pentas',
-          lane: 'hot',
-          route: 'system',
-          chlom_binding: 'chlom-1',
-          build_sha: 'signed-build-abc',
-          received_at: '2026-08-30T00:00:00.000Z',
-        }]);
+        assert.equal(options.headers['Content-Type'], 'application/json');
+        if (target.pathname === '/rest/v1/rpc/crownthrive_os_live_readback_v1') {
+          assert.deepEqual(JSON.parse(options.body), { p_window_hours: 24, p_limit: 200 });
+          return responseJson(livePayload());
+        }
+        if (target.pathname === '/rest/v1/rpc/crownthrive_os_intervention_history_v1') {
+          assert.deepEqual(JSON.parse(options.body), { p_limit: 500 });
+          return responseJson(interventionPayload());
+        }
+        throw new Error(`unexpected target ${target}`);
       };
 
       const response = mockResponse();
       await withEnv(boundEnv(url, publicFallback), () => operationsHandler(request(), response));
-      assert.equal(fetches, 1);
+      assert.equal(requests.length, 2);
       assert.equal(response.statusCode, 200);
-      const row = response.payload.activity.recent[0];
-      assert.equal(row.signing_build_sha, 'signed-build-abc');
-      assert.equal('build_sha' in row, false);
+      assert.equal(response.payload.status, 'OPERATIONAL');
+      assert.equal(response.payload.source.state, 'BOUND');
+      assert.equal(response.payload.activity.total_events, 15);
+      assert.equal(response.payload.activity.recent[0].source, 'PentaRuntime');
+      assert.equal(response.payload.intervention_history.count, 2);
+      assert.equal(response.payload.interventions[1].authority_class, 'D3');
+      assert.equal(response.payload.instrumentation.unobserved_activity_claimed, false);
       assert.equal(JSON.stringify(response.payload).includes(SERVICE_ROLE_KEY), false);
     }
   } finally {
