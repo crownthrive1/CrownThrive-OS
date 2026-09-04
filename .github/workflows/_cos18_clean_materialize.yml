@@ -4,7 +4,6 @@ on:
     branches:
       - "governance/cos-1.8-ratification-execution-20260904"
     paths:
-      - ".cos18-bootstrap/payload.tar.gz.b64"
       - ".github/workflows/_cos18_clean_materialize.yml"
 
 permissions:
@@ -47,21 +46,25 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python -m compileall -q scripts/cos18 tests/cos18
           PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests/cos18 -p "test_*.py" -v
           PYTHONDONTWRITEBYTECODE=1 python scripts/cos18/validate_cos18_kernel.py --root .
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f -name '*.pyc' -delete
 
       - name: Materialize one immutable behavior commit
         shell: bash
         run: |
           set -euo pipefail
-          rsync -a "$RUNNER_TEMP/cos18/extracted/" ./
-          rm -rf .cos18-bootstrap
-          rm -f .github/workflows/_cos18_clean_materialize.yml
+          # A contents-only materializer must never attempt workflow mutation.
+          rsync -a --exclude='.github/workflows/' "$RUNNER_TEMP/cos18/extracted/" ./
           git diff --check
           git config user.name "PentaGovernance Materializer"
           git config user.email "penta-governance@crownthrive.com"
-          git add -A
+          # Repository or runner policy may inherit signing. This machine commit is
+          # authenticated by GitHub Actions provenance and must not depend on a local GPG key.
+          git config --local commit.gpgsign false
+          git add -A -- . ':!.github/workflows/**' ':!.cos18-bootstrap/**'
           if git diff --cached --quiet; then
             echo "No materialization changes."
             exit 0
           fi
-          git commit -m "feat(cos): materialize COS 1.8 constitutional kernel"
+          git -c commit.gpgsign=false commit -m "feat(cos): materialize COS 1.8 constitutional kernel"
           git push origin "HEAD:governance/cos-1.8-ratification-execution-20260904"
