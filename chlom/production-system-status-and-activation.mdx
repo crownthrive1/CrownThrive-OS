@@ -1,0 +1,280 @@
+---
+title: "CHLOM Production System Status and Activation"
+sidebarTitle: "Production Status"
+description: "Authoritative production-state record for the CHLOM authenticated control plane, deployed gateway, DAIL evidence, source custody, activation boundaries, and remaining external-network predicates."
+icon: "shield-check"
+tag: "Production control plane"
+keywords:
+  - "CHLOM"
+  - "production gateway"
+  - "authenticated control plane"
+  - "DAIL"
+  - "PentaDocs"
+  - "CrownThrive"
+  - "idempotency"
+  - "rights infrastructure"
+standard_version: "1.0.0"
+primary_audience: "executive"
+page_type: "reference"
+content_state: "unresolved"
+---
+
+{/* pentadocs:audience-orientation:v2 */}
+<Info>
+  **Audience:** executive and governance readers (`executive`).
+
+  **This page:** CHLOM Production System Status and Activation — Authoritative production-state record for the CHLOM authenticated control plane, deployed gateway, DAIL evidence, source custody, activation boundaries, and remaining external-network predicates.
+
+  **Documentation state:** `unresolved` for page type `reference`. Documentation state is editorial posture only; it does not certify runtime, deployment, legal, rights, financial, provider, production, release, security, or operational status.
+
+  **Unresolved reason:** no explicit page-level editorial acceptance state was declared in the migrated source.
+
+  **Evidence needed:** an accepted governing source or accountable-owner attestation.
+
+  **Review role:** PentaDocs governance.
+
+  **Review trigger:** next material edit or source reconciliation.
+
+  **Related guidance:** [Documentation source governance](/standards/documentation-source-of-truth-and-autonomous-governance) and [Institutional record standard](/standards/record-and-format-standard).
+</Info>
+{/* /pentadocs:audience-orientation:v2 */}
+
+## CHLOM Production System Status and Activation
+
+**Observed:** September 4, 2026  
+**System:** CHLOM™, the Compliance Hybrid Licensing and Ownership Model  
+**Authority:** CrownThrive, LLC  
+**Classification:** Production internal control plane; external network activation remains separately gated
+
+CHLOM now has a deployed, authenticated production gateway over its live ThriveBase ownership, rights, licensing, entitlement, settlement-preview, token-candidate, oracle, and DAIL records. This page is the authoritative implementation-status boundary. It deliberately separates what is operational from what is only a production candidate, provider-gated, or legal/governance-gated.
+
+## Operational now
+
+| Capability | State | Evidence |
+|---|---|---|
+| Production gateway | **ACTIVE** | Supabase Edge Function `chlom-control-plane-v1`, provider version `4` |
+| Gateway contract | **ACTIVE** | `ct.chlom.authenticated-control-plane-gateway.v1`, gateway version `1.1.0` |
+| Dispatcher contract | **ACTIVE** | `ct.chlom.authenticated-control-plane-dispatch.v3` |
+| Gateway deployment digest | **BOUND** | `b1426595021a29106b7f10e344527a390af1f1ed36becb645ed5c1dcddaad540` |
+| Deployment-manifest digest | **BOUND** | `07f55628b2c66dda701c758c55273cdad85272348a744160ba275f5fb26df432` |
+| JWT enforcement | **ACTIVE** | Provider route has `verify_jwt=true`; unauthenticated provider probe returned HTTP `401` |
+| Origin enforcement | **ACTIVE** | CrownThrive preflight returned HTTP `204`; unapproved origin returned HTTP `403` |
+| Founder operator record | **ACTIVE** | `ct.subject.founder.kavonte-jones-sr`, authority class `D3`, version `1` |
+| Scope and authority enforcement | **ACTIVE** | Action-specific scope and D0–D3 threshold checks |
+| Read path | **ACTIVE** | Authenticated status and capabilities; no mutation idempotency key required; limit `120/minute` |
+| Mutation idempotency | **ACTIVE** | Valid key required; advisory lock, payload-conflict detection, stable replay result; limit `30/minute` |
+| Append-only dispatch evidence | **ACTIVE** | Domain event and dispatch receipt persisted; replay produced no duplicate mutation |
+| DAIL verification | **PASS** | `PASS_GLOBAL_COMPACT_CHAIN`, sequence lag `0`, verified through `2323298` |
+| GitHub source custody | **MERGED** | PR `#49`; merge commit `c30d07f63ffadb3c6e18639abc51a60ff9ca165b` |
+| External money movement | **DISABLED** | No dispatcher action; recorded count `0` |
+| Production token mint confirmation | **DISABLED** | No dispatcher action; confirmed count `0` |
+| Public validator activation | **DISABLED** | No dispatcher action |
+| Public-chain anchor confirmation | **PROVIDER-GATED** | Provider receipt is required |
+
+## Production gateway
+
+Base route:
+
+```text
+https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-control-plane-v1
+```
+
+Routes:
+
+```text
+GET  /status
+GET  /capabilities
+GET  /health
+POST /dispatch
+```
+
+Every request requires an authenticated Supabase bearer token. Mutation requests additionally require an `Idempotency-Key` header. The gateway forwards the caller identity to the database; it does not use a public service-role credential as the caller.
+
+### Allowed actions
+
+```text
+status
+capabilities
+register_asset_binding
+record_ownership_interest
+record_rights_instrument
+record_dla
+record_lex_offer
+record_agreement_entitlement
+record_obligation
+record_revenue_policy
+preview_settlement
+register_token_candidate
+report_oracle_signal
+bind_dail_proof
+```
+
+### Explicitly excluded actions
+
+```text
+external_money_movement
+production_token_mint_confirmation
+tokenomics_activation
+validator_activation
+public_chain_anchor_confirmation
+legal_title_adjudication
+```
+
+No alias or generic command route can invoke an excluded action. External execution remains `false` in gateway and dispatch responses.
+
+## Request contract
+
+A read request uses the authenticated session:
+
+```bash
+curl \
+  --request GET \
+  --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-control-plane-v1/status"
+```
+
+A mutation uses an exact action, payload, and stable idempotency key:
+
+```bash
+curl \
+  --request POST \
+  --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  --header "Content-Type: application/json" \
+  --header "Idempotency-Key: ct-idem:asset-example:v1" \
+  --data '{
+    "action": "register_asset_binding",
+    "payload": {
+      "canonical_asset_id": "ct.asset.example",
+      "asset_version_ref": "v1",
+      "asset_class": "DIGITAL_ASSET",
+      "fingerprint_sha256": "<64-lowercase-hex-characters>",
+      "source_system": "CROWNTHRIVE",
+      "source_ref": "ct.source.example.v1"
+    }
+  }' \
+  "https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/chlom-control-plane-v1/dispatch"
+```
+
+The same operator, action, and idempotency key with the same canonical payload returns the first persisted result. Reuse with a different payload is rejected.
+
+## Persisted production canary
+
+The gateway v1.1.0 release was bound through a real authenticated database-context mutation and a second replay call, not only a status request. The test explicitly remains classified as a database-authenticated canary rather than an external browser-issued founder-session canary.
+
+| Field | Value |
+|---|---|
+| Canonical asset | `ct.asset.chlom-control-plane.gateway-v1-1-0.20260904.01` |
+| Binding ID | `a20e8ac0-4a7c-4651-8906-9577216a3cdf` |
+| Binding record SHA-256 | `02f2385b3fcfd15ed69f72c0653874faa36b283d312da104640e1a42e827bc29` |
+| Asset DAIL event | `a8eb4005-d3b1-4572-a7c8-5d90b5e20cce` |
+| Asset DAIL sequence | `2323191` |
+| Asset DAIL event hash | `ffac4b323dd7a187d585fe2a63be3044baa0f9f39f3ecdee7698e5a199a1354c` |
+| Dispatch request ID | `81b8ac87-9ce5-4943-9f77-2852af406c32` |
+| Dispatch receipt ID | `fdc799fa-0c8a-4d8c-a803-fe9cd25588d0` |
+| Receipt DAIL event | `4d05d21a-b5ae-4e79-bd03-1826c2704622` |
+| Receipt DAIL sequence | `2323192` |
+| Receipt DAIL event hash | `20db482cf41126080746d8b3eb66ce1cef159f41d103ea438e95fecdee37845c` |
+| Idempotency response SHA-256 | `da00654e853d76800f11fa6cd9afe3d0a308f039f29aab727fcc86ff56946f53` |
+| First execution | `idempotent_replay=false` |
+| Second execution | `idempotent_replay=true` |
+| Duplicate domain mutations created | `0` |
+
+The deployment itself was then recorded as gateway deployment version `2`, manifest SHA-256 `07f55628b2c66dda701c758c55273cdad85272348a744160ba275f5fb26df432`, DAIL event `165c80b0-eb08-43e1-a17a-e5f157e4af6e`, sequence `2323281`.
+
+## DAIL assurance
+
+After the gateway mutation, replay proof, deployment-version record, and provider-boundary tests were completed, bounded catch-up returned:
+
+```json
+{
+  "ok": true,
+  "integrity_state": "PASS_GLOBAL_COMPACT_CHAIN",
+  "sequence_span_lag": 0,
+  "verified_through_sequence_id": 2323298,
+  "current_head_sequence_id": 2323298,
+  "v4_segment_count": 437,
+  "base_checkpoint_id": "dfb2018c-7dba-4200-b8af-16951efd4cc8"
+}
+```
+
+DAIL proves the integrity and sequence of CrownThrive's recorded events. It does not by itself prove a payment-provider transfer, blockchain mint, public-chain finality, or legal title.
+
+## Source state
+
+The previous CHLOM runtime blocker associated with pull request `#47` is obsolete. That pull request was merged into `crownthrive1/chlom-protocol` at commit:
+
+```text
+23245967e661e7dd1e6ea57a37c9160d6f8c8063
+```
+
+The initial authenticated gateway baseline was merged through CHLOM protocol pull request `#48`. The current production cutover—dispatcher v3, gateway v1.1.0, operations runbook, and exact deployment receipt—was reviewed in pull request `#49` and merged to `main` at:
+
+```text
+c30d07f63ffadb3c6e18639abc51a60ff9ca165b
+```
+
+The active Vercel commit check passed before merge. The immutable source tree now contains the deployed Edge Function source, read-safe idempotent dispatcher migration, operator and receipt registries, provider-boundary evidence, authenticated mutation/replay canary, deployment registry receipt, and DAIL assurance record. Runtime and network claims remain governed by their own reproducible-build and provider-readback gates.
+
+## Production candidate
+
+The following components are implemented or materially developed but are not certified here as an independently operating public Layer-1 network:
+
+- FRAME/native runtime and pallet suite.
+- Reproducible release-mode Wasm and canonical chain specification.
+- Validator deployment automation.
+- Runtime-upgrade and recovery procedures.
+- ZK proof circuits and verifier infrastructure.
+- Token and NFT provider adapters.
+
+A repository or local test result does not promote these components to public-network production.
+
+## Provider-gated
+
+These predicates require evidence from systems outside the database:
+
+- A real founder sign-in producing a valid Supabase session, followed by an external HTTPS status and mutation canary through this gateway.
+- Independently administered validator nodes in distinct failure domains.
+- Provider-observed node identities, block production, finality, restart survival, and snapshot recovery.
+- Reproducible Wasm and chain-spec byte hashes from independent builders.
+- Stripe or other provider transaction, transfer, payout, refund, and dispute receipts.
+- Testnet and then bounded production mint receipts read through independent blockchain providers.
+- Public-chain anchor transaction and finality receipts.
+
+The authenticated database-context canary proves role, scope, mutation, DAIL, receipt, and replay behavior. It is not represented as a browser-generated founder-session canary.
+
+## Legal and governance-gated
+
+The following cannot be activated by software alone:
+
+- Adjudication of legal ownership or title.
+- CHLOM Coin or CHM issuance.
+- Transferability or redemption rights.
+- Public tokenomics.
+- Validator economic incentives.
+- Securities, money-transmission, tax, sanctions, AML, consumer-disclosure, or jurisdictional determinations.
+- Binding third-party licenses without the required signed instrument and authority.
+
+## Ecosystem integration order
+
+The production gateway is the common rights-and-entitlement rail for CrownThrive's Thrive Flywheel. Integration proceeds in this order:
+
+1. **PentaGreen** — admission, commercialization, price, license, fulfillment, and entitlement binding.
+2. **CHLOM Wallet** — ownership, licenses, obligations, proofs, and recoverable access.
+3. **Go Flipbooks** — Work, Edition, Publication, Deployment, reading entitlement, and creator settlement.
+4. **PentaPersona** — persona packages, skill licenses, editions, provenance, and token candidates.
+5. **Virality Music and CrownThrive Studios** — master, publishing, sync, contributor, media, and distribution rights.
+6. **Locticians and Melanated media properties** — creator credentials, contributor permissions, service rights, and distribution terms.
+7. **The Tame Gallery, The Artful Mane Gallery, and Wearable Art** — provenance, edition, display, reproduction, and commercial-use rights.
+8. **PentaAds and AdLuxe Network** — advertiser, publisher, placement, attribution, and revenue-policy records.
+9. **CrownThriveU** — course, credential, educator, learner, and institutional entitlements.
+10. **CrownThrive IO** — developer keys, SDK contracts, webhooks, rate limits, and public-safe resolution.
+
+Each integration requires a downstream business-object canary and exact provider or database readback. A queue entry alone is not completion.
+
+## Acceptance boundary
+
+The truthful current statement is:
+
+> CHLOM's authenticated internal production control plane and production gateway are deployed and operational. Its public blockchain network, external validator set, public-chain anchoring, token issuance, and money movement are not yet activated and must not be inferred from internal records.
+
+This page supersedes summaries that collapse internal control-plane production and external-network production into a single status.
