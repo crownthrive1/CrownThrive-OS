@@ -37,6 +37,10 @@ jobs:
           test -f "$RUNNER_TEMP/cos18/extracted/.crownthrive/releases/cos-1.8.0-rc.1.kernel.json"
           test -f "$RUNNER_TEMP/cos18/extracted/.crownthrive/releases/cos-1.8.0-rc.1.manifest.json"
           test -f "$RUNNER_TEMP/cos18/extracted/supabase/migrations/20260904000100_cos_1_8_constitutional_kernel.sql"
+          test -f "$RUNNER_TEMP/cos18/extracted/.github/workflows/cos-1.8-constitutional-gate.yml"
+          echo '---COS18_GATE_BEGIN---'
+          cat "$RUNNER_TEMP/cos18/extracted/.github/workflows/cos-1.8-constitutional-gate.yml"
+          echo '---COS18_GATE_END---'
 
       - name: Independently validate extracted candidate
         shell: bash
@@ -53,13 +57,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # A contents-only materializer must never attempt workflow mutation.
           rsync -a --exclude='.github/workflows/' "$RUNNER_TEMP/cos18/extracted/" ./
           git diff --check
           git config user.name "PentaGovernance Materializer"
           git config user.email "penta-governance@crownthrive.com"
-          # Repository or runner policy may inherit signing. This machine commit is
-          # authenticated by GitHub Actions provenance and must not depend on a local GPG key.
           git config --local commit.gpgsign false
           git add -A -- . ':!.github/workflows/**' ':!.cos18-bootstrap/**'
           if git diff --cached --quiet; then
