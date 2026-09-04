@@ -19,6 +19,7 @@ class PaddleIntegrationContractTests(unittest.TestCase):
         result = validator.validate(ROOT)
         self.assertEqual(result["state"], "PASS")
         self.assertEqual(result["mcp_server_count"], 3)
+        self.assertEqual(result["preserved_mcp_server_count"], 3)
         self.assertEqual(result["skill_count"], 10)
         self.assertEqual(result["production_state"], "HOLD")
 
