@@ -5,6 +5,7 @@ SQL = (ROOT / "supabase/migrations/20260904134400_penta_pr_restack_execution_ada
 EDGE = (ROOT / "supabase/functions/penta-pr-restack-provider/index.ts").read_text()
 BRIDGE = (ROOT / "supabase/migrations/20260823202949_chlom_vault_capability_structural_replay_bridge_v1.sql").read_text()
 TOMBSTONE = (ROOT / "supabase/migrations/20260823203545_chlom_vault_capability_structural_replay_bridge_v1.sql").read_text()
+EXEC_BRIDGE = (ROOT / "supabase/migrations/20260823203648_execution_builder_structural_replay_bridge_v1.sql").read_text()
 
 
 def test_assignment_gate_is_exact_and_d2_bounded():
@@ -83,3 +84,39 @@ def test_late_bridge_is_provenance_only_tombstone():
     assert "create table" not in TOMBSTONE.lower()
     assert "create or replace view" not in TOMBSTONE.lower()
     assert "vault.create_secret" not in TOMBSTONE
+
+
+def test_execution_builder_replay_bridge_is_blank_replay_only_and_production_noop():
+    assert "20260823203649_execution_builder_agent_v1_0_1" in EXEC_BRIDGE
+    assert "to_regclass('chlom_runtime.agent_templates') is null" in EXEC_BRIDGE
+    assert "if not v_replay_bootstrap then" in EXEC_BRIDGE
+    assert "return;" in EXEC_BRIDGE
+    assert "replay_only_structural_bridge" in EXEC_BRIDGE
+    assert "execution_authority',false" in EXEC_BRIDGE
+    assert "certification_effect',false" in EXEC_BRIDGE
+    assert "authority_created',false" in EXEC_BRIDGE
+
+
+def test_execution_builder_replay_bridge_recreates_only_bounded_historical_shape():
+    assert "create table chlom_runtime.agent_templates" in EXEC_BRIDGE.lower()
+    assert "create table chlom_runtime.agent_suite_registry" in EXEC_BRIDGE.lower()
+    assert "create table chlom_runtime.agent_skill_packages" in EXEC_BRIDGE.lower()
+    assert "create table chlom_runtime.agent_health" in EXEC_BRIDGE.lower()
+    assert "create table chlom_runtime.construction_work_queue" in EXEC_BRIDGE.lower()
+    assert "create table institutional_federation.capability_execution_queue" in EXEC_BRIDGE.lower()
+    assert "authority_ceiling in ('D0','D1','D2')" in EXEC_BRIDGE
+    assert "check (not vote_eligible)" in EXEC_BRIDGE
+    assert "check (no_self_approval)" in EXEC_BRIDGE
+    assert "force row level security" in EXEC_BRIDGE.lower()
+    assert "from public, anon, authenticated, service_role" in EXEC_BRIDGE.lower()
+
+
+def test_execution_builder_replay_bridge_has_no_real_dail_or_provider_authority():
+    assert "REPLAY_ONLY_NOOP" in EXEC_BRIDGE
+    assert "'durable_write',false" in EXEC_BRIDGE
+    assert "insert into chlom_runtime.dail" not in EXEC_BRIDGE.lower()
+    assert "insert into public.dail" not in EXEC_BRIDGE.lower()
+    assert "provider_activation',false" in EXEC_BRIDGE
+    assert "grant execute on function chlom_runtime.append_dail_event" not in EXEC_BRIDGE.lower()
+    assert "vault.create_secret" not in EXEC_BRIDGE
+    assert "decrypted_secret" not in EXEC_BRIDGE
