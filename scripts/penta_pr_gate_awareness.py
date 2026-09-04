@@ -80,7 +80,7 @@ def evidence_path(number: int) -> str:
 
 
 def receipt_path(number: int) -> str:
-    return f"penta/continuity/receipts/pr-{number}-originator-readiness.json"
+    return f"penta/evidence/pr-originator-readiness/pr-{number}-receipt.json"
 
 
 def _projection_paths(number: int) -> set[str]:
@@ -181,7 +181,7 @@ def build_continuity_receipt(*, repo: Path, base: str, subject_head: str, number
         "schema": RECEIPT_SCHEMA,
         "receipt_id": f"ct.penta.pr-originator-readiness.{number}.{subject_head[:12]}",
         "created_at": utc_now(), "actor": originator,
-        "reason": f"Non-certifying originator-readiness continuity packet for PR #{number}; independent provider, security, governance, and certification gates remain mandatory.",
+        "reason": f"Non-certifying originator-readiness evidence for PR #{number}; independent provider, security, governance, and certification gates remain mandatory.",
         "subject": {"pr_number": number, "base_sha": base, "subject_head_sha": subject_head},
         "changes": items,
         "readiness": {
@@ -247,7 +247,7 @@ def validate_projection(*, repo: Path, base: str, head: str, number: int,
     if not epath.exists():
         raise GateAwarenessError(f"missing originator-readiness evidence blob: {evidence_path(number)}")
     if not rpath.exists():
-        raise GateAwarenessError(f"missing originator-readiness receipt blob: {receipt_path(number)}")
+        raise GateAwarenessError(f"missing originator-readiness evidence receipt: {receipt_path(number)}")
 
     policy = _load_json(policy_path)
     packet = _load_json(epath)
@@ -279,7 +279,7 @@ def validate_projection(*, repo: Path, base: str, head: str, number: int,
     _validate_hash(packet, "evidence_sha256")
     _validate_hash(receipt, "receipt_sha256")
     if packet.get("continuity_receipt", {}).get("sha256") != receipt.get("receipt_sha256"):
-        raise GateAwarenessError("readiness packet is not bound to its continuity receipt")
+        raise GateAwarenessError("readiness packet is not bound to its evidence receipt")
 
     subject = str(packet.get("subject_head_sha") or "")
     _ensure_commit(repo, subject)
