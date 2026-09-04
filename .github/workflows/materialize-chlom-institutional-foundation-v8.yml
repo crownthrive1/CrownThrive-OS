@@ -1,0 +1,69 @@
+name: Materialize CHLOM Institutional Foundation v8
+
+on:
+  push:
+    branches:
+      - 'repair/chlom-framework-package-custody-v8-*'
+    paths:
+      - 'supabase/migration_lineage/provider_custody/institutional_foundation_v8/**'
+      - 'supabase/migration_lineage/chlom_institutional_foundation_custody_v8.json'
+      - 'scripts/assemble_chlom_institutional_foundation_custody_v8.py'
+      - 'scripts/verify_chlom_institutional_foundation_custody_v8.py'
+      - '.github/workflows/materialize-chlom-institutional-foundation-v8.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-chlom-institutional-foundation-v8-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Exact provider federation custody
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact repair head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+
+      - name: Confirm OpenPGP transport support
+        run: gpg --version
+
+      - name: Materialize exact provider statements
+        run: python scripts/assemble_chlom_institutional_foundation_custody_v8.py
+
+      - name: Verify exact custody and dependency topology
+        run: |
+          python scripts/verify_chlom_institutional_foundation_custody_v8.py
+          python scripts/verify_chlom_replay_dependency_custody_v7.py
+          python scripts/verify_chlom_agent_runtime_custody.py
+
+      - name: Reject whitespace and patch corruption
+        run: git diff --check
+
+      - name: Commit without inherited runner signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo 'Exact institutional foundation already materialized.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-custody[bot]'
+          git config user.email 'crownthrive-custody[bot]@users.noreply.github.com'
+          git config commit.gpgsign false
+          git add \
+            supabase/migrations \
+            supabase/migration_lineage/chlom_institutional_foundation_materialization_v8.json
+          git -c commit.gpgsign=false commit -m 'fix(supabase): materialize exact institutional federation custody'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
