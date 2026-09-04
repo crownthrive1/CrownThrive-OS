@@ -1,0 +1,47 @@
+name: Materialize Framework Package Registry Custody
+
+on:
+  push:
+    branches:
+      - 'repair/chlom-agent-runtime-custody-v6-64345fe'
+    paths:
+      - 'supabase/migration_lineage/provider_custody/20260820221308/**'
+      - 'scripts/materialize_framework_package_registry_custody.py'
+      - '.github/workflows/materialize-framework-package-registry-custody.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-framework-package-registry-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Assemble and verify exact provider body
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact repair head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Assemble exact provider migration
+        run: python3 scripts/materialize_framework_package_registry_custody.py
+
+      - name: Reject patch corruption
+        run: git diff --check
+
+      - name: Commit exact migration custody without force
+        run: |
+          git config user.name 'crownthrive-custody[bot]'
+          git config user.email 'crownthrive-custody[bot]@users.noreply.github.com'
+          git add -A \
+            supabase/migrations/20260820221308_framework_package_registry_v1.sql \
+            supabase/migrations/20260820221308_remote_applied_lineage.sql \
+            supabase/migration_lineage/replay_diagnostics/20260904_framework_package_registry_custody.json
+          git commit -m 'fix(supabase): materialize framework package registry custody'
+          git push origin "HEAD:${GITHUB_REF_NAME}"

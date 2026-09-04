@@ -1,0 +1,27 @@
+pi_state in ('candidate','disabled','controlled_test','enabled','hold')),
+  mcp_state text not null default 'candidate' check (mcp_state in ('candidate','disabled','controlled_test','enabled','hold')),
+  commercial_state text not null default 'candidate' check (commercial_state in ('research_candidate','candidate','packaged','rights_cleared','pricing_authorized','fulfillment_certified','checkout_staged','live','hold')),
+  exact_price_authorized boolean not null default false,
+  checkout_enabled boolean not null default false,
+  customer_entitlement_active boolean not null default false,
+  public_contract_digest text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table institutional_federation.framework_package_registry enable row level security;
+drop policy if exists framework_package_registry_service_role_all on institutional_federation.framework_package_registry;
+create policy framework_package_registry_service_role_all on institutional_federation.framework_package_registry for all to service_role using (true) with check (true);
+revoke all on institutional_federation.framework_package_registry from anon, authenticated;
+grant select, insert, update, delete on institutional_federation.framework_package_registry to service_role;
+
+alter table institutional_federation.algorithm_registry add column if not exists implementation_package_id text;
+
+insert into institutional_federation.framework_package_registry (
+  package_id, framework_id, canonical_name, factory_order, framework_agent_id, canonical_host_repo_id, execution_slug,
+  package_state, workflow_ref, validator_ref, engine_ref, skill_ref, tools_ref, api_contract_ref, mcp_contract_ref, evals_ref,
+  commercial_manifest_ref, private_runtime_required, private_runtime_state, api_state, mcp_state, commercial_state,
+  optional_repository_projection, metadata
+) values
+('ct.framework-package.cie','ct.framework.cultural-imprint-engine','Cultural Imprint Engine',1,'c

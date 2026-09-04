@@ -1,0 +1,17 @@
+ion_gate_by_itself',true,
+  'supersedes_missing_repo_interpretation_at','2026-08-20T22:04:00Z'
+), updated_at=now()
+where repo_id in ('ct.repo.cie','ct.repo.convergent-ecosystem','ct.repo.thrive-flywheel','ct.repo.chlom','ct.repo.corridor-architecture','ct.repo.hybrid-incubator','ct.repo.mm-suites','ct.repo.one-seat');
+
+update institutional_federation.repository_agent_bindings b
+set metadata=coalesce(b.metadata,'{}'::jsonb) || jsonb_build_object(
+  'framework_child_model','executable_framework_package_not_physical_repository',
+  'physical_repository_required',false,
+  'package_id',p.package_id,
+  'canonical_package_host_repo_id','ct.repo.crownthrive-support',
+  'optional_repository_projection',p.optional_repository_projection,
+  'public_distribution_requires_ip_gate',true,
+  'runtime_mutation_requires_workflow_ref_environment_agent_capability_binding',true
+), updated_at=now()
+from institutional_federation.framework_package_registry p
+where b.framework_id=p.framework_id;

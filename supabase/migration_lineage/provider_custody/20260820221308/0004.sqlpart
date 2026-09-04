@@ -1,0 +1,39 @@
+upport','one-seat','source_discovery',null,null,null,null,null,null,null,null,null,false,'not_required','candidate','disabled','research_candidate','crownthrive1/CrownThrive-One-Seat',jsonb_build_object('source_ref','PR #169 package fleet'))
+on conflict (package_id) do update set
+  framework_id=excluded.framework_id,
+  canonical_name=excluded.canonical_name,
+  factory_order=excluded.factory_order,
+  framework_agent_id=excluded.framework_agent_id,
+  canonical_host_repo_id=excluded.canonical_host_repo_id,
+  execution_slug=excluded.execution_slug,
+  package_state=excluded.package_state,
+  workflow_ref=excluded.workflow_ref,
+  validator_ref=excluded.validator_ref,
+  engine_ref=excluded.engine_ref,
+  skill_ref=excluded.skill_ref,
+  tools_ref=excluded.tools_ref,
+  api_contract_ref=excluded.api_contract_ref,
+  mcp_contract_ref=excluded.mcp_contract_ref,
+  evals_ref=excluded.evals_ref,
+  commercial_manifest_ref=excluded.commercial_manifest_ref,
+  private_runtime_required=excluded.private_runtime_required,
+  private_runtime_state=excluded.private_runtime_state,
+  api_state=excluded.api_state,
+  mcp_state=excluded.mcp_state,
+  commercial_state=excluded.commercial_state,
+  optional_repository_projection=excluded.optional_repository_projection,
+  metadata=excluded.metadata,
+  updated_at=now();
+
+update institutional_federation.algorithm_registry
+set implementation_package_id='ct.framework-package.cie',
+    metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object('physical_repository_required',false,'optional_repository_projection','crownthrive1/CrownThrive-CIE','implementation_identity','ct.framework-package.cie'),
+    updated_at=now()
+where algorithm_id='ct.algorithm.cie.v1';
+
+update institutional_federation.repository_registry
+set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+  'semantic_role','optional_distribution_repository_projection',
+  'physical_repository_required_for_framework_package',false,
+  'framework_package_registry','institutional_federation.framework_package_registry',
+  'not_an_activat
