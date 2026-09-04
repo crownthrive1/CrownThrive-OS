@@ -146,9 +146,6 @@ function evidenceSinkState(oidcToken, selfTest = null) {
       : 'SERVICE_ROLE_CONFIGURATION_HOLD';
   }
 
-  // Workload identity is presence-only until the edge provider returns an exact
-  // persisted readback. If OIDC is present it is the primary route, so the
-  // service-role fallback does not manufacture a bound/verified OIDC state.
   const bound = verified || (
     !config.oidc_token_present &&
     config.service_role_configuration_valid
@@ -412,6 +409,26 @@ async function runSelfTest(state, oidcToken) {
   };
 }
 
+function classifySelfTestFailure(error) {
+  const message = String(error?.message || '');
+  if (/signing secret is not bound/i.test(message)) {
+    return {
+      reason: 'HMAC_BINDING_UNAVAILABLE',
+      detail: 'PentaFabric signing secret is not bound',
+    };
+  }
+  if (/canonical CrownThrive edge function|ingest URL/i.test(message)) {
+    return { reason: 'OIDC_INGEST_CONFIGURATION_HOLD' };
+  }
+  if (/canonical CrownThrive project|origin/i.test(message)) {
+    return { reason: 'SERVICE_ROLE_CONFIGURATION_HOLD' };
+  }
+  if (/exact readback|persisted readback/i.test(message)) {
+    return { reason: 'PROVIDER_READBACK_NOT_VERIFIED' };
+  }
+  return { reason: 'SELF_TEST_FAILED' };
+}
+
 export default async function handler(request, response) {
   const state = fabricState();
   const oidcToken = resolveVercelOidcToken(request);
@@ -455,15 +472,22 @@ export default async function handler(request, response) {
         observed_at: new Date().toISOString(),
         pass_manufactured: false,
       });
-    } catch {
+    } catch (error) {
+      const failure = classifySelfTestFailure(error);
       return send(response, 503, {
         schema: 'ct.penta.vercel.fabric.20260903.v2',
         status: 'DEGRADED',
         error: 'pentafabric_self_test_failure',
+        reason: failure.reason,
+        ...(failure.detail ? { detail: failure.detail } : {}),
         fabric: state,
         evidence_sink: evidenceSinkState(oidcToken),
         write_authorization: writeAuthorizationState(oidcToken),
-        self_test: { status: 'FAIL', provider_readback_verified: false },
+        self_test: {
+          status: 'FAIL',
+          reason: failure.reason,
+          provider_readback_verified: false,
+        },
         provider_readback_claimed: false,
         pass_manufactured: false,
       });
