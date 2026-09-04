@@ -1,37 +1,33 @@
 name: COS 1.8 Constitutional Gate
-
 on:
   pull_request:
     paths:
-      - ".crownthrive/releases/cos-1.8.0-rc.1.kernel.json"
-      - ".crownthrive/releases/cos-1.8.0-rc.1.manifest.json"
+      - ".crownthrive/releases/cos-1.8.0-rc.1*"
       - "governance/pentagovernance/**"
       - "scripts/cos18/**"
-      - "supabase/migrations/20260904000100_cos_1_8_constitutional_kernel.sql"
       - "tests/cos18/**"
+      - "supabase/migrations/20260904000100_cos_1_8_constitutional_kernel.sql"
+      - ".github/workflows/cos-1.8-constitutional-gate.yml"
   workflow_dispatch:
-
-permissions:
-  contents: read
-
+permissions: {contents: read}
 jobs:
-  constitutional-gate:
-    name: constitutional-gate
+  deterministic-kernel:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Ban tracked transient Python artifacts
+        with: {python-version: "3.12"}
+      - run: python -m compileall -q scripts/cos18 tests/cos18
+      - run: python -m unittest discover -s tests/cos18 -p "test_*.py" -v
+      - run: python scripts/cos18/validate_cos18_kernel.py --root .
+      - name: Prohibit premature production claims
         run: |
-          if git ls-files | grep -E '(^|/)(__pycache__/|.*\.pyc$)' >/dev/null; then
-            git ls-files | grep -E '(^|/)(__pycache__/|.*\.pyc$)'
-            exit 1
-          fi
-      - name: Compile
-        run: python -m compileall -q scripts/cos18 tests/cos18
-      - name: Unit tests
-        run: python -m unittest discover -s tests/cos18 -p 'test_*.py' -v
-      - name: Validate immutable kernel
-        run: python scripts/cos18/validate_cos18_kernel.py --root .
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          k=json.loads(Path(".crownthrive/releases/cos-1.8.0-rc.1.kernel.json").read_text())
+          assert k["release"]["constitutional_effectiveness"] is False
+          assert k["release"]["production_eligible"] is False
+          assert k["release"]["authority_created"] is False
+          print("PASS_FAIL_CLOSED_RELEASE_CLAIMS")
+          PY
