@@ -10,9 +10,10 @@ on:
         required: true
         type: string
 
-# v2 is deliberately observation/projection-only. PentaPM owns Development
-# metadata. This workflow must not create Issues, edit PR bodies, or push
-# evidence commits into candidate branches.
+# Observation/projection only. PentaPM owns Development metadata. This workflow
+# must not create Issues, edit PR bodies, push evidence commits, or certify the
+# candidate. Independent security, governance, provider, and certifier gates
+# remain mandatory.
 permissions:
   contents: read
   pull-requests: read
@@ -54,7 +55,7 @@ jobs:
                   "Accept": "application/vnd.github+json",
                   "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
                   "X-GitHub-Api-Version": "2022-11-28",
-                  "User-Agent": "CrownThrive-Penta-Gate-Awareness/2.0",
+                  "User-Agent": "CrownThrive-Penta-Gate-Awareness/2.1",
               },
           )
           with urllib.request.urlopen(request, timeout=30) as response:
@@ -99,7 +100,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Generate exact-head originator-readiness packet without source mutation
+      - name: Generate exact-head non-certifying originator-readiness packet
         shell: bash
         env:
           REPOSITORY: ${{ github.repository }}
@@ -124,6 +125,15 @@ jobs:
             --pr-number "$NUMBER" \
             --originator "$ORIGINATOR" \
             > "$RUNNER_TEMP/penta-pr-originator-readiness.json"
+          python - <<'PY'
+          import json, os
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "penta-pr-originator-readiness.json"), encoding="utf-8") as fh:
+              result = json.load(fh)
+          if result.get("authority_created") is not False:
+              raise SystemExit("originator_readiness_authority_boundary_failed")
+          if result.get("independent_certification_required") is not True:
+              raise SystemExit("independent_certification_requirement_missing")
+          PY
           cat "$RUNNER_TEMP/penta-pr-originator-readiness.json"
 
       - name: Upload immutable workflow evidence
@@ -132,9 +142,9 @@ jobs:
           name: penta-pr-originator-readiness-${{ steps.target.outputs.number }}-${{ steps.target.outputs.head_sha }}
           path: |
             ${{ runner.temp }}/penta-pr-originator-readiness.json
-            pr-worktree/penta/evidence/pr-self-cert/pr-${{ steps.target.outputs.number }}.json
-            pr-worktree/penta/continuity/receipts/pr-${{ steps.target.outputs.number }}-self-certification.json
-          if-no-files-found: warn
+            pr-worktree/penta/evidence/pr-originator-readiness/pr-${{ steps.target.outputs.number }}.json
+            pr-worktree/penta/evidence/pr-originator-readiness/pr-${{ steps.target.outputs.number }}-receipt.json
+          if-no-files-found: error
           retention-days: 90
 
       - name: Project ownership boundary
@@ -142,7 +152,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo '## Penta PR Gate Awareness v2'
+            echo '## Penta PR Gate Awareness v2.1'
             echo
             echo "- PR: #${{ steps.target.outputs.number }}"
             echo "- Exact head: \`${{ steps.target.outputs.head_sha }}\`"
@@ -150,5 +160,6 @@ jobs:
             echo '- Candidate branch mutation: **disabled**'
             echo '- Issue creation: **disabled**'
             echo '- PR body mutation: **disabled**'
-            echo '- Originator readiness: workflow artifact only; zero independent certification authority'
+            echo '- Originator readiness: workflow evidence only; authority_created=false'
+            echo '- Independent certification: **still required**'
           } >> "$GITHUB_STEP_SUMMARY"

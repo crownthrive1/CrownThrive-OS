@@ -1,4 +1,4 @@
-"""Tests for universal Penta PR gate-awareness and self-certification projection."""
+"""Tests for universal Penta PR gate-awareness and non-certifying readiness."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ class GateAwarenessTests(unittest.TestCase):
         subject = self.git(repo, "rev-parse", "HEAD")
         return repo, base, subject, temp
 
-    def test_prepare_writes_exact_head_self_cert_and_continuity_receipt(self) -> None:
+    def test_prepare_writes_exact_head_non_certifying_readiness(self) -> None:
         repo, base, subject, temp = self.fixture()
         self.addCleanup(temp.cleanup)
         result = prepare(
@@ -80,14 +80,22 @@ class GateAwarenessTests(unittest.TestCase):
             serialized_policy_path=repo / "penta" / "registry" / "serialized-suite.json",
         )
         self.assertTrue(result["changed"])
+        self.assertFalse(result["authority_created"])
+        self.assertTrue(result["independent_certification_required"])
         packet = json.loads((repo / evidence_path(42)).read_text(encoding="utf-8"))
         receipt = json.loads((repo / receipt_path(42)).read_text(encoding="utf-8"))
-        self.assertEqual(packet["self_certification_state"], "SELF_CERTIFIED")
+        self.assertEqual(packet["readiness_state"], "READY_FOR_INDEPENDENT_REVIEW")
         self.assertEqual(packet["originator_identity"], "penta.sample")
-        self.assertEqual(packet["self_certifier_identity"], "penta.sample")
+        self.assertNotIn("self_certification_state", packet)
+        self.assertNotIn("self_certifier_identity", packet)
         self.assertEqual(packet["subject_head_sha"], subject)
         self.assertEqual(packet["base_sha"], base)
+        self.assertFalse(packet["authority_created"])
+        self.assertTrue(packet["independent_certification_required"])
         self.assertFalse(packet["provider_results_manufactured"])
+        self.assertEqual(receipt["readiness"]["state"], "READY_FOR_INDEPENDENT_REVIEW")
+        self.assertFalse(receipt["readiness"]["authority_created"])
+        self.assertTrue(receipt["readiness"]["independent_certification_required"])
         self.assertEqual(len(receipt["changes"]), 1)
         self.assertEqual(receipt["changes"][0]["path"], ".github/workflows/sample.yml")
         self.assertEqual(receipt["changes"][0]["rollback_ref"], base)
@@ -119,8 +127,10 @@ class GateAwarenessTests(unittest.TestCase):
         self.assertEqual(result["state"], "PASS")
         self.assertEqual(result["subject_head_sha"], subject)
         self.assertEqual(result["projection_head_sha"], projection)
+        self.assertFalse(result["authority_created"])
+        self.assertTrue(result["independent_certification_required"])
 
-    def test_non_evidence_change_after_projection_invalidates_self_cert(self) -> None:
+    def test_non_evidence_change_after_projection_invalidates_readiness(self) -> None:
         repo, base, subject, temp = self.fixture()
         self.addCleanup(temp.cleanup)
         prepare(
