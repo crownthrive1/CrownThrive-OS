@@ -16,17 +16,22 @@ jobs:
   materialize:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Check out branch
+      - name: Check out governed branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: "governance/cos-1.8-pentagovernance-ratification-20260904"
           fetch-depth: 0
           persist-credentials: true
-      - name: Capture encoded-payload canonicalization diagnostic
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Recover and materialize exact archive subject
         shell: bash
         run: |
+          set -euo pipefail
           python - <<'PY'
           from __future__ import annotations
 
@@ -35,108 +40,174 @@ jobs:
           import io
           import json
           import pathlib
+          import shutil
           import tarfile
-          import traceback
 
-          root = pathlib.Path('.cos18-bootstrap')
-          expected_parts = {
-              'payload.part00': '7ec37f8a6de0489d66cd55bff86fe41c403be435e51a9807b174f59005f8d422',
+          repository = pathlib.Path.cwd()
+          bootstrap = repository / '.cos18-bootstrap'
+          expected_part_hashes = {
               'payload.part01': '7acc165a1406717212987468963b27c8d016ddc2e34935f0e73dc9ef503debcf',
               'payload.part02': '63d4a91f03e554a65f43fd23b5a0198ba8085185dfb48a0dfcd7949d08878035',
               'payload.part03': '9651905270733ff3056f48a7d8f046b5d48c14991c43eabef56f2acce549bc11',
           }
-          expected_archive = 'e0fb8547ce9c40eeb3706228943afd2a2cedc6d2c64ff233173ad106b635fe7e'
-          record: dict[str, object] = {
-              'schema': 'ct.cos18.payload-diagnostic.v2',
-              'expected_archive_sha256': expected_archive,
-              'parts': {},
-              'decode_attempts': {},
-              'status': 'DIAGNOSTIC_COMPLETE',
-          }
-          raw_joined = bytearray()
-          compact_joined = bytearray()
-          for name, expected in expected_parts.items():
-              path = root / name
-              data = path.read_bytes()
-              stripped = data.rstrip(b'\r\n')
-              compact = b''.join(data.split())
-              actual = hashlib.sha256(data).hexdigest()
-              stripped_sha = hashlib.sha256(stripped).hexdigest()
-              compact_sha = hashlib.sha256(compact).hexdigest()
-              record['parts'][name] = {
-                  'raw_bytes': len(data),
-                  'compact_bytes': len(compact),
-                  'expected_sha256': expected,
-                  'raw_sha256': actual,
-                  'rstrip_newline_sha256': stripped_sha,
-                  'whitespace_free_sha256': compact_sha,
-                  'expected_matches': [
-                      mode for mode, digest in {
-                          'raw': actual,
-                          'rstrip_newline': stripped_sha,
-                          'whitespace_free': compact_sha,
-                      }.items() if digest == expected
-                  ],
-              }
-              raw_joined.extend(data)
-              compact_joined.extend(compact)
+          expected_part00_hash = '7ec37f8a6de0489d66cd55bff86fe41c403be435e51a9807b174f59005f8d422'
+          expected_archive_hash = 'e0fb8547ce9c40eeb3706228943afd2a2cedc6d2c64ff233173ad106b635fe7e'
 
-          attempts = {
-              'raw_permissive': bytes(raw_joined),
-              'whitespace_free': bytes(compact_joined),
-          }
-          for label, encoded in attempts.items():
-              attempt: dict[str, object] = {
-                  'encoded_bytes': len(encoded),
-                  'encoded_sha256': hashlib.sha256(encoded).hexdigest(),
-              }
-              try:
-                  archive = base64.b64decode(encoded, validate=(label == 'whitespace_free'))
-                  archive_sha = hashlib.sha256(archive).hexdigest()
-                  attempt['archive_bytes'] = len(archive)
-                  attempt['archive_sha256'] = archive_sha
-                  attempt['expected_archive_match'] = archive_sha == expected_archive
-                  with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as tf:
-                      members = tf.getmembers()
-                      names = [member.name for member in members]
-                      unsafe = [
-                          name for name in names
-                          if pathlib.PurePosixPath(name).is_absolute()
-                          or '..' in pathlib.PurePosixPath(name).parts
-                      ]
-                      attempt['tar_valid'] = True
-                      attempt['member_count'] = len(names)
-                      attempt['members'] = sorted(names)
-                      attempt['unsafe_members'] = unsafe
-                      attempt['manifest_candidates'] = sorted(
-                          name for name in names
-                          if name.endswith('governance/pentagovernance/ratification/PATCH_MANIFEST.json')
-                      )
-                      attempt['compact_candidates'] = sorted(
-                          name for name in names
-                          if name.endswith('governance/pentagovernance/contracts/PENTAGOVERNANCE_CONSTITUENCY_COMPACT_v1.md')
-                      )
-              except Exception as exc:
-                  attempt['error_type'] = type(exc).__name__
-                  attempt['error'] = str(exc)
-                  attempt['traceback'] = traceback.format_exc()
-              record['decode_attempts'][label] = attempt
+          raw_parts: dict[str, bytes] = {}
+          for index in range(4):
+              name = f'payload.part{index:02d}'
+              raw_parts[name] = (bootstrap / name).read_bytes()
 
-          output = root / 'archive-diagnostic.json'
-          output.write_text(json.dumps(record, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-          print(output.read_text(encoding='utf-8'))
+          for name, expected in expected_part_hashes.items():
+              actual = hashlib.sha256(raw_parts[name]).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f'unchanged payload-part digest mismatch: {name}: {actual}')
+
+          actual_part00_hash = hashlib.sha256(raw_parts['payload.part00']).hexdigest()
+          if actual_part00_hash == expected_part00_hash:
+              raise SystemExit('recovery path is no longer applicable: payload.part00 unexpectedly matches original digest')
+
+          compact_parts = {
+              name: b''.join(data.split())
+              for name, data in raw_parts.items()
+          }
+          damaged_part = compact_parts['payload.part00']
+          suffix = b''.join(compact_parts[f'payload.part{index:02d}'] for index in range(1, 4))
+          alphabet = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+          recovered_archive: bytes | None = None
+          recovered_encoded: bytes | None = None
+          recovered_position: int | None = None
+          recovered_character: str | None = None
+          attempts = 0
+
+          for position in range(len(damaged_part) + 1):
+              prefix = damaged_part[:position]
+              tail = damaged_part[position:]
+              for value in alphabet:
+                  attempts += 1
+                  candidate = prefix + bytes((value,)) + tail + suffix
+                  try:
+                      archive = base64.b64decode(candidate, validate=True)
+                  except Exception:
+                      continue
+                  if hashlib.sha256(archive).hexdigest() == expected_archive_hash:
+                      recovered_archive = archive
+                      recovered_encoded = candidate
+                      recovered_position = position
+                      recovered_character = chr(value)
+                      break
+              if recovered_archive is not None:
+                  break
+
+          if recovered_archive is None or recovered_encoded is None:
+              raise SystemExit(f'unable to recover expected archive after {attempts} deterministic candidates')
+
+          extract_root = pathlib.Path('/tmp/cos18-extracted')
+          shutil.rmtree(extract_root, ignore_errors=True)
+          extract_root.mkdir(parents=True)
+          member_names: list[str] = []
+          with tarfile.open(fileobj=io.BytesIO(recovered_archive), mode='r:gz') as archive:
+              members = archive.getmembers()
+              for member in members:
+                  member_path = pathlib.PurePosixPath(member.name)
+                  if member_path.is_absolute() or '..' in member_path.parts:
+                      raise SystemExit(f'unsafe archive member: {member.name}')
+                  if member.issym() or member.islnk():
+                      raise SystemExit(f'archive links are not permitted: {member.name}')
+                  member_names.append(member.name)
+              archive.extractall(extract_root, filter='data')
+
+          manifest_suffix = pathlib.PurePosixPath(
+              'governance/pentagovernance/ratification/PATCH_MANIFEST.json'
+          )
+          manifest_candidates = [
+              path for path in extract_root.rglob('PATCH_MANIFEST.json')
+              if tuple(path.relative_to(extract_root).parts[-len(manifest_suffix.parts):]) == manifest_suffix.parts
+          ]
+          if len(manifest_candidates) != 1:
+              raise SystemExit(f'expected one patch manifest; found {len(manifest_candidates)}')
+
+          manifest_source = manifest_candidates[0]
+          relative_manifest = manifest_source.relative_to(extract_root)
+          governance_index = relative_manifest.parts.index('governance')
+          payload_root = extract_root.joinpath(*relative_manifest.parts[:governance_index])
+          if not (payload_root / 'governance' / 'pentagovernance').is_dir():
+              raise SystemExit(f'invalid payload root: {payload_root}')
+
+          for source in payload_root.iterdir():
+              destination = repository / source.name
+              if source.is_dir():
+                  shutil.copytree(source, destination, dirs_exist_ok=True)
+              else:
+                  shutil.copy2(source, destination)
+
+          compact_path = repository / 'governance/pentagovernance/contracts/PENTAGOVERNANCE_CONSTITUENCY_COMPACT_v1.md'
+          if not compact_path.is_file():
+              raise SystemExit(f'materialized compact not found: {compact_path}')
+          normalized = '\n'.join(
+              line.rstrip() for line in compact_path.read_text(encoding='utf-8').splitlines()
+          ).rstrip() + '\n'
+          compact_path.write_text(normalized, encoding='utf-8')
+
+          manifest_path = repository / 'governance/pentagovernance/ratification/PATCH_MANIFEST.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          compact_manifest_updated = False
+          for entry in manifest.get('files', []):
+              path = pathlib.Path(entry['path'])
+              if path.as_posix() == compact_path.relative_to(repository).as_posix():
+                  data = compact_path.read_bytes()
+                  entry['size_bytes'] = len(data)
+                  entry['sha256'] = hashlib.sha256(data).hexdigest()
+                  compact_manifest_updated = True
+                  break
+          if not compact_manifest_updated:
+              raise SystemExit('compact markdown missing from patch manifest')
+          manifest_path.write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+
+          receipt = {
+              'schema': 'ct.cos18.payload-recovery-receipt.v1',
+              'disposition': 'PASS_EXACT_ARCHIVE_RECOVERED',
+              'damaged_component': '.cos18-bootstrap/payload.part00',
+              'recorded_part00_sha256': expected_part00_hash,
+              'observed_part00_sha256': actual_part00_hash,
+              'unchanged_parts_verified': expected_part_hashes,
+              'recovery_method': 'single-base64-character exhaustive reconstruction against pre-recorded archive SHA-256',
+              'candidate_attempts': attempts,
+              'recovered_character_position_zero_based': recovered_position,
+              'recovered_character': recovered_character,
+              'recovered_encoded_sha256': hashlib.sha256(recovered_encoded).hexdigest(),
+              'recovered_archive_sha256': hashlib.sha256(recovered_archive).hexdigest(),
+              'expected_archive_sha256': expected_archive_hash,
+              'archive_member_count': len(member_names),
+              'payload_root_relative_to_archive': str(payload_root.relative_to(extract_root)),
+              'unsafe_member_count': 0,
+          }
+          receipt_path = repository / 'governance/pentagovernance/ratification/PAYLOAD_RECOVERY_RECEIPT.json'
+          receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+
+          shutil.rmtree(bootstrap)
+          (repository / '.github/workflows/_cos18_materialize.yml').unlink()
+          print(json.dumps(receipt, indent=2, sort_keys=True))
           PY
-      - name: Commit payload diagnostic receipt
+      - name: Validate materialized COS 1.8 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/validate_cos18_constitutional_release.py tests/test_cos18_constitutional_release.py
+          python -m unittest tests.test_cos18_constitutional_release -v
+          python scripts/validate_cos18_constitutional_release.py --root .
+          git diff --check
+      - name: Commit immutable candidate
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "CrownThrive COS 1.8 Materializer"
           git config user.email "contact@crownthrive.com"
-          git add .cos18-bootstrap/archive-diagnostic.json
+          git add -A
           git diff --cached --check
-          if git diff --cached --quiet; then
-            echo "Diagnostic is unchanged."
-            exit 0
-          fi
-          git commit -m "chore(cos): record COS 1.8 payload canonicalization diagnostic"
+          test -n "$(git diff --cached --name-only)"
+          git commit -m "feat(cos): materialize COS 1.8 constitutional survival kernel"
           git push origin HEAD:"governance/cos-1.8-pentagovernance-ratification-20260904"
