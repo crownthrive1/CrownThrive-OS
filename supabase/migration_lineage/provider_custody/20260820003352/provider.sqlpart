@@ -1,0 +1,77 @@
+create or replace function integration_control.refresh_credential_continuity()
+returns jsonb
+language plpgsql
+security definer
+set search_path to ''
+as $function$
+declare
+  r record;
+  p_secret text;
+  r_secret text;
+  p_hash text;
+  r_hash text;
+  p_present boolean;
+  r_present boolean;
+  v_state text;
+  v_match boolean;
+  v_checked integer := 0;
+begin
+  for r in select * from integration_control.credential_continuity_registry loop
+    p_secret := null;
+    r_secret := null;
+    p_hash := null;
+    r_hash := null;
+    p_present := false;
+    r_present := false;
+    v_match := null;
+
+    if r.primary_vault_name is not null then
+      select decrypted_secret into p_secret from vault.decrypted_secrets where name=r.primary_vault_name limit 1;
+      p_present := coalesce(p_secret,'') <> '';
+      if p_present then p_hash := encode(extensions.digest(p_secret,'sha256'),'hex'); end if;
+    end if;
+    if r.recovery_vault_name is not null then
+      select decrypted_secret into r_secret from vault.decrypted_secrets where name=r.recovery_vault_name limit 1;
+      r_present := coalesce(r_secret,'') <> '';
+      if r_present then r_hash := encode(extensions.digest(r_secret,'sha256'),'hex'); end if;
+    end if;
+
+    if r.primary_vault_name is null then
+      v_state := 'provider_managed_only';
+    elsif r.credential_class like 'future_%' and not p_present then
+      v_state := 'pending';
+    elsif not p_present then
+      v_state := 'blocked_missing_secret';
+    elsif r.recovery_vault_name is null then
+      v_state := 'verified_primary_only';
+    elsif r_present and p_hash = r_hash then
+      v_state := 'verified_dual_reference';
+      v_match := true;
+    elsif r_present then
+      v_state := 'pending';
+      v_match := false;
+    else
+      v_state := 'verified_primary_only';
+      v_match := false;
+    end if;
+
+    update integration_control.credential_continuity_registry
+       set primary_present=p_present,
+           recovery_present=r_present,
+           fingerprint_sha256=p_hash,
+           continuity_state=v_state,
+           last_verified_at=now(),
+           updated_at=now()
+     where credential_id=r.credential_id;
+
+    insert into integration_control.credential_continuity_audit(credential_id,primary_present,recovery_present,fingerprints_match,continuity_state,notes)
+    values(r.credential_id,p_present,r_present,v_match,v_state,
+      case when r.credential_class like 'future_%' and not p_present
+           then 'Automated internal Vault continuity check; future credential intentionally unprovisioned; no secret values persisted.'
+           else 'Automated internal Vault continuity check; no secret values persisted.' end);
+    v_checked := v_checked + 1;
+  end loop;
+
+  return jsonb_build_object('checked',v_checked,'checked_at',now());
+end;
+$function$;
