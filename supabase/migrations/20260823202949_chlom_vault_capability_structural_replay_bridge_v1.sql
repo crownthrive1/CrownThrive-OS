@@ -9,6 +9,13 @@
 
 begin;
 
+-- Fresh Preview replay may reach this compatibility bridge before the historical
+-- migrations that originally created these schemas. Restore namespace shape only;
+-- no executable capability, secret material or provider authority is created here.
+create schema if not exists chlom_runtime;
+revoke all on schema chlom_runtime from public, anon, authenticated;
+grant usage on schema chlom_runtime to service_role;
+
 create schema if not exists chlom_secrets;
 revoke all on schema chlom_secrets from public, anon, authenticated;
 grant usage on schema chlom_secrets to service_role;
@@ -87,7 +94,9 @@ declare
   v_view text;
   v_pk integer;
 begin
-  if to_regclass('chlom_runtime.capability_contracts') is null
+  if to_regnamespace('chlom_runtime') is null
+     or to_regnamespace('chlom_secrets') is null
+     or to_regclass('chlom_runtime.capability_contracts') is null
      or to_regclass('chlom_runtime.vaulted_capability_registry') is null
      or to_regclass('chlom_secrets.trade_secret_assets') is null
   then raise exception 'HOLD_CAPABILITY_STRUCTURAL_REPLAY_BRIDGE_INCOMPLETE'; end if;
