@@ -1,0 +1,37 @@
+name: COS 1.8 Constitutional Gate
+
+on:
+  pull_request:
+    paths:
+      - ".crownthrive/releases/cos-1.8.0-rc.1.kernel.json"
+      - ".crownthrive/releases/cos-1.8.0-rc.1.manifest.json"
+      - "governance/pentagovernance/**"
+      - "scripts/cos18/**"
+      - "supabase/migrations/20260904000100_cos_1_8_constitutional_kernel.sql"
+      - "tests/cos18/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  constitutional-gate:
+    name: constitutional-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ban tracked transient Python artifacts
+        run: |
+          if git ls-files | grep -E '(^|/)(__pycache__/|.*\.pyc$)' >/dev/null; then
+            git ls-files | grep -E '(^|/)(__pycache__/|.*\.pyc$)'
+            exit 1
+          fi
+      - name: Compile
+        run: python -m compileall -q scripts/cos18 tests/cos18
+      - name: Unit tests
+        run: python -m unittest discover -s tests/cos18 -p 'test_*.py' -v
+      - name: Validate immutable kernel
+        run: python scripts/cos18/validate_cos18_kernel.py --root .
