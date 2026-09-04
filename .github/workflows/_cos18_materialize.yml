@@ -24,11 +24,7 @@ jobs:
           ref: "governance/cos-1.8-pentagovernance-ratification-20260904"
           fetch-depth: 0
           persist-credentials: true
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: "3.12"
-      - name: Verify and materialize hash-locked patch
+      - name: Verify payload and emit archive index
         shell: bash
         run: |
           set -euo pipefail
@@ -39,71 +35,21 @@ jobs:
           cat .cos18-bootstrap/payload.part00 .cos18-bootstrap/payload.part01 .cos18-bootstrap/payload.part02 .cos18-bootstrap/payload.part03 > /tmp/cos18-patch.b64
           base64 --decode /tmp/cos18-patch.b64 > /tmp/cos18-patch.tar.gz
           echo "e0fb8547ce9c40eeb3706228943afd2a2cedc6d2c64ff233173ad106b635fe7e  /tmp/cos18-patch.tar.gz" | sha256sum --check --strict
-
-          python - <<'PY'
-          import pathlib
-          import tarfile
-
-          archive = pathlib.Path('/tmp/cos18-patch.tar.gz')
-          with tarfile.open(archive, 'r:gz') as tf:
-              for member in tf.getmembers():
-                  path = pathlib.PurePosixPath(member.name)
-                  if path.is_absolute() or '..' in path.parts:
-                      raise SystemExit(f'unsafe archive member: {member.name}')
-          PY
-
-          rm -rf /tmp/cos18-extract
-          mkdir -p /tmp/cos18-extract
-          tar -xzf /tmp/cos18-patch.tar.gz -C /tmp/cos18-extract
-
-          mapfile -t manifests < <(find /tmp/cos18-extract -type f -path '*/governance/pentagovernance/ratification/PATCH_MANIFEST.json' -print | sort)
-          test "${#manifests[@]}" -eq 1
-          payload_root="${manifests[0]%/governance/pentagovernance/ratification/PATCH_MANIFEST.json}"
-          test -d "$payload_root/governance/pentagovernance"
-          cp -a "$payload_root"/. .
-
-          python - <<'PY'
-          from pathlib import Path
-          import hashlib
-          import json
-
-          target = Path("governance/pentagovernance/contracts/PENTAGOVERNANCE_CONSTITUENCY_COMPACT_v1.md")
-          if not target.is_file():
-              raise SystemExit(f"materialized compact not found: {target}")
-          normalized = "\n".join(line.rstrip() for line in target.read_text(encoding="utf-8").splitlines()).rstrip() + "\n"
-          target.write_text(normalized, encoding="utf-8")
-
-          manifest_path = Path("governance/pentagovernance/ratification/PATCH_MANIFEST.json")
-          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-          found = False
-          for entry in manifest.get("files", []):
-              path = Path(entry["path"])
-              if path.as_posix() == target.as_posix():
-                  data = path.read_bytes()
-                  entry["size_bytes"] = len(data)
-                  entry["sha256"] = hashlib.sha256(data).hexdigest()
-                  found = True
-                  break
-          if not found:
-              raise SystemExit("compact markdown missing from patch manifest")
-          manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-          PY
-          rm -rf .cos18-bootstrap
-          rm -f .github/workflows/_cos18_materialize.yml
-      - name: Validate materialized candidate
-        run: |
-          python -m py_compile scripts/validate_cos18_constitutional_release.py tests/test_cos18_constitutional_release.py
-          python -m unittest tests.test_cos18_constitutional_release -v
-          python scripts/validate_cos18_constitutional_release.py --root .
+          {
+            printf 'archive_sha256=e0fb8547ce9c40eeb3706228943afd2a2cedc6d2c64ff233173ad106b635fe7e\n'
+            printf 'member_count='
+            tar -tzf /tmp/cos18-patch.tar.gz | wc -l
+            printf '%s\n' '--- members ---'
+            tar -tzf /tmp/cos18-patch.tar.gz | LC_ALL=C sort
+          } > .cos18-bootstrap/archive-index.txt
           git diff --check
-      - name: Commit exact candidate
+      - name: Commit archive index receipt
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "CrownThrive COS 1.8 Materializer"
           git config user.email "contact@crownthrive.com"
-          git add -A
+          git add .cos18-bootstrap/archive-index.txt
           git diff --cached --check
-          test -n "$(git diff --cached --name-only)"
-          git commit -m "feat(cos): materialize COS 1.8 constitutional survival kernel"
+          git commit -m "chore(cos): record hash-locked COS 1.8 archive index"
           git push origin HEAD:"governance/cos-1.8-pentagovernance-ratification-20260904"
