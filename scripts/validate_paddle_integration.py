@@ -31,6 +31,24 @@ EXPECTED_MCP_SERVERS: dict[str, dict[str, str]] = {
     },
 }
 
+PRESERVED_MCP_SERVERS: dict[str, dict[str, object]] = {
+    "crownthrive-os": {
+        "url": "https://crown-thrive-os.vercel.app/api/mcp",
+        "headers": {
+            "Authorization": "Bearer ${CROWNTHRIVE_CONTROL_TOKEN}",
+        },
+    },
+    "chlom-chain-evidence": {
+        "url": "https://chlom-protocol.vercel.app/api/mcp",
+        "headers": {
+            "Authorization": "Bearer ${CHLOM_API_TOKEN}",
+        },
+    },
+    "vercel": {
+        "url": "https://mcp.vercel.com",
+    },
+}
+
 EXPECTED_SKILLS = (
     "paddle-billing-history",
     "paddle-catalog-setup",
@@ -86,6 +104,13 @@ def validate(root: Path) -> dict[str, Any]:
     mcp = load_json(mcp_path)
     mcp_servers = mcp.get("mcpServers")
     require(isinstance(mcp_servers, dict), ".mcp.json must contain an mcpServers object")
+
+    for server_id, expected in PRESERVED_MCP_SERVERS.items():
+        actual = mcp_servers.get(server_id)
+        require(
+            actual == expected,
+            f"pre-existing MCP route {server_id} was removed or changed: expected {expected!r}, got {actual!r}",
+        )
 
     for server_id, expected in EXPECTED_MCP_SERVERS.items():
         actual = mcp_servers.get(server_id)
@@ -156,6 +181,7 @@ def validate(root: Path) -> dict[str, Any]:
         "validator": "ct.paddle-billing-source-contract.v1",
         "upstream_commit": UPSTREAM_SHA,
         "mcp_server_count": len(EXPECTED_MCP_SERVERS),
+        "preserved_mcp_server_count": len(PRESERVED_MCP_SERVERS),
         "skill_count": len(EXPECTED_SKILLS),
         "production_state": "HOLD",
         "files": {
