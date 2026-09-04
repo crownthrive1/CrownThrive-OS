@@ -10,6 +10,7 @@ on:
       - 'supabase/migration_lineage/chlom_replay_dependency_custody_v7.json'
       - 'scripts/assemble_chlom_foundation_custody_v7.sh'
       - 'scripts/verify_chlom_replay_dependency_custody_v7.py'
+      - 'scripts/inventory_remote_migration_markers.py'
       - '.github/workflows/materialize-chlom-provider-custody-v6.yml'
   workflow_dispatch:
 
@@ -22,7 +23,7 @@ concurrency:
 
 jobs:
   materialize:
-    name: Verify and assemble exact provider foundation and agent runtime
+    name: Verify custody and inventory bounded replay markers
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -43,19 +44,23 @@ jobs:
           python3 scripts/verify_chlom_replay_dependency_custody_v7.py
           python3 scripts/verify_chlom_agent_runtime_custody.py
 
+      - name: Inventory active no-op lineage markers in bounded interval
+        run: python3 scripts/inventory_remote_migration_markers.py
+
       - name: Reject whitespace and patch corruption
         run: git diff --check
 
-      - name: Commit exact provider custody without force
+      - name: Commit custody and marker inventory without force
         run: |
           if git diff --quiet --exit-code; then
-            echo 'Exact provider foundation custody is already materialized.'
+            echo 'Exact custody and marker inventory are already current.'
             exit 0
           fi
           git config user.name 'crownthrive-custody[bot]'
           git config user.email 'crownthrive-custody[bot]@users.noreply.github.com'
           git add \
             supabase/migrations \
-            supabase/migration_lineage/chlom_replay_dependency_custody_v7.json
-          git commit -m 'fix(supabase): materialize exact CHLOM replay foundation custody'
+            supabase/migration_lineage/chlom_replay_dependency_custody_v7.json \
+            supabase/migration_lineage/active_remote_marker_inventory_v8.json
+          git commit -m 'audit(supabase): inventory bounded replay lineage markers'
           git push origin "HEAD:${GITHUB_REF_NAME}"
