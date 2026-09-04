@@ -5,7 +5,8 @@ on:
     branches:
       - 'repair/chlom-agent-runtime-custody-v6-*'
     paths:
-      - 'scripts/materialize_chlom_provider_custody.py'
+      - 'supabase/migration_lineage/provider_custody/envelopes_v6/**'
+      - 'scripts/assemble_chlom_provider_custody_v6.sh'
       - '.github/workflows/materialize-chlom-provider-custody-v6.yml'
   workflow_dispatch:
 
@@ -18,13 +19,9 @@ concurrency:
 
 jobs:
   materialize:
-    name: Recover, verify, and commit exact provider bodies
+    name: Verify and assemble exact provider bodies
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_MANAGEMENT_TOKEN: ${{ secrets.SUPABASE_MANAGEMENT_TOKEN }}
-      SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
     steps:
       - name: Check out exact repair head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -32,8 +29,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Materialize provider-applied migration custody
-        run: python3 scripts/materialize_chlom_provider_custody.py
+      - name: Confirm OpenPGP transport support
+        run: gpg --version
+
+      - name: Verify envelopes and assemble provider migration custody
+        run: bash scripts/assemble_chlom_provider_custody_v6.sh
 
       - name: Verify exact source identities and safety boundary
         run: python3 scripts/verify_chlom_agent_runtime_custody.py
@@ -41,7 +41,7 @@ jobs:
       - name: Reject whitespace and patch corruption
         run: git diff --check
 
-      - name: Commit materialized provider custody without force
+      - name: Commit exact provider custody without force
         run: |
           if git diff --quiet --exit-code; then
             echo 'Exact provider custody is already materialized.'
