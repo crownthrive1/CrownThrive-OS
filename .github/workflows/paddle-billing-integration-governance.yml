@@ -1,0 +1,55 @@
+name: Paddle Billing Integration Governance
+
+on:
+  pull_request:
+    paths:
+      - ".mcp.json"
+      - ".agents/plugins/marketplace.json"
+      - "integrations/paddle/**"
+      - "skills/paddle-billing-governed-routing/**"
+      - "scripts/validate_paddle_integration.py"
+      - "tests/test_paddle_integration.py"
+      - ".github/workflows/paddle-billing-integration-governance.yml"
+  push:
+    branches:
+      - "codex/add-paddle-billing-mcp-skills"
+    paths:
+      - ".mcp.json"
+      - ".agents/plugins/marketplace.json"
+      - "integrations/paddle/**"
+      - "skills/paddle-billing-governed-routing/**"
+      - "scripts/validate_paddle_integration.py"
+      - "tests/test_paddle_integration.py"
+      - ".github/workflows/paddle-billing-integration-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Paddle Billing source contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Compile validator and tests
+        run: |
+          python -m py_compile scripts/validate_paddle_integration.py tests/test_paddle_integration.py
+      - name: Validate Paddle source contract
+        run: |
+          python scripts/validate_paddle_integration.py
+      - name: Run Paddle integration tests
+        run: |
+          python -m unittest tests.test_paddle_integration
+      - name: Check diff hygiene
+        run: |
+          git diff --check
