@@ -1,0 +1,88 @@
+name: Materialize CHLOM Gate and Specialist Agent Custody v9
+
+on:
+  push:
+    branches:
+      - 'repair/chlom-framework-package-custody-v8-20260904'
+    paths:
+      - 'supabase/migration_lineage/provider_custody/20260821025425/**'
+      - 'supabase/migration_lineage/provider_custody/20260821030400/**'
+      - 'scripts/materialize_chlom_gate_agent_custody_v9.py'
+      - '.github/workflows/materialize-chlom-gate-agent-custody-v9.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-chlom-gate-agent-custody-v9-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Assemble, verify, and commit exact provider custody
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Check out exact repair head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Materialize exact provider migrations
+        run: python3 scripts/materialize_chlom_gate_agent_custody_v9.py
+
+      - name: Reject patch and whitespace corruption
+        run: git diff --check
+
+      - name: Reverify complete migration object identities
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          expected = {
+              'supabase/migrations/20260821025311_chlom_construction_gates_control_plane_v1.sql': (
+                  3889,
+                  '184168880bc1dbe525ced4afa0ce197fd27a66628f66560d0b3009c6b5186fc2',
+                  '996423c8330ea2df8f1d776238f98c1eeafddcec',
+              ),
+              'supabase/migrations/20260821025425_chlom_construction_gate_catalog_v1.sql': (
+                  25248,
+                  'a2ad0cef8f291a0141c30b31211a152d5e89891f03732802972f9b7f39d08b1b',
+                  'b3a168fda13080328f95f3cb7f00202ec5cac8f0',
+              ),
+              'supabase/migrations/20260821030400_chlom_missing_specialist_agents_and_gate_assignments_v1.sql': (
+                  9441,
+                  'c5e88ce6ffbbaafe3a48773ce678998db286afa57c216ea5d1071bdbaa57423a',
+                  '84f287ac7071331a033fc3128319f2986d81a30c',
+              ),
+          }
+          for filename, (size, sha256, git_sha) in expected.items():
+              raw = Path(filename).read_bytes()
+              actual_sha = hashlib.sha256(raw).hexdigest()
+              actual_git = hashlib.sha1(
+                  b'blob ' + str(len(raw)).encode() + b'\0' + raw
+              ).hexdigest()
+              if (len(raw), actual_sha, actual_git) != (size, sha256, git_sha):
+                  raise SystemExit(
+                      f'HOLD_COMPLETE_PROVIDER_OBJECT_MISMATCH: {filename}: '
+                      f'{len(raw)} {actual_sha} {actual_git}'
+                  )
+          print('PASS_COMPLETE_PROVIDER_OBJECT_IDENTITIES')
+          PY
+
+      - name: Commit exact source custody without force
+        run: |
+          if git diff --quiet --exit-code; then
+            echo 'Exact provider custody already materialized.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-custody[bot]'
+          git config user.email 'crownthrive-custody[bot]@users.noreply.github.com'
+          git add -A \
+            supabase/migrations \
+            supabase/migration_lineage/replay_diagnostics/20260904_chlom_gate_agent_custody_v9.json
+          git commit -m 'fix(supabase): materialize CHLOM gate and specialist agent custody'
+          git push origin "HEAD:${GITHUB_REF_NAME}"

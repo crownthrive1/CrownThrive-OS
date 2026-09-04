@@ -1,0 +1,24 @@
+ handoff and reproducible bootstrap are synchronized.',array['test','staged','production','maintained'],array['module','platform','protocol','agent','algorithm','oracle','release','paper'],array[]::text[],'D2',false,array['operations_sre']::text[],false,'institutional_continuity',52,'{}'),
+('CG-053','operations','Incident & Runbook Readiness','Known failures have runbooks, severity, owner, pause/degraded mode, recovery, evidence and post-incident review.',array['staged','production','maintained'],array['module','platform','protocol','release'],array[]::text[],'D2',false,array['operations_sre','security_privacy']::text[],false,'incident_runbooks',53,'{}'),
+('CG-054','portability','Vendor Exit & Portability','Provider dependency, export format, recovery path, open standards/adapters and replacement strategy are tested.',array['staged','production','maintained'],array['module','platform','protocol','release'],array[]::text[],'D2',false,array['operations_sre','security_privacy']::text[],false,'vendor_exit',54,'{}'),
+('CG-055','claims','Public Claims / Legal State','Public claims match verified deployment, IP/legal status and measured evidence; target/research is labeled correctly.',array['staged','production','maintained'],array['platform','protocol','release','paper'],array[]::text[],'D3',true,array['legal_regulatory','accessibility_consumer','ip_licensing']::text[],false,'public_claims_review',55,'{}'),
+('CG-056','release','Canary & Independent Readback','Release passes canary, independent readback, rollback verification and post-release monitoring before promotion.',array['staged','production','maintained'],array['module','platform','protocol','release'],array[]::text[],'D2',false,array['operations_sre','security_privacy']::text[],false,'canary_readback',56,'{}'),
+('CG-057','chain','Mainnet Readiness','Real-value/mainnet activation requires legal, security, custody, economics, operations, governance and public-disclosure gates simultaneously PASS.',array['production','maintained'],array['protocol','release'],array[]::text[],'D3',true,array['blockchain_crypto','legal_regulatory','finance_tax_treasury','security_privacy','operations_sre']::text[],false,'mainnet_gate_packet',57,'{}'),
+('CG-058','release','Production Release Evidence','Production status requires exact artifact SHA/version, deployment evidence, tests, approvals, readback, monitoring, rollback and DAIL release event.',array['production','maintained'],array['module','platform','protocol','release'],array[]::text[],'D3',true,array['security_privacy','operations_sre']::text[],false,'production_release_packet',58,'{}')
+on conflict (gate_id) do update set
+ gate_family=excluded.gate_family, canonical_name=excluded.canonical_name, description=excluded.description,
+ required_for_stages=excluded.required_for_stages, scope_types=excluded.scope_types,
+ applies_to_module_classes=excluded.applies_to_module_classes, risk_class=excluded.risk_class,
+ d3_human_reserved=excluded.d3_human_reserved, specialist_domains=excluded.specialist_domains,
+ auto_evaluable=excluded.auto_evaluable, evaluation_method=excluded.evaluation_method,
+ sequence_no=excluded.sequence_no, metadata=excluded.metadata, updated_at=now();
+
+insert into chlom_runtime.construction_tracks(scope_type,scope_id,current_stage,target_stage,overall_state,owner_agent_id,evidence)
+select 'module',m.module_id,m.lifecycle_state,
+ case m.lifecycle_state when 'reconciled' then 'specified' when 'specified' then 'prototype' when 'prototype' then 'test' when 'test' then 'staged' when 'staged' then 'production' when 'production' then 'maintained' else 'maintained' end,
+ 'building','ct.chlom.agent.orchestrator',jsonb_build_object('seed','module_lifecycle','module_class',m.module_class)
+from chlom_runtime.modules m
+on conflict (scope_type,scope_id,target_stage) do update set current_stage=excluded.current_stage,owner_agent_id=excluded.owner_agent_id,evidence=excluded.evidence,updated_at=now();
+
+insert into chlom_runtime.construction_tracks(scope_type,scope_id,current_stage,target_stage,overall_state,owner_agent_id,evidence)
+value

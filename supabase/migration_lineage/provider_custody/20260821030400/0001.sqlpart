@@ -1,0 +1,59 @@
+b_build_object('real_value_execution',false)),
+('ct.chlom.agent.recovery','ct.chlom.agent.orchestrator','CHLOM Recovery and Custody Agent','recovery','A2','D2','test',array['ct.chlom.backup-recovery','ct.chlom.identity','ct.chlom.dail'],jsonb_build_object('scope','restore_and_custody_validation'),'daily',false,true,true,7200,jsonb_build_object('private_key_export',false)),
+('ct.chlom.agent.release-certifier','ct.chlom.agent.orchestrator','CHLOM Independent Release Certifier','verifier','A1','D2','test',array[]::text[],jsonb_build_object('scope','independent_promotion_verification'),'continuous',false,false,true,7200,jsonb_build_object('cannot_be_originator',true))
+on conflict (agent_id) do update set
+ parent_agent_id=excluded.parent_agent_id,canonical_name=excluded.canonical_name,agent_class=excluded.agent_class,
+ autonomy_class=excluded.autonomy_class,authority_ceiling=excluded.authority_ceiling,lifecycle_state=excluded.lifecycle_state,
+ module_scope=excluded.module_scope,tool_scope=excluded.tool_scope,schedule_profile=excluded.schedule_profile,
+ vote_eligible=false,self_healing_enabled=excluded.self_healing_enabled,no_self_approval=true,
+ heartbeat_ttl_seconds=excluded.heartbeat_ttl_seconds,metadata=excluded.metadata,updated_at=now();
+
+create table if not exists chlom_runtime.construction_gate_assignments (
+  gate_id text primary key references chlom_runtime.construction_gate_definitions(gate_id) on delete cascade,
+  primary_agent_id text not null references chlom_runtime.agent_templates(agent_id) on delete restrict,
+  verifier_agent_id text not null references chlom_runtime.agent_templates(agent_id) on delete restrict,
+  recovery_agent_id text references chlom_runtime.agent_templates(agent_id) on delete restrict,
+  assignment_state text not null default 'active' check (assignment_state in ('active','paused','superseded')),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (primary_agent_id <> verifier_agent_id)
+);
+revoke all on chlom_runtime.construction_gate_assignments from public,anon,authenticated;
+
+insert into chlom_runtime.construction_gate_assignments(gate_id,primary_agent_id,verifier_agent_id,recovery_agent_id,metadata)
+select g.gate_id,
+  case g.gate_family
+    when 'source' then 'ct.chlom.agent.continuity'
+    when 'identity' then 'ct.chlom.agent.identity'
+    when 'terminology' then 'ct.chlom.agent.continuity'
+    when 'architecture' then 'ct.chlom.agent.kernel'
+    when 'data' then 'ct.chlom.agent.kernel'
+    when 'authority' then 'ct.chlom.agent.security'
+    when 'security' then 'ct.chlom.agent.security'
+    when 'privacy' then 'ct.chlom.agent.security'
+    when 'implementation' then 'ct.chlom.agent.kernel'
+    when 'testing' then 'ct.chlom.agent.tevv'
+    when 'assurance' then 'ct.chlom.agent.formal'
+    when 'evidence' then 'ct.chlom.agent.dail'
+    when 'operations' then 'ct.chlom.agent.sre'
+    when 'resilience' then 'ct.chlom.agent.sre'
+    when 'performance' then 'ct.chlom.agent.sre'
+    when 'developer' then 'ct.chlom.agent.developer'
+    when 'agents' then 'ct.chlom.agent.orchestrator'
+    when 'oracles' then 'ct.chlom.agent.oracle'
+    when 'ai_ml' then 'ct.chlom.agent.tevv'
+    when 'rights' then 'ct.chlom.agent.ip-licensing'
+    when 'licensing' then 'ct.chlom.agent.dla'
+    when 'market' then 'ct.chlom.agent.lex'
+    when 'remedies' then 'ct.chlom.agent.dispute'
+    when 'commerce' then 'ct.chlom.agent.commerce'
+    when 'finance' then 'ct.chlom.agent.finance-tax'
+    when 'economics' then 'ct.chlom.agent.tokenomics-treasury'
+    when 'legal' then 'ct.chlom.agent.legal-regulatory'
+    when 'custody' then 'ct.chlom.agent.recovery'
+    when 'chain' then 'ct.chlom.agent.chain'
+    when 'integration' then case g.gate_id when 'CG-044' then 'ct.chlom.agent.vm-integration' when 'CG-045' then 'ct.chlom.agent.kjv-integration' else 'ct.chlom.agent.creator-beta' end
+    when 'consumer' then 'ct.chlom.agent.accessibility-consumer'
+    when 'culture' then 'ct.chlom.agent.cultural-governance'
+    when 'go

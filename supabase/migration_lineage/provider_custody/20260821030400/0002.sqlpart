@@ -1,0 +1,17 @@
+vernance' then 'ct.chlom.agent.orchestrator'
+    when 'documentation' then 'ct.chlom.agent.docs'
+    when 'continuity' then 'ct.chlom.agent.continuity'
+    when 'portability' then 'ct.chlom.agent.continuity'
+    when 'claims' then 'ct.chlom.agent.docs'
+    when 'release' then 'ct.chlom.agent.release-certifier'
+    else 'ct.chlom.agent.orchestrator' end,
+  case
+    when g.gate_family='release' then 'ct.chlom.agent.security'
+    when g.gate_family in ('security','privacy','custody','chain') then 'ct.chlom.agent.release-certifier'
+    when g.gate_family in ('rights','licensing','market','remedies') then 'ct.chlom.agent.security'
+    when g.gate_family in ('ai_ml','oracles','agents') then 'ct.chlom.agent.security'
+    else 'ct.chlom.agent.release-certifier' end,
+  case when g.gate_family in ('operations','resilience','custody','continuity','release','chain') then 'ct.chlom.agent.recovery' else null end,
+  jsonb_build_object('assignment_source','construction_gate_family_v1')
+from chlom_runtime.construction_gate_definitions g
+on conflict (gate_id) do update set primary_agent_id=excluded.primary_agent_id,verifier_agent_id=excluded.verifier_agent_id,recovery_agent_id=excluded.recovery_agent_id,metadata=excluded.metadata,updated_at=now();
