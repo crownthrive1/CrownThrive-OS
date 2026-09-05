@@ -64,7 +64,7 @@ CHLOM now has a deployed, authenticated production gateway over its live ThriveB
 | Read path | **ACTIVE** | Authenticated status and capabilities; no mutation idempotency key required; limit `120/minute` |
 | Mutation idempotency | **ACTIVE** | Valid key required; advisory lock, payload-conflict detection, stable replay result; limit `30/minute` |
 | Append-only dispatch evidence | **ACTIVE** | Domain event and dispatch receipt persisted; replay produced no duplicate mutation |
-| DAIL verification | **PASS** | `PASS_GLOBAL_COMPACT_CHAIN`, sequence lag `0`, verified through `2323298` |
+| DAIL verification | **PASS** | `PASS_GLOBAL_COMPACT_CHAIN`, sequence lag `0`, verified through `2351697` |
 | GitHub source custody | **MERGED** | PR `#49`; merge commit `c30d07f63ffadb3c6e18639abc51a60ff9ca165b` |
 | External money movement | **DISABLED** | No dispatcher action; recorded count `0` |
 | Production token mint confirmation | **DISABLED** | No dispatcher action; confirmed count `0` |
@@ -190,14 +190,40 @@ After the gateway mutation, replay proof, deployment-version record, and provide
   "ok": true,
   "integrity_state": "PASS_GLOBAL_COMPACT_CHAIN",
   "sequence_span_lag": 0,
-  "verified_through_sequence_id": 2323298,
-  "current_head_sequence_id": 2323298,
-  "v4_segment_count": 437,
+  "verified_through_sequence_id": 2351697,
+  "current_head_sequence_id": 2351697,
+  "v4_segment_count": 1184,
   "base_checkpoint_id": "dfb2018c-7dba-4200-b8af-16951efd4cc8"
 }
 ```
 
 DAIL proves the integrity and sequence of CrownThrive's recorded events. It does not by itself prove a payment-provider transfer, blockchain mint, public-chain finality, or legal title.
+
+## Signed-session HTTP production canary
+
+The previous external founder-session predicate is now **PASS**.
+
+```text
+Run key: ct.canary.chlom.signed-session-http.production.20260904.08
+Canary run ID: 414846f5-f8d3-4bb1-ba0d-1ed2251e7501
+Capability / mutation / replay HTTP: 200 / 200 / 200
+Unauthorized dispatch HTTP: 403
+Binding ID: a53ce809-7cdd-45b7-b17b-c75f21f9b9df
+Dispatch receipt: ea7fbeae-0dd8-47e7-a667-32f38d4e7d30
+Replay verified: true
+Duplicate domain mutations: 0
+Receipt SHA-256: 7c7f6844e9ce660c7a733455ffd4e656036df59e54b3d7212ffd0b9247d7e45d
+DAIL event: 4eaf702f-c54c-458e-be8b-f30ebcd380e8
+DAIL sequence: 2326863
+```
+
+A real GoTrue session was generated for the confirmed founder account, used against the production HTTPS gateway, tested for replay and unauthorized denial, and then revoked. No raw access token, refresh token, OTP, password, magic-link value, or one-use canary secret was persisted in the evidence record.
+
+## CHLOM Production Library — Volume II
+
+The ten-book Volume II release is now production-published through Go Flipbooks with 120 pages, ten complete public readers, ten CHLOM asset/ownership/rights/DLA chains, two PASS release certifications, zero PRO-slot consumption, and zero DAIL lag.
+
+See [CHLOM Production Library — Volume II](/chlom/production-library-volume-ii) for the complete title inventory, readers, Drive custody, SHA-256 records, release certifications, proof bindings, and rights boundaries.
 
 ## Source state
 
@@ -232,7 +258,6 @@ A repository or local test result does not promote these components to public-ne
 
 These predicates require evidence from systems outside the database:
 
-- A real founder sign-in producing a valid Supabase session, followed by an external HTTPS status and mutation canary through this gateway.
 - Independently administered validator nodes in distinct failure domains.
 - Provider-observed node identities, block production, finality, restart survival, and snapshot recovery.
 - Reproducible Wasm and chain-spec byte hashes from independent builders.
