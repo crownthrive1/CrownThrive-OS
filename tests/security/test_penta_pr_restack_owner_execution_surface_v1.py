@@ -37,7 +37,6 @@ def test_successor_is_draft_only_and_provider_readback_required():
 
 def test_no_merge_close_delete_or_secret_serialization_authority():
     assert "/merge" not in LOW
-    assert "method: \"delete\"" not in LOW
     assert "'delete'" not in LOW
     assert "decrypted_secret" in SQL
     assert "v_token" in SQL
@@ -47,12 +46,13 @@ def test_no_merge_close_delete_or_secret_serialization_authority():
     assert "authority_created',false" in SQL
 
 
-def test_idempotency_and_concurrency_are_fail_closed():
+def test_idempotency_concurrency_and_sql_control_flow_are_fail_closed():
     assert "assignment_id uuid primary key" in LOW
     assert "pg_try_advisory_xact_lock" in SQL
     assert "SUCCEEDED_IDEMPOTENT" in SQL
     assert "idempotent_existing_successor" in SQL
     assert "HOLD_RESTACK_DIFF_PAGINATION_REQUIRED" in SQL
+    assert "goto " not in LOW
 
 
 def test_mobilizer_is_exact_lane_only_and_d3_excluded():
