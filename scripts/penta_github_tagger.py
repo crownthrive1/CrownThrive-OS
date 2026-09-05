@@ -752,6 +752,8 @@ def tag_entity(
         terminal_labels,
     )
     current = set(entity.labels)
+    projected_lifecycle = set(stage_labels).union(terminal_labels)
+    existing_lifecycle = {name for name in current if _starts_with_any(name, LIFECYCLE_PREFIXES)}
     missing, stale = _label_plan(current, expected)
     changed = bool(missing or stale)
 
