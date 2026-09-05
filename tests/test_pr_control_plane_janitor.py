@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
+import os
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -14,8 +17,10 @@ from pr_control_plane_janitor import (  # noqa: E402
     classify_branch,
     create_archive_anchor,
     load_policy,
+    main,
     paginate,
     pagination_request_paths,
+    retry_delay_seconds,
 )
 
 
@@ -118,6 +123,20 @@ class PRControlPlaneJanitorTests(unittest.TestCase):
         self.assertTrue(row["archive_eligible"])
         self.assertEqual(row["min_age_hours"], 168.0)
 
+    def test_cos_release_candidate_is_managed_after_one_day(self) -> None:
+        row = self.classify(
+            "cos/release-candidate-fa4c8db948cd",
+            age_hours=25,
+        )
+        self.assertTrue(row["eligible"])
+        self.assertEqual(row["managed_pattern"], "cos/release-candidate-*")
+
+    def test_registry_sync_branch_preserves_open_pr(self) -> None:
+        name = "chore/repository-resource-registry-sync-123"
+        row = self.classify(name, age_hours=100, active_pr_refs={name})
+        self.assertFalse(row["eligible"])
+        self.assertEqual(row["reason"], "open_pr_head_or_base")
+
     def test_active_provider_branch_is_preserved_even_when_old(self) -> None:
         name = "admin-mcp/active-editor-projection"
         row = self.classify(
@@ -194,6 +213,40 @@ class PRControlPlaneJanitorTests(unittest.TestCase):
     def test_pagination_bounds_per_page(self) -> None:
         with self.assertRaises(JanitorError):
             pagination_request_paths("/branches?per_page=101")
+
+    def test_rate_limit_delay_honors_reset_and_cap(self) -> None:
+        self.assertEqual(
+            retry_delay_seconds(
+                {"X-RateLimit-Reset": "1060"},
+                now_epoch=1000,
+            ),
+            60.0,
+        )
+        self.assertEqual(
+            retry_delay_seconds(
+                {"Retry-After": "5"},
+                now_epoch=1000,
+                jitter_seconds=0.25,
+            ),
+            5.25,
+        )
+
+    def test_main_emits_fail_closed_hold_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = Path(temp_dir) / "hold.json"
+            with (
+                patch.dict(os.environ, {"GITHUB_TOKEN": "token"}),
+                patch("pr_control_plane_janitor.run", side_effect=JanitorError("rate limited")),
+            ):
+                code = main([
+                    "--mode", "audit",
+                    "--report", str(report),
+                ])
+            self.assertEqual(code, 2)
+            payload = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(payload["state"], "HOLD")
+            self.assertIn("rate limited", payload["hold_reason"])
+            self.assertFalse(payload["history_rewritten"])
 
     def test_pagination_rejects_duplicate_page_parameter(self) -> None:
         with self.assertRaises(JanitorError):
