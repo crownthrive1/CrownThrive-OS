@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Validate the CrownThrive Phase-4 gate contract while preserving Phase-3 execution authority."""
+"""Validate the CrownThrive Phase-4 gate contract while preserving Phase-3 execution authority.
+
+The single required merge context is applicability-driven. Legacy/global audits may remain
+available as advisory or program-level controls, but they must not become unconditional
+vetoes for an unrelated exact PR diff.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "developers/manifests/phase4-gate-contract.v4.json"
 DOCS_WORKFLOW = ROOT / ".github/workflows/docs-governance.yml"
 MERGE_WORKFLOW = ROOT / ".github/workflows/governed-merge-gate.yml"
+APPLICABILITY_POLICY = ROOT / "config/penta_pr_gate_applicability.json"
+APPLICABILITY_RESOLVER = ROOT / "scripts/resolve_pr_gate_applicability.py"
 
 ALLOWED_SOURCE_GENERATIONS = {
     "unversioned_legacy_name",
@@ -29,6 +36,11 @@ def read(path: Path) -> str:
     if not path.is_file():
         fail(f"missing required Phase-4 preparation artifact: {path.relative_to(ROOT)}")
     return path.read_text(encoding="utf-8")
+
+
+def require(text: str, fragment: str, message: str) -> None:
+    if fragment not in text:
+        fail(message)
 
 
 def main() -> int:
@@ -138,16 +150,32 @@ def main() -> int:
 
     docs = read(DOCS_WORKFLOW)
     merge = read(MERGE_WORKFLOW)
-    for label, text in (("Documentation Governance", docs), ("Governed Merge Gate", merge)):
-        if "scripts/validate_gate_registry_v4.py" not in text:
-            fail(f"{label} is not wired to the V4 gate registry validator")
-        if "scripts/validate_phase3_institutional_gate.py" not in text:
-            fail(f"{label} dropped the Phase-3 compatibility validator during Phase-4 preparation")
+    applicability = json.loads(read(APPLICABILITY_POLICY))
+    resolver = read(APPLICABILITY_RESOLVER)
 
-    if "name: CrownThrive governed merge gate" not in merge:
-        fail("Stable required GitHub status context was renamed")
-    if "scripts/run_phase4_preparation_audit.py" not in merge:
-        fail("Governed Merge Gate is not wrapped by the Phase-4 preparation audit")
+    # Documentation Governance remains a broad advisory/program audit and keeps the
+    # compatibility validators. The provider-required merge context is narrower.
+    for validator in ("scripts/validate_gate_registry_v4.py", "scripts/validate_phase3_institutional_gate.py"):
+        if validator not in docs:
+            fail(f"Documentation Governance dropped compatibility validator: {validator}")
+
+    require(merge, "name: CrownThrive governed merge gate", "Stable required GitHub status context was renamed")
+    require(merge, "scripts/resolve_pr_gate_applicability.py", "Governed Merge Gate lacks exact-diff applicability resolution")
+    require(merge, "scripts/validate_gate_registry_v4.py", "Governed Merge Gate dropped V4 registry validation")
+    require(merge, "if: steps.scope.outputs.phase_control == 'true'", "V4 phase-control validation is not applicability-scoped")
+    require(merge, "scripts/validate_phase3_institutional_gate.py", "Governed Merge Gate dropped Phase-3 compatibility validation")
+    require(merge, "if: steps.scope.outputs.phase3_state == 'true'", "Phase-3 compatibility validation is not exact-state scoped")
+    if "scripts/run_phase4_preparation_audit.py" in merge:
+        fail("Global Phase-4 preparation mega-audit must not be an unconditional required-merge veto")
+
+    if applicability.get("schema") != "ct.penta.pr-gate-applicability.v1":
+        fail("PR gate applicability policy schema drifted")
+    groups = applicability.get("groups", {})
+    for group_name in ("phase_control", "phase3_state", "security", "workflow_policy"):
+        if group_name not in groups:
+            fail(f"Applicability policy lacks required governance group: {group_name}")
+    if "phase3_state" not in resolver or "NOT_APPLICABLE" not in resolver:
+        fail("Applicability resolver does not preserve scoped Phase-3/NOT_APPLICABLE semantics")
 
     receipt = {
         "status": "PASS",
@@ -162,6 +190,9 @@ def main() -> int:
         "phase3_named_workflows": phase3_named,
         "backward_compatible_generations": [1, 2, 3, 4],
         "stable_required_status_context": "CrownThrive governed merge gate",
+        "required_merge_applicability": "exact_diff_scoped",
+        "phase3_state_gate": "conditional_on_affected_state_artifacts",
+        "global_phase4_audit_in_required_perimeter": False,
         "phase3_execution_authority_preserved": True,
         "hold_promotion_forbidden": True,
         "authority_manufacture_forbidden": True,
