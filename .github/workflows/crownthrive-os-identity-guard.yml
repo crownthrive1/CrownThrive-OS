@@ -53,19 +53,27 @@ jobs:
           pattern = re.compile(re.escape(legacy_slug), re.IGNORECASE)
           tracked = [v for v in subprocess.check_output(['git', 'ls-files', '-z']).decode('utf-8').split('\0') if v]
           tracked_set = set(tracked)
-          allowed = set(map(str, archive.get('allowed_paths') or []))
-          if not allowed:
-              raise SystemExit('Retired-identity archive allowlist may not be empty')
-          for filename in sorted(allowed):
+          allowed_migrations = set(map(str, archive.get('allowed_paths') or []))
+          allowed_evidence = set(map(str, archive.get('allowed_evidence_paths') or []))
+          allowed = allowed_migrations | allowed_evidence
+          if not allowed_migrations:
+              raise SystemExit('Retired-identity historical migration allowlist may not be empty')
+
+          def verify_allowed_path(filename: str, prefix: str, label: str) -> None:
               path = Path(filename)
-              if not filename.startswith('supabase/migrations/') or filename not in tracked_set or not path.is_file():
-                  raise SystemExit(f'Invalid retired-identity archive path: {filename}')
+              if not filename.startswith(prefix) or filename not in tracked_set or not path.is_file():
+                  raise SystemExit(f'Invalid retired-identity {label} path: {filename}')
               try:
                   historical_text = path.read_text(encoding='utf-8')
               except (UnicodeDecodeError, OSError) as exc:
-                  raise SystemExit(f'Unreadable retired-identity archive path: {filename}: {exc}')
+                  raise SystemExit(f'Unreadable retired-identity {label} path: {filename}: {exc}')
               if not pattern.search(historical_text):
-                  raise SystemExit(f'Stale retired-identity archive path no longer contains historical identity: {filename}')
+                  raise SystemExit(f'Stale retired-identity {label} path no longer contains historical identity: {filename}')
+
+          for filename in sorted(allowed_migrations):
+              verify_allowed_path(filename, 'supabase/migrations/', 'migration')
+          for filename in sorted(allowed_evidence):
+              verify_allowed_path(filename, 'supabase/migration_lineage/replay_diagnostics/', 'replay-evidence')
 
           hits = []
           for filename in tracked:
@@ -87,5 +95,9 @@ jobs:
               print(f'Replace live references with {expected_url}; historical exceptions require an explicit governed archive receipt.')
               raise SystemExit(1)
 
-          print(f'Canonical CrownThrive OS identity verified: {expected_url}; {len(allowed)} historical migration sources preserved under an exact archive boundary.')
+          print(
+              f'Canonical CrownThrive OS identity verified: {expected_url}; '
+              f'{len(allowed_migrations)} historical migrations and '
+              f'{len(allowed_evidence)} sanitized replay-evidence paths preserved under exact archive boundaries.'
+          )
           PY
