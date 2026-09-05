@@ -25,6 +25,7 @@ declare
   v_check_state text := 'UNKNOWN';
   v_total integer := 0;
   v_returned integer := 0;
+  v_logical_total integer := 0;
   v_pending integer := 0;
   v_bad integer := 0;
   v_detail_sha text;
@@ -217,7 +218,31 @@ begin
     );
   end if;
 
-  for v_check in select value from jsonb_array_elements(coalesce(v_check_json->'check_runs','[]'::jsonb)) loop
+  -- GitHub retains historical reruns for the same logical check on one commit.
+  -- Evaluate only the newest run for each (GitHub App, check name) identity so a
+  -- superseded cancelled/failed attempt cannot poison a later successful rerun.
+  -- A currently-latest cancelled/failed check still fails closed.
+  for v_check in
+    select ranked.value
+    from (
+      select j.value,
+             row_number() over (
+               partition by
+                 coalesce(nullif(j.value#>>'{app,slug}',''),'unknown-app'),
+                 coalesce(nullif(j.value->>'name',''),'check-id:'||coalesce(j.value->>'id','unknown'))
+               order by
+                 coalesce(
+                   nullif(j.value->>'completed_at','')::timestamptz,
+                   nullif(j.value->>'started_at','')::timestamptz,
+                   'epoch'::timestamptz
+                 ) desc,
+                 coalesce(nullif(j.value->>'id','')::bigint,0) desc
+             ) as rn
+      from jsonb_array_elements(coalesce(v_check_json->'check_runs','[]'::jsonb)) as j(value)
+    ) as ranked
+    where ranked.rn=1
+  loop
+    v_logical_total:=v_logical_total+1;
     if coalesce(v_check->>'status','')<>'completed' then
       v_pending:=v_pending+1;
     elsif coalesce(v_check->>'conclusion','') not in ('success','neutral','skipped') then
@@ -226,7 +251,7 @@ begin
   end loop;
 
   v_check_state:=case
-    when v_total=0 then 'UNKNOWN'
+    when v_logical_total=0 then 'UNKNOWN'
     when v_pending>0 then 'PENDING'
     when v_bad>0 then 'FAILURE'
     else 'SUCCESS'
@@ -248,8 +273,10 @@ begin
         'mergeable_state',v_mergeable_state,
         'check_runs_total',v_total,
         'check_runs_returned',v_returned,
+        'check_runs_logical_total',v_logical_total,
         'check_runs_pending',v_pending,
         'check_runs_nonpass',v_bad,
+        'check_run_identity','app_slug+name_latest',
         'raw_provider_body_stored',false,
         'provider_write',false,
         'authority_created',false,
@@ -279,8 +306,10 @@ begin
       'mergeable_state',v_mergeable_state,
       'checks_state',v_check_state,
       'check_runs_total',v_total,
+      'check_runs_logical_total',v_logical_total,
       'check_runs_pending',v_pending,
       'check_runs_nonpass',v_bad,
+      'check_run_identity','app_slug+name_latest',
       'detail_response_sha256',v_detail_sha,
       'check_runs_response_sha256',v_checks_sha,
       'provider_write',false,
@@ -298,8 +327,10 @@ begin
       'mergeable',v_mergeable,
       'checks_state',v_check_state,
       'check_runs_total',v_total,
+      'check_runs_logical_total',v_logical_total,
       'check_runs_pending',v_pending,
       'check_runs_nonpass',v_bad,
+      'check_run_identity','app_slug+name_latest',
       'detail_response_sha256',v_detail_sha,
       'check_runs_response_sha256',v_checks_sha,
       'raw_provider_body_stored',false,
@@ -320,8 +351,10 @@ begin
     'mergeable',v_mergeable,
     'checks_state',v_check_state,
     'check_runs_total',v_total,
+    'check_runs_logical_total',v_logical_total,
     'check_runs_pending',v_pending,
     'check_runs_nonpass',v_bad,
+    'check_run_identity','app_slug+name_latest',
     'dail_event_id',v_event->>'event_id',
     'provider_write',false,
     'authority_created',false,
@@ -348,7 +381,7 @@ revoke all on function public.penta_pr_refresh_exact_detail_v1(text,bigint,text)
 grant execute on function public.penta_pr_refresh_exact_detail_v1(text,bigint,text) to service_role;
 
 comment on function penta_pr.reconcile_github_pr_detail_exact_v1(text,bigint,text) is
-  'Exact-head, read-only GitHub PR/check reconciliation for one tracked open PR. Fails closed on head drift, provider/readback failure, pagination, or lifecycle drift; does not mutate provider state or create authority.';
+  'Exact-head, read-only GitHub PR/check reconciliation for one tracked open PR. Collapses superseded reruns by latest GitHub App + check name and fails closed on the current logical check state, head drift, provider/readback failure, pagination, or lifecycle drift; does not mutate provider state or create authority.';
 comment on function public.penta_pr_refresh_exact_detail_v1(text,bigint,text) is
   'Service-role wrapper for bounded exact-head PentaPR detail/check refresh.';
 
