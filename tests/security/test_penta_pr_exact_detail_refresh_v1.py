@@ -37,6 +37,27 @@ def test_check_aggregation_matches_canonical_nonfailure_contract():
     assert "else 'SUCCESS'" in text
 
 
+def test_superseded_check_attempts_are_collapsed_by_logical_identity():
+    text = source()
+    assert "row_number() over" in text
+    assert "j.value#>>'{app,slug}'" in text
+    assert "j.value->>'name'" in text
+    assert "where ranked.rn=1" in text
+    assert "v_logical_total:=v_logical_total+1" in text
+    assert "check_runs_logical_total" in text
+    assert "check_run_identity','app_slug+name_latest'" in text
+    assert "when v_logical_total=0 then 'UNKNOWN'" in text
+
+
+def test_latest_logical_nonpass_still_fails_closed():
+    text = source()
+    assert "coalesce(v_check->>'conclusion','') not in ('success','neutral','skipped')" in text
+    assert "v_bad:=v_bad+1" in text
+    assert "when v_bad>0 then 'FAILURE'" in text
+    assert "superseded cancelled/failed attempt cannot poison a later successful rerun" in text
+    assert "A currently-latest cancelled/failed check still fails closed" in text
+
+
 def test_concurrency_and_lifecycle_cas_fail_closed():
     text = source()
     assert "pg_try_advisory_xact_lock" in text
