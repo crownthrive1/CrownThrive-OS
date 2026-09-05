@@ -1,0 +1,137 @@
+---
+title: "ThriveBeacons cPanel Production Deployment"
+description: "Provider-verified migration of ThriveBeacons to Verpex/cPanel Passenger, including source, artifact, DNS, public readback, and rollback evidence."
+sidebarTitle: "ThriveBeacons cPanel Production"
+keywords:
+  - "ThriveBeacons"
+  - "cPanel"
+  - "Passenger"
+  - "Verpex"
+  - "production deployment"
+  - "rollback evidence"
+  - "Crown ID"
+standard_version: "1.0.0"
+primary_audience: "historical"
+page_type: "changelog"
+content_state: "historical"
+---
+
+{/* pentadocs:audience-orientation:v2 */}
+<Warning>
+  **Audience:** governance reviewers and operators (`historical`).
+
+  **This page:** ThriveBeacons cPanel Production Deployment — dated provider and institutional evidence for the September 3, 2026 migration from the preserved Vercel production route to Verpex/cPanel Passenger.
+
+  **Documentation state:** `historical` for page type `changelog`. Editorial state does not independently certify current runtime, provider, legal, rights, security, or commercial status. Use current provider readback and the canonical deployment contract for present-tense authority.
+
+  **Related guidance:** [Current operational state](/start-here/current-operational-state) and [Source authority hierarchy](/knowledge/source-authority-hierarchy).
+</Warning>
+{/* /pentadocs:audience-orientation:v2 */}
+
+## Disposition
+
+**Evidence date:** September 3, 2026  
+**Property:** `ct.platform.thrivebeacons`  
+**Canonical route:** `https://beacons.crownthrive.io`  
+**Disposition at certification:** `PRODUCTION_CERTIFIED`
+
+ThriveBeacons was deployed to the CrownThrive Verpex/cPanel account as a production Passenger Node application. The migration preserved the previously verified Vercel deployment as a DNS rollback target and exercised that rollback before restoring the cPanel route.
+
+## Canonical source and artifact
+
+| Field | Verified value |
+|---|---|
+| Repository | `crownthrive1/ThriveBeacons` |
+| Canonical main commit | `c77c08a1dc661402c374485fd0032690372a37ef` |
+| Runtime source commit | `ae266e7df929737b2a9133a4f2a6799cdc5fce7f` |
+| GitHub Actions run | `33817357408` |
+| Artifact ID | `9917021092` |
+| Artifact ZIP SHA-256 | `98ef4570e0ef6c1bf79e7212118cbd11443baa85412e54c4cc62414d697b31ef` |
+| Inner release SHA-256 | `482d7ef5827441a76b532d7a734c28df4b22f1e0e101e77fb1ebf4d0df56a09` |
+
+The release artifact was hash-verified before extraction. The immutable release was staged, the `current` symlink was switched, and the resulting path was read back before DNS promotion.
+
+## Runtime topology
+
+```text
+GitHub private source
+        ↓
+GitHub Actions production artifact
+        ↓
+Verpex/cPanel Passenger
+        ↓
+/applications/thrivebeacons/current
+        ↓
+ThriveBase PostgreSQL + Crown ID
+        ↓
+beacons.crownthrive.io
+```
+
+| Runtime field | Value |
+|---|---|
+| Provider | Verpex/cPanel Passenger |
+| cPanel account | `crownthr` |
+| Passenger application | `ThriveBeacons` |
+| Registered path | `/applications/thrivebeacons/current` |
+| Active release | `/home/crownthr/applications/thrivebeacons/releases/20260903204030-ae266e7df929` |
+| Database authority | ThriveBase PostgreSQL |
+| Identity provider | Crown ID |
+| Origin IP | `185.181.252.203` |
+
+## DNS and public readback
+
+The final authoritative record was:
+
+```text
+beacons.crownthrive.io. 300 IN A 185.181.252.203
+```
+
+Certification readback established:
+
+- Google public DNS returned `185.181.252.203` for the A record.
+- No production CNAME answer remained.
+- The public homepage returned HTTP 200.
+- `/api/auth/get-session` returned HTTP 200.
+- Public responses identified LiteSpeed and did not contain a Vercel request marker.
+- The cPanel origin returned HTTP 200 before public cutover.
+
+## Rollback proof
+
+The previous production route was preserved as:
+
+```text
+CNAME cname.vercel-dns-0.com.
+```
+
+Known-good Vercel rollback deployment:
+
+`dpl_Ggn9MHwb8hb19nYvSpv3354KAnBx`
+
+The production record was cut over to cPanel, rolled back to Vercel, provider-read back, and then cut over to cPanel again. Final public DNS and HTTPS readback passed after restoration.
+
+## Institutional evidence
+
+ThriveBase stores the canonical secret-free production receipt as:
+
+`ct.thrivebeacons.cpanel.production.2026-09-03.v1`
+
+The receipt includes the canonical and runtime commits, build and artifact identity, cPanel/Passenger topology, DNS operations, public readback, rollback evidence, and the `production_certified` disposition. It contains no secret values.
+
+The repository preserves equivalent machine-readable evidence at:
+
+`evidence/cpanel/THRIVEBEACONS-CPANEL-PRODUCTION-2026-09-03.json`
+
+## Authority boundaries
+
+- **GitHub** owns canonical source and build lineage.
+- **Verpex/cPanel Passenger** owns the active production runtime.
+- **ThriveBase** owns institutional state and the application database.
+- **Crown ID** owns production identity federation.
+- **CHLOM** owns rights, permissions, and entitlement authority.
+- **CIE** owns cultural, brand, and imprint constraints.
+- **Vault** owns runtime and provider secrets.
+- **Vercel** remains the verified rollback deployment, not the current production runtime.
+
+## Security closeout
+
+Temporary deployment and origin-probe scripts deleted themselves and were independently checked for removal. One-time release, Passenger-registration, and synchronous DNS functions were retired after provider readback. The maintained rollback path uses the governed asynchronous DNS operation queue rather than a persistent one-shot write endpoint.
