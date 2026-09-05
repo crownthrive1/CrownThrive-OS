@@ -754,6 +754,11 @@ def tag_entity(
     current = set(entity.labels)
     projected_lifecycle = set(stage_labels).union(terminal_labels)
     existing_lifecycle = {name for name in current if _starts_with_any(name, LIFECYCLE_PREFIXES)}
+    if entity.state == "open" and existing_lifecycle:
+        stage_labels = sorted(name for name in existing_lifecycle if name.startswith(STAGE_PREFIXES))
+        terminal_labels = sorted(name for name in existing_lifecycle if name.startswith(TERMINAL_PREFIXES))
+        expected.difference_update(projected_lifecycle)
+        expected.update(existing_lifecycle)
     missing, stale = _label_plan(current, expected)
     changed = bool(missing or stale)
 
