@@ -777,6 +777,16 @@ def tag_entity(
         for name in sorted(stale):
             remove_label(gh, number, name)
         current = read_labels(gh, number)
+        if entity.state == "open":
+            concurrent_lifecycle = {name for name in current if name.startswith(LIFECYCLE_PREFIXES)}.difference(expected)
+            if concurrent_lifecycle:
+                for name in sorted(projected_lifecycle.difference(existing_lifecycle).intersection(current)):
+                    remove_label(gh, number, name)
+                current = read_labels(gh, number)
+                stage_labels = sorted(name for name in current if name.startswith(STAGE_PREFIXES))
+                terminal_labels = sorted(name for name in current if name.startswith(TERMINAL_PREFIXES))
+                expected.difference_update(projected_lifecycle)
+                expected.update(name for name in current if name.startswith(LIFECYCLE_PREFIXES))
         still_missing = expected.difference(current)
         unexpected_managed = {
             name
