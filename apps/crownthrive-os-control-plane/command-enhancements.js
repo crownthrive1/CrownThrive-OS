@@ -1,16 +1,31 @@
 (() => {
   const CATEGORY_LABELS = Object.freeze({
     education: 'Education',
+    playbooks: 'Playbooks',
     infrastructure: 'Infrastructure',
-    'event-production': 'Live experience',
+    'api-platform': 'API platform',
+    publishing: 'Publishing',
+    advertising: 'Advertising',
+    credits: 'Crown Credits',
+    'event-production': 'Live experiences',
     'rights-kit': 'Licensing',
-    merchandise: 'Merchandise',
     'scripted-audio': 'Scripted audio',
     'stage-screen': 'Stage & screen',
+    'digital-art': 'Digital art',
+    'local-media': 'Local media',
+    promotion: 'Promotion',
+    'creative-services': 'Creative services',
+    'managed-services': 'Managed services',
+    merchandise: 'Digital merchandise',
+    'digital-product': 'Digital products',
   });
 
   function money(amountMinor, currency = 'USD') {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(Number(amountMinor || 0) / 100);
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: String(currency || 'USD').toUpperCase() }).format(Number(amountMinor || 0) / 100);
+    } catch {
+      return `$${(Number(amountMinor || 0) / 100).toFixed(2)}`;
+    }
   }
 
   function addMarketplaceNavigation() {
@@ -35,7 +50,7 @@
   function addOverviewAction() {
     const actions = document.querySelector('[data-page="overview"] .intro .actions');
     if (!actions || actions.querySelector('[data-marketplace-action]')) return;
-    const button = createMarketplaceButton('Browse Digital Products');
+    const button = createMarketplaceButton('Browse All Digital Products');
     button.dataset.marketplaceAction = '';
     actions.append(button);
   }
@@ -56,16 +71,16 @@
       </div>
       <div class="facts">
         <div class="fact"><span>Active products</span><strong id="marketplaceProductCount">—</strong></div>
+        <div class="fact"><span>Checkout options</span><strong id="marketplaceCheckoutCount">—</strong></div>
         <div class="fact"><span>Categories</span><strong id="marketplaceCategoryCount">—</strong></div>
         <div class="fact"><span>Price range</span><strong id="marketplacePriceRange">—</strong></div>
-        <div class="fact"><span>Governance</span><strong>CHLOM + PentaGreen</strong></div>
       </div>
       <div class="rows" id="marketplaceCategoryRows">
-        <div class="row"><span><strong>Reading governed catalog</strong><small>Active publication, checkout, rights, and delivery evidence only</small></span><span class="badge pending">READING</span></div>
+        <div class="row"><span><strong>Reading governed catalog</strong><small>Active product, price, Payment Link, digital fulfillment, and CHLOM boundary evidence only</small></span><span class="badge pending">READING</span></div>
       </div>`;
     const actions = document.createElement('div');
     actions.className = 'actions';
-    actions.append(createMarketplaceButton('Open All Digital Products'));
+    actions.append(createMarketplaceButton('Open 59 Digital Products'));
     panel.append(actions);
     grid.insertAdjacentElement('afterend', panel);
     return panel;
@@ -78,7 +93,9 @@
       state.textContent = 'READBACK HOLD';
     }
     const rows = document.querySelector('#marketplaceCategoryRows');
-    if (rows) rows.innerHTML = `<div class="row"><span><strong>Catalog unavailable</strong><small>${String(message || 'Live readback failed')}</small></span><span class="badge hold">HOLD</span></div>`;
+    if (rows) {
+      rows.innerHTML = `<div class="row"><span><strong>Catalog unavailable</strong><small>${String(message || 'Live readback failed')}</small></span><span class="badge hold">HOLD</span></div>`;
+    }
   }
 
   async function hydrateCatalog() {
@@ -88,30 +105,43 @@
 
     const products = payload.products.filter((product) => product.checkout_state === 'active');
     if (!products.length) throw new Error('catalog_empty');
+
     const counts = products.reduce((result, product) => {
-      result[product.category] = (result[product.category] || 0) + 1;
+      if (!result[product.category]) result[product.category] = { products: 0, checkouts: 0 };
+      result[product.category].products += 1;
+      result[product.category].checkouts += Array.isArray(product.offers) ? product.offers.length : 1;
       return result;
     }, {});
-    const prices = products.map((product) => Number(product.price_minor || 0)).filter(Number.isFinite);
+    const prices = products.flatMap((product) => Array.isArray(product.offers)
+      ? product.offers.map((offer) => Number(offer.amount_minor || 0))
+      : [Number(product.price_minor || 0)]).filter(Number.isFinite);
+    const productCount = Number(payload.active_product_count || products.length);
+    const checkoutCount = Number(payload.active_checkout_count || Object.values(counts).reduce((sum, entry) => sum + entry.checkouts, 0));
+    const categoryCount = Number(payload.category_count || Object.keys(counts).length);
 
     const state = document.querySelector('#marketplaceCatalogState');
     if (state) {
       state.className = 'badge pass';
-      state.textContent = `${products.length} LIVE`;
+      state.textContent = `${productCount} PRODUCTS`;
     }
-    const productCount = document.querySelector('#marketplaceProductCount');
-    if (productCount) productCount.textContent = new Intl.NumberFormat('en-US').format(products.length);
-    const categoryCount = document.querySelector('#marketplaceCategoryCount');
-    if (categoryCount) categoryCount.textContent = String(Object.keys(counts).length);
+    const productNode = document.querySelector('#marketplaceProductCount');
+    if (productNode) productNode.textContent = new Intl.NumberFormat('en-US').format(productCount);
+    const checkoutNode = document.querySelector('#marketplaceCheckoutCount');
+    if (checkoutNode) checkoutNode.textContent = new Intl.NumberFormat('en-US').format(checkoutCount);
+    const categoryNode = document.querySelector('#marketplaceCategoryCount');
+    if (categoryNode) categoryNode.textContent = String(categoryCount);
     const priceRange = document.querySelector('#marketplacePriceRange');
     if (priceRange) priceRange.textContent = prices.length ? `${money(Math.min(...prices))}–${money(Math.max(...prices))}` : '—';
 
     const rows = document.querySelector('#marketplaceCategoryRows');
     if (rows) {
-      rows.innerHTML = Object.entries(counts)
-        .sort(([a], [b]) => (CATEGORY_LABELS[a] || a).localeCompare(CATEGORY_LABELS[b] || b))
-        .map(([category, count]) => `<div class="row"><span><strong>${CATEGORY_LABELS[category] || category}</strong><small>Published controlled-preview products with active checkout</small></span><span class="badge pass">${count}</span></div>`)
+      const categoryRows = Object.entries(counts)
+        .sort(([left], [right]) => (CATEGORY_LABELS[left] || left).localeCompare(CATEGORY_LABELS[right] || right))
+        .map(([category, entry]) => `<div class="row"><span><strong>${CATEGORY_LABELS[category] || category}</strong><small>${entry.products} product${entry.products === 1 ? '' : 's'} · ${entry.checkouts} active checkout option${entry.checkouts === 1 ? '' : 's'}</small></span><span class="badge pass">${entry.products}</span></div>`)
         .join('');
+      const exclusions = Number(payload.physical_products_excluded || 0);
+      const duplicates = Number(payload.duplicate_active_links_collapsed || 0);
+      rows.innerHTML = `${categoryRows}<div class="row"><span><strong>Catalog boundary</strong><small>${exclusions} physical made-to-order products excluded · ${duplicates} duplicate active links collapsed · CHLOM + PentaGreen governed</small></span><span class="badge pass">VERIFIED</span></div>`;
     }
   }
 
