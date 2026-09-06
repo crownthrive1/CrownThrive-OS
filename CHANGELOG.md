@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-06 — ThriveBase Demo Sandbox Cursor Donor v1
+
+- Activated the underused `ThriveBase-Public` Micro project under the operational alias `ThriveBase Demo Sandbox` while preserving its provider name and bindings.
+- Added a continuously enforced managed-capacity policy reserving 70 of 100 discretionary units per minute for DAIL Cursor and retaining 30 units for existing request-driven public APIs and Vercel staging services.
+- Added two 35-unit signed donor dispatch slots per minute through the existing ECDSA P-256 public-to-private bridge, with exact replay protection, manifest fingerprints, PentaBalancer admission, PentaGas settlement, and terminal DAIL readback.
+- Preserved one canonical DAIL writer, no direct cross-project database access, no second ledger, and no independent authority source. The 70% figure is a CrownThrive-managed scheduler/worker budget, not a provider CPU partition guarantee.
+- Added one pressure-deferral retry with a six-second offset, allowing the donor to avoid common scheduler collisions without bypassing PentaBalancer.
+- Initial production observation recorded five bound donor runs, 3,000 donor-attributed routes, zero donor route failures, and an overall route-backlog movement from 548,013 to 539,230 during the measured deployment window.
+- Registered PentaGas formula and recipe, verified interop contract, P0 assignment, node identity, RLS-isolated donor controls, production canary, and machine-readable OS resource.
+
 ## 2026-09-06 — DAIL 500K Continuity Lock + PentaGas v1
 
 - Added `ct.dail.continuity.500k.v1`: lock routed evidence at 500,000 pending rows, retain the newest 500,000 as the active continuity window, and release only at 450,000 or fewer.
