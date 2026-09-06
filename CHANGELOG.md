@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-06 — DAIL 500K Continuity Lock + PentaGas v1
+
+- Added `ct.dail.continuity.500k.v1`: lock routed evidence at 500,000 pending rows, retain the newest 500,000 as the active continuity window, and release only at 450,000 or fewer.
+- Added deterministic depth bands and locked routing of 70% Head, 30% Continuity, and 0% Archive while preserving every queued row and the single canonical DAIL chain.
+- Added six production nodes for Head, Continuity, Archive, Router, Verifier, and PentaGas, with Archive execution budget frozen while the lock is active.
+- Added the nonfinancial `penta.gas` runtime with deterministic quote, node-budget reservation, settlement, five versioned formulas, five operational recipes, five verified interop contracts, and four nonbilling CHLOM Wallet meters.
+- Added service-role-only windowed lookup admission so deep-history reads defer below the continuity floor unless exact critical authority exists for integrity verification, disaster restore, incident response, rights conflict, or Founder override.
+- Upgraded DAIL Cursor to `dail_lane_drain_v5`, which applies the active-window fence and PentaGas controls while preserving one canonical writer and sequential chain verification.
+- Added PentaBalancer-managed exact reconciliation job `ct-dail-continuity-exact-reconcile-v1` every five minutes, while retaining the every-minute Cursor controller. Cohesion remains 100.
+- Added production semantic canary, bounded manual catch-up evidence, RLS/role isolation, architecture documentation, operational recipes, and machine-readable runtime state without rewriting CrownThrive OS v18.0.0.
+
 ## 2026-09-05 — Four-Part DAIL Cursor Runtime Extension v1
 
 - Added `ct.dail.cursor.v1` as a fourth coordination rail over the single canonical CHLOM DAIL chain; Machine, Human, Hybrid, and Cursor remain projections rather than independent authority realities.
