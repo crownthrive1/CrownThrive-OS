@@ -1,9 +1,11 @@
 begin;
 
 -- CrownThrive Penta scoped memory + cursor fabric v1.
--- Additive only: reuses the existing Penta protocol cookie and PentaContext fabric.
--- No destructive authority, provider-write authority, merge authority, certification authority,
--- vote/quorum effect, credential authority, money movement, rights grant, or D3 is created.
+-- Compatibility layer only. The existing `scoped_memory_v1` cookie pointer remains the
+-- canonical per-system memory namespace/cursor. This migration adds a deterministic
+-- working-cursor API that reuses that pointer rather than creating a second memory silo.
+-- No destructive authority, provider-write authority, merge authority, certification
+-- authority, vote/quorum effect, credential authority, money movement, rights grant or D3.
 
 create or replace function public.penta_scoped_memory_cursor_write_v1(
   p_system_key text,
@@ -23,7 +25,11 @@ set search_path to 'pg_catalog', 'public', 'extensions'
 as $function$
 declare
   v_system public.penta_system_registry%rowtype;
+  v_existing_cookie public.penta_protocol_cookies_v1%rowtype;
+  v_pointer jsonb;
   v_scope text;
+  v_continuity_cursor text;
+  v_continuity_contract text;
   v_state text:=lower(btrim(coalesce(p_cursor_state,'idle')));
   v_owner text;
   v_subject text;
@@ -47,8 +53,15 @@ begin
   if jsonb_typeof(coalesce(p_evidence_refs,'[]'::jsonb))<>'array' then raise exception 'evidence_refs_must_be_array'; end if;
 
   perform public.penta_cookie_install_v1(v_system.system_key,'penta.context');
+  select * into v_existing_cookie from public.penta_protocol_cookies_v1 where system_key=v_system.system_key;
+  v_pointer:=coalesce(v_existing_cookie.observed_state->'scoped_memory_v1','{}'::jsonb);
+  v_scope:=nullif(btrim(v_pointer->>'scope'),'');
+  v_continuity_cursor:=nullif(btrim(v_pointer->>'cursor'),'');
+  v_continuity_contract:=nullif(btrim(v_pointer->>'contract'),'');
+  if v_scope is null or v_continuity_cursor is null or v_continuity_contract is null then
+    raise exception 'scoped_memory_pointer_required';
+  end if;
 
-  v_scope:=left('penta:'||lower(v_system.system_key),128);
   v_owner:=coalesce(nullif(btrim(p_owner_system_key),''),v_system.system_key);
   v_subject:=coalesce(nullif(btrim(p_subject_ref),''),'registry:'||v_system.system_key);
   v_next:=case when p_next_predicate is null then null else left(public.penta_context_redact_v1(p_next_predicate),1024) end;
@@ -57,6 +70,7 @@ begin
   v_cursor_id:=public.penta_protocol_sha256_v1(jsonb_build_object(
     'contract','ct.penta.scoped-memory-cursor.v1',
     'system_key',v_system.system_key,
+    'continuity_cursor_ref',v_continuity_cursor,
     'subject_ref',v_subject,
     'subject_sha256',p_subject_sha256,
     'state',v_state,
@@ -75,6 +89,9 @@ begin
     'owner_system_key',v_owner,
     'next_predicate',v_next,
     'memory_scope',v_scope,
+    'continuity_cursor_ref',v_continuity_cursor,
+    'continuity_contract_ref',v_continuity_contract,
+    'memory_pointer_source','scoped_memory_v1',
     'memory_summary',case when v_memory is null then null else left(v_memory,512) end,
     'memory_summary_sha256',case when v_memory is null then null else encode(extensions.digest(convert_to(v_memory,'UTF8'),'sha256'),'hex') end,
     'deterministic',true,
@@ -91,6 +108,13 @@ begin
     jsonb_build_object(
       'scoped_cursor',v_cursor,
       'memory_scope',v_scope,
+      'memory_policy',jsonb_build_object(
+        'mode','minimal',
+        'durable_store','PentaContext',
+        'pointer_source','scoped_memory_v1',
+        'inline_summary_max_chars',512,
+        'append_supersede_only',true
+      ),
       'assist_contract',jsonb_build_object(
         'penta_chat','context_only',
         'penta_brain','planning_only',
@@ -115,6 +139,8 @@ begin
         'system_ref',v_system.system_key,
         'facts',jsonb_build_object(
           'cursor_id',v_cursor_id,
+          'continuity_cursor_ref',v_continuity_cursor,
+          'continuity_contract_ref',v_continuity_contract,
           'subject_ref',v_subject,
           'subject_sha256',p_subject_sha256,
           'cursor_state',v_state,
@@ -135,6 +161,7 @@ begin
     'system_key',v_system.system_key,
     'cursor_id',v_cursor_id,
     'memory_scope',v_scope,
+    'continuity_cursor_ref',v_continuity_cursor,
     'cursor',v_cursor,
     'cookie',v_cookie,
     'memory_receipt',v_memory_receipt,
@@ -157,6 +184,7 @@ as $function$
 declare
   v_system public.penta_system_registry%rowtype;
   v_cookie public.penta_protocol_cookies_v1%rowtype;
+  v_pointer jsonb;
   v_scope text;
   v_memory jsonb;
 begin
@@ -164,7 +192,9 @@ begin
   select * into v_system from public.penta_system_registry where system_key=btrim(p_system_key);
   if not found then raise exception 'penta_system_not_registered'; end if;
   select * into v_cookie from public.penta_protocol_cookies_v1 where system_key=v_system.system_key;
-  v_scope:=left('penta:'||lower(v_system.system_key),128);
+  v_pointer:=coalesce(v_cookie.observed_state->'scoped_memory_v1','{}'::jsonb);
+  v_scope:=nullif(btrim(v_pointer->>'scope'),'');
+  if v_scope is null or nullif(btrim(v_pointer->>'cursor'),'') is null then raise exception 'scoped_memory_pointer_required'; end if;
   v_memory:=public.penta_context_query_v1(
     v_scope,coalesce(p_query,''),greatest(1,least(coalesce(p_limit,4),12)),4096,
     null,'internal','penta.context'
@@ -178,6 +208,7 @@ begin
     'maturity',v_system.maturity,
     'authority_ceiling',v_system.risk_ceiling,
     'memory_scope',v_scope,
+    'continuity_pointer',v_pointer,
     'cursor',coalesce(v_cookie.observed_state->'scoped_cursor','{}'::jsonb),
     'assist_contract',coalesce(v_cookie.observed_state->'assist_contract','{}'::jsonb),
     'memory',v_memory,
@@ -200,22 +231,25 @@ declare
   v_considered integer:=0;
   v_initialized integer:=0;
   v_deferred integer:=0;
+  v_pointer_missing integer:=0;
   v_result jsonb;
 begin
   if current_user not in ('postgres','service_role') then raise exception 'service_role_required'; end if;
   for r in
-    select s.system_key
+    select s.system_key,
+           c.observed_state->'scoped_memory_v1' as pointer
     from public.penta_system_registry s
     left join public.penta_protocol_cookies_v1 c on c.system_key=s.system_key
     where s.maturity<>'retired'
-      and (
-        c.cookie_id is null
-        or coalesce(c.observed_state->'scoped_cursor'->>'contract','')<>'ct.penta.scoped-memory-cursor.v1'
-      )
+      and coalesce(c.observed_state->'scoped_cursor'->>'contract','')<>'ct.penta.scoped-memory-cursor.v1'
     order by s.system_key
     limit v_limit
   loop
     v_considered:=v_considered+1;
+    if nullif(btrim(r.pointer->>'scope'),'') is null or nullif(btrim(r.pointer->>'cursor'),'') is null then
+      v_pointer_missing:=v_pointer_missing+1;
+      continue;
+    end if;
     begin
       v_result:=public.penta_scoped_memory_cursor_write_v1(
         r.system_key,'registry:'||r.system_key,null,'idle',r.system_key,null,null,
@@ -235,12 +269,13 @@ begin
     'considered',v_considered,
     'initialized',v_initialized,
     'deferred',v_deferred,
+    'pointer_missing',v_pointer_missing,
     'remaining',(
       select count(*)
       from public.penta_system_registry s
       left join public.penta_protocol_cookies_v1 c on c.system_key=s.system_key
       where s.maturity<>'retired'
-        and (c.cookie_id is null or coalesce(c.observed_state->'scoped_cursor'->>'contract','')<>'ct.penta.scoped-memory-cursor.v1')
+        and coalesce(c.observed_state->'scoped_cursor'->>'contract','')<>'ct.penta.scoped-memory-cursor.v1'
     ),
     'authority_created',false,
     'destructive_authority',false,
@@ -260,8 +295,10 @@ as $function$
     'contract','ct.penta.scoped-memory-cursor.v1',
     'registered',count(*),
     'cookie_installed',count(*) filter (where c.cookie_id is not null),
-    'scoped_cursor_ready',count(*) filter (where c.observed_state->'scoped_cursor'->>'contract'='ct.penta.scoped-memory-cursor.v1'),
-    'missing_scoped_cursor',count(*) filter (where c.cookie_id is null or coalesce(c.observed_state->'scoped_cursor'->>'contract','')<>'ct.penta.scoped-memory-cursor.v1'),
+    'continuity_pointer_ready',count(*) filter (where nullif(btrim(c.observed_state->'scoped_memory_v1'->>'scope'),'') is not null and nullif(btrim(c.observed_state->'scoped_memory_v1'->>'cursor'),'') is not null),
+    'working_cursor_ready',count(*) filter (where c.observed_state->'scoped_cursor'->>'contract'='ct.penta.scoped-memory-cursor.v1'),
+    'pointer_cursor_aligned',count(*) filter (where c.observed_state->'scoped_cursor'->>'memory_scope'=c.observed_state->'scoped_memory_v1'->>'scope' and c.observed_state->'scoped_cursor'->>'continuity_cursor_ref'=c.observed_state->'scoped_memory_v1'->>'cursor'),
+    'missing_scoped_cursor',count(*) filter (where coalesce(c.observed_state->'scoped_cursor'->>'contract','')<>'ct.penta.scoped-memory-cursor.v1'),
     'penta_chat_assist','context_only',
     'penta_brain_assist','planning_only',
     'authority_created',false,
@@ -283,12 +320,12 @@ grant execute on function public.penta_scoped_memory_cursor_reconcile_v1(integer
 grant execute on function public.penta_scoped_memory_cursor_status_v1() to service_role;
 
 comment on function public.penta_scoped_memory_cursor_write_v1(text,text,text,text,text,text,text,jsonb,text) is
-'Writes a minimal redacted per-system working cursor into the existing Penta protocol cookie and optionally appends a bounded PentaContext memory. PentaChat assistance is context-only; PentaBrain assistance is planning-only; no authority is created.';
+'Writes a minimal deterministic working cursor into an existing Penta protocol cookie while reusing the canonical scoped_memory_v1 PentaContext pointer. No second memory namespace or authority is created.';
 comment on function public.penta_scoped_memory_cursor_read_v1(text,text,integer) is
-'Reads one registered system scoped cursor plus bounded internal PentaContext recall. Service-role only; no secret or authority surface is created.';
+'Reads one registered system working cursor plus bounded PentaContext recall through the existing scoped_memory_v1 pointer. Service-role only.';
 comment on function public.penta_scoped_memory_cursor_reconcile_v1(integer) is
-'Idempotently initializes the scoped-memory cursor contract for registered non-retired systems using existing cookies. Additive only; no deletion or scheduler creation.';
+'Idempotently initializes working cursors only where the canonical scoped_memory_v1 pointer already exists. It never invents a competing memory silo.';
 comment on function public.penta_scoped_memory_cursor_status_v1() is
-'Aggregated coverage status for the scoped Penta memory/cursor compatibility fabric.';
+'Aggregated alignment status for canonical continuity pointers and deterministic working cursors.';
 
 commit;
