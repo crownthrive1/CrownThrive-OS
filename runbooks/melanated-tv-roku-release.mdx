@@ -1,0 +1,90 @@
+---
+title: "Melanated TV — Roku release runbook"
+description: "All-channel Viloud integration, archive custody, advertising continuity, and the distinction between a source ZIP and a signed Roku package."
+icon: "tv"
+---
+
+## Current execution state
+
+Owner: CrownThrive, LLC. Platform: Melanated TV. Historical MVP, Melanated Voices Platform, and Melanated Voices TV names remain in provider IDs and the existing Roku listing for continuity; they are not new independent platform launches.
+
+Release workstream: `CT-ROKU-ALLCHANNELS-20260905`, source candidate `0.4.0`.
+
+The owner directed that every recovered channel remain included even when empty, and that ad-zone recycling occur later. An empty channel is an accepted catalog state, not a reason to remove the channel or block building the application. This does not establish that an unavailable stream is playing or that a package has been signed.
+
+**Roku production package: not generated.** The matching original package-signing credential and access to a linked development Roku have not been recovered. Device compilation, playback acceptance, package signature, and store submission must not be represented as completed.
+
+## Canonical archive
+
+[Open the private Google Drive release archive](https://drive.google.com/drive/folders/13Ry3pZ91YFGsMNU4oKKIYMi7HncyAZDM).
+
+The archive separates original encrypted packages, previous builds and findings, the all-channel source/build, and human/machine runbooks. Earlier reports remain immutable historical evidence. Consult the latest release cursor and checksum inventory before selecting an artifact.
+
+The two originally uploaded ZIP-named files and the preserved `.pkg` are identical bytes. Original SHA-256: `130c3b99e7fbbf14058dd402fe9129b25eafb026adfb74a7ded435b40697cff8`. They are encrypted Roku packages, not editable source archives, and are not the rebuilt release.
+
+## Channel inclusion and loading
+
+The build configuration includes all 66 channel IDs recovered from the existing Viloud-hosted website, plus the separately recovered Bless the Mic and Bless this House scheduled channels: 68 distinct channel feeds. A separate, previously registered Bless the Mic live input is retained as a visible entry; its previous HTTP 404 is recorded as availability evidence, not a retirement instruction.
+
+Every directory card is created from the bundled registry before remote feed responses arrive. Four flagship feeds may load initially; other channels load on selection. Network concurrency is capped at three, and the loaded-provider cache is bounded. Empty, not-yet-loaded, and temporarily unavailable channels remain discoverable.
+
+Live/scheduled channels use the provider's `GET /channel/{channel_id}?format=roku_json` response. On-demand catalogs use the ordinary channel response. Scheduled programs are not automatically reclassified as on-demand assets. Web-page URLs are not treated as native HLS streams. Provider domain, authentication, and entitlement restrictions remain enforced.
+
+## Advertising continuity
+
+Preserve the exact provider playback URL and its SCTE-35, cue, discontinuity, and stitched-ad behavior. Do not strip ad markers, invent VAST tags, assign arbitrary zone IDs, or replace the owner's provider stream with unrelated media. The recovered FAST bindings were template-bound and did not contain resolved per-channel VAST URLs or zone IDs in the checked projection. Client-side ad delivery and Roku advertising certification are not claimed.
+
+Zone recycling is deferred. Maintain the channel identity and the existing template-binding evidence so a later zone migration can be tested and reconciled without recreating the channel roster.
+
+## Provider findings
+
+The September 5, 2026 local-time investigation recovered all 66 canonical mappings and saved discovery evidence in ThriveBase. Evidence receipt: `9d580176-b7d6-4127-81bf-dbe88705917b`.
+
+MVP and MVP+ returned populated HLS rendition playlists and successful sample segment HEAD responses. Repeated samples also showed a media sequence remaining at zero while segment URIs changed, and program timestamps approximately 24 hours ahead of the observation time. These are transport findings, not proof of Roku playback. The original URLs and cues were preserved; no timestamp or playlist was rewritten to manufacture success.
+
+Melanated TV FAST and several other schedules returned no-content rendition states. Other feeds contained web-page URLs rather than direct media. Keep these channels in the directory and present useful unavailable/off-air messages.
+
+## Release procedure
+
+1. Verify the release cursor, archive inventory, and source ZIP checksum. Never upload the original backup as though it were the new build.
+2. Run the source/reference tests and a BrightScript-aware compiler. Structural and Python reference checks are not substitutes for Roku compilation.
+3. Sideload the ZIP on a linked development Roku, capture startup/player logs, and test navigation, empty states, valid playback, remote controls, deep links, memory behavior, and advertising transitions where applicable.
+4. Use the existing listing and original signing identity. Rekey the development device with the original package and matching signing password when necessary; do not generate a replacement identity silently. Confirm the candidate version exceeds the published version.
+5. Generate the new encrypted `.pkg` on the development Roku, inspect its developer ID, hash the generated file, and store it separately from the unsigned ZIP and original backup.
+6. Upload the newly signed `.pkg` to the existing Roku app's publishing dashboard and run the required submission tests. Record actual provider responses rather than inferring acceptance from an upload.
+
+## Machine contract
+
+```json
+{
+  "workstream": "CT-ROKU-ALLCHANNELS-20260905",
+  "candidate_version": "0.4.0",
+  "canonical_platform": "Melanated TV",
+  "recovered_website_channels": 66,
+  "configured_channel_feeds": 68,
+  "additional_registered_live_inputs": 1,
+  "empty_channels_block_build": false,
+  "max_concurrent_feeds": 3,
+  "bootstrap_feed_count": 4,
+  "max_cached_providers": 8,
+  "ad_zone_recycling": "deferred",
+  "provider_stream_rewriting": false,
+  "new_signed_pkg_generated": false,
+  "roku_device_acceptance_verified": false,
+  "store_submission_verified": false,
+  "drive_folder_id": "13Ry3pZ91YFGsMNU4oKKIYMi7HncyAZDM",
+  "source_receipt_id": "9d580176-b7d6-4127-81bf-dbe88705917b"
+}
+```
+
+## Reusable skill
+
+For every continuation: read the latest Drive cursor, preserve original hashes, merge channels by immutable provider ID, distinguish directory inclusion from stream availability, keep network and cache limits bounded, preserve ad bindings, run tests, record signing/device evidence separately, and append documentation receipts only after each destination acknowledges its own write. Never mark Drive upload, PentaDocs publication, Roku signing, or Roku acceptance complete by association with another completed step.
+
+## Provider references
+
+- [Viloud channel Delivery API](https://docs.viloud.tv/delivery-api/channels)
+- [Roku packaging and signing](https://developer.roku.com/dev/docs/packaging-channels)
+- [Roku debugging](https://developer.roku.com/dev/docs/debugging)
+- [Roku certification](https://developer.roku.com/dev/docs/certification)
+- [Roku Advertising Framework](https://developer.roku.com/dev/docs/integrating-roku-advertising-framework)
