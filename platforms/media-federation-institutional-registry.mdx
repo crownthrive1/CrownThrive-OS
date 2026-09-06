@@ -222,3 +222,56 @@ Melanated Voices remains a separate audio/catalog integration pending website re
 ```
 
 Implementation references: [Radio.co public station API](https://www.radio.co/api) and [Roku Audio node](https://developer.roku.com/dev/docs/audio).
+
+## September 6, 2026 — MVP Video/Audio shell and Melanated Voices routing repair
+
+Workstream **CT-MVP-VOICES-20260906** delivers unsigned Roku source candidate **0.5.0** under the owner's requested name **MVP — Melanated Voices Platform**. This is a concrete presentation-layer implementation of the cross-media objective, not a claim that the entire future identity, licensing, entitlement or multi-device orchestration system is complete. Existing provider and asset identities remain unchanged.
+
+### Website repair and data preservation
+
+The earlier 0.4.2 statement that Melanated Voices intentionally redirects to SoundCloud is superseded for the observed September 6 repair. The existing PHP application was blocked by a root SoundCloud redirect and a conflicting Passenger Node root mapping. Removing only the redirect exposed a Node placeholder, which identified the second defect. The final patch changed only the existing `.htaccess`: it removed that redirect, retained the old Node mapping as comments, and explicitly routed the homepage to the PHP entrypoint. Node files, uploaded media, user accounts and passwords were not altered. No application reinstall, database migration, or intentional application-data mutation was performed.
+
+The exact original and intermediate routing files were backed up outside the public web root and verified before writes. Original SHA-256: `6127e68a2d9497e61fa39613fc5ed380b7af735fe24e29346c4ff171d43b296a`. Final SHA-256: `0f3766fe3ba31f40d33b0eba0ef99ff443857ca8cc5074cc57ae7fba3a608729`.
+
+At 14:51 UTC the homepage and `/userAuth` returned HTTP 200 with Melanated Voices titles and no visible PHP error or redirect. Guest configuration, translations and login-form APIs returned valid JSON with `success: true` at 14:48 UTC. Three initial local frontend assets also returned HTTP 200. These are HTTP/API checks, **not a completed account-password login, full JavaScript browser-render test, or website media-playback test**. The error-log interface returned no entries on an earlier scoped read; a later retry timed out. Database metadata was read, but no full database dump or table-integrity certification was performed.
+
+A temporary authenticated, site-scoped repair extension was removed from the shared hosting gateway after use; deployment of the restored original source was acknowledged as version 13. Post-restoration behavior checks were not completed. Credentials were not exported, and this repair does not promote unrelated provider authority or policy states.
+
+### MVP entry experience
+
+The new native start screen offers **WATCH / VIDEO** and **LISTEN / AUDIO**. Video contains the existing live, FAST, syndicated and on-demand channels. Audio contains Backroad FM, the recovered Melanated Radio channels, the Virality syndicated channel, and an explicitly pending Melanated Voices native-catalog destination. All 68 Viloud feed IDs, the separate live input and Backroad FM remain configured; empty channels remain visible on their corresponding side.
+
+There are no provider-feed requests before the entry choice. Side-specific bootstrap requests then use the existing maximum concurrency of three and cache bound of eight providers. Switching sides stops active media and radio metadata polling, cancels pending feed work and ignores stale callbacks. The saved-state namespace and asset IDs are preserved.
+
+**Restored website routing does not establish a native Roku catalog/account connection.** That adapter remains disabled pending verified authentication, entitlement and playback contracts. Likewise, preserving the owner's FAST settings and SSAI cues does not certify advertising delivery. No ad-zone recycling was performed and no FAST ad timer was applied to Backroad FM.
+
+The enclosed native client targets Roku only. Other TV operating systems need their own clients; the shared presentation contract is preparation for those clients, not proof that they have been built.
+
+### Release custody and acceptance
+
+[Open the private MVP 0.5.0 release folder](https://drive.google.com/drive/folders/1eRzM48D-AdDPooEDEIT2wrFdGFVUIRTV). It contains the sideload ZIP, editable source kit, human installation and repair guides, machine-readable channel/client contracts, source cursor, checksums and repair observations. Earlier releases remain preserved.
+
+**170 structural/lexical checks and 158 Python source/reference tests passed.** The ZIP rebuilt deterministically. No external BrightScript compiler, Roku hardware compilation/playback, new package signature or store submission ran here. Upload `MVP_Unsigned_RC_0.5.0_sideload.zip` only to the development Roku installer; it is not the production `.pkg` upload.
+
+```json
+{
+  "workstream": "CT-MVP-VOICES-20260906",
+  "candidate_version": "0.5.0",
+  "entry_choices": ["video", "audio"],
+  "viloud_feeds": 68,
+  "additional_live_inputs": 1,
+  "radio_stations": 1,
+  "website_routing_repaired": true,
+  "website_guest_api_verified": true,
+  "credential_login_verified": false,
+  "browser_render_verified": false,
+  "native_voices_catalog_connected": false,
+  "native_targets_built": ["Roku"],
+  "signed_pkg_generated": false,
+  "roku_device_playback_verified": false,
+  "store_submitted": false,
+  "sideload_sha256": "0d64285ff9f456a33f002e0a5ce00195fcc437b58a6d890343c45c2fc958906b",
+  "full_kit_sha256": "b936389bcb75a089dd5d35a86239ac8129681434eaa661c4369aee0d3ea5b63d",
+  "drive_folder_id": "1eRzM48D-AdDPooEDEIT2wrFdGFVUIRTV"
+}
+```
