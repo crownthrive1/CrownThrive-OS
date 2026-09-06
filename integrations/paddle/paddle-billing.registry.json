@@ -1,0 +1,188 @@
+{
+  "registry_id": "ct.integration.paddle-billing.v1",
+  "schema_version": "1.0.0",
+  "recorded_at": "2026-09-04T08:17:25Z",
+  "institutional_phase": "Phase 3",
+  "stable_component_id": "ct.integration.paddle-billing",
+  "canonical_name": "Paddle Billing MCP and Agent Skills Integration",
+  "owner": "CrownThrive IO / PentaGreen",
+  "lifecycle_state": "CONTROLLED_TEST",
+  "production_state": "HOLD",
+  "provider": {
+    "name": "Paddle",
+    "product": "Paddle Billing",
+    "excluded_product": "Paddle Classic",
+    "source_repository": "PaddleHQ/paddle-agent-skills",
+    "source_url": "https://github.com/PaddleHQ/paddle-agent-skills",
+    "source_commit": "de7fcd3f6cc43bf87a65d6b2e65067611b47353c",
+    "plugin_name": "paddle",
+    "plugin_version": "0.1.0",
+    "plugin_subdirectory": "providers/codex/plugin",
+    "plugin_manifest_blob_sha": "7cc8c4dd51c5ead7fceaf8603866125668643502",
+    "mcp_manifest_blob_sha": "075ccf0168dff26ae26b5d92df3340c1f0e3b8f8",
+    "license": "Apache-2.0"
+  },
+  "marketplace": {
+    "manifest": ".agents/plugins/marketplace.json",
+    "source_type": "git-subdir",
+    "source_pin": "full_commit_sha",
+    "automatic_upstream_drift": "DENIED",
+    "update_policy": "Review, repin, validate, and accept a new exact upstream commit through a separate change."
+  },
+  "mcp_servers": [
+    {
+      "id": "paddle-docs",
+      "environment": "documentation",
+      "type": "http",
+      "url": "https://paddlehq.mcp.kapa.ai",
+      "authentication": "Interactive Google or GitHub sign-in where required by the provider.",
+      "mutation_authority": "NONE"
+    },
+    {
+      "id": "paddle-sandbox",
+      "environment": "sandbox",
+      "type": "http",
+      "url": "https://sandbox-mcp.paddle.com/mcp",
+      "authentication": {
+        "method": "bearer_token_env_var",
+        "environment_variable": "PADDLE_SANDBOX_API_KEY",
+        "secret_storage": "Protected CrownThrive runtime or operator keychain; never Git."
+      },
+      "mutation_authority": "Bounded sandbox operations only after task-level authorization."
+    },
+    {
+      "id": "paddle-live",
+      "environment": "live",
+      "type": "http",
+      "url": "https://mcp.paddle.com/mcp",
+      "authentication": "OAuth in the eligible operator context; provider permissions remain independently enforced.",
+      "mutation_authority": "HOLD unless the exact live operation has explicit human direction, current CrownThrive authority, provider permission, bounded scope, and readback."
+    }
+  ],
+  "skills": [
+    {
+      "id": "paddle-billing-history",
+      "intent": "Authenticated customer transaction and invoice history."
+    },
+    {
+      "id": "paddle-catalog-setup",
+      "intent": "Products, prices, tax categories, billing intervals, and catalog seeding."
+    },
+    {
+      "id": "paddle-checkout-web",
+      "intent": "Paddle Checkout integration for web applications."
+    },
+    {
+      "id": "paddle-customer-portal",
+      "intent": "Authenticated customer portal sessions and self-service billing."
+    },
+    {
+      "id": "paddle-pricing-pages",
+      "intent": "Localized pricing previews, currencies, and billing-frequency presentation."
+    },
+    {
+      "id": "paddle-sandbox-testing",
+      "intent": "End-to-end sandbox tests, simulated events, and integration canaries."
+    },
+    {
+      "id": "paddle-subscription-cancel",
+      "intent": "Authorized cancellation-at-period-end flows and reconciliation."
+    },
+    {
+      "id": "paddle-subscription-sync",
+      "intent": "Webhook-driven customer and subscription state synchronization."
+    },
+    {
+      "id": "paddle-subscription-update",
+      "intent": "Authorized upgrades, downgrades, item changes, and proration handling."
+    },
+    {
+      "id": "paddle-webhooks",
+      "intent": "Webhook receipt, signature verification, idempotency, retry, and reconciliation."
+    }
+  ],
+  "routing_policy": {
+    "wrapper_skill": "skills/paddle-billing-governed-routing/SKILL.md",
+    "mandatory_for": [
+      "Paddle catalog or price work",
+      "Paddle Checkout work",
+      "Paddle pricing-page work",
+      "Paddle webhook work",
+      "Paddle subscription synchronization, cancellation, or update work",
+      "Paddle customer portal work",
+      "Paddle billing-history work",
+      "Paddle sandbox verification"
+    ],
+    "requirements": [
+      "Load this wrapper and the exact matching upstream paddle-* skill before implementation.",
+      "Use paddle-docs to resolve current provider semantics when provider behavior or schemas are material.",
+      "Default execution to paddle-sandbox.",
+      "Do not route to paddle-live by implication, convenience, or stale configuration.",
+      "Use provider search before execute when the Paddle MCP exposes those tools.",
+      "Capture bounded provider readback for every side effect.",
+      "Keep credentials and restricted customer, payment, tax, dispute, payout, and settlement data out of public source and general logs.",
+      "Fail closed if the required skill, MCP server, credential binding, exact-operation authority, or readback is unavailable."
+    ]
+  },
+  "authority_and_side_effects": {
+    "data_classes": [
+      "catalog metadata",
+      "price and tax-category metadata",
+      "customer and subscription identifiers",
+      "transaction and invoice metadata",
+      "webhook event metadata"
+    ],
+    "consequential_operations": [
+      "live product or price creation or mutation",
+      "live subscription mutation or cancellation",
+      "live customer or transaction mutation",
+      "live webhook configuration or mutation"
+    ],
+    "required_controls": [
+      "authenticated provider identity",
+      "least-privilege provider permission",
+      "explicit environment selection",
+      "exact-operation CrownThrive authority",
+      "idempotency or duplicate control where applicable",
+      "bounded rollback or compensation",
+      "provider readback",
+      "DAIL/evidence receipt without restricted payloads"
+    ],
+    "non_inference": [
+      "MCP connectivity does not prove Paddle account authorization.",
+      "A successful API call does not prove settlement, entitlement, tax or legal sufficiency, revenue recognition, or provider-wide authority.",
+      "A source merge does not activate live commerce."
+    ]
+  },
+  "verification": {
+    "upstream_repository_read": "PASS",
+    "upstream_plugin_manifest_read": "PASS",
+    "upstream_mcp_manifest_read": "PASS",
+    "upstream_skill_inventory_count": 10,
+    "source_configuration": "CANDIDATE",
+    "marketplace_import": "NOT_PERFORMED",
+    "sandbox_authentication": "UNVERIFIED",
+    "sandbox_provider_readback": "NOT_RUN",
+    "live_oauth": "UNVERIFIED",
+    "live_provider_readback": "NOT_RUN",
+    "independent_review": "PENDING",
+    "production_certification": "HOLD"
+  },
+  "support_export_replacement": {
+    "provider_support": "Use Paddle developer/support channels under the authorized CrownThrive account.",
+    "export": "Export only the minimum provider records required for reconciliation; preserve restricted data outside public Git.",
+    "replacement": "CrownThrive stable commerce, licensing, entitlement, and ledger identities remain provider-independent.",
+    "rollback": [
+      "Disable or remove the Paddle plugin from the workspace.",
+      "Remove the three Paddle MCP entries from .mcp.json.",
+      "Revoke the Paddle live OAuth connection.",
+      "Rotate or revoke the sandbox API key.",
+      "Preserve source, provider, and incident receipts; do not erase history."
+    ]
+  },
+  "candidate_base": {
+    "repository": "crownthrive1/CrownThrive-OS",
+    "branch_base": "main",
+    "base_commit": "2835b5f1125c277fd960e8e12546f161093df772"
+  }
+}

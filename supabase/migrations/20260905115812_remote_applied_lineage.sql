@@ -1,0 +1,14 @@
+-- remote_applied_version: 20260905115812
+-- remote_applied_name: crownthrive_marketplace_catalog_v3
+-- CrownThrive migration-lineage restoration marker v1
+-- This timestamp is recorded as APPLIED in production ThriveBase.
+-- The applied migration creates public.crownthrive_marketplace_catalog_v3().
+-- It projects 59 active digital products and 91 canonical checkout options from
+-- integration_control.pentagreen_stripe_catalog_bridge_v1, enriches matching
+-- Go Flipbooks publications, excludes six physical made-to-order products,
+-- collapses eight duplicate active Payment Links, and exposes no secrets.
+-- The function is restricted to service_role; the Vercel API publishes only its
+-- validated public-safe JSON result under CHLOM and PentaGreen boundaries.
+-- Canonical applied SQL remains in supabase_migrations.schema_migrations under
+-- ThriveBase custody. This file restores Git/Supabase version-lineage parity.
+-- Clean-room reconstruction from this public marker alone is NOT certified.
