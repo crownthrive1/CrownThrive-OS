@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-05 — Four-Part DAIL Cursor Runtime Extension v1
+
+- Added `ct.dail.cursor.v1` as a fourth coordination rail over the single canonical CHLOM DAIL chain; Machine, Human, Hybrid, and Cursor remain projections rather than independent authority realities.
+- Added input-manifest and terminal-reconciliation DAIL binding, bounded rail high-water marks, route/deferred draining, compact verification catch-up, service-role isolation, RLS, and a production canary.
+- Integrated `ct-dail-cursor-control-v1` with PentaBalancer admission and exact scheduler cohesion. Retired the overlapping `ct-dail-serial-lane-drain-v4` and `chlom-dail-compact-catchup-v4` clocks without deleting their history.
+- Added hard emergency ceilings of four serial virtual slices, one canonical database writer, 100,000 rail events, 600 route events, 50 deferred events, 20,000 verification events, and 120 minutes maximum per activation.
+- Completed 20 DAIL-bound manual catch-up cycles: 4,928 route rows delivered, 6 deferred events delivered, 49,355 events verified, and observed verification lag reduced to zero.
+- Added architecture, operations, and machine-readable production resources under `docs/` and `.crownthrive/resources/` without rewriting the canonical CrownThrive OS v18.0.0 version.
 
 ## 2026-08-27 — D3 Founder Production Approval Window v1
 
