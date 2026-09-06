@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-06 — DAIL Oracle Capacity Mesh v1
+
+- Added `ct.dail.oracle-capacity-mesh.v1`, a local Cursor-subordinate fabric where five verified evidence oracles donate 100% of idle capacity at 100,000 or more pending routes while native oracle work always preempts donation.
+- Registered PentaDAIL, PentaCertify, PentaWire, PentaCensus, and PentaDiscovery as bounded donor identities operating inside the same ThriveBase database with zero core network hops, one canonical DAIL chain, and one canonical append fabric.
+- Added `LOCK_OVERCLOCK` at 500,000 pending routes, `RECOVERY_OVERCLOCK` from 100,000 through 499,999, and hysteresis release at 80,000 or fewer.
+- Added one verification donor and up to four route donors per cycle, verification-lag-aware route throttling, PentaBalancer admission, PentaGas accounting, signed Penta cookies, oracle-attributed terminal DAIL appends, exact readback, and slice-level rollback.
+- Added the 20-second PentaBalancer-managed scheduler `ct-dail-oracle-capacity-mesh-v1`, exact desired-state restoration, PentaTime registration, P0 operating assignment, RLS-isolated internal state, service-role-only execution, and authenticated safe status.
+- Corrected observability projections so MeshAssist and Cursor separate scheduler attempts, no-ops, deferrals, material runs, and completed runs; continuity status now separates exact counts, estimates, observation times, and staleness.
+- Initial observation recorded 3,000 oracle-attributed route deliveries, 15,000 oracle-attributed verifications, 13 signed cookies, zero route failures, a whole-stack pending-route change of -13,900, and a whole-stack verification-lag change of -13,421.
+- Added architecture documentation, reader-writer/cookie operations manual, Drive custody, production canary, and machine-readable OS resource without changing the canonical CrownThrive OS v18.0.0 version.
+
 ## 2026-09-06 — ThriveBase Demo Sandbox Cursor Donor v1
 
 - Activated the underused `ThriveBase-Public` Micro project under the operational alias `ThriveBase Demo Sandbox` while preserving its provider name and bindings.
