@@ -504,3 +504,66 @@ The KJV homepage image is used as a public reference, but a KJV feed read was bl
 ```
 
 Technical references: [Roku Poster](https://developer.roku.com/dev/docs/poster), [Roku RowList](https://developer.roku.com/dev/docs/rowlist), [YouTube iframe player](https://developers.google.com/youtube/iframe_api_reference), [YouTube API developer policies](https://developers.google.com/youtube/terms/developer-policies), and [YouTube uploads/metadata workflow](https://developers.google.com/youtube/v3/guides/implementation/videos).
+
+## September 6, 2026 — MVP 0.8.0 playback and dialog stability
+
+Workstream **CT-MVP-PLAYBACK-STABILITY-20260906** responds to the owner's report of popups failing to close and the screen freezing. The delivered source is **0.8.0**, consolidating the attached 0.7.0 baseline with two independently archived 0.7.1 branches. Earlier packages remain immutable; their shared version number does not make them byte-identical. The source freeze and destination operations occurred September 7 UTC during September 6 local operations.
+
+### Identified defects and source corrections
+
+The prior dialog-close callback treated `wasClosed` as a Boolean even though Roku defines it as an event. Button callbacks addressed a mutable global dialog, allowing a delayed callback to target a newer dialog. Background feed completion also rebuilt UI state without preserving modal focus. The replacement centralizes dialog ownership: each popup receives a serial, observers resolve the originating event node, and closing clears ownership and unsubscribes observers before dismissing the dialog. Focus restoration is deferred until the close action completes. All ten modal action callbacks, including the imported workspace search and corridor filter, use this lifecycle. Diagnostics places **Close** first; phone/web handoff screens have a dedicated **Back to MVP** control.
+
+The old live Play path sampled twice and waited roughly 11–15 seconds before showing the timing/sequence-confirmation dialog. In this candidate, a populated approved native source proceeds to the Roku player without that extra confirmation. Timing anomalies remain operator diagnostic evidence, not a reason to withhold an otherwise valid playback attempt. Auth, TLS, host restrictions, unsupported browser URLs and empty media are not overridden. HLS preflight has a 15-second deadline and checks only the master and a bounded number of declared renditions. The original adaptive URL is retained unless a prior declared rendition fails and another approved rendition in that same master supplies media.
+
+A repeating watchdog now continues after the first playing state. A 25-second startup or no-progress timeout permits at most **one reconnect to the same provider stream per Play attempt**, followed by a stopped player and actionable inline details error if recovery fails. Pause does not trigger a stall reconnect. Back cancels connecting, probes and queued reconnects. No timestamps, segment identities, advertising cues or playlists are rewritten, and no unrelated work is substituted.
+
+Channel grids render **40 entries per page** with next/previous actions. Platform previews are bounded at eight native and eight YouTube entries per provider. Search renders at most 120 matches with refinement. Selected/playing providers are protected in the eight-provider cache. A Task watchdog releases abandoned feed work after 35 seconds and public-catalog work after 25 seconds. Per-dispatch serials reject stale results after retries. These are implemented source safeguards, not an on-device performance certification.
+
+### Preserved media and parallel upgrades
+
+The 68 feed configurations, separate live input, Backroad FM station and variants, native-media host permissions, FAST SSAI defaults and public catalog endpoints match the 0.7.0 baseline. No website, database, ad-zone or provider configuration was changed. Existing rights and entitlement boundaries remain.
+
+The consolidated client includes **34 native workspace entries**, bundled gold/cultural artwork, corridor filters, workspace search, QR handoffs and bounded local saved-state retention from the Gilded Corridors branch. Expanded Culture's ten added platform identities already matched that roster; its alternate planning steps are retained under distinct step IDs. Both input app/config sources are archived in the kit. The ThriveTickets alias is resolved without deleting the legacy note key. The existing browser companion is retained, not newly deployed.
+
+The input full-kit SHA-256 fingerprints are `cca41d56a07de970d396838f48340d12d5b5d177614710377a23f0d6e55910ec` for Expanded Culture and `030d9bd80acd6e95f720010d2e53ae1620f85e84c2e14d6030f3583c050a969c` for Gilded Corridors.
+
+### Actual provider observations and release limits
+
+Three fresh rendition reads at 00:52 UTC returned **25 media segments each for MVP Linear and MVP+ FAST**, while Melanated TV FAST returned `HLS_NO_CONTENT` with zero segments. These were HTTP playlist observations, not decoded media or successful Roku playback. A subsequent source-host inventory was blocked and not bypassed. The 66-channel/2,082-placement scan remains historical 0.7.0 evidence; it was not repeated here.
+
+Native playback requires an available supported media source. YouTube discovery retains official phone/web handoff; its watch pages are not converted into native streams. Empty channels remain listed. Preserving SSAI cues is not verified advertisement delivery, and a retry mechanism does not repair an upstream generator.
+
+**Validation:** 296 local structural checks passed. The Python suite ran 368 tests: **367 passed and one legacy external-directory comparison was skipped**; the independent frozen configuration/source-preservation comparison passed. Twenty-four companion JavaScript checks executed with a mock DOM, and syntax checks passed. The sideload ZIP rebuilt deterministically and passed archive integrity. No external BrightScript compiler or new Roku device test ran, so native popup behavior, playback, advertising, signing and store acceptance remain separately unverified.
+
+[Open the private MVP 0.8.0 release folder](https://drive.google.com/drive/folders/18L02dvcYMx-UOoQkGZq5OCVuFqep20zN). It contains the unsigned sideload ZIP, editable source and parallel-input history, phone guide, stability report, human/machine contracts and fingerprinted evidence. Install the sideload ZIP through the existing local Roku installer without changing signing keys; then test Diagnostics Close, nested Options/keyboard cancellation, populated native playback, Back during connecting, Backroad FM and Switch side. The later execution receipt records destination acknowledgements separately from the source freeze.
+
+```json
+{
+  "workstream": "CT-MVP-PLAYBACK-STABILITY-20260906",
+  "candidate_version": "0.8.0",
+  "channel_feeds": 68,
+  "separate_live_inputs": 1,
+  "radio_stations": 1,
+  "native_workspaces": 34,
+  "timing_confirmation_popup": false,
+  "max_same_stream_auto_reconnects": 1,
+  "startup_timeout_seconds": 25,
+  "stall_timeout_seconds": 25,
+  "preflight_deadline_seconds": 15,
+  "channel_page_size": 40,
+  "max_concurrent_feeds": 3,
+  "max_cached_providers": 8,
+  "provider_playlist_rewriting": false,
+  "ad_zone_changes": false,
+  "youtube_native_playback": false,
+  "new_build_device_tested": false,
+  "external_brightscript_compiler_executed": false,
+  "signed_pkg_generated": false,
+  "store_submitted": false,
+  "sideload_sha256": "8b89083d96837e465b776087e69efa14e70dc68f356fef7d35163fd0c19205af",
+  "full_kit_sha256": "4af5688682383d3c4253097ab68ea6e4ca59e99ab1583ce441eaccd9bd6d0ae3",
+  "drive_folder_id": "18L02dvcYMx-UOoQkGZq5OCVuFqep20zN"
+}
+```
+
+Technical references: [Roku StandardDialog events and closing](https://developer.roku.com/dev/docs/standard-dialog), [originating SceneGraph observer events](https://developer.roku.com/dev/docs/rosgnodeevent), and [native focus control](https://developer.roku.com/dev/docs/ifsgnodefocus).
