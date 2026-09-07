@@ -5,12 +5,14 @@ on:
     paths:
       - "scripts/governed_collision_agent_v2.py"
       - "scripts/governed_collision_agent_v2_trusted.py"
+      - "scripts/governed_collision_agent_v2_trusted_consolidated.py"
       - "scripts/governed_collision_agent_v2_trusted_main.py"
       - "tests/test_collision_agent_v2.py"
       - "tests/test_collision_snapshot_retry_contract.py"
       - "tests/test_collision_trusted_observer.py"
       - "tests/test_collision_trusted_main_observer.py"
       - "tests/test_collision_trusted_gold_lane_scope.py"
+      - "tests/test_collision_trusted_consolidated_snapshot.py"
       - ".github/workflows/collision-governance-trusted-v2.yml"
       - ".github/workflows/collision-read-transport-governance.yml"
   push:
@@ -18,12 +20,14 @@ on:
     paths:
       - "scripts/governed_collision_agent_v2.py"
       - "scripts/governed_collision_agent_v2_trusted.py"
+      - "scripts/governed_collision_agent_v2_trusted_consolidated.py"
       - "scripts/governed_collision_agent_v2_trusted_main.py"
       - "tests/test_collision_agent_v2.py"
       - "tests/test_collision_snapshot_retry_contract.py"
       - "tests/test_collision_trusted_observer.py"
       - "tests/test_collision_trusted_main_observer.py"
       - "tests/test_collision_trusted_gold_lane_scope.py"
+      - "tests/test_collision_trusted_consolidated_snapshot.py"
       - ".github/workflows/collision-governance-trusted-v2.yml"
       - ".github/workflows/collision-read-transport-governance.yml"
   workflow_dispatch:
@@ -52,6 +56,7 @@ jobs:
           python -m py_compile \
             scripts/governed_collision_agent_v2.py \
             scripts/governed_collision_agent_v2_trusted.py \
+            scripts/governed_collision_agent_v2_trusted_consolidated.py \
             scripts/governed_collision_agent_v2_trusted_main.py
       - name: Run collision transport tests
         run: |
@@ -61,6 +66,7 @@ jobs:
             tests.test_collision_trusted_observer \
             tests.test_collision_trusted_main_observer \
             tests.test_collision_trusted_gold_lane_scope \
+            tests.test_collision_trusted_consolidated_snapshot \
             -v
       - name: Check diff hygiene
         run: |
@@ -88,7 +94,7 @@ jobs:
           set -euo pipefail
           report="collision-candidate-readonly-report.json"
           set +e
-          python3 scripts/governed_collision_agent_v2_trusted.py \
+          python3 scripts/governed_collision_agent_v2_trusted_consolidated.py \
             --repository "${{ github.repository }}" \
             --branch "${{ github.event.pull_request.base.ref }}" \
             --candidate "${{ github.event.pull_request.number }}" \
@@ -117,6 +123,7 @@ jobs:
           print("candidate_live_readonly_stale_open=" + str(scope.get("stale_base_open_pull_count")))
           print("candidate_live_readonly_authenticated_reads=" + str(transport.get("authenticated_requests")))
           print("candidate_live_readonly_public_fallback_reads=" + str(transport.get("public_fallback_requests")))
+          print("candidate_live_readonly_graphql_reads=" + str(transport.get("graphql_requests")))
           print("candidate_live_readonly_authority_created=false")
           PY
           exit "$status"
