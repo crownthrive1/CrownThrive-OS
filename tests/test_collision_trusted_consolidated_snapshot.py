@@ -121,13 +121,19 @@ class ConsolidatedSnapshotTests(unittest.TestCase):
             client.open_pulls()
         self.assertIn(11, client._snapshot_rest_file_numbers)
 
-    def test_missing_base_fails_closed(self):
+    def test_invalid_graphql_snapshot_fails_closed_through_rest_fallback(self):
         response = snapshot([pull_node(11, A40, B40)])
         response["data"]["repository"]["pullRequests"]["nodes"][0]["baseRefOid"] = ""
         client = StubClient(response, candidate=11)
-        with patch.object(client, "live_branch_sha", return_value=B40):
-            with self.assertRaisesRegex(agent.GitHubReadError, "graphql_pull_sha_invalid"):
+        with patch.object(
+            trusted.base.TrustedCandidateClient,
+            "open_pulls",
+            side_effect=agent.GitHubReadError("rest_fallback_failed_closed"),
+        ):
+            with self.assertRaisesRegex(agent.GitHubReadError, "rest_fallback_failed_closed"):
                 client.open_pulls()
+        self.assertFalse(client.graphql_snapshot_mode)
+        self.assertIn("graphql_pull_sha_invalid", client.graphql_last_error)
 
     def test_too_many_open_prs_fails_closed_to_rest(self):
         response = snapshot([])
