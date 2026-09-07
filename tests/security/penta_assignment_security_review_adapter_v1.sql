@@ -12,6 +12,8 @@ declare
   v_def text;
   v_result jsonb;
   v_non_security_assignment uuid;
+  v_known_blob text;
+  v_wrong_blob text:=repeat('0',40);
 begin
   select count(*) into v_count
   from penta_security.provider_source_policies_v1
@@ -48,12 +50,40 @@ begin
   if strpos(v_def,'EXACT_SUBJECT_REQUIRED')=0 then raise exception 'adapter must require exact head and subject digest'; end if;
   if strpos(v_def,'EXACT_MIGRATION_MANIFEST_REQUIRED')=0 then raise exception 'adapter must bind exact migration manifest'; end if;
   if strpos(v_def,'review_github_provider_source_v1')=0 then raise exception 'adapter must use PentaSecurity exact-head provider source reviews'; end if;
+  if strpos(v_def,'SOURCE_REVIEW_BYTES_MISMATCH')=0 then raise exception 'adapter must bind independent blob bytes to reviewed source sha256'; end if;
+  if strpos(v_def,'MIGRATION_BLOB_SOURCE_MISMATCH')=0 then raise exception 'adapter must fail closed on manifest/source blob mismatch'; end if;
+  if strpos(v_def,'computed_git_blob_sha1')=0 or strpos(v_def,'''sha1''')=0 or strpos(v_def,'decode(''00'',''hex'')')=0 then
+    raise exception 'adapter must compute canonical Git blob object identity';
+  end if;
   if strpos(v_def,'penta_assignment_record_owner_result_v1')=0 then raise exception 'adapter must use canonical owner-result sink'; end if;
   if strpos(v_def,'penta_assignment_bind_release_gate_v1')=0 then raise exception 'adapter must use exact-subject release-gate binding'; end if;
   if strpos(v_def,'ct.penta.release-gate.receipt.v1')=0 then raise exception 'adapter must emit hardened release-gate receipt contract'; end if;
   if strpos(v_def,'''independent_certification'',false')=0 then raise exception 'adapter must not claim independent certification'; end if;
   if strpos(v_def,'''release_authorized'',false')=0 then raise exception 'adapter must not create release authority'; end if;
   if strpos(v_def,'''authority_created'',false')=0 then raise exception 'adapter must remain authority-neutral'; end if;
+
+  -- Canonical Git object identity test vector: SHA1("blob 6\0hello\n").
+  v_known_blob:=encode(
+    extensions.digest(
+      convert_to('blob '||octet_length(convert_to(E'hello\n','UTF8'))::text,'UTF8')
+      || decode('00','hex')
+      || convert_to(E'hello\n','UTF8'),
+      'sha1'
+    ),
+    'hex'
+  );
+  if v_known_blob<>'ce013625030ba8dba906f756967f9e9ca394464a' then
+    raise exception 'canonical Git blob computation mismatch: %',v_known_blob;
+  end if;
+  if v_wrong_blob !~ '^[0-9a-f]{40}$' then
+    raise exception 'wrong-blob negative must remain syntactically valid';
+  end if;
+  if v_wrong_blob=v_known_blob then
+    raise exception 'wrong-blob negative unexpectedly equals canonical blob';
+  end if;
+  if strpos(v_def,'v_blob<>v_computed_blob')=0 then
+    raise exception 'adapter must reject the syntactically-valid wrong-blob negative before owner PASS';
+  end if;
 
   v_result:=penta_security.review_assignment_exact_subject_v1(gen_random_uuid());
   if v_result->>'state'<>'HOLD' or v_result->>'reason'<>'ASSIGNMENT_NOT_FOUND' then
