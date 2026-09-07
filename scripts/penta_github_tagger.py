@@ -48,12 +48,12 @@ MAX_PAGES = 10
 EXIT_DEFERRED = 75
 TRANSIENT_HTTP = frozenset({429, 500, 502, 503, 504})
 SEMANTIC_PR_ACTIONS = frozenset({"opened", "reopened", "synchronize", "edited"})
+LIFECYCLE_PREFIXES = (*STAGE_PREFIXES, *TERMINAL_PREFIXES)
 MANAGED_PREFIXES = (
     *ENTITY_PREFIXES,
     *LANE_PREFIXES,
     *RISK_PREFIXES,
-    *STAGE_PREFIXES,
-    *TERMINAL_PREFIXES,
+    *LIFECYCLE_PREFIXES,
 )
 
 LANE_KEYWORDS: dict[str, tuple[str, ...]] = {
@@ -752,6 +752,13 @@ def tag_entity(
         terminal_labels,
     )
     current = set(entity.labels)
+    projected_lifecycle = set(stage_labels).union(terminal_labels)
+    existing_lifecycle = {name for name in current if _starts_with_any(name, LIFECYCLE_PREFIXES)}
+    if entity.state == "open" and existing_lifecycle:
+        stage_labels = sorted(name for name in existing_lifecycle if name.startswith(STAGE_PREFIXES))
+        terminal_labels = sorted(name for name in existing_lifecycle if name.startswith(TERMINAL_PREFIXES))
+        expected.difference_update(projected_lifecycle)
+        expected.update(existing_lifecycle)
     missing, stale = _label_plan(current, expected)
     changed = bool(missing or stale)
 
@@ -770,6 +777,16 @@ def tag_entity(
         for name in sorted(stale):
             remove_label(gh, number, name)
         current = read_labels(gh, number)
+        if entity.state == "open":
+            concurrent_lifecycle = {name for name in current if name.startswith(LIFECYCLE_PREFIXES)}.difference(expected)
+            if concurrent_lifecycle:
+                for name in sorted(projected_lifecycle.difference(existing_lifecycle).intersection(current)):
+                    remove_label(gh, number, name)
+                current = read_labels(gh, number)
+                stage_labels = sorted(name for name in current if name.startswith(STAGE_PREFIXES))
+                terminal_labels = sorted(name for name in current if name.startswith(TERMINAL_PREFIXES))
+                expected.difference_update(projected_lifecycle)
+                expected.update(name for name in current if name.startswith(LIFECYCLE_PREFIXES))
         still_missing = expected.difference(current)
         unexpected_managed = {
             name
