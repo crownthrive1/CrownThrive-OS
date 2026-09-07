@@ -3,11 +3,10 @@
 -- Source candidate only until current exact-head CI, PentaSecurity/CHLOM/applicable-CIE
 -- review, independent PentaCertifier, governed merge/apply and production readback pass.
 --
--- This adapter closes one bounded orchestration gap: a PentaSecurity assignment owner
--- result may be emitted only after PentaSecurity itself has independently fetched and
--- reviewed every source migration bound to the assignment's exact Git head. It does
--- not create certification, release, provider-write, credential, money, D3, rights or
--- authority-expansion power.
+-- PentaSecurity may emit an assignment owner result only after it independently reviews
+-- every migration at the assignment exact Git head AND proves the manifest Git blob
+-- identity is the Git object for the exact bytes reviewed. This creates no certification,
+-- release, provider-write, credential, money, D3, rights or authority-expansion power.
 
 insert into penta_security.provider_source_policies_v1(
   policy_key,policy_version,system_family,provider_system,resource_type,resource_id,
@@ -104,6 +103,7 @@ declare
   v_version text;
   v_blob text;
   v_policy_key text;
+  v_policy penta_security.provider_source_policies_v1%rowtype;
   v_review jsonb;
   v_reviews jsonb:='[]'::jsonb;
   v_missing jsonb:='[]'::jsonb;
@@ -111,6 +111,12 @@ declare
   v_pass_count integer:=0;
   v_existing_owner_pass boolean:=false;
   v_existing_gate_pass boolean:=false;
+  v_http extensions.http_response;
+  v_source text;
+  v_source_bytes integer;
+  v_source_sha256 text;
+  v_computed_blob text;
+  v_review_base_ok boolean;
   v_evidence jsonb;
   v_evidence_sha text;
   v_gate_payload jsonb;
@@ -193,6 +199,11 @@ begin
     v_version:=coalesce(m->>'version','');
     v_blob:=coalesce(m->>'blob','');
     v_review_count:=v_review_count+1;
+    v_source:=null;
+    v_source_bytes:=null;
+    v_source_sha256:=null;
+    v_computed_blob:=null;
+    v_review_base_ok:=false;
 
     if v_version !~ '^[0-9]{14}$' or v_blob !~ '^[0-9a-f]{40}$' then
       v_missing:=v_missing||jsonb_build_array('MIGRATION_IDENTITY_INVALID:'||coalesce(v_version,'<null>'));
@@ -200,12 +211,14 @@ begin
     end if;
 
     v_policy_key:='ct.penta.security.assignment-migration.'||v_version||'.v1';
-    if not exists(
-      select 1 from penta_security.provider_source_policies_v1 p
-      where p.policy_key=v_policy_key and p.state='active'
-        and p.repository=a.source_repo
-        and p.resource_id='assignment-migration:'||v_version
-    ) then
+    select * into v_policy
+    from penta_security.provider_source_policies_v1 p
+    where p.policy_key=v_policy_key and p.state='active'
+      and p.repository=a.source_repo
+      and p.resource_id='assignment-migration:'||v_version
+    order by p.created_at desc,p.policy_version desc
+    limit 1;
+    if not found then
       v_missing:=v_missing||jsonb_build_array('SOURCE_POLICY_MISSING:'||v_version);
       continue;
     end if;
@@ -216,26 +229,67 @@ begin
       v_review:=jsonb_build_object('disposition','HOLD_SOURCE_REVIEW_RUNTIME_ERROR','error_class',sqlstate,'authority_expansion',false);
     end;
 
+    v_review_base_ok :=
+      v_review->>'disposition'='PASS'
+      and coalesce(v_review->>'exact_head_sha','')=a.exact_head_sha
+      and coalesce(v_review->>'source_sha256','') ~ '^[0-9a-f]{64}$'
+      and coalesce(v_review->>'evidence_sha256','') ~ '^[0-9a-f]{64}$'
+      and coalesce(v_review->>'dail_event_hash','') ~ '^[0-9a-f]{64}$'
+      and coalesce((v_review->>'authority_expansion')::boolean,true)=false;
+
+    if v_review_base_ok then
+      begin
+        v_http:=extensions.http_get(
+          'https://raw.githubusercontent.com/'||v_policy.repository||'/'||a.exact_head_sha||'/'||v_policy.source_path
+        );
+      exception when others then
+        v_http:=null;
+      end;
+
+      if v_http is null or v_http.status<>200 then
+        v_missing:=v_missing||jsonb_build_array('SOURCE_BLOB_FETCH_FAILED:'||v_version);
+      else
+        v_source:=coalesce(v_http.content,'');
+        v_source_bytes:=octet_length(convert_to(v_source,'UTF8'));
+        if v_source_bytes=0 or v_source_bytes>v_policy.max_source_bytes then
+          v_missing:=v_missing||jsonb_build_array('SOURCE_BLOB_BYTES_INVALID:'||v_version);
+        else
+          v_source_sha256:=encode(extensions.digest(convert_to(v_source,'UTF8'),'sha256'),'hex');
+          v_computed_blob:=encode(
+            extensions.digest(
+              convert_to('blob '||v_source_bytes::text,'UTF8') || decode('00','hex') || convert_to(v_source,'UTF8'),
+              'sha1'
+            ),
+            'hex'
+          );
+
+          if v_source_sha256<>coalesce(v_review->>'source_sha256','') then
+            v_missing:=v_missing||jsonb_build_array('SOURCE_REVIEW_BYTES_MISMATCH:'||v_version);
+          elsif v_blob<>v_computed_blob then
+            v_missing:=v_missing||jsonb_build_array('MIGRATION_BLOB_SOURCE_MISMATCH:'||v_version);
+          else
+            v_pass_count:=v_pass_count+1;
+          end if;
+        end if;
+      end if;
+    else
+      v_missing:=v_missing||jsonb_build_array('SOURCE_REVIEW_NOT_PASS:'||v_version||':'||coalesce(v_review->>'disposition','UNKNOWN'));
+    end if;
+
     v_reviews:=v_reviews||jsonb_build_array(jsonb_build_object(
       'version',v_version,
-      'blob',v_blob,
+      'manifest_blob',v_blob,
+      'computed_git_blob_sha1',v_computed_blob,
+      'blob_match',coalesce(v_blob=v_computed_blob,false),
       'policy_key',v_policy_key,
       'disposition',v_review->>'disposition',
-      'source_sha256',v_review->>'source_sha256',
+      'review_source_sha256',v_review->>'source_sha256',
+      'bound_source_sha256',v_source_sha256,
+      'source_bytes',v_source_bytes,
       'evidence_sha256',v_review->>'evidence_sha256',
       'dail_event_id',v_review->>'dail_event_id',
       'dail_event_hash',v_review->>'dail_event_hash'
     ));
-
-    if v_review->>'disposition'='PASS'
-       and coalesce(v_review->>'exact_head_sha','')=a.exact_head_sha
-       and coalesce(v_review->>'evidence_sha256','') ~ '^[0-9a-f]{64}$'
-       and coalesce(v_review->>'dail_event_hash','') ~ '^[0-9a-f]{64}$'
-       and coalesce((v_review->>'authority_expansion')::boolean,true)=false then
-      v_pass_count:=v_pass_count+1;
-    else
-      v_missing:=v_missing||jsonb_build_array('SOURCE_REVIEW_NOT_PASS:'||v_version||':'||coalesce(v_review->>'disposition','UNKNOWN'));
-    end if;
   end loop;
 
   if v_review_count=0 or v_pass_count<>v_review_count or jsonb_array_length(v_missing)>0 then
@@ -369,6 +423,9 @@ begin
 
   select pg_get_functiondef('penta_security.review_assignment_exact_subject_v1(uuid)'::regprocedure) into v_def;
   if strpos(v_def,'review_github_provider_source_v1')=0
+     or strpos(v_def,'MIGRATION_BLOB_SOURCE_MISMATCH')=0
+     or strpos(v_def,'SOURCE_REVIEW_BYTES_MISMATCH')=0
+     or strpos(v_def,'computed_git_blob_sha1')=0
      or strpos(v_def,'penta_assignment_record_owner_result_v1')=0
      or strpos(v_def,'penta_assignment_bind_release_gate_v1')=0
      or strpos(v_def,'ct.penta.release-gate.receipt.v1')=0 then
