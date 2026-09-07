@@ -56,7 +56,7 @@ class CollisionSnapshotRetryContractTests(unittest.TestCase):
     def test_each_attempt_recomputes_and_preserves_evidence(self) -> None:
         workflow = workflow_text()
         self.assertIn('report="collision-governance-v2-report-attempt-${attempt}.json"', workflow)
-        self.assertEqual(workflow.count("python3 scripts/governed_collision_agent_v2_trusted.py"), 1)
+        self.assertEqual(workflow.count("python3 scripts/governed_collision_agent_v2_trusted_consolidated.py"), 1)
         self.assertEqual(workflow.count("python3 scripts/governed_collision_agent_v2_trusted_main.py"), 1)
         main_section = workflow.split("trusted-main-reconciliation:", 1)[1]
         self.assertNotIn("python3 scripts/governed_collision_agent_v2.py", main_section)

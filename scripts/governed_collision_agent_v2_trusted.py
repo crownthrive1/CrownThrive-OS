@@ -13,6 +13,14 @@ surface. Every exact provider read prefers the authenticated transport. A
 403/429 may degrade that exact read to a bounded public GET, but later reads
 retry authenticated transport rather than entering a sticky public-only mode.
 No writes use this transport and both transports remain fail-closed.
+
+Candidate preflight is additionally scoped to the current gold lane: the exact
+candidate plus open PRs whose provider-reported base SHA equals the live target
+branch SHA. Stale-base open PRs remain visible in the initial provider inventory
+but do not consume per-PR file/semantic inspection budget because PR lifecycle v2
+requires them to restack before they may enter the current merge lane. The exact
+candidate is always retained even when stale so the observer never hides its own
+subject. Missing scope metadata fails closed.
 """
 
 from __future__ import annotations
@@ -132,14 +140,22 @@ class TrustedCandidateClient(agent.GitHubClient):
         *,
         event_base_sha: str,
         candidate: int,
+        branch: str = "main",
     ) -> None:
         super().__init__(repository, token)
         if not event_base_sha:
             raise agent.GitHubReadError("trusted_event_base_sha_required")
+        if not branch:
+            raise agent.GitHubReadError("trusted_gold_lane_branch_required")
         self.event_base_sha = event_base_sha
         self.candidate = candidate
+        self.gold_lane_branch = branch
         self.authenticated_requests = 0
         self.public_fallback_requests = 0
+        self.observed_open_pull_count = 0
+        self.gold_lane_open_pull_count = 0
+        self.stale_base_open_pull_count = 0
+        self.gold_lane_main_sha = ""
         # Evidence flag: at least one exact read used the public fallback. It is
         # deliberately not a transport-mode latch.
         self.public_read_mode = False
@@ -152,6 +168,12 @@ class TrustedCandidateClient(agent.GitHubClient):
             "public_read_mode": self.public_read_mode,
             "public_request_budget": MAX_PUBLIC_FALLBACK_REQUESTS,
             "last_transport": self.last_transport,
+            "gold_lane_scope_rule": "candidate_plus_open_prs_with_base_sha_equal_live_target_sha",
+            "gold_lane_branch": self.gold_lane_branch,
+            "gold_lane_main_sha": self.gold_lane_main_sha or None,
+            "observed_open_pull_count": self.observed_open_pull_count,
+            "gold_lane_open_pull_count": self.gold_lane_open_pull_count,
+            "stale_base_open_pull_count": self.stale_base_open_pull_count,
         }
 
     def live_branch_sha(self, branch: str) -> str:
@@ -170,6 +192,36 @@ class TrustedCandidateClient(agent.GitHubClient):
 
     def main_sha(self, branch: str) -> str:
         return self.live_branch_sha(branch)
+
+    def open_pulls(self) -> list[dict[str, Any]]:
+        """Return only current gold-lane peers plus the exact candidate.
+
+        The base client still retrieves the complete bounded open-PR metadata
+        inventory. Only expensive per-PR file/semantic inspection is excluded for
+        stale-base PRs that cannot enter the current merge lane until restacked.
+        """
+        pulls = super().open_pulls()
+        current_main = self.live_branch_sha(self.gold_lane_branch)
+        eligible: list[dict[str, Any]] = []
+        stale_count = 0
+        for pull in pulls:
+            try:
+                number = int(pull["number"])
+                base_sha = str(pull["base"]["sha"])
+            except (KeyError, TypeError, ValueError, AttributeError) as exc:
+                raise agent.GitHubReadError("trusted_pull_scope_metadata_missing") from exc
+            if not base_sha:
+                raise agent.GitHubReadError("trusted_pull_base_sha_empty")
+            if number == self.candidate or base_sha == current_main:
+                eligible.append(pull)
+            else:
+                stale_count += 1
+
+        self.gold_lane_main_sha = current_main
+        self.observed_open_pull_count = len(pulls)
+        self.gold_lane_open_pull_count = len(eligible)
+        self.stale_base_open_pull_count = stale_count
+        return eligible
 
     def _request_once(
         self,
@@ -316,6 +368,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.token,
             event_base_sha=args.event_base_sha,
             candidate=args.candidate,
+            branch=args.branch,
         )
         report = agent.analyze_snapshot(
             client,
@@ -326,6 +379,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         report["trusted_event_base_sha"] = args.event_base_sha
         report["trusted_base_fence_source"] = "git_ref_live_branch_sha"
         report["trusted_end_fence_source"] = "git_ref_live_branch_sha"
+        report["trusted_gold_lane_scope"] = {
+            "rule": "candidate_plus_open_prs_with_base_sha_equal_live_target_sha",
+            "branch": args.branch,
+            "main_sha": client.gold_lane_main_sha or None,
+            "observed_open_pull_count": client.observed_open_pull_count,
+            "eligible_open_pull_count": client.gold_lane_open_pull_count,
+            "stale_base_open_pull_count": client.stale_base_open_pull_count,
+            "stale_prs_are_lineage_only": True,
+            "authority_created": False,
+        }
         report["trusted_provider_transport"] = client.transport_evidence()
         agent.write_report(report, args.output)
         decision = report.get("decision")
