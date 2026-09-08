@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0.0",
+  "namespace": "adluxe.places",
+  "provenance_issue": "crownthrive1/CrownThrive-OS#4238",
+  "required_envelope": [
+    "event_id",
+    "event_type",
+    "event_time",
+    "correlation_id",
+    "idempotency_key",
+    "provider",
+    "provider_event_id",
+    "venue_id",
+    "screen_id"
+  ],
+  "events": {
+    "screen.paired": ["device_id", "pairing_session_id"],
+    "screen.heartbeat": ["app_version", "device_status", "network_status"],
+    "screen.offline": ["last_seen_at", "offline_reason"],
+    "campaign.assigned": ["campaign_id", "creative_id", "schedule_id"],
+    "creative.started": ["campaign_id", "creative_id", "playback_session_id"],
+    "creative.completed": ["campaign_id", "creative_id", "playback_session_id", "duration_ms"],
+    "proof_of_play.recorded": ["campaign_id", "creative_id", "playback_session_id", "proof_method"],
+    "qr.scanned": ["campaign_id", "creative_id", "placement_id", "attribution_token"],
+    "conversion.recorded": ["campaign_id", "conversion_type", "conversion_value", "attribution_token"],
+    "billing.debit_recorded": ["campaign_id", "transaction_id", "amount", "currency", "billing_basis"],
+    "publisher.credit_recorded": ["campaign_id", "publisher_id", "transaction_id", "amount", "currency"],
+    "delivery.failed": ["campaign_id", "creative_id", "failure_code", "failure_detail"]
+  },
+  "projection_rules": {
+    "CrownLytics": ["creative.started", "creative.completed", "proof_of_play.recorded", "qr.scanned", "conversion.recorded", "billing.debit_recorded", "publisher.credit_recorded"],
+    "CrownPulse": ["screen.heartbeat", "screen.offline", "delivery.failed"],
+    "ThrivePush": ["screen.offline", "delivery.failed"],
+    "CrownRewards": ["qr.scanned", "conversion.recorded"],
+    "CHLOM_DAIL": ["campaign.assigned", "proof_of_play.recorded", "billing.debit_recorded", "publisher.credit_recorded"]
+  },
+  "measurement_guardrail": "proof_of_play is a delivery event and must not be relabeled as a verified human impression without an approved audience-measurement methodology"
+}
