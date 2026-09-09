@@ -1,0 +1,105 @@
+---
+title: "Oops, Home. — product and developer guide"
+sidebarTitle: "Oops, Home."
+description: "Published partner plans, scoped API and provider-readiness requirements."
+icon: "compass"
+---
+
+Oops, Home. is a CrownThrive planning companion for adults, including campus communities, off-duty military, shift workers and travelers. It helps people find places, make an outing plan and keep a way home. No institutional endorsement or emergency monitoring is implied.
+
+[Open Oops](https://asrm-safe-ride.crownthrive.chatgpt.site) · [Business plans](https://asrm-safe-ride.crownthrive.chatgpt.site/partners/plans) · [Developer portal](https://asrm-safe-ride.crownthrive.chatgpt.site/developers) · [Complete API reference](https://asrm-safe-ride.crownthrive.chatgpt.site/developers/docs)
+
+## What the app does
+
+The published app includes global manual-city discovery, Google venue details and available last-reported fuel prices; a twelve-stop outing planner; ride and delivery provider links; chosen contacts; a covered button that opens the selected dialer; parked-car pins; explicitly started foreground location links; an encrypted device wallet; supported device/provider connections; guides and a live Go Flipbooks catalog.
+
+Install controls and separately explained permissions are at [Install & permissions](https://asrm-safe-ride.crownthrive.chatgpt.site/setup). Installation itself grants no sensor or account permission. Only public rescue assets are cached; account and provider operations need internet. A browser readiness report is not a physical phone installation certificate.
+
+The Oops AI companion offers planning and product help. Guests receive scripted basic help. Signed-in AI use requires consent. Saved preferences are explicitly user-authored. Optional page/category context and Pro's short recent-conversation context are bounded; wallet contents, health records, precise GPS and private plans are not supplied. The assistant does not secretly learn a customer's movements, book services, diagnose or promise human monitoring.
+
+## Plans and purchase boundaries
+
+All prices below exclude applicable tax.
+
+| Plan or service | Price | Included |
+| --- | --- | --- |
+| Free account | $0 | Core tools, one cloud plan, three Google searches/day and five AI answers/month |
+| Personal Pro | $4.99 USD/month | Twenty cloud plans, thirty Google searches/day, one hundred AI answers/month, optional six-message context and ad-free use |
+| Featured local placement | $25 USD one time | Seven days in the selected area's sponsored rotation after approval and verified payment, starting on first eligible server delivery |
+| Integrator Pass | $49 USD one time | Thirty days of the documented business API from first successful payment verification, with no automatic renewal |
+| Managed integration | Accepted scoped quote | Only the written work after access/feasibility checks, exact customer acceptance and verified payment |
+
+No guaranteed views, clicks, sales, ranking, exclusivity, review time or uptime are sold. The Integrator Pass does not include personal Pro, featured placement, implementation labor, provider data, tickets or commission rights.
+
+Read [partner terms](https://asrm-safe-ride.crownthrive.chatgpt.site/partners/terms), [developer terms](https://asrm-safe-ride.crownthrive.chatgpt.site/developers/terms), [privacy](https://asrm-safe-ride.crownthrive.chatgpt.site/policies/privacy) and [billing controls](https://asrm-safe-ride.crownthrive.chatgpt.site/account) before purchase.
+
+## Developer quick start
+
+1. Sign in to your own developer portal and accept the business terms.
+2. Register your app. One active app may be registered before purchase.
+3. Purchase and verify a 30-day pass to issue or use keys.
+4. Choose the minimum scopes and copy the key once into your server secret manager.
+5. Use HTTPS and the Authorization bearer header. Never put the key in browser code, URLs, app bundles or logs.
+
+The server stores only a SHA-256 hash and a short display prefix. Keys expire after ninety days and can be revoked in the portal. Every API request still requires an active pass. Disabling an app revokes its keys. Expired passes retain app-management and revocation controls.
+
+[OpenAPI 3.1 JSON](https://asrm-safe-ride.crownthrive.chatgpt.site/api/developer/openapi) is the machine-readable contract. The [public capability catalog](https://asrm-safe-ride.crownthrive.chatgpt.site/api/developer/catalog) requires no account or payment.
+
+Base URL: `https://asrm-safe-ride.crownthrive.chatgpt.site/api/developer/v1`.
+
+| Method and path | Required scope | Capability |
+| --- | --- | --- |
+| GET /catalog | catalog:read | Read capabilities, exclusions and limits |
+| GET /requests | requests:read | Read your account's partner request status, quotes and review progress |
+| POST /requests | requests:submit | Submit attested business content into the existing AI review queue |
+
+Ownership comes from the stored key. Client-supplied member IDs or roles do not change it. Machine keys cannot access consumer plans, wallet files, contacts, health data, location links, billing actions or staff records.
+
+GET requests accepts `limit` from 1 to 50 (default 20) and the returned UUID `next_cursor`. Results use descending UUID order; restart pagination to refresh around concurrent submissions.
+
+POST requires JSON, a UUID `Idempotency-Key` header and these fields: kind (featured or integration), name, headline, description, HTTPS website, two-letter country, area, category, rights_accepted=true and terms_accepted=true. Categories are food, activities, transport, campus, military and services. Required lengths are name 2–100, headline 5–100, description 20–1,600 and area 2–120.
+
+Retry a timeout using the same app, idempotency key and normalized content. The original request is returned without duplication. Changed content with the same key returns 409. The API records a request; approval and payment remain separate steps in the partner workspace.
+
+## Usage and errors
+
+The pass covers three active apps and two active keys per app. Each account shares 1,000 API calls per UTC day and sixty per UTC minute. New submissions are limited to ten/day and five awaiting review. Authorized business-validation failures and replays count as calls; invalid credentials, missing scopes and inactive passes do not. A replay is not a second new submission.
+
+Up to fifty app records may be retained. Key issuance is limited to ten/day and checkout attempts to five/day. There is no automatic renewal or pass stacking.
+
+Responses: 200 success; 400 invalid content; 401 missing/expired/revoked key; 402 inactive pass; 403 insufficient scope; 404 unknown route; 409 idempotency conflict; 413 oversized body; 415 wrong content type; 429 usage or queue cap; 503 unavailable service. Bodies are limited to 12,000 characters.
+
+Wait at least the Retry-After value on 429. Daily caps persist until UTC midnight; an outstanding-review cap persists until work leaves review. Do not retry a daily or review cap every minute indefinitely. Successful responses include daily usage.
+
+## Automation and staff
+
+Payment verification, token checks, quotas and eligible placement delivery run in backend code. The existing hourly PentaMarketer intake task reviews supported partner work with bounded leases and immutable evidence. Developer submissions join that same queue. Missing information or provider access becomes a visible blocker; it is not marked completed.
+
+AI can review public business details, prepare feasible scopes, implement authorized supported work and verify results. It cannot manufacture provider accounts, accept third-party contracts, invent commission rates or purchase tickets for a customer without the necessary provider rights and explicit purchase action.
+
+Moderators have limited content/support responsibilities. Administrators handle operations. Protected superadmins manage staff grants after verified sign-in. Developer keys have none of those roles. Private business information and secrets are not copied into public documentation.
+
+## Provider readiness
+
+| Connection | Current behavior | Requirement for expansion |
+| --- | --- | --- |
+| Google food and fuel | Existing discovery and available provider-reported fields | Coverage, attribution and freshness checks; pump prices are not guaranteed |
+| Ticketmaster Discovery | Adapter exists; server credential is pending | Authorized credential and successful live event readback |
+| Ticket purchases | Provider checkout links | Approved commerce API, official distribution relationship and tested reservation/payment/refund lifecycle |
+| Commissions | No verified agreement or rate is claimed | Approved commercial agreement, permitted attribution and settlement/refund reconciliation |
+| Delivery, rides, watches and vehicles | Provider handoffs or individually verified supported connections | Separate account/device consent, API approval and actual capability readback |
+| Physical PWA installation | Manifest, service worker, install controls and browser reports | Real Android and iPhone installation/permission/offline-relaunch evidence |
+
+[Ticketmaster's Partner API](https://developer.ticketmaster.com/products-and-docs/apis/partner/) is restricted to official distribution relationships; Discovery access does not grant purchase authority. See [Discovery documentation](https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/) and [Google Places](https://developers.google.com/maps/documentation/places/web-service/overview). Provider contracts and availability may change.
+
+Never paste credentials, customer health data, identity documents or private customer records into partner descriptions or support messages. Use the authorized secret/account-connection workflow.
+
+## Retention, OS record and release evidence
+
+Developer usage expires after thirty-five days and optional browser capability reports after thirty days through bounded existing hourly maintenance. Reports contain five booleans, an account link and a timestamp; they are always classified as browser reports. Commercial and audit records follow the privacy/accounting/dispute workflow.
+
+Oops retains its existing CrownThrive OS identity `ct.surface.asrm.safe-ride`. The developer service is `ct.oops.developer.v1`. Catalog registration does not itself grant OS economic execution, provider contracts or consumer-data access.
+
+Release 12 was published on September 9, 2026. Its source commit is `de9db875ea2cfb3311305d6ac13995c3b0bbd1f6`. Fifty-three software checks and twelve rolled-back database security groups passed, with live backend readbacks for public status and authentication rejection. These checks are not a real customer's paid purchase or physical phone installation. Actual provider purchasing, commission agreements and real-device testing remain explicit dependencies.
+
+For support or privacy requests, use the [Oops support center](https://asrm-safe-ride.crownthrive.chatgpt.site/support).
