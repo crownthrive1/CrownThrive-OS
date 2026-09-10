@@ -1,0 +1,125 @@
+version: 1
+policy_id: ct.rbac.thrivesupport
+scope:
+  domain: crownthrivesupport.com
+  provider_account: thrivesupport
+  document_root: /home/thrivesupport/public_html
+  projection: ct.projection.support.thrivesupport-public
+
+default_effect: deny
+
+permissions:
+  - docs.read.public
+  - docs.read.member
+  - docs.read.creator_partner
+  - docs.read.staff
+  - docs.read.admin
+  - docs.read.control_plane
+  - docs.write.draft
+  - docs.write.review
+  - docs.publish.public
+  - docs.publish.internal
+  - support.case.read
+  - support.case.write
+  - deploy.thrivesupport.stage
+  - deploy.thrivesupport.production
+  - rollback.thrivesupport
+  - audit.receipt.read
+
+roles:
+  anonymous_public:
+    grants: [docs.read.public]
+
+  member:
+    inherits: [anonymous_public]
+    grants: [docs.read.member]
+
+  creator_partner:
+    inherits: [member]
+    grants: [docs.read.creator_partner]
+
+  support_agent:
+    inherits: [member]
+    grants:
+      - docs.read.staff
+      - support.case.read
+      - support.case.write
+
+  support_editor:
+    inherits: [support_agent]
+    grants:
+      - docs.write.draft
+      - docs.write.review
+
+  support_admin:
+    inherits: [support_editor]
+    grants:
+      - docs.read.admin
+      - docs.publish.public
+      - docs.publish.internal
+      - deploy.thrivesupport.stage
+      - deploy.thrivesupport.production
+      - rollback.thrivesupport
+      - audit.receipt.read
+
+  control_plane_approver:
+    grants:
+      - docs.read.staff
+      - docs.read.admin
+      - docs.read.control_plane
+      - docs.write.review
+      - deploy.thrivesupport.production
+      - audit.receipt.read
+
+explicit_denies:
+  all_roles:
+    - vault.secret.read_value
+    - provider.credential.export
+    - cpanel.cross_account.admin
+    - dns.global.write
+    - host.root.unscoped
+
+production_release:
+  required_roles:
+    initiator: support_admin
+    approver: control_plane_approver
+  require_distinct_principals: true
+  allowed_provider_accounts: [thrivesupport]
+  allowed_document_roots: [/home/thrivesupport/public_html]
+  controls:
+    - pre_change_backup
+    - checksum_manifest
+    - scoped_provider_write
+    - provider_write_receipt
+    - provider_readback
+    - route_validation
+    - rollback_point
+    - audit_receipt
+  fail_closed_when_missing:
+    - initiator_authorization
+    - approver_authorization
+    - backup
+    - checksum_manifest
+    - provider_receipt
+    - provider_readback
+
+content_visibility:
+  public:
+    permission: docs.read.public
+    publicly_projectable: true
+  member:
+    permission: docs.read.member
+    authentication_required: true
+  creator_partner:
+    permission: docs.read.creator_partner
+    authentication_required: true
+  staff:
+    permission: docs.read.staff
+    authentication_required: true
+  admin:
+    permission: docs.read.admin
+    authentication_required: true
+  control_plane:
+    permission: docs.read.control_plane
+    authentication_required: true
+    public_projection_forbidden: true
