@@ -5,10 +5,10 @@ import { readFile } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
 
-test('every loader route receives the external v3.1 executive extension', async () => {
+test('every loader route preserves the external executive extension across later Command releases', async () => {
   const source = await read('command-loader.js');
-  assert.match(source, /VERSION = '3\.1\.0'/);
-  assert.match(source, /ct\.command\.executive-pulse\.v3\.1\.0\.20260910/);
+  assert.match(source, /VERSION = '(?:3\.1\.0|4\.0\.0)'/);
+  assert.match(source, /data-command-extension="executive-pulse(?: governed-estate)?"/);
   assert.match(source, /command-enhancements\.css/);
   assert.match(source, /command-enhancements\.js/);
   assert.match(source, /credentials: 'same-origin'/);
@@ -59,7 +59,7 @@ test('command extension stays read-only and does not manufacture a pass', async 
   assert.match(source, /Economic mutations.*remain outside this interface/);
 });
 
-test('release contract preserves external-rail and privacy boundaries', async () => {
+test('v3.1 release contract remains a preserved historical security baseline', async () => {
   const release = JSON.parse(await read('command-release-v31.json'));
   assert.equal(release.version, '3.1.0');
   assert.equal(release.control_contract.read_only_projection, true);
