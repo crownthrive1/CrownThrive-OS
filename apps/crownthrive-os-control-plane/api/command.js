@@ -1,4 +1,5 @@
 const CANONICAL_SUPABASE_ORIGIN = 'https://tzajnzshmtzjenqulehq.supabase.co';
+const CANONICAL_COMMAND_ORIGIN = 'https://crown-thrive-os.vercel.app';
 const DEFAULT_EVENT_LIMIT = 12;
 const MIN_EVENT_LIMIT = 3;
 const MAX_EVENT_LIMIT = 25;
@@ -42,6 +43,14 @@ function canonicalSupabaseOrigin(value) {
   return CANONICAL_SUPABASE_ORIGIN;
 }
 
+function requestSearchParams(request) {
+  try {
+    return new URL(String(request?.url || '/'), CANONICAL_COMMAND_ORIGIN).searchParams;
+  } catch {
+    return new URLSearchParams();
+  }
+}
+
 function bindingState() {
   const suppliedUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -56,7 +65,7 @@ function bindingState() {
 }
 
 function eventLimit(request) {
-  const raw = Number(request.query?.limit ?? DEFAULT_EVENT_LIMIT);
+  const raw = Number(requestSearchParams(request).get('limit') ?? DEFAULT_EVENT_LIMIT);
   if (!Number.isFinite(raw)) return DEFAULT_EVENT_LIMIT;
   return Math.min(Math.max(Math.trunc(raw), MIN_EVENT_LIMIT), MAX_EVENT_LIMIT);
 }
