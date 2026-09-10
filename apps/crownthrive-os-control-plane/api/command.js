@@ -44,11 +44,29 @@ function canonicalSupabaseOrigin(value) {
 }
 
 function requestSearchParams(request) {
+  let params;
   try {
-    return new URL(String(request?.url || '/'), CANONICAL_COMMAND_ORIGIN).searchParams;
+    params = new URL(String(request?.url || '/'), CANONICAL_COMMAND_ORIGIN).searchParams;
   } catch {
-    return new URLSearchParams();
+    params = new URLSearchParams();
   }
+  if ([...params.keys()].length) return params;
+
+  const descriptor = Object.getOwnPropertyDescriptor(request || {}, 'query');
+  const plainQuery = descriptor && Object.hasOwn(descriptor, 'value')
+    ? descriptor.value
+    : null;
+  if (!plainQuery || typeof plainQuery !== 'object' || Array.isArray(plainQuery)) return params;
+
+  const fallback = new URLSearchParams();
+  for (const [key, value] of Object.entries(plainQuery)) {
+    if (Array.isArray(value)) {
+      for (const item of value) fallback.append(key, String(item));
+    } else if (value !== undefined && value !== null) {
+      fallback.set(key, String(value));
+    }
+  }
+  return fallback;
 }
 
 function bindingState() {
