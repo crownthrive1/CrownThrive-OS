@@ -1,4 +1,5 @@
 const CANONICAL_SUPABASE_ORIGIN = 'https://tzajnzshmtzjenqulehq.supabase.co';
+const CANONICAL_COMMAND_ORIGIN = 'https://crown-thrive-os.vercel.app';
 const DEFAULT_WINDOW_HOURS = 24;
 const DEFAULT_LIMIT = 200;
 const INTERVENTION_LIMIT = 500;
@@ -40,6 +41,14 @@ function canonicalSupabaseOrigin(value) {
   return CANONICAL_SUPABASE_ORIGIN;
 }
 
+function requestSearchParams(request) {
+  try {
+    return new URL(String(request?.url || '/'), CANONICAL_COMMAND_ORIGIN).searchParams;
+  } catch {
+    return new URLSearchParams();
+  }
+}
+
 function countBy(rows, key) {
   const counts = new Map();
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -52,7 +61,8 @@ function countBy(rows, key) {
 }
 
 function windowHours(request) {
-  const raw = String(request.query?.window || request.query?.hours || DEFAULT_WINDOW_HOURS).toLowerCase();
+  const params = requestSearchParams(request);
+  const raw = String(params.get('window') || params.get('hours') || DEFAULT_WINDOW_HOURS).toLowerCase();
   if (raw === '1h') return 1;
   if (raw === '7d') return 168;
   const parsed = Number(raw);

@@ -1,4 +1,5 @@
 const CANONICAL_SUPABASE_ORIGIN = 'https://tzajnzshmtzjenqulehq.supabase.co';
+const CANONICAL_COMMAND_ORIGIN = 'https://crown-thrive-os.vercel.app';
 const DEFAULT_EVENT_LIMIT = 12;
 const MIN_EVENT_LIMIT = 3;
 const MAX_EVENT_LIMIT = 25;
@@ -42,6 +43,32 @@ function canonicalSupabaseOrigin(value) {
   return CANONICAL_SUPABASE_ORIGIN;
 }
 
+function requestSearchParams(request) {
+  let params;
+  try {
+    params = new URL(String(request?.url || '/'), CANONICAL_COMMAND_ORIGIN).searchParams;
+  } catch {
+    params = new URLSearchParams();
+  }
+  if ([...params.keys()].length) return params;
+
+  const descriptor = Object.getOwnPropertyDescriptor(request || {}, 'query');
+  const plainQuery = descriptor && Object.hasOwn(descriptor, 'value')
+    ? descriptor.value
+    : null;
+  if (!plainQuery || typeof plainQuery !== 'object' || Array.isArray(plainQuery)) return params;
+
+  const fallback = new URLSearchParams();
+  for (const [key, value] of Object.entries(plainQuery)) {
+    if (Array.isArray(value)) {
+      for (const item of value) fallback.append(key, String(item));
+    } else if (value !== undefined && value !== null) {
+      fallback.set(key, String(value));
+    }
+  }
+  return fallback;
+}
+
 function bindingState() {
   const suppliedUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -56,7 +83,7 @@ function bindingState() {
 }
 
 function eventLimit(request) {
-  const raw = Number(request.query?.limit ?? DEFAULT_EVENT_LIMIT);
+  const raw = Number(requestSearchParams(request).get('limit') ?? DEFAULT_EVENT_LIMIT);
   if (!Number.isFinite(raw)) return DEFAULT_EVENT_LIMIT;
   return Math.min(Math.max(Math.trunc(raw), MIN_EVENT_LIMIT), MAX_EVENT_LIMIT);
 }
