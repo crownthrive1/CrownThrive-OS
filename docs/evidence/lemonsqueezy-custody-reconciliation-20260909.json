@@ -1,5 +1,5 @@
 {
-  "contract": "ct.lemonsqueezy.custody-reconciliation.v1",
+  "contract": "ct.lemonsqueezy.custody-reconciliation.v2",
   "recorded_at": "2026-09-09",
   "service_id": "lemonsqueezy_crownthrive",
   "provider": "Lemon Squeezy",
@@ -8,7 +8,8 @@
     "alias": "Penta_LemonSqueezy",
     "custody": "supabase_vault",
     "duplicate_alias_created": false,
-    "raw_secret_in_source": false
+    "raw_secret_in_source": false,
+    "founder_directive_keep_existing_key": true
   },
   "credential_claim_metadata": {
     "issued_at_utc": "2026-09-04T08:38:51Z",
@@ -16,47 +17,63 @@
     "raw_token_persisted": false
   },
   "production_migration_lineage": [
-    {
-      "version": "20260904084109",
-      "name": "wire_lemonsqueezy_vault_api_mcp_v1"
-    },
-    {
-      "version": "20260904084500",
-      "name": "lemonsqueezy_pentawire_route_v2"
-    },
-    {
-      "version": "20260906173706",
-      "name": "pentawire_lemonsqueezy_bootstrap_certification_v1"
-    },
-    {
-      "version": "20260906174539",
-      "name": "pentawire_lemonsqueezy_existing_clock_maintenance_v1"
-    }
+    {"version": "20260904084109", "name": "wire_lemonsqueezy_vault_api_mcp_v1"},
+    {"version": "20260904084500", "name": "lemonsqueezy_pentawire_route_v2"},
+    {"version": "20260906173706", "name": "pentawire_lemonsqueezy_bootstrap_certification_v1"},
+    {"version": "20260906174539", "name": "pentawire_lemonsqueezy_existing_clock_maintenance_v1"}
   ],
-  "verified_prior_read_contract": {
+  "verified_runtime": {
     "api_function": "public.ct_lemonsqueezy_api_v1(text,jsonb)",
     "mcp_function": "public.ct_lemonsqueezy_mcp_call_v1(text,jsonb)",
+    "api_binding_count": 3,
+    "mcp_binding_count": 3,
     "service_role_only": true,
     "provider_write": false,
     "credential_exposed": false,
     "credential_forwarded_to_caller": false,
-    "secret_value_returned": false
+    "secret_value_returned": false,
+    "provider_auth_http_status": 200,
+    "provider_account_id": "2027084",
+    "store_id": "74683",
+    "store_name": "CrownThrive, LLC",
+    "currency": "USD",
+    "test_mode": false
   },
-  "legacy_source_pr": {
-    "number": 3158,
-    "state_at_reconciliation": "open",
-    "mergeable_at_reconciliation": false,
-    "head": "feat/lemonsqueezy-vault-api-mcp-20260904",
-    "historical_migration_path": "supabase/migrations/20260904084500_wire_lemonsqueezy_vault_api_mcp_v2.sql"
+  "fabric_bindings": [
+    "PentaCertify",
+    "PentaCredentials",
+    "PentaFabric",
+    "PentaFlex",
+    "PentaMCP",
+    "PentaMesh",
+    "PentaWire"
+  ],
+  "runtime_consumers": [
+    "CrownThrive IO",
+    "PentaCredentials",
+    "PentaMCP",
+    "PentaWire",
+    "PentaFlex",
+    "PentaCertify",
+    "PentaFabric",
+    "PentaMesh",
+    "PentaGreen",
+    "CHLOM Wallet"
+  ],
+  "routing": {
+    "hot": {"state": "ready", "credential_reference_state": "present", "vault_alias": "Penta_LemonSqueezy"},
+    "warm": {"state": "blocked", "credential_reference_state": "missing", "reason": "No distinct recovery credential has been supplied; no fake redundancy is declared."},
+    "cold": {"state": "sealed", "credential_reference_state": "reconcile_required", "reason": "Cold custody remains sealed and activation-gated rather than treating the same live key as an independent backup."}
   },
   "source_disposition": {
+    "legacy_pr_3158_superseded": true,
+    "canonical_reconciliation_pr_4509_merged": true,
     "historical_migration_reintroduced": false,
-    "reason": "Production already records migration version 20260904084500 as lemonsqueezy_pentawire_route_v2. Reintroducing a different historical migration under the same version would create ambiguous Supabase migration lineage.",
-    "reconciliation_record_only": true
+    "reason": "Production already records migration version 20260904084500 as lemonsqueezy_pentawire_route_v2. Reintroducing a different historical migration under the same version would create ambiguous Supabase migration lineage."
   },
   "security_disposition": {
     "raw_key_committed": false,
-    "rotation_recommended": true,
-    "rotation_reason": "The live credential was supplied in an interactive chat. Rotate provider-side when practical and replace the value behind the existing Penta_LemonSqueezy Vault alias in place so downstream bindings remain stable."
+    "rotation_recommended": false,
+    "founder_directive": "Keep the existing provider key and stable Vault alias. Expand bindings without rotating, duplicating, forwarding, or exposing the raw credential."
   }
 }
