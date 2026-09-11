@@ -3,7 +3,9 @@
 
 Historical evidence is preserved. Every surviving decimal-phase reference must
 match an exact governed path and expected hit count so new or changed usage
-cannot silently become current instruction.
+cannot silently become current instruction. A registry entry whose retired alias
+has been removed from source is safe cleanup debt: it remains visible as
+STALE_REGISTRATION but does not block merge.
 """
 
 from __future__ import annotations
@@ -189,12 +191,16 @@ def scan(root: pathlib.Path) -> tuple[dict, int]:
             continue
         governed_counts[category] += 1
 
+    # A registered retired alias disappearing from source reduces legacy surface.
+    # Keep it visible for registry cleanup, but never force source to re-introduce
+    # obsolete language merely to satisfy an exact-count manifest.
     for rel in sorted(set(expected) - set(observed)):
         findings.append(
             {
                 "path": rel,
                 "disposition": "STALE_REGISTRATION",
                 "reason": "registered_alias_use_no_longer_present_or_file_missing",
+                "blocking": False,
             }
         )
 
@@ -202,17 +208,20 @@ def scan(root: pathlib.Path) -> tuple[dict, int]:
         name: sum(item.get("disposition") == name for item in findings)
         for name in ("REPAIR_REQUIRED", "REVIEW_CONTEXT", "STALE_REGISTRATION")
     }
+    blocking_count = counts["REPAIR_REQUIRED"] + counts["REVIEW_CONTEXT"]
     summary = {
         "service": "ct.penta.gap-closure.v2",
-        "rule": "retired phase aliases may remain only at exact governed paths and hit counts",
+        "rule": "new/changed/stale-current retired phase aliases fail closed; removed registered aliases are advisory cleanup",
         "registry": REGISTRY.as_posix(),
         "observed_alias_paths": len(observed),
         "governed_counts": governed_counts,
         "counts": counts,
+        "blocking_findings": blocking_count,
+        "stale_registration_policy": "ADVISORY_CLEANUP",
         "registry_errors": registry_errors,
         "findings": findings,
     }
-    return summary, 2 if registry_errors or any(counts.values()) else 0
+    return summary, 2 if registry_errors or blocking_count else 0
 
 
 def main() -> int:
@@ -225,14 +234,16 @@ def main() -> int:
         print(json.dumps(summary, indent=2, sort_keys=True))
     elif status:
         for finding in summary["findings"]:
-            print(f"{finding['disposition']}: {finding['path']} ({finding['reason']})")
+            if finding.get("disposition") != "STALE_REGISTRATION":
+                print(f"{finding['disposition']}: {finding['path']} ({finding['reason']})")
         for error in summary["registry_errors"]:
             print(f"REGISTRY_ERROR: {error}")
     else:
         print(
             "PASS: "
             f"{summary['observed_alias_paths']} retired-alias paths are exact-count governed; "
-            "no stale current claims escaped historical custody."
+            f"{summary['counts']['STALE_REGISTRATION']} removed registrations remain advisory cleanup; "
+            "no unmanaged or stale-current alias claims block the gate."
         )
     return status
 

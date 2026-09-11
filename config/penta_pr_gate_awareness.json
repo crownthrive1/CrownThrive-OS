@@ -1,6 +1,6 @@
 {
   "schema": "ct.penta.pr-gate-awareness.policy.v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "production_candidate",
   "applies_to": "all_same_repository_pull_requests",
   "owner": "PentaPR",
@@ -9,10 +9,10 @@
     "state_name": "SELF_CERTIFIED",
     "meaning": "The originating Penta or PR authority has produced an exact-source, hash-bound candidate evidence packet and accepts responsibility for the evidence it submitted.",
     "does_not_replace": [
-      "required provider checks",
-      "PentaSerialized continuity validation",
-      "security and policy gates",
-      "exact destination readback",
+      "the single provider-required governed merge context",
+      "applicable security and policy controls aggregated by that context",
+      "applicable release-specific PentaSecurity/CHLOM/CIE/PentaCertifier predicates",
+      "exact destination or production readback",
       "DAIL institutional binding",
       "D3 or human-reserved authority when applicable"
     ],
@@ -23,14 +23,19 @@
   "gate_awareness": {
     "required": true,
     "required_contexts": [
-      "CrownThrive governed merge gate",
+      "CrownThrive governed merge gate"
+    ],
+    "advisory_contexts": [
       "PentaSerialized Continuity Assurance",
       "Security Governance",
       "Documentation Governance",
       "PentaPM Governance"
     ],
+    "applicability_contract": "config/penta_pr_gate_applicability.json",
+    "required_context_rule": "Only provider-required contexts block GitHub merge eligibility. Advisory workflows remain useful evidence but do not independently block merge unless their control is aggregated as applicable inside the required governed merge context.",
+    "not_applicable_rule": "A control unrelated to the trusted exact diff is NOT_APPLICABLE, never FAIL and never synthetic PASS.",
     "missing_gate_action": "route_or_dispatch_without_bypass",
-    "failed_gate_action": "hold_and_route_to_owner",
+    "failed_gate_action": "hold_and_route_to_exact_owner_with_repair_contract",
     "pending_gate_action": "wait_or_retry_bounded",
     "head_change_action": "invalidate_prior_self_certification_and_regenerate"
   },
@@ -50,7 +55,9 @@
     "originator_identity_required": true,
     "self_certifier_identity_required": true,
     "provider_gate_results_are_provider_truth": true,
-    "dail_binding_required_before_institutional_certification": true
+    "dail_binding_required_before_institutional_certification": true,
+    "applicability_contract_required": true,
+    "gate_owner_and_repair_action_required": true
   },
   "authority": {
     "risk_ceiling": "D2",
@@ -61,6 +68,7 @@
     "originator_may_not_forge_provider_results": true,
     "originator_may_not_bypass_required_checks": true,
     "originator_may_not_manufacture_d3_authority": true,
+    "applicability_does_not_create_authority": true,
     "final_institutional_pass_requires_required_gates_and_readback": true
   }
 }
