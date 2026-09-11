@@ -1,4 +1,5 @@
 const ALLOWED = new Set(['salon','media','platform','institution','agency']);
+const UPSTREAM = 'https://crown-thrive-os.vercel.app/api/cie-demo';
 
 export default async function handler(request, response) {
   response.setHeader('Cache-Control','no-store, max-age=0');
@@ -11,11 +12,8 @@ export default async function handler(request, response) {
   }
   const preset = String(request.query?.preset || 'media').trim().toLowerCase();
   if (!ALLOWED.has(preset)) return response.status(400).json({error:'unknown_preset',allowed:[...ALLOWED]});
-  const host = request.headers['x-forwarded-host'] || request.headers.host;
-  const protocol = request.headers['x-forwarded-proto'] || 'https';
-  const upstream = `${protocol}://${host}/api/cie-demo`;
   try {
-    const runResponse = await fetch(upstream, {
+    const runResponse = await fetch(UPSTREAM, {
       method:'POST',
       headers:{'content-type':'application/json','user-agent':'CrownThrive-CIE-Proof-Bridge/1.0'},
       body:JSON.stringify({preset}),
@@ -28,6 +26,7 @@ export default async function handler(request, response) {
       preset,
       upstream_status:runResponse.status,
       executed_via:'GET_TO_LIVE_POST_BRIDGE',
+      upstream:UPSTREAM,
       run:data,
     });
   } catch (error) {
