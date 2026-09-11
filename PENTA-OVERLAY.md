@@ -40,15 +40,17 @@ The `CrownThrive-OS` self-reference remains dynamic by contract because a static
 
 ## Provider binding
 
-The scheduled multi-repository lane expects `PENTAOVERLAY_GITHUB_TOKEN` or a successor scoped GitHub App installation token. The credential value is never stored in the registry, receipt, source, artifact, or summary.
+The production multi-repository lane expects `PENTAOVERLAY_GITHUB_TOKEN` or a successor scoped GitHub App installation token. The credential value is never stored in the registry, receipt, source, artifact, or summary.
 
 If provider binding cannot read a registered private repository or cannot perform an otherwise eligible mutation, the capability remains HOLD. Workflow completion means the engine ran; it is not proof that provider mutation passed.
 
-## Scheduling
+## Scheduling and activation
 
 `.github/workflows/penta-overlay.yml` runs the control plane every four hours and supports manual dispatch. Pull requests that change PentaOverlay run deterministic contract tests without provider mutation.
 
-A scheduled run can create one central governed registry PR only when:
+A merge to `main` that materially changes PentaOverlay itself also performs one immediate canonical reconciliation. The top-level push trigger is path-scoped to PentaOverlay production files, so unrelated CrownThrive OS pushes do not create duplicate repository sweeps. This gives each production change an immediate provider/readback exercise while the four-hour schedule remains the steady-state cadence.
+
+A production reconciliation can create one central governed registry PR only when:
 
 - the reconciliation receipt is `PASS_OBSERVED`;
 - a material registry change exists;
@@ -67,7 +69,7 @@ Provider-dependent read/write capability is independently held until live provid
 
 `penta/retirements/repository-resource-manual-reconciliation.v1.json` makes the former repeated manual reconciliation lane conditionally superseded by PentaOverlay. Historical branches, PRs, receipts, provenance, and emergency break-glass diagnosis are preserved. The old lane is not deleted or allowed to compete as a second scheduler.
 
-The retirement becomes effective only after PentaOverlay is canonical on `main`, its exact merged subject passes contract checks, its scheduled workflow executes, and the required multi-repository provider read binding is proven by readback.
+The retirement becomes effective only after PentaOverlay is canonical on `main`, its exact merged subject passes contract checks, a reconciliation executes from canonical `main` by schedule, manual dispatch, or PentaOverlay production-change activation, and the required multi-repository provider read binding is proven by live readback.
 
 ## Non-authority invariant
 
