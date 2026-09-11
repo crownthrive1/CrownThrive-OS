@@ -17,12 +17,15 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import email.utils
 import fnmatch
 import json
 import os
 from pathlib import Path
+import random
 import subprocess
 import sys
+import time
 from typing import Any, Iterable, Iterator
 import urllib.error
 import urllib.parse
@@ -31,9 +34,11 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_POLICY = ROOT / "config/pr_control_plane_janitor.json"
 API_VERSION = "2022-11-28"
-USER_AGENT = "CrownThrive-PR-Control-Plane-Janitor/1.1"
+USER_AGENT = "CrownThrive-PR-Control-Plane-Janitor/1.3"
 MAX_PAGINATION_PAGES = 100
 ARCHIVE_PARENT_CHUNK = 24
+MAX_API_ATTEMPTS = 3
+MAX_RETRY_DELAY_SECONDS = 60.0
 
 
 class JanitorError(RuntimeError):
@@ -151,6 +156,37 @@ def classify_branch(
     return row
 
 
+def retry_delay_seconds(
+    headers: dict[str, str],
+    *,
+    now_epoch: float | None = None,
+    jitter_seconds: float = 0.0,
+) -> float:
+    """Resolve a bounded provider-requested rate-limit delay."""
+    normalized = {str(key).lower(): str(value) for key, value in headers.items()}
+    now = time.time() if now_epoch is None else now_epoch
+    candidates: list[float] = []
+
+    retry_after = normalized.get("retry-after", "").strip()
+    if retry_after:
+        try:
+            candidates.append(float(retry_after))
+        except ValueError:
+            parsed = email.utils.parsedate_to_datetime(retry_after)
+            if parsed is not None:
+                candidates.append(parsed.timestamp() - now)
+
+    reset = normalized.get("x-ratelimit-reset", "").strip()
+    if reset:
+        try:
+            candidates.append(float(reset) - now)
+        except ValueError:
+            pass
+
+    requested = max([1.0, *candidates]) + max(0.0, jitter_seconds)
+    return min(MAX_RETRY_DELAY_SECONDS, requested)
+
+
 def api_request(
     *,
     repo_full_name: str,
@@ -169,20 +205,43 @@ def api_request(
     if payload is not None:
         data = json.dumps(dict(payload), separators=(",", ":")).encode("utf-8")
         headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(
-        f"https://api.github.com/repos/{repo_full_name}{path}",
-        method=method,
-        headers=headers,
-        data=data,
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            raw = response.read()
-            body = json.loads(raw.decode("utf-8")) if raw else None
-            return body, dict(response.headers.items()), response.status
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise JanitorError(f"GitHub API {method} {path} failed {exc.code}: {detail[:800]}") from exc
+    for attempt in range(1, MAX_API_ATTEMPTS + 1):
+        request = urllib.request.Request(
+            f"https://api.github.com/repos/{repo_full_name}{path}",
+            method=method,
+            headers=headers,
+            data=data,
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raw = response.read()
+                body = json.loads(raw.decode("utf-8")) if raw else None
+                return body, dict(response.headers.items()), response.status
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            response_headers = dict(exc.headers.items()) if exc.headers else {}
+            normalized = {str(key).lower(): str(value) for key, value in response_headers.items()}
+            rate_limited = (
+                exc.code == 429
+                or (
+                    exc.code == 403
+                    and (
+                        normalized.get("x-ratelimit-remaining") == "0"
+                        or "rate limit" in detail.lower()
+                    )
+                )
+            )
+            if rate_limited and attempt < MAX_API_ATTEMPTS:
+                time.sleep(retry_delay_seconds(
+                    response_headers,
+                    jitter_seconds=random.uniform(0.0, 0.5),
+                ))
+                continue
+            raise JanitorError(
+                f"GitHub API {method} {path} failed {exc.code}: {detail[:800]}"
+            ) from exc
+
+    raise JanitorError(f"GitHub API {method} {path} exhausted bounded retries")
 
 
 # Python 3.12-friendly structural alias without importing typing.Mapping twice.
@@ -569,6 +628,8 @@ def main(argv: list[str] | None = None) -> int:
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     if not token:
         raise SystemExit("PR_CONTROL_PLANE_JANITOR_HOLD: GITHUB_TOKEN is required")
+    report = Path(args.report)
+    report.parent.mkdir(parents=True, exist_ok=True)
     try:
         policy = load_policy(Path(args.policy).resolve())
         max_delete = args.max_delete
@@ -584,11 +645,21 @@ def main(argv: list[str] | None = None) -> int:
             execution_branch=args.execution_branch,
         )
     except JanitorError as exc:
+        hold = {
+            "schema": "ct.github.pr-control-plane-janitor-report/v1",
+            "generated_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+            "repository": args.repository,
+            "mode": args.mode,
+            "state": "HOLD",
+            "hold_reason": str(exc),
+            "history_rewritten": False,
+            "unique_unmerged_work_deleted": False,
+            "authority_expansion": False,
+        }
+        report.write_text(json.dumps(hold, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(f"PR_CONTROL_PLANE_JANITOR_HOLD: {exc}", file=sys.stderr)
         return 2
 
-    report = Path(args.report)
-    report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({
         key: result[key]
