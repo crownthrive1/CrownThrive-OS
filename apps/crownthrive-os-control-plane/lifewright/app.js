@@ -1,1 +1,1 @@
-(()=>{const core=document.createElement('script');core.src='/lifewright/app-core.js';document.head.append(core);})();
+(()=>{const addCss=s=>{const l=document.createElement('link');l.rel='stylesheet';l.href=s;document.head.append(l)},load=s=>new Promise((ok,fail)=>{const e=document.createElement('script');e.src=s;e.onload=ok;e.onerror=fail;document.head.append(e)});addCss('/app-runtime.css');addCss('/lifewright/app-v1.css');load('/app-runtime.js').then(()=>load('/lifewright/app-core.js')).then(()=>load('/lifewright/app-v1.js')).catch(()=>{});})();
