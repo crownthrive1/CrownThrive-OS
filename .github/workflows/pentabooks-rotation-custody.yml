@@ -1,0 +1,58 @@
+name: PentaBooks recurring custody and recovery
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+    - cron: "7 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "primary or cold_recovery"
+        required: false
+        default: "primary"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentabooks-recurring-custody
+  cancel-in-progress: false
+
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PENTABOOKS_ROTATION_ID: PB-ROT-002
+      PENTABOOKS_EXPECTED_SKUS: "32"
+      PENTABOOKS_CONTROL_ZIP_SHA256: 916a370a84144fd7039bb59f26c4e98799f0691b88a5a5e68877744a6ff5075c
+      PENTABOOKS_DRIVE_ROOT_ID: 1-gcnrwNNiI1ws7afhHntTB5PSKZlKfb1
+      PENTABOOKS_DRIVE_PRODUCT_LANE_ID: 1-nYcUr39_998K4eC9Xjo68ju6meqCTBG
+      PENTABOOKS_DRIVE_CREDENTIALS_JSON: ${{ secrets.PENTABOOKS_DRIVE_CREDENTIALS_JSON }}
+      PENTABOOKS_THRIVEBASE_URL: ${{ secrets.PENTABOOKS_THRIVEBASE_URL }}
+      PENTABOOKS_THRIVEBASE_SERVICE_ROLE_KEY: ${{ secrets.PENTABOOKS_THRIVEBASE_SERVICE_ROLE_KEY }}
+      PENTABOOKS_ALERT_WEBHOOK: ${{ secrets.PENTABOOKS_ALERT_WEBHOOK }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Determine cycle
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "PENTABOOKS_MODE=${{ inputs.mode }}" >> "$GITHUB_ENV"
+          elif [[ "${{ github.event.schedule }}" == "7 * * * *" ]]; then
+            echo "PENTABOOKS_MODE=cold_recovery" >> "$GITHUB_ENV"
+          else
+            echo "PENTABOOKS_MODE=primary" >> "$GITHUB_ENV"
+          fi
+      - name: Run deterministic guard
+        run: python scripts/pentabooks/rotation_custody_guard.py --output pentabooks-cycle-evidence.json
+      - name: Preserve cycle evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pentabooks-cycle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: pentabooks-cycle-evidence.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,71 @@
+---
+title: PentaBooks Recurring Custody and Recovery
+description: Hourly production discovery, custody reconciliation, registry convergence, and cold recovery for PentaBooks rotations.
+---
+
+# PentaBooks Recurring Custody and Recovery
+
+## Objective
+
+The recurrence closes the gap between content production and durable, independently verifiable commercial readiness. It does not treat registration, model output, a local path, a Drive file ID, or a workflow-success badge as equivalent to a complete and deliverable product.
+
+## Cadence
+
+- Primary cycle: `0 * * * *`
+- Cold-recovery cycle: `7 * * * *`
+- Timezone contract: `America/New_York`
+- Idempotency: `rotation_id + product_id + sha256`
+
+GitHub Actions schedules are UTC-based and may be delayed by the provider; the evidence payload must preserve both the scheduled expression and actual observed time. Business-time interpretation remains `America/New_York`.
+
+## Primary cycle
+
+1. Discover newly generated or changed candidate artifacts.
+2. Resolve the exact rotation, SKU, edition, source lineage, and rights controller.
+3. Classify each object as public, controlled, sealed, secret alias, or prohibited.
+4. Compute byte size and SHA-256 before transport.
+5. Verify the complete independent package contract.
+6. Preserve producer/Library custody.
+7. Write to the exact Google Drive rotation and product lane.
+8. Download the Drive object and prove byte-for-byte equality.
+9. Append immutable custody evidence.
+10. Reconcile Master Registry, PentaDocs, PentaGreen, package, rights, route, QA, and recovery projections.
+11. Hand only eligible records to PentaGreen.
+12. Emit a bounded cycle report and alert only on actionable drift.
+
+## Cold recovery
+
+The cold route retries only missed or degraded subjects. It recovers absent product payloads, stale provider readbacks, dead-lettered registry writes, expired leases, failed alerts, and projection drift. It never duplicates a previously accepted subject/hash pair.
+
+## Fail-closed conditions
+
+The cycle must use `RECOVERY_REQUIRED` or `QUARANTINED` when:
+
+- the exact source or artifact hash is unknown;
+- the delivery ZIP is named but the binary is absent;
+- the Drive write cannot be downloaded and compared;
+- public and sealed material are mixed;
+- a rights or identity ambiguity exists;
+- provider credentials are absent or unverified;
+- registry rows conflict on SKU, edition, price, rights, or custody;
+- entitlement, expiration, refund, recovery, or checkout canaries fail;
+- a public route exposes unreleased or protected content.
+
+## Runtime secret aliases
+
+The implementation recognizes only secret names, never secret values:
+
+- `PENTABOOKS_DRIVE_CREDENTIALS_JSON`
+- `PENTABOOKS_THRIVEBASE_URL`
+- `PENTABOOKS_THRIVEBASE_SERVICE_ROLE_KEY`
+- `PENTABOOKS_ALERT_WEBHOOK`
+
+Their mere presence does not prove authority or a successful provider call. Every mutation still requires exact provider readback.
+
+## Rotation 002 recovery subject
+
+Rotation 002 has verified control custody and an open 32-SKU product-payload recovery queue. The recurrence may close a SKU only after recovering or rebuilding the exact complete-product ZIP from governed source, writing it to both custody lanes, downloading it, matching size and SHA-256, and reconciling the registries. Source novels cannot be relabeled as adaptation packages.
+
+## Evidence boundary
+
+A successful guard run proves that the guard executed. A successful Drive read proves only that Drive predicate. A successful database append proves only that event mutation. A successful provider product query proves only that provider predicate. Public release requires the full current gate set, not a composite optimistic status.
