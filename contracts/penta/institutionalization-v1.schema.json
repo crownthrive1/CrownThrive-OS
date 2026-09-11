@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crownthrive.com/contracts/penta/institutionalization-v1.schema.json",
+  "title": "CrownThrive Penta Institutionalization v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "assignment_id",
+    "assignment_key",
+    "three_dail",
+    "pentadocs",
+    "drive",
+    "certification",
+    "os_projection",
+    "chain",
+    "terminal_gate",
+    "history_preserved",
+    "authority_expansion"
+  ],
+  "properties": {
+    "contract": { "const": "ct.penta.institutionalization.v1" },
+    "assignment_id": { "type": "string", "format": "uuid" },
+    "assignment_key": { "type": "string", "minLength": 8 },
+    "three_dail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence", "decision", "execution"],
+      "properties": {
+        "evidence": { "$ref": "#/$defs/dailReceipt" },
+        "decision": { "$ref": "#/$defs/dailReceipt" },
+        "execution": { "$ref": "#/$defs/dailReceipt" },
+        "activation": { "anyOf": [{ "$ref": "#/$defs/dailReceipt" }, { "type": "null" }] }
+      }
+    },
+    "pentadocs": {
+      "type": "object",
+      "required": ["record_id", "docs_path", "sha256", "readback"],
+      "properties": {
+        "record_id": { "type": "string", "format": "uuid" },
+        "docs_path": { "type": "string" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "readback": { "const": true }
+      }
+    },
+    "drive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["folder_id", "human", "hybrid", "machine"],
+      "properties": {
+        "folder_id": { "type": "string", "minLength": 1 },
+        "human": { "$ref": "#/$defs/providerProjection" },
+        "hybrid": { "$ref": "#/$defs/providerProjection" },
+        "machine": { "$ref": "#/$defs/providerProjection" }
+      }
+    },
+    "certification": {
+      "type": "object",
+      "required": ["required", "state", "independence_state"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "certification_id": { "type": ["string", "null"] },
+        "state": { "enum": ["PENDING", "HOLD", "CERTIFIED", "ACTIVE", "INVALIDATED", "NOT_REQUIRED"] },
+        "independence_state": { "enum": ["separation_of_duties_satisfied", "not_required", "pending"] },
+        "event": { "anyOf": [{ "$ref": "#/$defs/dailReceipt" }, { "type": "null" }] }
+      }
+    },
+    "os_projection": {
+      "type": "object",
+      "required": ["state", "readback"],
+      "properties": {
+        "state": { "enum": ["PENDING", "PROJECTED", "READBACK_PASS", "HOLD", "FAILED"] },
+        "readback": { "type": "boolean" },
+        "event": { "anyOf": [{ "$ref": "#/$defs/dailReceipt" }, { "type": "null" }] }
+      }
+    },
+    "chain": {
+      "type": "object",
+      "required": ["state", "failure_count", "checked_events", "head_hash", "checked_at"],
+      "properties": {
+        "state": { "enum": ["PASS", "HOLD", "FAIL"] },
+        "failure_count": { "type": "integer", "minimum": 0 },
+        "checked_events": { "type": "integer", "minimum": 0 },
+        "head_hash": { "$ref": "#/$defs/sha256" },
+        "checked_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "terminal_gate": { "enum": ["HOLD", "PASS", "TERMINALIZED"] },
+    "history_preserved": { "const": true },
+    "authority_expansion": { "const": false }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "dailReceipt": {
+      "type": "object",
+      "required": ["event_id", "event_hash", "readback"],
+      "properties": {
+        "event_id": { "type": "string", "format": "uuid" },
+        "event_hash": { "$ref": "#/$defs/sha256" },
+        "readback": { "const": true }
+      }
+    },
+    "providerProjection": {
+      "type": "object",
+      "required": ["id", "url", "sha256", "readback"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "readback": { "const": true }
+      }
+    }
+  }
+}
