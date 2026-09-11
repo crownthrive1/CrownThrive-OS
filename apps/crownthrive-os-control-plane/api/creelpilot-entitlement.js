@@ -49,11 +49,17 @@ export default async function handler(request, response) {
   }
 
   try {
-    const session = await stripeGet(`/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, secret, {
-      'expand[]': ['subscription', 'line_items.data.price'],
-    });
+    const [session, lineItemResult] = await Promise.all([
+      stripeGet(`/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, secret, {
+        'expand[]': ['subscription'],
+      }),
+      stripeGet(`/v1/checkout/sessions/${encodeURIComponent(sessionId)}/line_items`, secret, {
+        limit: 10,
+        'expand[]': ['data.price'],
+      }),
+    ]);
 
-    const lineItems = session?.line_items?.data || [];
+    const lineItems = lineItemResult?.data || [];
     const hasExactPrice = lineItems.some(item =>
       item?.price?.id === EXPECTED_PRICE &&
       item?.price?.product === EXPECTED_PRODUCT &&
