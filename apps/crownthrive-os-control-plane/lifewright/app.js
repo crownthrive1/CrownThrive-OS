@@ -1,1 +1,1 @@
-(()=>{const core=document.createElement('script');core.src='/lifewright/app-core.js';document.head.append(core);if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/lifewright/sw.js',{scope:'/lifewright'}).catch(()=>{}));})();
+(()=>{const core=document.createElement('script');core.src='/lifewright/app-core.js';document.head.append(core);})();
