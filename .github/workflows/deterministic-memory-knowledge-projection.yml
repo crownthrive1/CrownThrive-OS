@@ -1,0 +1,146 @@
+name: Deterministic Memory Knowledge Projection
+
+on:
+  push:
+    branches:
+      - admin-mcp/pentadocs-pentacensus-deterministic-memory
+    paths:
+      - ".github/workflows/deterministic-memory-knowledge-projection.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deterministic-memory-knowledge-projection-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  materialize-governed-knowledge:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Institutionalize governed family assignments
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('penta/registry/penta-families.v1.json')
+          payload = json.loads(path.read_text(encoding='utf-8'))
+          assignments = {
+              'system-architecture': ('PentaBC', 'PentaMemoryConfig'),
+              'resilience-continuity': ('PentaClean', 'PentaFlush', 'PentaHydrate', 'PentaMemoryRollback'),
+              'intelligence-research': ('PentaHarvestor',),
+              'communications-service': ('PentaNotifs',),
+              'observability-organic': ('PentaOverseer', 'PentaBrainMemoryRuntime'),
+              'knowledge-semantics-data': ('PentaMemoryCensus', 'PentaMemorySchema'),
+              'automation-agentic': ('PentaPrioritize',),
+              'routing-interoperability': ('PentaRelay',),
+          }
+          families = payload.get('families')
+          if not isinstance(families, list):
+              raise SystemExit('penta family registry must contain a families list')
+          by_id = {
+              family.get('family_id'): family
+              for family in families
+              if isinstance(family, dict) and isinstance(family.get('family_id'), str)
+          }
+          missing = sorted(set(assignments) - set(by_id))
+          if missing:
+              raise SystemExit(f'missing governed family records: {missing}')
+
+          for target_family, members in assignments.items():
+              for member in members:
+                  owners = [
+                      family_id
+                      for family_id, family in by_id.items()
+                      if member in family.get('explicit_members', [])
+                  ]
+                  if owners and owners != [target_family]:
+                      raise SystemExit(
+                          f'{member}: existing family collision {owners} vs {target_family}'
+                      )
+                  explicit = by_id[target_family].setdefault('explicit_members', [])
+                  if not isinstance(explicit, list):
+                      raise SystemExit(f'{target_family}: explicit_members must be a list')
+                  if member not in explicit:
+                      explicit.append(member)
+
+          for target_family, members in assignments.items():
+              for member in members:
+                  owners = [
+                      family_id
+                      for family_id, family in by_id.items()
+                      if member in family.get('explicit_members', [])
+                  ]
+                  if owners != [target_family]:
+                      raise SystemExit(f'{member}: non-deterministic family readback {owners}')
+
+          path.write_text(
+              json.dumps(payload, indent=2, ensure_ascii=False) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Generate governed Penta knowledge corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/penta_portal_docs.py --write
+          python scripts/penta_portal_finalize.py --apply
+          python scripts/penta_operational_knowledge_entrypoint.py --apply
+          python scripts/pentagonal_reference_suite.py --apply
+          python runtime/penta_deterministic_memory.py reconcile --write
+
+      - name: Validate exact generated corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/penta_portal_finalize.py --check
+          python scripts/penta_operational_knowledge_entrypoint.py --check
+          python scripts/pentagonal_reference_suite.py --check
+          python scripts/penta_census.py --root .
+          python -m unittest tests.test_penta_census -v
+          python runtime/penta_deterministic_memory.py validate
+          python runtime/penta_deterministic_memory.py reconcile --check
+          python -m unittest \
+            tests.test_penta_portal_docs \
+            tests.test_penta_operational_knowledge \
+            tests.test_pentagonal_reference_suite \
+            tests.test_penta_deterministic_memory \
+            tests.test_penta_sql_contract \
+            tests.test_penta_family_reconciliation \
+            tests.test_penta_provider_family_aliases \
+            -v
+          python scripts/validate_docs.py
+          git diff --check
+
+      - name: Commit deterministic institutional projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -type d -name __pycache__ -prune -exec rm -rf '{}' +
+          git config user.name "CrownThrive PentaDocs"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git status --short
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Governed Penta knowledge corpus already converged."
+            exit 0
+          fi
+          git diff --cached --check
+          git commit -m "docs(penta): institutionalize deterministic memory identities"
+          git push origin HEAD:${GITHUB_REF_NAME}
