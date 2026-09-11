@@ -121,7 +121,8 @@ export function publicPacket(packet) {
     description: packet.description,
     pdf_url: `https://crown-thrive-os.vercel.app/api/cie-packet?id=${encodeURIComponent(packet.id)}`,
     cover_url: `https://crown-thrive-os.vercel.app/api/cie-packet-cover?id=${encodeURIComponent(packet.id)}`,
-    go_flipbooks_reader: `https://go-flipbooks.vercel.app/reader/${packet.slug}`,
+    go_flipbooks_reader: `https://go-flipbooks.vercel.app/reader?slug=${encodeURIComponent(packet.slug)}`,
+    go_flipbooks_catalog: `https://go-flipbooks.vercel.app/api/catalog?search=${encodeURIComponent(packet.slug)}&limit=10`,
     source: 'CrownThrive CIE Website 2.0'
   };
 }
