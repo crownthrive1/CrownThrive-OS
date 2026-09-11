@@ -115,9 +115,9 @@ Legacy documents may preserve earlier terminology as source history, but those h
 
 ## Start here
 
-- Licensing: [`LICENSING.md`](LICENSING.md)
+- Licensing: [`LICENSING.md`](./LICENSING.md)
 - Commercial rights: [`../COMMERCIAL-LICENSE.md`](../COMMERCIAL-LICENSE.md)
 - Machine access: [`../MACHINE-ACCESS-TERMS.md`](../MACHINE-ACCESS-TERMS.md)
-- Pentafabric architecture: [`architecture/PENTAFABRIC.md`](architecture/PENTAFABRIC.md)
-- Agents and factories: [`AGENTS-AND-FACTORIES.md`](AGENTS-AND-FACTORIES.md)
+- Pentafabric architecture: [`architecture/PENTAFABRIC.md`](./architecture/PENTAFABRIC.md)
+- Agents and factories: [`AGENTS-AND-FACTORIES.md`](./AGENTS-AND-FACTORIES.md)
 - Support and partnerships: [`../SUPPORT.md`](../SUPPORT.md)
