@@ -1,0 +1,115 @@
+---
+title: "CrownThrive Public API Marketplace Institutional Registry"
+sidebarTitle: "API Marketplace"
+description: "Current registry for CrownThrive's public API marketplace, 1,713-profile catalog, commerce, MCP, dual-plane security and deployment holds."
+icon: "store"
+content_state: "current_runtime_readback"
+keywords:
+  - "API Marketplace"
+  - "CrownThrive IO"
+  - "MCP"
+  - "Stripe"
+  - "API products"
+  - "developer marketplace"
+---
+
+<Info>
+  **Service ID:** `api_marketplace_public`<br />**Gateway contract:** `ct.api-marketplace-gateway.v1`<br />**Runtime:** `api-marketplace-gateway` `1.0.3`<br />**State:** `read_verified` with paid and MCP canaries passing
+</Info>
+
+## Institutional role
+
+The CrownThrive Public API Marketplace packages public-safe API and intelligence profiles as developer products without exposing CrownThrive's internal databases or private provider credentials.
+
+It separates:
+
+- external catalog and plan reads;
+- customer developer keys;
+- subscription activation;
+- usage and quota accounting;
+- provider/source materialization;
+- HOT/WARM/COLD data routes;
+- internal and external planes;
+- MCP discovery and consumption.
+
+## Current catalog
+
+| Metric | Current readback |
+| --- | --: |
+| Active SKUs | `1,713` |
+| First SKU | `CTAPI-0001` |
+| Last SKU | `CTAPI-1713` |
+| Source-unique candidates | `1,713` |
+| Product kind | `intelligence_profile` |
+| Current readiness | `profile_only` |
+| Full source corpus materialized | `true` |
+
+`profile_only` means the published catalog entries are productized intelligence/API profiles. It does not imply that every upstream source is proxied as a live transactional API.
+
+## Runtime and MCP
+
+| Component | State |
+| --- | --- |
+| Gateway | active, public-read surface |
+| MCP server | `ct.mcp.api-marketplace-public` |
+| MCP tool count | `5` |
+| MCP canary | `PASS` |
+| Paid canary | `PASS` |
+| PentaWire | bound |
+| Provider writes | `false` |
+| Authority effect | `none` |
+
+## Commerce
+
+The marketplace has four plans and a live Stripe base-subscription product. Checkout-session readback is the activation evidence.
+
+Current boundaries:
+
+- base subscription: live;
+- enterprise: quote/contract mode;
+- overage settlement: not live;
+- dedicated Stripe webhook lane: registered but capacity-blocked;
+- 15-minute Stripe reconciliation job: active;
+- provider billing, quotas and throttles remain separate from CrownThrive's local policy.
+
+## Security topology
+
+Customer API keys are stored as SHA-256 hashes. Customers do not receive internal database access.
+
+Current topology:
+
+- runtime role: `ct_api_marketplace_runtime`;
+- external schema: `api_marketplace_public`;
+- HOT: product registry;
+- WARM: response cache;
+- COLD: snapshot items;
+- direct cross-plane database access: prohibited;
+- customer reverse transport: prohibited;
+- provider write: prohibited;
+- target public ThriveBase plane: approved but pending separate provider project creation.
+
+The current runtime still resides on the private project with logical isolation. Physical public-project separation remains an explicit pending topology step.
+
+## Request-budget hold
+
+The local monthly request-budget policy is unresolved and therefore fail-closed. This does not negate the read canaries, catalog or commerce activation; it prevents the system from inventing a local request ceiling.
+
+Provider throttles, billing limits and quotas continue to apply even when CrownThrive later sets an unlimited local ceiling.
+
+## Source control
+
+Canonical source convergence is recorded in `crownthrive1/PRIVATE-PentaInteroperation`, PR `10`, merge `2f1a09332792f204c945d75ad4f4472dccf134fe`.
+
+## Continuing controls
+
+1. Create and certify the separate public ThriveBase project before claiming physical separation.
+2. Establish a governed request-budget policy.
+3. Do not present profile products as live provider proxies unless an exact adapter and canary prove it.
+4. Complete the dedicated Stripe webhook capacity lane before enabling autonomous overage settlement.
+5. Preserve the no-provider-write and no-internal-access boundaries.
+
+## Related records
+
+- [U.S. Government Data API Fabric](/platforms/us-government-data-api-fabric)
+- [Penta App Factory Institutional Registry](/platforms/penta-app-factory-institutional-registry)
+- [Two-Week Institutional Reconciliation](/changelog/2026-08-31-two-week-institutional-reconciliation)
