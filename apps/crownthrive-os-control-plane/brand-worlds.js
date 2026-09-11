@@ -33,3 +33,4 @@
   }
   switcher();if(body.classList.contains('zaza'))zaza();if(body.classList.contains('musiq'))musiq();if(body.classList.contains('magic'))magic();reveal();
 })();
+(()=>{const v2=document.createElement('script');v2.src='/brand-worlds-v02.js';document.head.append(v2)})();

@@ -1,1 +1,1 @@
-(()=>{const core=document.createElement('script');core.src='/lifewright/app-core.js';document.head.append(core);})();
+(()=>{const css=document.createElement('link');css.rel='stylesheet';css.href='/lifewright/app-v03.css';document.head.append(css);const core=document.createElement('script');core.src='/lifewright/app-core.js';core.onload=()=>{const v03=document.createElement('script');v03.src='/lifewright/app-v03.js';document.head.append(v03)};document.head.append(core);})();
