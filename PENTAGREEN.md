@@ -72,5 +72,16 @@ PentaGreen is a first-class member of CrownThrive's PENTA operating family. Its 
 
 Current code, docs, APIs, MCPs, workflows, agents, registries, factories, and new releases should use the canonical Penta names. Historical changelogs, immutable receipts, prior releases, signed evidence, and exact legacy identifiers should preserve `ThriveEvergreen` where changing the identifier would damage provenance. Where useful, render them as **PentaGreen™ (legacy: ThriveEvergreen™)**.
 
+## CII public impact-provider rails
+
+CrownThrive Impact Institute (CII) owns the impact-program purpose, reporting context, and public-accountability layer for climate and sustainability initiatives. PentaGreen governs only the applicable CrownThrive economic activation and reconciliation; it does not redefine CII program truth.
+
+Current public provider routes supplied for CII are:
+
+- **Stripe Climate:** `https://climate.stripe.com/S7JiiF`
+- **EcoDrive:** `https://app.ecodrive.community/public-dashboard/b4ab0870-7f71-4415-8bac-9e653e3d7469`
+
+These routes are public evidence/navigation surfaces. URL availability, a badge, a dashboard, or a provider-hosted counter does not by itself create settlement, tax, impact, or institutional economic truth. Dynamic metrics must be reconciled from current provider evidence before they are promoted into canonical CrownThrive state.
+
 **Effective:** 2026-08-26  
 **Owner:** CrownThrive, LLC
