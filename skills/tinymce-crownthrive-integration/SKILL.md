@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use TinyMCE 8 and TinyMCE AI inside CrownThrive applications without exposing signing keys, trusting browser-supplied identities, or confusing documentation MCP access with production provider authority.
+Use TinyMCE 8, TinyMCE AI, and entitled Tiny Cloud document-conversion features inside CrownThrive applications without exposing signing keys, trusting browser-supplied identities, or confusing documentation MCP access with production provider authority.
 
 ## Upstream skill source
 
@@ -14,12 +14,13 @@ CrownThrive maintains `crownthrive1/tinymce-ai-skills` as the GitHub source for 
 2. Use TinyMCE major channel `8` unless the application has a separately governed version pin.
 3. Confirm the Tiny plan/plugin entitlement before enabling premium plugins.
 4. Use the official Tiny documentation MCP (`https://tinymcedocs.mcp.kapa.ai`) or current Tiny docs for API details.
-5. For TinyMCE AI, obtain the authenticated CrownThrive user from the application's existing identity/session provider.
-6. Request the Tiny AI JWT from the CrownThrive server route `/api/tinymce-ai-token`; never use Tiny's demo identity service in production.
-7. Keep the RSA private key server-only. The browser may receive only the short-lived signed JWT.
-8. Require `aud` to match the Tiny API key, `sub` to come from verified identity, short `iat`/`exp`, and only the required AI permissions.
-9. Fail closed when identity, key binding, provider entitlement, origin policy, or signing configuration is missing.
-10. Verify provider behavior after deployment and preserve public-safe evidence without raw secrets.
+5. Obtain the authenticated CrownThrive user from the application's existing identity/session provider before issuing any Tiny JWT.
+6. Request JWTs from `/api/tinymce-ai-token?service=<service>`; supported services are `ai`, `importword`, `exportword`, and `exportpdf`.
+7. Never use Tiny's demo identity service in production.
+8. Keep the RSA private key server-only. The browser may receive only short-lived signed JWTs.
+9. For `ai`, require `aud`, verified-user `sub`, short `iat`/`exp`, and only required `auth.ai.permissions`. For document converters, issue only their required `aud`, `iat`, and `exp` claim set.
+10. Fail closed when identity, key binding, provider entitlement, origin policy, or signing configuration is missing.
+11. Verify each enabled provider feature after deployment and preserve public-safe evidence without raw secrets.
 
 ## CrownThrive implementation
 
