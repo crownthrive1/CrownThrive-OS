@@ -1,0 +1,50 @@
+name: Reconcile CHLOM Phase Alias Dispositions
+
+on:
+  push:
+    branches:
+      - 'repair/chlom-controlled-convergence-v11-20260904'
+    paths:
+      - 'scripts/reconcile_chlom_phase_alias_dispositions.py'
+      - '.github/workflows/reconcile-chlom-phase-alias-dispositions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reconcile-chlom-phase-alias-dispositions-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Reconcile exact reviewed alias paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact production-candidate head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reconcile exact reviewed dispositions
+        run: python3 scripts/reconcile_chlom_phase_alias_dispositions.py
+
+      - name: Verify Phase 3 gap-closure registry
+        run: python3 scripts/penta_gap_closure.py . --json
+
+      - name: Reject whitespace corruption
+        run: git diff --check
+
+      - name: Commit reconciled registry without force
+        run: |
+          if git diff --quiet --exit-code; then
+            echo 'Alias disposition registry is already reconciled.'
+            exit 0
+          fi
+          git config user.name 'crownthrive-governance[bot]'
+          git config user.email 'crownthrive-governance[bot]@users.noreply.github.com'
+          git add developers/manifests/penta-phase-alias-dispositions.v1.json
+          git commit -m 'fix(governance): reconcile CHLOM migration alias dispositions'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
