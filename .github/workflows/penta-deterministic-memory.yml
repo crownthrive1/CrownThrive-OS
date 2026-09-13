@@ -1,0 +1,120 @@
+name: Penta Deterministic Memory
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/penta-deterministic-memory.yml"
+      - "config/penta_deterministic_memory.v1.json"
+      - "runtime/penta_deterministic_memory.py"
+      - "schemas/penta/deterministic-memory-census.schema.json"
+      - "data/penta/deterministic-memory-census.v1.json"
+      - "data/penta/namespace-census.v1.json"
+      - "data/penta/os-v1.registry.json"
+      - "penta/registry/penta-families.v1.json"
+      - "penta_census/**"
+      - "scripts/penta_census.py"
+      - "tests/pentacensus/**"
+      - "tests/test_penta_census.py"
+      - "tests/test_penta_deterministic_memory.py"
+      - "tests/test_penta_family_reconciliation.py"
+      - "tests/test_penta_provider_family_aliases.py"
+      - "tests/test_penta_sql_contract.py"
+      - "supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql"
+      - "supabase/rollbacks/20260831094500_penta_deterministic_memory_v1.rollback.sql"
+      - "docs/phase3/PENTA_DETERMINISTIC_MEMORY_PRODUCTION_CONTRACT_v1.0.md"
+  push:
+    branches:
+      - main
+      - "admin-mcp/pentadocs-pentacensus-*"
+    paths:
+      - ".github/workflows/penta-deterministic-memory.yml"
+      - "config/penta_deterministic_memory.v1.json"
+      - "runtime/penta_deterministic_memory.py"
+      - "schemas/penta/deterministic-memory-census.schema.json"
+      - "data/penta/deterministic-memory-census.v1.json"
+      - "data/penta/namespace-census.v1.json"
+      - "data/penta/os-v1.registry.json"
+      - "penta/registry/penta-families.v1.json"
+      - "penta_census/**"
+      - "scripts/penta_census.py"
+      - "tests/pentacensus/**"
+      - "tests/test_penta_census.py"
+      - "tests/test_penta_deterministic_memory.py"
+      - "tests/test_penta_family_reconciliation.py"
+      - "tests/test_penta_provider_family_aliases.py"
+      - "tests/test_penta_sql_contract.py"
+      - "supabase/migrations/20260831094500_penta_deterministic_memory_v1.sql"
+      - "supabase/rollbacks/20260831094500_penta_deterministic_memory_v1.rollback.sql"
+      - "docs/phase3/PENTA_DETERMINISTIC_MEMORY_PRODUCTION_CONTRACT_v1.0.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: penta-deterministic-memory-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deterministic-memory-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Compile deterministic memory and census sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            runtime/penta_deterministic_memory.py
+            scripts/penta_census.py
+            tests/test_penta_census.py
+            tests/test_penta_deterministic_memory.py
+            tests/test_penta_family_reconciliation.py
+            tests/test_penta_provider_family_aliases.py
+            tests/test_penta_sql_contract.py
+          )
+          if test -d penta_census; then
+            while IFS= read -r -d '' source; do
+              files+=("$source")
+            done < <(find penta_census -type f -name '*.py' -print0)
+          fi
+          python -m py_compile "${files[@]}"
+
+      - name: Validate canonical PentaCensus discovery contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/penta_census.py --root .
+          python -m unittest tests.test_penta_census -v
+
+      - name: Validate deterministic memory projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python runtime/penta_deterministic_memory.py validate
+          python runtime/penta_deterministic_memory.py reconcile --check
+          python -m unittest \
+            tests.test_penta_deterministic_memory \
+            tests.test_penta_sql_contract \
+            tests.test_penta_family_reconciliation \
+            tests.test_penta_provider_family_aliases \
+            -v
+
+      - name: Enforce committed deterministic readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- \
+            data/penta/namespace-census.v1.json \
+            data/penta/deterministic-memory-census.v1.json
+          git diff --check
