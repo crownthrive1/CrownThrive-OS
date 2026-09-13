@@ -4,6 +4,7 @@ const DEFAULT_SUPABASE_URL = 'https://tzajnzshmtzjenqulehq.supabase.co';
 const DEFAULT_TTL_SECONDS = 600;
 const MIN_TTL_SECONDS = 300;
 const MAX_TTL_SECONDS = 900;
+const TINY_SERVICES = Object.freeze(['ai', 'importword', 'exportword', 'exportpdf']);
 
 const AI_PERMISSIONS = Object.freeze([
   'ai:conversations:read',
@@ -31,6 +32,12 @@ function parseTtl() {
   const configured = Number.parseInt(process.env.TINYMCE_JWT_TTL_SECONDS || '', 10);
   if (!Number.isFinite(configured)) return DEFAULT_TTL_SECONDS;
   return Math.min(MAX_TTL_SECONDS, Math.max(MIN_TTL_SECONDS, configured));
+}
+
+function requestedService(req) {
+  const raw = Array.isArray(req?.query?.service) ? req.query.service[0] : req?.query?.service;
+  const service = String(raw || 'ai').trim().toLowerCase();
+  return TINY_SERVICES.includes(service) ? service : null;
 }
 
 function base64urlJson(value) {
@@ -112,6 +119,28 @@ async function authenticateUser(req) {
   return { ok: true, user };
 }
 
+function buildPayload(service, userId, tinyApiKey, now, ttl) {
+  const payload = {
+    aud: tinyApiKey,
+    iat: now,
+    exp: now + ttl,
+  };
+
+  if (service === 'ai') {
+    return {
+      ...payload,
+      sub: String(userId),
+      auth: {
+        ai: {
+          permissions: AI_PERMISSIONS,
+        },
+      },
+    };
+  }
+
+  return payload;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('Pragma', 'no-cache');
@@ -134,10 +163,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  const tinyApiKey = String(process.env.TINYMCE_API_KEY || '').trim();
-  const privateKey = normalizePrivateKey(process.env.TINYMCE_JWT_PRIVATE_KEY);
-  if (!tinyApiKey || !privateKey) {
-    json(res, 503, { error: 'TINYMCE_JWT_UNBOUND' });
+  const service = requestedService(req);
+  if (!service) {
+    json(res, 400, { error: 'UNSUPPORTED_TINY_SERVICE', supported: TINY_SERVICES });
     return;
   }
 
@@ -147,19 +175,16 @@ export default async function handler(req, res) {
     return;
   }
 
+  const tinyApiKey = String(process.env.TINYMCE_API_KEY || '').trim();
+  const privateKey = normalizePrivateKey(process.env.TINYMCE_JWT_PRIVATE_KEY);
+  if (!tinyApiKey || !privateKey) {
+    json(res, 503, { error: 'TINYMCE_JWT_UNBOUND' });
+    return;
+  }
+
   const now = Math.floor(Date.now() / 1000);
   const ttl = parseTtl();
-  const payload = {
-    aud: tinyApiKey,
-    sub: String(auth.user.id),
-    iat: now,
-    exp: now + ttl,
-    auth: {
-      ai: {
-        permissions: AI_PERMISSIONS,
-      },
-    },
-  };
+  const payload = buildPayload(service, auth.user.id, tinyApiKey, now, ttl);
 
   let token;
   try {
@@ -172,5 +197,6 @@ export default async function handler(req, res) {
   json(res, 200, {
     token,
     expires_in: ttl,
+    service,
   });
 }
