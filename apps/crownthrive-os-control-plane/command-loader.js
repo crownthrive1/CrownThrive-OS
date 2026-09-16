@@ -14,6 +14,8 @@
 
   const STORAGE_STYLE = '<link rel="stylesheet" href="/storage-command.css" data-storage-command-style>';
   const STORAGE_SCRIPT = '<script src="/storage-command.js" defer data-storage-command-script></script>';
+  const SUITE_STYLE = '<link rel="stylesheet" href="/command-suite.css" data-command-suite-style>';
+  const SUITE_SCRIPT = '<script src="/command-suite.js" defer data-command-suite-script></script>';
 
   function showFailure(error) {
     const status = document.querySelector('#command-loader-status');
@@ -42,6 +44,8 @@
     if (!output.includes('data-command-estate-script')) output = output.replace('</body>', `${ESTATE_SCRIPT}</body>`);
     if (!output.includes('data-storage-command-style')) output = output.replace('</head>', `${STORAGE_STYLE}</head>`);
     if (!output.includes('data-storage-command-script')) output = output.replace('</body>', `${STORAGE_SCRIPT}</body>`);
+    if (!output.includes('data-command-suite-style')) output = output.replace('</head>', `${SUITE_STYLE}</head>`);
+    if (!output.includes('data-command-suite-script')) output = output.replace('</body>', `${SUITE_SCRIPT}</body>`);
     return output;
   }
 
