@@ -78,11 +78,16 @@ test('ecosystem atlas covers CrownThrive corridors and the Penta family', () => 
   assert.match(html, /id="atlasCorridor"/);
 });
 
-test('Vercel makes the new command surface primary while preserving APIs', () => {
+test('Vercel makes the canonical command shell primary through its loader while preserving APIs', async () => {
   const rewrites = Object.fromEntries(vercel.rewrites.map(({ source, destination }) => [source, destination]));
   for (const route of ['/','/command','/wallet','/dail','/atlas','/ops','/infrastructure','/commerce','/evidence','/integrations']) {
-    assert.equal(rewrites[route], '/command-v3.html', route);
+    assert.equal(rewrites[route], '/index.html', route);
   }
+  const [indexHtml, loader] = await Promise.all([read('index.html'), read('command-loader.js')]);
+  assert.ok(indexHtml.includes('src="/command-loader.js"'));
+  assert.ok(indexHtml.includes('href="/command-v3.html"'));
+  assert.ok(loader.includes("const CANONICAL_SHELL = '/command-v3.html'"));
+  assert.equal(rewrites['/command-v3.html'], undefined, 'canonical shell must not recurse into loader');
   assert.equal(rewrites['/health'], '/api/health');
   assert.equal(rewrites['/fabric'], '/api/fabric');
   assert.equal(rewrites['/mcp'], '/api/mcp');

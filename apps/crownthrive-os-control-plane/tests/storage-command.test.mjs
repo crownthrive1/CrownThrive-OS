@@ -126,7 +126,7 @@ test('browser integration adds no polling interval and no upstream HTML injectio
   const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
   assert.equal(source.includes('setInterval'), false); assert.equal(source.includes('innerHTML'), false);
   assert.ok(source.includes('MutationObserver')); assert.ok(source.includes('STALE / last known'));
-  for (const page of ['overview', 'dail', 'infrastructure', 'commerce', 'evidence', 'integrations']) assert.match(source, new RegExp(`\b${page}:`));
+  for (const page of ['overview', 'dail', 'infrastructure', 'commerce', 'evidence', 'integrations']) assert.ok(source.includes(`${page}: [`), page);
 });
 
 test('every canonical command route uses the extension loader; other routes and CSP remain unchanged', async () => {

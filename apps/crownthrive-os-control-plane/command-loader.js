@@ -26,7 +26,7 @@
   function injectRelease(html) {
     let output = html.replace(
       /data-command-version="[^"]+"/i,
-      `data-command-version="${VERSION}" data-command-extension="executive-pulse governed-estate storage-observability" data-command-release="${RELEASE}"`,
+      `data-command-version="${VERSION}" data-command-extension="executive-pulse governed-estate" data-command-release="${RELEASE}"`,
     );
 
     if (!output.includes('name="ct-command-release"')) {
