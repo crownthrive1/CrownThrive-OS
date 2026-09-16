@@ -1,0 +1,197 @@
+name: PentaRelease — Intelligence PR Recovery
+
+on:
+  workflow_run:
+    workflows: ["PentaRelease — Release Intelligence v3"]
+    types: [completed]
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  checks: read
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: pentarelease-intelligence-pr-recovery
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout canonical control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Reconcile release-intelligence pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO="$GITHUB_REPOSITORY"
+          GATE_WORKFLOW="pentarelease-explicit-governed-pr-gate.yml"
+
+          latest=$(gh release list --repo "$REPO" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
+          if [ -z "$latest" ]; then
+            echo 'No published release exists; no release-intelligence PR may be reconciled.'
+            exit 0
+          fi
+          echo "Latest published release: $latest"
+
+          gh pr list --repo "$REPO" --state open --limit 1000 \
+            --json number,title,headRefName,headRefOid,url,body,createdAt > /tmp/open-prs.json
+
+          jq --arg title "PentaRelease release intelligence $latest" \
+            '[.[] | select(.title == $title) | select(.headRefName | startswith("pentarelease/intelligence-"))] | sort_by(.number)' \
+            /tmp/open-prs.json > /tmp/current-intelligence.json
+
+          canonical=''
+          while IFS= read -r number; do
+            [ -n "$number" ] || continue
+            author=$(gh api "repos/$REPO/pulls/$number" --jq '.user.login // empty')
+            if [ "$author" = 'github-actions[bot]' ]; then
+              canonical="$number"
+            fi
+          done < <(jq -r '.[].number' /tmp/current-intelligence.json)
+
+          if [ -n "$canonical" ]; then
+            PR=$(gh api "repos/$REPO/pulls/$canonical")
+            state=$(jq -r '.state' <<<"$PR")
+            base_ref=$(jq -r '.base.ref' <<<"$PR")
+            base_sha=$(jq -r '.base.sha' <<<"$PR")
+            head_ref=$(jq -r '.head.ref' <<<"$PR")
+            head_sha=$(jq -r '.head.sha' <<<"$PR")
+            author=$(jq -r '.user.login' <<<"$PR")
+            test "$state" = 'open'
+            test "$base_ref" = 'main'
+            test "$author" = 'github-actions[bot]'
+            [[ "$head_ref" == pentarelease/intelligence-* ]]
+            [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+            [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
+
+            echo "Canonical generated PR: #$canonical ($head_ref @ $head_sha)"
+            before=$(gh run list --repo "$REPO" --workflow "$GATE_WORKFLOW" --branch "$head_ref" --event workflow_dispatch --limit 10 \
+              --json databaseId,headSha --jq ".[] | select(.headSha == \"$head_sha\") | .databaseId" | head -n1 || true)
+
+            gh workflow run "$GATE_WORKFLOW" --repo "$REPO" --ref "$head_ref" \
+              -f pr_number="$canonical" \
+              -f base_sha="$base_sha" \
+              -f head_sha="$head_sha"
+
+            run_id=''
+            for _ in $(seq 1 60); do
+              candidate=$(gh run list --repo "$REPO" --workflow "$GATE_WORKFLOW" --branch "$head_ref" --event workflow_dispatch --limit 20 \
+                --json databaseId,headSha --jq ".[] | select(.headSha == \"$head_sha\") | .databaseId" | head -n1 || true)
+              if [ -n "$candidate" ] && [ "$candidate" != "${before:-}" ]; then
+                run_id="$candidate"
+                break
+              fi
+              sleep 5
+            done
+            test -n "$run_id"
+            echo "Explicit governed gate run: $run_id"
+            gh run watch "$run_id" --repo "$REPO" --exit-status
+
+            gate=$(gh api "repos/$REPO/commits/$head_sha/check-runs" \
+              --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
+            test "$gate" = 'completed:success'
+
+            gh pr merge "$canonical" --repo "$REPO" --auto --squash \
+              --subject "PentaRelease release intelligence $latest"
+
+            merged='false'
+            for _ in $(seq 1 120); do
+              SNAP=$(gh pr view "$canonical" --repo "$REPO" --json state,mergedAt,mergeCommit)
+              merged_at=$(jq -r '.mergedAt // empty' <<<"$SNAP")
+              if [ -n "$merged_at" ]; then
+                merge_sha=$(jq -r '.mergeCommit.oid // empty' <<<"$SNAP")
+                test -n "$merge_sha"
+                echo "Merged canonical PR #$canonical at $merge_sha"
+                merged='true'
+                break
+              fi
+              if [ "$(jq -r '.state' <<<"$SNAP")" = 'CLOSED' ]; then
+                echo "Canonical PR #$canonical closed without merge." >&2
+                exit 46
+              fi
+              sleep 5
+            done
+            test "$merged" = 'true'
+          else
+            echo "No open generated release-intelligence PR exists for $latest; checking whether main is already converged."
+          fi
+
+          git fetch origin main
+          source_tag=$(git show origin/main:.pentarelease/state/release-surface.json | jq -r '.last_release // empty')
+          test -n "$source_tag"
+          echo "Protected-main release projection: $source_tag"
+
+          source_covers_tag() {
+            python3 - "$1" "$2" <<'PY'
+          import sys
+          def parse(tag):
+              value = tag[1:] if tag.startswith('v') else tag
+              parts = value.split('.')
+              if len(parts) != 4 or any(not p.isdigit() for p in parts):
+                  raise SystemExit(2)
+              return tuple(map(int, parts))
+          raise SystemExit(0 if parse(sys.argv[1]) >= parse(sys.argv[2]) else 1)
+          PY
+          }
+
+          if ! source_covers_tag "$source_tag" "$latest"; then
+            echo "Main has not yet converged to $latest; duplicate retirement remains fail-closed."
+            exit 47
+          fi
+
+          git show origin/main:README.md | grep -Fq "Latest PentaRelease — $latest"
+          echo "README and managed release state are converged to $latest."
+
+          gh pr list --repo "$REPO" --state open --limit 1000 \
+            --json number,title,headRefName,body > /tmp/remaining-open-prs.json
+
+          retired=0
+          while IFS=$'\t' read -r number title head body64; do
+            [ -n "$number" ] || continue
+            [[ "$head" == pentarelease/intelligence-* ]] || continue
+            [[ "$title" == 'PentaRelease release intelligence '* ]] || continue
+            tag=${title#PentaRelease release intelligence }
+            author=$(gh api "repos/$REPO/pulls/$number" --jq '.user.login // empty')
+            if [ "$author" != 'github-actions[bot]' ]; then
+              echo "KEEP #$number: author $author is not generated-bot identity."
+              continue
+            fi
+            if ! source_covers_tag "$source_tag" "$tag"; then
+              echo "KEEP #$number: main projection $source_tag does not cover $tag."
+              continue
+            fi
+            note="PentaRelease recovery: protected main now represents $source_tag, which covers generated release-intelligence shell $tag. The canonical release projection is merged and provider-read back, so this duplicate/superseded automation PR may close without deleting its provenance branch."
+            gh pr close "$number" --repo "$REPO" --comment "$note"
+            body=$(printf '%s' "$body64" | base64 --decode 2>/dev/null || true)
+            issue=$(grep -oE 'Refs #[0-9]+' <<<"$body" | tail -n1 | grep -oE '[0-9]+' || true)
+            if [ -n "$issue" ]; then
+              gh issue close "$issue" --repo "$REPO" --reason completed \
+                --comment "PentaRelease recovery closed generated PR #$number after protected-main convergence to $source_tag." || true
+            fi
+            retired=$((retired + 1))
+          done < <(jq -r '.[] | [.number,.title,.headRefName,((.body // "")|@base64)] | @tsv' /tmp/remaining-open-prs.json)
+
+          {
+            echo '## PentaRelease intelligence PR recovery'
+            echo
+            echo "- Latest published release: $latest"
+            echo "- Protected-main release projection: $source_tag"
+            echo "- Canonical PR processed: ${canonical:-none required}"
+            echo "- Duplicate/superseded intelligence PRs retired: $retired"
+            echo '- Governance: exact PR/base/head binding plus CrownThrive governed merge gate; no branch-protection bypass.'
+            echo '- Provenance branches are retained.'
+          } >> "$GITHUB_STEP_SUMMARY"
