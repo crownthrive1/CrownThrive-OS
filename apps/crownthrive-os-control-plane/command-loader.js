@@ -12,6 +12,9 @@
   const ENHANCEMENT_SCRIPT = '<script src="/command-enhancements.js" defer data-command-extension-script></script>';
   const ESTATE_SCRIPT = '<script src="/command-estate.js" defer data-command-estate-script></script>';
 
+  const STORAGE_STYLE = '<link rel="stylesheet" href="/storage-command.css" data-storage-command-style>';
+  const STORAGE_SCRIPT = '<script src="/storage-command.js" defer data-storage-command-script></script>';
+
   function showFailure(error) {
     const status = document.querySelector('#command-loader-status');
     if (status) status.textContent = `Command shell readback failed: ${String(error?.message || error)}`;
@@ -23,7 +26,7 @@
   function injectRelease(html) {
     let output = html.replace(
       /data-command-version="[^"]+"/i,
-      `data-command-version="${VERSION}" data-command-extension="executive-pulse governed-estate" data-command-release="${RELEASE}"`,
+      `data-command-version="${VERSION}" data-command-extension="executive-pulse governed-estate storage-observability" data-command-release="${RELEASE}"`,
     );
 
     if (!output.includes('name="ct-command-release"')) {
@@ -37,6 +40,8 @@
     if (!output.includes('data-marketplace-link')) output = output.replace('</nav>', `${MARKETPLACE_LINK}</nav>`);
     if (!output.includes('data-command-extension-script')) output = output.replace('</body>', `${ENHANCEMENT_SCRIPT}</body>`);
     if (!output.includes('data-command-estate-script')) output = output.replace('</body>', `${ESTATE_SCRIPT}</body>`);
+    if (!output.includes('data-storage-command-style')) output = output.replace('</head>', `${STORAGE_STYLE}</head>`);
+    if (!output.includes('data-storage-command-script')) output = output.replace('</body>', `${STORAGE_SCRIPT}</body>`);
     return output;
   }
 
