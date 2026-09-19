@@ -22,8 +22,9 @@ permissions:
   pull-requests: write
 
 concurrency:
+  # Single-flight convergence: stale schedule/workflow runs cannot create parallel PRs.
   group: pentarelease-release-intelligence-v3
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   PENTARELEASE_EVIDENCE_ENDPOINT: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-release-evidence-oidc
@@ -215,8 +216,26 @@ jobs:
             jq -e --arg n "$EXPECTED" '.assets[] | select(.name == $n)' <<<"$READBACK" >/dev/null
           done
 
+      - name: Detect existing canonical convergence
+        id: dedupe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXISTING=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --base main --search "in:title PentaRelease release intelligence $TAG" --json number,headRefName --jq 'sort_by(.number) | last // empty')
+          if [ -n "$EXISTING" ]; then
+            echo "existing=true" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$(jq -r '.number' <<<"$EXISTING")" >> "$GITHUB_OUTPUT"
+            echo "Canonical open convergence already exists; refusing duplicate PR generation."
+          else
+            echo "existing=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Commit synchronized README and PentaDocs surfaces
         id: commit
+        if: steps.dedupe.outputs.existing != 'true'
         env:
           TAG: ${{ steps.release.outputs.tag }}
         shell: bash
@@ -249,7 +268,7 @@ jobs:
 
       - name: Govern and merge synchronized surfaces
         id: merge
-        if: steps.commit.outputs.changed == 'true'
+        if: steps.dedupe.outputs.existing != 'true' && steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.commit.outputs.branch }}
