@@ -10,9 +10,9 @@ on:
         required: true
         type: string
 
-# v2 is deliberately observation/projection-only. PentaPM owns Development
-# metadata. This workflow must not create Issues, edit PR bodies, or push
-# evidence commits into candidate branches.
+# v3 remains observation/projection-only. PentaPM owns Development metadata.
+# It publishes exact-head originator readiness plus a machine-readable gate
+# applicability/submission contract. It does not mutate candidate source.
 permissions:
   contents: read
   pull-requests: read
@@ -54,7 +54,7 @@ jobs:
                   "Accept": "application/vnd.github+json",
                   "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
                   "X-GitHub-Api-Version": "2022-11-28",
-                  "User-Agent": "CrownThrive-Penta-Gate-Awareness/2.0",
+                  "User-Agent": "CrownThrive-Penta-Gate-Awareness/3.0",
               },
           )
           with urllib.request.urlopen(request, timeout=30) as response:
@@ -99,6 +99,25 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Resolve exact gate applicability and Penta submission contract
+        id: applicability
+        shell: bash
+        env:
+          BASE_SHA: ${{ steps.target.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.target.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          cd pr-worktree
+          git fetch --no-tags --no-recurse-submodules origin "$BASE_SHA" "$HEAD_SHA"
+          python ../penta-control/scripts/resolve_pr_gate_applicability.py \
+            --repo . \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
+            --policy ../penta-control/config/penta_pr_gate_applicability.json \
+            --github-output "$GITHUB_OUTPUT" \
+            --json-output "$RUNNER_TEMP/penta-pr-gate-contract.json"
+          cat "$RUNNER_TEMP/penta-pr-gate-contract.json"
+
       - name: Generate exact-head originator-readiness packet without source mutation
         shell: bash
         env:
@@ -132,23 +151,28 @@ jobs:
           name: penta-pr-originator-readiness-${{ steps.target.outputs.number }}-${{ steps.target.outputs.head_sha }}
           path: |
             ${{ runner.temp }}/penta-pr-originator-readiness.json
+            ${{ runner.temp }}/penta-pr-gate-contract.json
             pr-worktree/penta/evidence/pr-self-cert/pr-${{ steps.target.outputs.number }}.json
             pr-worktree/penta/continuity/receipts/pr-${{ steps.target.outputs.number }}-self-certification.json
           if-no-files-found: warn
           retention-days: 90
 
-      - name: Project ownership boundary
+      - name: Project ownership and repair boundary
         if: always()
         shell: bash
         run: |
           {
-            echo '## Penta PR Gate Awareness v2'
+            echo '## Penta PR Gate Awareness v3'
             echo
             echo "- PR: #${{ steps.target.outputs.number }}"
             echo "- Exact head: \`${{ steps.target.outputs.head_sha }}\`"
+            echo "- Change class: **${{ steps.applicability.outputs.change_class || 'unresolved' }}**"
+            echo "- Risk class: **${{ steps.applicability.outputs.risk_class || 'unresolved' }}**"
+            echo "- Required merge groups: \`${{ steps.applicability.outputs.required_groups || 'universal-only' }}\`"
+            echo "- Gate contract SHA-256: \`${{ steps.applicability.outputs.contract_sha256 || 'unresolved' }}\`"
             echo '- Development metadata owner: **PentaPM only**'
-            echo '- Candidate branch mutation: **disabled**'
-            echo '- Issue creation: **disabled**'
-            echo '- PR body mutation: **disabled**'
-            echo '- Originator readiness: workflow artifact only; zero independent certification authority'
+            echo '- Candidate branch mutation: **disabled in Gate Awareness**'
+            echo '- Unrelated controls: **NOT_APPLICABLE**, not FAIL'
+            echo '- Each applicable group includes an exact owner, evidence requirement and repair action in the uploaded contract.'
+            echo '- Originator readiness: workflow artifact only; zero independent certification authority.'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,200 @@
+{
+  "schema": "ct.penta.pr-gate-applicability.v1",
+  "version": "1.0.0",
+  "status": "production_candidate",
+  "owner": "PentaPR",
+  "required_status_context": "CrownThrive governed merge gate",
+  "principles": {
+    "one_required_aggregator": true,
+    "unrelated_controls_are_not_applicable_not_failed": true,
+    "required_controls_must_name_owner_evidence_and_repair": true,
+    "advisory_workflows_do_not_block_merge_unless_aggregated": true,
+    "gate_applicability_creates_no_authority": true,
+    "d3_remains_human_reserved": true
+  },
+  "submission_contract": {
+    "schema": "ct.penta.pr-submission.v1",
+    "generated_from_trusted_git_diff": true,
+    "required_fields": [
+      "repository",
+      "pr_number",
+      "base_sha",
+      "head_sha",
+      "change_class",
+      "risk_class",
+      "changed_files",
+      "required_merge_groups",
+      "not_applicable_groups",
+      "owner_by_group",
+      "evidence_required_by_group",
+      "repair_action_by_group",
+      "rollback_ref"
+    ],
+    "effect_declarations": [
+      "provider_write",
+      "credential_effect",
+      "money_movement",
+      "rights_effect",
+      "d3_effect",
+      "authority_expansion"
+    ],
+    "effect_declaration_rule": "Effects are separate governed evidence. Gate routing never converts an UNKNOWN effect into PASS."
+  },
+  "universal_merge_controls": [
+    {
+      "id": "trusted_git_diff",
+      "owner": "PentaPR",
+      "evidence": "exact base/head and trusted Git diff binding",
+      "repair_action": "reconcile the branch to current base and regenerate exact-head readiness evidence"
+    },
+    {
+      "id": "penta_serialized_continuity",
+      "owner": "PentaSerialized",
+      "evidence": "protected-change continuity and rollback contract",
+      "repair_action": "add or repair the exact continuity/tombstone/supersession evidence required by the serialized policy"
+    },
+    {
+      "id": "evidence_classifier_negative_vectors",
+      "owner": "PentaPR",
+      "evidence": "deterministic evidence-classifier self-test",
+      "repair_action": "repair the classifier or its tests on the same PR lane"
+    },
+    {
+      "id": "git_sanity",
+      "owner": "PentaBuild",
+      "evidence": "no conflict markers or whitespace errors",
+      "repair_action": "repair the exact source diff"
+    }
+  ],
+  "groups": {
+    "documentation": {
+      "owner": "PentaDocs",
+      "extensions": [".md", ".mdx"],
+      "patterns": ["docs/**", "developers/**", "commerce/**", "commercial/**", "docs.json", "mint.json"],
+      "evidence": ["institutional documentation validation"],
+      "repair_action": "repair documentation/frontmatter/navigation/link or public-private projection defects in the same lane"
+    },
+    "phase_control": {
+      "owner": "PentaRelease",
+      "patterns": [
+        "phase3/**",
+        "phase4/**",
+        "developers/manifests/phase4-gate-contract.v4.json",
+        "scripts/validate_gate_registry_v4.py",
+        "scripts/run_phase4_preparation_audit.py",
+        "scripts/penta_gap_closure.py",
+        ".github/workflows/governed-merge-gate.yml",
+        ".github/workflows/docs-governance.yml"
+      ],
+      "evidence": ["gate registry", "phase-control compatibility", "retired-phase disposition as applicable"],
+      "repair_action": "repair the exact phase/gate contract rather than requiring unrelated PRs to satisfy global phase state"
+    },
+    "phase3_state": {
+      "owner": "PentaRelease",
+      "patterns": [
+        "developers/manifests/phase3-institutional-gate.v1.json",
+        "docs/phase3/**",
+        "docs/versioning/VERSION_REGISTRY.json",
+        "releases/v3.0.0/MANIFEST.json",
+        "AGENTS.md",
+        ".github/pull_request_template.md",
+        "SECURITY.md",
+        "docs/phase-model/PENTA_PHASE_MODEL.md",
+        "docs/archive/PENTA_PHASE_RETIREMENT_MANIFEST.json",
+        "start-here/current-operational-state.mdx",
+        "docs.json",
+        "developers/manifests/homepage-projection.v2.json",
+        "developers/manifests/institutional-phase-namespace.v2.json",
+        "developers/manifests/agent-sovereign-governance.v1.json",
+        "developers/manifests/cpanel-hosting-control.v1.json",
+        "developers/manifests/github-main-enforcement-target.v1.json",
+        "developers/manifests/pm-notification-routing.v1.json",
+        "developers/manifests/repository-governance-enforcement-state.v1.json",
+        "developers/manifests/s103-s100-engine-domain-edges.v1.json",
+        "developers/manifests/security-self-healing-policy.v1.json",
+        "developers/manifests/github-actions-runtime-policy.v1.json",
+        "scripts/validate_phase3_institutional_gate.py"
+      ],
+      "evidence": ["Phase 3 institutional-state invariant validation"],
+      "repair_action": "repair the exact Phase 3 state artifact or invariant changed by the PR; unrelated pre-existing Phase 3 drift is not a PR veto"
+    },
+    "homepage": {
+      "owner": "PentaDocs",
+      "patterns": ["homepage/**", "scripts/*homepage*", "scripts/render_homepage_projection.py", "developers/manifests/*homepage*"],
+      "evidence": ["homepage projection render and control-plane validation"],
+      "repair_action": "repair the homepage projection/control-plane artifacts"
+    },
+    "collab_portal": {
+      "owner": "PentaWire",
+      "patterns": ["**/*collab*portal*", "scripts/validate_collab_portal_adapter.py"],
+      "evidence": ["Collab Portal adapter contract validation"],
+      "repair_action": "repair the Collab Portal adapter or its exact contract"
+    },
+    "holdings_82": {
+      "owner": "PentaCensus",
+      "patterns": ["**/*holdings*82*", "scripts/validate_holdings_82_domain_seed.py"],
+      "evidence": ["Holdings 82-domain seed validation"],
+      "repair_action": "repair the affected holdings/domain seed only"
+    },
+    "registry_crosswalk": {
+      "owner": "PentaCensus",
+      "patterns": [
+        "scripts/validate_phase_2_7_74_registry_seed.py",
+        "scripts/validate_s103_74_canonical_crosswalk.py",
+        "scripts/validate_s103_s100_engine_domain_edges.py",
+        "**/*s103*",
+        "**/*s100*",
+        "**/*74*registry*"
+      ],
+      "evidence": ["affected registry seed/crosswalk/engine-domain validation"],
+      "repair_action": "repair the exact registry or crosswalk changed by the PR"
+    },
+    "namespace_api": {
+      "owner": "PentaWire",
+      "patterns": ["api/**", "mcp/**", "supabase/functions/**", "scripts/validate_phase_namespace_and_api_control.py", "developers/manifests/*api*", "developers/manifests/*mcp*"],
+      "evidence": ["namespace and API/MCP control validation"],
+      "repair_action": "repair the changed API/MCP namespace, authority, or dispatch contract"
+    },
+    "agent_governance": {
+      "owner": "PentaAuthority",
+      "patterns": ["agents/**", "factory/**", "penta/**", "scripts/*agent*", "supabase/migrations/*agent*", "supabase/migrations/*authority*", "supabase/migrations/*vote*", "supabase/migrations/*quorum*"],
+      "evidence": ["agent/Penta authority and sovereign-governance validation"],
+      "repair_action": "repair owner-verifier separation or authority boundaries on the same source lane"
+    },
+    "security": {
+      "owner": "PentaSecurity",
+      "patterns": ["supabase/**", "security/**", "penta/security/**", "scripts/*security*", "scripts/governed_*", "config/*security*", ".github/**"],
+      "evidence": ["deterministic security governance and applicable negative/adversarial checks"],
+      "repair_action": "repair the exact security defect; do not waive the control"
+    },
+    "penta_control": {
+      "owner": "PentaSELF",
+      "patterns": ["penta/**", "scripts/penta_*", "config/penta_*", "supabase/migrations/*penta*"],
+      "evidence": ["function-style Penta control tests"],
+      "repair_action": "repair the affected Penta control/runtime contract and tests"
+    },
+    "pm_routing": {
+      "owner": "PentaPM",
+      "patterns": ["scripts/resolve_pm_notification_recipients.py", "scripts/penta_pr_*", ".github/workflows/penta-pm*", ".github/workflows/penta-pr*", "penta/registry/**"],
+      "evidence": ["PentaPM routing invariants"],
+      "repair_action": "repair routing/metadata ownership or the PR lifecycle contract"
+    },
+    "security_self_heal": {
+      "owner": "PentaSELF",
+      "patterns": ["scripts/security_self_heal_plan.py", "penta/self/**", ".github/workflows/penta-gate-heal.yml"],
+      "evidence": ["security self-healing invariants"],
+      "repair_action": "repair the bounded self-heal plan without weakening security gates"
+    },
+    "workflow_policy": {
+      "owner": "PentaSecurity",
+      "patterns": [".github/workflows/**", ".github/actions/**", "scripts/validate_github_actions_runtime_policy.py"],
+      "evidence": ["GitHub Actions runtime/supply-chain policy", "CodeQL mode compatibility"],
+      "repair_action": "repair the workflow/action supply-chain policy on the same PR"
+    }
+  },
+  "release_gates": {
+    "note": "These are release/production authority predicates, not extra GitHub status contexts. Applicability remains governed by current effect/risk evidence.",
+    "possible": ["PentaSecurity", "CHLOM_RIGHTS", "CIE", "PentaCertifier", "provider_readback", "production_readback", "D3_HUMAN_RESERVED"],
+    "unknown_is_pass": false
+  }
+}
