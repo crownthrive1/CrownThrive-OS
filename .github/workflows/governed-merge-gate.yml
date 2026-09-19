@@ -77,8 +77,35 @@ jobs:
       - name: Validate evidence-data classifier negative vectors
         run: python scripts/governed_current_pr_preflight_v2.py --self-test
 
+      - name: Detect Phase 4 preparation audit applicability
+        id: phase4_scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags --no-recurse-submodules --depth=256 origin "$PR_BASE_SHA" "$PR_HEAD_SHA"
+          changed=$(git diff --name-only "$PR_BASE_SHA" "$PR_HEAD_SHA")
+          printf '%s\n' "$changed"
+          if grep -Eq '^(phase4/|scripts/run_phase4_preparation_audit\.py$|scripts/run_phase3_convergence_audit\.py$|scripts/validate_gate_registry_v4\.py$|config/.*gate|governance/.*gate|\.github/workflows/governed-merge-gate\.yml$)' <<<"$changed"; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run complete local Phase 4 preparation audit
+        if: steps.phase4_scope.outputs.required == 'true'
         run: python scripts/run_phase4_preparation_audit.py
+
+      - name: Record Phase 4 audit not applicable
+        if: steps.phase4_scope.outputs.required != 'true'
+        run: echo "Phase 4 preparation audit not applicable to this exact diff; all ordinary governed merge checks remain active."
 
       - name: Run function-style Penta control tests
         run: |
