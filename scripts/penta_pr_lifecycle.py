@@ -184,7 +184,7 @@ def lifecycle_comment(gh: GH, number: int) -> tuple[dict[str, Any] | None, dict[
 def save_state(gh: GH, number: int, state: dict[str, Any]) -> None:
     body = (
         f"{MARKER}{json.dumps(state, separators=(',', ':'))} -->\n\n"
-        f"PentaPR lifecycle control. Hard terminal deadline: **{state['deadline_at']}**. "
+        "PentaPR lifecycle control. "
         f"Current disposition: **{state['disposition']}**. "
         "PentaTagger supplies semantic labels; PentaMerge/PentaCloser retain terminal authority."
     )
@@ -210,7 +210,11 @@ def set_labels(gh: GH, number: int, disposition: str) -> set[str]:
         [DISPOSITION_STAGE[disposition]],
         STAGE_PREFIXES,
     )
-    additive = {desired_disposition, "penta:deadline-12h", "penta:authority:pr"}
+    if "penta:deadline-12h" in current:
+        remove_label(gh, number, "penta:deadline-12h")
+        current.discard("penta:deadline-12h")
+
+    additive = {desired_disposition, "penta:authority:pr"}
     missing = additive.difference(current)
     if missing:
         add_labels(gh, number, missing)
