@@ -273,8 +273,12 @@ def classify(gh: GH, pr: dict[str, Any]) -> tuple[str, str]:
     labels = read_labels(gh, number)
     if "penta:hold" in labels:
         return "NURTURE", "operator_hold"
-    text = ((pull.get("title") or "") + "\n" + (pull.get("body") or "")).lower()
-    if "superseded by" in text or "represented-zero-delta" in text:
+    title = (pull.get("title") or "").lower()
+    body = pull.get("body") or ""
+    body_lower = body.lower()
+    represented_marker = "<!-- penta-represented-zero-delta:" in body_lower
+    explicit_supersession = "superseded by #" in body_lower
+    if represented_marker or explicit_supersession:
         return "CLOSE", "superseded_or_represented"
     if pull.get("draft"):
         return "NURTURE", "draft"
