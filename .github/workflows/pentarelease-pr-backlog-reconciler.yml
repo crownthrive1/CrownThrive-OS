@@ -94,8 +94,20 @@ jobs:
           PY
           }
 
-          gh pr list --repo "$REPO" --state open --limit 100 \
-            --json number,title,headRefName > /tmp/pentarelease-open-prs.json
+          # The repository can exceed 100 open PRs. Page the provider API so the
+          # reconciler cannot silently ignore older generated shells.
+          : > /tmp/pentarelease-open-prs.ndjson
+          page=1
+          while true; do
+            batch=$(gh api "repos/$REPO/pulls?state=open&per_page=100&page=$page")
+            count=$(jq 'length' <<<"$batch")
+            [ "$count" -gt 0 ] || break
+            jq -c '.[] | {number,title,headRefName:.head.ref}' <<<"$batch" >> /tmp/pentarelease-open-prs.ndjson
+            [ "$count" -eq 100 ] || break
+            page=$((page + 1))
+          done
+          jq -s '.' /tmp/pentarelease-open-prs.ndjson > /tmp/pentarelease-open-prs.json
+          echo "Provider-complete open PR scan: $(jq 'length' /tmp/pentarelease-open-prs.json) PRs across $page page(s)."
 
           retired=0
           retained_branches=0
