@@ -23,7 +23,7 @@ on:
         default: ''
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
   issues: write
   checks: read
@@ -41,8 +41,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
-      group: penta-pr-lifecycle-${{ github.repository }}
-      cancel-in-progress: false
+      # Targeted lifecycle runs supersede stale work for the same PR/mode.
+      # Repository-wide sweeps remain serialized under the explicit sweep key.
+      group: penta-pr-lifecycle-${{ github.repository }}-${{ inputs.number || github.event.inputs.number || 'sweep' }}-${{ inputs.mode || github.event.inputs.mode || 'pr' }}
+      cancel-in-progress: true
     steps:
       - name: Checkout canonical Penta control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
