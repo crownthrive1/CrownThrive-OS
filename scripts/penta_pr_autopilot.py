@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Event-driven autonomous PentaPR convergence authority.
+"""Event-driven autonomous PentaPR convergence coordinator.
 
-v2.1 removes time-only terminal closure. PentaPR may restack, merge when the
-governed gate is current and green, or request PentaCloser only for an explicit
-CLOSE disposition such as a deterministic supersession/represented-zero-delta.
-A PR is never closed merely because a wall-clock deadline expired.
+v2.2 keeps reversible restack assistance in the autonomous lane but fails closed
+for terminal provider mutations. MERGE and CLOSE dispositions are evidence that
+native terminal owners have work to do; they are not sufficient authority for
+this autopilot to merge or close a pull request.
+
+Terminal mutation remains reserved for the governed PentaMerge/PentaCloser path
+after exact-head semantic owner results, required security/CHLOM/CIE gates and
+independent certification are current and provider-read back. A stale predecessor
+must also have the required successor/handoff readback before terminal close.
 """
 from __future__ import annotations
 
@@ -16,12 +21,31 @@ from typing import Any
 import penta_pr_lifecycle as lifecycle
 
 AUTOPILOT_SELF_CHECK = "pentapr autopilot"
+AUTONOMOUS_TERMINAL_HOLDS = {
+    "MERGE": "HOLD_INDEPENDENT_SEMANTIC_GATE_OWNER_RESULTS_REQUIRED",
+    "CLOSE": "HOLD_SUCCESSOR_OR_TERMINAL_HANDOFF_PROVIDER_READBACK_REQUIRED",
+}
 
 
 def configure_self_check_exclusion() -> None:
     lifecycle.SELF_LIFECYCLE_CHECK_NAMES = frozenset(
         set(lifecycle.SELF_LIFECYCLE_CHECK_NAMES) | {AUTOPILOT_SELF_CHECK}
     )
+
+
+def autonomous_terminal_mutation_guard(disposition: str | None) -> tuple[bool, str]:
+    """Return a deterministic fail-closed decision for autonomous terminal work.
+
+    The autonomous coordinator may classify and prepare work, but it must not
+    convert GitHub mergeability/check labels into terminal authority. The native
+    terminal owner can execute separately after governed semantic evidence is
+    exact-head current and read back.
+    """
+
+    hold = AUTONOMOUS_TERMINAL_HOLDS.get(disposition or "")
+    if hold:
+        return False, hold
+    return True, "PASS_NON_TERMINAL_AUTONOMOUS_ACTION"
 
 
 def attempt_restack(gh: lifecycle.GH, number: int) -> tuple[bool, str]:
@@ -61,18 +85,11 @@ def drive_one(gh: lifecycle.GH, number: int) -> None:
         print(f"PentaAutopilot #{number} restack={changed} {message}")
         return
 
-    if disposition == "MERGE":
-        merged, message = lifecycle.attempt_merge(gh, number)
-        print(f"PentaAutopilot #{number} merged={merged} {message}")
-        return
-
-    if disposition == "CLOSE":
-        # PentaCloser remains the terminal authority. Crucially, it is invoked
-        # only for an evidence-based CLOSE classification, never because a
-        # generic deadline elapsed.
-        lifecycle.pentacloser(gh, number)
+    terminal_allowed, terminal_reason = autonomous_terminal_mutation_guard(disposition)
+    if not terminal_allowed:
         print(
-            f"PentaAutopilot #{number} close_candidate=true "
+            f"PentaAutopilot #{number} terminal=DEFERRED "
+            f"disposition={disposition} hold={terminal_reason} "
             f"reason={reason or 'unknown'}"
         )
         return
@@ -87,8 +104,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=os.getenv("GITHUB_REPOSITORY"))
     parser.add_argument("--number", type=int)
-    # Compatibility flag retained so old/manual callers do not crash. It no
-    # longer grants time-only closure authority.
+    # Compatibility flag retained so old/manual callers do not crash. It does
+    # not grant terminal provider-mutation authority.
     parser.add_argument("--allow-deadline-close", action="store_true")
     args = parser.parse_args()
     if not args.repo:
