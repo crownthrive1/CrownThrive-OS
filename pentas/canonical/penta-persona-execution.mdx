@@ -1,0 +1,52 @@
+---
+title: "PentaPersona Execution"
+sidebarTitle: "PentaPersona Execution"
+description: "Production persona capability, playbook, queue, execution, readback, and evidence runtime."
+standard_version: "1.0.0"
+primary_audience: "internal"
+page_type: "reference"
+content_state: "evidence-backed"
+last_verified_at: "2026-08-31T09:07:30Z"
+---
+
+# PentaPersona Execution
+
+| Field | Current assignment |
+| --- | --- |
+| Machine key | `penta.persona-execution` |
+| Identity class | `LIVE_ONLY` |
+| Family | Penta System Architecture Family |
+| Maturity | `production` |
+| Activation/runtime | `ACTIVE` / `RUNTIME_PRESENT` |
+| Authority ceiling | D2 maximum; per-persona ceiling may be lower |
+| Docs route | `/pentas/canonical/penta-persona-execution` |
+
+## Runtime contract
+
+Persona execution resolves an approved persona, exact capability, exact playbook, authority ceiling, prerequisites, current provider/transport state, idempotency, and evidence target before work is claimed.
+
+### Required state machine
+
+`proposed -> eligible -> claimed -> executing -> provider_pending/readback_pending -> completed`
+
+or a typed `HOLD`, `DENIED`, `FAILED`, `CANCELLED`, or `SUPERSEDED` state.
+
+## Mandatory checks
+
+1. Persona identity is approved and current.
+2. Capability and playbook are enabled and production-certified.
+3. Requested work matches role/corridor and input schema.
+4. Authority remains at or below both persona and capability ceilings.
+5. D3/human-reserved conditions are routed, never executed.
+6. PentaMail/PentaMailer is used for business/persona email transport.
+7. Provider write requires a current verified binding and read-after-write.
+8. Money, rights, legal, credential, privacy, and safety gates remain independent.
+9. Material outcomes append/read back DAIL.
+
+## Recovery
+
+Execution state must survive worker/model restart. Stale claims are reconciled using exact work identity, lease/claim state, provider observations, and idempotency before another action. Ambiguous external outcomes remain HOLD until readback resolves them.
+
+## Machine contract
+
+`contracts/personas/penta-persona-execution.v1.json`

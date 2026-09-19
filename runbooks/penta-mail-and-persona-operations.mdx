@@ -1,0 +1,66 @@
+---
+title: "PentaMail and Persona Operations"
+sidebarTitle: "PentaMail and Persona Operations"
+description: "Production runbook for communication acquisition, persona execution, delivery, readback, evidence, incident handling, and recovery."
+standard_version: "1.0.0"
+primary_audience: "internal"
+page_type: "runbook"
+content_state: "evidence-backed"
+last_verified_at: "2026-08-31T09:07:30Z"
+---
+
+# PentaMail and Persona Operations
+
+## Normal flow
+
+1. Acquire message/thread context from the mailbox connector without sending.
+2. Normalize and deduplicate a PentaMarketer work item.
+3. Classify intent, traffic class, risk, D-level, and accountable owner.
+4. Resolve the approved persona and exact capability/playbook.
+5. Enforce recipient, suppression, opt-out, complaint, bounce, wrong-person, risk, working-hours and campaign rules.
+6. Render from verified facts; never invent pricing, proof, rights, deadlines, results, identity or authority.
+7. Enqueue through PentaMarketer to PentaMail/PentaMailer with stable idempotency.
+8. Dispatch through the verified provider route.
+9. Read back provider message ID/outcome and exact work/outbox state.
+10. Update lifecycle and stop conditions.
+11. Append/read back applicable CHLOM/DAIL evidence.
+
+## Reply handling
+
+A legitimate human reply stops the cold cadence for that contact but does not stop relationship work. Route through:
+
+`COLD_PROSPECT -> REPLIED -> ENGAGED -> QUALIFYING -> OPPORTUNITY -> CONVERSION`
+
+Automated acknowledgements do not count as human engagement. Opt-out, wrong-person, hard bounce, complaint, risk hold, claimed/won, or conversion stops the applicable cold sequence.
+
+## Direct mailbox prohibition
+
+If PentaMail is unavailable, do not use Gmail/Outlook send as a fallback. Persist `HOLD_PENTAMAIL_TRANSPORT_UNAVAILABLE` or `HOLD_DIRECT_MAILBOX_SEND_PROHIBITED`.
+
+## Incident triage
+
+| Symptom | Required action |
+| --- | --- |
+| No provider message ID | reconcile attempt; do not retry blindly |
+| Ambiguous timeout | read provider/outbox state before another send |
+| Duplicate provider IDs | halt exact work identity; open collision incident |
+| Suppression/opt-out received | stop cadence immediately and persist terminal state |
+| Complaint/bounce spike | pause affected route/campaign, preserve evidence, route compliance review |
+| Persona authority mismatch | deny/HOLD and route accountable owner |
+| DAIL append/readback failure | keep material result `UNBOUND/HOLD` |
+| Credential/provider degradation | fail closed; no alternate unverified route |
+
+## Recovery
+
+Recover from the immutable work/message identity, provider attempt ledger, receipt chain, rate reservations, persona/capability/playbook version, and DAIL. Restart must not create a second send. Reconcile first, then retry only if the operation is proven retry-safe.
+
+## Verification checklist
+
+- current persona registry and contract digest;
+- current sender and provider route;
+- current suppression/recipient state;
+- exact traffic class and campaign window;
+- outbox claim uniqueness;
+- provider acceptance/readback;
+- terminal state and evidence;
+- no raw secret or private recipient-policy configuration exposed.
