@@ -1,0 +1,89 @@
+name: Penta PR Represented-Zero-Delta Sweeper
+
+on:
+  schedule:
+    - cron: '37 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+  actions: write
+
+concurrency:
+  group: penta-pr-represented-zero-delta-sweeper
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Mark provider-proven represented-zero-delta PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO="$GITHUB_REPOSITORY"
+          page=1
+          marked=0
+          scanned=0
+
+          while true; do
+            batch=$(gh api "repos/$REPO/pulls?state=open&per_page=100&page=$page&sort=created&direction=asc")
+            count=$(jq 'length' <<<"$batch")
+            [ "$count" -gt 0 ] || break
+
+            while IFS=$'\t' read -r number head_sha head_repo body; do
+              scanned=$((scanned + 1))
+              [ "$head_repo" = "$REPO" ] || continue
+
+              labels=$(gh api "repos/$REPO/issues/$number" --jq '[.labels[].name]')
+              if jq -e 'index("penta:hold") != null' <<<"$labels" >/dev/null; then
+                echo "KEEP #$number: operator hold"
+                continue
+              fi
+
+              compare=$(gh api "repos/$REPO/compare/main...$head_sha" 2>/dev/null || true)
+              [ -n "$compare" ] || continue
+              ahead=$(jq -r '.ahead_by // -1' <<<"$compare")
+              status=$(jq -r '.status // "unknown"' <<<"$compare")
+
+              if [ "$ahead" != "0" ]; then
+                continue
+              fi
+
+              marker="<!-- penta-represented-zero-delta:main:$head_sha -->"
+              if grep -Fq "$marker" <<<"$body"; then
+                continue
+              fi
+
+              new_body="$body"
+              if [ -n "$new_body" ]; then
+                new_body="$new_body"$'\n\n'
+              fi
+              new_body="$new_body$marker"$'\n'"represented-zero-delta: GitHub compare proves this PR head has zero commits not already reachable from current main. Compare status: $status. Terminal authority remains with PentaPR/PentaCloser."
+
+              gh api --method PATCH "repos/$REPO/pulls/$number" -f body="$new_body" >/dev/null
+              echo "MARK #$number represented-zero-delta head=$head_sha status=$status"
+              marked=$((marked + 1))
+
+              # Route through the existing governed lifecycle instead of closing here.
+              gh workflow run penta-pr-autopilot.yml --repo "$REPO" -f number="$number" || true
+            done < <(jq -r '.[] | [.number,.head.sha,.head.repo.full_name,(.body // "")] | @tsv' <<<"$batch")
+
+            [ "$count" -eq 100 ] || break
+            page=$((page + 1))
+          done
+
+          {
+            echo '## Represented-zero-delta sweep'
+            echo
+            echo "- Open PRs scanned: $scanned"
+            echo "- PRs marked for governed retirement: $marked"
+            echo "- Retirement rule: exact provider compare shows ahead_by == 0 against current main"
+            echo "- Direct closure by sweeper: false"
+            echo "- Operator holds preserved: true"
+          } >> "$GITHUB_STEP_SUMMARY"
