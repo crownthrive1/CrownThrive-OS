@@ -184,7 +184,7 @@ def lifecycle_comment(gh: GH, number: int) -> tuple[dict[str, Any] | None, dict[
 def save_state(gh: GH, number: int, state: dict[str, Any]) -> None:
     body = (
         f"{MARKER}{json.dumps(state, separators=(',', ':'))} -->\n\n"
-        f"PentaPR lifecycle control. Hard terminal deadline: **{state['deadline_at']}**. "
+        "PentaPR lifecycle control. "
         f"Current disposition: **{state['disposition']}**. "
         "PentaTagger supplies semantic labels; PentaMerge/PentaCloser retain terminal authority."
     )
@@ -210,7 +210,11 @@ def set_labels(gh: GH, number: int, disposition: str) -> set[str]:
         [DISPOSITION_STAGE[disposition]],
         STAGE_PREFIXES,
     )
-    additive = {desired_disposition, "penta:deadline-12h", "penta:authority:pr"}
+    if "penta:deadline-12h" in current:
+        remove_label(gh, number, "penta:deadline-12h")
+        current.discard("penta:deadline-12h")
+
+    additive = {desired_disposition, "penta:authority:pr"}
     missing = additive.difference(current)
     if missing:
         add_labels(gh, number, missing)
@@ -269,8 +273,12 @@ def classify(gh: GH, pr: dict[str, Any]) -> tuple[str, str]:
     labels = read_labels(gh, number)
     if "penta:hold" in labels:
         return "NURTURE", "operator_hold"
-    text = ((pull.get("title") or "") + "\n" + (pull.get("body") or "")).lower()
-    if "superseded by" in text or "represented-zero-delta" in text:
+    title = (pull.get("title") or "").lower()
+    body = pull.get("body") or ""
+    body_lower = body.lower()
+    represented_marker = "<!-- penta-represented-zero-delta:" in body_lower
+    explicit_supersession = "superseded by #" in body_lower
+    if represented_marker or explicit_supersession:
         return "CLOSE", "superseded_or_represented"
     if pull.get("draft"):
         return "NURTURE", "draft"
@@ -359,63 +367,71 @@ def pentamerge(gh: GH, number: int | None = None) -> None:
 
 
 def pentacloser(gh: GH, number: int | None = None) -> None:
-    now = dt.datetime.now(dt.timezone.utc)
+    """Close only exact-head PRs already classified CLOSE by evidence.
+
+    Wall-clock age and deadline metadata never create close authority. The
+    lifecycle classifier must first establish a deterministic represented or
+    superseded disposition, and provider readback must bind it to the current
+    exact head before PentaCloser may terminalize the PR.
+    """
     pull_requests = open_pull_requests(gh, number)
     for pr in pull_requests:
-        number = pr["number"]
-        labels = read_labels(gh, number)
+        pr_number = pr["number"]
+        labels = read_labels(gh, pr_number)
         if "penta:hold" in labels:
-            print(f"PentaCloser #{number} terminal=HELD")
+            print(f"PentaCloser #{pr_number} terminal=HELD")
             continue
-        _, state = lifecycle_comment(gh, number)
-        if not state or now < parse_iso(state["deadline_at"]):
+
+        _, state = lifecycle_comment(gh, pr_number)
+        if not state:
+            print(f"PentaCloser #{pr_number} terminal=DEFERRED reason=lifecycle_missing")
+            continue
+        if state.get("disposition") != "CLOSE" or state.get("reason") != "superseded_or_represented":
+            print(
+                f"PentaCloser #{pr_number} terminal=DEFERRED "
+                f"reason={state.get('reason') or 'not_evidence_close'}"
+            )
             continue
 
         expected_head_sha = ((pr.get("head") or {}).get("sha"))
         lifecycle_head_sha = state.get("head_sha")
         if lifecycle_head_sha != expected_head_sha:
             raise RuntimeError(
-                f"preclose_lifecycle_head_stale:{number}:"
+                f"preclose_lifecycle_head_stale:{pr_number}:"
                 f"lifecycle={lifecycle_head_sha or 'missing'}:expected={expected_head_sha or 'missing'}"
             )
 
-        merged, message = attempt_merge(gh, number)
+        merged, message = attempt_merge(gh, pr_number)
         if merged:
-            print(f"PentaCloser #{number} terminal=MERGED")
+            print(f"PentaCloser #{pr_number} terminal=MERGED")
             continue
 
-        state.update(
-            {
-                "disposition": "CLOSE",
-                "reason": "hard_deadline_expired",
-                "updated_at": iso(now),
-            }
-        )
-        set_labels(gh, number, "CLOSE")
-        save_state(gh, number, state)
+        set_labels(gh, pr_number, "CLOSE")
+        save_state(gh, pr_number, state)
         readback = require_preclose_readback(
             gh,
-            number,
+            pr_number,
             lifecycle_head_sha=lifecycle_head_sha,
             expected_head_sha=expected_head_sha,
         )
         gh.post(
-            f"/repos/{gh.repo}/issues/{number}/comments",
+            f"/repos/{gh.repo}/issues/{pr_number}/comments",
             {
                 "body": (
-                    "PentaCloser terminal disposition at the 12-hour hard limit. "
-                    "This PR did not satisfy current exact-head merge requirements and is being closed, "
-                    "not force-merged. Fresh GitHub provider readback confirmed "
-                    "`penta:tagged`, `penta:close`, and `penta:stage:close-candidate` "
-                    f"on exact head `{expected_head_sha}` before closure "
+                    "PentaCloser evidence-based terminal disposition. "
+                    "Current lifecycle evidence classifies this PR as superseded or represented; "
+                    "wall-clock age did not create closure authority. Fresh GitHub provider readback "
+                    "confirmed `penta:tagged`, `penta:close`, and "
+                    "`penta:stage:close-candidate` on exact head "
+                    f"`{expected_head_sha}` before closure "
                     f"({len(readback)} total labels visible). Merge attempt: `{message}`. "
                     "History and branch provenance remain preserved."
                 )
             },
         )
-        gh.patch(f"/repos/{gh.repo}/pulls/{number}", {"state": "closed"})
-        mark_terminal(gh, number, "penta:terminal:closed", "penta:authority:closer")
-        print(f"PentaCloser #{number} terminal=CLOSED")
+        gh.patch(f"/repos/{gh.repo}/pulls/{pr_number}", {"state": "closed"})
+        mark_terminal(gh, pr_number, "penta:terminal:closed", "penta:authority:closer")
+        print(f"PentaCloser #{pr_number} terminal=CLOSED")
 
 
 def main() -> int:
