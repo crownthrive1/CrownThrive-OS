@@ -120,6 +120,89 @@ def classifications_for(trusted_files: set[str], policy: dict[str, Any], contrac
     return classifications, domains
 
 
+def validate_legacy_readiness_payload(
+    packet: dict[str, Any],
+    receipt: dict[str, Any],
+) -> dict[str, Any]:
+    """Translate legacy self-certification into non-authoritative readiness evidence.
+
+    This is a compatibility bridge only. It can preserve historical originator
+    readiness semantics, but it can never manufacture provider truth, satisfy
+    DAIL, create certification, or grant merge/release authority.
+    """
+    if not isinstance(packet, dict) or not isinstance(receipt, dict):
+        raise ValueError("legacy_readiness_payload_invalid")
+    if packet.get("schema") != "ct.penta.pr.self-certification.v1":
+        raise ValueError("legacy_readiness_packet_schema_invalid")
+    if receipt.get("schema") != "crownthrive.penta.serialized.git-receipt/v1":
+        raise ValueError("legacy_readiness_receipt_schema_invalid")
+
+    existing_semantics = packet.get("canonical_semantics")
+    if existing_semantics not in (None, "", "originator_readiness_evidence"):
+        raise ValueError("legacy_readiness_partial_canonical_semantics_rejected")
+
+    originator = str(packet.get("originator_identity") or "")
+    certifier = str(packet.get("self_certifier_identity") or "")
+    if not originator or certifier != originator:
+        raise ValueError("legacy_readiness_identity_mismatch")
+    if packet.get("self_certification_state") != "SELF_CERTIFIED":
+        raise ValueError("legacy_readiness_self_certification_state_invalid")
+
+    if packet.get("provider_results_manufactured") is not False:
+        raise ValueError("legacy_readiness_provider_truth_not_clean")
+    if packet.get("required_gate_bypass") is not False:
+        raise ValueError("legacy_readiness_gate_bypass_detected")
+
+    authority_fields = (
+        "independent_certification",
+        "authority_created",
+        "merge_authority",
+        "release_authority",
+    )
+    if any(packet.get(field) is True for field in authority_fields):
+        raise ValueError("legacy_readiness_authority_claim_rejected")
+
+    if (
+        packet.get("final_institutional_certification_state")
+        != "PENDING_REQUIRED_GATES_READBACK_AND_DAIL"
+    ):
+        raise ValueError("legacy_readiness_final_certification_not_pending")
+    if (
+        packet.get("dail_binding_state")
+        != "REQUIRED_BEFORE_INSTITUTIONAL_CERTIFICATION"
+    ):
+        raise ValueError("legacy_readiness_dail_not_pending")
+
+    self_cert = receipt.get("self_certification")
+    if not isinstance(self_cert, dict):
+        raise ValueError("legacy_readiness_receipt_self_certification_missing")
+    if self_cert.get("state") != "SELF_CERTIFIED":
+        raise ValueError("legacy_readiness_receipt_state_invalid")
+    if str(self_cert.get("originator") or "") != originator:
+        raise ValueError("legacy_readiness_receipt_identity_mismatch")
+    if self_cert.get("provider_results_manufactured") is not False:
+        raise ValueError("legacy_readiness_receipt_provider_truth_not_clean")
+    if self_cert.get("final_gate_bypassed") is not False:
+        raise ValueError("legacy_readiness_receipt_gate_bypass_detected")
+
+    return {
+        "state": "PASS",
+        "canonical_semantics": "originator_readiness_evidence",
+        "originator_identity": originator,
+        "legacy_bridge_applied": True,
+        "independent_certification": False,
+        "authority_created": False,
+        "merge_authority": False,
+        "release_authority": False,
+        "requires_pentacertifier": True,
+        "provider_results_manufactured": False,
+        "required_gate_bypass": False,
+        "final_institutional_certification_state":
+            "PENDING_REQUIRED_GATES_READBACK_AND_DAIL",
+        "dail_binding_state": "REQUIRED_BEFORE_INSTITUTIONAL_CERTIFICATION",
+    }
+
+
 def _self_cert_paths(number: int) -> tuple[Path, Path]:
     return (
         ROOT / f"penta/evidence/pr-self-cert/pr-{number}.json",
