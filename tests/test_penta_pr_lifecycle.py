@@ -135,13 +135,13 @@ def label_names(gh):
     return {item["name"] for item in gh.issue["labels"]}
 
 
-def install_expired_state(gh: FakeGH, *, head_sha: str = "abc") -> None:
-    expired = iso(dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=1))
+def install_evidence_close_state(gh: FakeGH, *, head_sha: str = "abc") -> None:
+    observed = iso(dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=1))
     state = {
-        "first_seen_at": expired,
-        "deadline_at": expired,
-        "disposition": "NURTURE",
-        "reason": "test",
+        "first_seen_at": observed,
+        "deadline_at": observed,
+        "disposition": "CLOSE",
+        "reason": "superseded_or_represented",
         "head_sha": head_sha,
     }
     gh.comments.append(
@@ -165,7 +165,7 @@ class PentaPRLifecycleTests(unittest.TestCase):
         self.assertIn("penta:close", labels)
         self.assertIn("penta:stage:close-candidate", labels)
         self.assertIn("penta:authority:pr", labels)
-        self.assertIn("penta:deadline-12h", labels)
+        self.assertNotIn("penta:deadline-12h", labels, "deadlines are metadata, not closure authority")
         self.assertNotIn("penta:stage:review", labels)
 
     def test_terminal_close_stamps_closer_and_removes_stage(self):
@@ -199,7 +199,7 @@ class PentaPRLifecycleTests(unittest.TestCase):
 
     def test_closer_tags_and_reads_back_before_terminal_close(self):
         gh = FakeGH()
-        install_expired_state(gh)
+        install_evidence_close_state(gh)
         pentacloser(gh)
         labels = label_names(gh)
         self.assertTrue(gh.closed)
@@ -220,7 +220,7 @@ class PentaPRLifecycleTests(unittest.TestCase):
 
     def test_closer_fails_closed_when_provider_hides_close_labels(self):
         gh = MissingPrecloseLabelsGH()
-        install_expired_state(gh)
+        install_evidence_close_state(gh)
         with self.assertRaisesRegex(RuntimeError, "preclose_label_readback_failed"):
             pentacloser(gh)
         self.assertFalse(gh.closed)
@@ -230,21 +230,21 @@ class PentaPRLifecycleTests(unittest.TestCase):
         gh.issue["labels"] = [
             item for item in gh.issue["labels"] if item["name"] != "penta:tagged"
         ]
-        install_expired_state(gh)
+        install_evidence_close_state(gh)
         with self.assertRaisesRegex(RuntimeError, "preclose_label_readback_failed"):
             pentacloser(gh)
         self.assertFalse(gh.closed)
 
     def test_closer_blocks_hold_added_during_preclose_window(self):
         gh = HoldDuringPrecloseGH()
-        install_expired_state(gh)
+        install_evidence_close_state(gh)
         with self.assertRaisesRegex(RuntimeError, "preclose_hold_detected"):
             pentacloser(gh)
         self.assertFalse(gh.closed)
 
     def test_closer_blocks_stale_lifecycle_head(self):
         gh = FakeGH()
-        install_expired_state(gh, head_sha="stale")
+        install_evidence_close_state(gh, head_sha="stale")
         with self.assertRaisesRegex(RuntimeError, "preclose_lifecycle_head_stale"):
             pentacloser(gh)
         self.assertFalse(gh.closed)
