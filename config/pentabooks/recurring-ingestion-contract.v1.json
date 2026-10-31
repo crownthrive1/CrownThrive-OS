@@ -1,0 +1,28 @@
+{
+  "schema": "ct.pentabooks.recurring-ingestion-contract.v1",
+  "contract_id": "PB-RECURRENCE-001",
+  "effective_at": "2026-09-03T21:30:00-04:00",
+  "timezone": "America/New_York",
+  "schedules": [
+    {
+      "name": "primary",
+      "cron": "0 * * * *",
+      "function": "discover, classify, hash, reconcile, custody-check, register, and hand off new PentaBooks artifacts"
+    },
+    {
+      "name": "cold_recovery",
+      "cron": "7 * * * *",
+      "function": "retry missed artifacts, stale readbacks, dead-lettered handoffs, and provider drift without duplicating accepted events"
+    }
+  ],
+  "idempotency_key": "rotation_id + product_id + sha256",
+  "write_policy": "append-only evidence; update projections only after source evidence is immutable",
+  "secret_policy": "Use vault aliases or repository/provider secret names only. Never serialize secret values into logs, manifests, Drive, PentaDocs, or product packages.",
+  "provider_secret_aliases": [
+    "PENTABOOKS_DRIVE_CREDENTIALS_JSON",
+    "PENTABOOKS_THRIVEBASE_URL",
+    "PENTABOOKS_THRIVEBASE_SERVICE_ROLE_KEY",
+    "PENTABOOKS_ALERT_WEBHOOK"
+  ],
+  "current_binding_state": "SCHEDULE_IMPLEMENTATION_PREPARED__RUNTIME_CREDENTIAL_READBACK_REQUIRED"
+}
