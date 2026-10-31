@@ -50,8 +50,10 @@ jobs:
             scripts/pentarelease/release_surface.py \
             scripts/pentarelease/enrich_release_intelligence.py \
             scripts/pentarelease/build_cie_subject.py \
+            scripts/pentarelease/evidence_failure_diagnostic.py \
             scripts/pentarelease/pentadocs_group.py \
             scripts/validate_docs.py
+          python3 -m unittest tests.test_pentarelease_evidence_diagnostic
           python3 -m json.tool .pentarelease/state/release-surface.json >/dev/null
           python3 -m json.tool .pentarelease/policy.json >/dev/null
 
@@ -144,13 +146,20 @@ jobs:
             --slurpfile cie_subject /tmp/pentarelease-source/PENTARELEASE_CIE_SUBJECT.json \
             '{release_version:$release_version,release_tag:$release_tag,pr_number:null,payload_bytes:$payload_bytes,cie_subject:$cie_subject[0]}' \
             > /tmp/pentarelease-evidence-request.json
-          curl --fail-with-body --silent --show-error \
+          # Keep provider body private; emit only an allowlisted failure code/status.
+          CURL_EXIT=0
+          HTTP_STATUS=$(curl --fail-with-body --silent \
             -X POST "$PENTARELEASE_EVIDENCE_ENDPOINT" \
             -H "Authorization: Bearer $OIDC_TOKEN" \
             -H 'Content-Type: application/json' \
             --data-binary @/tmp/pentarelease-evidence-request.json \
-            > /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json
-          jq . /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json
+            --output /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json \
+            --write-out '%{http_code}') || CURL_EXIT=$?
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            python3 scripts/pentarelease/evidence_failure_diagnostic.py \
+              /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json "$HTTP_STATUS" || true
+            exit "$CURL_EXIT"
+          fi
           test "$(jq -r '.ok' /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json)" = "true"
           test -n "$(jq -r '.result.projected.footer.evidence_sha256 // .result.footer.evidence_sha256 // empty' /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json)"
           jq -e '.result.projected.footer.cie.score | type == "number"' /tmp/pentarelease-source/PENTARELEASE_RUNTIME_EVIDENCE.json >/dev/null
