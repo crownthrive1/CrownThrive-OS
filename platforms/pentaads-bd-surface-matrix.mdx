@@ -1,0 +1,109 @@
+---
+title: "PentaAds Brilliant Directories Surface Matrix"
+sidebarTitle: "BD Surface Matrix"
+description: "Reusable Brilliant Directories advertising surfaces, route controls, density, privacy and deployment states for PentaAds."
+icon: "table-cells"
+content_state: "current"
+keywords:
+  - "PentaAds"
+  - "Brilliant Directories"
+  - "surface matrix"
+  - "ad placement"
+  - "route policy"
+---
+
+## Canonical surface registry
+
+ThriveBase holds twelve reusable Brilliant Directories surface contracts. The registry separates structurally bounded placements from surfaces that require connector-specific selectors or player/component integration.
+
+| Surface | Default detection | Format | Default action | State |
+| --- | --- | --- | --- | --- |
+| Header | `#header`, `header`, `.header` | banner/leaderboard | after | `BOUNDED` |
+| Footer | `footer`, `#footer`, `.footer` | banner/leaderboard | before | `BOUNDED` |
+| Sidebar | `aside`, `.sidebar`, `.sidebar-column`, `.col-md-4` | `300×250` banner | prepend | `BOUNDED` |
+| Search results | search/directory/location/category routes | banner/native | between result groups | `CONNECTOR_SPECIFIC` |
+| Category landing | category routes | banner/native | after introduction | `CONNECTOR_SPECIFIC` |
+| Member/profile | member/profile/professional routes | banner/native | after profile summary | `CONNECTOR_SPECIFIC` |
+| Listing detail | listing routes | banner/native | after main description | `CONNECTOR_SPECIFIC` |
+| Editorial post | blog/article/post/news routes | in-content banner/native | bounded editorial point | `CONNECTOR_SPECIFIC` |
+| Gallery | photo/album/gallery routes | `300×250` banner | prepend to main | `BOUNDED` |
+| Video/TV | video/TV/watch routes | VAST | player handoff | `HELD_PLAYER_CONTRACT` |
+| Sponsored link | explicit sponsored component | direct link | component-owned | `HELD_SURFACE_MAPPING` |
+| Restricted routes | admin/account/dashboard/commerce/API | none | none | `PROHIBITED` |
+
+## Density defaults
+
+- one header placement per rendered route;
+- one footer placement per rendered route;
+- one primary sidebar placement unless an explicit rotator is certified;
+- no generic fallback from a missing sidebar into primary content;
+- in-content placements require an editorial or result-list density contract;
+- intrusive formats are outside the base BD adapter and require explicit opt-in;
+- duplicates are blocked by deterministic CrownThrive markers.
+
+## Viewport defaults
+
+| Inventory | Viewport policy |
+| --- | --- |
+| `970×90` | tablet/desktop unless responsive provider behavior is independently proved |
+| `300×250` | mobile/tablet/desktop only when the container preserves layout stability |
+| Mobile banner | requires a real mobile zone assigned to the publisher site |
+| VAST | viewport-neutral, player-specific |
+| Direct link | component-responsive; never automatic navigation |
+
+Central PentaAds inventory must not be silently substituted for a publisher-specific mobile or video zone.
+
+## Privacy rules
+
+The adapter does not export:
+
+- member identifiers;
+- profile or listing identifiers;
+- names, email addresses or contact data;
+- search query text;
+- checkout, billing or account context;
+- viewer identifiers for VAST.
+
+Provider inventory IDs and public provider render URLs are operational identifiers, not credentials. Secret-bearing provider, BD, Supabase, GitHub and cPanel values remain server-side.
+
+## Locticians base mapping
+
+| Surface | Provider zone | Size | Current state |
+| --- | --: | --- | --- |
+| Header | `108419` | `970×90` | source-certified, installation held |
+| Sidebar | `108418` | `300×250` | source-certified, installation held |
+| Gallery | `108421` | `300×250` | source-certified, installation held |
+| Footer | `108420` | `970×90` | source-certified, installation held |
+| Sponsored links | `109030–109034` | direct link | provider URLs verified; surface mapping held |
+
+## State machine
+
+`discovered → mapped → preflighted → installed → published → independently_read_back → verified`
+
+Failure path:
+
+`preflighted/installed → mismatch → rollback_started → rollback_read_back → rolled_back`
+
+Missing BD global write authority produces:
+
+`mapped → HOLD_BD_TEMPLATE_WRITE_AUTHORITY`
+
+## Installation acceptance criteria
+
+A surface cannot be promoted to installed unless the receipt proves:
+
+1. the exact provider site and zone identity;
+2. source authority and source preimage;
+3. route and viewport eligibility;
+4. no duplicate existing placement;
+5. exact runtime and manifest hashes;
+6. source readback;
+7. public marker and zone readback;
+8. rollback availability;
+9. independent certification.
+
+## Related records
+
+- [PentaAds for Brilliant Directories](/platforms/pentaads-brilliant-directories-adapter)
+- [PentaAds Certification and Recovery](/platforms/pentaads-deployment-certification-recovery)
+- [PentaAds Placement OS Institutional Registry](/platforms/pentaads-placement-os-institutional-registry)
