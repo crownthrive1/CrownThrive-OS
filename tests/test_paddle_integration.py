@@ -15,12 +15,15 @@ spec.loader.exec_module(validator)
 
 
 class PaddleIntegrationContractTests(unittest.TestCase):
-    def test_repository_contract_passes(self) -> None:
+    def test_repository_and_serving_contract_passes(self) -> None:
         result = validator.validate(ROOT)
         self.assertEqual(result["state"], "PASS")
         self.assertEqual(result["mcp_server_count"], 3)
         self.assertEqual(result["preserved_mcp_server_count"], 3)
         self.assertEqual(result["skill_count"], 10)
+        self.assertEqual(result["serving_existing_tool_count"], 9)
+        self.assertEqual(result["serving_paddle_tool_count"], 3)
+        self.assertEqual(result["serving_total_tool_count"], 12)
         self.assertEqual(result["production_state"], "HOLD")
 
     def test_literal_sandbox_secret_is_rejected(self) -> None:
