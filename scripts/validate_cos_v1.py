@@ -48,6 +48,7 @@ UNITTEST_MODULES = (
     "tests.test_penta_convergence_certifier",
     "tests.test_penta_institutional_services",
     "tests.test_run_function_tests",
+    "tests.test_typescript_syntax",
 )
 
 
@@ -127,6 +128,7 @@ def require_environment(root: Path) -> None:
         Path("scripts/validate_github_actions_runtime_policy.py"),
         Path("scripts/validate_gate_registry_v4.py"),
         Path("scripts/run_function_tests.py"),
+        Path("scripts/check_typescript_syntax.mjs"),
         *(Path(path) for path in FUNCTION_TEST_MODULES),
         *(Path(*module.split(".")).with_suffix(".py") for module in UNITTEST_MODULES),
     )
@@ -164,7 +166,7 @@ def validate(root: Path) -> None:
     validate_workflow_yaml(root)
     run(["node", "scripts/validate-source.mjs"], cwd=root / CONTROL_PLANE)
     run(
-        ["node", "--experimental-strip-types", "--check", str(PENTAFABRIC_INGEST)],
+        ["node", "scripts/check_typescript_syntax.mjs", str(PENTAFABRIC_INGEST)],
         cwd=root,
     )
     run([sys.executable, "-B", "scripts/validate_penta_provider_control_plane.py"], cwd=root)
