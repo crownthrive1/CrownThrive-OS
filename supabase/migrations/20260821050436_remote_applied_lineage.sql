@@ -1,8 +1,0 @@
--- remote_applied_version: 20260821050436
--- CrownThrive migration-lineage restoration marker v1
--- This timestamp is recorded as APPLIED in production ThriveBase.
--- Exact historical SQL is intentionally not republished from production history.
--- Production history contains secret-like, Vault, and protected implementation patterns.
--- Canonical applied SQL remains in supabase_migrations.schema_migrations under ThriveBase custody.
--- This file is a no-op and exists only to restore Git/Supabase timestamp lineage parity.
--- Clean-room reconstruction from these public markers alone is NOT certified.
