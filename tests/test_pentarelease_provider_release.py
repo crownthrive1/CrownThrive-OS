@@ -1,6 +1,9 @@
 import importlib.util
 import io
 import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 import urllib.error
@@ -255,6 +258,60 @@ class ProviderReleaseTests(unittest.TestCase):
                 "provider_release_tag_mismatch",
             ):
                 provider_release.load_verified_release(path, "v3.63.3.0")
+
+
+class ProviderReleaseCliTests(unittest.TestCase):
+    def run_surface(self, mode, payload):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            release_file = root / "release.json"
+            release_file.write_text(json.dumps(payload), encoding="utf-8")
+            outdir = root / "out"
+            invocation = (
+                [str(MODULE_PATH)] if mode == "script"
+                else ["-m", "scripts.pentarelease.provider_release"]
+            )
+            # Match Actions' direct-file invocation without PYTHONPATH assistance.
+            # An empty PATH also makes any unintended second gh lookup fail.
+            env = {**os.environ, "PATH": "", "PYTHONPATH": ""}
+            result = subprocess.run(
+                [sys.executable, "-E", *invocation, "surface",
+                 "--release-json", str(release_file),
+                 "--repository", "crownthrive1/CrownThrive-OS",
+                 "--tag", "v3.63.3.0", "--repo-root", str(root),
+                 "--source-dir", str(root / "source"),
+                 "--outdir", str(outdir), "--no-sync-repository"],
+                cwd=root if mode == "script" else ROOT,
+                env=env, capture_output=True, text=True, timeout=20,
+            )
+            assets = sorted(p.name for p in outdir.iterdir()) if outdir.exists() else []
+            record = (
+                json.loads((outdir / "PENTARELEASE_RELEASE_RECORD.json").read_text())
+                if result.returncode == 0 else None
+            )
+            return result, assets, record
+
+    def test_surface_cli_materializes_verified_payload_in_both_invocation_modes(self):
+        for mode in ("script", "module"):
+            with self.subTest(mode=mode):
+                result, assets, record = self.run_surface(mode, provider_payload())
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout)["status"], "materialized")
+                self.assertEqual(len(assets), 8)
+                self.assertEqual(record["tag"], "v3.63.3.0")
+                self.assertEqual(record["official_release_url"], provider_payload()["html_url"])
+
+    def test_surface_cli_keeps_invalid_release_on_hold(self):
+        for mode in ("script", "module"):
+            for payload, reason in (
+                (provider_payload("v3.63.2.0"), "provider_release_tag_mismatch"),
+                ({**provider_payload(), "draft": True}, "provider_release_not_published"),
+            ):
+                with self.subTest(mode=mode, reason=reason):
+                    result, assets, _ = self.run_surface(mode, payload)
+                    self.assertEqual(result.returncode, 45, result.stderr)
+                    self.assertIn(reason, result.stderr)
+                    self.assertEqual(assets, [])
 
 
 class ProviderReleaseWorkflowContractTests(unittest.TestCase):

@@ -326,7 +326,12 @@ def normalize_for_release_surface(payload: dict[str, Any], expected_tag: str) ->
 
 
 def run_verified_surface(args: argparse.Namespace) -> None:
-    from scripts.pentarelease import release_surface
+    # Direct-file execution puts this script's directory, not the repository
+    # root, on sys.path. Preserve package imports for module/library callers.
+    if __name__ == "__main__" and not __package__:
+        import release_surface
+    else:
+        from scripts.pentarelease import release_surface
 
     payload = load_verified_release(Path(args.release_json), args.tag)
     normalized = normalize_for_release_surface(payload, args.tag)
