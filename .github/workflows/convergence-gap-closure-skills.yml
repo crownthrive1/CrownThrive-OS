@@ -1,0 +1,49 @@
+name: Convergence Gap Closure Skills
+
+on:
+  pull_request:
+    paths:
+      - "skills/convergence-gap-closure-v2/**"
+      - "registry/skills-fleet-gap-closure-v2.json"
+      - "runtime/skills_fleet_gap_closure.py"
+      - "schemas/skill-gap-*.schema.json"
+      - "contracts/skills/convergence-gap-closure-suite.v2.json"
+      - "tests/test_skills_fleet_gap_closure.py"
+      - "scripts/package_skills_fleet_gap_closure.py"
+      - "runbooks/skills-fleet-gap-closure.md"
+      - ".github/workflows/convergence-gap-closure-skills.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skills/convergence-gap-closure-v2/**"
+      - "registry/skills-fleet-gap-closure-v2.json"
+      - "runtime/skills_fleet_gap_closure.py"
+      - "schemas/skill-gap-*.schema.json"
+      - "contracts/skills/convergence-gap-closure-suite.v2.json"
+      - "tests/test_skills_fleet_gap_closure.py"
+      - "scripts/package_skills_fleet_gap_closure.py"
+      - "runbooks/skills-fleet-gap-closure.md"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Validate registry and skill paths
+        run: python3 runtime/skills_fleet_gap_closure.py validate-registry
+      - name: Run deterministic unit tests
+        run: python3 -m unittest tests.test_skills_fleet_gap_closure -v
+      - name: Build deterministic source package twice
+        run: |
+          python3 scripts/package_skills_fleet_gap_closure.py --output /tmp/skills-one.zip --manifest /tmp/skills-one.json
+          python3 scripts/package_skills_fleet_gap_closure.py --output /tmp/skills-two.zip --manifest /tmp/skills-two.json
+          sha256sum /tmp/skills-one.zip /tmp/skills-two.zip
+          cmp /tmp/skills-one.zip /tmp/skills-two.zip
+          cmp /tmp/skills-one.json /tmp/skills-two.json
