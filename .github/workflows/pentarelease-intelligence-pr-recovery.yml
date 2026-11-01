@@ -105,7 +105,15 @@ jobs:
               --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
             test "$gate" = 'completed:success'
 
+            MERGE_READY=$(gh api "repos/$REPO/pulls/$canonical")
+            test "$(jq -r '.state' <<<"$MERGE_READY")" = 'open'
+            test "$(jq -r '.base.ref' <<<"$MERGE_READY")" = 'main'
+            test "$(jq -r '.base.sha' <<<"$MERGE_READY")" = "$base_sha"
+            test "$(jq -r '.head.sha' <<<"$MERGE_READY")" = "$head_sha"
+            test "$(jq -r '.user.login' <<<"$MERGE_READY")" = 'github-actions[bot]'
+
             gh pr merge "$canonical" --repo "$REPO" --auto --squash \
+              --match-head-commit "$head_sha" \
               --subject "PentaRelease release intelligence $latest"
 
             merged='false'
