@@ -79,9 +79,10 @@ jobs:
             [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
 
             echo "Canonical generated PR: #$canonical ($head_ref @ $head_sha)"
+            gate_title="PentaRelease governed gate PR $canonical base $base_sha head $head_sha"
             existing=$(gh run list --repo "$REPO" --workflow "$GATE_WORKFLOW" --branch "$head_ref" --event workflow_dispatch --limit 20 \
-              --json databaseId,headSha,status,conclusion \
-              --jq ".[] | select(.headSha == \"$head_sha\") | [.databaseId,.status,(.conclusion // \"\")] | @tsv" \
+              --json databaseId,headSha,displayTitle,status,conclusion \
+              --jq ".[] | select(.headSha == \"$head_sha\" and .displayTitle == \"$gate_title\") | [.databaseId,.status,(.conclusion // \"\")] | @tsv" \
               | head -n1 || true)
 
             run_id=''
@@ -112,8 +113,8 @@ jobs:
 
               for _ in $(seq 1 60); do
                 candidate=$(gh run list --repo "$REPO" --workflow "$GATE_WORKFLOW" --branch "$head_ref" --event workflow_dispatch --limit 20 \
-                  --json databaseId,headSha,status,conclusion \
-                  --jq ".[] | select(.headSha == \"$head_sha\") | [.databaseId,.status,(.conclusion // \"\")] | @tsv" \
+                  --json databaseId,headSha,displayTitle,status,conclusion \
+                  --jq ".[] | select(.headSha == \"$head_sha\" and .displayTitle == \"$gate_title\") | [.databaseId,.status,(.conclusion // \"\")] | @tsv" \
                   | head -n1 || true)
                 if [ -n "$candidate" ]; then
                   IFS=$'\t' read -r run_id run_status run_conclusion <<<"$candidate"
