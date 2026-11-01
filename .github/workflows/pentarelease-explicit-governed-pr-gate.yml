@@ -58,6 +58,8 @@ jobs:
           test "$(jq -r '.base.ref' <<<"$SNAPSHOT")" = "main"
           test "$(jq -r '.base.sha' <<<"$SNAPSHOT")" = "$CT_EXPECTED_BASE_SHA"
           test "$(jq -r '.head.sha' <<<"$SNAPSHOT")" = "$CT_EXPECTED_HEAD_SHA"
+          test "$(jq -r '.head.repo.full_name // empty' <<<"$SNAPSHOT")" = "$GITHUB_REPOSITORY"
+          test "$(jq -r '.user.login // empty' <<<"$SNAPSHOT")" = 'github-actions[bot]'
           test "$(git rev-parse HEAD)" = "$CT_EXPECTED_HEAD_SHA"
           git fetch --no-tags --no-recurse-submodules origin "$CT_EXPECTED_BASE_SHA" "$CT_EXPECTED_HEAD_SHA"
           git cat-file -e "${CT_EXPECTED_BASE_SHA}^{commit}"
