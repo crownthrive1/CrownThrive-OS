@@ -79,27 +79,52 @@ jobs:
             [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
 
             echo "Canonical generated PR: #$canonical ($head_ref @ $head_sha)"
-            before=$(gh run list --repo "$REPO" --workflow "$GATE_WORKFLOW" --branch "$head_ref" --event workflow_dispatch --limit 10 \
-              --json databaseId,headSha --jq ".[] | select(.headSha == \"$head_sha\") | .databaseId" | head -n1 || true)
-
-            gh workflow run "$GATE_WORKFLOW" --repo "$REPO" --ref "$head_ref" \
-              -f pr_number="$canonical" \
-              -f base_sha="$base_sha" \
-              -f head_sha="$head_sha"
+            existing=$(gh run list --repo "$REPO" --workflow "$GATE_WORKFLOW" --branch "$head_ref" --event workflow_dispatch --limit 20 \
+              --json databaseId,headSha,status,conclusion \
+              --jq ".[] | select(.headSha == \"$head_sha\") | [.databaseId,.status,(.conclusion // \"\")] | @tsv" \
+              | head -n1 || true)
 
             run_id=''
-            for _ in $(seq 1 60); do
-              candidate=$(gh run list --repo "$REPO" --workflow "$GATE_WORKFLOW" --branch "$head_ref" --event workflow_dispatch --limit 20 \
-                --json databaseId,headSha --jq ".[] | select(.headSha == \"$head_sha\") | .databaseId" | head -n1 || true)
-              if [ -n "$candidate" ] && [ "$candidate" != "${before:-}" ]; then
-                run_id="$candidate"
-                break
-              fi
-              sleep 5
-            done
-            test -n "$run_id"
-            echo "Explicit governed gate run: $run_id"
-            gh run watch "$run_id" --repo "$REPO" --exit-status
+            if [ -n "$existing" ]; then
+              IFS=$'\t' read -r run_id run_status run_conclusion <<<"$existing"
+              case "$run_status:$run_conclusion" in
+                completed:success)
+                  echo "Reusing successful exact-head explicit gate run: $run_id"
+                  ;;
+                queued:|in_progress:)
+                  echo "Watching existing exact-head explicit gate run: $run_id"
+                  gh run watch "$run_id" --repo "$REPO" --exit-status
+                  ;;
+                completed:*)
+                  echo "Existing exact-head explicit gate run $run_id ended $run_conclusion; changed evidence is required before retry." >&2
+                  exit 44
+                  ;;
+                *)
+                  echo "Unexpected exact-head explicit gate run state: $run_status:$run_conclusion" >&2
+                  exit 44
+                  ;;
+              esac
+            else
+              gh workflow run "$GATE_WORKFLOW" --repo "$REPO" --ref "$head_ref" \
+                -f pr_number="$canonical" \
+                -f base_sha="$base_sha" \
+                -f head_sha="$head_sha"
+
+              for _ in $(seq 1 60); do
+                candidate=$(gh run list --repo "$REPO" --workflow "$GATE_WORKFLOW" --branch "$head_ref" --event workflow_dispatch --limit 20 \
+                  --json databaseId,headSha,status,conclusion \
+                  --jq ".[] | select(.headSha == \"$head_sha\") | [.databaseId,.status,(.conclusion // \"\")] | @tsv" \
+                  | head -n1 || true)
+                if [ -n "$candidate" ]; then
+                  IFS=$'\t' read -r run_id run_status run_conclusion <<<"$candidate"
+                  break
+                fi
+                sleep 5
+              done
+              test -n "$run_id"
+              echo "New explicit governed gate run: $run_id"
+              gh run watch "$run_id" --repo "$REPO" --exit-status
+            fi
 
             gate=$(gh api "repos/$REPO/commits/$head_sha/check-runs" \
               --jq '[.check_runs[] | select(.name=="CrownThrive governed merge gate")] | sort_by(.started_at) | last | ((.status // "missing") + ":" + (.conclusion // "pending"))')
