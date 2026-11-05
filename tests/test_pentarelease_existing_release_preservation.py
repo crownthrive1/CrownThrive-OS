@@ -4,9 +4,8 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import textwrap
 import unittest
-
-import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/crownthrive-os-v2-release.yml"
@@ -46,11 +45,12 @@ else:
 
 class ExistingReleasePreservationTests(unittest.TestCase):
     def run_publisher(self, mode="existing", mismatch="", metadata=None):
-        workflow = yaml.safe_load(WORKFLOW.read_text())
-        script = next(
-            step["run"] for step in workflow["jobs"]["publish"]["steps"]
-            if step["name"] == "Publish or update GitHub Release"
-        )
+        # Keep this regression runnable in stdlib-only governance runners.
+        # The repository's workflow validators separately parse the YAML.
+        block = WORKFLOW.read_text().split(
+            "      - name: Publish or update GitHub Release\n", 1
+        )[1].split("      - name:", 1)[0]
+        script = textwrap.dedent(block.split("        run: |\n", 1)[1])
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             package = root / "package"
