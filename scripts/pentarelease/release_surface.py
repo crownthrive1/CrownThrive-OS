@@ -573,12 +573,16 @@ def sync_repository_surfaces(
 
 
 def docs_page(title: str, body: str, description: str) -> str:
+    # JSON strings are valid YAML scalars; reuse the exact title for the sidebar.
+    title_value = json.dumps(title, ensure_ascii=False)
+    description_value = json.dumps(description, ensure_ascii=False)
     rendered_body = body.rstrip()
     if not re.search(r"(?m)^#\s+", rendered_body):
         rendered_body = f"# {title}\n\n{rendered_body}"
     return f"""---
-title: "{title}"
-description: "{description}"
+title: {title_value}
+sidebarTitle: {title_value}
+description: {description_value}
 ---
 
 {rendered_body}

@@ -290,7 +290,13 @@ PentaRelease maintains this bounded block. Content outside the markers remains u
 
 
 def mdx(title: str, description: str, body: str) -> str:
-    return f'---\ntitle: "{title}"\ndescription: "{description}"\n---\n\n{body.rstrip()}\n'
+    # JSON strings are valid YAML scalars; reuse the exact title for the sidebar.
+    title_value = json.dumps(title, ensure_ascii=False)
+    description_value = json.dumps(description, ensure_ascii=False)
+    return (
+        f'---\ntitle: {title_value}\nsidebarTitle: {title_value}\n'
+        f'description: {description_value}\n---\n\n{body.rstrip()}\n'
+    )
 
 
 def main() -> None:
