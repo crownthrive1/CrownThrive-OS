@@ -116,26 +116,34 @@ jobs:
           [ "$DRAFT" = "true" ] && FLAGS+=(--draft)
           [ "$PRERELEASE" = "true" ] && FLAGS+=(--prerelease)
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" \
-              --title "$TITLE" \
-              --notes-file "$PACKAGE/RELEASE_NOTES.md" \
-              --target "$TARGET"
+          EXISTING=$(mktemp -d)
+          trap 'rm -rf "$EXISTING"' EXIT
+          if gh release view "$TAG" --json tagName,name,targetCommitish,isDraft,isPrerelease > "$EXISTING/release.json" 2>/dev/null; then
+            # A delayed source merge must not overwrite later release enrichment.
+            # Reconcile exact original inputs and preserve the provider body/assets.
+            test "$(jq -r '.tagName' "$EXISTING/release.json")" = "$TAG"
+            test "$(jq -r '.name' "$EXISTING/release.json")" = "$TITLE"
+            test "$(jq -r '.targetCommitish' "$EXISTING/release.json")" = "$TARGET"
+            test "$(jq -r '.isDraft' "$EXISTING/release.json")" = "$DRAFT"
+            test "$(jq -r '.isPrerelease' "$EXISTING/release.json")" = "$PRERELEASE"
+            gh release download "$TAG" --pattern MANIFEST.json --pattern RELEASE_NOTES.md --dir "$EXISTING"
+            cmp "$PACKAGE/MANIFEST.json" "$EXISTING/MANIFEST.json"
+            cmp "$PACKAGE/RELEASE_NOTES.md" "$EXISTING/RELEASE_NOTES.md"
+            echo "Existing release inputs match; preserving published notes and assets."
           else
+            # Creation fails safely if an existing release was unreadable or raced us.
             gh release create "$TAG" \
               --target "$TARGET" \
               --title "$TITLE" \
               --notes-file "$PACKAGE/RELEASE_NOTES.md" \
               "${FLAGS[@]}"
+            gh release upload "$TAG" \
+              "$ZIP" \
+              "$TGZ" \
+              dist/pentarelease/SHA256SUMS \
+              dist/pentarelease/MANIFEST.json \
+              dist/pentarelease/RELEASE_NOTES.md
           fi
-
-          gh release upload "$TAG" \
-            "$ZIP" \
-            "$TGZ" \
-            dist/pentarelease/SHA256SUMS \
-            dist/pentarelease/MANIFEST.json \
-            dist/pentarelease/RELEASE_NOTES.md \
-            --clobber
 
       - name: Verify provider release and downloadable asset readback
         env:
