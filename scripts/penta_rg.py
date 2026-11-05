@@ -29,6 +29,7 @@ BAD = {"failure", "cancelled", "timed_out", "action_required", "startup_failure"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 USES = re.compile(r"(?m)^\s*-?\s*uses:\s*([^\s#]+)")
 MARKER = "<!-- pentarg-control:"
+GITHUB_RERUN_WINDOW = dt.timedelta(days=30)
 
 
 class PentaRGError(RuntimeError):
@@ -219,8 +220,19 @@ def provider_rerun_not_retriable(exc):
             "workflow run cannot be retried",
             "workflow run is not rerunnable",
             "workflow run cannot be re-run",
+            "unable to retry this workflow run because it was created over a month ago",
         )
     )
+
+
+def workflow_rerun_expired(run, now=None):
+    """GitHub's rerun window starts at creation, not the last run attempt.
+
+    Missing provider metadata cannot prove expiration; the narrow provider-error
+    classifier remains the fallback for incomplete data and boundary races.
+    """
+    created = parse_time(run.get("created_at"))
+    return bool(created and (now or utc_now()) - created >= GITHUB_RERUN_WINDOW)
 
 
 class GitHubClient:
@@ -247,13 +259,15 @@ class GitHubClient:
 
     def paginate(self, path, pages=3):
         values, sep = [], "&" if "?" in path else "?"
-        for page in range(1, pages + 1):
+        page = 1
+        while pages is None or page <= pages:
             batch = self.get(f"{path}{sep}page={page}")
             if not isinstance(batch, list):
                 raise PentaRGError(f"pagination_expected_list:{path}")
             values += batch
             if len(batch) < 100:
                 break
+            page += 1
         return values
 
 
@@ -272,7 +286,10 @@ def _workflow_runs(gh, sha):
 
 
 def _comments(gh, number):
-    return gh.paginate(f"/repos/{gh.repo}/issues/{number}/comments?per_page=100")
+    # Idempotency needs the complete history, not only the first 300 comments.
+    # Every page consumes the shared request budget; exhaustion defers before
+    # a caller can mistake incomplete history for an absent receipt.
+    return gh.paginate(f"/repos/{gh.repo}/issues/{number}/comments?per_page=100", pages=None)
 
 
 def _marked(gh, number, key):
@@ -295,9 +312,13 @@ def remote_audit(repo, token, policy, apply=False):
             files, states = _pull_files(gh, number), []
             for run in _workflow_runs(gh, sha) if sha else []:
                 state, route = classify_run_conclusion(run.get("conclusion"))
-                states.append({"id": run.get("id"), "name": run.get("name"), "status": run.get("status"), "conclusion": run.get("conclusion"), "gate_state": state, "route": route})
+                if route == "bounded_rerun_then_remediation" and workflow_rerun_expired(run):
+                    route = "current_head_remediation_or_supersession"
+                states.append({"id": run.get("id"), "name": run.get("name"), "status": run.get("status"), "conclusion": run.get("conclusion"), "gate_state": state, "route": route, "created_at": run.get("created_at")})
                 if route == "bounded_rerun_then_remediation" and run.get("id"):
                     actions.append(Action("rerun_failed_workflow", str(run["id"]), "D1", f"PR #{number} exact-head provider run failed", True, "new attempt; prior attempt immutable", {"pr": number, "head_sha": sha}))
+                elif route == "current_head_remediation_or_supersession" and run.get("id"):
+                    actions.append(Action("remediate_expired_workflow_run", str(run["id"]), "D1", "GitHub's 30-day rerun window has expired; failed evidence remains HOLD", False, "no mutation; historical run preserved", {"pr": number, "head_sha": sha, "created_at": run.get("created_at"), "provider_reason": "workflow_run_rerun_window_expired"}))
                 elif route == "provider_approval_or_actor_policy":
                     actions.append(Action("reissue_pr_from_trusted_actor_or_approve_provider_run", f"pr:{number}", "D2", "provider returned action_required before jobs", False, "no mutation", {"head_sha": sha, "workflow": run.get("name")}))
             starter = starter_pr_match(str(raw.get("title") or ""), files, policy)
@@ -317,8 +338,12 @@ def remote_audit(repo, token, policy, apply=False):
                     executed.append({"action": action.action, "pr": number, "status": "APPLIED"})
                 elif action.action == "rerun_failed_workflow":
                     run, pr = int(action.target), int((action.metadata or {}).get("pr") or 0); key = f"rerun-{run}-v1"
-                    if pr and _marked(gh, pr, key):
+                    hold_key = f"rerun-{run}-provider-nonretriable-v1"
+                    comments = _comments(gh, pr) if pr else []
+                    if any(f"{MARKER}{key} -->" in str(v.get("body") or "") for v in comments):
                         executed.append({"action": action.action, "run_id": run, "status": "NOOP_ALREADY_REQUESTED"}); continue
+                    if any(f"{MARKER}{hold_key} -->" in str(v.get("body") or "") for v in comments):
+                        executed.append({"action": action.action, "run_id": run, "status": "NOOP_PROVIDER_NOT_RETRIABLE"}); continue
                     try:
                         gh.post(f"/repos/{repo}/actions/runs/{run}/rerun-failed-jobs", {})
                     except ProviderDeferred:
@@ -326,7 +351,6 @@ def remote_audit(repo, token, policy, apply=False):
                     except PentaRGError as exc:
                         if not provider_rerun_not_retriable(exc):
                             raise
-                        hold_key = f"rerun-{run}-provider-nonretriable-v1"
                         if pr:
                             _comment(
                                 gh,

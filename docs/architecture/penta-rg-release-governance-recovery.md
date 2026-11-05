@@ -32,6 +32,25 @@ PentaRG distinguishes:
 6. **Duplicate/unbound workflow defects** — generic starter PRs are archived with an explicit tombstone and recoverable branch history.
 7. **Delivery defects** — Vercel source, project binding, environment contract, preview, production, domain, runtime, and rollback are independently tracked.
 
+### Expired GitHub reruns
+
+GitHub permits reruns only within 30 days of a workflow run's creation. PentaRG
+checks `created_at`, not the latest attempt or update time, before planning a
+failed-job retry. Expired failed runs remain `HOLD`, with an explicit
+`remediate_expired_workflow_run` plan that cannot apply a mutation. Current-head
+remediation or governed supersession is required; historical evidence stays intact.
+
+If creation metadata is unavailable or the provider rejects a boundary-time
+request, only GitHub's explicit non-retriable-run response is recorded as a
+non-retriable HOLD. Its receipt prevents another request for the same run, and
+the sweep continues so that it can write its provider receipt. Generic permission
+failures remain fatal; quota exhaustion remains `DEFERRED`. A successful sweep
+does not certify the held runs or manufacture passing checks.
+
+Receipt lookup reads the complete PR comment history within the shared request
+budget. If that history cannot be completed, recovery defers before another
+retry or comment write; a truncated comment list never proves a receipt absent.
+
 ## Vercel application plane
 
 `apps/crownthrive-os-control-plane` is a buildless Vercel application for:
