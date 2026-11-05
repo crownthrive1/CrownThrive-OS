@@ -61,10 +61,33 @@ jobs:
           echo "DRAFT=$DRAFT" >> "$GITHUB_ENV"
           echo "PRERELEASE=$PRERELEASE" >> "$GITHUB_ENV"
 
+      - name: Resolve immutable release source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A merged source branch can be auto-deleted. Existing releases must
+          # use their tag's commit while TARGET remains the original metadata.
+          # Enumerate every page: a failed read must never mean "not published".
+          RELEASE_TAGS=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[].tag_name')
+          SOURCE_REF="$TARGET"
+          if printf '%s\n' "$RELEASE_TAGS" | grep -Fx -- "$TAG" >/dev/null; then
+            # The commits endpoint peels lightweight and annotated tags. Qualify
+            # the tag to avoid ambiguity with a branch bearing the same name.
+            ENCODED_REF=$(python -c 'import os, urllib.parse; print(urllib.parse.quote("refs/tags/" + os.environ["TAG"], safe=""))')
+            SOURCE_REF=$(gh api "repos/$GITHUB_REPOSITORY/commits/$ENCODED_REF" --jq '.sha')
+            if [[ ! "$SOURCE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+              echo 'Existing release tag did not resolve to an immutable commit SHA.' >&2
+              exit 1
+            fi
+          fi
+          echo "SOURCE_REF=$SOURCE_REF" >> "$GITHUB_ENV"
+
       - name: Checkout requested release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.TARGET }}
+          ref: ${{ env.SOURCE_REF }}
           fetch-depth: 0
 
       - name: Validate PentaRelease package contract
@@ -179,3 +202,4 @@ jobs:
           - Checksums: SHA256SUMS
           - Provider readback: verified
           EOF
+
