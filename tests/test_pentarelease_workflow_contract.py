@@ -1,3 +1,5 @@
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -24,12 +26,69 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("HOLD_PR_PROVIDER_IDENTITY", self.text)
         self.assertIn("HOLD_PR_MERGE_IDENTITY", self.text)
 
-    def test_recursive_actions_identity_is_hold_not_false_code_failure(self):
+    def test_action_required_is_hold_without_assuming_provider_cause(self):
         self.assertIn('RUN_CONCLUSION" = "action_required', self.text)
-        self.assertIn("GitHub Actions recursive identity prevented PR workflow execution", self.text)
+        self.assertIn("PR workflow returned action_required", self.text)
+        self.assertIn("specific provider approval or eligibility requirement", self.text)
+        self.assertIn("PR-bound validation is not yet proven", self.text)
+        self.assertNotIn("recursive identity", self.text)
         self.assertIn('promotion_state=HOLD_PR_PROVIDER_IDENTITY', self.text)
         self.assertIn('RUN_CONCLUSION" != "success', self.text)
         self.assertIn("exit 46", self.text)
+
+    def test_action_required_branch_preserves_exact_head_hold_and_exit(self):
+        # Execute only the real diagnostic branch with synthetic provider state.
+        # No provider commands, approval, rerun, or merge are executed.
+        guard = '            if [ "$RUN_HEAD" = "$HEAD_SHA" ] && [ "$RUN_STATUS" = "completed" ] && [ "$RUN_CONCLUSION" = "action_required" ]; then'
+        start = self.text.index(guard)
+        end = self.text.index("\n            fi", start) + len("\n            fi")
+        script = (
+            "set -euo pipefail\n"
+            + self.text[start:end]
+            + '\nprintf "continued=true\\n" >> "$GITHUB_OUTPUT"\n'
+        )
+        head = "a" * 40
+        cases = (
+            (head, "completed", "action_required", True),
+            ("b" * 40, "completed", "action_required", False),
+            (head, "in_progress", "action_required", False),
+            (head, "completed", "success", False),
+            (head, "completed", "failure", False),
+        )
+        for run_head, status, conclusion, held in cases:
+            with self.subTest(run_head=run_head, status=status, conclusion=conclusion):
+                with tempfile.TemporaryDirectory() as directory:
+                    output = Path(directory) / "github-output"
+                    result = subprocess.run(
+                        ["bash", "-c", script],
+                        env={
+                            "RUN_HEAD": run_head,
+                            "HEAD_SHA": head,
+                            "RUN_STATUS": status,
+                            "RUN_CONCLUSION": conclusion,
+                            "GITHUB_OUTPUT": str(output),
+                            "PR_URL": "https://github.com/example/repository/pull/1",
+                            "BRANCH": "pentarelease/surface-test",
+                        },
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    if held:
+                        self.assertEqual(
+                            output.read_text(),
+                            "promotion_state=HOLD_PR_PROVIDER_IDENTITY\n"
+                            "pr_url=https://github.com/example/repository/pull/1\n"
+                            "branch=pentarelease/surface-test\n",
+                        )
+                        self.assertIn("PR workflow returned action_required", result.stdout)
+                        self.assertIn("PR-bound validation is not yet proven", result.stdout)
+                        self.assertNotIn("recursive identity", result.stdout)
+                    else:
+                        self.assertEqual(output.read_text(), "continued=true\n")
+                        self.assertEqual(result.stdout, "")
 
     def test_reconciliation_has_local_and_provider_preflight(self):
         self.assertIn("Determine reconciliation need", self.text)
