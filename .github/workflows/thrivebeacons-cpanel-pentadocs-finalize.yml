@@ -1,0 +1,97 @@
+name: ThriveBeacons cPanel PentaDocs Finalize
+
+on:
+  push:
+    branches:
+      - docs/thrivebeacons-cpanel-production-20260903
+    paths:
+      - penta/evidence/thrivebeacons-cpanel-pentadocs-finalize.ready
+
+permissions:
+  contents: write
+
+concurrency:
+  group: thrivebeacons-cpanel-pentadocs-finalize
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out documentation branch
+        uses: actions/checkout@v4
+        with:
+          ref: docs/thrivebeacons-cpanel-production-20260903
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Add ThriveBeacons production record to navigation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('docs.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          anchor = 'changelog/crownthrive-app-factory-rc1-institutionalization-2026-08-30'
+          target = 'changelog/thrivebeacons-cpanel-production-2026-09-03'
+          inserted = False
+          already_present = False
+
+          def visit(value):
+              global inserted, already_present
+              if isinstance(value, list):
+                  if target in value:
+                      already_present = True
+                  if anchor in value and target not in value:
+                      value.insert(value.index(anchor) + 1, target)
+                      inserted = True
+                  for child in value:
+                      visit(child)
+              elif isinstance(value, dict):
+                  for child in value.values():
+                      visit(child)
+
+          visit(data)
+          if not inserted and not already_present:
+              raise SystemExit('navigation anchor not found; refusing ambiguous insertion')
+          path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          print(json.dumps({'inserted': inserted, 'already_present': already_present, 'target': target}))
+          PY
+
+      - name: Apply PentaDocs v2 governance
+        run: python scripts/pentadocs_quality.py --apply
+
+      - name: Verify documentation corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/penta_portal_finalize.py --check
+          python scripts/penta_operational_knowledge_entrypoint.py --check
+          python scripts/pentagonal_reference_suite.py --check
+          python scripts/validate_docs.py
+          git diff --check
+
+      - name: Commit finalized documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add \
+            docs.json \
+            changelog/thrivebeacons-cpanel-production-2026-09-03.mdx \
+            data/documentation/pentadocs-page-profiles.v1.json
+          if git diff --cached --quiet; then
+            echo 'Documentation already finalized.'
+            exit 0
+          fi
+          git config user.name 'CrownThrive PentaDocs Governance'
+          git config user.email 'contact@crownthrive.com'
+          git commit -m 'docs(thrivebeacons): finalize cPanel production evidence'
+          git push origin HEAD:docs/thrivebeacons-cpanel-production-20260903
