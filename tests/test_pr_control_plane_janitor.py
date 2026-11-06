@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -16,6 +19,7 @@ from pr_control_plane_janitor import (  # noqa: E402
     load_policy,
     paginate,
     pagination_request_paths,
+    run,
 )
 
 
@@ -285,6 +289,174 @@ class PRControlPlaneJanitorTests(unittest.TestCase):
                     candidates=[{"tip_sha": tip}],
                     now=dt.datetime(2026, 8, 31, tzinfo=dt.timezone.utc),
                 )
+
+
+class ArchiveParentRegressionTests(unittest.TestCase):
+    """Exercise archive requests against real, isolated local Git objects.
+
+    The API boundary is mocked throughout. No GitHub requests or ref deletions
+    occur, including tests of the apply-mode safety gate.
+    """
+
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory(prefix="janitor-archive-test-")
+        self.addCleanup(temporary.cleanup)
+        self.repo = Path(temporary.name)
+        self.env = {
+            **os.environ,
+            "GIT_AUTHOR_NAME": "Archive test",
+            "GIT_AUTHOR_EMAIL": "archive-test@example.invalid",
+            "GIT_COMMITTER_NAME": "Archive test",
+            "GIT_COMMITTER_EMAIL": "archive-test@example.invalid",
+        }
+        self.local_git("init", "-q")
+        self.main_tree = self.local_git("mktree", input="")
+        self.main_sha = self.local_git("commit-tree", self.main_tree, "-m", "main")
+        self.local_git("update-ref", "refs/remotes/origin/main", self.main_sha)
+        self.tip = self.new_tip("candidate")
+        self.calls: list[tuple[str, str, object]] = []
+        self.commit_requests: list[dict] = []
+        self.parent_mutation = None
+        self.tree_drift = False
+        self.ref_drift = False
+
+    def local_git(self, *args: str, input: str | None = None) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=self.repo, env=self.env, input=input,
+            text=True, capture_output=True, check=True,
+        )
+        return result.stdout.strip()
+
+    def new_tip(self, message: str) -> str:
+        return self.local_git(
+            "commit-tree", self.main_tree, "-p", self.main_sha, "-m", message,
+        )
+
+    def fake_api(self, *, repo_full_name, token, path, method="GET", payload=None):
+        self.calls.append((path, method, payload))
+        if path == "/git/commits" and method == "POST":
+            self.commit_requests.append(payload)
+            args = ["commit-tree", payload["tree"], "-m", payload["message"]]
+            for parent in payload["parents"]:
+                args.extend(["-p", parent])
+            sha = self.local_git(*args)
+            # commit-tree removes duplicate parents, just as a Git-backed
+            # provider may do. Read the actual object instead of echoing input.
+            parents = self.local_git("show", "-s", "--format=%P", sha).split()
+            if self.parent_mutation is not None:
+                parents = self.parent_mutation(parents)
+            tree = self.local_git("rev-parse", f"{sha}^{{tree}}")
+            return ({
+                "sha": sha,
+                "tree": {"sha": "f" * 40 if self.tree_drift else tree},
+                "parents": [{"sha": parent} for parent in parents],
+            }, {}, 201)
+        if path == "/git/refs" and method == "POST":
+            self.local_git("update-ref", payload["ref"], payload["sha"])
+            return ({"ref": payload["ref"], "object": {"sha": payload["sha"]}}, {}, 201)
+        if path.startswith("/git/ref/heads/") and method == "GET":
+            ref = "refs/heads/" + path.removeprefix("/git/ref/heads/")
+            sha = self.local_git("rev-parse", ref)
+            return ({"object": {"sha": self.main_sha if self.ref_drift else sha}}, {}, 200)
+        self.fail(f"unexpected API call: {method} {path}")
+
+    def anchor(self, tips: list[str]):
+        with patch("pr_control_plane_janitor.api_request", side_effect=self.fake_api):
+            return create_archive_anchor(
+                repo=self.repo,
+                repo_full_name="owner/repository",
+                token="unused-test-token",
+                main_ref="refs/remotes/origin/main",
+                candidates=[{"tip_sha": tip} for tip in tips],
+                now=dt.datetime(2026, 11, 6, tzinfo=dt.timezone.utc),
+            )
+
+    def test_shared_tip_is_requested_once_but_preserves_both_candidate_records(self):
+        result = self.anchor([self.tip, self.tip])
+        self.assertEqual(self.commit_requests[0]["parents"], [self.main_sha, self.tip])
+        self.assertEqual(result["archived_count"], 2)
+        self.assertEqual(result["archived_tip_shas"], [self.tip, self.tip])
+        self.assertTrue(result["exact_ref_readback"])
+        self.assertFalse(result["source_tree_changed"])
+
+    def test_tip_equal_to_chain_parent_does_not_duplicate_first_parent(self):
+        result = self.anchor([self.main_sha, self.tip])
+        self.assertEqual(self.commit_requests[0]["parents"], [self.main_sha, self.tip])
+        self.assertTrue(result["exact_ref_readback"])
+
+    def test_duplicate_tips_across_chunks_keep_exact_ordered_chain(self):
+        tips = [self.new_tip(f"candidate-{index}") for index in range(24)]
+        result = self.anchor([*tips, tips[0], tips[1], tips[1]])
+        anchors = result["archive_commits"]
+        self.assertEqual(len(anchors), 2)
+        self.assertEqual(self.commit_requests[0]["parents"], [self.main_sha, *tips])
+        self.assertEqual(self.commit_requests[1]["parents"], [anchors[0], tips[0], tips[1]])
+        self.assertEqual(result["archived_count"], 27)
+        self.assertEqual(len(result["archived_tip_shas"]), 27)
+        for tip in tips:
+            self.local_git("merge-base", "--is-ancestor", tip, anchors[-1])
+        for anchor in anchors:
+            self.assertEqual(self.local_git("rev-parse", f"{anchor}^{{tree}}"), self.main_tree)
+
+    def test_missing_unique_parent_still_holds(self):
+        self.parent_mutation = lambda parents: parents[:-1]
+        with self.assertRaisesRegex(JanitorError, "exact requested parents"):
+            self.anchor([self.tip, self.tip])
+        self.assertEqual(len(self.calls), 1)
+
+    def test_reordered_unique_parents_still_hold(self):
+        self.parent_mutation = lambda parents: list(reversed(parents))
+        with self.assertRaisesRegex(JanitorError, "exact requested parents"):
+            self.anchor([self.tip])
+        self.assertEqual(len(self.calls), 1)
+
+    def test_unexpected_extra_parent_still_holds(self):
+        extra = self.new_tip("unexpected")
+        self.parent_mutation = lambda parents: [*parents, extra]
+        with self.assertRaisesRegex(JanitorError, "exact requested parents"):
+            self.anchor([self.tip])
+        self.assertEqual(len(self.calls), 1)
+
+    def test_duplicate_parent_in_response_still_holds(self):
+        self.parent_mutation = lambda parents: [*parents, parents[-1]]
+        with self.assertRaisesRegex(JanitorError, "exact requested parents"):
+            self.anchor([self.tip])
+        self.assertEqual(len(self.calls), 1)
+
+    def test_tree_drift_still_holds_before_ref_creation(self):
+        self.tree_drift = True
+        with self.assertRaisesRegex(JanitorError, "tree drifted"):
+            self.anchor([self.tip])
+        self.assertEqual(len(self.calls), 1)
+
+    def test_ref_drift_still_holds(self):
+        self.ref_drift = True
+        with self.assertRaisesRegex(JanitorError, "ref exact readback mismatch"):
+            self.anchor([self.tip])
+        self.assertEqual(len(self.calls), 3)
+
+    def test_archive_hold_prevents_all_deletions_including_direct_main_candidates(self):
+        self.parent_mutation = lambda parents: parents[:-1]
+        branches = [
+            {"name": "noop-archive", "protected": False, "commit": {"sha": self.tip}},
+            {"name": "noop-direct", "protected": False, "commit": {"sha": self.main_sha}},
+        ]
+        for branch in branches:
+            self.local_git("update-ref", f"refs/remotes/origin/{branch['name']}", branch["commit"]["sha"])
+        with (
+            patch("pr_control_plane_janitor.api_request", side_effect=self.fake_api),
+            patch("pr_control_plane_janitor.open_pr_refs", return_value=set()),
+            patch("pr_control_plane_janitor.branch_rows", return_value=branches),
+            patch("pr_control_plane_janitor.delete_branch") as delete,
+        ):
+            with self.assertRaisesRegex(JanitorError, "exact requested parents"):
+                run(
+                    repo=self.repo, repo_full_name="owner/repository", token="unused-test-token",
+                    policy=load_policy(ROOT / "config/pr_control_plane_janitor.json"),
+                    mode="apply", max_delete=75, execution_branch="main",
+                )
+        delete.assert_not_called()
+        self.assertEqual(len(self.calls), 1)
 
 
 if __name__ == "__main__":

@@ -341,7 +341,10 @@ def create_archive_anchor(
         tip_shas = [str(row.get("tip_sha") or "").strip() for row in group]
         if any(len(sha) != 40 for sha in tip_shas):
             raise JanitorError("archive candidate has malformed tip SHA")
-        requested_parents = [current_parent, *tip_shas]
+        # Multiple branch refs can share one tip. Git removes duplicate parents,
+        # so normalize the request before requiring exact ordered readback.
+        # Keep the chain parent first and retain every candidate record below.
+        requested_parents = list(dict.fromkeys([current_parent, *tip_shas]))
         body, _, status = api_request(
             repo_full_name=repo_full_name,
             token=token,
