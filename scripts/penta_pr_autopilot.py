@@ -9,7 +9,9 @@ A PR is never closed merely because a wall-clock deadline expired.
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import re
 import sys
 from typing import Any
 
@@ -62,7 +64,36 @@ def drive_one(gh: lifecycle.GH, number: int) -> None:
         return
 
     if disposition == "MERGE":
-        merged, message = lifecycle.attempt_merge(gh, number)
+        # Visible check runs can be green while GitHub's required-check rules
+        # still block this PR. Do not attempt a merge while it reports blocked.
+        if pull.get("mergeable_state") == "blocked":
+            print(f"PentaAutopilot #{number} terminal=HOLD reason=provider_merge_blocked")
+            return
+        try:
+            merged, message = lifecycle.attempt_merge(gh, number)
+        except lifecycle.GitHubAPIError as exc:
+            payload = exc.response
+            message = payload.get("message") if isinstance(payload, dict) else None
+            if not (
+                exc.method == "PUT"
+                and exc.path == f"/repos/{gh.repo}/pulls/{number}/merge"
+                and exc.status == 405
+                and isinstance(message, str)
+                and re.match(r"\ARepository rule violations found(?::\s+|\r?\n)\s*\S", message)
+                and payload.get("merged", False) is False
+            ):
+                raise
+            # Only an explicit rejection of this merge is a per-PR HOLD.
+            # Keep the shared lifecycle exception behavior: PentaCloser must
+            # not interpret a rejected merge as permission to close the PR.
+            # Unknown/auth/rate/server/transport errors still abort, with no
+            # retry or terminal labels for an uncertain outcome.
+            print(
+                f"PentaAutopilot #{number} terminal=HOLD "
+                f"reason=provider_merge_rule_rejection status={exc.status} "
+                f"message={json.dumps(message[:500])}"
+            )
+            return
         print(f"PentaAutopilot #{number} merged={merged} {message}")
         return
 

@@ -38,6 +38,20 @@ PRECLOSE_REQUIRED_LABELS = frozenset(
 )
 
 
+class GitHubAPIError(RuntimeError):
+    """Preserve provider error identity without parsing a formatted traceback."""
+
+    def __init__(self, method: str, path: str, status: int, raw: str) -> None:
+        super().__init__(f"{method} {path} -> {status}: {raw[:500]}")
+        self.method = method
+        self.path = path
+        self.status = status
+        try:
+            self.response = json.loads(raw)
+        except json.JSONDecodeError:
+            self.response = None
+
+
 class GH:
     def __init__(self, repo: str) -> None:
         self.repo = repo
@@ -62,7 +76,7 @@ class GH:
                 return json.loads(raw or b"null")
         except urllib.error.HTTPError as exc:
             raw = exc.read().decode(errors="replace")
-            raise RuntimeError(f"{method} {path} -> {exc.code}: {raw[:500]}") from exc
+            raise GitHubAPIError(method, path, exc.code, raw) from exc
 
     def get(self, path: str) -> Any:
         return self.req("GET", path)
