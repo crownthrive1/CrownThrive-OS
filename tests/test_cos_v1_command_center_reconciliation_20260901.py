@@ -78,6 +78,11 @@ class COSV1CommandCenterReconciliationTests(unittest.TestCase):
         self.assertNotIn("Provider readback:", page)
         self.assertIn("Historical connection observations", page)
 
+    def test_page_metadata_does_not_index_historical_phase_as_current(self) -> None:
+        frontmatter = PAGE.read_text(encoding="utf-8").split("---", 2)[1]
+        self.assertIn('"historical phase snapshot"', frontmatter)
+        self.assertNotIn('"Phase 2"', frontmatter)
+
     def test_standard_preserves_phase_and_native_sites_boundaries(self) -> None:
         standard = STANDARD.read_text(encoding="utf-8")
         self.assertIn("Public ecosystem rollout: Phase 0", standard)
