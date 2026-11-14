@@ -78,10 +78,13 @@ class COSV1CommandCenterReconciliationTests(unittest.TestCase):
         self.assertNotIn("Provider readback:", page)
         self.assertIn("Historical connection observations", page)
 
-    def test_page_metadata_does_not_index_historical_phase_as_current(self) -> None:
+    def test_page_metadata_preserves_hold_and_excludes_retired_phase_tokens(self) -> None:
         frontmatter = PAGE.read_text(encoding="utf-8").split("---", 2)[1]
-        self.assertIn('"historical phase snapshot"', frontmatter)
-        self.assertNotIn('"Phase 2"', frontmatter)
+        keywords = next(line for line in frontmatter.splitlines() if line.startswith("keywords:"))
+        self.assertIn('"historical phase snapshot"', keywords)
+        self.assertNotRegex(keywords, r'"Phase\\s+2(?:\\.\\d+)?(?:[^"]*)?"')
+        self.assertIn('tag: "Prototype · HOLD"', frontmatter)
+        self.assertIn('content_state: "unresolved"', frontmatter)
 
     def test_standard_preserves_phase_and_native_sites_boundaries(self) -> None:
         standard = STANDARD.read_text(encoding="utf-8")
