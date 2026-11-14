@@ -8,6 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/cos-v1-command-center-reconciliation.2026-09-01.v1.json"
 STANDARD = ROOT / "developers/ACCOUNT-API-REVIEW-AND-SITES-RELEASE-STANDARD.md"
+PAGE = ROOT / "technology/crownthrive-command-center.mdx"
 
 
 def load_manifest() -> dict:
@@ -64,6 +65,18 @@ class COSV1CommandCenterReconciliationTests(unittest.TestCase):
         self.assertEqual(route["clock"], "ct.schedule.founder-operating-loop.4h.v1")
         self.assertFalse(route["duplicate_dispatch_clock_created"])
         self.assertIn("Communications Watch", route["outbound_route"])
+
+    def test_page_labels_provider_and_phase_values_as_historical(self) -> None:
+        page = PAGE.read_text(encoding="utf-8")
+        self.assertIn("Freshness boundary", page)
+        self.assertIn("2026-08-24T05:28:25.137432+00:00", page)
+        self.assertIn("Historical institutional snapshot", page)
+        self.assertIn("not current institutional-phase assertions", page)
+        self.assertIn("2026-09-01", page)
+        self.assertIn("not a current provider readback", page)
+        self.assertNotIn("| Field | Verified state |", page)
+        self.assertNotIn("Provider readback:", page)
+        self.assertIn("Historical connection observations", page)
 
     def test_standard_preserves_phase_and_native_sites_boundaries(self) -> None:
         standard = STANDARD.read_text(encoding="utf-8")
