@@ -82,7 +82,7 @@ class COSV1CommandCenterReconciliationTests(unittest.TestCase):
         frontmatter = PAGE.read_text(encoding="utf-8").split("---", 2)[1]
         keywords = next(line for line in frontmatter.splitlines() if line.startswith("keywords:"))
         self.assertIn('"historical phase snapshot"', keywords)
-        self.assertNotRegex(keywords, r'"Phase\\s+2(?:\\.\\d+)?(?:[^"]*)?"')
+        self.assertNotRegex(keywords, r'"Phase[ ]+2([.][0-9]+)?([^"]*)?"')
         self.assertIn('tag: "Prototype · HOLD"', frontmatter)
         self.assertIn('content_state: "unresolved"', frontmatter)
 
