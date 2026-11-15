@@ -9,10 +9,15 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "developers/manifests/cos-v1-command-center-reconciliation.2026-09-01.v1.json"
 STANDARD = ROOT / "developers/ACCOUNT-API-REVIEW-AND-SITES-RELEASE-STANDARD.md"
 PAGE = ROOT / "technology/crownthrive-command-center.mdx"
+SCHEDULER_TOPOLOGY = ROOT / "developers/contracts/agent-scheduler-topology-production.v1.json"
 
 
 def load_manifest() -> dict:
     return json.loads(MANIFEST.read_text(encoding="utf-8"))
+
+
+def load_scheduler_topology() -> dict:
+    return json.loads(SCHEDULER_TOPOLOGY.read_text(encoding="utf-8"))
 
 
 class COSV1CommandCenterReconciliationTests(unittest.TestCase):
@@ -60,10 +65,21 @@ class COSV1CommandCenterReconciliationTests(unittest.TestCase):
         self.assertFalse(manifest["site_release_default"]["site_replacement_allowed"])
         self.assertFalse(manifest["site_release_default"]["audience_expansion_allowed"])
 
-    def test_four_hour_route_reuses_existing_clocks(self) -> None:
+    def test_four_hour_review_is_folded_into_the_canonical_relay(self) -> None:
         route = load_manifest()["four_hour_review"]
+        external = load_scheduler_topology()["canonical_external_clock_model"]
         self.assertEqual(route["clock"], "ct.schedule.founder-operating-loop.4h.v1")
+        self.assertEqual(route["topology"], "folded_into_existing_external_evidence_relay")
         self.assertFalse(route["duplicate_dispatch_clock_created"])
+        self.assertEqual(external["post_maintenance_target_count"], 2)
+        self.assertEqual(
+            external["external_evidence_relay"]["schedule_id"],
+            "ct.schedule.external-evidence-relay.hourly.v1",
+        )
+        self.assertEqual(
+            external["communications"]["canonical_name"],
+            "CrownThrive Communications Watch",
+        )
         self.assertIn("Communications Watch", route["outbound_route"])
 
     def test_page_labels_provider_and_phase_values_as_historical(self) -> None:
