@@ -621,7 +621,7 @@ def main(argv: list[str] | None = None) -> int:
             report = Path(args.report)
             report.parent.mkdir(parents=True, exist_ok=True)
             report.write_text(
-                json.dumps(failure_report, indent=2, sort_keys=True) + "\\n",
+                json.dumps(failure_report, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
         except OSError as report_exc:
