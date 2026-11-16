@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -488,6 +489,32 @@ class ApiTransportFailureTests(unittest.TestCase):
                 )
         urlopen.assert_called_once()
 
+    def test_http_error_body_timeout_becomes_reconciliation_hold_without_retry(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://api.github.com/repos/owner/repository/git/commits",
+            502,
+            "Bad Gateway",
+            {},
+            None,
+        )
+        with (
+            patch("pr_control_plane_janitor.urllib.request.urlopen", side_effect=error) as urlopen,
+            patch.object(error, "read", side_effect=TimeoutError("response body timed out")) as body_read,
+        ):
+            with self.assertRaisesRegex(
+                JanitorError,
+                r"POST /git/commits failed 502; error response body read failed \\(TimeoutError\\)",
+            ):
+                api_request(
+                    repo_full_name="owner/repository",
+                    token="unused-test-token",
+                    path="/git/commits",
+                    method="POST",
+                    payload={"tree": "a" * 40, "parents": ["b" * 40]},
+                )
+        urlopen.assert_called_once()
+        body_read.assert_called_once()
+
 
 class FailureReportTests(unittest.TestCase):
     def test_commit_post_timeout_writes_unknown_effect_report_without_retry(self) -> None:
@@ -536,6 +563,58 @@ class FailureReportTests(unittest.TestCase):
             self.assertTrue(evidence["reconcile_before_retry"])
             self.assertFalse(evidence["automatic_retry_authorized"])
 
+
+    def test_http_error_body_timeout_writes_unknown_effect_report_without_retry(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://api.github.com/repos/owner/repository/git/commits",
+            502,
+            "Bad Gateway",
+            {},
+            None,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "nested" / "janitor-report.json"
+
+            def fail_during_archive_commit(**kwargs):
+                return api_request(
+                    repo_full_name=kwargs["repo_full_name"],
+                    token=kwargs["token"],
+                    path="/git/commits",
+                    method="POST",
+                    payload={"tree": "a" * 40, "parents": ["b" * 40]},
+                )
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "GITHUB_TOKEN": "test-token",
+                        "GITHUB_RUN_ID": "43800000001",
+                        "GITHUB_RUN_ATTEMPT": "1",
+                    },
+                    clear=False,
+                ),
+                patch("pr_control_plane_janitor.load_policy", return_value={"default_max_delete": 75}),
+                patch("pr_control_plane_janitor.run", side_effect=fail_during_archive_commit),
+                patch("pr_control_plane_janitor.urllib.request.urlopen", side_effect=error) as urlopen,
+                patch.object(error, "read", side_effect=TimeoutError("response body timed out")) as body_read,
+            ):
+                exit_code = main([
+                    "--repository", "owner/repository",
+                    "--mode", "apply",
+                    "--report", str(report),
+                ])
+
+            self.assertEqual(exit_code, 2)
+            urlopen.assert_called_once()
+            body_read.assert_called_once()
+            self.assertTrue(report.is_file())
+            evidence = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(evidence["schema"], "ct.github.pr-control-plane-janitor-failure/v1")
+            self.assertIn("POST /git/commits failed 502; error response body read failed", evidence["error"])
+            self.assertEqual(evidence["effects_state"], "UNKNOWN_RECONCILIATION_REQUIRED")
+            self.assertTrue(evidence["reconcile_before_retry"])
+            self.assertFalse(evidence["automatic_retry_authorized"])
 
     def test_janitor_hold_writes_reconciliation_report(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

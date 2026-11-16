@@ -182,7 +182,15 @@ def api_request(
             body = json.loads(raw.decode("utf-8")) if raw else None
             return body, dict(response.headers.items()), response.status
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")
+        except (OSError, http.client.HTTPException, UnicodeError) as read_exc:
+            read_detail = str(getattr(read_exc, "reason", read_exc)).replace("\\r", " ").replace("\\n", " ")
+            raise JanitorError(
+                f"GitHub API {method} {path} failed {exc.code}; "
+                f"error response body read failed ({type(read_exc).__name__}): "
+                f"{read_detail[:300]}"
+            ) from read_exc
         raise JanitorError(f"GitHub API {method} {path} failed {exc.code}: {detail[:800]}") from exc
     except (OSError, http.client.HTTPException, UnicodeError, json.JSONDecodeError) as exc:
         # A write may have reached GitHub before its response was lost. Normalize
