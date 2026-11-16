@@ -82,6 +82,91 @@ class COSV1CommandCenterReconciliationTests(unittest.TestCase):
         )
         self.assertIn("Communications Watch", route["outbound_route"])
 
+    def test_internal_clocks_and_retired_external_scaffolding_stay_separate(self) -> None:
+        topology = load_scheduler_topology()
+        external = topology["canonical_external_clock_model"]
+        relay = external["external_evidence_relay"]
+        communications = external["communications"]
+        backup = external["backup_continuity"]
+        maintenance = external["maintenance_coordinator"]
+
+        self.assertEqual(relay["cadence"], "hourly at minute 17")
+        self.assertEqual(relay["external_task_id"], "6a8620e935cc8191bbd31075e12dd22a")
+        self.assertEqual(relay["state"], "ACTIVE_CONNECTOR_FAILURE_DOMAIN_ONLY")
+        self.assertFalse(relay["authority_expansion"])
+
+        self.assertEqual(communications["binding_id"], "ct.automation.email-attention.v1")
+        self.assertEqual(
+            communications["failure_domain"],
+            "email_and_communications_connector",
+        )
+        self.assertEqual(
+            communications["state"],
+            "ACTIVE_COMMUNICATIONS_FAILURE_DOMAIN_ONLY",
+        )
+
+        self.assertEqual(backup["internal_clock"], "pg_cron")
+        self.assertEqual(
+            backup["external_connector_parent"],
+            relay["schedule_id"],
+        )
+        self.assertEqual(
+            backup["dedicated_external_clock"],
+            "RETIRED_SCHEDULING_SCAFFOLDING",
+        )
+        self.assertEqual(
+            maintenance["state"],
+            "RETIRED_SCHEDULING_SCAFFOLDING",
+        )
+        self.assertFalse(maintenance["task_enabled"])
+        self.assertTrue(maintenance["maintenance_closed"])
+
+        retired = topology["retired_external_scaffolding"]
+        for key in (
+            "document_recovery_state",
+            "penta_hourly_delivery_watch_state",
+            "penta_reward_v5_review_state",
+        ):
+            self.assertEqual(retired[key], "RETIRED_SCHEDULING_SCAFFOLDING")
+        self.assertTrue(retired["historical_records_preserved"])
+
+    def test_scheduler_invariants_preserve_authority_and_recovery_boundaries(self) -> None:
+        invariants = load_scheduler_topology()["invariants"]
+        for key in (
+            "no_duplicate_clocks",
+            "no_recursive_external_schedulers",
+            "originator_verifier_separation",
+            "d3_human_reserved",
+            "append_or_supersede_history",
+        ):
+            with self.subTest(invariant=key):
+                self.assertTrue(invariants[key])
+        for key in (
+            "scheduler_clock_creates_authority",
+            "authority_expansion",
+            "money_movement_from_scheduler",
+            "provider_write_authority_from_scheduler",
+            "raw_secret_export",
+            "direct_main_write_from_scheduler",
+        ):
+            with self.subTest(invariant=key):
+                self.assertFalse(invariants[key])
+
+    def test_later_provider_migration_custody_remains_held(self) -> None:
+        lineage = load_scheduler_topology()["source_lineage"]
+        self.assertEqual(
+            lineage["later_provider_migration_source_custody"],
+            "HOLD_PENDING_AUTHORITATIVE_RECOVERY",
+        )
+        self.assertEqual(
+            lineage["history_policy"],
+            "append_or_supersede_never_silent_delete",
+        )
+        self.assertIn(
+            "20260826205712_schedule_penta_judicial_timeout_v1",
+            lineage["later_provider_migrations_without_local_sql"],
+        )
+
     def test_page_labels_provider_and_phase_values_as_historical(self) -> None:
         page = PAGE.read_text(encoding="utf-8")
         self.assertIn("Freshness boundary", page)
