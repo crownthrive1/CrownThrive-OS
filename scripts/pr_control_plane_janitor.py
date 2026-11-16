@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import fnmatch
+import http.client
 import json
 import os
 from pathlib import Path
@@ -183,6 +184,15 @@ def api_request(
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise JanitorError(f"GitHub API {method} {path} failed {exc.code}: {detail[:800]}") from exc
+    except (OSError, http.client.HTTPException, UnicodeError, json.JSONDecodeError) as exc:
+        # A write may have reached GitHub before its response was lost. Normalize
+        # transport/protocol/readback failures so main() persists a HOLD report;
+        # never retry this request here.
+        detail = str(getattr(exc, "reason", exc)).replace("\r", " ").replace("\n", " ")
+        raise JanitorError(
+            f"GitHub API {method} {path} transport/readback failed "
+            f"({type(exc).__name__}): {detail[:300]}"
+        ) from exc
 
 
 # Python 3.12-friendly structural alias without importing typing.Mapping twice.

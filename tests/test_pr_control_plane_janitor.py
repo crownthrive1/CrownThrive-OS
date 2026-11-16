@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from pr_control_plane_janitor import (  # noqa: E402
     JanitorError,
+    api_request,
     classify_branch,
     create_archive_anchor,
     load_policy,
@@ -468,7 +469,74 @@ class ArchiveParentRegressionTests(unittest.TestCase):
         self.assertEqual(len(self.calls), 1)
 
 
+class ApiTransportFailureTests(unittest.TestCase):
+    def test_commit_post_timeout_becomes_reconciliation_hold_without_retry(self) -> None:
+        with patch(
+            "pr_control_plane_janitor.urllib.request.urlopen",
+            side_effect=TimeoutError("timed out"),
+        ) as urlopen:
+            with self.assertRaisesRegex(
+                JanitorError,
+                r"POST /git/commits transport/readback failed \(TimeoutError\)",
+            ):
+                api_request(
+                    repo_full_name="owner/repository",
+                    token="unused-test-token",
+                    path="/git/commits",
+                    method="POST",
+                    payload={"tree": "a" * 40, "parents": ["b" * 40]},
+                )
+        urlopen.assert_called_once()
+
+
 class FailureReportTests(unittest.TestCase):
+    def test_commit_post_timeout_writes_unknown_effect_report_without_retry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "nested" / "janitor-report.json"
+
+            def fail_during_archive_commit(**kwargs):
+                return api_request(
+                    repo_full_name=kwargs["repo_full_name"],
+                    token=kwargs["token"],
+                    path="/git/commits",
+                    method="POST",
+                    payload={"tree": "a" * 40, "parents": ["b" * 40]},
+                )
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "GITHUB_TOKEN": "test-token",
+                        "GITHUB_RUN_ID": "43800000000",
+                        "GITHUB_RUN_ATTEMPT": "1",
+                    },
+                    clear=False,
+                ),
+                patch("pr_control_plane_janitor.load_policy", return_value={"default_max_delete": 75}),
+                patch("pr_control_plane_janitor.run", side_effect=fail_during_archive_commit),
+                patch(
+                    "pr_control_plane_janitor.urllib.request.urlopen",
+                    side_effect=TimeoutError("timed out"),
+                ) as urlopen,
+            ):
+                exit_code = main([
+                    "--repository", "owner/repository",
+                    "--mode", "apply",
+                    "--report", str(report),
+                ])
+
+            self.assertEqual(exit_code, 2)
+            urlopen.assert_called_once()
+            self.assertTrue(report.is_file())
+            evidence = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(evidence["schema"], "ct.github.pr-control-plane-janitor-failure/v1")
+            self.assertIn("POST /git/commits transport/readback failed", evidence["error"])
+            self.assertEqual(evidence["effects_state"], "UNKNOWN_RECONCILIATION_REQUIRED")
+            self.assertTrue(evidence["reconcile_before_retry"])
+            self.assertFalse(evidence["automatic_retry_authorized"])
+
+
     def test_janitor_hold_writes_reconciliation_report(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             report = Path(directory) / "nested" / "janitor-report.json"
