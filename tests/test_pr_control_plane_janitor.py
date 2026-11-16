@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -17,6 +18,7 @@ from pr_control_plane_janitor import (  # noqa: E402
     classify_branch,
     create_archive_anchor,
     load_policy,
+    main,
     paginate,
     pagination_request_paths,
     run,
@@ -464,6 +466,50 @@ class ArchiveParentRegressionTests(unittest.TestCase):
                 )
         delete.assert_not_called()
         self.assertEqual(len(self.calls), 1)
+
+
+class FailureReportTests(unittest.TestCase):
+    def test_janitor_hold_writes_reconciliation_report(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "nested" / "janitor-report.json"
+            message = (
+                "archive commit readback did not preserve exact requested parents "
+                "(created_sha=" + "a" * 40 + "; requested_parents=" + "b" * 40
+                + "; observed_parents=" + "b" * 40 + "; archive_ref_created=false)"
+            )
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "GITHUB_TOKEN": "test-token",
+                        "GITHUB_RUN_ID": "43749209620",
+                        "GITHUB_RUN_ATTEMPT": "1",
+                    },
+                    clear=False,
+                ),
+                patch("pr_control_plane_janitor.load_policy", return_value={"default_max_delete": 75}),
+                patch("pr_control_plane_janitor.run", side_effect=JanitorError(message)) as run_mock,
+            ):
+                exit_code = main([
+                    "--repository", "owner/repository",
+                    "--mode", "apply",
+                    "--report", str(report),
+                ])
+
+            self.assertEqual(exit_code, 2)
+            run_mock.assert_called_once()
+            self.assertTrue(report.is_file())
+            evidence = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(evidence["schema"], "ct.github.pr-control-plane-janitor-failure/v1")
+            self.assertEqual(evidence["state"], "HOLD")
+            self.assertEqual(evidence["repository"], "owner/repository")
+            self.assertEqual(evidence["mode"], "apply")
+            self.assertEqual(evidence["run_id"], "43749209620")
+            self.assertEqual(evidence["run_attempt"], "1")
+            self.assertEqual(evidence["error"], message)
+            self.assertEqual(evidence["effects_state"], "UNKNOWN_RECONCILIATION_REQUIRED")
+            self.assertTrue(evidence["reconcile_before_retry"])
+            self.assertFalse(evidence["automatic_retry_authorized"])
 
 
 if __name__ == "__main__":

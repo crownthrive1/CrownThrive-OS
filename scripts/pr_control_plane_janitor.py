@@ -586,6 +586,7 @@ def main(argv: list[str] | None = None) -> int:
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     if not token:
         raise SystemExit("PR_CONTROL_PLANE_JANITOR_HOLD: GITHUB_TOKEN is required")
+    max_delete: int | None = args.max_delete
     try:
         policy = load_policy(Path(args.policy).resolve())
         max_delete = args.max_delete
@@ -601,6 +602,30 @@ def main(argv: list[str] | None = None) -> int:
             execution_branch=args.execution_branch,
         )
     except JanitorError as exc:
+        failure_report = {
+            "schema": "ct.github.pr-control-plane-janitor-failure/v1",
+            "state": "HOLD",
+            "generated_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+            "repository": args.repository,
+            "mode": args.mode,
+            "max_delete": max_delete,
+            "execution_branch": args.execution_branch,
+            "run_id": os.environ.get("GITHUB_RUN_ID"),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "error": str(exc),
+            "effects_state": "UNKNOWN_RECONCILIATION_REQUIRED",
+            "reconcile_before_retry": True,
+            "automatic_retry_authorized": False,
+        }
+        try:
+            report = Path(args.report)
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text(
+                json.dumps(failure_report, indent=2, sort_keys=True) + "\\n",
+                encoding="utf-8",
+            )
+        except OSError as report_exc:
+            print(f"PR_CONTROL_PLANE_JANITOR_REPORT_WRITE_FAILED: {report_exc}", file=sys.stderr)
         print(f"PR_CONTROL_PLANE_JANITOR_HOLD: {exc}", file=sys.stderr)
         return 2
 
