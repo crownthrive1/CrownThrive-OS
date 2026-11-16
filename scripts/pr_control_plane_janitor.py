@@ -185,7 +185,7 @@ def api_request(
         try:
             detail = exc.read().decode("utf-8", errors="replace")
         except (OSError, http.client.HTTPException, UnicodeError) as read_exc:
-            read_detail = str(getattr(read_exc, "reason", read_exc)).replace("\\r", " ").replace("\\n", " ")
+            read_detail = str(getattr(read_exc, "reason", read_exc)).replace("\r", " ").replace("\n", " ")
             raise JanitorError(
                 f"GitHub API {method} {path} failed {exc.code}; "
                 f"error response body read failed ({type(read_exc).__name__}): "

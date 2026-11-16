@@ -503,7 +503,7 @@ class ApiTransportFailureTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(
                 JanitorError,
-                r"POST /git/commits failed 502; error response body read failed \\(TimeoutError\\)",
+                r"POST /git/commits failed 502; error response body read failed \(TimeoutError\)",
             ):
                 api_request(
                     repo_full_name="owner/repository",
