@@ -17,7 +17,9 @@ on:
         default: '75'
         type: string
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/janitor-deduplicate-archive-parents-20261106
     paths:
       - 'config/pr_control_plane_janitor.json'
       - 'scripts/pr_control_plane_janitor.py'
@@ -37,7 +39,7 @@ concurrency:
 
 jobs:
   branch-hygiene:
-    if: github.repository == 'crownthrive1/CrownThrive-OS'
+    if: github.repository == 'crownthrive1/CrownThrive-OS' && (github.event_name != 'push' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -148,3 +150,29 @@ jobs:
               for name in d['deleted_refs'][:75]:
                   print(f'- `{name}`')
           PY
+
+  candidate-validation:
+    if: github.repository == 'crownthrive1/CrownThrive-OS' && github.event_name == 'push' && github.ref == 'refs/heads/fix/janitor-deduplicate-archive-parents-20261106'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Validate exact Janitor candidate
+        run: |
+          python -m py_compile scripts/pr_control_plane_janitor.py tests/test_pr_control_plane_janitor.py
+          python -m unittest -v tests.test_pr_control_plane_janitor
+          python -m json.tool config/pr_control_plane_janitor.json >/dev/null
+          git diff --check
