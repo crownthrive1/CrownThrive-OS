@@ -316,6 +316,7 @@ class ArchiveParentRegressionTests(unittest.TestCase):
         self.tip = self.new_tip("candidate")
         self.calls: list[tuple[str, str, object]] = []
         self.commit_requests: list[dict] = []
+        self.created_shas: list[str] = []
         self.parent_mutation = None
         self.tree_drift = False
         self.ref_drift = False
@@ -340,6 +341,7 @@ class ArchiveParentRegressionTests(unittest.TestCase):
             for parent in payload["parents"]:
                 args.extend(["-p", parent])
             sha = self.local_git(*args)
+            self.created_shas.append(sha)
             # commit-tree removes duplicate parents, just as a Git-backed
             # provider may do. Read the actual object instead of echoing input.
             parents = self.local_git("show", "-s", "--format=%P", sha).split()
@@ -398,10 +400,15 @@ class ArchiveParentRegressionTests(unittest.TestCase):
         for anchor in anchors:
             self.assertEqual(self.local_git("rev-parse", f"{anchor}^{{tree}}"), self.main_tree)
 
-    def test_missing_unique_parent_still_holds(self):
+    def test_missing_unique_parent_still_holds_with_commit_reconciliation_evidence(self):
         self.parent_mutation = lambda parents: parents[:-1]
-        with self.assertRaisesRegex(JanitorError, "exact requested parents"):
+        with self.assertRaisesRegex(JanitorError, "exact requested parents") as raised:
             self.anchor([self.tip, self.tip])
+        message = str(raised.exception)
+        self.assertIn(f"created_sha={self.created_shas[0]}", message)
+        self.assertIn(f"requested_parents={self.main_sha},{self.tip}", message)
+        self.assertIn(f"observed_parents={self.main_sha}", message)
+        self.assertIn("archive_ref_created=false", message)
         self.assertEqual(len(self.calls), 1)
 
     def test_reordered_unique_parents_still_hold(self):

@@ -364,7 +364,21 @@ def create_archive_anchor(
         created_sha = str(body.get("sha") or "").strip()
         observed_parents = [str((item or {}).get("sha") or "") for item in body.get("parents", [])]
         if len(created_sha) != 40 or observed_parents != requested_parents:
-            raise JanitorError("archive commit readback did not preserve exact requested parents")
+            safe_created_sha = (
+                created_sha
+                if len(created_sha) == 40
+                and all(character in "0123456789abcdefABCDEF" for character in created_sha)
+                else "unavailable"
+            )
+            requested_summary = ",".join(requested_parents)
+            observed_summary = ",".join(observed_parents)
+            raise JanitorError(
+                "archive commit readback did not preserve exact requested parents "
+                f"(created_sha={safe_created_sha}; "
+                f"requested_parents={requested_summary}; "
+                f"observed_parents={observed_summary}; "
+                "archive_ref_created=false)"
+            )
         if str((body.get("tree") or {}).get("sha") or "") != main_tree:
             raise JanitorError("archive commit tree drifted from protected main")
         anchor_commits.append(created_sha)
