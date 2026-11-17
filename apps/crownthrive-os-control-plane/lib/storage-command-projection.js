@@ -33,7 +33,24 @@ export function integer(value) {
 const boolean = (value) => typeof value === 'boolean' ? value : null;
 const state = (value) => STATES.has(value) ? value : 'UNKNOWN';
 function instant(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(value)) return null;
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match) return null;
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, zone] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  if (year < 1 || month < 1 || month > 12 || day < 1 || day > (daysInMonth || 0) ||
+      hour > 23 || minute > 59 || second > 59) return null;
+  if (zone !== 'Z') {
+    const offset = /^([+-])(\d{2}):(\d{2})$/.exec(zone);
+    if (!offset || Number(offset[2]) > 23 || Number(offset[3]) > 59) return null;
+  }
   const time = Date.parse(value);
   return Number.isFinite(time) ? new Date(time).toISOString() : null;
 }
