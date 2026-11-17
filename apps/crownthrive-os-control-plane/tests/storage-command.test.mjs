@@ -145,6 +145,14 @@ test('HEAD has an empty response body', async () => {
   const r = response(); await createHandler({ env, now, fetcher: goodFetch })({ method: 'HEAD' }, r);
   assert.equal(r.code, 200); assert.equal(r.body, null); assert.equal(r.ended, true);
 });
+test('commerce copy distinguishes catalog visibility from purchase authority', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  assert.ok(source.includes('Catalog sales flag:'));
+  assert.ok(source.includes('Catalog visibility is not a purchase path or proof of a purchasable offer.'));
+  assert.equal(source.includes('External sales:'), false);
+  assert.equal(source.includes("'Storage sales'"), false);
+});
+
 test('browser integration adds no polling interval and no upstream HTML injection', async () => {
   const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
   assert.equal(source.includes('setInterval'), false); assert.equal(source.includes('innerHTML'), false);
