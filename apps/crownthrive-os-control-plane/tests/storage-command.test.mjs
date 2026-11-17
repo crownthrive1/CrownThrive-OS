@@ -65,6 +65,19 @@ test('duplicate section identities are unknown and are not counted as sealed', (
   assert.equal(p.archive.section_progress_percent, null);
   assert.equal(p.archive.sealed_sections_in_status, 1);
 });
+test('write admission honors the local safety stop even when writes_enabled remains true', () => {
+  const expired = wasabi();
+  expired.control.safety_stop_at = '2026-09-16T20:59:59Z';
+  assert.equal(projectStorage(expired, catalog(), AT).controls.write_admission_state, 'SAFETY_STOP_ELAPSED');
+
+  const active = wasabi();
+  active.control.safety_stop_at = '2026-09-16T21:00:01Z';
+  assert.equal(projectStorage(active, catalog(), AT).controls.write_admission_state, 'ENABLED_WITHIN_WINDOW');
+
+  const unknown = wasabi();
+  delete unknown.control.safety_stop_at;
+  assert.equal(projectStorage(unknown, catalog(), AT).controls.write_admission_state, 'UNKNOWN');
+});
 test('configured upload ceiling and empirical qualification remain separate', () => {
   const p = projectStorage(wasabi(), catalog(), AT);
   assert.equal(p.controls.single_put_ceiling_bytes, 536870912);
@@ -155,6 +168,11 @@ test('non-object, malformed and oversized responses are never trusted', async ()
 test('HEAD has an empty response body', async () => {
   const r = response(); await createHandler({ env, now, fetcher: goodFetch })({ method: 'HEAD' }, r);
   assert.equal(r.code, 200); assert.equal(r.body, null); assert.equal(r.ended, true);
+});
+test('storage write label uses the safety-window admission state, not the raw flag', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  assert.ok(source.includes('write_admission_state'));
+  assert.equal(source.includes("flag(s.controls?.writes_enabled, 'Enabled within limits', 'Held')"), false);
 });
 test('commerce copy distinguishes catalog visibility from purchase authority', async () => {
   const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');

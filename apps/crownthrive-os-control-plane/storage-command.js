@@ -129,7 +129,7 @@
       else if (page === 'infrastructure') {
         renderArchive(item.body, s);
         const g = grid(item.body);
-        metric(g, 'Storage writes', flag(s.controls?.writes_enabled, 'Enabled within limits', 'Held'));
+        metric(g, 'Storage writes', s.controls?.write_admission_state === 'ENABLED_WITHIN_WINDOW' ? 'Enabled within safety window' : state(s.controls?.write_admission_state));
         metric(g, 'PentaBalancer', state(s.controls?.balancer_mode), `Pressure: ${number(s.controls?.pressure)}`);
         metric(g, 'Registered object bytes', bytes(s.custody?.registered_bytes), 'Registry total, not provider billable usage');
         metric(g, 'External delivery bindings', number(s.custody?.external_delivery_enabled_count), 'Known consumer allowlist only');
