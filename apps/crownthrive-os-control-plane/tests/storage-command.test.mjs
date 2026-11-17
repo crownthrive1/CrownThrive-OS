@@ -92,6 +92,17 @@ test('stale or future source observation is unavailable, not freshened by retrie
     assert.equal(projectStorage(w, catalog(), AT).status, 'PARTIAL');
   }
 });
+test('provider timestamps require an explicit timezone and valid calendar date', () => {
+  const noZone = wasabi(); noZone.observed_at = '2026-09-16T21:00:00';
+  const noZoneResult = projectStorage(noZone, catalog(), '2026-09-16T21:00:00.000Z');
+  assert.equal(noZoneResult.archive, null);
+  assert.equal(noZoneResult.status, 'PARTIAL');
+
+  const impossibleDate = wasabi(); impossibleDate.observed_at = '2026-09-31T21:00:00Z';
+  const impossibleDateResult = projectStorage(impossibleDate, catalog(), '2026-10-01T21:00:00.000Z');
+  assert.equal(impossibleDateResult.archive, null);
+  assert.equal(impossibleDateResult.status, 'PARTIAL');
+});
 test('GET executes only two fixed existing read RPCs and returns sanitized no-store JSON', async () => {
   const calls = []; const r = response();
   await createHandler({ env, now, fetcher: async (url, options) => { calls.push({ url, options }); return goodFetch(url); } })({ method: 'GET', url: '/api/storage-command?url=https://attacker.invalid' }, r);
