@@ -48,7 +48,15 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
   const meta = object(control?.metadata) ? control.metadata : {};
   const immutable = object(meta.dail_immutable_v2) ? meta.dail_immutable_v2 : {};
   const sectionNo = integer(cursor?.section_no);
-  const currentSection = sectionNo !== null && sectionNo > 0 ? list(w?.sections).find((s) => object(s) && integer(s.section_no) === sectionNo) : null;
+  const sections = list(w?.sections).filter((s) => object(s) && integer(s.section_no) !== null);
+  const sectionCounts = new Map();
+  for (const section of sections) {
+    const number = integer(section.section_no);
+    sectionCounts.set(number, (sectionCounts.get(number) || 0) + 1);
+  }
+  // Duplicate section identities are ambiguous evidence, not additional progress.
+  const uniqueSections = sections.filter((section) => sectionCounts.get(integer(section.section_no)) === 1);
+  const currentSection = sectionNo !== null && sectionNo > 0 ? uniqueSections.find((s) => integer(s.section_no) === sectionNo) : null;
   const target = integer(control?.archive_section_events);
   const sectionEvents = integer(currentSection?.events);
   const validProgress = target !== null && target > 0 && sectionEvents !== null && sectionEvents <= target;
@@ -81,7 +89,7 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
       section_progress_percent: validProgress ? Math.round(sectionEvents / target * 10000) / 100 : null,
       next_shard_no: integer(cursor.next_shard_no), last_archived_sequence_id: integer(cursor.last_sequence_id),
       last_run_at: instant(cursor.last_run_at),
-      sealed_sections_in_status: Array.isArray(w.sections) ? w.sections.filter((s) => object(s) && s.state === 'SEALED_VERIFIED').length : null,
+      sealed_sections_in_status: Array.isArray(w.sections) ? uniqueSections.filter((s) => s.state === 'SEALED_VERIFIED').length : null,
       last_run_events_copied: integer(cursor.last_result?.events_copied),
       source_pruning_enabled: boolean(w.source_delete_enabled),
       hot_window: 'LOGICAL_LATEST_ONE_MILLION_ACTUAL_ROWS_NOT_PHYSICALLY_PRUNED',
