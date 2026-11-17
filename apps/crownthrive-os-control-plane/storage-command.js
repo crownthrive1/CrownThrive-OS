@@ -98,8 +98,8 @@
   }
   function renderCommerce(root, s) {
     const c = s.commerce;
-    note(root, `External sales: ${flag(c?.sales_enabled, 'gate open in current source', 'held by current source')}. ${state(c?.activation_state)}.`);
-    note(root, 'Provider capacity and commercial use, payment path, tax configuration, and fulfillment acceptance must pass in the canonical owner systems. This panel cannot open those gates.');
+    note(root, `Catalog sales flag: ${flag(c?.sales_enabled, 'enabled in source', 'disabled in source')}. ${state(c?.activation_state)}.`);
+    note(root, 'Catalog visibility is not a purchase path or proof of a purchasable offer. Provider capacity, commercial rights, payment, tax configuration, entitlement, and fulfillment acceptance must pass in their canonical owner systems. This panel cannot open those gates.');
     const list = node('div', '', 'storage-offers');
     for (const offer of c?.offers || []) {
       const item = node('div', '', 'storage-offer');
@@ -122,7 +122,7 @@
         const g = grid(item.body);
         metric(g, 'Actual archived events', number(s.archive?.total_archived_events));
         metric(g, 'Section completion', validNumber(s.archive?.section_progress_percent) ? `${number(s.archive.section_progress_percent)}%` : 'Not observed');
-        metric(g, 'Storage sales', flag(s.commerce?.sales_enabled, 'Source gate open', 'Held'));
+        metric(g, 'Catalog sales flag', flag(s.commerce?.sales_enabled, 'Enabled in source', 'Disabled in source'));
         item.body.append(link('/infrastructure#storage-command', 'Inspect storage command'));
       } else if (page === 'dail') renderArchive(item.body, s);
       else if (page === 'commerce') renderCommerce(item.body, s);
