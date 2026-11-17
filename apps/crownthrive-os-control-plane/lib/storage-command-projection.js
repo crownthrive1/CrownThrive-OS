@@ -92,7 +92,7 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
     const matches = c.offers.filter((x) => object(x) && x.id === id);
     if (matches.length !== 1) return [];
     const row = matches[0];
-    return [{ id, name, billing_amount_cents: integer(row.billing_amount_cents), billing_interval_months: integer(row.billing_interval_months), currency: row.currency === 'usd' ? 'usd' : null, included_bytes: integer(row.included_bytes), included_download_bytes: integer(row.included_download_bytes), catalog_binding_present: boolean(row.stripe_catalog_active), available: c.sales_enabled === true && row.available === true, state: state(row.state) }];
+    return [{ id, name, billing_amount_cents: integer(row.billing_amount_cents), billing_interval_months: integer(row.billing_interval_months), currency: row.currency === 'usd' ? 'usd' : null, included_bytes: integer(row.included_bytes), included_download_bytes: integer(row.included_download_bytes), catalog_binding_present: boolean(row.stripe_catalog_active), catalog_available: c.sales_enabled === true && row.available === true, available: false, purchase_state: 'NOT_PROVEN_BY_CATALOG_READ', state: state(row.state) }];
   }) : [];
   return {
     schema: SCHEMA,
