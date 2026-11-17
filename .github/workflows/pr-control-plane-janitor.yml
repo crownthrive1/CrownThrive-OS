@@ -17,7 +17,9 @@ on:
         default: '75'
         type: string
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/janitor-deduplicate-archive-parents-20261106
     paths:
       - 'config/pr_control_plane_janitor.json'
       - 'scripts/pr_control_plane_janitor.py'
@@ -31,13 +33,15 @@ permissions:
   contents: write
   pull-requests: read
 
+# Do not cancel an in-flight apply wave after a remote write may have committed.
+# A newer trigger may wait; ambiguous effects must be reconciled, not interrupted.
 concurrency:
   group: crownthrive-pr-control-plane-janitor
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   branch-hygiene:
-    if: github.repository == 'crownthrive1/CrownThrive-OS'
+    if: github.repository == 'crownthrive1/CrownThrive-OS' && (github.event_name != 'push' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -115,6 +119,15 @@ jobs:
           d = json.loads(Path('/tmp/pr-control-plane-janitor-report.json').read_text())
           print('## PR Control Plane Janitor')
           print()
+          if d.get("schema") == "ct.github.pr-control-plane-janitor-failure/v1":
+              print(f"- State: {d.get('state', 'HOLD')}")
+              print(f"- Mode: {d.get('mode', 'unknown')}")
+              print(f"- Run: `{d.get('run_id') or 'unknown'}` attempt `{d.get('run_attempt') or 'unknown'}`")
+              print(f"- Error: {d.get('error', 'unavailable')}")
+              print(f"- Effects: {d.get('effects_state', 'UNKNOWN_RECONCILIATION_REQUIRED')}")
+              print(f"- Reconcile before retry: {str(d.get('reconcile_before_retry', True)).lower()}")
+              print(f"- Automatic retry authorized: {str(d.get('automatic_retry_authorized', False)).lower()}")
+              raise SystemExit(0)
           print(f"- Mode: {d['mode']}")
           print(f"- Branches scanned: {d['branches_scanned']}")
           print(f"- Open-PR refs preserved: {d['open_pr_refs_preserved']}")
@@ -139,3 +152,29 @@ jobs:
               for name in d['deleted_refs'][:75]:
                   print(f'- `{name}`')
           PY
+
+  candidate-validation:
+    if: github.repository == 'crownthrive1/CrownThrive-OS' && github.event_name == 'push' && github.ref == 'refs/heads/fix/janitor-deduplicate-archive-parents-20261106'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Validate exact Janitor candidate
+        run: |
+          python -m py_compile scripts/pr_control_plane_janitor.py tests/test_pr_control_plane_janitor.py
+          python -m unittest -v tests.test_pr_control_plane_janitor
+          python -m json.tool config/pr_control_plane_janitor.json >/dev/null
+          git diff --check

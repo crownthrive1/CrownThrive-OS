@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import fnmatch
+import http.client
 import json
 import os
 from pathlib import Path
@@ -181,8 +182,25 @@ def api_request(
             body = json.loads(raw.decode("utf-8")) if raw else None
             return body, dict(response.headers.items()), response.status
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")
+        except (OSError, http.client.HTTPException, UnicodeError) as read_exc:
+            read_detail = str(getattr(read_exc, "reason", read_exc)).replace("\r", " ").replace("\n", " ")
+            raise JanitorError(
+                f"GitHub API {method} {path} failed {exc.code}; "
+                f"error response body read failed ({type(read_exc).__name__}): "
+                f"{read_detail[:300]}"
+            ) from read_exc
         raise JanitorError(f"GitHub API {method} {path} failed {exc.code}: {detail[:800]}") from exc
+    except (OSError, http.client.HTTPException, UnicodeError, json.JSONDecodeError) as exc:
+        # A write may have reached GitHub before its response was lost. Normalize
+        # transport/protocol/readback failures so main() persists a HOLD report;
+        # never retry this request here.
+        detail = str(getattr(exc, "reason", exc)).replace("\r", " ").replace("\n", " ")
+        raise JanitorError(
+            f"GitHub API {method} {path} transport/readback failed "
+            f"({type(exc).__name__}): {detail[:300]}"
+        ) from exc
 
 
 # Python 3.12-friendly structural alias without importing typing.Mapping twice.
@@ -341,7 +359,10 @@ def create_archive_anchor(
         tip_shas = [str(row.get("tip_sha") or "").strip() for row in group]
         if any(len(sha) != 40 for sha in tip_shas):
             raise JanitorError("archive candidate has malformed tip SHA")
-        requested_parents = [current_parent, *tip_shas]
+        # Multiple branch refs can share one tip. Git removes duplicate parents,
+        # so normalize the request before requiring exact ordered readback.
+        # Keep the chain parent first and retain every candidate record below.
+        requested_parents = list(dict.fromkeys([current_parent, *tip_shas]))
         body, _, status = api_request(
             repo_full_name=repo_full_name,
             token=token,
@@ -361,7 +382,21 @@ def create_archive_anchor(
         created_sha = str(body.get("sha") or "").strip()
         observed_parents = [str((item or {}).get("sha") or "") for item in body.get("parents", [])]
         if len(created_sha) != 40 or observed_parents != requested_parents:
-            raise JanitorError("archive commit readback did not preserve exact requested parents")
+            safe_created_sha = (
+                created_sha
+                if len(created_sha) == 40
+                and all(character in "0123456789abcdefABCDEF" for character in created_sha)
+                else "unavailable"
+            )
+            requested_summary = ",".join(requested_parents)
+            observed_summary = ",".join(observed_parents)
+            raise JanitorError(
+                "archive commit readback did not preserve exact requested parents "
+                f"(created_sha={safe_created_sha}; "
+                f"requested_parents={requested_summary}; "
+                f"observed_parents={observed_summary}; "
+                "archive_ref_created=false)"
+            )
         if str((body.get("tree") or {}).get("sha") or "") != main_tree:
             raise JanitorError("archive commit tree drifted from protected main")
         anchor_commits.append(created_sha)
@@ -569,6 +604,7 @@ def main(argv: list[str] | None = None) -> int:
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     if not token:
         raise SystemExit("PR_CONTROL_PLANE_JANITOR_HOLD: GITHUB_TOKEN is required")
+    max_delete: int | None = args.max_delete
     try:
         policy = load_policy(Path(args.policy).resolve())
         max_delete = args.max_delete
@@ -584,6 +620,30 @@ def main(argv: list[str] | None = None) -> int:
             execution_branch=args.execution_branch,
         )
     except JanitorError as exc:
+        failure_report = {
+            "schema": "ct.github.pr-control-plane-janitor-failure/v1",
+            "state": "HOLD",
+            "generated_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+            "repository": args.repository,
+            "mode": args.mode,
+            "max_delete": max_delete,
+            "execution_branch": args.execution_branch,
+            "run_id": os.environ.get("GITHUB_RUN_ID"),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "error": str(exc),
+            "effects_state": "UNKNOWN_RECONCILIATION_REQUIRED",
+            "reconcile_before_retry": True,
+            "automatic_retry_authorized": False,
+        }
+        try:
+            report = Path(args.report)
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text(
+                json.dumps(failure_report, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        except OSError as report_exc:
+            print(f"PR_CONTROL_PLANE_JANITOR_REPORT_WRITE_FAILED: {report_exc}", file=sys.stderr)
         print(f"PR_CONTROL_PLANE_JANITOR_HOLD: {exc}", file=sys.stderr)
         return 2
 
