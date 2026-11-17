@@ -65,7 +65,7 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
   const meta = object(control?.metadata) ? control.metadata : {};
   const immutable = object(meta.dail_immutable_v2) ? meta.dail_immutable_v2 : {};
   const sectionNo = integer(cursor?.section_no);
-  const sections = list(w?.sections).filter((s) => object(s) && integer(s.section_no) !== null);
+  const sections = list(w?.sections).filter((s) => object(s) && integer(s.section_no) > 0);
   const sectionCounts = new Map();
   for (const section of sections) {
     const number = integer(section.section_no);
