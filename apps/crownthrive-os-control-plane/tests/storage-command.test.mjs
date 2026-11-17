@@ -53,6 +53,18 @@ test('unknown enums and duplicate bucket identities cannot manufacture READY', (
   const p = projectStorage(w, catalog(), AT);
   assert.equal(p.archive.state, 'UNKNOWN'); assert.equal(p.custody.buckets[0].state, 'UNKNOWN');
 });
+test('duplicate section identities are unknown and are not counted as sealed', () => {
+  const w = wasabi();
+  w.sections = [
+    { section_no: 1, events: 510000, state: 'SEALED_VERIFIED' },
+    { section_no: 1, events: 510000, state: 'SEALED_VERIFIED' },
+    { section_no: 2, events: 1000000, state: 'SEALED_VERIFIED' },
+  ];
+  const p = projectStorage(w, catalog(), AT);
+  assert.equal(p.archive.section_events, null);
+  assert.equal(p.archive.section_progress_percent, null);
+  assert.equal(p.archive.sealed_sections_in_status, 1);
+});
 test('configured upload ceiling and empirical qualification remain separate', () => {
   const p = projectStorage(wasabi(), catalog(), AT);
   assert.equal(p.controls.single_put_ceiling_bytes, 536870912);
