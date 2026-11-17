@@ -56,6 +56,7 @@ test('unknown enums and duplicate bucket identities cannot manufacture READY', (
 test('duplicate section identities are unknown and are not counted as sealed', () => {
   const w = wasabi();
   w.sections = [
+    { section_no: 0, events: 1000000, state: 'SEALED_VERIFIED' },
     { section_no: 1, events: 510000, state: 'SEALED_VERIFIED' },
     { section_no: 1, events: 510000, state: 'SEALED_VERIFIED' },
     { section_no: 2, events: 1000000, state: 'SEALED_VERIFIED' },
