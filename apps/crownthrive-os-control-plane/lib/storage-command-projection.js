@@ -57,8 +57,12 @@ function instant(value) {
 const list = (value) => Array.isArray(value) ? value : [];
 
 export function projectStorage(wasabi, catalog, retrievedAt) {
-  const sourceAge = Date.parse(retrievedAt) - Date.parse(wasabi?.observed_at);
-  const w = object(wasabi) && object(wasabi.archive) && object(wasabi.control) && instant(wasabi.observed_at) && Number.isFinite(sourceAge) && sourceAge >= -60_000 && sourceAge <= 90_000 ? wasabi : null;
+  const retrievedInstant = instant(retrievedAt);
+  const observedInstant = instant(wasabi?.observed_at);
+  const sourceAge = retrievedInstant && observedInstant
+    ? Date.parse(retrievedInstant) - Date.parse(observedInstant)
+    : NaN;
+  const w = object(wasabi) && object(wasabi.archive) && object(wasabi.control) && observedInstant && Number.isFinite(sourceAge) && sourceAge >= -60_000 && sourceAge <= 90_000 ? wasabi : null;
   const c = object(catalog) && typeof catalog.sales_enabled === 'boolean' && Array.isArray(catalog.offers) ? catalog : null;
   const cursor = w?.archive;
   const control = w?.control;
@@ -97,7 +101,7 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
   return {
     schema: SCHEMA,
     status: w && c ? 'OBSERVED' : w || c ? 'PARTIAL' : 'UNAVAILABLE',
-    retrieved_at: instant(retrievedAt),
+    retrieved_at: retrievedInstant,
     source: { wasabi_status: w ? 'THRIVEBASE_READ' : 'UNAVAILABLE', catalog: c ? 'THRIVEBASE_READ' : 'UNAVAILABLE', wasabi_observed_at: instant(w?.observed_at), evidence_class: 'REGISTERED_PROVIDER_READBACK_NOT_NEW_PROVIDER_PROBE' },
     archive: w ? {
       state: state(cursor.state), enabled: boolean(cursor.enabled),
@@ -113,7 +117,7 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
       sequence_ids_are_event_counts: false,
     } : null,
     custody: w ? { buckets, consumers, registered_verified_objects: integer(w.objects?.verified_count), registered_bytes: integer(w.objects?.registered_bytes), retention_mode: ['COMPLIANCE', 'GOVERNANCE'].includes(immutable.retention_mode) ? immutable.retention_mode : null, retention_days: integer(immutable.retention_days), full_restore_proven_by_this_read: false, external_delivery_enabled_count: Array.isArray(w.consumers) ? consumers.filter((x) => x.external_delivery_enabled === true).length : null } : null,
-    controls: w ? { writes_enabled: boolean(control.writes_enabled), write_admission_state: control.writes_enabled === false ? 'DISABLED' : control.writes_enabled === true && instant(control.safety_stop_at) && Date.parse(retrievedAt) < Date.parse(instant(control.safety_stop_at)) ? 'ENABLED_WITHIN_WINDOW' : control.writes_enabled === true && instant(control.safety_stop_at) && Date.parse(retrievedAt) >= Date.parse(instant(control.safety_stop_at)) ? 'SAFETY_STOP_ELAPSED' : 'UNKNOWN', local_write_budget_bytes: integer(control.upload_budget_bytes), local_write_stop_at: instant(control.safety_stop_at), balancer_mode: state(w.balancer?.mode), pressure: integer(w.balancer?.pressure), single_put_ceiling_bytes: integer(meta.max_supported_binary_ticket_bytes), largest_empirical_test_bytes: integer(meta.largest_live_qualification_object_bytes), independent_blockchain_or_ipfs_network: boolean(w.independent_blockchain_or_ipfs_network) } : null,
+    controls: w ? { writes_enabled: boolean(control.writes_enabled), write_admission_state: control.writes_enabled === false ? 'DISABLED' : control.writes_enabled === true && instant(control.safety_stop_at) && Date.parse(retrievedInstant) < Date.parse(instant(control.safety_stop_at)) ? 'ENABLED_WITHIN_WINDOW' : control.writes_enabled === true && instant(control.safety_stop_at) && Date.parse(retrievedInstant) >= Date.parse(instant(control.safety_stop_at)) ? 'SAFETY_STOP_ELAPSED' : 'UNKNOWN', local_write_budget_bytes: integer(control.upload_budget_bytes), local_write_stop_at: instant(control.safety_stop_at), balancer_mode: state(w.balancer?.mode), pressure: integer(w.balancer?.pressure), single_put_ceiling_bytes: integer(meta.max_supported_binary_ticket_bytes), largest_empirical_test_bytes: integer(meta.largest_live_qualification_object_bytes), independent_blockchain_or_ipfs_network: boolean(w.independent_blockchain_or_ipfs_network) } : null,
     commerce: c ? { sales_enabled: c.sales_enabled, activation_state: state(c.activation_state), offers, payment_execution_exposed: false, catalog_is_not_payment_or_fulfillment_proof: true } : null,
     privacy: { public_safe: true, read_only: true, raw_payloads_exposed: false, credentials_exposed: false, customer_records_exposed: false, signed_urls_exposed: false },
   };
