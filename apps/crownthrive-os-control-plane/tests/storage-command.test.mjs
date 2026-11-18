@@ -78,6 +78,18 @@ test('write admission honors the local safety stop even when writes_enabled rema
   const unknown = wasabi();
   delete unknown.control.safety_stop_at;
   assert.equal(projectStorage(unknown, catalog(), AT).controls.write_admission_state, 'UNKNOWN');
+
+  const exhausted = wasabi();
+  exhausted.control.upload_budget_bytes = 0;
+  assert.equal(projectStorage(exhausted, catalog(), AT).controls.write_admission_state, 'BUDGET_EXHAUSTED');
+
+  const missingBudget = wasabi();
+  delete missingBudget.control.upload_budget_bytes;
+  assert.equal(projectStorage(missingBudget, catalog(), AT).controls.write_admission_state, 'UNKNOWN');
+
+  const invalidBudget = wasabi();
+  invalidBudget.control.upload_budget_bytes = -1;
+  assert.equal(projectStorage(invalidBudget, catalog(), AT).controls.write_admission_state, 'UNKNOWN');
 });
 test('configured upload ceiling and empirical qualification remain separate', () => {
   const p = projectStorage(wasabi(), catalog(), AT);

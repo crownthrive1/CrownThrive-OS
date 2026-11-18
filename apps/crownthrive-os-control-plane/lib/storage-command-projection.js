@@ -68,6 +68,17 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
   const control = w?.control;
   const meta = object(control?.metadata) ? control.metadata : {};
   const immutable = object(meta.dail_immutable_v2) ? meta.dail_immutable_v2 : {};
+  const uploadBudget = integer(control?.upload_budget_bytes);
+  const safetyStop = instant(control?.safety_stop_at);
+  const writeAdmissionState = control?.writes_enabled === false
+    ? 'DISABLED'
+    : control?.writes_enabled !== true || uploadBudget === null || !retrievedInstant || !safetyStop
+      ? 'UNKNOWN'
+      : Date.parse(retrievedInstant) >= Date.parse(safetyStop)
+        ? 'SAFETY_STOP_ELAPSED'
+        : uploadBudget === 0
+          ? 'BUDGET_EXHAUSTED'
+          : 'ENABLED_WITHIN_WINDOW';
   const sectionNo = integer(cursor?.section_no);
   const sections = list(w?.sections).filter((s) => object(s) && integer(s.section_no) > 0);
   const sectionCounts = new Map();
@@ -117,7 +128,7 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
       sequence_ids_are_event_counts: false,
     } : null,
     custody: w ? { buckets, consumers, registered_verified_objects: integer(w.objects?.verified_count), registered_bytes: integer(w.objects?.registered_bytes), retention_mode: ['COMPLIANCE', 'GOVERNANCE'].includes(immutable.retention_mode) ? immutable.retention_mode : null, retention_days: integer(immutable.retention_days), full_restore_proven_by_this_read: false, external_delivery_enabled_count: Array.isArray(w.consumers) ? consumers.filter((x) => x.external_delivery_enabled === true).length : null } : null,
-    controls: w ? { writes_enabled: boolean(control.writes_enabled), write_admission_state: control.writes_enabled === false ? 'DISABLED' : control.writes_enabled === true && instant(control.safety_stop_at) && Date.parse(retrievedInstant) < Date.parse(instant(control.safety_stop_at)) ? 'ENABLED_WITHIN_WINDOW' : control.writes_enabled === true && instant(control.safety_stop_at) && Date.parse(retrievedInstant) >= Date.parse(instant(control.safety_stop_at)) ? 'SAFETY_STOP_ELAPSED' : 'UNKNOWN', local_write_budget_bytes: integer(control.upload_budget_bytes), local_write_stop_at: instant(control.safety_stop_at), balancer_mode: state(w.balancer?.mode), pressure: integer(w.balancer?.pressure), single_put_ceiling_bytes: integer(meta.max_supported_binary_ticket_bytes), largest_empirical_test_bytes: integer(meta.largest_live_qualification_object_bytes), independent_blockchain_or_ipfs_network: boolean(w.independent_blockchain_or_ipfs_network) } : null,
+    controls: w ? { writes_enabled: boolean(control.writes_enabled), write_admission_state: writeAdmissionState, local_write_budget_bytes: uploadBudget, local_write_stop_at: safetyStop, balancer_mode: state(w.balancer?.mode), pressure: integer(w.balancer?.pressure), single_put_ceiling_bytes: integer(meta.max_supported_binary_ticket_bytes), largest_empirical_test_bytes: integer(meta.largest_live_qualification_object_bytes), independent_blockchain_or_ipfs_network: boolean(w.independent_blockchain_or_ipfs_network) } : null,
     commerce: c ? { sales_enabled: c.sales_enabled, activation_state: state(c.activation_state), offers, payment_execution_exposed: false, catalog_is_not_payment_or_fulfillment_proof: true } : null,
     privacy: { public_safe: true, read_only: true, raw_payloads_exposed: false, credentials_exposed: false, customer_records_exposed: false, signed_urls_exposed: false },
   };
