@@ -81,7 +81,8 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
         : uploadBudget === 0
           ? 'BUDGET_EXHAUSTED'
           : 'ENABLED_WITHIN_WINDOW';
-  const sectionNo = integer(cursor?.section_no);
+  const rawSectionNo = integer(cursor?.section_no);
+  const sectionNo = rawSectionNo !== null && rawSectionNo > 0 ? rawSectionNo : null;
   const sections = list(w?.sections).filter((s) => object(s) && integer(s.section_no) > 0);
   const sectionCounts = new Map();
   for (const section of sections) {
@@ -90,7 +91,7 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
   }
   // Duplicate section identities are ambiguous evidence, not additional progress.
   const uniqueSections = sections.filter((section) => sectionCounts.get(integer(section.section_no)) === 1);
-  const currentSection = sectionNo !== null && sectionNo > 0 ? uniqueSections.find((s) => integer(s.section_no) === sectionNo) : null;
+  const currentSection = sectionNo !== null ? uniqueSections.find((s) => integer(s.section_no) === sectionNo) : null;
   const target = integer(control?.archive_section_events);
   const sectionEvents = integer(currentSection?.events);
   const validProgress = target !== null && target > 0 && sectionEvents !== null && sectionEvents <= target;
@@ -118,7 +119,7 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
     source: { wasabi_status: w ? 'THRIVEBASE_READ' : 'UNAVAILABLE', catalog: c ? 'THRIVEBASE_READ' : 'UNAVAILABLE', wasabi_observed_at: instant(w?.observed_at), evidence_class: 'REGISTERED_PROVIDER_READBACK_NOT_NEW_PROVIDER_PROBE' },
     archive: w ? {
       state: state(cursor.state), enabled: boolean(cursor.enabled),
-      total_archived_events: integer(cursor.exported_event_count), section_no: integer(cursor.section_no),
+      total_archived_events: integer(cursor.exported_event_count), section_no: sectionNo,
       section_events: sectionEvents, section_target_events: target,
       section_progress_percent: validProgress ? Math.round(sectionEvents / target * 10000) / 100 : null,
       next_shard_no: integer(cursor.next_shard_no), last_archived_sequence_id: integer(cursor.last_sequence_id),
