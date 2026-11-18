@@ -7,7 +7,7 @@ const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 async function readBoundedText(upstream) {
   const declaredHeader = upstream.headers?.get('content-length');
   if (declaredHeader !== null && declaredHeader !== undefined) {
-    if (!/^\\d+$/.test(declaredHeader)) {
+    if (!/^\d+$/.test(declaredHeader)) {
       try { await upstream.body?.cancel(); } catch {}
       throw new Error('upstream_invalid_length');
     }
