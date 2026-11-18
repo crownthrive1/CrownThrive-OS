@@ -215,6 +215,34 @@ test('non-object, malformed and oversized responses are never trusted', async ()
     assert.equal(r.code, 503);
   }
 });
+test('upstream response byte limit is enforced while streaming without or with a false small Content-Length', async () => {
+  for (const declaredLength of [null, '1']) {
+    let cancelled = false;
+    let pulls = 0;
+    const r = response();
+    await createHandler({
+      env, now,
+      fetcher: async (url) => {
+        if (!url.includes('ct_wasabi_status_v1')) return goodFetch(url);
+        const headers = declaredLength === null ? {} : { 'Content-Length': declaredLength };
+        return new Response(new ReadableStream({
+          pull(controller) {
+            pulls += 1;
+            controller.enqueue(new Uint8Array(pulls === 3 ? 1 : 1024 * 1024));
+            if (pulls === 4) controller.close();
+          },
+          cancel() { cancelled = true; },
+        }), { status: 200, headers });
+      },
+    })({ method: 'GET' }, r);
+    assert.equal(r.code, 200);
+    assert.equal(r.body.status, 'PARTIAL');
+    assert.equal(r.body.archive, null);
+    assert.equal(cancelled, true);
+    assert.equal(pulls, 3);
+  }
+});
+
 test('HEAD has an empty response body', async () => {
   const r = response(); await createHandler({ env, now, fetcher: goodFetch })({ method: 'HEAD' }, r);
   assert.equal(r.code, 200); assert.equal(r.body, null); assert.equal(r.ended, true);
