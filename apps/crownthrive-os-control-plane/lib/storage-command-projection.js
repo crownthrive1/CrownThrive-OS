@@ -48,6 +48,8 @@ function instant(value) {
   if (year < 1 || month < 1 || month > 12 || day < 1 || day > (daysInMonth || 0) ||
       hour > 23 || minute > 59 || second > 59) return null;
   if (zone !== 'Z') {
+    // RFC 3339 -00:00 means the local offset is unknown, not UTC.
+    if (zone === '-00:00') return null;
     const offset = /^([+-])(\d{2}):(\d{2})$/.exec(zone);
     if (!offset || Number(offset[2]) > 23 || Number(offset[3]) > 59) return null;
   }
