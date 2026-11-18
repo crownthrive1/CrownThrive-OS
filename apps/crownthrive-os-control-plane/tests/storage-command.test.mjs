@@ -66,6 +66,19 @@ test('duplicate section identities are unknown and are not counted as sealed', (
   assert.equal(p.archive.section_progress_percent, null);
   assert.equal(p.archive.sealed_sections_in_status, 1);
 });
+test('zero cursor section sentinel is not presented as a current section', () => {
+  const w = wasabi();
+  w.archive.section_no = 0;
+  w.sections = [
+    { section_no: 0, events: 1000000, state: 'SEALED_VERIFIED' },
+    { section_no: 1, events: 510000, state: 'COPYING' },
+  ];
+  const p = projectStorage(w, catalog(), AT);
+  assert.equal(p.archive.section_no, null);
+  assert.equal(p.archive.section_events, null);
+  assert.equal(p.archive.section_progress_percent, null);
+  assert.equal(p.archive.sealed_sections_in_status, 0);
+});
 test('write admission honors the local safety stop even when writes_enabled remains true', () => {
   const expired = wasabi();
   expired.control.safety_stop_at = '2026-09-16T20:59:59Z';
