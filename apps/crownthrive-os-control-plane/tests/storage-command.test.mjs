@@ -117,6 +117,14 @@ test('stale or future source observation is unavailable, not freshened by retrie
     assert.equal(projectStorage(w, catalog(), AT).status, 'PARTIAL');
   }
 });
+test('retrieval timestamp must be strict and cannot normalize into an observed read', () => {
+  const w = wasabi();
+  w.observed_at = '2026-10-01T21:00:00.000Z';
+  const p = projectStorage(w, catalog(), '2026-09-31T21:00:00Z');
+  assert.equal(p.archive, null);
+  assert.equal(p.status, 'PARTIAL');
+  assert.equal(p.retrieved_at, null);
+});
 test('provider timestamps require an explicit timezone and valid calendar date', () => {
   const noZone = wasabi(); noZone.observed_at = '2026-09-16T21:00:00';
   const noZoneResult = projectStorage(noZone, catalog(), '2026-09-16T21:00:00.000Z');
