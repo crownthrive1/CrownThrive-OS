@@ -148,6 +148,22 @@ test('provider timestamps require an explicit timezone and valid calendar date',
   assert.equal(impossibleDateResult.archive, null);
   assert.equal(impossibleDateResult.status, 'PARTIAL');
 });
+test('unknown RFC 3339 local offset cannot be treated as UTC freshness evidence', () => {
+  const unknownObservation = wasabi();
+  unknownObservation.observed_at = '2026-09-16T21:00:00-00:00';
+  const observed = projectStorage(unknownObservation, catalog(), AT);
+  assert.equal(observed.archive, null);
+  assert.equal(observed.status, 'PARTIAL');
+
+  const unknownRetrieval = projectStorage(wasabi(), catalog(), '2026-09-16T21:00:00-00:00');
+  assert.equal(unknownRetrieval.archive, null);
+  assert.equal(unknownRetrieval.status, 'PARTIAL');
+  assert.equal(unknownRetrieval.retrieved_at, null);
+
+  const unknownSafetyStop = wasabi();
+  unknownSafetyStop.control.safety_stop_at = '2026-10-14T00:00:00-00:00';
+  assert.equal(projectStorage(unknownSafetyStop, catalog(), AT).controls.write_admission_state, 'UNKNOWN');
+});
 test('GET executes only two fixed existing read RPCs and returns sanitized no-store JSON', async () => {
   const calls = []; const r = response();
   await createHandler({ env, now, fetcher: async (url, options) => { calls.push({ url, options }); return goodFetch(url); } })({ method: 'GET', url: '/api/storage-command?url=https://attacker.invalid' }, r);
