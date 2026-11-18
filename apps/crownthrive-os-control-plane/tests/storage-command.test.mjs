@@ -232,7 +232,7 @@ test('upstream response byte limit is enforced while streaming without or with a
             if (pulls === 4) controller.close();
           },
           cancel() { cancelled = true; },
-        }), { status: 200, headers });
+        }, { highWaterMark: 0 }), { status: 200, headers });
       },
     })({ method: 'GET' }, r);
     assert.equal(r.code, 200);
