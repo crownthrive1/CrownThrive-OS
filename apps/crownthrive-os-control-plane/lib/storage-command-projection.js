@@ -100,11 +100,13 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
     const bucket = matches.length === 1 ? matches[0] : null;
     return { lane, state: state(bucket?.state), provider_verified_at: instant(bucket?.verified_at) };
   });
-  const consumers = Object.entries(CONSUMERS).flatMap(([id, name]) => {
+  const consumers = Object.entries(CONSUMERS).map(([id, name]) => {
     const matches = list(w?.consumers).filter((x) => object(x) && x.consumer_id === id);
-    if (matches.length !== 1) return [];
+    if (matches.length !== 1) {
+      return { name, backend_state: 'UNKNOWN', cutover_state: 'UNKNOWN', external_delivery_enabled: null };
+    }
     const row = matches[0];
-    return [{ name, backend_state: state(row.backend_state), cutover_state: state(row.site_cutover_state), external_delivery_enabled: boolean(row.external_delivery_enabled) }];
+    return { name, backend_state: state(row.backend_state), cutover_state: state(row.site_cutover_state), external_delivery_enabled: boolean(row.external_delivery_enabled) };
   });
   const offers = c ? Object.entries(OFFER_NAMES).flatMap(([id, name]) => {
     const matches = c.offers.filter((x) => object(x) && x.id === id);
@@ -130,7 +132,7 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
       hot_window: 'LOGICAL_LATEST_ONE_MILLION_ACTUAL_ROWS_NOT_PHYSICALLY_PRUNED',
       sequence_ids_are_event_counts: false,
     } : null,
-    custody: w ? { buckets, consumers, registered_verified_objects: integer(w.objects?.verified_count), registered_bytes: integer(w.objects?.registered_bytes), retention_mode: ['COMPLIANCE', 'GOVERNANCE'].includes(immutable.retention_mode) ? immutable.retention_mode : null, retention_days: integer(immutable.retention_days), full_restore_proven_by_this_read: false, external_delivery_enabled_count: Array.isArray(w.consumers) ? consumers.filter((x) => x.external_delivery_enabled === true).length : null } : null,
+    custody: w ? { buckets, consumers, registered_verified_objects: integer(w.objects?.verified_count), registered_bytes: integer(w.objects?.registered_bytes), retention_mode: ['COMPLIANCE', 'GOVERNANCE'].includes(immutable.retention_mode) ? immutable.retention_mode : null, retention_days: integer(immutable.retention_days), full_restore_proven_by_this_read: false, external_delivery_enabled_count: Array.isArray(w.consumers) && consumers.every((x) => x.external_delivery_enabled !== null) ? consumers.filter((x) => x.external_delivery_enabled === true).length : null } : null,
     controls: w ? { writes_enabled: boolean(control.writes_enabled), write_admission_state: writeAdmissionState, local_write_budget_bytes: uploadBudget, local_write_stop_at: safetyStop, balancer_mode: state(w.balancer?.mode), pressure: integer(w.balancer?.pressure), single_put_ceiling_bytes: integer(meta.max_supported_binary_ticket_bytes), largest_empirical_test_bytes: integer(meta.largest_live_qualification_object_bytes), independent_blockchain_or_ipfs_network: boolean(w.independent_blockchain_or_ipfs_network) } : null,
     commerce: c ? { sales_enabled: c.sales_enabled, activation_state: state(c.activation_state), offers, payment_execution_exposed: false, catalog_is_not_payment_or_fulfillment_proof: true } : null,
     privacy: { public_safe: true, read_only: true, raw_payloads_exposed: false, credentials_exposed: false, customer_records_exposed: false, signed_urls_exposed: false },
