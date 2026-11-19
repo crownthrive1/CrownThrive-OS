@@ -247,9 +247,11 @@ test('HEAD has an empty response body', async () => {
   const r = response(); await createHandler({ env, now, fetcher: goodFetch })({ method: 'HEAD' }, r);
   assert.equal(r.code, 200); assert.equal(r.body, null); assert.equal(r.ended, true);
 });
-test('storage write label uses the safety-window admission state, not the raw flag', async () => {
+test('storage write label identifies a local gate, not provider authorization', async () => {
   const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
-  assert.ok(source.includes('write_admission_state'));
+  assert.ok(source.includes("metric(g, 'Local write admission'"));
+  assert.ok(source.includes('Budget and safety-stop check only; does not authorize provider writes or bypass continuity, capacity, retention, rights, privacy, security, or release gates'));
+  assert.equal(source.includes("metric(g, 'Storage writes'"), false);
   assert.equal(source.includes("flag(s.controls?.writes_enabled, 'Enabled within limits', 'Held')"), false);
 });
 test('commerce copy distinguishes catalog visibility from purchase authority', async () => {
