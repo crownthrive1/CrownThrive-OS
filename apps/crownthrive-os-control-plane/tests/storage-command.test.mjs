@@ -209,6 +209,27 @@ test('one unavailable source degrades only that panel', async () => {
   await createHandler({ env, now, fetcher: async (url) => url.includes('ct_wasabi_status_v1') ? new Response('private error', { status: 500 }) : goodFetch(url) })({ method: 'GET' }, r);
   assert.equal(r.code, 200); assert.equal(r.body.status, 'PARTIAL'); assert.equal(r.body.archive, null); assert.equal(r.body.commerce.sales_enabled, false);
 });
+test('non-success upstream response bodies are cancelled before reporting a partial read', async () => {
+  let cancelled = false;
+  const r = response();
+  await createHandler({
+    env, now,
+    fetcher: async (url) => {
+      if (url.includes('ct_wasabi_status_v1')) {
+        return new Response(new ReadableStream({
+          cancel() { cancelled = true; },
+        }, { highWaterMark: 0 }), { status: 503 });
+      }
+      return goodFetch(url);
+    },
+  })({ method: 'GET' }, r);
+  assert.equal(cancelled, true);
+  assert.equal(r.code, 200);
+  assert.equal(r.body.status, 'PARTIAL');
+  assert.equal(r.body.archive, null);
+  assert.equal(r.body.commerce.sales_enabled, false);
+});
+
 test('non-object, malformed and oversized responses are never trusted', async () => {
   for (const body of ['[]', 'null', 'not JSON', JSON.stringify({ padding: 'x'.repeat(2 * 1024 * 1024 + 1) })]) {
     const r = response(); await createHandler({ env, now, fetcher: async () => new Response(body) })({ method: 'GET' }, r);

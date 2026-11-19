@@ -53,7 +53,10 @@ export function createHandler({ env = process.env, fetcher = globalThis.fetch, n
         headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Accept: 'application/json' },
         body: '{}',
       });
-      if (!upstream.ok) throw new Error('upstream_unavailable');
+      if (!upstream.ok) {
+        try { await upstream.body?.cancel(); } catch {}
+        throw new Error('upstream_unavailable');
+      }
       const body = await readBoundedText(upstream);
       const parsed = JSON.parse(body);
       if (!object(parsed)) throw new Error('upstream_invalid');
