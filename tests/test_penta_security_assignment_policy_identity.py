@@ -37,7 +37,7 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
         self.assertIn("when no_data_found or too_many_rows then", self.migration)
         self.assertIn("SOURCE_POLICY_IDENTITY_AMBIGUOUS:", self.migration)
         self.assertNotIn("order by p.created_at desc", self.migration)
-        self.assertNotRegex(self.migration, r"\\blimit\\s+1\\b")
+        self.assertNotIn("limit 1", self.migration.lower())
 
     def test_sql_acceptance_covers_policy_identity_and_ambiguity(self) -> None:
         required = (
