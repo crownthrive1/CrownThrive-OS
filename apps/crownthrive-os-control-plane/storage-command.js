@@ -105,7 +105,12 @@
       const item = node('div', '', 'storage-offer');
       const price = offer.currency === 'usd' && validNumber(offer.billing_amount_cents) && offer.billing_interval_months > 0
         ? `$${fmt.format(offer.billing_amount_cents / 100)} every ${offer.billing_interval_months} month${offer.billing_interval_months === 1 ? '' : 's'}` : 'Billing not observed';
-      item.append(node('strong', offer.name), node('span', `${price} · ${bytes(offer.included_bytes)}`), node('small', flag(offer.catalog_binding_present, 'Catalog binding recorded', 'Catalog binding absent')));
+      item.append(
+        node('strong', offer.name),
+        node('span', `${price} · ${bytes(offer.included_bytes)}`),
+        node('small', flag(offer.catalog_binding_present, 'Catalog binding recorded', 'Catalog binding absent')),
+        node('small', `Catalog listing: ${flag(offer.catalog_available, 'Listed in catalog', 'Not available in catalog')}. Purchase path: ${state(offer.purchase_state)}.`),
+      );
       list.append(item);
     }
     root.append(list);
