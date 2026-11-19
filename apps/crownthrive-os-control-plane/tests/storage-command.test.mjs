@@ -264,6 +264,30 @@ test('upstream response byte limit is enforced while streaming without or with a
   }
 });
 
+test('upstream response chunk count is bounded independently of byte size', async () => {
+  let cancelled = false;
+  let pulls = 0;
+  const r = response();
+  await createHandler({
+    env, now,
+    fetcher: async (url) => {
+      if (!url.includes('ct_wasabi_status_v1')) return goodFetch(url);
+      return new Response(new ReadableStream({
+        pull(controller) {
+          pulls += 1;
+          controller.enqueue(new Uint8Array([65]));
+        },
+        cancel() { cancelled = true; },
+      }, { highWaterMark: 0 }), { status: 200 });
+    },
+  })({ method: 'GET' }, r);
+  assert.equal(r.code, 200);
+  assert.equal(r.body.status, 'PARTIAL');
+  assert.equal(r.body.archive, null);
+  assert.equal(cancelled, true);
+  assert.equal(pulls, 4097);
+});
+
 test('HEAD has an empty response body', async () => {
   const r = response(); await createHandler({ env, now, fetcher: goodFetch })({ method: 'HEAD' }, r);
   assert.equal(r.code, 200); assert.equal(r.body, null); assert.equal(r.ended, true);

@@ -3,6 +3,7 @@ import { SCHEMA, object, projectStorage } from '../lib/storage-command-projectio
 const ORIGIN = 'https://tzajnzshmtzjenqulehq.supabase.co';
 const RPCS = ['ct_wasabi_status_v1', 'ct_storage_fabric_catalog_v1'];
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_RESPONSE_CHUNKS = 4096;
 
 async function readBoundedText(upstream) {
   const declaredHeader = upstream.headers?.get('content-length');
@@ -26,6 +27,7 @@ async function readBoundedText(upstream) {
       const { done, value } = await reader.read();
       if (done) break;
       if (!(value instanceof Uint8Array)) throw new Error('upstream_invalid');
+      if (chunks.length >= MAX_RESPONSE_CHUNKS) throw new Error('upstream_too_fragmented');
       total += value.byteLength;
       if (total > MAX_RESPONSE_BYTES) throw new Error('upstream_oversize');
       chunks.push(Buffer.from(value));
