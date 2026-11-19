@@ -390,3 +390,11 @@ test('loader injects storage assets without replacing existing estate and wallet
   assert.ok(loader.includes('/command-estate.js')); assert.ok(loader.includes('/command-enhancements.js'));
   assert.ok(loader.includes("const CANONICAL_SHELL = '/command-v3.html'"));
 });
+
+test('commerce offer cards separate catalog listing from purchase authority', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  assert.ok(source.includes("flag(offer.catalog_available, 'Listed in catalog', 'Not available in catalog')"));
+  assert.ok(source.includes('Purchase path: ${state(offer.purchase_state)}.'));
+  assert.ok(source.includes('Catalog visibility is not a purchase path or proof of a purchasable offer.'));
+  assert.equal(source.includes("Purchase path: Available"), false);
+});
