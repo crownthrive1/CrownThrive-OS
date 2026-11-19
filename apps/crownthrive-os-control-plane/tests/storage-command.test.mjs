@@ -53,6 +53,41 @@ test('unknown enums and duplicate bucket identities cannot manufacture READY', (
   const p = projectStorage(w, catalog(), AT);
   assert.equal(p.archive.state, 'UNKNOWN'); assert.equal(p.custody.buckets[0].state, 'UNKNOWN');
 });
+test('missing and duplicate allowlisted consumers remain unknown and invalidate the delivery count', () => {
+  const missing = projectStorage(wasabi(), catalog(), AT);
+  assert.equal(missing.custody.consumers.length, 16);
+  assert.deepEqual(
+    missing.custody.consumers.find((row) => row.name === 'Gretna Junction origins'),
+    { name: 'Gretna Junction origins', backend_state: 'UNKNOWN', cutover_state: 'UNKNOWN', external_delivery_enabled: null },
+  );
+  assert.equal(missing.custody.external_delivery_enabled_count, null);
+
+  const duplicate = wasabi();
+  duplicate.consumers.push({ ...duplicate.consumers[0], external_delivery_enabled: true });
+  const ambiguous = projectStorage(duplicate, catalog(), AT);
+  assert.deepEqual(
+    ambiguous.custody.consumers.find((row) => row.name === 'Virality Music masters'),
+    { name: 'Virality Music masters', backend_state: 'UNKNOWN', cutover_state: 'UNKNOWN', external_delivery_enabled: null },
+  );
+  assert.equal(ambiguous.custody.external_delivery_enabled_count, null);
+
+  const complete = wasabi();
+  const ids = [
+    'gretna-origins', 'locticians-origins', 'virality-origins', 'virality-masters',
+    'virality-delivery', 'go-flipbooks-delivery', 'melanated-vault-masters',
+    'melanated-stock-masters', 'melanated-tv-masters', 'crownthrive-studios-masters',
+    'little-crowns-private', 'chlom-web3-objects', 'fabric-archive', 'fabric-evidence',
+    'melanin-magic-origins', 'melanated-voices-masters',
+  ];
+  complete.consumers = ids.map((consumer_id, index) => ({
+    consumer_id, backend_state: 'READY', site_cutover_state: 'NOT_CUT_OVER',
+    external_delivery_enabled: index < 2,
+  }));
+  const fullyObserved = projectStorage(complete, catalog(), AT);
+  assert.equal(fullyObserved.custody.consumers.length, 16);
+  assert.equal(fullyObserved.custody.external_delivery_enabled_count, 2);
+});
+
 test('duplicate section identities are unknown and are not counted as sealed', () => {
   const w = wasabi();
   w.sections = [
