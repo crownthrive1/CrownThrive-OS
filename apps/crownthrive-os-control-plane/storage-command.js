@@ -22,8 +22,9 @@
   const flag = (v, yes, no) => v === true ? yes : v === false ? no : 'Not observed';
   const state = (v) => typeof v === 'string' ? v.replaceAll('_', ' ') : 'Not observed';
   function time(value) {
-    const parsed = typeof value === 'string' ? Date.parse(value) : NaN;
-    return Number.isFinite(parsed) ? new Date(parsed).toLocaleString('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' }) : 'Not observed';
+    // Projection timestamps are canonical UTC ISO; never normalize malformed display evidence.
+    const parsed = canonicalInstant(value);
+    return parsed === null ? 'Not observed' : new Date(parsed).toLocaleString('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' });
   }
   function bytes(v) {
     if (!validNumber(v)) return 'Not observed';
