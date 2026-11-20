@@ -52,6 +52,45 @@ class PentaGretnaCpanelSitesAuthorityTests(unittest.TestCase):
         self.assertFalse(credential["silent_replacement_authorized"])
         self.assertFalse(credential["duplicate_credential_creation_authorized"])
 
+    def test_provider_authenticated_state_requires_two_current_readbacks(self) -> None:
+        reader = self.migration.index(
+            "create or replace function integration_control.cpanel_gretna_junction_secure_read_v1("
+        )
+        first_write = self.migration.index("do $block$")
+        self.assertLess(reader, first_write)
+        domain_read = self.migration.index("v_domain_read :=")
+        disk_read = self.migration.index("v_disk_read :=")
+        service_write = self.migration.index("insert into integration_control.services")
+        self.assertLess(domain_read, service_write)
+        self.assertLess(disk_read, service_write)
+        self.assertIn("target_domain.status", self.migration)
+        self.assertIn("disk_usage.status", self.migration)
+        self.assertIn("gretna_current_provider_auth_readback_required", self.migration)
+        for predicate in (
+            "provider_called",
+            "target_domain_found",
+            "provider_write",
+            "credential_exposed",
+            "secret_value_returned",
+            "response_body_stored",
+            "authority_effect",
+            "evidence_sha256",
+            "observed_at",
+        ):
+            self.assertIn(predicate, self.migration)
+        self.assertNotIn("'cpanel_provider_readback','PASS_2026-09-10'", self.migration)
+        self.assertIn("'historical_cpanel_provider_readback','PASS_2026-09-10'", self.migration)
+        self.assertIn("PASS_CURRENT_AT_MIGRATION", self.migration)
+
+    def test_source_repair_preserves_historical_evidence_and_requires_live_canaries(self) -> None:
+        self.assertFalse(self.correction["historical_provider_observations"]["current_evidence"])
+        repair = self.correction["source_repair"]
+        self.assertEqual(repair["state"], "IMPLEMENTED_IN_SOURCE_PENDING_CI_AND_PROVIDER_READBACK")
+        self.assertEqual(repair["required_current_canaries"], ["target_domain.status", "disk_usage.status"])
+        self.assertFalse(repair["security_boundaries"]["provider_write"])
+        self.assertFalse(repair["security_boundaries"]["credential_rotation"])
+        self.assertFalse(repair["security_boundaries"]["duplicate_credential_creation"])
+
 
 if __name__ == "__main__":
     unittest.main()

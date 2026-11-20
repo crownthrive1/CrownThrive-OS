@@ -12,7 +12,8 @@
   "corrections": [
     "A cPanel UAPI domain or disk read verifies only the secondary cPanel hosting/domain-control service.",
     "Those cPanel observations do not independently establish the Sites publication provider connection state or Sites health.",
-    "The migration must not set website_surfaces.provider_system, provider_connection_state, or health_state from cPanel evidence."
+    "The migration must not set website_surfaces.provider_system, provider_connection_state, or health_state from cPanel evidence.",
+    "The migration now requires current read-only cPanel UAPI domain and disk canaries before writing provider-authenticated or hot-route-ready states."
   ],
   "credential_identity": {
     "vault_alias": "Gretne Junction cPanel",
@@ -30,5 +31,22 @@
     "cpanel_role": "secondary_hosting_domain_control",
     "provider_write": false,
     "authority_created": false
+  },
+  "source_repair": {
+    "updated_at": "2026-11-20T19:02:12Z",
+    "state": "IMPLEMENTED_IN_SOURCE_PENDING_CI_AND_PROVIDER_READBACK",
+    "migration": "supabase/migrations/20260910160000_reconcile_gretna_cpanel_sites_authority.sql",
+    "required_current_canaries": [
+      "target_domain.status",
+      "disk_usage.status"
+    ],
+    "fail_closed_predicate": "Both sanitized readbacks must report state=PASS and provider_called=true, with target_domain_found=true for the domain read; evidence SHA-256 values and observed_at timestamps must be present.",
+    "security_boundaries": {
+      "provider_write": false,
+      "credential_rotation": false,
+      "duplicate_credential_creation": false,
+      "raw_secret_persistence": false,
+      "sites_publication_authority_preserved": true
+    }
   }
 }
