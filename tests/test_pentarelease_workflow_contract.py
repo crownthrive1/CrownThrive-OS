@@ -7,6 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPREHENSIVE_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-comprehensive-release-surface.yml"
 AWARENESS_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-autonomous-awareness.yml"
 RECONCILER_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-pr-backlog-reconciler.yml"
+RECOVERY_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-intelligence-pr-recovery.yml"
+RELEASE_INTELLIGENCE_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-release-intelligence-v3.yml"
 DECISION_ENGINE = ROOT / "scripts" / "pentarelease" / "decide.py"
 
 
@@ -16,6 +18,8 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         cls.text = COMPREHENSIVE_WORKFLOW.read_text(encoding="utf-8")
         cls.awareness_text = AWARENESS_WORKFLOW.read_text(encoding="utf-8")
         cls.reconciler_text = RECONCILER_WORKFLOW.read_text(encoding="utf-8")
+        cls.recovery_text = RECOVERY_WORKFLOW.read_text(encoding="utf-8")
+        cls.release_intelligence_text = RELEASE_INTELLIGENCE_WORKFLOW.read_text(encoding="utf-8")
         cls.decision_text = DECISION_ENGINE.read_text(encoding="utf-8")
 
     def test_never_direct_pushes_protected_main(self):
@@ -134,6 +138,14 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("managed PentaRelease group inside the existing CrownThrive OS PentaDocs tab", self.text)
         self.assertIn("pentadocs_group.inspect", self.text)
         self.assertNotIn('names.count("Releases & Evidence") == 1', self.text)
+
+    def test_recovery_shares_publisher_lock_without_duplicate_schedule(self):
+        self.assertIn("workflow_run:", self.recovery_text)
+        self.assertNotIn("\n  schedule:\n", self.recovery_text)
+        self.assertIn("group: pentarelease-release-intelligence-v3", self.recovery_text)
+        self.assertIn("group: pentarelease-release-intelligence-v3", self.release_intelligence_text)
+        self.assertIn("cancel-in-progress: false", self.recovery_text)
+        self.assertIn("cancel-in-progress: false", self.release_intelligence_text)
 
     def test_reconciler_keeps_least_privilege_and_retains_branches(self):
         self.assertIn("contents: read", self.reconciler_text)
