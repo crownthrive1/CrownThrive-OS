@@ -12,6 +12,7 @@
   let activeController = null;
   const fmt = new Intl.NumberFormat('en-US');
   const validNumber = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+  const validPercent = (v) => validNumber(v) && v <= 100;
   const number = (v) => validNumber(v) ? fmt.format(v) : 'Not observed';
   const flag = (v, yes, no) => v === true ? yes : v === false ? no : 'Not observed';
   const state = (v) => typeof v === 'string' ? v.replaceAll('_', ' ') : 'Not observed';
@@ -90,7 +91,7 @@
     metric(g, 'Archive state', state(a?.state), `Next shard: ${number(a?.next_shard_no)}`);
     const progress = node('progress');
     progress.max = 100;
-    if (validNumber(a?.section_progress_percent)) progress.value = Math.min(100, a.section_progress_percent);
+    if (validPercent(a?.section_progress_percent)) progress.value = a.section_progress_percent;
     progress.setAttribute('aria-label', 'Current million-event section completion');
     root.append(progress);
     note(root, `Last archive work: ${time(a?.last_run_at)}. Last copied batch: ${number(a?.last_run_events_copied)} events.`);
@@ -126,7 +127,7 @@
       if (page === 'overview') {
         const g = grid(item.body);
         metric(g, 'Actual archived events', number(s.archive?.total_archived_events));
-        metric(g, 'Section completion', validNumber(s.archive?.section_progress_percent) ? `${number(s.archive.section_progress_percent)}%` : 'Not observed');
+        metric(g, 'Section completion', validPercent(s.archive?.section_progress_percent) ? `${number(s.archive.section_progress_percent)}%` : 'Not observed');
         metric(g, 'Catalog sales flag', flag(s.commerce?.sales_enabled, 'Enabled in source', 'Disabled in source'));
         item.body.append(link('/infrastructure#storage-command', 'Inspect storage command'));
       } else if (page === 'dail') renderArchive(item.body, s);

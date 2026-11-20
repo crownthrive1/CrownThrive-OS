@@ -418,3 +418,11 @@ test('commerce offer cards separate catalog listing from purchase authority', as
   assert.ok(source.includes('Catalog visibility is not a purchase path or proof of a purchasable offer.'));
   assert.equal(source.includes("Purchase path: Available"), false);
 });
+
+test('browser progress rejects out-of-range percentages instead of clamping them to complete', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  assert.ok(source.includes("const validPercent = (v) => validNumber(v) && v <= 100;"));
+  assert.ok(source.includes("if (validPercent(a?.section_progress_percent)) progress.value = a.section_progress_percent;"));
+  assert.ok(source.includes("validPercent(s.archive?.section_progress_percent) ?"));
+  assert.equal(source.includes('Math.min(100, a.section_progress_percent)'), false);
+});
