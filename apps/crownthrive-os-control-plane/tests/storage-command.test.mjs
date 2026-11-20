@@ -469,7 +469,6 @@ test('browser progress renderer leaves invalid percentages unassigned and accept
           const pageName = selector.slice(12, -2);
           return pageRoots.get(pageName) ?? null;
         }
-        if (match) return pageRoots.get(match[1]) ?? null;
         if (selector === '#nav') return nav;
         if (selector === '#fresh') return fresh;
         if (selector === '#refresh') return refresh;
@@ -549,7 +548,6 @@ test('browser rejects noncanonical retrieval timestamps before accepting a snaps
           const pageName = selector.slice(12, -2);
           return pageRoots.get(pageName) ?? null;
         }
-        if (match) return pageRoots.get(match[1]) ?? null;
         if (selector === '#nav') return nav;
         if (selector === '#fresh') return fresh;
         if (selector === '#refresh') return refresh;
