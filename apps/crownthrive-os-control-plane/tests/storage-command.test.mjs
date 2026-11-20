@@ -145,7 +145,7 @@ test('configured upload ceiling and empirical qualification remain separate', ()
   assert.equal(p.controls.largest_empirical_test_bytes, 34603008);
 });
 test('quarterly price is never mislabeled as a monthly charge', () => {
-  const offer = projectStorage(wasabi(), catalog(), AT).commerce.offers[0];
+  const offer = projectStorage(wasabi(), catalog(), AT).commerce.offers.find((row) => row.id === 'CT-SF-ARCHIVE-1000');
   assert.equal(offer.billing_amount_cents, 14700); assert.equal(offer.billing_interval_months, 3);
   assert.equal(offer.available, false); assert.equal(offer.name, 'Archive Vault');
 });
@@ -155,7 +155,7 @@ test('catalog availability never establishes purchase availability', () => {
   c.activation_state = 'ACCEPTING_ORDERS';
   c.offers[0].available = true;
   c.offers[0].state = 'ACCEPTING_ORDERS';
-  const offer = projectStorage(wasabi(), c, AT).commerce.offers[0];
+  const offer = projectStorage(wasabi(), c, AT).commerce.offers.find((row) => row.id === 'CT-SF-ARCHIVE-1000');
   assert.equal(offer.catalog_available, true);
   assert.equal(offer.available, false);
   assert.equal(offer.purchase_state, 'NOT_PROVEN_BY_CATALOG_READ');
