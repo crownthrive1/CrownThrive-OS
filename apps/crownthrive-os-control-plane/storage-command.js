@@ -13,6 +13,11 @@
   const fmt = new Intl.NumberFormat('en-US');
   const validNumber = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
   const validPercent = (v) => validNumber(v) && v <= 100;
+  function canonicalInstant(value) {
+    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(value)) return null;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) && new Date(parsed).toISOString() === value ? parsed : null;
+  }
   const number = (v) => validNumber(v) ? fmt.format(v) : 'Not observed';
   const flag = (v, yes, no) => v === true ? yes : v === false ? no : 'Not observed';
   const state = (v) => typeof v === 'string' ? v.replaceAll('_', ' ') : 'Not observed';
@@ -178,8 +183,9 @@
       try {
         const response = await fetch(ENDPOINT, { cache: 'no-store', credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json' }, signal: activeController.signal });
         const data = await response.json();
-        if (!response.ok || data?.schema !== CONTRACT || !['OBSERVED', 'PARTIAL'].includes(data.status) || typeof data.retrieved_at !== 'string') throw new Error('storage_readback_failed');
-        const age = Date.now() - Date.parse(data.retrieved_at);
+        const retrievedAt = canonicalInstant(data?.retrieved_at);
+        if (!response.ok || data?.schema !== CONTRACT || !['OBSERVED', 'PARTIAL'].includes(data.status) || retrievedAt === null) throw new Error('storage_readback_failed');
+        const age = Date.now() - retrievedAt;
         if (!Number.isFinite(age) || age < -60_000 || age > 90_000) throw new Error('storage_readback_stale');
         snapshot = data; render(data);
         clearTimeout(staleTimer);

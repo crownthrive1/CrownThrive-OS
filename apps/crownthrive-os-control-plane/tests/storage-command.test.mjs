@@ -509,3 +509,88 @@ test('browser progress renderer leaves invalid percentages unassigned and accept
   assert.deepEqual(boundary.map((element) => element.valueAssigned), [true, true]);
   assert.deepEqual(boundary.map((element) => element.value), [100, 100]);
 });
+
+test('browser rejects noncanonical retrieval timestamps before accepting a snapshot', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  async function readbackBadges(retrievedAt) {
+    const created = [];
+    class Element {
+      constructor(tagName) {
+        this.tagName = tagName;
+        this.children = [];
+        this.dataset = {};
+        this.attributes = {};
+        this.listeners = {};
+        created.push(this);
+      }
+      append(...items) { this.children.push(...items); }
+      appendChild(item) { this.children.push(item); return item; }
+      replaceChildren(...items) { this.children = items; }
+      setAttribute(name, value) { this.attributes[name] = String(value); }
+      addEventListener(name, callback) { this.listeners[name] = callback; }
+      querySelector() { return null; }
+      click() {}
+    }
+    const pageNames = ['overview', 'dail', 'infrastructure', 'commerce', 'evidence', 'integrations'];
+    const pageRoots = new Map(pageNames.map((name) => [name, new Element('section')]));
+    const nav = new Element('nav');
+    const fresh = new Element('div');
+    const refresh = new Element('button');
+    const document = {
+      hidden: false,
+      documentElement: { dataset: {} },
+      createElement: (tag) => new Element(tag),
+      createTextNode: (value) => { const item = new Element('#text'); item.textContent = String(value); return item; },
+      querySelector(selector) {
+        const match = /^\\[data-page="([^"]+)"\\]$/.exec(selector);
+        if (match) return pageRoots.get(match[1]) ?? null;
+        if (selector === '#nav') return nav;
+        if (selector === '#fresh') return fresh;
+        if (selector === '#refresh') return refresh;
+        return null;
+      },
+      addEventListener() {},
+    };
+    const payload = {
+      schema: 'ct.command.storage-status.v1',
+      status: 'OBSERVED',
+      retrieved_at: retrievedAt,
+      archive: { section_progress_percent: 51 },
+      commerce: { sales_enabled: false, activation_state: 'UNKNOWN', offers: [] },
+      custody: { consumers: [], buckets: [] },
+      controls: {},
+    };
+    runInNewContext(source, {
+      document,
+      location: { hash: '' },
+      window: { addEventListener() {} },
+      MutationObserver: class { observe() {} disconnect() {} },
+      requestAnimationFrame() {},
+      fetch: async () => ({ ok: true, json: async () => payload }),
+      AbortController,
+      Date,
+      Intl,
+      setTimeout: () => 1,
+      clearTimeout() {},
+      URL,
+      Blob,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    return created.filter((element) => element.attributes.role === 'status');
+  }
+
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  const localTimestampWithoutZone = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+  assert.ok(Number.isFinite(Date.parse(localTimestampWithoutZone)));
+
+  const invalid = await readbackBadges(localTimestampWithoutZone);
+  assert.equal(invalid.length, 6);
+  assert.ok(invalid.every((badge) => badge.textContent === 'Storage readback unavailable'));
+  assert.ok(invalid.every((badge) => badge.dataset.state === 'UNAVAILABLE'));
+
+  const valid = await readbackBadges(new Date().toISOString());
+  assert.equal(valid.length, 6);
+  assert.ok(valid.every((badge) => badge.textContent === 'Readback observed'));
+  assert.ok(valid.every((badge) => badge.dataset.state === 'OBSERVED'));
+});
