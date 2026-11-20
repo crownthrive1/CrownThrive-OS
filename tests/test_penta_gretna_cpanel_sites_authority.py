@@ -78,9 +78,9 @@ class PentaGretnaCpanelSitesAuthorityTests(unittest.TestCase):
             "observed_at",
         ):
             self.assertIn(predicate, self.migration)
+        self.assertIn("'cpanel_provider_readback','PASS_CURRENT_AT_MIGRATION'", self.migration)
         self.assertNotIn("'cpanel_provider_readback','PASS_2026-09-10'", self.migration)
         self.assertIn("'historical_cpanel_provider_readback','PASS_2026-09-10'", self.migration)
-        self.assertIn("PASS_CURRENT_AT_MIGRATION", self.migration)
 
     def test_source_repair_preserves_historical_evidence_and_requires_live_canaries(self) -> None:
         self.assertFalse(self.correction["historical_provider_observations"]["current_evidence"])
