@@ -108,11 +108,31 @@ export function projectStorage(wasabi, catalog, retrievedAt) {
     const row = matches[0];
     return { name, backend_state: state(row.backend_state), cutover_state: state(row.site_cutover_state), external_delivery_enabled: boolean(row.external_delivery_enabled) };
   });
-  const offers = c ? Object.entries(OFFER_NAMES).flatMap(([id, name]) => {
+  const offers = c ? Object.entries(OFFER_NAMES).map(([id, name]) => {
     const matches = c.offers.filter((x) => object(x) && x.id === id);
-    if (matches.length !== 1) return [];
+    if (matches.length !== 1) {
+      return {
+        id, name,
+        catalog_record_state: matches.length === 0 ? 'MISSING' : 'AMBIGUOUS',
+        billing_amount_cents: null, billing_interval_months: null, currency: null,
+        included_bytes: null, included_download_bytes: null,
+        catalog_binding_present: null, catalog_available: null,
+        available: false, purchase_state: 'UNKNOWN', state: 'UNKNOWN',
+      };
+    }
     const row = matches[0];
-    return [{ id, name, billing_amount_cents: integer(row.billing_amount_cents), billing_interval_months: integer(row.billing_interval_months), currency: row.currency === 'usd' ? 'usd' : null, included_bytes: integer(row.included_bytes), included_download_bytes: integer(row.included_download_bytes), catalog_binding_present: boolean(row.stripe_catalog_active), catalog_available: c.sales_enabled === true && row.available === true, available: false, purchase_state: 'NOT_PROVEN_BY_CATALOG_READ', state: state(row.state) }];
+    return {
+      id, name, catalog_record_state: 'OBSERVED',
+      billing_amount_cents: integer(row.billing_amount_cents),
+      billing_interval_months: integer(row.billing_interval_months),
+      currency: row.currency === 'usd' ? 'usd' : null,
+      included_bytes: integer(row.included_bytes),
+      included_download_bytes: integer(row.included_download_bytes),
+      catalog_binding_present: boolean(row.stripe_catalog_active),
+      catalog_available: c.sales_enabled ? boolean(row.available) : false,
+      available: false, purchase_state: 'NOT_PROVEN_BY_CATALOG_READ',
+      state: state(row.state),
+    };
   }) : [];
   return {
     schema: SCHEMA,

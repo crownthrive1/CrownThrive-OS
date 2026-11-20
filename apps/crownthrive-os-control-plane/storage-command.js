@@ -109,7 +109,7 @@
         node('strong', offer.name),
         node('span', `${price} · ${bytes(offer.included_bytes)}`),
         node('small', flag(offer.catalog_binding_present, 'Catalog binding recorded', 'Catalog binding absent')),
-        node('small', `Catalog listing: ${flag(offer.catalog_available, 'Listed in catalog', 'Not available in catalog')}. Purchase path: ${state(offer.purchase_state)}.`),
+        node('small', `Catalog record: ${state(offer.catalog_record_state)}. Catalog listing: ${flag(offer.catalog_available, 'Listed in catalog', 'Not available in catalog')}. Purchase path: ${state(offer.purchase_state)}.`),
       );
       list.append(item);
     }

@@ -160,9 +160,29 @@ test('catalog availability never establishes purchase availability', () => {
   assert.equal(offer.available, false);
   assert.equal(offer.purchase_state, 'NOT_PROVEN_BY_CATALOG_READ');
 });
-test('unknown offers are omitted and duplicate canonical offers are held', () => {
+test('canonical offers remain visible when missing or duplicated without exposing untrusted rows', () => {
   const c = catalog(); c.offers.push({ id: 'malicious', name: 'SECRET' }, { ...c.offers[0] });
-  assert.deepEqual(projectStorage(wasabi(), c, AT).commerce.offers, []);
+  const offers = projectStorage(wasabi(), c, AT).commerce.offers;
+  assert.equal(offers.length, 4);
+  const archive = offers.find((offer) => offer.id === 'CT-SF-ARCHIVE-1000');
+  assert.equal(archive.catalog_record_state, 'AMBIGUOUS');
+  assert.equal(archive.catalog_available, null);
+  assert.equal(archive.catalog_binding_present, null);
+  assert.equal(archive.billing_amount_cents, null);
+  assert.equal(archive.purchase_state, 'UNKNOWN');
+  assert.equal(offers.find((offer) => offer.id === 'CT-SF-START-100').catalog_record_state, 'MISSING');
+  assert.equal(offers.some((offer) => offer.id === 'malicious'), false);
+  assert.equal(JSON.stringify(offers).includes('SECRET'), false);
+});
+
+test('catalog listing remains unknown when an observed offer omits its availability flag', () => {
+  const c = catalog();
+  c.sales_enabled = true;
+  delete c.offers[0].available;
+  const offer = projectStorage(wasabi(), c, AT).commerce.offers.find((row) => row.id === 'CT-SF-ARCHIVE-1000');
+  assert.equal(offer.catalog_record_state, 'OBSERVED');
+  assert.equal(offer.catalog_available, null);
+  assert.equal(offer.purchase_state, 'NOT_PROVEN_BY_CATALOG_READ');
 });
 test('overflowed or missing section progress is not clamped into false completeness', () => {
   const w = wasabi(); w.sections[0].events = 1000001;
@@ -394,7 +414,7 @@ test('loader injects storage assets without replacing existing estate and wallet
 test('commerce offer cards separate catalog listing from purchase authority', async () => {
   const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
   assert.ok(source.includes("flag(offer.catalog_available, 'Listed in catalog', 'Not available in catalog')"));
-  assert.ok(source.includes('Purchase path: ${state(offer.purchase_state)}.'));
+  assert.ok(source.includes('Catalog record: ${state(offer.catalog_record_state)}. Catalog listing: ${flag(offer.catalog_available, \'Listed in catalog\', \'Not available in catalog\')}. Purchase path: ${state(offer.purchase_state)}.'));
   assert.ok(source.includes('Catalog visibility is not a purchase path or proof of a purchasable offer.'));
   assert.equal(source.includes("Purchase path: Available"), false);
 });
