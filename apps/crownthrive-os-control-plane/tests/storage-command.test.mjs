@@ -465,7 +465,10 @@ test('browser progress renderer leaves invalid percentages unassigned and accept
       createElement: (tag) => new Element(tag),
       createTextNode: (value) => { const item = new Element('#text'); item.textContent = String(value); return item; },
       querySelector(selector) {
-        const match = /^\[data-page="([^"]+)"\]$/.exec(selector);
+        if (selector.startsWith('[data-page="') && selector.endsWith('"]')) {
+          const pageName = selector.slice(12, -2);
+          return pageRoots.get(pageName) ?? null;
+        }
         if (match) return pageRoots.get(match[1]) ?? null;
         if (selector === '#nav') return nav;
         if (selector === '#fresh') return fresh;
