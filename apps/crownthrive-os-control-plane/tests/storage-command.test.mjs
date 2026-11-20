@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 import { projectStorage, integer } from '../lib/storage-command-projection.js';
 import { createHandler } from '../api/storage-command.js';
 const AT = '2026-09-16T21:00:00.000Z';
@@ -425,4 +426,86 @@ test('browser progress rejects out-of-range percentages instead of clamping them
   assert.ok(source.includes("if (validPercent(a?.section_progress_percent)) progress.value = a.section_progress_percent;"));
   assert.ok(source.includes("validPercent(s.archive?.section_progress_percent) ?"));
   assert.equal(source.includes('Math.min(100, a.section_progress_percent)'), false);
+});
+
+test('browser progress renderer leaves invalid percentages unassigned and accepts the upper boundary', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  async function render(progressPercent) {
+    const created = [];
+    class Element {
+      constructor(tagName) {
+        this.tagName = tagName;
+        this.children = [];
+        this.dataset = {};
+        this.attributes = {};
+        this.listeners = {};
+        this.valueAssigned = false;
+        created.push(this);
+      }
+      append(...items) { this.children.push(...items); }
+      appendChild(item) { this.children.push(item); return item; }
+      replaceChildren(...items) { this.children = items; }
+      setAttribute(name, value) { this.attributes[name] = String(value); }
+      addEventListener(name, callback) { this.listeners[name] = callback; }
+      querySelector() { return null; }
+      click() {}
+    }
+    Object.defineProperty(Element.prototype, 'value', {
+      get() { return this._value ?? 0; },
+      set(value) { this.valueAssigned = true; this._value = value; },
+    });
+    const pageNames = ['overview', 'dail', 'infrastructure', 'commerce', 'evidence', 'integrations'];
+    const pageRoots = new Map(pageNames.map((name) => [name, new Element('section')]));
+    const nav = new Element('nav');
+    const fresh = new Element('div');
+    const refresh = new Element('button');
+    const document = {
+      hidden: false,
+      documentElement: { dataset: {} },
+      createElement: (tag) => new Element(tag),
+      createTextNode: (value) => { const item = new Element('#text'); item.textContent = String(value); return item; },
+      querySelector(selector) {
+        const match = /^\[data-page="([^"]+)"\]$/.exec(selector);
+        if (match) return pageRoots.get(match[1]) ?? null;
+        if (selector === '#nav') return nav;
+        if (selector === '#fresh') return fresh;
+        if (selector === '#refresh') return refresh;
+        return null;
+      },
+      addEventListener() {},
+    };
+    const payload = {
+      schema: 'ct.command.storage-status.v1',
+      status: 'OBSERVED',
+      retrieved_at: new Date().toISOString(),
+      archive: { section_progress_percent: progressPercent },
+      commerce: { sales_enabled: false, activation_state: 'UNKNOWN', offers: [] },
+      custody: { consumers: [], buckets: [] },
+      controls: {},
+    };
+    runInNewContext(source, {
+      document,
+      location: { hash: '' },
+      window: { addEventListener() {} },
+      MutationObserver: class { observe() {} disconnect() {} },
+      requestAnimationFrame() {},
+      fetch: async () => ({ ok: true, json: async () => payload }),
+      AbortController,
+      Date,
+      Intl,
+      setTimeout: () => 1,
+      clearTimeout() {},
+      URL,
+      Blob,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    return created.filter((element) => element.tagName === 'progress');
+  }
+  const invalid = await render(101);
+  assert.equal(invalid.length, 2);
+  assert.deepEqual(invalid.map((element) => element.valueAssigned), [false, false]);
+  const boundary = await render(100);
+  assert.equal(boundary.length, 2);
+  assert.deepEqual(boundary.map((element) => element.valueAssigned), [true, true]);
+  assert.deepEqual(boundary.map((element) => element.value), [100, 100]);
 });
