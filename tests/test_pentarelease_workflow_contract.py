@@ -147,6 +147,13 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", self.recovery_text)
         self.assertIn("cancel-in-progress: false", self.release_intelligence_text)
 
+    def test_reconciler_does_not_cancel_in_flight_provider_effects(self):
+        # PR retirement is a provider effect; an active reconciliation must finish.
+        self.assertEqual(self.reconciler_text.count("cancel-in-progress:"), 1)
+        self.assertIn("group: pentarelease-pr-backlog-reconciler", self.reconciler_text)
+        self.assertIn("cancel-in-progress: false", self.reconciler_text)
+        self.assertNotIn("cancel-in-progress: true", self.reconciler_text)
+
     def test_reconciler_keeps_least_privilege_and_retains_branches(self):
         self.assertIn("contents: read", self.reconciler_text)
         self.assertIn('gh pr close "$number" --repo "$REPO" --comment "$NOTE"', self.reconciler_text)
