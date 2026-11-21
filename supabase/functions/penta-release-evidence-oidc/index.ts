@@ -41,6 +41,75 @@ function claim(payload: Record<string, unknown>, key: string): string {
   const value = payload[key];
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
+
+type FailureStage =
+  | "authorization"
+  | "oidc_verification"
+  | "request_validation"
+  | "database_connect"
+  | "resolve_release_evidence_bundle"
+  | "enqueue_release_projection"
+  | "dispatch_release_footer";
+
+type DiagnosticCode =
+  | "github_oidc_bearer_required"
+  | "github_oidc_verification_failed"
+  | "method_not_allowed"
+  | "request_body_invalid"
+  | "request_validation_rejected"
+  | "database_unavailable"
+  | "database_connection_failed"
+  | "database_unique_conflict"
+  | "database_foreign_key_conflict"
+  | "database_constraint_rejected"
+  | "database_permission_denied"
+  | "database_contract_missing"
+  | "database_timeout_or_lock"
+  | "database_serialization_conflict"
+  | "database_value_rejected"
+  | "database_capacity_exhausted"
+  | "database_application_exception"
+  | "database_provider_error";
+
+function safeDiagnosticCode(error: unknown): DiagnosticCode {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "database_unavailable") return "database_unavailable";
+  if (message === "request_body_invalid" || error instanceof SyntaxError) return "request_body_invalid";
+  if (message.startsWith("oidc_") || message.includes("JWT") || message.includes("signature") || message.includes("audience") || message.includes("issuer")) {
+    return "github_oidc_verification_failed";
+  }
+  if (["release_version_invalid", "release_tag_mismatch", "pr_number_invalid", "payload_bytes_invalid"].includes(message)) {
+    return "request_validation_rejected";
+  }
+  const candidateCode = typeof error === "object" && error !== null
+    ? (error as { code?: unknown }).code
+    : undefined;
+  const sqlState = typeof candidateCode === "string" ? candidateCode : "";
+  switch (sqlState) {
+    case "23505": return "database_unique_conflict";
+    case "23503": return "database_foreign_key_conflict";
+    case "23514":
+    case "23502": return "database_constraint_rejected";
+    case "42501": return "database_permission_denied";
+    case "42883":
+    case "42P01":
+    case "3F000": return "database_contract_missing";
+    case "57014":
+    case "55P03": return "database_timeout_or_lock";
+    case "40001": return "database_serialization_conflict";
+    case "22P02":
+    case "22003": return "database_value_rejected";
+    case "53300": return "database_capacity_exhausted";
+    case "08000":
+    case "08001":
+    case "08003":
+    case "08006":
+    case "57P03": return "database_connection_failed";
+    case "P0001": return "database_application_exception";
+    default: return "database_provider_error";
+  }
+}
+
 async function verifyGitHubOidc(token: string) {
   const { payload } = await jwtVerify(token, JWKS, {
     issuer: ISSUER,
@@ -65,17 +134,19 @@ async function verifyGitHubOidc(token: string) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "GET") return json({ service: "ct.pentarelease.evidence-oidc.v1", production: true, audience: AUDIENCE, repository: REPOSITORY, raw_token_persisted: false });
-  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+  if (req.method !== "POST") return json({ error: "method_not_allowed", diagnostic_version: 1, diagnostic_stage: "request_validation", diagnostic_code: "method_not_allowed", raw_token_persisted: false }, 405);
   const auth = req.headers.get("authorization") ?? "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  if (!token) return json({ error: "github_oidc_bearer_required" }, 401);
+  if (!token) return json({ error: "github_oidc_bearer_required", diagnostic_version: 1, diagnostic_stage: "authorization", diagnostic_code: "github_oidc_bearer_required", raw_token_persisted: false }, 401);
+  let failureStage: FailureStage = "oidc_verification";
   try {
     const claims = await verifyGitHubOidc(token);
+    failureStage = "request_validation";
     const body = await req.json() as Record<string, unknown>;
     const releaseVersion = String(body.release_version ?? "").trim();
     const releaseTag = String(body.release_tag ?? "").trim();
     const prNumber = body.pr_number == null || body.pr_number === "" ? null : Number(body.pr_number);
-    const payloadBytes = Math.max(0, Number(body.payload_bytes ?? 0));
+    const payloadBytes = Number(body.payload_bytes ?? 0);
     const cieSubject = body.cie_subject && typeof body.cie_subject === "object" && !Array.isArray(body.cie_subject)
       ? body.cie_subject as Record<string, unknown>
       : null;
@@ -84,14 +155,17 @@ Deno.serve(async (req: Request) => {
     if (prNumber !== null && (!Number.isSafeInteger(prNumber) || prNumber <= 0)) throw new Error("pr_number_invalid");
     if (!Number.isSafeInteger(payloadBytes) || payloadBytes < 0) throw new Error("payload_bytes_invalid");
 
+    failureStage = "database_connect";
     const sql = db();
     const result = await sql.begin(async (tx) => {
+      failureStage = "resolve_release_evidence_bundle";
       const resolved = await tx<Array<{ result: Record<string, unknown> }>>`
         select penta_os20.resolve_release_evidence_bundle_v1(
           ${releaseVersion},
           ${payloadBytes}::bigint,
           ${cieSubject ? tx.json(cieSubject) : null}::jsonb
         ) as result`;
+      failureStage = "enqueue_release_projection";
       const provenance = {
         source: "github_actions_oidc",
         repository: REPOSITORY,
@@ -111,6 +185,7 @@ Deno.serve(async (req: Request) => {
         ) as result`;
       let prDispatch: Record<string, unknown> | null = null;
       if (prNumber !== null) {
+        failureStage = "dispatch_release_footer";
         const rows = await tx<Array<{ result: Record<string, unknown> }>>`
           select penta_os20.dispatch_release_footer_to_github_v1(
             ${releaseVersion},
@@ -123,8 +198,15 @@ Deno.serve(async (req: Request) => {
     });
     return json({ ok: true, service: "ct.pentarelease.evidence-oidc.v1", release_version: releaseVersion, release_tag: releaseTag, pr_number: prNumber, result, raw_token_persisted: false, authority_manufactured: false });
   } catch (error) {
-    const detail = error instanceof Error ? error.message : "unknown_error";
-    const authFailure = detail.startsWith("oidc_") || detail.includes("JWT") || detail.includes("signature") || detail.includes("audience") || detail.includes("issuer");
-    return json({ ok: false, error: authFailure ? "github_oidc_verification_failed" : "release_evidence_projection_rejected", detail: detail.slice(0, 240), raw_token_persisted: false }, authFailure ? 401 : 409);
+    const diagnosticCode = safeDiagnosticCode(error);
+    const authFailure = diagnosticCode === "github_oidc_verification_failed";
+    return json({
+      ok: false,
+      error: authFailure ? "github_oidc_verification_failed" : "release_evidence_projection_rejected",
+      diagnostic_version: 1,
+      diagnostic_stage: failureStage,
+      diagnostic_code: diagnosticCode,
+      raw_token_persisted: false,
+    }, authFailure ? 401 : 409);
   }
 });

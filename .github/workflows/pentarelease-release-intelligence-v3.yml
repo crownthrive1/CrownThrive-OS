@@ -24,7 +24,7 @@ permissions:
 concurrency:
   # Single-flight convergence: stale schedule/workflow runs cannot create parallel PRs.
   group: pentarelease-release-intelligence-v3
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   PENTARELEASE_EVIDENCE_ENDPOINT: https://tzajnzshmtzjenqulehq.supabase.co/functions/v1/penta-release-evidence-oidc
@@ -282,6 +282,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.commit.outputs.branch }}
           HEAD_SHA: ${{ steps.commit.outputs.head_sha }}
+          BASE_SHA: ${{ steps.commit.outputs.base_sha }}
           TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
@@ -308,7 +309,17 @@ jobs:
           done
           test "$PASS" = true
 
+          MERGE_READY=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUM}")
+          test "$(jq -r '.state' <<<"$MERGE_READY")" = 'open'
+          test "$(jq -r '.base.ref' <<<"$MERGE_READY")" = 'main'
+          test "$(jq -r '.base.sha' <<<"$MERGE_READY")" = "$BASE_SHA"
+          test "$(jq -r '.head.ref' <<<"$MERGE_READY")" = "$BRANCH"
+          test "$(jq -r '.head.sha' <<<"$MERGE_READY")" = "$HEAD_SHA"
+          test "$(jq -r '.head.repo.full_name // empty' <<<"$MERGE_READY")" = "$GITHUB_REPOSITORY"
+          test "$(jq -r '.user.login' <<<"$MERGE_READY")" = 'github-actions[bot]'
+
           gh pr merge "$PR_URL" --repo "$GITHUB_REPOSITORY" --auto --squash \
+            --match-head-commit "$HEAD_SHA" \
             --subject "PentaRelease release intelligence $TAG"
 
           MERGED=false

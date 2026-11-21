@@ -1,0 +1,33 @@
+name: PentaRelease exact-candidate contract tests
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pentarelease-*.yml'
+      - 'scripts/pentarelease/**'
+      - 'tests/test_pentarelease_workflow_contract.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pentarelease-contract-tests-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  contract-tests:
+    name: PentaRelease exact-candidate workflow contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - name: Run PentaRelease workflow contract tests
+        run: python -m unittest tests.test_pentarelease_workflow_contract -v

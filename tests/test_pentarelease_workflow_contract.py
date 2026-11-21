@@ -7,7 +7,10 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPREHENSIVE_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-comprehensive-release-surface.yml"
 AWARENESS_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-autonomous-awareness.yml"
 RECONCILER_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-pr-backlog-reconciler.yml"
+RECOVERY_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-intelligence-pr-recovery.yml"
+RELEASE_INTELLIGENCE_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-release-intelligence-v3.yml"
 DECISION_ENGINE = ROOT / "scripts" / "pentarelease" / "decide.py"
+OIDC_EVIDENCE_FUNCTION = ROOT / "supabase" / "functions" / "penta-release-evidence-oidc" / "index.ts"
 
 
 class PentaReleaseWorkflowContractTests(unittest.TestCase):
@@ -16,7 +19,10 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         cls.text = COMPREHENSIVE_WORKFLOW.read_text(encoding="utf-8")
         cls.awareness_text = AWARENESS_WORKFLOW.read_text(encoding="utf-8")
         cls.reconciler_text = RECONCILER_WORKFLOW.read_text(encoding="utf-8")
+        cls.recovery_text = RECOVERY_WORKFLOW.read_text(encoding="utf-8")
+        cls.release_intelligence_text = RELEASE_INTELLIGENCE_WORKFLOW.read_text(encoding="utf-8")
         cls.decision_text = DECISION_ENGINE.read_text(encoding="utf-8")
+        cls.oidc_evidence_text = OIDC_EVIDENCE_FUNCTION.read_text(encoding="utf-8")
 
     def test_never_direct_pushes_protected_main(self):
         self.assertNotIn('git push origin "$HEAD_SHA":refs/heads/main', self.text)
@@ -135,6 +141,21 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("pentadocs_group.inspect", self.text)
         self.assertNotIn('names.count("Releases & Evidence") == 1', self.text)
 
+    def test_recovery_shares_publisher_lock_without_duplicate_schedule(self):
+        self.assertIn("workflow_run:", self.recovery_text)
+        self.assertNotIn("\n  schedule:\n", self.recovery_text)
+        self.assertIn("group: pentarelease-release-intelligence-v3", self.recovery_text)
+        self.assertIn("group: pentarelease-release-intelligence-v3", self.release_intelligence_text)
+        self.assertIn("cancel-in-progress: false", self.recovery_text)
+        self.assertIn("cancel-in-progress: false", self.release_intelligence_text)
+
+    def test_reconciler_does_not_cancel_in_flight_provider_effects(self):
+        # PR retirement is a provider effect; an active reconciliation must finish.
+        self.assertEqual(self.reconciler_text.count("cancel-in-progress:"), 1)
+        self.assertIn("group: pentarelease-pr-backlog-reconciler", self.reconciler_text)
+        self.assertIn("cancel-in-progress: false", self.reconciler_text)
+        self.assertNotIn("cancel-in-progress: true", self.reconciler_text)
+
     def test_reconciler_keeps_least_privilege_and_retains_branches(self):
         self.assertIn("contents: read", self.reconciler_text)
         self.assertIn('gh pr close "$number" --repo "$REPO" --comment "$NOTE"', self.reconciler_text)
@@ -178,6 +199,28 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn(r"\.env\.(example|sample|template)$", self.awareness_text)
         self.assertIn(r"\.env($|\.)", self.awareness_text)
         self.assertIn("prohibited secret-bearing path", self.awareness_text)
+
+
+    def test_oidc_payload_bytes_reject_negative_values_instead_of_clamping(self):
+        self.assertIn("const payloadBytes = Number(body.payload_bytes ?? 0);", self.oidc_evidence_text)
+        self.assertNotIn("Math.max(0, Number(body.payload_bytes ?? 0))", self.oidc_evidence_text)
+        self.assertIn(
+            'if (!Number.isSafeInteger(payloadBytes) || payloadBytes < 0) throw new Error("payload_bytes_invalid");',
+            self.oidc_evidence_text,
+        )
+
+    def test_oidc_projection_errors_emit_only_allowlisted_stage_and_code(self):
+        self.assertIn(
+            'error: authFailure ? "github_oidc_verification_failed" : "release_evidence_projection_rejected",',
+            self.oidc_evidence_text,
+        )
+        self.assertIn("function safeDiagnosticCode(error: unknown): DiagnosticCode", self.oidc_evidence_text)
+        self.assertIn("diagnostic_stage: failureStage", self.oidc_evidence_text)
+        self.assertIn("diagnostic_code: diagnosticCode", self.oidc_evidence_text)
+        self.assertIn('case "23505": return "database_unique_conflict";', self.oidc_evidence_text)
+        self.assertIn('case "P0001": return "database_application_exception";', self.oidc_evidence_text)
+        self.assertNotIn("detail: detail.slice(0, 240)", self.oidc_evidence_text)
+        self.assertNotIn("detail: detail", self.oidc_evidence_text)
 
 
 if __name__ == "__main__":
