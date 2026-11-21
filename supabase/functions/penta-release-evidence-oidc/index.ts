@@ -75,7 +75,7 @@ Deno.serve(async (req: Request) => {
     const releaseVersion = String(body.release_version ?? "").trim();
     const releaseTag = String(body.release_tag ?? "").trim();
     const prNumber = body.pr_number == null || body.pr_number === "" ? null : Number(body.pr_number);
-    const payloadBytes = Math.max(0, Number(body.payload_bytes ?? 0));
+    const payloadBytes = Number(body.payload_bytes ?? 0);
     const cieSubject = body.cie_subject && typeof body.cie_subject === "object" && !Array.isArray(body.cie_subject)
       ? body.cie_subject as Record<string, unknown>
       : null;
@@ -125,6 +125,6 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown_error";
     const authFailure = detail.startsWith("oidc_") || detail.includes("JWT") || detail.includes("signature") || detail.includes("audience") || detail.includes("issuer");
-    return json({ ok: false, error: authFailure ? "github_oidc_verification_failed" : "release_evidence_projection_rejected", detail: detail.slice(0, 240), raw_token_persisted: false }, authFailure ? 401 : 409);
+    return json({ ok: false, error: authFailure ? "github_oidc_verification_failed" : "release_evidence_projection_rejected", raw_token_persisted: false }, authFailure ? 401 : 409);
   }
 });

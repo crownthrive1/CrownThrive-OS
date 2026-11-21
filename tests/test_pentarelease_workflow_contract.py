@@ -10,6 +10,7 @@ RECONCILER_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-pr-backlog-
 RECOVERY_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-intelligence-pr-recovery.yml"
 RELEASE_INTELLIGENCE_WORKFLOW = ROOT / ".github" / "workflows" / "pentarelease-release-intelligence-v3.yml"
 DECISION_ENGINE = ROOT / "scripts" / "pentarelease" / "decide.py"
+OIDC_EVIDENCE_FUNCTION = ROOT / "supabase" / "functions" / "penta-release-evidence-oidc" / "index.ts"
 
 
 class PentaReleaseWorkflowContractTests(unittest.TestCase):
@@ -21,6 +22,7 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         cls.recovery_text = RECOVERY_WORKFLOW.read_text(encoding="utf-8")
         cls.release_intelligence_text = RELEASE_INTELLIGENCE_WORKFLOW.read_text(encoding="utf-8")
         cls.decision_text = DECISION_ENGINE.read_text(encoding="utf-8")
+        cls.oidc_evidence_text = OIDC_EVIDENCE_FUNCTION.read_text(encoding="utf-8")
 
     def test_never_direct_pushes_protected_main(self):
         self.assertNotIn('git push origin "$HEAD_SHA":refs/heads/main', self.text)
@@ -197,6 +199,22 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn(r"\.env\.(example|sample|template)$", self.awareness_text)
         self.assertIn(r"\.env($|\.)", self.awareness_text)
         self.assertIn("prohibited secret-bearing path", self.awareness_text)
+
+
+    def test_oidc_payload_bytes_reject_negative_values_instead_of_clamping(self):
+        self.assertIn("const payloadBytes = Number(body.payload_bytes ?? 0);", self.oidc_evidence_text)
+        self.assertNotIn("Math.max(0, Number(body.payload_bytes ?? 0))", self.oidc_evidence_text)
+        self.assertIn(
+            'if (!Number.isSafeInteger(payloadBytes) || payloadBytes < 0) throw new Error("payload_bytes_invalid");',
+            self.oidc_evidence_text,
+        )
+
+    def test_oidc_projection_errors_do_not_echo_provider_exception_details(self):
+        self.assertIn(
+            'error: authFailure ? "github_oidc_verification_failed" : "release_evidence_projection_rejected",',
+            self.oidc_evidence_text,
+        )
+        self.assertNotIn("detail: detail.slice(0, 240)", self.oidc_evidence_text)
 
 
 if __name__ == "__main__":
