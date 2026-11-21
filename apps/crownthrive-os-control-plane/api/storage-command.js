@@ -16,7 +16,7 @@ function cancelQuietly(target) {
 async function readBoundedText(upstream) {
   const declaredHeader = upstream.headers?.get('content-length');
   if (declaredHeader !== null && declaredHeader !== undefined) {
-    if (!/^\\d+$/.test(declaredHeader)) {
+    if (!/^\d+$/.test(declaredHeader)) {
       cancelQuietly(upstream.body);
       throw new Error('upstream_invalid_length');
     }
