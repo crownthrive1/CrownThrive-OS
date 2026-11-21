@@ -10,6 +10,7 @@
   let lastAttempt = 0;
   let staleTimer = null;
   let activeController = null;
+  let refreshQueued = false;
   const fmt = new Intl.NumberFormat('en-US');
   const validNumber = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
   const validPercent = (v) => validNumber(v) && v <= 100;
@@ -176,14 +177,19 @@
     if (snapshot) render(snapshot, true);
     else for (const item of pages.values()) { item.badge.textContent = 'Storage readback unavailable'; item.badge.dataset.state = 'UNAVAILABLE'; item.stamp.textContent = 'No current storage snapshot. Existing command-center functions remain available.'; }
   }
-  function refresh(force = false) {
-    if (pending || (!force && (document.hidden || Date.now() - lastAttempt < 25_000))) return pending;
+  function refresh(force = false, queueIfPending = false) {
+    if (pending) {
+      if (queueIfPending) refreshQueued = true;
+      return pending;
+    }
+    if (!force && (document.hidden || Date.now() - lastAttempt < 25_000)) return pending;
     lastAttempt = Date.now();
-    activeController = new AbortController();
-    const timeout = setTimeout(() => activeController?.abort(), 12_000);
+    const controller = new AbortController();
+    activeController = controller;
+    const timeout = setTimeout(() => controller.abort(), 12_000);
     pending = (async () => {
       try {
-        const response = await fetch(ENDPOINT, { cache: 'no-store', credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json' }, signal: activeController.signal });
+        const response = await fetch(ENDPOINT, { cache: 'no-store', credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json' }, signal: controller.signal });
         const data = await response.json();
         const retrievedAt = canonicalInstant(data?.retrieved_at);
         if (!response.ok || data?.schema !== CONTRACT || !['OBSERVED', 'PARTIAL'].includes(data.status) || retrievedAt === null) throw new Error('storage_readback_failed');
@@ -193,7 +199,14 @@
         clearTimeout(staleTimer);
         staleTimer = setTimeout(() => render(snapshot, true), Math.max(0, 90_000 - age));
       } catch { markFailure(); }
-      finally { clearTimeout(timeout); activeController = null; pending = null; }
+      finally {
+        clearTimeout(timeout);
+        if (activeController === controller) activeController = null;
+        pending = null;
+        const shouldRefresh = refreshQueued;
+        refreshQueued = false;
+        if (shouldRefresh && !document.hidden) refresh(true);
+      }
     })();
     return pending;
   }
@@ -206,7 +219,7 @@
     document.querySelector('#refresh')?.addEventListener('click', () => refresh(true));
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
     window.addEventListener('pagehide', () => { observer.disconnect(); activeController?.abort(); clearTimeout(staleTimer); });
-    window.addEventListener('pageshow', (event) => { if (event.persisted) { if (fresh) observer.observe(fresh, { childList: true, subtree: true, characterData: true }); refresh(true); } });
+    window.addEventListener('pageshow', (event) => { if (event.persisted) { if (fresh) observer.observe(fresh, { childList: true, subtree: true, characterData: true }); refresh(true, true); } });
     refresh(true);
   } catch { document.documentElement.dataset.storageCommandState = 'UNAVAILABLE'; }
 })();

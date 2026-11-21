@@ -598,3 +598,118 @@ test('browser rejects noncanonical retrieval timestamps before accepting a snaps
   assert.ok(valid.every((badge) => badge.textContent === 'Readback observed'));
   assert.ok(valid.every((badge) => badge.dataset.state === 'OBSERVED'));
 });
+
+
+test('BFCache restore queues a fresh read after the aborted request settles', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  const created = [];
+  const windowListeners = new Map();
+  const observers = [];
+
+  class Element {
+    constructor(tagName) {
+      this.tagName = tagName;
+      this.children = [];
+      this.dataset = {};
+      this.attributes = {};
+      this.listeners = {};
+      this.textContent = '';
+      created.push(this);
+    }
+    append(...items) { this.children.push(...items); }
+    appendChild(item) { this.children.push(item); return item; }
+    replaceChildren(...items) { this.children = items; }
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+    addEventListener(name, callback) { this.listeners[name] = callback; }
+    querySelector() { return null; }
+    click() {}
+    scrollIntoView() {}
+  }
+
+  const pageNames = ['overview', 'dail', 'infrastructure', 'commerce', 'evidence', 'integrations'];
+  const pageRoots = new Map(pageNames.map((name) => [name, new Element('section')]));
+  const nav = new Element('nav');
+  const fresh = new Element('div');
+  const refresh = new Element('button');
+  const document = {
+    hidden: false,
+    documentElement: { dataset: {} },
+    createElement: (tag) => new Element(tag),
+    createTextNode: (value) => new Element('#text'),
+    querySelector(selector) {
+      if (selector.startsWith('[data-page="') && selector.endsWith('"]')) {
+        return pageRoots.get(selector.slice(12, -2)) ?? null;
+      }
+      if (selector === '#nav') return nav;
+      if (selector === '#fresh') return fresh;
+      if (selector === '#refresh') return refresh;
+      return null;
+    },
+    addEventListener() {},
+  };
+
+  class Observer {
+    constructor(callback) {
+      this.callback = callback;
+      this.observeCalls = 0;
+      this.disconnectCalls = 0;
+      observers.push(this);
+    }
+    observe() { this.observeCalls += 1; }
+    disconnect() { this.disconnectCalls += 1; }
+  }
+
+  const payload = {
+    schema: 'ct.command.storage-status.v1',
+    status: 'PARTIAL',
+    retrieved_at: new Date().toISOString(),
+    source: { wasabi_observed_at: null },
+    archive: null,
+    commerce: null,
+    custody: null,
+    controls: null,
+  };
+  let fetchCalls = 0;
+  let rejectFirst;
+  const fetcher = async () => {
+    fetchCalls += 1;
+    if (fetchCalls === 1) {
+      return await new Promise((resolve, reject) => { rejectFirst = reject; });
+    }
+    return { ok: true, json: async () => payload };
+  };
+
+  runInNewContext(source, {
+    document,
+    location: { hash: '' },
+    window: { addEventListener: (name, callback) => windowListeners.set(name, callback) },
+    MutationObserver: Observer,
+    requestAnimationFrame() {},
+    fetch: fetcher,
+    AbortController,
+    Date,
+    Intl,
+    setTimeout: () => 1,
+    clearTimeout() {},
+    URL,
+    Blob,
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fetchCalls, 1);
+  const observer = observers[0];
+  windowListeners.get('pagehide')();
+  assert.equal(observer.disconnectCalls, 1);
+
+  windowListeners.get('pageshow')({ persisted: true });
+  assert.equal(observer.observeCalls, 2);
+
+  rejectFirst(new Error('aborted'));
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(fetchCalls, 2);
+  const badges = created.filter((element) => element.attributes.role === 'status');
+  assert.equal(badges.length, 6);
+  assert.ok(badges.every((badge) => badge.textContent === 'Partial readback'));
+});
