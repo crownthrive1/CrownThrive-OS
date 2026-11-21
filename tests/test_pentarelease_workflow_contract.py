@@ -209,12 +209,17 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
             self.oidc_evidence_text,
         )
 
-    def test_oidc_projection_errors_do_not_echo_provider_exception_details(self):
+    def test_oidc_projection_errors_emit_only_allowlisted_stage_and_code(self):
         self.assertIn(
             'error: authFailure ? "github_oidc_verification_failed" : "release_evidence_projection_rejected",',
             self.oidc_evidence_text,
         )
+        self.assertIn("function safeDiagnosticCode(error: unknown): DiagnosticCode", self.oidc_evidence_text)
+        self.assertIn("diagnostic_stage: failureStage", self.oidc_evidence_text)
+        self.assertIn("diagnostic_code: diagnosticCode", self.oidc_evidence_text)
+        self.assertIn('case "23505": return "database_unique_conflict";', self.oidc_evidence_text)
         self.assertNotIn("detail: detail.slice(0, 240)", self.oidc_evidence_text)
+        self.assertNotIn("detail: detail", self.oidc_evidence_text)
 
 
 if __name__ == "__main__":
