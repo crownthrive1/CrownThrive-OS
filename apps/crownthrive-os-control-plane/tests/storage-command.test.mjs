@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 import { projectStorage, integer } from '../lib/storage-command-projection.js';
 import { createHandler } from '../api/storage-command.js';
 const AT = '2026-09-16T21:00:00.000Z';
@@ -53,19 +54,136 @@ test('unknown enums and duplicate bucket identities cannot manufacture READY', (
   const p = projectStorage(w, catalog(), AT);
   assert.equal(p.archive.state, 'UNKNOWN'); assert.equal(p.custody.buckets[0].state, 'UNKNOWN');
 });
+test('missing and duplicate allowlisted consumers remain unknown and invalidate the delivery count', () => {
+  const missing = projectStorage(wasabi(), catalog(), AT);
+  assert.equal(missing.custody.consumers.length, 16);
+  assert.deepEqual(
+    missing.custody.consumers.find((row) => row.name === 'Gretna Junction origins'),
+    { name: 'Gretna Junction origins', backend_state: 'UNKNOWN', cutover_state: 'UNKNOWN', external_delivery_enabled: null },
+  );
+  assert.equal(missing.custody.external_delivery_enabled_count, null);
+
+  const duplicate = wasabi();
+  duplicate.consumers.push({ ...duplicate.consumers[0], external_delivery_enabled: true });
+  const ambiguous = projectStorage(duplicate, catalog(), AT);
+  assert.deepEqual(
+    ambiguous.custody.consumers.find((row) => row.name === 'Virality Music masters'),
+    { name: 'Virality Music masters', backend_state: 'UNKNOWN', cutover_state: 'UNKNOWN', external_delivery_enabled: null },
+  );
+  assert.equal(ambiguous.custody.external_delivery_enabled_count, null);
+
+  const complete = wasabi();
+  const ids = [
+    'gretna-origins', 'locticians-origins', 'virality-origins', 'virality-masters',
+    'virality-delivery', 'go-flipbooks-delivery', 'melanated-vault-masters',
+    'melanated-stock-masters', 'melanated-tv-masters', 'crownthrive-studios-masters',
+    'little-crowns-private', 'chlom-web3-objects', 'fabric-archive', 'fabric-evidence',
+    'melanin-magic-origins', 'melanated-voices-masters',
+  ];
+  complete.consumers = ids.map((consumer_id, index) => ({
+    consumer_id, backend_state: 'READY', site_cutover_state: 'NOT_CUT_OVER',
+    external_delivery_enabled: index < 2,
+  }));
+  const fullyObserved = projectStorage(complete, catalog(), AT);
+  assert.equal(fullyObserved.custody.consumers.length, 16);
+  assert.equal(fullyObserved.custody.external_delivery_enabled_count, 2);
+});
+
+test('duplicate section identities are unknown and are not counted as sealed', () => {
+  const w = wasabi();
+  w.sections = [
+    { section_no: 0, events: 1000000, state: 'SEALED_VERIFIED' },
+    { section_no: 1, events: 510000, state: 'SEALED_VERIFIED' },
+    { section_no: 1, events: 510000, state: 'SEALED_VERIFIED' },
+    { section_no: 2, events: 1000000, state: 'SEALED_VERIFIED' },
+  ];
+  const p = projectStorage(w, catalog(), AT);
+  assert.equal(p.archive.section_events, null);
+  assert.equal(p.archive.section_progress_percent, null);
+  assert.equal(p.archive.sealed_sections_in_status, 1);
+});
+test('zero cursor section sentinel is not presented as a current section', () => {
+  const w = wasabi();
+  w.archive.section_no = 0;
+  w.sections = [
+    { section_no: 0, events: 1000000, state: 'SEALED_VERIFIED' },
+    { section_no: 1, events: 510000, state: 'COPYING' },
+  ];
+  const p = projectStorage(w, catalog(), AT);
+  assert.equal(p.archive.section_no, null);
+  assert.equal(p.archive.section_events, null);
+  assert.equal(p.archive.section_progress_percent, null);
+  assert.equal(p.archive.sealed_sections_in_status, 0);
+});
+test('write admission honors the local safety stop even when writes_enabled remains true', () => {
+  const expired = wasabi();
+  expired.control.safety_stop_at = '2026-09-16T20:59:59Z';
+  assert.equal(projectStorage(expired, catalog(), AT).controls.write_admission_state, 'SAFETY_STOP_ELAPSED');
+
+  const active = wasabi();
+  active.control.safety_stop_at = '2026-09-16T21:00:01Z';
+  assert.equal(projectStorage(active, catalog(), AT).controls.write_admission_state, 'ENABLED_WITHIN_WINDOW');
+
+  const unknown = wasabi();
+  delete unknown.control.safety_stop_at;
+  assert.equal(projectStorage(unknown, catalog(), AT).controls.write_admission_state, 'UNKNOWN');
+
+  const exhausted = wasabi();
+  exhausted.control.upload_budget_bytes = 0;
+  assert.equal(projectStorage(exhausted, catalog(), AT).controls.write_admission_state, 'BUDGET_EXHAUSTED');
+
+  const missingBudget = wasabi();
+  delete missingBudget.control.upload_budget_bytes;
+  assert.equal(projectStorage(missingBudget, catalog(), AT).controls.write_admission_state, 'UNKNOWN');
+
+  const invalidBudget = wasabi();
+  invalidBudget.control.upload_budget_bytes = -1;
+  assert.equal(projectStorage(invalidBudget, catalog(), AT).controls.write_admission_state, 'UNKNOWN');
+});
 test('configured upload ceiling and empirical qualification remain separate', () => {
   const p = projectStorage(wasabi(), catalog(), AT);
   assert.equal(p.controls.single_put_ceiling_bytes, 536870912);
   assert.equal(p.controls.largest_empirical_test_bytes, 34603008);
 });
 test('quarterly price is never mislabeled as a monthly charge', () => {
-  const offer = projectStorage(wasabi(), catalog(), AT).commerce.offers[0];
+  const offer = projectStorage(wasabi(), catalog(), AT).commerce.offers.find((row) => row.id === 'CT-SF-ARCHIVE-1000');
   assert.equal(offer.billing_amount_cents, 14700); assert.equal(offer.billing_interval_months, 3);
   assert.equal(offer.available, false); assert.equal(offer.name, 'Archive Vault');
 });
-test('unknown offers are omitted and duplicate canonical offers are held', () => {
+test('catalog availability never establishes purchase availability', () => {
+  const c = catalog();
+  c.sales_enabled = true;
+  c.activation_state = 'ACCEPTING_ORDERS';
+  c.offers[0].available = true;
+  c.offers[0].state = 'ACCEPTING_ORDERS';
+  const offer = projectStorage(wasabi(), c, AT).commerce.offers.find((row) => row.id === 'CT-SF-ARCHIVE-1000');
+  assert.equal(offer.catalog_available, true);
+  assert.equal(offer.available, false);
+  assert.equal(offer.purchase_state, 'NOT_PROVEN_BY_CATALOG_READ');
+});
+test('canonical offers remain visible when missing or duplicated without exposing untrusted rows', () => {
   const c = catalog(); c.offers.push({ id: 'malicious', name: 'SECRET' }, { ...c.offers[0] });
-  assert.deepEqual(projectStorage(wasabi(), c, AT).commerce.offers, []);
+  const offers = projectStorage(wasabi(), c, AT).commerce.offers;
+  assert.equal(offers.length, 4);
+  const archive = offers.find((offer) => offer.id === 'CT-SF-ARCHIVE-1000');
+  assert.equal(archive.catalog_record_state, 'AMBIGUOUS');
+  assert.equal(archive.catalog_available, null);
+  assert.equal(archive.catalog_binding_present, null);
+  assert.equal(archive.billing_amount_cents, null);
+  assert.equal(archive.purchase_state, 'UNKNOWN');
+  assert.equal(offers.find((offer) => offer.id === 'CT-SF-START-100').catalog_record_state, 'MISSING');
+  assert.equal(offers.some((offer) => offer.id === 'malicious'), false);
+  assert.equal(JSON.stringify(offers).includes('SECRET'), false);
+});
+
+test('catalog listing remains unknown when an observed offer omits its availability flag', () => {
+  const c = catalog();
+  c.sales_enabled = true;
+  delete c.offers[0].available;
+  const offer = projectStorage(wasabi(), c, AT).commerce.offers.find((row) => row.id === 'CT-SF-ARCHIVE-1000');
+  assert.equal(offer.catalog_record_state, 'OBSERVED');
+  assert.equal(offer.catalog_available, null);
+  assert.equal(offer.purchase_state, 'NOT_PROVEN_BY_CATALOG_READ');
 });
 test('overflowed or missing section progress is not clamped into false completeness', () => {
   const w = wasabi(); w.sections[0].events = 1000001;
@@ -79,6 +197,41 @@ test('stale or future source observation is unavailable, not freshened by retrie
     assert.equal(projectStorage(w, catalog(), AT).archive, null);
     assert.equal(projectStorage(w, catalog(), AT).status, 'PARTIAL');
   }
+});
+test('retrieval timestamp must be strict and cannot normalize into an observed read', () => {
+  const w = wasabi();
+  w.observed_at = '2026-10-01T21:00:00.000Z';
+  const p = projectStorage(w, catalog(), '2026-09-31T21:00:00Z');
+  assert.equal(p.archive, null);
+  assert.equal(p.status, 'PARTIAL');
+  assert.equal(p.retrieved_at, null);
+});
+test('provider timestamps require an explicit timezone and valid calendar date', () => {
+  const noZone = wasabi(); noZone.observed_at = '2026-09-16T21:00:00';
+  const noZoneResult = projectStorage(noZone, catalog(), '2026-09-16T21:00:00.000Z');
+  assert.equal(noZoneResult.archive, null);
+  assert.equal(noZoneResult.status, 'PARTIAL');
+
+  const impossibleDate = wasabi(); impossibleDate.observed_at = '2026-09-31T21:00:00Z';
+  const impossibleDateResult = projectStorage(impossibleDate, catalog(), '2026-10-01T21:00:00.000Z');
+  assert.equal(impossibleDateResult.archive, null);
+  assert.equal(impossibleDateResult.status, 'PARTIAL');
+});
+test('unknown RFC 3339 local offset cannot be treated as UTC freshness evidence', () => {
+  const unknownObservation = wasabi();
+  unknownObservation.observed_at = '2026-09-16T21:00:00-00:00';
+  const observed = projectStorage(unknownObservation, catalog(), AT);
+  assert.equal(observed.archive, null);
+  assert.equal(observed.status, 'PARTIAL');
+
+  const unknownRetrieval = projectStorage(wasabi(), catalog(), '2026-09-16T21:00:00-00:00');
+  assert.equal(unknownRetrieval.archive, null);
+  assert.equal(unknownRetrieval.status, 'PARTIAL');
+  assert.equal(unknownRetrieval.retrieved_at, null);
+
+  const unknownSafetyStop = wasabi();
+  unknownSafetyStop.control.safety_stop_at = '2026-10-14T00:00:00-00:00';
+  assert.equal(projectStorage(unknownSafetyStop, catalog(), AT).controls.write_admission_state, 'UNKNOWN');
 });
 test('GET executes only two fixed existing read RPCs and returns sanitized no-store JSON', async () => {
   const calls = []; const r = response();
@@ -112,16 +265,181 @@ test('one unavailable source degrades only that panel', async () => {
   await createHandler({ env, now, fetcher: async (url) => url.includes('ct_wasabi_status_v1') ? new Response('private error', { status: 500 }) : goodFetch(url) })({ method: 'GET' }, r);
   assert.equal(r.code, 200); assert.equal(r.body.status, 'PARTIAL'); assert.equal(r.body.archive, null); assert.equal(r.body.commerce.sales_enabled, false);
 });
+test('non-success upstream response bodies are cancelled before reporting a partial read', async () => {
+  let cancelled = false;
+  const r = response();
+  await createHandler({
+    env, now,
+    fetcher: async (url) => {
+      if (url.includes('ct_wasabi_status_v1')) {
+        return new Response(new ReadableStream({
+          cancel() { cancelled = true; },
+        }, { highWaterMark: 0 }), { status: 503 });
+      }
+      return goodFetch(url);
+    },
+  })({ method: 'GET' }, r);
+  assert.equal(cancelled, true);
+  assert.equal(r.code, 200);
+  assert.equal(r.body.status, 'PARTIAL');
+  assert.equal(r.body.archive, null);
+  assert.equal(r.body.commerce.sales_enabled, false);
+});
+
 test('non-object, malformed and oversized responses are never trusted', async () => {
   for (const body of ['[]', 'null', 'not JSON', JSON.stringify({ padding: 'x'.repeat(2 * 1024 * 1024 + 1) })]) {
     const r = response(); await createHandler({ env, now, fetcher: async () => new Response(body) })({ method: 'GET' }, r);
     assert.equal(r.code, 503);
   }
 });
+test('decimal Content-Length is accepted and exponent notation is rejected', async () => {
+  const body = JSON.stringify(wasabi());
+  const accepted = response();
+  await createHandler({
+    env, now,
+    fetcher: async (url) => {
+      if (!url.includes('ct_wasabi_status_v1')) return goodFetch(url);
+      return {
+        ok: true,
+        headers: { get: (name) => name.toLowerCase() === 'content-length' ? String(Buffer.byteLength(body)) : null },
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(body));
+            controller.close();
+          },
+        }),
+      };
+    },
+  })({ method: 'GET' }, accepted);
+  assert.equal(accepted.code, 200);
+  assert.equal(accepted.body.archive.total_archived_events, 510000);
+
+  let cancelled = false;
+  let pulls = 0;
+  const rejected = response();
+  await createHandler({
+    env, now,
+    fetcher: async (url) => {
+      if (!url.includes('ct_wasabi_status_v1')) return goodFetch(url);
+      return {
+        ok: true,
+        headers: { get: (name) => name.toLowerCase() === 'content-length' ? '1e3' : null },
+        body: new ReadableStream({
+          pull(controller) {
+            pulls += 1;
+            controller.enqueue(new Uint8Array([65]));
+          },
+          cancel() { cancelled = true; },
+        }, { highWaterMark: 0 }),
+      };
+    },
+  })({ method: 'GET' }, rejected);
+  assert.equal(rejected.code, 200);
+  assert.equal(rejected.body.status, 'PARTIAL');
+  assert.equal(rejected.body.archive, null);
+  assert.equal(cancelled, true);
+  assert.equal(pulls, 0);
+});
+
+test('upstream response byte limit is enforced while streaming without or with a false small Content-Length', async () => {
+  for (const declaredLength of [null, '1']) {
+    let cancelled = false;
+    let pulls = 0;
+    const r = response();
+    await createHandler({
+      env, now,
+      fetcher: async (url) => {
+        if (!url.includes('ct_wasabi_status_v1')) return goodFetch(url);
+        const headers = declaredLength === null ? {} : { 'Content-Length': declaredLength };
+        return new Response(new ReadableStream({
+          pull(controller) {
+            pulls += 1;
+            controller.enqueue(new Uint8Array(pulls === 3 ? 1 : 1024 * 1024));
+            if (pulls === 4) controller.close();
+          },
+          cancel() { cancelled = true; },
+        }, { highWaterMark: 0 }), { status: 200, headers });
+      },
+    })({ method: 'GET' }, r);
+    assert.equal(r.code, 200);
+    assert.equal(r.body.status, 'PARTIAL');
+    assert.equal(r.body.archive, null);
+    assert.equal(cancelled, true);
+    assert.equal(pulls, 3);
+  }
+});
+
+test('upstream response chunk count is bounded independently of byte size', async () => {
+  let cancelled = false;
+  let pulls = 0;
+  const r = response();
+  await createHandler({
+    env, now,
+    fetcher: async (url) => {
+      if (!url.includes('ct_wasabi_status_v1')) return goodFetch(url);
+      return new Response(new ReadableStream({
+        pull(controller) {
+          pulls += 1;
+          controller.enqueue(new Uint8Array([65]));
+        },
+        cancel() { cancelled = true; },
+      }, { highWaterMark: 0 }), { status: 200 });
+    },
+  })({ method: 'GET' }, r);
+  assert.equal(r.code, 200);
+  assert.equal(r.body.status, 'PARTIAL');
+  assert.equal(r.body.archive, null);
+  assert.equal(cancelled, true);
+  assert.equal(pulls, 4097);
+});
+
+test('upstream response chunk limit accepts exactly the configured maximum', async () => {
+  const body = JSON.stringify(wasabi()).padEnd(4096, ' ');
+  const bytes = new TextEncoder().encode(body);
+  assert.equal(bytes.length, 4096);
+  let enqueued = 0;
+  let cancelled = false;
+  const r = response();
+  await createHandler({
+    env, now,
+    fetcher: async (url) => {
+      if (!url.includes('ct_wasabi_status_v1')) return goodFetch(url);
+      return new Response(new ReadableStream({
+        pull(controller) {
+          if (enqueued === bytes.length) { controller.close(); return; }
+          controller.enqueue(bytes.slice(enqueued, enqueued + 1));
+          enqueued += 1;
+        },
+        cancel() { cancelled = true; },
+      }, { highWaterMark: 0 }), { status: 200 });
+    },
+  })({ method: 'GET' }, r);
+  assert.equal(r.code, 200);
+  assert.equal(r.body.status, 'OBSERVED');
+  assert.equal(r.body.archive.section_progress_percent, 51);
+  assert.equal(enqueued, 4096);
+  assert.equal(cancelled, false);
+});
+
 test('HEAD has an empty response body', async () => {
   const r = response(); await createHandler({ env, now, fetcher: goodFetch })({ method: 'HEAD' }, r);
   assert.equal(r.code, 200); assert.equal(r.body, null); assert.equal(r.ended, true);
 });
+test('storage write label identifies a local gate, not provider authorization', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  assert.ok(source.includes("metric(g, 'Local write admission'"));
+  assert.ok(source.includes('Budget and safety-stop check only; does not authorize provider writes or bypass continuity, capacity, retention, rights, privacy, security, or release gates'));
+  assert.equal(source.includes("metric(g, 'Storage writes'"), false);
+  assert.equal(source.includes("flag(s.controls?.writes_enabled, 'Enabled within limits', 'Held')"), false);
+});
+test('commerce copy distinguishes catalog visibility from purchase authority', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  assert.ok(source.includes('Catalog sales flag:'));
+  assert.ok(source.includes('Catalog visibility is not a purchase path or proof of a purchasable offer.'));
+  assert.equal(source.includes('External sales:'), false);
+  assert.equal(source.includes("'Storage sales'"), false);
+});
+
 test('browser integration adds no polling interval and no upstream HTML injection', async () => {
   const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
   assert.equal(source.includes('setInterval'), false); assert.equal(source.includes('innerHTML'), false);
@@ -141,4 +459,306 @@ test('loader injects storage assets without replacing existing estate and wallet
   assert.ok(loader.includes('data-storage-command-script')); assert.ok(loader.includes('data-storage-command-style'));
   assert.ok(loader.includes('/command-estate.js')); assert.ok(loader.includes('/command-enhancements.js'));
   assert.ok(loader.includes("const CANONICAL_SHELL = '/command-v3.html'"));
+});
+
+test('commerce offer cards separate catalog listing from purchase authority', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  assert.ok(source.includes("flag(offer.catalog_available, 'Listed in catalog', 'Not available in catalog')"));
+  assert.ok(source.includes('Catalog record: ${state(offer.catalog_record_state)}. Catalog listing: ${flag(offer.catalog_available, \'Listed in catalog\', \'Not available in catalog\')}. Purchase path: ${state(offer.purchase_state)}.'));
+  assert.ok(source.includes('Catalog visibility is not a purchase path or proof of a purchasable offer.'));
+  assert.equal(source.includes("Purchase path: Available"), false);
+});
+
+test('browser progress rejects out-of-range percentages instead of clamping them to complete', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  assert.ok(source.includes("const validPercent = (v) => validNumber(v) && v <= 100;"));
+  assert.ok(source.includes("if (validPercent(a?.section_progress_percent)) progress.value = a.section_progress_percent;"));
+  assert.ok(source.includes("validPercent(s.archive?.section_progress_percent) ?"));
+  assert.equal(source.includes('Math.min(100, a.section_progress_percent)'), false);
+});
+
+test('browser progress renderer leaves invalid percentages unassigned and accepts the upper boundary', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  async function render(progressPercent) {
+    const created = [];
+    class Element {
+      constructor(tagName) {
+        this.tagName = tagName;
+        this.children = [];
+        this.dataset = {};
+        this.attributes = {};
+        this.listeners = {};
+        this.valueAssigned = false;
+        created.push(this);
+      }
+      append(...items) { this.children.push(...items); }
+      appendChild(item) { this.children.push(item); return item; }
+      replaceChildren(...items) { this.children = items; }
+      setAttribute(name, value) { this.attributes[name] = String(value); }
+      addEventListener(name, callback) { this.listeners[name] = callback; }
+      querySelector() { return null; }
+      click() {}
+    }
+    Object.defineProperty(Element.prototype, 'value', {
+      get() { return this._value ?? 0; },
+      set(value) { this.valueAssigned = true; this._value = value; },
+    });
+    const pageNames = ['overview', 'dail', 'infrastructure', 'commerce', 'evidence', 'integrations'];
+    const pageRoots = new Map(pageNames.map((name) => [name, new Element('section')]));
+    const nav = new Element('nav');
+    const fresh = new Element('div');
+    const refresh = new Element('button');
+    const document = {
+      hidden: false,
+      documentElement: { dataset: {} },
+      createElement: (tag) => new Element(tag),
+      createTextNode: (value) => { const item = new Element('#text'); item.textContent = String(value); return item; },
+      querySelector(selector) {
+        if (selector.startsWith('[data-page="') && selector.endsWith('"]')) {
+          const pageName = selector.slice(12, -2);
+          return pageRoots.get(pageName) ?? null;
+        }
+        if (selector === '#nav') return nav;
+        if (selector === '#fresh') return fresh;
+        if (selector === '#refresh') return refresh;
+        return null;
+      },
+      addEventListener() {},
+    };
+    const payload = {
+      schema: 'ct.command.storage-status.v1',
+      status: 'OBSERVED',
+      retrieved_at: new Date().toISOString(),
+      archive: { section_progress_percent: progressPercent },
+      commerce: { sales_enabled: false, activation_state: 'UNKNOWN', offers: [] },
+      custody: { consumers: [], buckets: [] },
+      controls: {},
+    };
+    runInNewContext(source, {
+      document,
+      location: { hash: '' },
+      window: { addEventListener() {} },
+      MutationObserver: class { observe() {} disconnect() {} },
+      requestAnimationFrame() {},
+      fetch: async () => ({ ok: true, json: async () => payload }),
+      AbortController,
+      Date,
+      Intl,
+      setTimeout: () => 1,
+      clearTimeout() {},
+      URL,
+      Blob,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    return created.filter((element) => element.tagName === 'progress');
+  }
+  const invalid = await render(101);
+  assert.equal(invalid.length, 2);
+  assert.deepEqual(invalid.map((element) => element.valueAssigned), [false, false]);
+  const boundary = await render(100);
+  assert.equal(boundary.length, 2);
+  assert.deepEqual(boundary.map((element) => element.valueAssigned), [true, true]);
+  assert.deepEqual(boundary.map((element) => element.value), [100, 100]);
+});
+
+test('browser rejects noncanonical retrieval timestamps before accepting a snapshot', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  async function readbackBadges(retrievedAt) {
+    const created = [];
+    class Element {
+      constructor(tagName) {
+        this.tagName = tagName;
+        this.children = [];
+        this.dataset = {};
+        this.attributes = {};
+        this.listeners = {};
+        created.push(this);
+      }
+      append(...items) { this.children.push(...items); }
+      appendChild(item) { this.children.push(item); return item; }
+      replaceChildren(...items) { this.children = items; }
+      setAttribute(name, value) { this.attributes[name] = String(value); }
+      addEventListener(name, callback) { this.listeners[name] = callback; }
+      querySelector() { return null; }
+      click() {}
+    }
+    const pageNames = ['overview', 'dail', 'infrastructure', 'commerce', 'evidence', 'integrations'];
+    const pageRoots = new Map(pageNames.map((name) => [name, new Element('section')]));
+    const nav = new Element('nav');
+    const fresh = new Element('div');
+    const refresh = new Element('button');
+    const document = {
+      hidden: false,
+      documentElement: { dataset: {} },
+      createElement: (tag) => new Element(tag),
+      createTextNode: (value) => { const item = new Element('#text'); item.textContent = String(value); return item; },
+      querySelector(selector) {
+        if (selector.startsWith('[data-page="') && selector.endsWith('"]')) {
+          const pageName = selector.slice(12, -2);
+          return pageRoots.get(pageName) ?? null;
+        }
+        if (selector === '#nav') return nav;
+        if (selector === '#fresh') return fresh;
+        if (selector === '#refresh') return refresh;
+        return null;
+      },
+      addEventListener() {},
+    };
+    const payload = {
+      schema: 'ct.command.storage-status.v1',
+      status: 'OBSERVED',
+      retrieved_at: retrievedAt,
+      archive: { section_progress_percent: 51 },
+      commerce: { sales_enabled: false, activation_state: 'UNKNOWN', offers: [] },
+      custody: { consumers: [], buckets: [] },
+      controls: {},
+    };
+    runInNewContext(source, {
+      document,
+      location: { hash: '' },
+      window: { addEventListener() {} },
+      MutationObserver: class { observe() {} disconnect() {} },
+      requestAnimationFrame() {},
+      fetch: async () => ({ ok: true, json: async () => payload }),
+      AbortController,
+      Date,
+      Intl,
+      setTimeout: () => 1,
+      clearTimeout() {},
+      URL,
+      Blob,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    return created.filter((element) => element.attributes.role === 'status');
+  }
+
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  const localTimestampWithoutZone = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+  assert.ok(Number.isFinite(Date.parse(localTimestampWithoutZone)));
+
+  const invalid = await readbackBadges(localTimestampWithoutZone);
+  assert.equal(invalid.length, 6);
+  assert.ok(invalid.every((badge) => badge.textContent === 'Storage readback unavailable'));
+  assert.ok(invalid.every((badge) => badge.dataset.state === 'UNAVAILABLE'));
+
+  const valid = await readbackBadges(new Date().toISOString());
+  assert.equal(valid.length, 6);
+  assert.ok(valid.every((badge) => badge.textContent === 'Readback observed'));
+  assert.ok(valid.every((badge) => badge.dataset.state === 'OBSERVED'));
+});
+
+
+test('BFCache restore queues a fresh read after the aborted request settles', async () => {
+  const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
+  const created = [];
+  const windowListeners = new Map();
+  const observers = [];
+
+  class Element {
+    constructor(tagName) {
+      this.tagName = tagName;
+      this.children = [];
+      this.dataset = {};
+      this.attributes = {};
+      this.listeners = {};
+      this.textContent = '';
+      created.push(this);
+    }
+    append(...items) { this.children.push(...items); }
+    appendChild(item) { this.children.push(item); return item; }
+    replaceChildren(...items) { this.children = items; }
+    setAttribute(name, value) { this.attributes[name] = String(value); }
+    addEventListener(name, callback) { this.listeners[name] = callback; }
+    querySelector() { return null; }
+    click() {}
+    scrollIntoView() {}
+  }
+
+  const pageNames = ['overview', 'dail', 'infrastructure', 'commerce', 'evidence', 'integrations'];
+  const pageRoots = new Map(pageNames.map((name) => [name, new Element('section')]));
+  const nav = new Element('nav');
+  const fresh = new Element('div');
+  const refresh = new Element('button');
+  const document = {
+    hidden: false,
+    documentElement: { dataset: {} },
+    createElement: (tag) => new Element(tag),
+    createTextNode: (value) => new Element('#text'),
+    querySelector(selector) {
+      if (selector.startsWith('[data-page="') && selector.endsWith('"]')) {
+        return pageRoots.get(selector.slice(12, -2)) ?? null;
+      }
+      if (selector === '#nav') return nav;
+      if (selector === '#fresh') return fresh;
+      if (selector === '#refresh') return refresh;
+      return null;
+    },
+    addEventListener() {},
+  };
+
+  class Observer {
+    constructor(callback) {
+      this.callback = callback;
+      this.observeCalls = 0;
+      this.disconnectCalls = 0;
+      observers.push(this);
+    }
+    observe() { this.observeCalls += 1; }
+    disconnect() { this.disconnectCalls += 1; }
+  }
+
+  const payload = {
+    schema: 'ct.command.storage-status.v1',
+    status: 'PARTIAL',
+    retrieved_at: new Date().toISOString(),
+    source: { wasabi_observed_at: null },
+    archive: null,
+    commerce: null,
+    custody: null,
+    controls: null,
+  };
+  let fetchCalls = 0;
+  let rejectFirst;
+  const fetcher = async () => {
+    fetchCalls += 1;
+    if (fetchCalls === 1) {
+      return await new Promise((resolve, reject) => { rejectFirst = reject; });
+    }
+    return { ok: true, json: async () => payload };
+  };
+
+  runInNewContext(source, {
+    document,
+    location: { hash: '' },
+    window: { addEventListener: (name, callback) => windowListeners.set(name, callback) },
+    MutationObserver: Observer,
+    requestAnimationFrame() {},
+    fetch: fetcher,
+    AbortController,
+    Date,
+    Intl,
+    setTimeout: () => 1,
+    clearTimeout() {},
+    URL,
+    Blob,
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(fetchCalls, 1);
+  const observer = observers[0];
+  windowListeners.get('pagehide')();
+  assert.equal(observer.disconnectCalls, 1);
+
+  windowListeners.get('pageshow')({ persisted: true });
+  assert.equal(observer.observeCalls, 2);
+
+  rejectFirst(new Error('aborted'));
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(fetchCalls, 2);
+  const badges = created.filter((element) => element.attributes.role === 'status');
+  assert.equal(badges.length, 6);
+  assert.ok(badges.every((badge) => badge.textContent === 'Partial readback'));
 });
