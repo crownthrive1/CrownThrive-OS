@@ -5,16 +5,24 @@ const RPCS = ['ct_wasabi_status_v1', 'ct_storage_fabric_catalog_v1'];
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_RESPONSE_CHUNKS = 4096;
 
+// Cancellation is best-effort. An upstream stream's cancel hook is not part of
+// the response deadline and must never keep the read route pending indefinitely.
+function cancelQuietly(target) {
+  try {
+    void Promise.resolve(target?.cancel?.()).catch(() => {});
+  } catch {}
+}
+
 async function readBoundedText(upstream) {
   const declaredHeader = upstream.headers?.get('content-length');
   if (declaredHeader !== null && declaredHeader !== undefined) {
-    if (!/^\d+$/.test(declaredHeader)) {
-      try { await upstream.body?.cancel(); } catch {}
+    if (!/^\\d+$/.test(declaredHeader)) {
+      cancelQuietly(upstream.body);
       throw new Error('upstream_invalid_length');
     }
     const declared = Number(declaredHeader);
     if (!Number.isSafeInteger(declared) || declared > MAX_RESPONSE_BYTES) {
-      try { await upstream.body?.cancel(); } catch {}
+      cancelQuietly(upstream.body);
       throw new Error('upstream_oversize');
     }
   }
@@ -33,7 +41,7 @@ async function readBoundedText(upstream) {
       chunks.push(Buffer.from(value));
     }
   } catch (error) {
-    try { await reader.cancel(); } catch {}
+    cancelQuietly(reader);
     throw error;
   } finally {
     try { reader.releaseLock(); } catch {}
@@ -56,7 +64,7 @@ export function createHandler({ env = process.env, fetcher = globalThis.fetch, n
         body: '{}',
       });
       if (!upstream.ok) {
-        try { await upstream.body?.cancel(); } catch {}
+        cancelQuietly(upstream.body);
         throw new Error('upstream_unavailable');
       }
       const body = await readBoundedText(upstream);
