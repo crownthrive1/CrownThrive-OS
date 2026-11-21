@@ -31,6 +31,24 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
             with self.subTest(clause=clause):
                 self.assertIn(clause, self.migration)
 
+    def test_policy_selection_binds_complete_policy_content(self) -> None:
+        required = (
+            "p.source_path=v_expected_policy.source_path",
+            "p.required_literals=v_expected_policy.required_literals",
+            "p.forbidden_literals=v_expected_policy.forbidden_literals",
+            "p.max_source_bytes=v_expected_policy.max_source_bytes",
+            "v_policy_content_count<>1",
+            "SOURCE_POLICY_CONTENT_MISMATCH:",
+            "SOURCE_POLICY_CONTENT_CHANGED_DURING_SELECTION:",
+        )
+        for clause in required:
+            with self.subTest(clause=clause):
+                self.assertIn(clause, self.migration)
+
+        for version in ("20260831093500", "20260831135000", "20260831143500", "20260831154500"):
+            with self.subTest(version=version):
+                self.assertIn(version, self.migration)
+
     def test_policy_selection_requires_exactly_one_row_and_fails_closed(self) -> None:
         self.assertIn("if v_policy_count<>1 then", self.migration)
         self.assertIn("select * into strict v_policy", self.migration)

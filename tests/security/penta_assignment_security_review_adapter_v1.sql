@@ -14,6 +14,7 @@ declare
   v_non_security_assignment uuid;
   v_known_blob text;
   v_wrong_blob text:=repeat('0',40);
+  v_exact_policy_matches integer;
 begin
   select count(*) into v_count
   from penta_security.provider_source_policies_v1
@@ -43,6 +44,55 @@ begin
     raise exception 'assignment source policy boundary invalid';
   end if;
 
+  -- One exact policy fixture and four single-field conflicts. Complete tuple
+  -- equality must accept only the exact source-path/literal/size combination.
+  with expected as (
+    select
+      'supabase/migrations/20260831093500_penta_assignment_review_only_owner_routes_v1.sql'::text as source_path,
+      array[
+        '''route_mode'',''review_only''',
+        '''pm_execution_eligible'',false',
+        '''authority_expansion'',false',
+        'REVIEW_ONLY_ROUTE_MUST_BE_CENSUS_HANDOFF',
+        'HOLD_ASSIGNMENT_REVIEW_TRANSPORT_PENDING'
+      ]::text[] as required_literals,
+      array[
+        '''provider_write'',true',
+        '''credential_change'',true',
+        '''money_movement'',true',
+        '''d3_execution'',true',
+        '''authority_expansion'',true'
+      ]::text[] as forbidden_literals,
+      300000::integer as max_source_bytes
+  ),
+  fixtures as (
+    select 'exact'::text as fixture_name,e.source_path,e.required_literals,e.forbidden_literals,e.max_source_bytes
+    from expected e
+    union all
+    select 'source_path_mismatch','supabase/migrations/wrong.sql',e.required_literals,e.forbidden_literals,e.max_source_bytes
+    from expected e
+    union all
+    select 'required_literals_mismatch',e.source_path,array['changed']::text[],e.forbidden_literals,e.max_source_bytes
+    from expected e
+    union all
+    select 'forbidden_literals_mismatch',e.source_path,e.required_literals,array['changed']::text[],e.max_source_bytes
+    from expected e
+    union all
+    select 'max_source_bytes_mismatch',e.source_path,e.required_literals,e.forbidden_literals,300001
+    from expected e
+  )
+  select count(*) filter (
+    where f.source_path=e.source_path
+      and f.required_literals=e.required_literals
+      and f.forbidden_literals=e.forbidden_literals
+      and f.max_source_bytes=e.max_source_bytes
+  )
+  into v_exact_policy_matches
+  from expected e cross join fixtures f;
+  if v_exact_policy_matches<>1 then
+    raise exception 'complete policy content tuple must reject each conflicting field';
+  end if;
+
   select pg_get_functiondef('penta_security.review_assignment_exact_subject_v1(uuid)'::regprocedure) into v_def;
   if strpos(v_def,'pg_try_advisory_xact_lock')=0 then raise exception 'adapter must use bounded concurrency guard'; end if;
   if strpos(v_def,'PENTASECURITY_NOT_ASSIGNED_OWNER')=0 then raise exception 'adapter must reject non-owner assignment'; end if;
@@ -57,6 +107,12 @@ begin
   if strpos(v_def,'p.resource_id=''assignment-migration:''||v_version')=0 then raise exception 'adapter must bind exact resource identity'; end if;
   if strpos(v_def,'p.repository=a.source_repo')=0 then raise exception 'adapter must bind exact source repository'; end if;
   if strpos(v_def,'p.authority_effect=''none''')=0 then raise exception 'adapter must require authority-neutral policy'; end if;
+  if strpos(v_def,'p.source_path=v_expected_policy.source_path')=0 then raise exception 'adapter must bind exact policy source path'; end if;
+  if strpos(v_def,'p.required_literals=v_expected_policy.required_literals')=0 then raise exception 'adapter must bind exact required literals'; end if;
+  if strpos(v_def,'p.forbidden_literals=v_expected_policy.forbidden_literals')=0 then raise exception 'adapter must bind exact forbidden literals'; end if;
+  if strpos(v_def,'p.max_source_bytes=v_expected_policy.max_source_bytes')=0 then raise exception 'adapter must bind exact maximum source bytes'; end if;
+  if strpos(v_def,'SOURCE_POLICY_CONTENT_MISMATCH:')=0 then raise exception 'adapter must hold on conflicting policy content'; end if;
+  if strpos(v_def,'SOURCE_POLICY_CONTENT_CHANGED_DURING_SELECTION:')=0 then raise exception 'adapter must recheck exact content at strict selection'; end if;
   if strpos(v_def,'v_policy_count<>1')=0 or strpos(v_def,'into strict v_policy')=0 or strpos(v_def,'too_many_rows')=0 then
     raise exception 'adapter must require exactly one policy identity and fail closed on ambiguity';
   end if;

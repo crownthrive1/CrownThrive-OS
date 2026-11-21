@@ -110,6 +110,8 @@ declare
   v_review_count integer:=0;
   v_pass_count integer:=0;
   v_policy_count integer:=0;
+  v_policy_content_count integer:=0;
+  v_expected_policy record;
   v_existing_owner_pass boolean:=false;
   v_existing_gate_pass boolean:=false;
   v_http extensions.http_response;
@@ -212,6 +214,90 @@ begin
     end if;
 
     v_policy_key:='ct.penta.security.assignment-migration.'||v_version||'.v1';
+
+    -- The identity key alone is insufficient: an ON CONFLICT DO NOTHING
+    -- migration can leave a pre-existing row with altered review policy.
+    -- Resolve the canonical content tuple for this exact migration version.
+    select e.source_path,e.required_literals,e.forbidden_literals,e.max_source_bytes
+    into v_expected_policy
+    from (values
+      (
+        '20260831093500'::text,
+        'supabase/migrations/20260831093500_penta_assignment_review_only_owner_routes_v1.sql'::text,
+        array[
+          '''route_mode'',''review_only''',
+          '''pm_execution_eligible'',false',
+          '''authority_expansion'',false',
+          'REVIEW_ONLY_ROUTE_MUST_BE_CENSUS_HANDOFF',
+          'HOLD_ASSIGNMENT_REVIEW_TRANSPORT_PENDING'
+        ]::text[],
+        array[
+          '''provider_write'',true',
+          '''credential_change'',true',
+          '''money_movement'',true',
+          '''d3_execution'',true',
+          '''authority_expansion'',true'
+        ]::text[],
+        300000::integer
+      ),
+      (
+        '20260831135000'::text,
+        'supabase/migrations/20260831135000_penta_assignment_release_gate_bridge_v1.sql'::text,
+        array[
+          'release_gate_exact_head_mismatch',
+          'release_gate_subject_digest_mismatch',
+          'release_gate_dail_readback_required',
+          'PENTASECURITY_EXACT_SUBJECT_PASS',
+          'OWNER_RESULTS:'
+        ]::text[],
+        array[
+          '''provider_write'',true',
+          '''money_movement'',true',
+          '''credential_change'',true',
+          '''authority_expansion'',true'
+        ]::text[],
+        500000::integer
+      ),
+      (
+        '20260831143500'::text,
+        'supabase/migrations/20260831143500_penta_assignment_release_gate_dail_binding_hardening_v1.sql'::text,
+        array[
+          'ct.penta.release-gate.receipt.v1',
+          'release_gate_dail_payload_contract_mismatch',
+          'assignment_id',
+          'authority_system_key',
+          'authority_created'
+        ]::text[],
+        array[
+          '''authority_created'',true',
+          '''release_authorized'',true'
+        ]::text[],
+        300000::integer
+      ),
+      (
+        '20260831154500'::text,
+        'supabase/migrations/20260831154500_penta_wire_assignment_owner_review_transport_v1.sql'::text,
+        array[
+          'PENTAWIRE_NOT_ASSIGNED_OWNER',
+          'GITHUB_EXACT_HEAD_PROVIDER_EVIDENCE_MISSING',
+          '''security_decision'',false',
+          'penta_assignment_record_owner_result_v1',
+          '''authority_expansion'',false'
+        ]::text[],
+        array[
+          '''security_decision'',true',
+          '''independent_certification'',true',
+          '''authority_expansion'',true'
+        ]::text[],
+        600000::integer
+      )
+    ) as e(version,source_path,required_literals,forbidden_literals,max_source_bytes)
+    where e.version=v_version;
+    if not found then
+      v_missing:=v_missing||jsonb_build_array('SOURCE_POLICY_EXPECTATION_MISSING:'||v_version);
+      continue;
+    end if;
+
     select count(*) into v_policy_count
     from penta_security.provider_source_policies_v1 p
     where p.policy_key=v_policy_key
@@ -233,6 +319,26 @@ begin
       continue;
     end if;
 
+    select count(*) into v_policy_content_count
+    from penta_security.provider_source_policies_v1 p
+    where p.policy_key=v_policy_key
+      and p.policy_version='1.0.0'
+      and p.system_family='SECURITY_TRUST'
+      and p.provider_system='github'
+      and p.resource_type='migration_source'
+      and p.resource_id='assignment-migration:'||v_version
+      and p.repository=a.source_repo
+      and p.state='active'
+      and p.authority_effect='none'
+      and p.source_path=v_expected_policy.source_path
+      and p.required_literals=v_expected_policy.required_literals
+      and p.forbidden_literals=v_expected_policy.forbidden_literals
+      and p.max_source_bytes=v_expected_policy.max_source_bytes;
+    if v_policy_content_count<>1 then
+      v_missing:=v_missing||jsonb_build_array('SOURCE_POLICY_CONTENT_MISMATCH:'||v_version);
+      continue;
+    end if;
+
     begin
       select * into strict v_policy
       from penta_security.provider_source_policies_v1 p
@@ -244,10 +350,14 @@ begin
         and p.resource_id='assignment-migration:'||v_version
         and p.repository=a.source_repo
         and p.state='active'
-        and p.authority_effect='none';
+        and p.authority_effect='none'
+        and p.source_path=v_expected_policy.source_path
+        and p.required_literals=v_expected_policy.required_literals
+        and p.forbidden_literals=v_expected_policy.forbidden_literals
+        and p.max_source_bytes=v_expected_policy.max_source_bytes;
     exception
       when no_data_found or too_many_rows then
-        v_missing:=v_missing||jsonb_build_array('SOURCE_POLICY_IDENTITY_CHANGED_DURING_SELECTION:'||v_version);
+        v_missing:=v_missing||jsonb_build_array('SOURCE_POLICY_CONTENT_CHANGED_DURING_SELECTION:'||v_version);
         continue;
     end;
 
