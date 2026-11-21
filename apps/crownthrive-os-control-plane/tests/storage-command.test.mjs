@@ -292,6 +292,55 @@ test('non-object, malformed and oversized responses are never trusted', async ()
     assert.equal(r.code, 503);
   }
 });
+test('decimal Content-Length is accepted and exponent notation is rejected', async () => {
+  const body = JSON.stringify(wasabi());
+  const accepted = response();
+  await createHandler({
+    env, now,
+    fetcher: async (url) => {
+      if (!url.includes('ct_wasabi_status_v1')) return goodFetch(url);
+      return {
+        ok: true,
+        headers: { get: (name) => name.toLowerCase() === 'content-length' ? String(Buffer.byteLength(body)) : null },
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(body));
+            controller.close();
+          },
+        }),
+      };
+    },
+  })({ method: 'GET' }, accepted);
+  assert.equal(accepted.code, 200);
+  assert.equal(accepted.body.archive.total_archived_events, 510000);
+
+  let cancelled = false;
+  let pulls = 0;
+  const rejected = response();
+  await createHandler({
+    env, now,
+    fetcher: async (url) => {
+      if (!url.includes('ct_wasabi_status_v1')) return goodFetch(url);
+      return {
+        ok: true,
+        headers: { get: (name) => name.toLowerCase() === 'content-length' ? '1e3' : null },
+        body: new ReadableStream({
+          pull(controller) {
+            pulls += 1;
+            controller.enqueue(new Uint8Array([65]));
+          },
+          cancel() { cancelled = true; },
+        }, { highWaterMark: 0 }),
+      };
+    },
+  })({ method: 'GET' }, rejected);
+  assert.equal(rejected.code, 200);
+  assert.equal(rejected.body.status, 'PARTIAL');
+  assert.equal(rejected.body.archive, null);
+  assert.equal(cancelled, true);
+  assert.equal(pulls, 0);
+});
+
 test('upstream response byte limit is enforced while streaming without or with a false small Content-Length', async () => {
   for (const declaredLength of [null, '1']) {
     let cancelled = false;
