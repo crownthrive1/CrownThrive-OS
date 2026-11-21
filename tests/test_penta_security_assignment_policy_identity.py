@@ -71,6 +71,23 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
             with self.subTest(clause=clause):
                 self.assertIn(clause, self.sql_test)
 
+    def test_sql_acceptance_reads_back_four_canonical_policy_rows(self) -> None:
+        required = (
+            "v_policy_row_matches<>4",
+            "p.policy_key='ct.penta.security.assignment-migration.'||e.version||'.v1'",
+            "p.source_path=e.source_path",
+            "p.required_literals=e.required_literals",
+            "p.forbidden_literals=e.forbidden_literals",
+            "p.max_source_bytes=e.max_source_bytes",
+        )
+        for clause in required:
+            with self.subTest(clause=clause):
+                self.assertIn(clause, self.sql_test)
+
+        for version in ("20260831093500", "20260831135000", "20260831143500", "20260831154500"):
+            with self.subTest(version=version):
+                self.assertIn(version, self.sql_test)
+
     def test_security_adapter_remains_authority_neutral(self) -> None:
         self.assertIn("'independent_certification',false", self.migration)
         self.assertIn("'release_authorized',false", self.migration)

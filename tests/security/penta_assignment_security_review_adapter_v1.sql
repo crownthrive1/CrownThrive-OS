@@ -15,6 +15,7 @@ declare
   v_known_blob text;
   v_wrong_blob text:=repeat('0',40);
   v_exact_policy_matches integer;
+  v_policy_row_matches integer;
 begin
   select count(*) into v_count
   from penta_security.provider_source_policies_v1
@@ -42,6 +43,111 @@ begin
       )
   ) then
     raise exception 'assignment source policy boundary invalid';
+  end if;
+
+  -- Read back the persisted policy rows. The synthetic fixture below is not
+  -- a substitute for checking the actual ON CONFLICT DO NOTHING result.
+  with expected(version,source_path,required_literals,forbidden_literals,max_source_bytes) as (
+    values
+      (
+        '20260831093500'::text,
+        'supabase/migrations/20260831093500_penta_assignment_review_only_owner_routes_v1.sql'::text,
+        array[
+          '''route_mode'',''review_only''',
+          '''pm_execution_eligible'',false',
+          '''authority_expansion'',false',
+          'REVIEW_ONLY_ROUTE_MUST_BE_CENSUS_HANDOFF',
+          'HOLD_ASSIGNMENT_REVIEW_TRANSPORT_PENDING'
+        ]::text[],
+        array[
+          '''provider_write'',true',
+          '''credential_change'',true',
+          '''money_movement'',true',
+          '''d3_execution'',true',
+          '''authority_expansion'',true'
+        ]::text[],
+        300000::integer
+      ),
+      (
+        '20260831135000'::text,
+        'supabase/migrations/20260831135000_penta_assignment_release_gate_bridge_v1.sql'::text,
+        array[
+          'release_gate_exact_head_mismatch',
+          'release_gate_subject_digest_mismatch',
+          'release_gate_dail_readback_required',
+          'PENTASECURITY_EXACT_SUBJECT_PASS',
+          'OWNER_RESULTS:'
+        ]::text[],
+        array[
+          '''provider_write'',true',
+          '''money_movement'',true',
+          '''credential_change'',true',
+          '''authority_expansion'',true'
+        ]::text[],
+        500000::integer
+      ),
+      (
+        '20260831143500'::text,
+        'supabase/migrations/20260831143500_penta_assignment_release_gate_dail_binding_hardening_v1.sql'::text,
+        array[
+          'ct.penta.release-gate.receipt.v1',
+          'release_gate_dail_payload_contract_mismatch',
+          'assignment_id',
+          'authority_system_key',
+          'authority_created'
+        ]::text[],
+        array[
+          '''authority_created'',true',
+          '''release_authorized'',true'
+        ]::text[],
+        300000::integer
+      ),
+      (
+        '20260831154500'::text,
+        'supabase/migrations/20260831154500_penta_wire_assignment_owner_review_transport_v1.sql'::text,
+        array[
+          'PENTAWIRE_NOT_ASSIGNED_OWNER',
+          'GITHUB_EXACT_HEAD_PROVIDER_EVIDENCE_MISSING',
+          '''security_decision'',false',
+          'penta_assignment_record_owner_result_v1',
+          '''authority_expansion'',false'
+        ]::text[],
+        array[
+          '''security_decision'',true',
+          '''independent_certification'',true',
+          '''authority_expansion'',true'
+        ]::text[],
+        600000::integer
+      )
+  )
+  select count(*)
+  into v_policy_row_matches
+  from expected e
+  where (
+    select count(*)
+    from penta_security.provider_source_policies_v1 p
+    where p.policy_key='ct.penta.security.assignment-migration.'||e.version||'.v1'
+      and p.policy_version='1.0.0'
+  )=1
+  and exists (
+    select 1
+    from penta_security.provider_source_policies_v1 p
+    where p.policy_key='ct.penta.security.assignment-migration.'||e.version||'.v1'
+      and p.policy_version='1.0.0'
+      and p.system_family='SECURITY_TRUST'
+      and p.provider_system='github'
+      and p.resource_type='migration_source'
+      and p.resource_id='assignment-migration:'||e.version
+      and p.repository='crownthrive1/CrownThrive-OS'
+      and p.state='active'
+      and p.authority_effect='none'
+      and p.source_path=e.source_path
+      and p.required_literals=e.required_literals
+      and p.forbidden_literals=e.forbidden_literals
+      and p.max_source_bytes=e.max_source_bytes
+  );
+  if v_policy_row_matches<>4 then
+    raise exception 'four persisted assignment policies must match canonical content; matched %',v_policy_row_matches;
   end if;
 
   -- One exact policy fixture and four single-field conflicts. Complete tuple
