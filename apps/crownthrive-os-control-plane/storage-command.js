@@ -129,7 +129,8 @@
       item.body.replaceChildren();
       item.badge.textContent = stale ? 'STALE / last known' : s.status === 'OBSERVED' ? 'Readback observed' : 'Partial readback';
       item.badge.dataset.state = stale ? 'STALE' : s.status;
-      item.stamp.textContent = `${stale ? 'Last known snapshot' : 'Retrieved'}: ${time(s.retrieved_at)}. Stored provider evidence is not a new provider probe.`;
+      // Keep API retrieval time distinct from the provider's own observation time.
+      item.stamp.textContent = `${stale ? 'Last known snapshot' : 'Retrieved'}: ${time(s.retrieved_at)}. Provider observed: ${time(s.source?.wasabi_observed_at)}. Registered provider evidence, not a new provider probe.`;
       if (page === 'overview') {
         const g = grid(item.body);
         metric(g, 'Actual archived events', number(s.archive?.total_archived_events));

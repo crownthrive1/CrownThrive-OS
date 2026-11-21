@@ -6,7 +6,7 @@ import { runInNewContext } from 'node:vm';
 test('browser display rejects malformed timestamps instead of normalizing them', async () => {
   const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
 
-  async function render(lastRunAt) {
+  async function render(lastRunAt, providerObservedAt = '2026-09-16T20:59:00.000Z') {
     const created = [];
     class Element {
       constructor(tagName) {
@@ -53,6 +53,7 @@ test('browser display rejects malformed timestamps instead of normalizing them',
       schema: 'ct.command.storage-status.v1',
       status: 'OBSERVED',
       retrieved_at: new Date().toISOString(),
+      source: { wasabi_observed_at: providerObservedAt },
       archive: {
         total_archived_events: 510000,
         section_no: 1,
@@ -100,4 +101,14 @@ test('browser display rejects malformed timestamps instead of normalizing them',
 
   const valid = await render('2026-09-16T21:00:00.000Z');
   assert.ok(valid.some((text) => text.startsWith('Last archive work: ') && !text.includes('Not observed')));
+
+  const observed = await render('2026-09-16T21:00:00.000Z', '2026-09-16T20:59:00.000Z');
+  const stamps = observed.filter((text) => text.startsWith('Retrieved: '));
+  assert.equal(stamps.length, 6);
+  assert.ok(stamps.every((text) => text.includes('Provider observed: ') && text.endsWith('Registered provider evidence, not a new provider probe.')));
+
+  const missing = await render('2026-09-16T21:00:00.000Z', null);
+  const missingStamps = missing.filter((text) => text.startsWith('Retrieved: '));
+  assert.equal(missingStamps.length, 6);
+  assert.ok(missingStamps.every((text) => text.includes('Provider observed: Not observed.')));
 });
