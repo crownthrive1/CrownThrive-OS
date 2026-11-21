@@ -36,6 +36,7 @@ ALLOWED_DIAGNOSTIC_CODES = frozenset({
     "database_serialization_conflict",
     "database_value_rejected",
     "database_capacity_exhausted",
+    "database_application_exception",
     "database_provider_error",
     "unclassified_provider_error",
 })
@@ -78,6 +79,8 @@ def _legacy_detail_code(detail):
         return "database_value_rejected"
     if any(token in value for token in ("connection refused", "connection reset", "could not connect")):
         return "database_connection_failed"
+    if re.search(r"\\bP0001\\b", value, flags=re.IGNORECASE) or "raise exception" in value:
+        return "database_application_exception"
     return "unclassified_provider_error"
 
 

@@ -68,6 +68,7 @@ type DiagnosticCode =
   | "database_serialization_conflict"
   | "database_value_rejected"
   | "database_capacity_exhausted"
+  | "database_application_exception"
   | "database_provider_error";
 
 function safeDiagnosticCode(error: unknown): DiagnosticCode {
@@ -104,6 +105,7 @@ function safeDiagnosticCode(error: unknown): DiagnosticCode {
     case "08003":
     case "08006":
     case "57P03": return "database_connection_failed";
+    case "P0001": return "database_application_exception";
     default: return "database_provider_error";
   }
 }

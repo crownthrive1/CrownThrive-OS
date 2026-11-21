@@ -44,6 +44,7 @@ class EvidenceDiagnosticTests(unittest.TestCase):
             'canceling statement due to statement timeout for tenant PRIVATE_TENANT': "database_timeout_or_lock",
             'could not serialize access due to concurrent update': "database_serialization_conflict",
             'invalid input syntax for type bigint: "PRIVATE_VALUE"': "database_value_rejected",
+            "P0001: resolver raised an exception for PRIVATE_TENANT": "database_application_exception",
             "unexpected private provider failure": "unclassified_provider_error",
         }
         for detail, expected in cases.items():
@@ -56,6 +57,17 @@ class EvidenceDiagnosticTests(unittest.TestCase):
                 self.assertEqual(result["diagnostic_stage"], "unavailable")
                 self.assertNotIn("PRIVATE_", json.dumps(result))
                 self.assertNotIn(detail, json.dumps(result))
+
+    def test_database_application_exception_code_is_allowlisted_without_echo(self):
+        result = self.check_payload(json.dumps({
+            "error": "release_evidence_projection_rejected",
+            "diagnostic_stage": "resolve_release_evidence_bundle",
+            "diagnostic_code": "database_application_exception",
+            "detail": "PRIVATE_TENANT_AND_PROVIDER_DETAIL",
+        }).encode())
+        self.assertEqual(result["diagnostic_code"], "database_application_exception")
+        self.assertEqual(result["diagnostic_stage"], "resolve_release_evidence_bundle")
+        self.assertNotIn("PRIVATE_", json.dumps(result))
 
     def test_untrusted_diagnostic_values_are_not_echoed(self):
         result = self.check_payload(json.dumps({

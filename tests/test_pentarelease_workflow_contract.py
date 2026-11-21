@@ -218,6 +218,7 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn("diagnostic_stage: failureStage", self.oidc_evidence_text)
         self.assertIn("diagnostic_code: diagnosticCode", self.oidc_evidence_text)
         self.assertIn('case "23505": return "database_unique_conflict";', self.oidc_evidence_text)
+        self.assertIn('case "P0001": return "database_application_exception";', self.oidc_evidence_text)
         self.assertNotIn("detail: detail.slice(0, 240)", self.oidc_evidence_text)
         self.assertNotIn("detail: detail", self.oidc_evidence_text)
 
