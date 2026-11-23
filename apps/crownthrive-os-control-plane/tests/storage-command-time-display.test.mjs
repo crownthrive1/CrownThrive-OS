@@ -67,7 +67,7 @@ test('browser display rejects malformed timestamps instead of normalizing them',
         last_run_events_copied: 15000,
         source_pruning_enabled: false,
       },
-      commerce: { sales_enabled: false, activation_state: 'UNKNOWN', offers: [] },
+      commerce: { sales_enabled: false, activation_state: 'UNKNOWN', offers: [{ name: 'Vault Start', currency: 'usd', billing_amount_cents: 2900, billing_interval_months: 1, included_bytes: 100000000000, included_download_bytes: 200000000000, catalog_binding_present: false, catalog_record_state: 'OBSERVED', catalog_available: false, purchase_state: 'NOT_PROVEN_BY_CATALOG_READ' }] },
       custody: { consumers: [], buckets: [], registered_bytes: 0, external_delivery_enabled_count: 0 },
       controls: { write_admission_state: 'UNKNOWN', balancer_mode: 'UNKNOWN', pressure: null },
     };
@@ -101,6 +101,7 @@ test('browser display rejects malformed timestamps instead of normalizing them',
 
   const valid = await render('2026-09-16T21:00:00.000Z');
   assert.ok(valid.some((text) => text.startsWith('Last archive work: ') && !text.includes('Not observed')));
+  assert.ok(valid.includes('$29 every 1 month · Storage: 100 GB · Download allowance: 200 GB'));
 
   const observed = await render('2026-09-16T21:00:00.000Z', '2026-09-16T20:59:00.000Z');
   const stamps = observed.filter((text) => text.startsWith('Retrieved: '));
