@@ -147,11 +147,22 @@ Deno.serve(async (req: Request) => {
       throw new Error("request_body_invalid");
     }
     const body = rawBody as Record<string, unknown>;
-    const releaseVersion = String(body.release_version ?? "").trim();
-    const releaseTag = String(body.release_tag ?? "").trim();
-    if (typeof body.pr_number === "boolean") throw new Error("pr_number_invalid");
+    if (typeof body.release_version !== "string") throw new Error("release_version_invalid");
+    if (typeof body.release_tag !== "string") throw new Error("release_tag_mismatch");
+    const releaseVersion = body.release_version.trim();
+    const releaseTag = body.release_tag.trim();
+    if (
+      body.pr_number != null &&
+      body.pr_number !== "" &&
+      typeof body.pr_number !== "number" &&
+      typeof body.pr_number !== "string"
+    ) throw new Error("pr_number_invalid");
     const prNumber = body.pr_number == null || body.pr_number === "" ? null : Number(body.pr_number);
-    if (typeof body.payload_bytes === "boolean") throw new Error("payload_bytes_invalid");
+    if (
+      body.payload_bytes != null &&
+      typeof body.payload_bytes !== "number" &&
+      typeof body.payload_bytes !== "string"
+    ) throw new Error("payload_bytes_invalid");
     const payloadBytes = Number(body.payload_bytes ?? 0);
     const cieSubject = body.cie_subject && typeof body.cie_subject === "object" && !Array.isArray(body.cie_subject)
       ? body.cie_subject as Record<string, unknown>

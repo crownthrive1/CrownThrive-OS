@@ -213,8 +213,12 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
         self.assertIn('const rawBody: unknown = await req.json();', self.oidc_evidence_text)
         self.assertIn('if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {', self.oidc_evidence_text)
         self.assertIn('throw new Error("request_body_invalid");', self.oidc_evidence_text)
-        self.assertIn('if (typeof body.pr_number === "boolean") throw new Error("pr_number_invalid");', self.oidc_evidence_text)
-        self.assertIn('if (typeof body.payload_bytes === "boolean") throw new Error("payload_bytes_invalid");', self.oidc_evidence_text)
+        self.assertIn('if (typeof body.release_version !== "string") throw new Error("release_version_invalid");', self.oidc_evidence_text)
+        self.assertIn('if (typeof body.release_tag !== "string") throw new Error("release_tag_mismatch");', self.oidc_evidence_text)
+        self.assertIn('typeof body.pr_number !== "number"', self.oidc_evidence_text)
+        self.assertIn('typeof body.pr_number !== "string"', self.oidc_evidence_text)
+        self.assertIn('typeof body.payload_bytes !== "number"', self.oidc_evidence_text)
+        self.assertIn('typeof body.payload_bytes !== "string"', self.oidc_evidence_text)
 
     def test_oidc_projection_errors_emit_only_allowlisted_stage_and_code(self):
         self.assertIn(
