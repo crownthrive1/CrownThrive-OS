@@ -341,4 +341,36 @@ begin
 end
 $;
 
+
+
+-- Internal unbound SECURITY DEFINER core must retain the same restricted search path.
+-- The core remains non-executable by PUBLIC and runtime roles; only the wrapper is callable.
+do $core_verify$
+declare
+  v_core_prosecdef boolean;
+  v_core_proconfig text;
+begin
+  select
+    p.prosecdef,
+    regexp_replace(coalesce(array_to_string(p.proconfig, ','), ''), '[[:space:]]', '', 'g')
+  into v_core_prosecdef, v_core_proconfig
+  from pg_proc p
+  where p.oid = 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)'::regprocedure;
+
+  if not coalesce(v_core_prosecdef, false) then
+    raise exception 'internal assignment review core must remain SECURITY DEFINER';
+  end if;
+  if v_core_proconfig <> 'search_path=pg_catalog,penta_security,integration_control' then
+    raise exception 'internal assignment review core must persist exact restricted search_path: %', v_core_proconfig;
+  end if;
+
+  if has_function_privilege('public', 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)', 'EXECUTE')
+     or has_function_privilege('anon', 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)', 'EXECUTE')
+     or has_function_privilege('service_role', 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)', 'EXECUTE') then
+    raise exception 'internal assignment review core must not be directly executable by runtime roles';
+  end if;
+end
+$core_verify$;
+
 rollback;

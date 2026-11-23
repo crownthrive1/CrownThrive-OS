@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "supabase" / "migrations" / "20260907211000_penta_assignment_security_review_adapter_v1.sql"
 FINAL_MIGRATION = ROOT / "supabase" / "migrations" / "20260907225700_penta_assignment_manifest_content_binding_v1.sql"
+CORE_MIGRATION = ROOT / "supabase" / "migrations" / "20261123110000_penta_assignment_unbound_core_search_path_hardening_v1.sql"
 SQL_TEST = ROOT / "tests" / "security" / "penta_assignment_security_review_adapter_v1.sql"
 
 
@@ -15,6 +16,7 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.migration = MIGRATION.read_text(encoding="utf-8")
         cls.final_migration = FINAL_MIGRATION.read_text(encoding="utf-8")
+        cls.core_migration = CORE_MIGRATION.read_text(encoding="utf-8")
         cls.sql_test = SQL_TEST.read_text(encoding="utf-8")
 
     def test_policy_selection_binds_complete_identity_tuple(self) -> None:
@@ -115,6 +117,39 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
             "setsearch_pathto'pg_catalog','penta_security','integration_control'",
             final_migration,
         )
+
+    def test_unbound_security_definer_core_has_restricted_search_path(self) -> None:
+        core_migration = "".join(self.core_migration.lower().split())
+        sql_test = "".join(self.sql_test.lower().split())
+
+        self.assertIn(
+            "alterfunctionpenta_security.review_assignment_exact_subject_unbound_v1(uuid)setsearch_pathtopg_catalog,penta_security,integration_control",
+            core_migration,
+        )
+        self.assertIn(
+            "v_core_proconfig<>'search_path=pg_catalog,penta_security,integration_control'",
+            sql_test,
+        )
+        self.assertIn(
+            "penta_security.review_assignment_exact_subject_unbound_v1(uuid)'::regprocedure",
+            sql_test,
+        )
+        for role in ("public", "anon", "authenticated", "service_role"):
+            with self.subTest(role=role):
+                self.assertIn(
+                    f"has_function_privilege('{role}','penta_security.review_assignment_exact_subject_unbound_v1(uuid)','execute')",
+                    sql_test,
+                )
+
+        for qualified_reference in (
+            "public.chlom_append_dail_event",
+            "chlom_runtime.dail_events",
+            "extensions.http_response",
+            "extensions.http_get",
+            "extensions.digest",
+        ):
+            with self.subTest(reference=qualified_reference):
+                self.assertIn(qualified_reference, self.migration)
 
     def test_security_adapter_remains_authority_neutral(self) -> None:
         self.assertIn("'independent_certification',false", self.migration)
