@@ -300,7 +300,7 @@ $$;
 
 -- Effective SECURITY DEFINER configuration and schema CREATE ACL acceptance.
 -- This is a read-only catalog assertion; it creates no authority or provider effect.
-do $
+do $$
 declare
   v_prosecdef boolean;
   v_proconfig text;
@@ -339,7 +339,7 @@ begin
     raise exception 'runtime roles must not have CREATE on protected security schemas';
   end if;
 end
-$;
+$$;
 
 
 
