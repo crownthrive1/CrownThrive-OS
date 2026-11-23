@@ -142,10 +142,16 @@ Deno.serve(async (req: Request) => {
   try {
     const claims = await verifyGitHubOidc(token);
     failureStage = "request_validation";
-    const body = await req.json() as Record<string, unknown>;
+    const rawBody: unknown = await req.json();
+    if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+      throw new Error("request_body_invalid");
+    }
+    const body = rawBody as Record<string, unknown>;
     const releaseVersion = String(body.release_version ?? "").trim();
     const releaseTag = String(body.release_tag ?? "").trim();
+    if (typeof body.pr_number === "boolean") throw new Error("pr_number_invalid");
     const prNumber = body.pr_number == null || body.pr_number === "" ? null : Number(body.pr_number);
+    if (typeof body.payload_bytes === "boolean") throw new Error("payload_bytes_invalid");
     const payloadBytes = Number(body.payload_bytes ?? 0);
     const cieSubject = body.cie_subject && typeof body.cie_subject === "object" && !Array.isArray(body.cie_subject)
       ? body.cie_subject as Record<string, unknown>

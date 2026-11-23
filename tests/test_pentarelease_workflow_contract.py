@@ -209,6 +209,13 @@ class PentaReleaseWorkflowContractTests(unittest.TestCase):
             self.oidc_evidence_text,
         )
 
+    def test_oidc_body_and_numeric_fields_reject_invalid_json_types(self):
+        self.assertIn('const rawBody: unknown = await req.json();', self.oidc_evidence_text)
+        self.assertIn('if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {', self.oidc_evidence_text)
+        self.assertIn('throw new Error("request_body_invalid");', self.oidc_evidence_text)
+        self.assertIn('if (typeof body.pr_number === "boolean") throw new Error("pr_number_invalid");', self.oidc_evidence_text)
+        self.assertIn('if (typeof body.payload_bytes === "boolean") throw new Error("payload_bytes_invalid");', self.oidc_evidence_text)
+
     def test_oidc_projection_errors_emit_only_allowlisted_stage_and_code(self):
         self.assertIn(
             'error: authFailure ? "github_oidc_verification_failed" : "release_evidence_projection_rejected",',
