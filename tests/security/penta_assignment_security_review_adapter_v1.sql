@@ -297,4 +297,48 @@ begin
 end
 $$;
 
+
+-- Effective SECURITY DEFINER configuration and schema CREATE ACL acceptance.
+-- This is a read-only catalog assertion; it creates no authority or provider effect.
+do $
+declare
+  v_prosecdef boolean;
+  v_proconfig text;
+begin
+  select
+    p.prosecdef,
+    regexp_replace(coalesce(array_to_string(p.proconfig, ','), ''), '[[:space:]]', '', 'g')
+  into v_prosecdef, v_proconfig
+  from pg_proc p
+  where p.oid = 'penta_security.review_assignment_exact_subject_v1(uuid)'::regprocedure;
+
+  if not coalesce(v_prosecdef, false) then
+    raise exception 'canonical assignment review wrapper must remain SECURITY DEFINER';
+  end if;
+  if v_proconfig <> 'search_path=pg_catalog,penta_security,integration_control' then
+    raise exception 'canonical assignment review wrapper must persist exact restricted search_path: %', v_proconfig;
+  end if;
+
+  if exists (
+    select 1
+    from pg_namespace n
+    cross join lateral aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) acl
+    where n.nspname in ('penta_security', 'integration_control')
+      and acl.grantee = 0
+      and acl.privilege_type = 'CREATE'
+  ) then
+    raise exception 'PUBLIC must not have CREATE on protected security schemas';
+  end if;
+
+  if has_schema_privilege('anon', 'penta_security', 'CREATE')
+     or has_schema_privilege('authenticated', 'penta_security', 'CREATE')
+     or has_schema_privilege('service_role', 'penta_security', 'CREATE')
+     or has_schema_privilege('anon', 'integration_control', 'CREATE')
+     or has_schema_privilege('authenticated', 'integration_control', 'CREATE')
+     or has_schema_privilege('service_role', 'integration_control', 'CREATE') then
+    raise exception 'runtime roles must not have CREATE on protected security schemas';
+  end if;
+end
+$;
+
 rollback;

@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "supabase" / "migrations" / "20260907211000_penta_assignment_security_review_adapter_v1.sql"
+FINAL_MIGRATION = ROOT / "supabase" / "migrations" / "20260907225700_penta_assignment_manifest_content_binding_v1.sql"
 SQL_TEST = ROOT / "tests" / "security" / "penta_assignment_security_review_adapter_v1.sql"
 
 
@@ -13,6 +14,7 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.migration = MIGRATION.read_text(encoding="utf-8")
+        cls.final_migration = FINAL_MIGRATION.read_text(encoding="utf-8")
         cls.sql_test = SQL_TEST.read_text(encoding="utf-8")
 
     def test_policy_selection_binds_complete_identity_tuple(self) -> None:
@@ -87,6 +89,32 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
         for version in ("20260831093500", "20260831135000", "20260831143500", "20260831154500"):
             with self.subTest(version=version):
                 self.assertIn(version, self.sql_test)
+
+    def test_effective_search_path_and_schema_create_acl_are_verified(self) -> None:
+        sql = "".join(self.sql_test.lower().split())
+        required = (
+            "p.prosecdef",
+            "p.proconfig",
+            "search_path=pg_catalog,penta_security,integration_control",
+            "aclexplode",
+            "acl.grantee=0",
+            "acl.privilege_type='create'",
+            "has_schema_privilege('anon','penta_security','create')",
+            "has_schema_privilege('authenticated','penta_security','create')",
+            "has_schema_privilege('service_role','penta_security','create')",
+            "has_schema_privilege('anon','integration_control','create')",
+            "has_schema_privilege('authenticated','integration_control','create')",
+            "has_schema_privilege('service_role','integration_control','create')",
+        )
+        for clause in required:
+            with self.subTest(clause=clause):
+                self.assertIn(clause, sql)
+
+        final_migration = "".join(self.final_migration.lower().split())
+        self.assertIn(
+            "setsearch_pathtopg_catalog','penta_security','integration_control'",
+            final_migration,
+        )
 
     def test_security_adapter_remains_authority_neutral(self) -> None:
         self.assertIn("'independent_certification',false", self.migration)
