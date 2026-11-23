@@ -119,14 +119,14 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
         )
         core_migration = "".join(self.core_migration.lower().split())
         for clause in (
-            "penta_security_protected_schema_public_create",
+            "pentasecurity_protected_schema_public_create",
             "has_schema_privilege('anon','penta_security','create')",
             "has_schema_privilege('authenticated','penta_security','create')",
             "has_schema_privilege('service_role','penta_security','create')",
             "has_schema_privilege('anon','integration_control','create')",
             "has_schema_privilege('authenticated','integration_control','create')",
             "has_schema_privilege('service_role','integration_control','create')",
-            "penta_security_protected_schema_runtime_create",
+            "pentasecurity_protected_schema_runtime_create",
         ):
             with self.subTest(clause=clause):
                 self.assertIn(clause, core_migration)
