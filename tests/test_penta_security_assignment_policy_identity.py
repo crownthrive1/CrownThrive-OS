@@ -112,7 +112,7 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
 
         final_migration = "".join(self.final_migration.lower().split())
         self.assertIn(
-            "setsearch_pathtopg_catalog','penta_security','integration_control'",
+            "setsearch_pathto'pg_catalog','penta_security','integration_control'",
             final_migration,
         )
 
