@@ -17,10 +17,11 @@ permissions:
   pull-requests: write
 
 # Release/workflow events are the primary path. The hourly sweep is only a
-# recovery net; a newer reconciliation supersedes an older in-flight sweep.
+# recovery net. Serialize runs so a newer event cannot cancel an in-flight
+# provider reconciliation; the next run re-reads current provider state.
 concurrency:
   group: pentarelease-pr-backlog-reconciler
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   reconcile:
