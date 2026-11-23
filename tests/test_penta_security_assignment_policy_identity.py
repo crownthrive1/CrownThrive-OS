@@ -123,7 +123,7 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
         sql_test = "".join(self.sql_test.lower().split())
 
         self.assertIn(
-            "alterfunctionpenta_security.review_assignment_exact_subject_unbound_v1(uuid)setsearch_pathtopg_catalog,penta_security,integration_control",
+            "alterfunctionpenta_security.review_assignment_exact_subject_unbound_v1(uuid)setsearch_pathto'pg_catalog','penta_security','integration_control'",
             core_migration,
         )
         self.assertIn(
