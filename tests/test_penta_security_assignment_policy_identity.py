@@ -151,6 +151,12 @@ class PentaSecurityAssignmentPolicyIdentityTests(unittest.TestCase):
             with self.subTest(reference=qualified_reference):
                 self.assertIn(qualified_reference, self.migration)
 
+    def test_sql_dollar_quoted_blocks_are_balanced(self) -> None:
+        sql = self.sql_test
+        self.assertNotIn("\\ndo $\\ndeclare", sql)
+        self.assertEqual(sql.count("do $"), sql.count("$;"))
+        self.assertEqual(sql.count("do $core_verify$"), sql.count("$core_verify$;"))
+
     def test_security_adapter_remains_authority_neutral(self) -> None:
         self.assertIn("'independent_certification',false", self.migration)
         self.assertIn("'release_authorized',false", self.migration)
