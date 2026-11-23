@@ -12,6 +12,25 @@ begin
   if to_regprocedure('penta_security.review_assignment_exact_subject_unbound_v1(uuid)') is null then
     raise exception 'PENTASECURITY_UNBOUND_CORE_MISSING';
   end if;
+  if exists (
+    select 1
+    from pg_namespace n
+    cross join lateral aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) acl
+    where n.nspname in ('penta_security', 'integration_control')
+      and acl.grantee = 0
+      and acl.privilege_type = 'CREATE'
+  ) then
+    raise exception 'PENTASECURITY_PROTECTED_SCHEMA_PUBLIC_CREATE';
+  end if;
+
+  if has_schema_privilege('anon', 'penta_security', 'CREATE')
+     or has_schema_privilege('authenticated', 'penta_security', 'CREATE')
+     or has_schema_privilege('service_role', 'penta_security', 'CREATE')
+     or has_schema_privilege('anon', 'integration_control', 'CREATE')
+     or has_schema_privilege('authenticated', 'integration_control', 'CREATE')
+     or has_schema_privilege('service_role', 'integration_control', 'CREATE') then
+    raise exception 'PENTASECURITY_PROTECTED_SCHEMA_RUNTIME_CREATE';
+  end if;
 end
 $preflight$;
 
