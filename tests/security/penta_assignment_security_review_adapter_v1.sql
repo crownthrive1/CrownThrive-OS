@@ -1,0 +1,376 @@
+-- Transactional deterministic / negative acceptance for
+-- 20260907211000_penta_assignment_security_review_adapter_v1.sql.
+--
+-- This test never manufactures PentaSecurity PASS, CHLOM/CIE disposition,
+-- independent certification, release authority or provider mutation.
+
+begin;
+
+do $$
+declare
+  v_count integer;
+  v_def text;
+  v_result jsonb;
+  v_non_security_assignment uuid;
+  v_known_blob text;
+  v_wrong_blob text:=repeat('0',40);
+  v_exact_policy_matches integer;
+  v_policy_row_matches integer;
+begin
+  select count(*) into v_count
+  from penta_security.provider_source_policies_v1
+  where policy_key in (
+    'ct.penta.security.assignment-migration.20260831093500.v1',
+    'ct.penta.security.assignment-migration.20260831135000.v1',
+    'ct.penta.security.assignment-migration.20260831143500.v1',
+    'ct.penta.security.assignment-migration.20260831154500.v1'
+  )
+    and policy_version='1.0.0'
+    and state='active'
+    and authority_effect='none'
+    and repository='crownthrive1/CrownThrive-OS';
+  if v_count<>4 then raise exception 'expected four active authority-neutral source policies, got %',v_count; end if;
+
+  if exists(
+    select 1 from penta_security.provider_source_policies_v1
+    where policy_key like 'ct.penta.security.assignment-migration.%'
+      and policy_version='1.0.0'
+      and (
+        authority_effect<>'none'
+        or source_path ~ '(^/|\.\.)'
+        or max_source_bytes<1
+        or max_source_bytes>2000000
+      )
+  ) then
+    raise exception 'assignment source policy boundary invalid';
+  end if;
+
+  -- Read back the persisted policy rows. The synthetic fixture below is not
+  -- a substitute for checking the actual ON CONFLICT DO NOTHING result.
+  with expected(version,source_path,required_literals,forbidden_literals,max_source_bytes) as (
+    values
+      (
+        '20260831093500'::text,
+        'supabase/migrations/20260831093500_penta_assignment_review_only_owner_routes_v1.sql'::text,
+        array[
+          '''route_mode'',''review_only''',
+          '''pm_execution_eligible'',false',
+          '''authority_expansion'',false',
+          'REVIEW_ONLY_ROUTE_MUST_BE_CENSUS_HANDOFF',
+          'HOLD_ASSIGNMENT_REVIEW_TRANSPORT_PENDING'
+        ]::text[],
+        array[
+          '''provider_write'',true',
+          '''credential_change'',true',
+          '''money_movement'',true',
+          '''d3_execution'',true',
+          '''authority_expansion'',true'
+        ]::text[],
+        300000::integer
+      ),
+      (
+        '20260831135000'::text,
+        'supabase/migrations/20260831135000_penta_assignment_release_gate_bridge_v1.sql'::text,
+        array[
+          'release_gate_exact_head_mismatch',
+          'release_gate_subject_digest_mismatch',
+          'release_gate_dail_readback_required',
+          'PENTASECURITY_EXACT_SUBJECT_PASS',
+          'OWNER_RESULTS:'
+        ]::text[],
+        array[
+          '''provider_write'',true',
+          '''money_movement'',true',
+          '''credential_change'',true',
+          '''authority_expansion'',true'
+        ]::text[],
+        500000::integer
+      ),
+      (
+        '20260831143500'::text,
+        'supabase/migrations/20260831143500_penta_assignment_release_gate_dail_binding_hardening_v1.sql'::text,
+        array[
+          'ct.penta.release-gate.receipt.v1',
+          'release_gate_dail_payload_contract_mismatch',
+          'assignment_id',
+          'authority_system_key',
+          'authority_created'
+        ]::text[],
+        array[
+          '''authority_created'',true',
+          '''release_authorized'',true'
+        ]::text[],
+        300000::integer
+      ),
+      (
+        '20260831154500'::text,
+        'supabase/migrations/20260831154500_penta_wire_assignment_owner_review_transport_v1.sql'::text,
+        array[
+          'PENTAWIRE_NOT_ASSIGNED_OWNER',
+          'GITHUB_EXACT_HEAD_PROVIDER_EVIDENCE_MISSING',
+          '''security_decision'',false',
+          'penta_assignment_record_owner_result_v1',
+          '''authority_expansion'',false'
+        ]::text[],
+        array[
+          '''security_decision'',true',
+          '''independent_certification'',true',
+          '''authority_expansion'',true'
+        ]::text[],
+        600000::integer
+      )
+  )
+  select count(*)
+  into v_policy_row_matches
+  from expected e
+  where (
+    select count(*)
+    from penta_security.provider_source_policies_v1 p
+    where p.policy_key='ct.penta.security.assignment-migration.'||e.version||'.v1'
+      and p.policy_version='1.0.0'
+  )=1
+  and exists (
+    select 1
+    from penta_security.provider_source_policies_v1 p
+    where p.policy_key='ct.penta.security.assignment-migration.'||e.version||'.v1'
+      and p.policy_version='1.0.0'
+      and p.system_family='SECURITY_TRUST'
+      and p.provider_system='github'
+      and p.resource_type='migration_source'
+      and p.resource_id='assignment-migration:'||e.version
+      and p.repository='crownthrive1/CrownThrive-OS'
+      and p.state='active'
+      and p.authority_effect='none'
+      and p.source_path=e.source_path
+      and p.required_literals=e.required_literals
+      and p.forbidden_literals=e.forbidden_literals
+      and p.max_source_bytes=e.max_source_bytes
+  );
+  if v_policy_row_matches<>4 then
+    raise exception 'four persisted assignment policies must match canonical content; matched %',v_policy_row_matches;
+  end if;
+
+  -- One exact policy fixture and four single-field conflicts. Complete tuple
+  -- equality must accept only the exact source-path/literal/size combination.
+  with expected as (
+    select
+      'supabase/migrations/20260831093500_penta_assignment_review_only_owner_routes_v1.sql'::text as source_path,
+      array[
+        '''route_mode'',''review_only''',
+        '''pm_execution_eligible'',false',
+        '''authority_expansion'',false',
+        'REVIEW_ONLY_ROUTE_MUST_BE_CENSUS_HANDOFF',
+        'HOLD_ASSIGNMENT_REVIEW_TRANSPORT_PENDING'
+      ]::text[] as required_literals,
+      array[
+        '''provider_write'',true',
+        '''credential_change'',true',
+        '''money_movement'',true',
+        '''d3_execution'',true',
+        '''authority_expansion'',true'
+      ]::text[] as forbidden_literals,
+      300000::integer as max_source_bytes
+  ),
+  fixtures as (
+    select 'exact'::text as fixture_name,e.source_path,e.required_literals,e.forbidden_literals,e.max_source_bytes
+    from expected e
+    union all
+    select 'source_path_mismatch','supabase/migrations/wrong.sql',e.required_literals,e.forbidden_literals,e.max_source_bytes
+    from expected e
+    union all
+    select 'required_literals_mismatch',e.source_path,array['changed']::text[],e.forbidden_literals,e.max_source_bytes
+    from expected e
+    union all
+    select 'forbidden_literals_mismatch',e.source_path,e.required_literals,array['changed']::text[],e.max_source_bytes
+    from expected e
+    union all
+    select 'max_source_bytes_mismatch',e.source_path,e.required_literals,e.forbidden_literals,300001
+    from expected e
+  )
+  select count(*) filter (
+    where f.source_path=e.source_path
+      and f.required_literals=e.required_literals
+      and f.forbidden_literals=e.forbidden_literals
+      and f.max_source_bytes=e.max_source_bytes
+  )
+  into v_exact_policy_matches
+  from expected e cross join fixtures f;
+  if v_exact_policy_matches<>1 then
+    raise exception 'complete policy content tuple must reject each conflicting field';
+  end if;
+
+  select pg_get_functiondef('penta_security.review_assignment_exact_subject_v1(uuid)'::regprocedure) into v_def;
+  if strpos(v_def,'pg_try_advisory_xact_lock')=0 then raise exception 'adapter must use bounded concurrency guard'; end if;
+  if strpos(v_def,'PENTASECURITY_NOT_ASSIGNED_OWNER')=0 then raise exception 'adapter must reject non-owner assignment'; end if;
+  if strpos(v_def,'ASSIGNMENT_AUTHORITY_BOUNDARY')=0 then raise exception 'adapter must enforce D0-D2/no-reserved-effects boundary'; end if;
+  if strpos(v_def,'EXACT_SUBJECT_REQUIRED')=0 then raise exception 'adapter must require exact head and subject digest'; end if;
+  if strpos(v_def,'EXACT_MIGRATION_MANIFEST_REQUIRED')=0 then raise exception 'adapter must bind exact migration manifest'; end if;
+  if strpos(v_def,'review_github_provider_source_v1')=0 then raise exception 'adapter must use PentaSecurity exact-head provider source reviews'; end if;
+  if strpos(v_def,'p.policy_version=''1.0.0''')=0 then raise exception 'adapter must bind exact policy version'; end if;
+  if strpos(v_def,'p.system_family=''SECURITY_TRUST''')=0 then raise exception 'adapter must bind exact policy system family'; end if;
+  if strpos(v_def,'p.provider_system=''github''')=0 then raise exception 'adapter must bind exact provider system'; end if;
+  if strpos(v_def,'p.resource_type=''migration_source''')=0 then raise exception 'adapter must bind exact resource type'; end if;
+  if strpos(v_def,'p.resource_id=''assignment-migration:''||v_version')=0 then raise exception 'adapter must bind exact resource identity'; end if;
+  if strpos(v_def,'p.repository=a.source_repo')=0 then raise exception 'adapter must bind exact source repository'; end if;
+  if strpos(v_def,'p.authority_effect=''none''')=0 then raise exception 'adapter must require authority-neutral policy'; end if;
+  if strpos(v_def,'p.source_path=v_expected_policy.source_path')=0 then raise exception 'adapter must bind exact policy source path'; end if;
+  if strpos(v_def,'p.required_literals=v_expected_policy.required_literals')=0 then raise exception 'adapter must bind exact required literals'; end if;
+  if strpos(v_def,'p.forbidden_literals=v_expected_policy.forbidden_literals')=0 then raise exception 'adapter must bind exact forbidden literals'; end if;
+  if strpos(v_def,'p.max_source_bytes=v_expected_policy.max_source_bytes')=0 then raise exception 'adapter must bind exact maximum source bytes'; end if;
+  if strpos(v_def,'SOURCE_POLICY_CONTENT_MISMATCH:')=0 then raise exception 'adapter must hold on conflicting policy content'; end if;
+  if strpos(v_def,'SOURCE_POLICY_CONTENT_CHANGED_DURING_SELECTION:')=0 then raise exception 'adapter must recheck exact content at strict selection'; end if;
+  if strpos(v_def,'v_policy_count<>1')=0 or strpos(v_def,'into strict v_policy')=0 or strpos(v_def,'too_many_rows')=0 then
+    raise exception 'adapter must require exactly one policy identity and fail closed on ambiguity';
+  end if;
+  if strpos(v_def,'order by p.created_at desc')>0 or strpos(v_def,'limit 1')>0 then
+    raise exception 'adapter must not silently select one conflicting policy row';
+  end if;
+  if strpos(v_def,'SOURCE_REVIEW_BYTES_MISMATCH')=0 then raise exception 'adapter must bind independent blob bytes to reviewed source sha256'; end if;
+  if strpos(v_def,'MIGRATION_BLOB_SOURCE_MISMATCH')=0 then raise exception 'adapter must fail closed on manifest/source blob mismatch'; end if;
+  if strpos(v_def,'computed_git_blob_sha1')=0 or strpos(v_def,'''sha1''')=0 or strpos(v_def,'decode(''00'',''hex'')')=0 then
+    raise exception 'adapter must compute canonical Git blob object identity';
+  end if;
+  if strpos(v_def,'penta_assignment_record_owner_result_v1')=0 then raise exception 'adapter must use canonical owner-result sink'; end if;
+  if strpos(v_def,'penta_assignment_bind_release_gate_v1')=0 then raise exception 'adapter must use exact-subject release-gate binding'; end if;
+  if strpos(v_def,'ct.penta.release-gate.receipt.v1')=0 then raise exception 'adapter must emit hardened release-gate receipt contract'; end if;
+  if strpos(v_def,'''independent_certification'',false')=0 then raise exception 'adapter must not claim independent certification'; end if;
+  if strpos(v_def,'''release_authorized'',false')=0 then raise exception 'adapter must not create release authority'; end if;
+  if strpos(v_def,'''authority_created'',false')=0 then raise exception 'adapter must remain authority-neutral'; end if;
+
+  -- Canonical Git object identity test vector: SHA1("blob 6\0hello\n").
+  v_known_blob:=encode(
+    extensions.digest(
+      convert_to('blob '||octet_length(convert_to(E'hello\n','UTF8'))::text,'UTF8')
+      || decode('00','hex')
+      || convert_to(E'hello\n','UTF8'),
+      'sha1'
+    ),
+    'hex'
+  );
+  if v_known_blob<>'ce013625030ba8dba906f756967f9e9ca394464a' then
+    raise exception 'canonical Git blob computation mismatch: %',v_known_blob;
+  end if;
+  if v_wrong_blob !~ '^[0-9a-f]{40}$' then
+    raise exception 'wrong-blob negative must remain syntactically valid';
+  end if;
+  if v_wrong_blob=v_known_blob then
+    raise exception 'wrong-blob negative unexpectedly equals canonical blob';
+  end if;
+  if strpos(v_def,'v_blob<>v_computed_blob')=0 then
+    raise exception 'adapter must reject the syntactically-valid wrong-blob negative before owner PASS';
+  end if;
+
+  v_result:=penta_security.review_assignment_exact_subject_v1(gen_random_uuid());
+  if v_result->>'state'<>'HOLD' or v_result->>'reason'<>'ASSIGNMENT_NOT_FOUND' then
+    raise exception 'unknown assignment must fail closed: %',v_result;
+  end if;
+  if coalesce((v_result->>'authority_created')::boolean,true) then
+    raise exception 'unknown assignment HOLD must create no authority: %',v_result;
+  end if;
+
+  select assignment_id into v_non_security_assignment
+  from integration_control.penta_assignment_contracts_v1
+  where not (owner_pentas ? 'PentaSecurity')
+    and state not in ('COMPLETED','SUPERSEDED','RETIRED')
+  order by created_at desc
+  limit 1;
+
+  if v_non_security_assignment is not null then
+    v_result:=penta_security.review_assignment_exact_subject_v1(v_non_security_assignment);
+    if v_result->>'state'<>'HOLD' or v_result->>'reason'<>'PENTASECURITY_NOT_ASSIGNED_OWNER' then
+      raise exception 'non-owner assignment must fail closed: %',v_result;
+    end if;
+  end if;
+end
+$$;
+
+do $$
+begin
+  if has_function_privilege('public','penta_security.review_assignment_exact_subject_v1(uuid)','EXECUTE')
+     or has_function_privilege('anon','penta_security.review_assignment_exact_subject_v1(uuid)','EXECUTE')
+     or has_function_privilege('authenticated','penta_security.review_assignment_exact_subject_v1(uuid)','EXECUTE') then
+    raise exception 'assignment review adapter must not be publicly executable';
+  end if;
+  if not has_function_privilege('service_role','penta_security.review_assignment_exact_subject_v1(uuid)','EXECUTE') then
+    raise exception 'service_role must retain assignment review adapter execution';
+  end if;
+end
+$$;
+
+
+-- Effective SECURITY DEFINER configuration and schema CREATE ACL acceptance.
+-- This is a read-only catalog assertion; it creates no authority or provider effect.
+do $$
+declare
+  v_prosecdef boolean;
+  v_proconfig text;
+begin
+  select
+    p.prosecdef,
+    regexp_replace(coalesce(array_to_string(p.proconfig, ','), ''), '[[:space:]]', '', 'g')
+  into v_prosecdef, v_proconfig
+  from pg_proc p
+  where p.oid = 'penta_security.review_assignment_exact_subject_v1(uuid)'::regprocedure;
+
+  if not coalesce(v_prosecdef, false) then
+    raise exception 'canonical assignment review wrapper must remain SECURITY DEFINER';
+  end if;
+  if v_proconfig <> 'search_path=pg_catalog,penta_security,integration_control' then
+    raise exception 'canonical assignment review wrapper must persist exact restricted search_path: %', v_proconfig;
+  end if;
+
+  if exists (
+    select 1
+    from pg_namespace n
+    cross join lateral aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) acl
+    where n.nspname in ('penta_security', 'integration_control')
+      and acl.grantee = 0
+      and acl.privilege_type = 'CREATE'
+  ) then
+    raise exception 'PUBLIC must not have CREATE on protected security schemas';
+  end if;
+
+  if has_schema_privilege('anon', 'penta_security', 'CREATE')
+     or has_schema_privilege('authenticated', 'penta_security', 'CREATE')
+     or has_schema_privilege('service_role', 'penta_security', 'CREATE')
+     or has_schema_privilege('anon', 'integration_control', 'CREATE')
+     or has_schema_privilege('authenticated', 'integration_control', 'CREATE')
+     or has_schema_privilege('service_role', 'integration_control', 'CREATE') then
+    raise exception 'runtime roles must not have CREATE on protected security schemas';
+  end if;
+end
+$$;
+
+
+
+-- Internal unbound SECURITY DEFINER core must retain the same restricted search path.
+-- The core remains non-executable by PUBLIC and runtime roles; only the wrapper is callable.
+do $core_verify$
+declare
+  v_core_prosecdef boolean;
+  v_core_proconfig text;
+begin
+  select
+    p.prosecdef,
+    regexp_replace(coalesce(array_to_string(p.proconfig, ','), ''), '[[:space:]]', '', 'g')
+  into v_core_prosecdef, v_core_proconfig
+  from pg_proc p
+  where p.oid = 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)'::regprocedure;
+
+  if not coalesce(v_core_prosecdef, false) then
+    raise exception 'internal assignment review core must remain SECURITY DEFINER';
+  end if;
+  if v_core_proconfig <> 'search_path=pg_catalog,penta_security,integration_control' then
+    raise exception 'internal assignment review core must persist exact restricted search_path: %', v_core_proconfig;
+  end if;
+
+  if has_function_privilege('public', 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)', 'EXECUTE')
+     or has_function_privilege('anon', 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)', 'EXECUTE')
+     or has_function_privilege('service_role', 'penta_security.review_assignment_exact_subject_unbound_v1(uuid)', 'EXECUTE') then
+    raise exception 'internal assignment review core must not be directly executable by runtime roles';
+  end if;
+end
+$core_verify$;
+
+rollback;
