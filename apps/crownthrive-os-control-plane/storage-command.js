@@ -10,14 +10,22 @@
   let lastAttempt = 0;
   let staleTimer = null;
   let activeController = null;
+  let refreshQueued = false;
   const fmt = new Intl.NumberFormat('en-US');
   const validNumber = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+  const validPercent = (v) => validNumber(v) && v <= 100;
+  function canonicalInstant(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return null;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) && new Date(parsed).toISOString() === value ? parsed : null;
+  }
   const number = (v) => validNumber(v) ? fmt.format(v) : 'Not observed';
   const flag = (v, yes, no) => v === true ? yes : v === false ? no : 'Not observed';
   const state = (v) => typeof v === 'string' ? v.replaceAll('_', ' ') : 'Not observed';
   function time(value) {
-    const parsed = typeof value === 'string' ? Date.parse(value) : NaN;
-    return Number.isFinite(parsed) ? new Date(parsed).toLocaleString('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' }) : 'Not observed';
+    // Projection timestamps are canonical UTC ISO; never normalize malformed display evidence.
+    const parsed = canonicalInstant(value);
+    return parsed === null ? 'Not observed' : new Date(parsed).toLocaleString('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' });
   }
   function bytes(v) {
     if (!validNumber(v)) return 'Not observed';
@@ -90,7 +98,7 @@
     metric(g, 'Archive state', state(a?.state), `Next shard: ${number(a?.next_shard_no)}`);
     const progress = node('progress');
     progress.max = 100;
-    if (validNumber(a?.section_progress_percent)) progress.value = Math.min(100, a.section_progress_percent);
+    if (validPercent(a?.section_progress_percent)) progress.value = a.section_progress_percent;
     progress.setAttribute('aria-label', 'Current million-event section completion');
     root.append(progress);
     note(root, `Last archive work: ${time(a?.last_run_at)}. Last copied batch: ${number(a?.last_run_events_copied)} events.`);
@@ -98,38 +106,44 @@
   }
   function renderCommerce(root, s) {
     const c = s.commerce;
-    note(root, `External sales: ${flag(c?.sales_enabled, 'gate open in current source', 'held by current source')}. ${state(c?.activation_state)}.`);
-    note(root, 'Provider capacity and commercial use, payment path, tax configuration, and fulfillment acceptance must pass in the canonical owner systems. This panel cannot open those gates.');
+    note(root, `Catalog sales flag: ${flag(c?.sales_enabled, 'enabled in source', 'disabled in source')}. ${state(c?.activation_state)}.`);
+    note(root, 'Catalog visibility is not a purchase path or proof of a purchasable offer. Provider capacity, commercial rights, payment, tax configuration, entitlement, and fulfillment acceptance must pass in their canonical owner systems. This panel cannot open those gates.');
     const list = node('div', '', 'storage-offers');
     for (const offer of c?.offers || []) {
       const item = node('div', '', 'storage-offer');
       const price = offer.currency === 'usd' && validNumber(offer.billing_amount_cents) && offer.billing_interval_months > 0
-        ? `$${fmt.format(offer.billing_amount_cents / 100)} every ${offer.billing_interval_months} month${offer.billing_interval_months === 1 ? '' : 's'}` : 'Billing not observed';
-      item.append(node('strong', offer.name), node('span', `${price} · ${bytes(offer.included_bytes)}`), node('small', flag(offer.catalog_binding_present, 'Catalog binding recorded', 'Catalog binding absent')));
+        ? `Recorded catalog amount: $${fmt.format(offer.billing_amount_cents / 100)} every ${offer.billing_interval_months} month${offer.billing_interval_months === 1 ? '' : 's'}` : 'Recorded catalog amount: Not observed';
+      item.append(
+        node('strong', offer.name),
+        node('span', `${price} · Storage: ${bytes(offer.included_bytes)} · Download allowance: ${bytes(offer.included_download_bytes)}`),
+        node('small', `Recorded Stripe-catalog flag: ${flag(offer.catalog_binding_present, 'Active', 'Inactive')}`),
+        node('small', `Catalog record: ${state(offer.catalog_record_state)}. Catalog listing: ${flag(offer.catalog_available, 'Listed in catalog', 'Not available in catalog')}. Purchase path: ${state(offer.purchase_state)}.`),
+      );
       list.append(item);
     }
     root.append(list);
     root.append(link(PORTAL, 'Open PentaFabric Storage portal ↗'));
-    note(root, 'Prices are current catalog readback, not a new Stripe payment verification. No checkout or payment is initiated here.');
+    note(root, 'Amounts and Stripe-catalog flags are recorded ThriveBase catalog fields, not live Stripe price or product verification and not proof of checkout, payment, entitlement, or fulfillment. No checkout or payment is initiated here.');
   }
   function render(s, stale = false) {
     for (const [page, item] of pages) {
       item.body.replaceChildren();
       item.badge.textContent = stale ? 'STALE / last known' : s.status === 'OBSERVED' ? 'Readback observed' : 'Partial readback';
       item.badge.dataset.state = stale ? 'STALE' : s.status;
-      item.stamp.textContent = `${stale ? 'Last known snapshot' : 'Retrieved'}: ${time(s.retrieved_at)}. Stored provider evidence is not a new provider probe.`;
+      // Keep API retrieval time distinct from the provider's own observation time.
+      item.stamp.textContent = `${stale ? 'Last known snapshot' : 'Retrieved'}: ${time(s.retrieved_at)}. Provider observed: ${time(s.source?.wasabi_observed_at)}. Registered provider evidence, not a new provider probe.`;
       if (page === 'overview') {
         const g = grid(item.body);
         metric(g, 'Actual archived events', number(s.archive?.total_archived_events));
-        metric(g, 'Section completion', validNumber(s.archive?.section_progress_percent) ? `${number(s.archive.section_progress_percent)}%` : 'Not observed');
-        metric(g, 'Storage sales', flag(s.commerce?.sales_enabled, 'Source gate open', 'Held'));
+        metric(g, 'Section completion', validPercent(s.archive?.section_progress_percent) ? `${number(s.archive.section_progress_percent)}%` : 'Not observed');
+        metric(g, 'Catalog sales flag', flag(s.commerce?.sales_enabled, 'Enabled in source', 'Disabled in source'));
         item.body.append(link('/infrastructure#storage-command', 'Inspect storage command'));
       } else if (page === 'dail') renderArchive(item.body, s);
       else if (page === 'commerce') renderCommerce(item.body, s);
       else if (page === 'infrastructure') {
         renderArchive(item.body, s);
         const g = grid(item.body);
-        metric(g, 'Storage writes', flag(s.controls?.writes_enabled, 'Enabled within limits', 'Held'));
+        metric(g, 'Local write admission', s.controls?.write_admission_state === 'ENABLED_WITHIN_WINDOW' ? 'Local gate open' : state(s.controls?.write_admission_state), 'Budget and safety-stop check only; does not authorize provider writes or bypass continuity, capacity, retention, rights, privacy, security, or release gates');
         metric(g, 'PentaBalancer', state(s.controls?.balancer_mode), `Pressure: ${number(s.controls?.pressure)}`);
         metric(g, 'Registered object bytes', bytes(s.custody?.registered_bytes), 'Registry total, not provider billable usage');
         metric(g, 'External delivery bindings', number(s.custody?.external_delivery_enabled_count), 'Known consumer allowlist only');
@@ -163,23 +177,36 @@
     if (snapshot) render(snapshot, true);
     else for (const item of pages.values()) { item.badge.textContent = 'Storage readback unavailable'; item.badge.dataset.state = 'UNAVAILABLE'; item.stamp.textContent = 'No current storage snapshot. Existing command-center functions remain available.'; }
   }
-  function refresh(force = false) {
-    if (pending || (!force && (document.hidden || Date.now() - lastAttempt < 25_000))) return pending;
+  function refresh(force = false, queueIfPending = false) {
+    if (pending) {
+      if (queueIfPending) refreshQueued = true;
+      return pending;
+    }
+    if (!force && (document.hidden || Date.now() - lastAttempt < 25_000)) return pending;
     lastAttempt = Date.now();
-    activeController = new AbortController();
-    const timeout = setTimeout(() => activeController?.abort(), 12_000);
+    const controller = new AbortController();
+    activeController = controller;
+    const timeout = setTimeout(() => controller.abort(), 12_000);
     pending = (async () => {
       try {
-        const response = await fetch(ENDPOINT, { cache: 'no-store', credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json' }, signal: activeController.signal });
+        const response = await fetch(ENDPOINT, { cache: 'no-store', credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json' }, signal: controller.signal });
         const data = await response.json();
-        if (!response.ok || data?.schema !== CONTRACT || !['OBSERVED', 'PARTIAL'].includes(data.status) || typeof data.retrieved_at !== 'string') throw new Error('storage_readback_failed');
-        const age = Date.now() - Date.parse(data.retrieved_at);
+        const retrievedAt = canonicalInstant(data?.retrieved_at);
+        if (!response.ok || data?.schema !== CONTRACT || !['OBSERVED', 'PARTIAL'].includes(data.status) || retrievedAt === null) throw new Error('storage_readback_failed');
+        const age = Date.now() - retrievedAt;
         if (!Number.isFinite(age) || age < -60_000 || age > 90_000) throw new Error('storage_readback_stale');
         snapshot = data; render(data);
         clearTimeout(staleTimer);
         staleTimer = setTimeout(() => render(snapshot, true), Math.max(0, 90_000 - age));
       } catch { markFailure(); }
-      finally { clearTimeout(timeout); activeController = null; pending = null; }
+      finally {
+        clearTimeout(timeout);
+        if (activeController === controller) activeController = null;
+        pending = null;
+        const shouldRefresh = refreshQueued;
+        refreshQueued = false;
+        if (shouldRefresh && !document.hidden) refresh(true);
+      }
     })();
     return pending;
   }
@@ -192,7 +219,7 @@
     document.querySelector('#refresh')?.addEventListener('click', () => refresh(true));
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
     window.addEventListener('pagehide', () => { observer.disconnect(); activeController?.abort(); clearTimeout(staleTimer); });
-    window.addEventListener('pageshow', (event) => { if (event.persisted) { if (fresh) observer.observe(fresh, { childList: true, subtree: true, characterData: true }); refresh(true); } });
+    window.addEventListener('pageshow', (event) => { if (event.persisted) { if (fresh) observer.observe(fresh, { childList: true, subtree: true, characterData: true }); refresh(true, true); } });
     refresh(true);
   } catch { document.documentElement.dataset.storageCommandState = 'UNAVAILABLE'; }
 })();

@@ -3,6 +3,55 @@ import { SCHEMA, object, projectStorage } from '../lib/storage-command-projectio
 const ORIGIN = 'https://tzajnzshmtzjenqulehq.supabase.co';
 const RPCS = ['ct_wasabi_status_v1', 'ct_storage_fabric_catalog_v1'];
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_RESPONSE_CHUNKS = 4096;
+
+// Cancellation is best-effort. An upstream stream's cancel hook is not part of
+// the response deadline and must never keep the read route pending indefinitely.
+function cancelQuietly(target) {
+  try {
+    void Promise.resolve(target?.cancel?.()).catch(() => {});
+  } catch {}
+}
+
+async function readBoundedText(upstream) {
+  const declaredHeader = upstream.headers?.get('content-length');
+  if (declaredHeader !== null && declaredHeader !== undefined) {
+    if (!/^\d+$/.test(declaredHeader)) {
+      cancelQuietly(upstream.body);
+      throw new Error('upstream_invalid_length');
+    }
+    const declared = Number(declaredHeader);
+    if (!Number.isSafeInteger(declared) || declared > MAX_RESPONSE_BYTES) {
+      cancelQuietly(upstream.body);
+      throw new Error('upstream_oversize');
+    }
+  }
+  if (!upstream.body || typeof upstream.body.getReader !== 'function') throw new Error('upstream_invalid');
+  const reader = upstream.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!(value instanceof Uint8Array)) throw new Error('upstream_invalid');
+      if (chunks.length >= MAX_RESPONSE_CHUNKS) throw new Error('upstream_too_fragmented');
+      total += value.byteLength;
+      if (total > MAX_RESPONSE_BYTES) throw new Error('upstream_oversize');
+      chunks.push(Buffer.from(value));
+    }
+  } catch (error) {
+    cancelQuietly(reader);
+    throw error;
+  } finally {
+    try { reader.releaseLock(); } catch {}
+  }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks, total));
+  } catch {
+    throw new Error('upstream_invalid_encoding');
+  }
+}
 
 export function createHandler({ env = process.env, fetcher = globalThis.fetch, now = () => new Date() } = {}) {
   async function read(name, key) {
@@ -14,11 +63,11 @@ export function createHandler({ env = process.env, fetcher = globalThis.fetch, n
         headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Accept: 'application/json' },
         body: '{}',
       });
-      if (!upstream.ok) throw new Error('upstream_unavailable');
-      const declared = Number(upstream.headers?.get('content-length'));
-      if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) throw new Error('upstream_oversize');
-      const body = await upstream.text();
-      if (Buffer.byteLength(body) > MAX_RESPONSE_BYTES) throw new Error('upstream_oversize');
+      if (!upstream.ok) {
+        cancelQuietly(upstream.body);
+        throw new Error('upstream_unavailable');
+      }
+      const body = await readBoundedText(upstream);
       const parsed = JSON.parse(body);
       if (!object(parsed)) throw new Error('upstream_invalid');
       return parsed;
