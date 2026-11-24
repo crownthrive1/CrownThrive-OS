@@ -116,7 +116,7 @@
       item.append(
         node('strong', offer.name),
         node('span', `${price} · Storage: ${bytes(offer.included_bytes)} · Download allowance: ${bytes(offer.included_download_bytes)}`),
-        node('small', flag(offer.catalog_binding_present, 'Catalog binding recorded', 'Catalog binding absent')),
+        node('small', `Stripe catalog active flag: ${flag(offer.catalog_binding_present, 'Active', 'Inactive')}`),
         node('small', `Catalog record: ${state(offer.catalog_record_state)}. Catalog listing: ${flag(offer.catalog_available, 'Listed in catalog', 'Not available in catalog')}. Purchase path: ${state(offer.purchase_state)}.`),
       );
       list.append(item);

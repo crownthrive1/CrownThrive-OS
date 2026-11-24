@@ -435,6 +435,8 @@ test('storage write label identifies a local gate, not provider authorization', 
 test('commerce copy distinguishes catalog visibility from purchase authority', async () => {
   const source = await readFile(new URL('../storage-command.js', import.meta.url), 'utf8');
   assert.ok(source.includes('Catalog sales flag:'));
+  assert.ok(source.includes('Stripe catalog active flag:'));
+  assert.equal(source.includes('Catalog binding recorded'), false);
   assert.ok(source.includes('Catalog visibility is not a purchase path or proof of a purchasable offer.'));
   assert.equal(source.includes('External sales:'), false);
   assert.equal(source.includes("'Storage sales'"), false);
