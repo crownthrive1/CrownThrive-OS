@@ -112,7 +112,7 @@
     for (const offer of c?.offers || []) {
       const item = node('div', '', 'storage-offer');
       const price = offer.currency === 'usd' && validNumber(offer.billing_amount_cents) && offer.billing_interval_months > 0
-        ? `Recorded catalog amount: ${fmt.format(offer.billing_amount_cents / 100)} every ${offer.billing_interval_months} month${offer.billing_interval_months === 1 ? '' : 's'}` : 'Recorded catalog amount: Not observed';
+        ? `Recorded catalog amount: $${fmt.format(offer.billing_amount_cents / 100)} every ${offer.billing_interval_months} month${offer.billing_interval_months === 1 ? '' : 's'}` : 'Recorded catalog amount: Not observed';
       item.append(
         node('strong', offer.name),
         node('span', `${price} · Storage: ${bytes(offer.included_bytes)} · Download allowance: ${bytes(offer.included_download_bytes)}`),
