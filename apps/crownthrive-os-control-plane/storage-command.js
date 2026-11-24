@@ -112,18 +112,18 @@
     for (const offer of c?.offers || []) {
       const item = node('div', '', 'storage-offer');
       const price = offer.currency === 'usd' && validNumber(offer.billing_amount_cents) && offer.billing_interval_months > 0
-        ? `$${fmt.format(offer.billing_amount_cents / 100)} every ${offer.billing_interval_months} month${offer.billing_interval_months === 1 ? '' : 's'}` : 'Billing not observed';
+        ? `Recorded catalog amount: ${fmt.format(offer.billing_amount_cents / 100)} every ${offer.billing_interval_months} month${offer.billing_interval_months === 1 ? '' : 's'}` : 'Recorded catalog amount: Not observed';
       item.append(
         node('strong', offer.name),
         node('span', `${price} · Storage: ${bytes(offer.included_bytes)} · Download allowance: ${bytes(offer.included_download_bytes)}`),
-        node('small', `Stripe catalog active flag: ${flag(offer.catalog_binding_present, 'Active', 'Inactive')}`),
+        node('small', `Recorded Stripe-catalog flag: ${flag(offer.catalog_binding_present, 'Active', 'Inactive')}`),
         node('small', `Catalog record: ${state(offer.catalog_record_state)}. Catalog listing: ${flag(offer.catalog_available, 'Listed in catalog', 'Not available in catalog')}. Purchase path: ${state(offer.purchase_state)}.`),
       );
       list.append(item);
     }
     root.append(list);
     root.append(link(PORTAL, 'Open PentaFabric Storage portal ↗'));
-    note(root, 'Prices are current catalog readback, not a new Stripe payment verification. No checkout or payment is initiated here.');
+    note(root, 'Amounts and Stripe-catalog flags are recorded ThriveBase catalog fields, not live Stripe price or product verification and not proof of checkout, payment, entitlement, or fulfillment. No checkout or payment is initiated here.');
   }
   function render(s, stale = false) {
     for (const [page, item] of pages) {
