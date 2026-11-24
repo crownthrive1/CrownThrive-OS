@@ -101,7 +101,8 @@ test('browser display rejects malformed timestamps instead of normalizing them',
 
   const valid = await render('2026-09-16T21:00:00.000Z');
   assert.ok(valid.some((text) => text.startsWith('Last archive work: ') && !text.includes('Not observed')));
-  assert.ok(valid.includes('$29 every 1 month · Storage: 100 GB · Download allowance: 200 GB'));
+  assert.ok(valid.includes('Recorded catalog amount: $29 every 1 month · Storage: 100 GB · Download allowance: 200 GB'));
+  assert.ok(valid.includes('Recorded Stripe-catalog flag: Inactive'));
 
   const observed = await render('2026-09-16T21:00:00.000Z', '2026-09-16T20:59:00.000Z');
   const stamps = observed.filter((text) => text.startsWith('Retrieved: '));
